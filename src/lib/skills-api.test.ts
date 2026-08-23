@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import mockPagesData from "../data/skills-mock.json";
 
 const INDEX_URL =
-  "https://cdn.jsdmirror.com/gh/luckie2076/skills-index@dist/index.jsonl";
+  "https://raw.githubusercontent.com/luckie2076/skills-index/dist/index.jsonl";
 
 const mockPages = mockPagesData as Array<{
   skills: {
@@ -150,32 +150,33 @@ describe("fetchSkillsPage", () => {
     expect(past.total).toBe(200);
   });
 
-  it("retries the download after a failure", async () => {
+  it("falls back to the CDN and clears the cache on total failure, retrying next call", async () => {
     const fetchSkillsPage = await freshModule();
+    // Both candidates fail on the first attempt → loadIndex rejects.
     fetchMock
       .mockRejectedValueOnce(new Error("network down"))
-      .mockResolvedValueOnce(
-        ok(
-          jsonl({
-            source: "owner/repo",
-            skillId: "pdf",
-            installs: 1,
-            weeklyInstalls: [],
-          }),
-        ),
-      );
+      .mockRejectedValueOnce(new Error("network down"));
+    await expect(fetchSkillsPage(0)).rejects.toThrow();
 
-    await expect(fetchSkillsPage(0)).rejects.toThrow("network down");
+    // Second attempt (cache cleared) succeeds on the origin.
+    fetchMock.mockResolvedValueOnce(
+      ok(
+        jsonl({
+          source: "owner/repo",
+          skillId: "pdf",
+          installs: 1,
+          weeklyInstalls: [],
+        }),
+      ),
+    );
     await expect(fetchSkillsPage(0)).resolves.toBeDefined();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it("rejects on a non-2xx response", async () => {
+  it("rejects when every candidate is a non-2xx response", async () => {
     const fetchSkillsPage = await freshModule();
-    fetchMock.mockResolvedValueOnce({ ok: false, status: 404 } as Response);
+    fetchMock.mockResolvedValue({ ok: false, status: 404 } as Response);
 
-    await expect(fetchSkillsPage(0)).rejects.toThrow(
-      "index request failed: 404",
-    );
+    await expect(fetchSkillsPage(0)).rejects.toThrow(/无法连接数据源/);
   });
 });

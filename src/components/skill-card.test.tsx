@@ -1,9 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SkillCard } from "./skill-card";
+import { installSkillFromSource } from "../lib/local-skills";
 import type { Skill } from "../types/skill";
+
+vi.mock("../lib/local-skills", () => ({
+  installSkillFromSource: vi.fn(),
+}));
 
 const skill: Skill = {
   name: "pdf",
@@ -40,16 +45,34 @@ describe("SkillCard", () => {
     expect(button).toHaveTextContent("安装");
   });
 
-  it("switches to a disabled 'installed' state after clicking install", async () => {
+  it("installs the skill and switches to a disabled 'installed' state", async () => {
     const user = userEvent.setup();
+    vi.mocked(installSkillFromSource).mockResolvedValue(undefined);
     render(<SkillCard skill={skill} />);
 
-    const button = screen.getByRole("button", { name: "安装" });
-    await user.click(button);
+    await user.click(screen.getByRole("button", { name: "安装" }));
+    expect(installSkillFromSource).toHaveBeenCalledWith(
+      skill.repo,
+      skill.name,
+      skill.path,
+    );
+    expect(
+      await screen.findByRole("button", { name: "已安装" }),
+    ).toBeDisabled();
+  });
 
-    const installed = screen.getByRole("button", { name: "已安装" });
-    expect(installed).toBeDisabled();
-    expect(installed).toHaveTextContent("已安装");
+  it("returns to '重试' and surfaces the error when the install fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(installSkillFromSource).mockRejectedValue(
+      new Error("clone failed: network unreachable"),
+    );
+    render(<SkillCard skill={skill} />);
+
+    await user.click(screen.getByRole("button", { name: "安装" }));
+    expect(await screen.findByRole("button", { name: "重试" })).toBeEnabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "clone failed: network unreachable",
+    );
   });
 
   it("opens the detail sheet when the card is clicked", async () => {

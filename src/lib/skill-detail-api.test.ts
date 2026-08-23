@@ -96,7 +96,7 @@ describe("fetchSkillDetail", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://cdn.jsdmirror.com/gh/anthropics/skills@main/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/anthropics/skills/HEAD/skills/pdf/SKILL.md",
     );
   });
 
@@ -115,7 +115,7 @@ describe("fetchSkillDetail", () => {
 
     expect(detail.path).toBe("skills/pdf/SKILL.md");
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://cdn.jsdmirror.com/gh/anthropics/skills@main/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/anthropics/skills/HEAD/skills/pdf/SKILL.md",
     );
   });
 
@@ -133,7 +133,7 @@ describe("fetchSkillDetail", () => {
       fetchSkillDetail("owner/repo", "pdf", "skills/pdf"),
     ).rejects.toThrow("SKILL.md for pdf not found in owner/repo");
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://cdn.jsdmirror.com/gh/owner/repo@main/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/owner/repo/HEAD/skills/pdf/SKILL.md",
     );
   });
 });

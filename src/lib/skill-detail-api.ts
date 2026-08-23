@@ -1,4 +1,5 @@
 import type { SkillDetail } from "../types/skill";
+import { fetchFirstText, fileCandidates } from "./cdn-config";
 
 /** Frontmatter fields surfaced in the detail view. */
 const FRONTMATTER_FIELDS = [
@@ -13,16 +14,14 @@ type FrontmatterField = (typeof FRONTMATTER_FIELDS)[number];
 
 type Frontmatter = Partial<Record<FrontmatterField, string>>;
 
-/** CDN mirror of GitHub repo files (jsDelivr mirror) with CORS headers. */
-const GH_CDN = "https://cdn.jsdmirror.com/gh";
-
 /**
  * Fetch a skill's SKILL.md from its source GitHub repo.
  *
- * The file is fetched through JSDMirror (a jsDelivr mirror sending CORS
- * headers), which works identically in a plain browser and inside the Tauri
- * WebView and is reliably reachable from mainland China. Caching (and
- * persistence across restarts) is delegated to TanStack Query.
+ * The file is fetched through the configurable download source (direct GitHub
+ * raw by default, with a jsDelivr-mirror CDN fallback), which works identically
+ * in a plain browser and inside the Tauri WebView and is reliably reachable
+ * from mainland China. Caching (and persistence across restarts) is delegated
+ * to TanStack Query.
  *
  * `knownPath` is the skill's directory as recorded in the registry index
  * (e.g. "skills/find-skills") and always present for registry skills, so the
@@ -37,9 +36,12 @@ export async function fetchSkillDetail(
     throw new Error(`SKILL.md for ${skillId} not found in ${repo}`);
   }
   const path = `${knownPath.replace(/\/+$/, "")}/SKILL.md`;
-  const raw = await fetchText(`${GH_CDN}/${repo}@main/${path}`);
-  if (raw != null) return toDetail(raw, skillId, path);
-  throw new Error(`SKILL.md for ${skillId} not found in ${repo}`);
+  try {
+    const { text } = await fetchFirstText(fileCandidates({ repo, path }));
+    return toDetail(text, skillId, path);
+  } catch {
+    throw new Error(`SKILL.md for ${skillId} not found in ${repo}`);
+  }
 }
 
 /**
@@ -84,16 +86,6 @@ export function parseFrontmatter(raw: string): {
       .join("\n")
       .trim(),
   };
-}
-
-/** GET a URL and return its text body, or null for any error/non-2xx. */
-async function fetchText(url: string): Promise<string | null> {
-  try {
-    const resp = await fetch(url);
-    return resp.ok ? await resp.text() : null;
-  } catch {
-    return null;
-  }
 }
 
 /** Strip one pair of matching surrounding single or double quotes. */

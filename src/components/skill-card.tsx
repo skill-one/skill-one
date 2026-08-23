@@ -1,17 +1,32 @@
 import { useState } from "react";
-import { Star, Check, Download } from "lucide-react";
+import { Star, Check, Download, Loader2, RefreshCw } from "lucide-react";
 
+import { installSkillFromSource } from "../lib/local-skills";
 import { cn, formatStars } from "../lib/utils";
 import type { Skill } from "../types/skill";
 import { Button } from "./ui/button";
 import { OwnerAvatar } from "./owner-avatar";
 
+/** Install button state machine: idle → installing → installed | error. */
+type InstallState = "idle" | "installing" | "installed" | "error";
+
+/** Best-effort message from a rejection; Tauri rejects with a non-`Error` value. */
+function toErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === "string" && err.trim()) return err;
+  if (err && typeof err === "object") {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+  }
+  return "安装失败，请重试";
+}
+
 /**
  * A single curated skill card.
  *
- * The card body opens the detail panel (`onSelect`); the install action is
- * purely local UI state (toggles to a disabled "已安装" button) and does not
- * persist or trigger any real installation.
+ * The card body opens the detail panel (`onSelect`); the install action
+ * triggers a real install through the skills backend (Tauri) or the mock
+ * store (browser), and reflects loading / success / failure accordingly.
  */
 export function SkillCard({
   skill,
@@ -24,9 +39,25 @@ export function SkillCard({
   /** Opens the skill detail panel. */
   onSelect?: () => void;
 }) {
-  const [installed, setInstalled] = useState(false);
+  const [installState, setInstallState] = useState<InstallState>("idle");
+  const [installError, setInstallError] = useState<string | null>(null);
 
   const owner = skill.repo.split("/")[0];
+
+  const handleInstall = async (e: React.MouseEvent) => {
+    // Keep the click from opening the detail panel.
+    e.stopPropagation();
+    if (installState === "installing" || installState === "installed") return;
+    setInstallState("installing");
+    setInstallError(null);
+    try {
+      await installSkillFromSource(skill.repo, skill.name, skill.path);
+      setInstallState("installed");
+    } catch (err) {
+      setInstallState("error");
+      setInstallError(toErrorMessage(err));
+    }
+  };
 
   return (
     <article
@@ -61,19 +92,27 @@ export function SkillCard({
         </div>
         <Button
           size="sm"
-          variant={installed ? "secondary" : "default"}
-          disabled={installed}
-          onClick={(e) => {
-            // Keep the click from opening the detail panel.
-            e.stopPropagation();
-            setInstalled(true);
-          }}
+          variant={installState === "installed" ? "secondary" : "default"}
+          disabled={
+            installState === "installing" || installState === "installed"
+          }
+          onClick={(e) => void handleInstall(e)}
           className={cn("h-7 shrink-0 px-2.5 text-[12px]")}
         >
-          {installed ? (
+          {installState === "installing" ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              安装中
+            </>
+          ) : installState === "installed" ? (
             <>
               <Check className="h-3.5 w-3.5" />
               已安装
+            </>
+          ) : installState === "error" ? (
+            <>
+              <RefreshCw className="h-3.5 w-3.5" />
+              重试
             </>
           ) : (
             <>
@@ -96,6 +135,15 @@ export function SkillCard({
           {formatStars(skill.stars)}
         </span>
       </div>
+
+      {installState === "error" && installError && (
+        <p
+          role="alert"
+          className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-red-600"
+        >
+          {installError}
+        </p>
+      )}
     </article>
   );
 }

@@ -1,13 +1,17 @@
 import type { Skill } from "../types/skill";
+import { fetchFirstText, fileCandidates } from "./cdn-config";
 
 /**
- * Full skills index (JSONL, one JSON object per line) published by the
- * skills-index repo to its orphan `dist` branch. Served through JSDMirror —
- * a jsDelivr mirror that sends CORS headers (unlike GitHub release assets) —
- * so it is fetchable directly from the WebView and a plain browser alike.
+ * The skills-index repo publishes the full index (JSONL, one object per line)
+ * to its `dist` orphan branch. It is fetched through the configurable download
+ * source (direct GitHub raw by default, CDN fallback), which sends CORS headers
+ * so it is fetchable from the WebView and a plain browser alike.
  */
-const INDEX_URL =
-  "https://cdn.jsdmirror.com/gh/luckie2076/skills-index@dist/index.jsonl";
+const INDEX_SPEC = {
+  repo: "luckie2076/skills-index",
+  path: "index.jsonl",
+  ref: "dist",
+} as const;
 
 /** Number of skills returned per page (matches the previous Rust page size). */
 const PAGE_SIZE = 200;
@@ -95,12 +99,8 @@ function parseIndex(text: string): Skill[] {
 let indexPromise: Promise<Skill[]> | null = null;
 
 function loadIndex(): Promise<Skill[]> {
-  indexPromise ??= fetch(INDEX_URL)
-    .then((resp) => {
-      if (!resp.ok) throw new Error(`index request failed: ${resp.status}`);
-      return resp.text();
-    })
-    .then(parseIndex)
+  indexPromise ??= fetchFirstText(fileCandidates({ ...INDEX_SPEC }))
+    .then(({ text }) => parseIndex(text))
     .catch((err: unknown) => {
       indexPromise = null;
       throw err;
@@ -111,9 +111,9 @@ function loadIndex(): Promise<Skill[]> {
 /**
  * Fetch one page (0-indexed) of skills.
  *
- * Downloads the full index from JSDMirror on first call (then cached) and
- * slices it locally. Caching of page data is delegated to TanStack Query,
- * which owns the freshness window and background revalidation.
+ * Downloads the full index once (cached) through the configurable download
+ * source, then slices it locally. Caching of page data is delegated to TanStack
+ * Query, which owns the freshness window and background revalidation.
  */
 export async function fetchSkillsPage(page: number): Promise<SkillsPage> {
   const skills = await loadIndex();

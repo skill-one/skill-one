@@ -9,6 +9,7 @@ import { ExplorePage } from "./components/explore-page";
 import { MyAgentsPage } from "./components/my-agents-page";
 import { MySkillsPage } from "./components/my-skills-page";
 import { PlaceholderPage } from "./components/placeholder-page";
+import { SettingsPage } from "./components/settings-page";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 
 /**
@@ -73,16 +74,19 @@ export default function App() {
                 <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/my-skills" element={<MySkillsPage />} />
                 <Route path="/my-agents" element={<MyAgentsPage />} />
-                <Route path="/tags" element={<PlaceholderPage title="标签" />} />
-                <Route path="/tools" element={<PlaceholderPage title="工具" />} />
+                <Route
+                  path="/tags"
+                  element={<PlaceholderPage title="标签" />}
+                />
+                <Route
+                  path="/tools"
+                  element={<PlaceholderPage title="工具" />}
+                />
                 <Route
                   path="/updates"
                   element={<PlaceholderPage title="更新" />}
                 />
-                <Route
-                  path="/settings"
-                  element={<PlaceholderPage title="设置" />}
-                />
+                <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/explore" replace />} />
               </Routes>
             </SidebarInset>

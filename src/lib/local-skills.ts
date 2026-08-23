@@ -9,8 +9,10 @@
  */
 
 import { isTauri } from "./tauri";
+import { fetchFirstText, fileCandidates } from "./cdn-config";
 import {
   getLinkStatus,
+  installSkill,
   linkAgents,
   listInstalledSkills,
   removeSkills,
@@ -23,6 +25,7 @@ import {
 import {
   getMockAgentStatus,
   getMockInstalledSkills,
+  installMockSkill,
   removeMockSkill,
   setMockAgentLinked,
 } from "./mock-local";
@@ -33,6 +36,32 @@ export async function fetchInstalledSkills(): Promise<InstalledSkill[]> {
     return listInstalledSkills({ global: true });
   }
   return getMockInstalledSkills();
+}
+
+/**
+ * Install a single skill from its source GitHub repo. Only the named skill is
+ * installed, never the entire repo.
+ *
+ * The frontend resolves a reachable URL for the skill's SKILL.md (direct GitHub
+ * raw by default, CDN fallback) and hands it to the backend: `install_skill`
+ * downloads that single file and writes it into the canonical skills dir. In
+ * the browser this records the install in the mock store instead.
+ */
+export async function installSkillFromSource(
+  repo: string,
+  name: string,
+  path?: string,
+): Promise<void> {
+  const skillDir = path && path.trim() ? path : name;
+  const skillMd = `${skillDir.replace(/\/+$/, "")}/SKILL.md`;
+  if (isTauri()) {
+    const { url } = await fetchFirstText(
+      fileCandidates({ repo, path: skillMd }),
+    );
+    await installSkill(url, { global: true, skills: [name] });
+    return;
+  }
+  installMockSkill(repo, name);
 }
 
 /** Remove an installed skill (backend in Tauri, mock store in the browser). */

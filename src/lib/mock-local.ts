@@ -70,6 +70,27 @@ export function removeMockSkill(name: string): void {
   mockSkills = mockSkills.filter((s) => s.name !== name);
 }
 
+/**
+ * Record a mock install of a single skill from a GitHub source (`owner/repo`).
+ * Mirrors a successful install in the browser without cloning a repo.
+ * Already-installed sources/names are left untouched.
+ */
+export function installMockSkill(repo: string, name: string): void {
+  if (mockSkills.some((s) => s.name === name || s.source === repo)) return;
+  mockSkills = [
+    {
+      name,
+      path: `~/.agents/skills/${name}`,
+      scope: "global",
+      agents: [],
+      source: repo,
+      sourceUrl: null,
+      sourceType: "github",
+    },
+    ...mockSkills,
+  ];
+}
+
 export function resetMockInstalledSkills(): void {
   mockSkills = buildMockSkills();
 }
