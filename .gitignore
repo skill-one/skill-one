@@ -8,10 +8,17 @@ node_modules
 # Build output
 dist
 dist-ssr
+*.tsbuildinfo
 
 # Tauri
 src-tauri/target
 src-tauri/gen/schemas
+
+# Tooling / local state
+.trae/
+.codebuddy/
+.playwright-cli/
+.playwright/
 
 # Editor / OS
 .DS_Store
