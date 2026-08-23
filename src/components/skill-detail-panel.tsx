@@ -1,0 +1,155 @@
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2, Star, X } from "lucide-react";
+
+import { fetchSkillDetail } from "../lib/skill-detail-api";
+import { formatStars } from "../lib/utils";
+import type { Skill } from "../types/skill";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+
+interface SkillDetailPanelProps {
+  /** The skill to show; null renders nothing. */
+  skill: Skill | null;
+  onPrev: () => void;
+  onNext: () => void;
+  onClose: () => void;
+}
+
+/**
+ * Fixed right-hand detail panel shown next to the skill grid in a split
+ * layout. Switching skills happens by clicking another card in the left
+ * grid. Escape or the X button closes the panel and restores the
+ * full-width grid. Each skill's SKILL.md is fetched through TanStack Query
+ * and cached independently, so revisits are instant.
+ */
+export function SkillDetailPanel({
+  skill,
+  onPrev,
+  onNext,
+  onClose,
+}: SkillDetailPanelProps) {
+  const {
+    data: detail,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["skill-detail", skill?.repo, skill?.name],
+    queryFn: () => fetchSkillDetail(skill!.repo, skill!.name),
+    enabled: skill != null,
+  });
+
+  // Escape closes the panel; ←/→ switch skills (delegated to the page).
+  useEffect(() => {
+    if (!skill) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft") onPrev();
+      else if (e.key === "ArrowRight") onNext();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [skill, onPrev, onNext, onClose]);
+
+  if (!skill) return null;
+
+  const owner = skill.repo.split("/")[0];
+  const description = detail?.description || skill.description;
+
+  return (
+    <aside
+      role="complementary"
+      aria-label="技能详情"
+      className="flex h-full w-[440px] shrink-0 animate-in slide-in-from-right flex-col border-l border-border bg-card duration-200"
+    >
+      <div className="flex flex-col gap-4 border-b border-border p-6 pb-5">
+        <div className="flex items-center justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="关闭"
+            className="h-7 w-7 p-0"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <img
+            src={`https://github.com/${owner}.png`}
+            alt={`${owner} 的头像`}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="h-11 w-11 shrink-0 rounded-full border border-border/60 bg-muted"
+          />
+          <div className="min-w-0">
+            <h2 className="truncate text-[17px] font-semibold tracking-tight text-foreground">
+              {skill.name}
+            </h2>
+            <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+              {skill.repo}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {detail?.version && (
+            <Badge variant="secondary">v{detail.version}</Badge>
+          )}
+          {detail?.license && <Badge variant="secondary">{detail.license}</Badge>}
+          {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
+          <span className="ml-0.5 flex items-center gap-1 text-[12px] text-muted-foreground">
+            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+            <span className="font-medium tabular-nums">
+              {formatStars(skill.stars)}
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-6">
+        {isPending ? (
+          <div className="flex h-40 items-center justify-center text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <p className="text-[13px] leading-relaxed text-muted-foreground">
+              加载失败：
+              {error instanceof Error ? error.message : "未知错误"}
+              <br />
+              该仓库可能没有可访问的 SKILL.md。
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-1"
+              onClick={() => void refetch()}
+            >
+              重试
+            </Button>
+          </div>
+        ) : detail ? (
+          <div className="flex flex-col gap-5">
+            {description && (
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                {description}
+              </p>
+            )}
+            <div>
+              <p className="mb-2 font-mono text-[11px] text-muted-foreground/70">
+                {detail.path}
+              </p>
+              <pre className="whitespace-pre-wrap break-words font-mono text-[12.5px] leading-relaxed text-foreground/90">
+                {detail.instructions || "（SKILL.md 无正文内容）"}
+              </pre>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </aside>
+  );
+}

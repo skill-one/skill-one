@@ -1,0 +1,56 @@
+[
+  {
+    "name": "pdf",
+    "repo": "anthropics/skills",
+    "description": "Read, generate, merge, split, and annotate PDF documents with form filling and OCR support.",
+    "version": "1.2.0",
+    "installedAt": "2026-08-10",
+    "enabled": true,
+    "hasUpdate": false
+  },
+  {
+    "name": "docx",
+    "repo": "anthropics/skills",
+    "description": "Create and edit Word documents with headings, tables, styles, and embedded images programmatically.",
+    "version": "1.1.4",
+    "installedAt": "2026-08-08",
+    "enabled": true,
+    "hasUpdate": true
+  },
+  {
+    "name": "pptx",
+    "repo": "anthropics/skills",
+    "description": "Create polished slide decks with layouts, speaker notes, charts, and consistent master templates.",
+    "version": "1.0.9",
+    "installedAt": "2026-08-05",
+    "enabled": true,
+    "hasUpdate": false
+  },
+  {
+    "name": "mcp-builder",
+    "repo": "anthropics/skills",
+    "description": "Scaffold Model Context Protocol servers with tools, resources, and prompts in TypeScript or Python.",
+    "version": "0.9.2",
+    "installedAt": "2026-07-28",
+    "enabled": false,
+    "hasUpdate": true
+  },
+  {
+    "name": "code-review",
+    "repo": "obra/superpowers",
+    "description": "Run structured code reviews with severity levels, refactor suggestions, and automated best-practice checks.",
+    "version": "2.0.1",
+    "installedAt": "2026-07-22",
+    "enabled": true,
+    "hasUpdate": false
+  },
+  {
+    "name": "frontend-design",
+    "repo": "anthropics/skills",
+    "description": "Build accessible, responsive React UIs with Tailwind, component libraries, and modern design patterns.",
+    "version": "1.5.0",
+    "installedAt": "2026-07-15",
+    "enabled": true,
+    "hasUpdate": false
+  }
+]

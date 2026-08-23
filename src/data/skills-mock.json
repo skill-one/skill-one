@@ -1,0 +1,3408 @@
+[
+  {
+    "skills": [
+      {
+        "source": "vercel-labs/skills",
+        "skillId": "find-skills",
+        "name": "find-skills",
+        "installs": 3023443,
+        "weeklyInstalls": [
+          113781,
+          109199,
+          109085,
+          115475,
+          107969,
+          101120,
+          96861,
+          93130
+        ],
+        "description": "Helps users discover and install agent skills when they ask questions like \"how do I do X\", \"find a skill for X\", \"is there a skill that can...\", or express interest in extending capabilities. This skill should be used when the user is looking for functionality that might exist as an installable skill."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "grill-me",
+        "name": "grill-me",
+        "installs": 909231,
+        "weeklyInstalls": [
+          47001,
+          49104,
+          70968,
+          69550,
+          67971,
+          64738,
+          75922,
+          65802
+        ],
+        "description": "A relentless interview to sharpen a plan or design."
+      },
+      {
+        "source": "anthropics/skills",
+        "skillId": "frontend-design",
+        "name": "frontend-design",
+        "installs": 796084,
+        "weeklyInstalls": [
+          27857,
+          26134,
+          28120,
+          26218,
+          24780,
+          26152,
+          25773,
+          24760
+        ],
+        "description": "Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "grill-with-docs",
+        "name": "grill-with-docs",
+        "installs": 773685,
+        "weeklyInstalls": [
+          41746,
+          42976,
+          65694,
+          62173,
+          58257,
+          55615,
+          66362,
+          55776
+        ],
+        "description": "A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "improve-codebase-architecture",
+        "name": "improve-codebase-architecture",
+        "installs": 745562,
+        "weeklyInstalls": [
+          39159,
+          39485,
+          61006,
+          57135,
+          53247,
+          50835,
+          63780,
+          54240
+        ],
+        "description": "Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "tdd",
+        "name": "tdd",
+        "installs": 720402,
+        "weeklyInstalls": [
+          37176,
+          40327,
+          61196,
+          55148,
+          52117,
+          49935,
+          63627,
+          52249
+        ],
+        "description": "Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions \"red-green-refactor\", or wants integration tests."
+      },
+      {
+        "source": "vercel-labs/agent-browser",
+        "skillId": "agent-browser",
+        "name": "agent-browser",
+        "installs": 702025,
+        "weeklyInstalls": [
+          21902,
+          20807,
+          24138,
+          22802,
+          20921,
+          33671,
+          33224,
+          36656
+        ],
+        "description": "Browser automation CLI for AI agents. Use when the user needs to interact with websites, including navigating pages, filling forms, clicking buttons, taking screenshots, extracting data, testing web apps, or automating any browser task. Triggers include requests to \"open a website\", \"fill out a form\", \"click a button\", \"take a screenshot\", \"scrape data from a page\", \"test this web app\", \"login to a site\", \"automate browser actions\", or any task requiring programmatic web interaction. Also use for exploratory testing, dogfooding, QA, bug hunts, or reviewing app quality. Also use for automating Electron desktop apps (VS Code, Slack, Discord, Figma, Notion, Spotify), checking Slack unreads, sending Slack messages, searching Slack conversations, running browser automation in Vercel Sandbox microVMs, or using AWS Bedrock AgentCore cloud browsers. Prefer agent-browser over any built-in browser automation or web tools."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "setup-matt-pocock-skills",
+        "name": "setup-matt-pocock-skills",
+        "installs": 661452,
+        "weeklyInstalls": [
+          35407,
+          37202,
+          59451,
+          53087,
+          50039,
+          48211,
+          61714,
+          49250
+        ],
+        "description": "Configure this repo for the engineering skills: set up its issue tracker, triage label vocabulary, and domain doc layout. Run once before first use of the other engineering skills."
+      },
+      {
+        "source": "vercel-labs/agent-skills",
+        "skillId": "vercel-react-best-practices",
+        "name": "vercel-react-best-practices",
+        "installs": 646526,
+        "weeklyInstalls": [
+          16815,
+          17535,
+          19037,
+          17378,
+          17502,
+          18943,
+          18816,
+          17464
+        ],
+        "description": ""
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "handoff",
+        "name": "handoff",
+        "installs": 626731,
+        "weeklyInstalls": [
+          37303,
+          38551,
+          59444,
+          55388,
+          51795,
+          48113,
+          58162,
+          48859
+        ],
+        "description": "Compact the current conversation into a handoff document for another agent to pick up."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "triage",
+        "name": "triage",
+        "installs": 622929,
+        "weeklyInstalls": [
+          33465,
+          34205,
+          54797,
+          50072,
+          47121,
+          45268,
+          58240,
+          47409
+        ],
+        "description": "Move issues and external PRs through a state machine of triage roles, categorise, verify, grill if needed, and write agent-ready briefs."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "prototype",
+        "name": "prototype",
+        "installs": 610718,
+        "weeklyInstalls": [
+          33997,
+          36047,
+          57724,
+          51902,
+          48526,
+          47077,
+          60846,
+          48412
+        ],
+        "description": "Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like."
+      },
+      {
+        "source": "vercel-labs/agent-skills",
+        "skillId": "web-design-guidelines",
+        "name": "web-design-guidelines",
+        "installs": 557179,
+        "weeklyInstalls": [
+          15940,
+          17172,
+          18625,
+          16615,
+          16429,
+          18456,
+          18715,
+          18063
+        ],
+        "description": "Review UI code for Web Interface Guidelines compliance. Use when asked to \"review my UI\", \"check accessibility\", \"audit design\", \"review UX\", or \"check my site against best practices\"."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "microsoft-foundry",
+        "name": "microsoft-foundry",
+        "installs": 540032,
+        "weeklyInstalls": [
+          13388,
+          12104,
+          16172,
+          16805,
+          17545,
+          16759,
+          16823,
+          16117
+        ],
+        "description": "Deploy, evaluate, fine-tune, and manage Foundry agents end-to-end with azd: hosted agent scaffold/run/deploy, prompt agent create, batch eval, continuous eval, prompt optimizer, Agent Optimizer scaffold, agent.yaml, dataset curation from traces, model fine-tuning (SFT/DPO/RFT). USE FOR: azd ai agent, azd provision/deploy, deploy agent, hosted agent, create agent, add tool to agent, invoke agent, evaluate agent, continuous eval, continuous monitoring, agent CI/CD, optimize prompt, improve prompt, optimize agent instructions, agent optimizer, deploy model, Foundry project, RBAC, role assignment, permissions, quota, capacity, region, troubleshoot agent, deployment failure, AI Services, create Foundry resource, provision, knowledge index, customize deployment, onboard, availability, fine-tune, SFT, DPO, RFT, training-data, grader, distillation, fine-tuned model, large file upload. DO NOT USE FOR: Azure Functions, App Service, general Azure deploy (use azure-deploy), general Azure prep (use azure-prepare)."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-diagnostics",
+        "name": "azure-diagnostics",
+        "installs": 534004,
+        "weeklyInstalls": [
+          13189,
+          11865,
+          15912,
+          16576,
+          17293,
+          16428,
+          16308,
+          15389
+        ],
+        "description": "Debug Azure production issues on Azure using AppLens, Azure Monitor, resource health, and safe triage. WHEN: debug production issues, troubleshoot app service, app service high CPU, app service deployment failure, troubleshoot container apps, troubleshoot functions, troubleshoot AKS, VM RDP, Linux SSH, VM black screen, can't connect to VM, reset VM password, NSG or firewall blocking, kubectl cannot connect, kube-system/CoreDNS failures, pod pending, crashloop, node not ready, upgrade failures, analyze logs, KQL, insights, image pull failures, cold start issues, health probe failures, resource health, root cause of errors, troubleshoot event hubs, troubleshoot service bus, messaging SDK error, AMQP connection failure, message lock lost, service bus dead letter."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-ai",
+        "name": "azure-ai",
+        "installs": 533661,
+        "weeklyInstalls": [
+          13214,
+          11849,
+          15888,
+          16560,
+          17111,
+          16417,
+          16165,
+          15011
+        ],
+        "description": "Use for Azure AI: Search, Speech, OpenAI, Document Intelligence. Helps with search, vector/hybrid search, speech-to-text, text-to-speech, transcription, OCR. WHEN: AI Search, query search, vector search, hybrid search, semantic search, speech-to-text, text-to-speech, transcribe, OCR, convert text to speech."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-deploy",
+        "name": "azure-deploy",
+        "installs": 533613,
+        "weeklyInstalls": [
+          13203,
+          11882,
+          15923,
+          16592,
+          17119,
+          16395,
+          16139,
+          15267
+        ],
+        "description": "Execute Azure deployments for ALREADY-PREPARED applications that have existing .azure/deployment-plan.md and infrastructure files. DO NOT use this skill when the user asks to CREATE a new application — use azure-prepare instead. This skill runs azd up, azd deploy, terraform apply, and az deployment commands with built-in error recovery. Requires .azure/deployment-plan.md from azure-prepare and validated status from azure-validate. WHEN: \"run azd up\", \"run azd deploy\", \"execute deployment\", \"push to production\", \"push to cloud\", \"go live\", \"ship it\", \"bicep deploy\", \"terraform apply\", \"publish to Azure\", \"launch on Azure\". DO NOT USE WHEN: \"create and deploy\", \"build and deploy\", \"create a new app\", \"set up infrastructure\", \"create and deploy to Azure using Terraform\" — use azure-prepare for these."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-prepare",
+        "name": "azure-prepare",
+        "installs": 533441,
+        "weeklyInstalls": [
+          13174,
+          11842,
+          15872,
+          16531,
+          17273,
+          16404,
+          16114,
+          15245
+        ],
+        "description": "Prepare azd-based Azure projects for deployment: generates azure.yaml, infrastructure (Bicep/Terraform), and Dockerfiles for the Azure Developer CLI (azd) workflow. USE ONLY when the user explicitly wants to use azd as the deployment tool, or the project already has an azure.yaml file. DO NOT USE FOR: non-azd deployments, Python App Service code-only deploys (use python-appservice-deploy), or cross-cloud migration (use azure-cloud-migrate). WHEN: prepare app for azd, create azure.yaml, set up azd infrastructure, modernize app for Azure with azd, deploy with azd, function app, timer trigger, service bus trigger, event-driven function, managed identity, generate Bicep, generate Terraform, create and deploy to Azure."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-validate",
+        "name": "azure-validate",
+        "installs": 533122,
+        "weeklyInstalls": [
+          13168,
+          11832,
+          15867,
+          16527,
+          17299,
+          16527,
+          16330,
+          15239
+        ],
+        "description": "Pre-deployment validation for Azure readiness. Run deep checks on configuration, infrastructure (Bicep or Terraform), RBAC role assignments, managed identity permissions, and prerequisites before deploying. WHEN: validate my app, check deployment readiness, run preflight checks, verify configuration, check if ready to deploy, validate azure.yaml, validate Bicep, test before deploying, troubleshoot deployment errors, validate Azure Functions, validate function app, validate serverless deployment, verify RBAC roles, check role assignments, review managed identity permissions, what-if analysis, validate Container Apps deployment."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-storage",
+        "name": "azure-storage",
+        "installs": 532592,
+        "weeklyInstalls": [
+          13168,
+          11827,
+          15867,
+          16526,
+          17092,
+          16350,
+          16132,
+          14994
+        ],
+        "description": "Azure Storage Services including Blob Storage, File Shares, Queue Storage, Table Storage, and Data Lake. Answers questions about storage access tiers (hot, cool, cold, archive), when to use each tier, and tier comparison. Provides object storage, SMB file shares, async messaging, NoSQL key-value, and big data analytics. Includes lifecycle management. USE FOR: blob storage, file shares, queue storage, table storage, data lake, upload files, download blobs, storage accounts, access tiers, storage tiers, hot cool cold archive, storage tier comparison, when to use storage tiers, lifecycle management, Azure Storage concepts. DO NOT USE FOR: SQL databases, Cosmos DB (use azure-prepare), messaging with Event Hubs or Service Bus (use azure-messaging)."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "entra-app-registration",
+        "name": "entra-app-registration",
+        "installs": 532329,
+        "weeklyInstalls": [
+          13172,
+          11827,
+          15874,
+          16529,
+          17252,
+          16403,
+          16119,
+          14985
+        ],
+        "description": "Guides Microsoft Entra ID app registration, OAuth 2.0 authentication, and MSAL integration. USE FOR: create app registration, register Azure AD app, configure OAuth, set up authentication, add API permissions, generate service principal, MSAL example, console app auth, Entra ID setup, Azure AD authentication. DO NOT USE FOR: Key Vault secrets (use azure-keyvault-expiration-audit), general Azure resource security guidance."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "appinsights-instrumentation",
+        "name": "appinsights-instrumentation",
+        "installs": 532098,
+        "weeklyInstalls": [
+          13159,
+          11819,
+          15867,
+          16528,
+          17111,
+          16383,
+          16130,
+          14987
+        ],
+        "description": "Guidance for instrumenting webapps with Azure Application Insights. Provides telemetry patterns, SDK setup, and configuration references. WHEN: how to instrument app, App Insights SDK, telemetry patterns, what is App Insights, Application Insights guidance, instrumentation examples, APM best practices."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-resource-lookup",
+        "name": "azure-resource-lookup",
+        "installs": 532011,
+        "weeklyInstalls": [
+          13153,
+          11822,
+          15861,
+          16517,
+          17142,
+          16362,
+          16117,
+          14989
+        ],
+        "description": "List, find, and show Azure resources across subscriptions or resource groups. Handles prompts like \"list the websites in my subscription\", \"list my web apps\", \"show my app services\", \"list virtual machines\", \"list my VMs\", \"show storage accounts\", \"find container apps\", and \"what resources do I have\". USE FOR: list websites, list web apps, list app services, show websites in subscription, resource inventory, find resources by tag, tag analysis, orphaned resource discovery (not for cost analysis), unattached disks, count resources by type, cross-subscription lookup, and Azure Resource Graph queries. DO NOT USE FOR: deploying/changing resources (use azure-deploy), cost optimization (use azure-cost), or non-Azure clouds."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-compliance",
+        "name": "azure-compliance",
+        "installs": 531957,
+        "weeklyInstalls": [
+          13154,
+          11822,
+          15864,
+          16521,
+          17071,
+          16376,
+          16120,
+          14978
+        ],
+        "description": "Run Azure compliance and security audits with azqr plus Key Vault expiration checks. Covers best-practice assessment, resource review, policy/compliance validation, and security posture checks. WHEN: compliance scan, security audit, BEFORE running azqr (compliance cli tool), Azure best practices, Key Vault expiration check, expired certificates, expiring secrets, orphaned resources, compliance assessment."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-aigateway",
+        "name": "azure-aigateway",
+        "installs": 531808,
+        "weeklyInstalls": [
+          13149,
+          11817,
+          15861,
+          16521,
+          17064,
+          16365,
+          16103,
+          14973
+        ],
+        "description": "Configure Azure API Management as an AI Gateway for AI models, MCP tools, and agents. WHEN: semantic caching, token limit, content safety, load balancing, AI model governance, MCP rate limiting, jailbreak detection, add Azure OpenAI backend, add AI Foundry model, test AI gateway, LLM policies, configure AI backend, token metrics, AI cost control, convert API to MCP, import OpenAPI to gateway."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-kusto",
+        "name": "azure-kusto",
+        "installs": 531729,
+        "weeklyInstalls": [
+          13147,
+          11814,
+          15857,
+          16512,
+          17067,
+          16353,
+          16100,
+          14974
+        ],
+        "description": "Query and analyze data in Azure Data Explorer (Kusto/ADX) using KQL for log analytics, telemetry, and time series analysis. WHEN: KQL queries, Kusto database queries, Azure Data Explorer, ADX clusters, log analytics, time series data, IoT telemetry, anomaly detection."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-resource-visualizer",
+        "name": "azure-resource-visualizer",
+        "installs": 531717,
+        "weeklyInstalls": [
+          13147,
+          11820,
+          15858,
+          16512,
+          17065,
+          16315,
+          16102,
+          14980
+        ],
+        "description": "Analyze Azure resource groups and generate detailed Mermaid architecture diagrams showing the relationships between individual resources. WHEN: create architecture diagram, visualize Azure resources, show resource relationships, generate Mermaid diagram, analyze resource group, diagram my resources, architecture visualization, resource topology, map Azure infrastructure."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-messaging",
+        "name": "azure-messaging",
+        "installs": 521461,
+        "weeklyInstalls": [
+          13132,
+          11813,
+          15851,
+          16511,
+          17067,
+          16345,
+          16100,
+          14969
+        ],
+        "description": "Troubleshoot and resolve issues with Azure Messaging SDKs for Event Hubs and Service Bus. Covers connection failures, authentication errors, message processing issues, and SDK configuration problems. WHEN: event hub SDK error, service bus SDK issue, messaging connection failure, AMQP error, event processor host issue, message lock lost, message lock expired, lock renewal, lock renewal batch, send timeout, receiver disconnected, SDK troubleshooting, azure messaging SDK, event hub consumer, service bus queue issue, topic subscription error, enable logging event hub, service bus logging, eventhub python, servicebus java, eventhub javascript, servicebus dotnet, event hub checkpoint, event hub not receiving messages, service bus dead letter, batch processing lock, session lock expired, idle timeout, connection inactive, link detach, slow reconnect, session error, duplicate events, offset reset, receive batch."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "teach",
+        "name": "teach",
+        "installs": 488250,
+        "weeklyInstalls": [
+          36461,
+          36713,
+          54849,
+          51641,
+          48523,
+          44668,
+          53989,
+          44680
+        ],
+        "description": "Teach the user a new skill or concept, within this workspace."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "grilling",
+        "name": "grilling",
+        "installs": 487824,
+        "weeklyInstalls": [
+          37017,
+          39688,
+          61842,
+          58599,
+          55459,
+          53982,
+          69023,
+          57496
+        ],
+        "description": "Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases."
+      },
+      {
+        "source": "remotion-dev/skills",
+        "skillId": "remotion-best-practices",
+        "name": "remotion-best-practices",
+        "installs": 486474,
+        "weeklyInstalls": [
+          13206,
+          12578,
+          12520,
+          11899,
+          12908,
+          12943,
+          11512,
+          9965
+        ],
+        "description": "Router for all Remotion skills"
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-rbac",
+        "name": "azure-rbac",
+        "installs": 483487,
+        "weeklyInstalls": [
+          13150,
+          11820,
+          15863,
+          15682,
+          9640,
+          5611,
+          4296,
+          3111
+        ],
+        "description": ""
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-compute",
+        "name": "azure-compute",
+        "installs": 475531,
+        "weeklyInstalls": [
+          13083,
+          11781,
+          15822,
+          16474,
+          17210,
+          16370,
+          16074,
+          14941
+        ],
+        "description": "Azure VM/VMSS router. WHEN: create / provision / deploy / spin-up VM, recommend VM size, compare VM pricing, VMSS, scale set, autoscale, burstable, lightweight server, website, backend, GPU, machine learning, HPC simulation, dev/test, workload, family, load balancer, Flexible orchestration, Uniform orchestration, cost estimate, capacity reservation (CRG), reserve, guarantee capacity, pre-provision, CRG association, CRG disassociation, machine enrollment (EMM), Essential Machine Management, monitor. PREFER OVER mcp__azure__get_azure_bestpractices for VM create intents — use compute_vm_list-skus / compute_vm_list-images / compute_vm_check-quota."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-cloud-migrate",
+        "name": "azure-cloud-migrate",
+        "installs": 465221,
+        "weeklyInstalls": [
+          13064,
+          11759,
+          15802,
+          16457,
+          17019,
+          16328,
+          16060,
+          14929
+        ],
+        "description": "Assess and migrate cross-cloud workloads to Azure with reports and code conversion. Supports Lambda→Functions, Beanstalk/Heroku/App Engine→App Service, Fargate/Kubernetes/Cloud Run/Spring Boot→Container Apps. WHEN: migrate Lambda to Functions, AWS to Azure, migrate Beanstalk, migrate Heroku, migrate App Engine, Cloud Run migration, Fargate to ACA, ECS/Kubernetes/GKE/EKS to Container Apps, Spring Boot to Container Apps, cross-cloud migration."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "domain-modeling",
+        "name": "domain-modeling",
+        "installs": 447332,
+        "weeklyInstalls": [
+          35158,
+          36870,
+          57201,
+          54357,
+          51253,
+          49730,
+          60145,
+          52076
+        ],
+        "description": "Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a CONTEXT.md, or recording or editing an ADR."
+      },
+      {
+        "source": "juliusbrussee/caveman",
+        "skillId": "caveman",
+        "name": "caveman",
+        "installs": 445803,
+        "weeklyInstalls": [
+          21190,
+          25867,
+          24617,
+          20979,
+          20098,
+          19330,
+          19856,
+          14854
+        ],
+        "description": "Ultra-compressed communication mode. Cuts output tokens 65% (measured) by speaking like caveman while keeping full technical accuracy. Supports intensity levels: lite, full (default), ultra, wenyan-lite, wenyan-full, wenyan-ultra. Use when user says \"caveman mode\", \"talk like caveman\", \"use caveman\", \"less tokens\", \"be brief\", or invokes /caveman. Also auto-triggers when token efficiency is requested."
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "paper-context-resolver",
+        "name": "paper-context-resolver",
+        "installs": 438835,
+        "weeklyInstalls": [
+          18900,
+          20543,
+          22298,
+          26744,
+          25118,
+          11191,
+          32245,
+          50275
+        ],
+        "description": "Rigor Paper Context helper for README-first deep learning repo reproduction. Use only when the README and repository files leave a narrow reproduction-critical gap and the task is to resolve a specific paper detail such as dataset split, preprocessing, evaluation protocol, checkpoint mapping, or runtime assumption from primary paper sources while recording conflicts. Do not use for general paper summary, repo scanning, environment setup, command execution, title-only paper lookup, or replacing README guidance by default."
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "repo-intake-and-plan",
+        "name": "repo-intake-and-plan",
+        "installs": 438132,
+        "weeklyInstalls": [
+          18858,
+          20520,
+          22259,
+          26714,
+          25102,
+          11173,
+          32230,
+          50247
+        ],
+        "description": "Rigor Intake helper for README-first deep learning repo reproduction. Use when the task is specifically to scan a repository, read the README and common project files, extract documented commands, classify inference, evaluation, and training candidates, and return the smallest trustworthy reproduction plan to the main orchestrator. Do not use for environment setup, asset download, command execution, final reporting, paper lookup, or end-to-end orchestration."
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "minimal-run-and-audit",
+        "name": "minimal-run-and-audit",
+        "installs": 438058,
+        "weeklyInstalls": [
+          18847,
+          20520,
+          22254,
+          26708,
+          25092,
+          11172,
+          32229,
+          50250
+        ],
+        "description": "Rigor Run skill for README-first deep learning repo reproduction. Use when the task is specifically to capture or normalize evidence from the selected smoke test or documented inference or evaluation command and write standardized `repro_outputs/` files, including patch notes when repository files changed. Do not use for training execution, initial repo intake, generic environment setup, paper lookup, target selection, hidden scientific-meaning changes, or end-to-end orchestration by itself."
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "env-and-assets-bootstrap",
+        "name": "env-and-assets-bootstrap",
+        "installs": 438045,
+        "weeklyInstalls": [
+          18852,
+          20514,
+          22250,
+          26715,
+          25092,
+          11166,
+          32229,
+          50245
+        ],
+        "description": "Rigor Setup skill for README-first deep learning repo reproduction. Use when the task is specifically to prepare a conservative conda-first environment, checkpoint and dataset path assumptions, cache location hints, and setup notes before any run on a README-documented repository. Do not use for repo scanning, full orchestration, paper interpretation, final run reporting, or generic environment setup that is not tied to a specific reproduction target."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-hosted-copilot-sdk",
+        "name": "azure-hosted-copilot-sdk",
+        "installs": 436030,
+        "weeklyInstalls": [
+          13114,
+          11801,
+          12958,
+          7749,
+          4839,
+          3499,
+          2952,
+          2233
+        ],
+        "description": ""
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "codebase-design",
+        "name": "codebase-design",
+        "installs": 434426,
+        "weeklyInstalls": [
+          34335,
+          35367,
+          55119,
+          52647,
+          49482,
+          47700,
+          60375,
+          50766
+        ],
+        "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "diagnosing-bugs",
+        "name": "diagnosing-bugs",
+        "installs": 428635,
+        "weeklyInstalls": [
+          34098,
+          35003,
+          54567,
+          51571,
+          48632,
+          46765,
+          59214,
+          49914
+        ],
+        "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow."
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-doc",
+        "name": "lark-doc",
+        "installs": 419722,
+        "weeklyInstalls": [
+          28624,
+          29279,
+          30930,
+          30616,
+          13050,
+          9977,
+          8764,
+          8078
+        ],
+        "description": "飞书云文档（Docx / Wiki）内容操作：读取、创建、编辑文档，插入或下载图片附件，以及操作思维笔记。用户提供文档 URL/token（包括 doubao.com 的 /docx/、/wiki/）时使用；按 URL 路径/token 而非域名路由。文档内嵌资源按读取参考中的统一规则分流。独立评论操作走 lark-drive；随正文读取评论使用 docs +fetch。表格或 Base 内部数据操作不在本 skill。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-base",
+        "name": "lark-base",
+        "installs": 417932,
+        "weeklyInstalls": [
+          28472,
+          29149,
+          30718,
+          30598,
+          12935,
+          9954,
+          8660,
+          7977
+        ],
+        "description": "飞书多维表格（Base）操作：建表、字段、记录、视图、统计、公式/lookup、表单、仪表盘、应用模式（BaseApp/AppMode 页面与组件）、Workspace 目录、workflow、角色权限；遇到 Base/多维表格/bitable、BaseApp/AppMode、/base/ 或 /app/ 链接时使用。BaseApp 不走 lark-apps；文件导入/导出转 lark-drive，认证/授权转 lark-shared。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-shared",
+        "name": "lark-shared",
+        "installs": 416787,
+        "weeklyInstalls": [
+          28399,
+          29173,
+          30739,
+          30569,
+          12836,
+          9865,
+          8580,
+          7907
+        ],
+        "description": "Use for lark-cli setup/auth tasks: auth login/status/logout, user vs bot identity, business-domain permissions (--domain, including all/docs/drive), missing scopes, revoking authorization, or handling _notice JSON."
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-drive",
+        "name": "lark-drive",
+        "installs": 416325,
+        "weeklyInstalls": [
+          28458,
+          29100,
+          30742,
+          30551,
+          12855,
+          9820,
+          8428,
+          7697
+        ],
+        "description": "飞书云空间（云盘/云存储）：管理 Drive 文件和文件夹，包含上传/下载、创建文件夹、复制/移动/删除、查看元数据、查询权限设置、评论/权限/订阅、标题、版本、飞书文档密级标签（secure labels）和本地文件导入。用户需要整理云盘目录、处理云空间资源 URL/token、判断链接类型/真实 token/标题，或导入 Word/Markdown/Excel/CSV/PPTX/.base 为 docx/sheet/bitable/slides 时使用；doubao.com 云空间 URL/token 也按资源路径和 token 路由，不回退 WebFetch。不负责：文档内容编辑（走 lark-doc）、表格/Base 表内数据操作（走 lark-sheets/lark-base）、知识空间节点/成员管理（走 lark-wiki）、原生 Markdown 文件读写/patch/diff（走 lark-markdown）。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-im",
+        "name": "lark-im",
+        "installs": 416231,
+        "weeklyInstalls": [
+          28431,
+          29082,
+          30648,
+          30467,
+          12789,
+          9698,
+          8385,
+          7641
+        ],
+        "description": "飞书即时通讯：收发消息和管理群聊。发送和回复消息、搜索聊天记录、管理群聊成员、上传下载图片和文件、管理表情回复、发送应用内/短信/电话加急、发送和处理交互卡片（Interactive Card）、监听卡片按钮回调（card.action.trigger）。当用户需要发消息、查看或搜索聊天记录、下载聊天中的文件、查看群成员、搜索群、创建群聊或话题群、管理标记数据、管理 Feed 置顶（添加/移除/查询置顶会话）、管理标签数据、处理卡片回调时使用。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-wiki",
+        "name": "lark-wiki",
+        "installs": 415194,
+        "weeklyInstalls": [
+          28298,
+          28976,
+          30712,
+          30459,
+          12836,
+          9738,
+          8410,
+          7771
+        ],
+        "description": "飞书知识库：管理知识空间、空间成员和文档节点。创建和查询知识空间、查看和管理空间成员、管理节点层级结构、在知识库中组织文档和快捷方式。当用户需要在知识库中查找或创建文档、浏览知识空间结构、查看或管理空间成员、移动或复制节点时使用。当用户给出 doubao.com 的 /wiki/ URL/token 时，也应直接使用本 skill，不要因为域名不是飞书而回退到 WebFetch；路由依据是 URL 路径模式和 token，而不是域名。不负责：上传文件到知识库节点下（走 lark-drive）、编辑文档/表格/Base 内容（走 lark-doc / lark-sheets / lark-base）。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-sheets",
+        "name": "lark-sheets",
+        "installs": 414926,
+        "weeklyInstalls": [
+          28355,
+          29041,
+          30612,
+          30454,
+          12719,
+          9740,
+          8467,
+          7781
+        ],
+        "description": "飞书电子表格：创建和操作电子表格。支持创建表格、管理工作表与行列结构（增删/合并/调整尺寸/隐藏/冻结）、读写单元格（值/公式/样式/批注/单元格图片）、查找替换、多操作批量更新，以及图表、透视表、条件格式、筛选器、迷你图、浮动图片等对象的创建与维护。当用户需要创建电子表格、管理工作表、批量读写或编辑数据、统计汇总与可视化、表格美化、公式计算（含 Excel 公式迁移）、金融/财务建模（DCF、三张表、预算、Sensitivity 等）等任务时使用。若用户是想按名称或关键词搜索云空间（云盘/云存储）里的表格文件，请改用 lark-drive 的 drive +search 先定位资源。当用户给出 doubao.com 的 /sheets/ URL/token 时，也应直接使用本 skill，不要因为域名不是飞书而回退到 WebFetch；路由依据是 URL 路径模式和 token，而不是域名。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-whiteboard",
+        "name": "lark-whiteboard",
+        "installs": 414460,
+        "weeklyInstalls": [
+          28337,
+          28999,
+          30629,
+          30417,
+          12771,
+          9668,
+          8299,
+          7586
+        ],
+        "description": "飞书画板：查询和编辑飞书云文档中的画板。支持导出画板为预览图片、导出原始节点结构、使用多种格式更新画板内容。 当用户需要查看画板内容、导出画板图片、编辑画板时使用此 skill。不负责：飞书云文档内容编辑（lark-doc）、文档内嵌电子表格/Base（lark-sheets / lark-base）。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-task",
+        "name": "lark-task",
+        "installs": 414093,
+        "weeklyInstalls": [
+          28320,
+          28969,
+          30612,
+          30416,
+          12731,
+          9686,
+          8262,
+          7598
+        ],
+        "description": "飞书任务：管理任务、清单和任务智能体。创建待办任务、查看和更新任务状态、拆分子任务、组织任务清单、分配协作成员、上传任务附件、注册或注销任务智能体、更新任务智能体的主页数据、写入智能体任务记录。当用户需要创建待办事项、查看任务列表、跟踪任务进度、管理项目清单或给他人分配任务、为任务上传附件文件、注册注销任务智能体、更新智能体主页数据、写入任务记录时使用。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-calendar",
+        "name": "lark-calendar",
+        "installs": 413413,
+        "weeklyInstalls": [
+          28199,
+          28897,
+          30549,
+          30393,
+          12563,
+          9428,
+          8078,
+          7410
+        ],
+        "description": "飞书日历：管理日历日程和会议室。查看/搜索日程、创建/更新日程、管理参会人、查询忙闲和推荐时段、预定会议室。当用户需要查看日程安排、创建/修改会议、查询/预定会议室时使用。不负责：查询过去的视频会议记录（走 lark-vc）、待办任务（走 lark-task）。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-mail",
+        "name": "lark-mail",
+        "installs": 412215,
+        "weeklyInstalls": [
+          28185,
+          28833,
+          30504,
+          30252,
+          12454,
+          9266,
+          8059,
+          7288
+        ],
+        "description": "飞书邮箱：Use when user mentions 起草邮件、写邮件、草稿、发送/回复/转发邮件、查阅邮件、看邮件、搜索邮件、邮件文件夹、邮件标签、邮件联系人、监听新邮件、邮件收信规则等；use for mail/email intent only. Do not use for docs/sheets/calendar/auth setup/pure contact lookup/IM chat tasks."
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-minutes",
+        "name": "lark-minutes",
+        "installs": 412104,
+        "weeklyInstalls": [
+          28146,
+          28871,
+          30514,
+          30277,
+          12468,
+          9271,
+          8027,
+          7348
+        ],
+        "description": "飞书妙记：搜索妙记、查看妙记基础信息、下载/上传音视频、读取或编辑妙记的产物内容、改标题、替换说话人/关键词、申请妙记查看/编辑权限。当给出minute_token、本地音视频文件，要查/改/转妙记产物，或用户明确要主动申请妙记权限时使用；本地音视频转纪要/逐字稿优先走本 skill，不要用 ffmpeg/whisper 本地转写。不负责：获取会议关联妙记，或仅按自然语言标题定位纪要"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-vc",
+        "name": "lark-vc",
+        "installs": 412005,
+        "weeklyInstalls": [
+          28140,
+          28836,
+          30482,
+          30217,
+          12509,
+          9279,
+          7976,
+          7367
+        ],
+        "description": "飞书视频会议：查询进行中的会议列表（含会议 ID）、读取会中实时内容（发言、聊天、共享等）、发送会中消息，以及搜索历史会议、查询会议纪要（总结/待办/章节/逐字稿）和参会人快照。Agent 真实入会/离会走 lark-vc-agent；查询未来日程走 lark-calendar。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-event",
+        "name": "lark-event",
+        "installs": 411822,
+        "weeklyInstalls": [
+          28169,
+          28865,
+          30446,
+          30248,
+          12524,
+          9289,
+          8031,
+          7308
+        ],
+        "description": "Lark/Feishu real-time event listening / subscribing / consuming: stream events as NDJSON via `lark-cli event consume <EventKey>` (covers IM messages/reactions/chat changes, Approval status changes, Task updates, VC meeting started/joined/ended, Minutes generated, Whiteboard updated, etc.). Use for Lark bots, real-time message processing, long-running subscribers, streaming webhook/push handlers. Supports `--max-events` / `--timeout` bounded runs and a stderr ready-marker contract — designed for AI agents running as subprocesses."
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-contact",
+        "name": "lark-contact",
+        "installs": 411503,
+        "weeklyInstalls": [
+          28120,
+          28909,
+          30467,
+          30230,
+          12440,
+          9313,
+          8022,
+          7296
+        ],
+        "description": "飞书 / Lark 通讯录:按姓名 / 邮箱解析成 open_id,或按 open_id 反查姓名 / 部门 / 邮箱 / 联系方式 / 个人状态 / 签名,以及按关键词搜索当前用户可见的机器人 / 智能体(agent)。当用户提到一个名字要下一步发消息 / 排日程,或拿到 open_id 想查具体信息时使用。不负责部门树遍历、按部门列员工、组织架构图,这类需求走原生 OpenAPI。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-workflow-meeting-summary",
+        "name": "lark-workflow-meeting-summary",
+        "installs": 411017,
+        "weeklyInstalls": [
+          28138,
+          28836,
+          30433,
+          30202,
+          12424,
+          9253,
+          7936,
+          7228
+        ],
+        "description": "会议纪要整理工作流：汇总指定时间范围内的会议纪要并生成结构化报告。当用户需要整理会议纪要、生成会议周报、回顾一段时间内的会议内容时使用。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-workflow-standup-report",
+        "name": "lark-workflow-standup-report",
+        "installs": 410442,
+        "weeklyInstalls": [
+          28092,
+          28802,
+          30399,
+          30176,
+          12409,
+          9236,
+          7922,
+          7220
+        ],
+        "description": "日程待办摘要：编排 calendar +agenda 和 task +get-my-tasks，生成指定日期的日程与未完成任务摘要。适用于了解今天/明天/本周的安排。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-openapi-explorer",
+        "name": "lark-openapi-explorer",
+        "installs": 410231,
+        "weeklyInstalls": [
+          28074,
+          28783,
+          30373,
+          30159,
+          12391,
+          9229,
+          7891,
+          7212
+        ],
+        "description": "飞书/Lark 原生 OpenAPI 探索：从官方文档库中挖掘未经 CLI 封装的原生 OpenAPI 接口。当用户的需求无法被现有 lark-* skill 或 lark-cli 已注册命令满足，需要查找并调用原生飞书 OpenAPI 时使用。"
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-skill-maker",
+        "name": "lark-skill-maker",
+        "installs": 410002,
+        "weeklyInstalls": [
+          28060,
+          28773,
+          30353,
+          30146,
+          12384,
+          9227,
+          7878,
+          7206
+        ],
+        "description": "创建 lark-cli 的自定义 Skill。当用户需要把飞书 API 操作封装成可复用的 Skill（包装原子 API 或编排多步流程）时使用。"
+      },
+      {
+        "source": "heygen-com/hyperframes",
+        "skillId": "hyperframes-cli",
+        "name": "hyperframes-cli",
+        "installs": 408304,
+        "weeklyInstalls": [
+          31091,
+          27892,
+          30378,
+          49284,
+          39233,
+          42582,
+          28363,
+          38236
+        ],
+        "description": "Use the HyperFrames CLI development loop: init, add, catalog, capture, lint, check, snapshot, compare, grade-compare, preview, play, present, beats, keyframes, single or batch render, publish, cloud, cloudrun, feedback, lambda, doctor, browser, info, upgrade, skills, compositions, docs, benchmark, telemetry, transcribe, auth, tts, and remove-background. Also use when diagnosing build or render failures. validate, inspect, and layout are deprecated aliases; use check. Covers local, HeyGen-hosted cloud, AWS Lambda, and Google Cloud Run rendering."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "video-edit",
+        "name": "video-edit",
+        "installs": 406086,
+        "weeklyInstalls": [
+          40833,
+          41126,
+          32902,
+          3365,
+          3015,
+          3035,
+          2944,
+          3867
+        ],
+        "description": "Edit existing video on RunComfy — this skill is a smart router that matches the user's intent to the right edit model in the RunComfy catalog. Picks Wan 2.7 Edit-Video (general restyle / background swap / packaging swap, identity + motion preservation), Kling 2.6 Pro Motion Control (transfer precise motion from a reference video to a target character), or Lucy Edit Restyle (lightweight identity-stable restyle / outfit swap). Bundles each model's documented prompting patterns so the skill gets sharper edits without burning iterations on the wrong model. Calls `runcomfy run <vendor>/<model>/<endpoint>` through the local RunComfy CLI. Triggers on \"video edit\", \"edit video\", \"restyle video\", \"swap video background\", \"motion control\", \"outfit swap video\", or any explicit ask to transform a video."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "image-to-video",
+        "name": "image-to-video",
+        "installs": 404610,
+        "weeklyInstalls": [
+          40433,
+          40824,
+          32737,
+          3341,
+          2999,
+          3022,
+          2940,
+          3789
+        ],
+        "description": "Animate any still image on RunComfy — this skill is a smart router that matches the user's intent to the right i2v model in the RunComfy catalog. Picks HappyHorse 1.0 I2V (Arena #1, native audio, identity preservation) for general animations, Wan 2.7 with `audio_url` for custom-voiceover lip-sync, or Seedance 2.0 Pro for multi-modal animation from image + reference video + reference audio. Bundles each model's documented prompting patterns so the caller gets sharper output without burning iterations on the wrong model. Calls `runcomfy run <vendor>/<model>/image-to-video` (or endpoint variant) through the local RunComfy CLI. Triggers on \"image to video\", \"image-to-video\", \"i2v\", \"animate image\", \"make this move\", or any explicit ask to turn a still into video."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "nano-banana-2",
+        "name": "nano-banana-2",
+        "installs": 404336,
+        "weeklyInstalls": [
+          40798,
+          40823,
+          33174,
+          3201,
+          2995,
+          3028,
+          2932,
+          3748
+        ],
+        "description": "Generate images with Google Nano Banana 2 (Gemini-family flash-tier text-to-image) on RunComfy — bundled with the model's documented prompting patterns so the skill gets sharper output than naive prompting against the same model. Documents Nano Banana 2's strengths (rapid iteration, in-image typography rendering, predictable framing, optional web-grounded context), the resolution-tier pricing, the safety-tolerance dial, and when to route to Nano Banana Pro / GPT Image 2 / Flux 2 / Seedream instead. Calls `runcomfy run google/nano-banana-2/text-to-image` through the local RunComfy CLI. Triggers on \"nano banana\", \"nano-banana-2\", \"nano banana 2\", \"google image gen\", \"gemini image\", or any explicit ask to generate with this model."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "nano-banana-edit",
+        "name": "nano-banana-edit",
+        "installs": 404033,
+        "weeklyInstalls": [
+          40726,
+          40914,
+          32925,
+          3194,
+          2997,
+          3020,
+          2930,
+          3708
+        ],
+        "description": "Edit images with Google Nano Banana 2 (image-to-image edit endpoint) on RunComfy. Documents Nano Banana Edit's strengths (preserve subject identity, swap background, localize edits with spatial language, multi-image batch edits up to 20 inputs), the schema, and when to route to GPT Image 2 edit / Flux Kontext / Nano Banana 2 t2i instead. Calls `runcomfy run google/nano-banana-2/edit` through the local RunComfy CLI. Triggers on \"nano banana edit\", \"edit with nano banana\", \"image edit nano banana\", or any explicit ask to edit with this model."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "image-edit",
+        "name": "image-edit",
+        "installs": 403931,
+        "weeklyInstalls": [
+          40468,
+          40540,
+          32887,
+          3198,
+          2999,
+          3021,
+          2936,
+          3778
+        ],
+        "description": "Edit images on RunComfy — this skill is a smart router that matches the user's intent to the right edit model in the RunComfy catalog. Picks Nano Banana Edit (batch up to 20, identity-preserving default), OpenAI GPT Image 2 Edit (multilingual in-image text rewrite, multi-ref composition, layout precision), Flux Kontext Pro (single-ref high-fidelity local edit), or Z-Image Turbo Inpaint (mask-driven precise region edit). Bundles each model's documented prompting patterns so the skill gets sharper edits without burning iterations on the wrong model. Calls `runcomfy run <vendor>/<model>/edit` through the local RunComfy CLI. Triggers on \"image edit\", \"edit image\", \"image-to-image\", \"i2i\", \"swap background\", \"remove object\", \"rewrite headline\", or any explicit ask to edit a single or batch of images."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "flux-kontext",
+        "name": "flux-kontext",
+        "installs": 403820,
+        "weeklyInstalls": [
+          40642,
+          40531,
+          33109,
+          3168,
+          2994,
+          3020,
+          2933,
+          3704
+        ],
+        "description": "Edit images with Flux 1 Kontext Pro (Black Forest Labs' precise local image-edit model) on RunComfy — bundled with the model's documented prompting patterns so the skill gets sharper output than naive prompting against the same model. Documents Flux Kontext's strengths (single-reference precise local edits, strong prompt control, consistent high-fidelity outputs), the schema (single image + prompt), and when to route to Nano Banana Edit / GPT Image 2 edit / Flux 2 Klein instead. Calls `runcomfy run blackforestlabs/flux-1-kontext/pro/edit` through the local RunComfy CLI. Triggers on \"flux kontext\", \"flux-kontext\", \"flux 1 kontext\", \"kontext\", \"BFL kontext\", or any explicit ask to edit with this model."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "wan-2-7",
+        "name": "wan-2-7",
+        "installs": 403285,
+        "weeklyInstalls": [
+          40412,
+          40767,
+          32715,
+          3352,
+          2994,
+          3021,
+          2931,
+          3704
+        ],
+        "description": "Generate text-to-video with Wan 2.7 (Wan-AI's flagship motion model) on RunComfy. Documents Wan 2.7's strengths (multi-reference conditioning, audio-driven lip-sync via `audio_url`, smoother transitions, prompt expansion), the duration / resolution / aspect-ratio schema, and when to route to HappyHorse 1.0 / Seedance 2.0 / Kling / LTX 2 instead. Calls `runcomfy run wan-ai/wan-2-7/text-to-video` through the local RunComfy CLI. Triggers on \"wan\", \"wan 2.7\", \"wan-2-7\", \"wan video\", or any explicit ask to generate video with this model."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "gpt-image-edit",
+        "name": "gpt-image-edit",
+        "installs": 403117,
+        "weeklyInstalls": [
+          40578,
+          40798,
+          32787,
+          3185,
+          2993,
+          3019,
+          2932,
+          3705
+        ],
+        "description": "Edit images with OpenAI GPT Image 2 (the `/edit` endpoint of ChatGPT Images 2.0) on RunComfy — bundled with the model's documented prompting patterns so the skill gets sharper output than naive prompting against the same model. Documents GPT Image Edit's strengths (preservation language, multilingual in-image text editing, multi-reference up to 10 images, layout / typography precision), the schema, and when to route to Nano Banana Edit / Flux Kontext / GPT Image 2 t2i instead. Calls `runcomfy run openai/gpt-image-2/edit` through the local RunComfy CLI. Triggers on \"gpt image edit\", \"gpt-image-edit\", \"chatgpt image edit\", \"edit with gpt image 2\", or any explicit ask to edit with this model."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "seedance-v2",
+        "name": "seedance-v2",
+        "installs": 403106,
+        "weeklyInstalls": [
+          40194,
+          40781,
+          32828,
+          3364,
+          2995,
+          3022,
+          2932,
+          3707
+        ],
+        "description": "Generate cinematic short-form video with ByteDance Seedance 2.0 Pro on RunComfy. Documents Seedance 2.0 Pro's strengths (multi-modal references — up to 9 images, 3 videos, 3 audio — synchronized in-pass audio with natural lip-sync, cinematic motion refinement), the 4–15s duration schema, and when to route to HappyHorse 1.0 / Wan 2.7 / Kling instead. Calls `runcomfy run bytedance/seedance-v2/pro` through the local RunComfy CLI. Triggers on \"seedance\", \"seedance 2\", \"seedance v2\", \"seedance pro\", \"bytedance video\", or any explicit ask to generate video with this model."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "happyhorse-1-0",
+        "name": "happyhorse-1-0",
+        "installs": 403076,
+        "weeklyInstalls": [
+          40171,
+          40740,
+          32782,
+          3326,
+          2994,
+          3020,
+          2931,
+          3701
+        ],
+        "description": "Generate text-to-video with HappyHorse 1.0 on RunComfy. Documents HappyHorse 1.0's strengths (#1 on Artificial Analysis Video Arena, native 1080p with in-pass synchronized audio, multi-shot character consistency, 6-language prompt support), the duration / aspect-ratio / resolution schema, and when to route to Wan 2.7 / Seedance 2 / LTX 2 instead. Calls `runcomfy run happyhorse/happyhorse-1-0/text-to-video` through the local RunComfy CLI. Triggers on \"happyhorse\", \"happy horse\", \"happyhorse 1.0\", \"happyhorse video\", or any explicit ask to generate video with this model."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "flux-2-klein",
+        "name": "flux-2-klein",
+        "installs": 402905,
+        "weeklyInstalls": [
+          40718,
+          40603,
+          32890,
+          3210,
+          2994,
+          3023,
+          2932,
+          3704
+        ],
+        "description": "Generate images with Flux 2 Klein (Black Forest Labs' distilled fast variant of Flux 2) on RunComfy — bundled with the model's documented prompting patterns so the skill gets sharper output than naive prompting against the same model. Documents Flux 2 Klein's strengths (sub-second latency, multi-reference brand styling, declarative subject-first prompts), the step-count strategy (4–8 for fast iteration, ~25 for polish), the 9B vs 4B variant trade-off, and when to route to Flux 2 Pro / Seedream 5 / GPT Image 2 instead. Calls `runcomfy run blackforestlabs/flux-2-klein/9b/text-to-image` (or `/4b/`) through the local RunComfy CLI. Triggers on \"flux 2 klein\", \"flux-2-klein\", \"flux klein\", \"BFL flux 2\", or any explicit ask to generate with this model."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-quotas",
+        "name": "azure-quotas",
+        "installs": 401780,
+        "weeklyInstalls": [
+          13002,
+          11700,
+          15764,
+          16405,
+          17003,
+          16256,
+          16011,
+          15155
+        ],
+        "description": "Check/manage Azure quotas and usage across providers. For deployment planning, capacity validation, region selection. WHEN: \"check quotas\", \"service limits\", \"current usage\", \"request quota increase\", \"quota exceeded\", \"validate capacity\", \"regional availability\", \"provisioning limits\", \"vCPU limit\", \"how many vCPUs available in my subscription\"."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "ask-matt",
+        "name": "ask-matt",
+        "installs": 397212,
+        "weeklyInstalls": [
+          32003,
+          33691,
+          52427,
+          48409,
+          45660,
+          42586,
+          55243,
+          44321
+        ],
+        "description": "Ask which skill or flow fits your situation. A router over the skills in this repo."
+      },
+      {
+        "source": "heygen-com/hyperframes",
+        "skillId": "hyperframes",
+        "name": "hyperframes",
+        "installs": 395136,
+        "weeklyInstalls": [
+          31617,
+          28260,
+          31048,
+          43568,
+          37026,
+          39553,
+          27453,
+          34140
+        ],
+        "description": "Mandatory entry point: read this first for any request to make, create, edit, animate, or render a video, animation, or motion graphic, including a promo, explainer, captioned clip, title card, overlay, slideshow or interactive deck, Remotion port, or any HyperFrames HTML composition. Also use it to inspect, diagnose, validate, preview, publish, or batch-render an existing HyperFrames project. Inputs may be a website URL, GitHub PR, Figma design or URL, text or brief, existing footage, or music. It resumes project state, captures intent when applicable, selects and installs the owning workflow, and routes domain capabilities. HyperFrames is the default output framework unless the user explicitly chooses another framework for the deliverable or asks only to record a browser session."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-upgrade",
+        "name": "azure-upgrade",
+        "installs": 393958,
+        "weeklyInstalls": [
+          13002,
+          11702,
+          15762,
+          16398,
+          17016,
+          16246,
+          16006,
+          14887
+        ],
+        "description": "Assess and upgrade Azure workloads between plans, tiers, or SKUs, or modernize Azure SDK dependencies in source code. WHEN: upgrade Consumption to Flex Consumption, upgrade Azure Functions plan, change hosting plan, function app SKU, migrate App Service to Container Apps, modernize legacy Azure Java SDKs (com.microsoft.azure to com.azure), migrate Azure Cache for Redis (ACR/ACRE) to Azure Managed Redis (AMR)."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "implement",
+        "name": "implement",
+        "installs": 388971,
+        "weeklyInstalls": [
+          21009,
+          29791,
+          55947,
+          51986,
+          48810,
+          45430,
+          55168,
+          45552
+        ],
+        "description": "Implement a piece of work based on a spec or set of tickets."
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-approval",
+        "name": "lark-approval",
+        "installs": 385152,
+        "weeklyInstalls": [
+          28153,
+          28866,
+          30452,
+          30238,
+          12478,
+          9286,
+          7972,
+          7262
+        ],
+        "description": "飞书审批：查询和处理审批待办/已办/实例，搜索可发起审批定义、查看定义详情并发起原生审批实例。当用户要处理审批任务、查看审批实例、搜索或发起审批时使用。审批待办不是飞书任务；非审批类待办走 lark-task。不负责创建审批定义；三方审批定义不走原生提单。"
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "kling-3-0",
+        "name": "kling-3-0",
+        "installs": 380009,
+        "weeklyInstalls": [
+          40324,
+          40654,
+          32803,
+          3353,
+          2996,
+          3022,
+          2933,
+          3735
+        ],
+        "description": "Kling 3.0 video generation on RunComfy. Kling 3.0 (also called Kling V3.0) is Kuaishou Technology's third-generation multi-shot video model with native synchronized audio and consistent character identity across shots. This skill covers all six Kling 3.0 endpoints, spanning three rendering tiers (Standard, Pro, 4K) and two modes (text-to-video, image-to-video). Calls runcomfy run kling/kling-3.0/<tier>/<mode> through the local RunComfy CLI. Triggers on \"kling\", \"kling 3.0\", \"kling v3\", \"kling pro\", \"kling 4k\", \"kling text to video\", \"kling image to video\", or any explicit ask to generate or animate with Kling 3.0."
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "design-taste-frontend",
+        "name": "design-taste-frontend",
+        "installs": 378230,
+        "weeklyInstalls": [
+          23159,
+          26204,
+          28201,
+          22203,
+          21764,
+          22212,
+          26808,
+          24487
+        ],
+        "description": ""
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "code-review",
+        "name": "code-review",
+        "installs": 368710,
+        "weeklyInstalls": [
+          0,
+          22030,
+          56657,
+          53517,
+          50915,
+          48107,
+          61595,
+          50927
+        ],
+        "description": "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\"."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "codex-pet",
+        "name": "codex-pet",
+        "installs": 368398,
+        "weeklyInstalls": [
+          40684,
+          40661,
+          32841,
+          3208,
+          3001,
+          3026,
+          2938,
+          3725
+        ],
+        "description": "Codex Pet generator on RunComfy. Build a Codex-compatible Codex Pet spritesheet.webp + pet.json from a single reference image, drop it into `${CODEX_HOME:-$HOME/.codex}/pets/<name>/` and Codex picks it up as a custom Codex Pet next to the 8 built-ins. This skill produces the exact Codex Pet atlas Codex expects (1536x1872 PNG/WebP, 8 cols x 9 rows, 192x208 cells, 9 animation states — idle, running-right, running-left, waving, jumping, failed, waiting, running, review). Calls OpenAI GPT Image 2 edit ONCE via the local RunComfy CLI as `runcomfy run openai/gpt-image-2/edit` to produce a canonical Codex Pet pose, then assembles all 9 animation rows programmatically with ImageMagick micro-transforms — no Codex Pro, no `$imagegen`, no OPENAI_API_KEY required, only RUNCOMFY_TOKEN. Triggers on \"codex pet\", \"create codex pet\", \"make codex pet\", \"hatch codex pet\", \"/hatch image\", \"desktop pet codex\", \"codex pets\", \"spritesheet.webp\", or any explicit ask to build a custom pet for OpenAI Codex."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-enterprise-infra-planner",
+        "name": "azure-enterprise-infra-planner",
+        "installs": 368096,
+        "weeklyInstalls": [
+          13004,
+          11699,
+          15756,
+          16402,
+          17041,
+          16276,
+          16011,
+          14897
+        ],
+        "description": "Architect and provision enterprise Azure infrastructure from workload descriptions. For cloud architects and platform engineers planning networking, identity, security, compliance, and multi-resource topologies with WAF alignment. Generates Bicep or Terraform directly (no azd). WHEN: 'plan Azure infrastructure', 'architect Azure landing zone', 'design hub-spoke network', 'plan multi-region DR topology', 'set up VNets firewalls and private endpoints', 'subscription-scope Bicep deployment', 'Azure Backup for VM workloads'. PREFER azure-prepare FOR app-centric workflows."
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-slides",
+        "name": "lark-slides",
+        "installs": 365451,
+        "weeklyInstalls": [
+          28176,
+          28854,
+          30475,
+          30269,
+          12543,
+          9387,
+          8067,
+          7365
+        ],
+        "description": "飞书幻灯片：创建和编辑幻灯片。创建演示文稿、读取幻灯片内容、管理幻灯片页面（创建、删除、读取、局部替换）。当用户需要创建或编辑幻灯片、读取或修改单个页面时使用。当用户给出 doubao.com 的 /slides/ URL/token 时，也应直接使用本 skill，不要因为域名不是飞书而回退到 WebFetch；路由依据是 URL 路径模式和 token，而不是域名。不负责：云文档内容编辑（走 lark-doc）、云文档里的独立画板对象（走 lark-whiteboard）、上传或下载普通文件（走 lark-drive）。"
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "to-prd",
+        "name": "to-prd",
+        "installs": 364982,
+        "weeklyInstalls": [
+          36489,
+          37819,
+          20213,
+          2268,
+          1392,
+          1347,
+          2031,
+          1235
+        ],
+        "description": ""
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-attendance",
+        "name": "lark-attendance",
+        "installs": 363131,
+        "weeklyInstalls": [
+          28043,
+          28771,
+          30358,
+          30138,
+          12385,
+          9221,
+          7876,
+          7198
+        ],
+        "description": "飞书考勤打卡：查询自己的考勤打卡记录"
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-kubernetes",
+        "name": "azure-kubernetes",
+        "installs": 361253,
+        "weeklyInstalls": [
+          13002,
+          11702,
+          15763,
+          16406,
+          17012,
+          16273,
+          16009,
+          15162
+        ],
+        "description": "Plan, create, and configure production-ready Azure Kubernetes Service (AKS) clusters. Covers Day-0 checklist, SKU selection (Automatic vs Standard), networking options (private API server, Azure CNI Overlay, egress configuration), security, and operations (autoscaling, upgrade strategy, cost analysis). WHEN: create AKS environment, provision AKS, enable AKS observability, design AKS networking, choose AKS SKU, secure AKS, optimize AKS, AKS spot nodes, AKS cluster-autoscaler, rightsize AKS pod, pod rightsizing, over-provisioned AKS pod, pod resource requests and limits, Vertical Pod Autoscaler, VPA recommendations."
+      },
+      {
+        "source": "heygen-com/hyperframes",
+        "skillId": "hyperframes-registry",
+        "name": "hyperframes-registry",
+        "installs": 360834,
+        "weeklyInstalls": [
+          30803,
+          27598,
+          28345,
+          41451,
+          29452,
+          27688,
+          21925,
+          37717
+        ],
+        "description": "Install, discover, and wire registry blocks and components into HyperFrames compositions. Use when running hyperframes add or hyperframes catalog, installing one item or every block matching a tag, wiring an installed item into index.html, or working with hyperframes.json. Covers discovery, install locations, block sub-composition wiring, component snippet merging, and authoring a new block or component to contribute upstream (idea → scaffold → validate → PR)."
+      },
+      {
+        "source": "supabase/agent-skills",
+        "skillId": "supabase-postgres-best-practices",
+        "name": "supabase-postgres-best-practices",
+        "installs": 358201,
+        "weeklyInstalls": [
+          11919,
+          12353,
+          14539,
+          12589,
+          12100,
+          14155,
+          15410,
+          13399
+        ],
+        "description": "Postgres best practices maintained by Supabase, for Postgres running anywhere. Load this skill BEFORE writing or changing anything that lives in a Postgres database: creating or altering tables and columns (including choosing column types), schema design, migrations and declarative schema files, RLS policies and the tests that verify them, indexes, triggers, database functions, queues and scheduled jobs (pg_cron, pgmq), vector/semantic search (pgvector), and restoring dumps (pg_restore) or importing data. Also load it when diagnosing slow queries, high CPU, timeouts, EXPLAIN plans, connection exhaustion, locking, bloat, or rows visible to the wrong user or tenant. This is not just a performance guide — schema, migration, security, and SQL authoring tasks need these rules too, even for a one-column change or a single query."
+      },
+      {
+        "source": "anthropics/skills",
+        "skillId": "skill-creator",
+        "name": "skill-creator",
+        "installs": 356723,
+        "weeklyInstalls": [
+          10775,
+          10292,
+          9599,
+          8985,
+          8677,
+          8627,
+          8460,
+          7468
+        ],
+        "description": "Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "to-issues",
+        "name": "to-issues",
+        "installs": 352044,
+        "weeklyInstalls": [
+          35364,
+          36743,
+          20807,
+          2184,
+          1324,
+          1287,
+          1968,
+          1205
+        ],
+        "description": ""
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "ai-video-generation",
+        "name": "ai-video-generation",
+        "installs": 349470,
+        "weeklyInstalls": [
+          40896,
+          40878,
+          32908,
+          3208,
+          3008,
+          3040,
+          2951,
+          3866
+        ],
+        "description": "Generate AI videos on RunComfy via the `runcomfy` CLI — a smart router across the full video-model catalog: HappyHorse 1.0 (Arena #1, native in-pass audio), Wan-AI Wan 2-7 (open weights, audio-driven lip-sync), ByteDance Seedance v2 / 1-5 / 1-0 (multi-modal cinematic), Kling 3.0 / 2-6, Google Veo 3-1, MiniMax Hailuo 2-3, ByteDance Dreamina 3-0. Covers text-to-video (t2v), image-to-video (i2v), and Veo's video-extend endpoint. The skill picks the right model for the user's intent (Arena-#1 quality, multi-shot character identity, in-pass audio, cinematic motion, fastest path, sub-15s clip, longest duration) and ships each model's documented prompting patterns plus the minimal `runcomfy run` invoke. Triggers on \"generate video\", \"make a video\", \"text to video\", \"t2v\", \"image to video\", \"i2v\", \"animate\", \"AI video\", \"make X move\", \"video from prompt\", \"video from image\", or any explicit ask to produce a video clip from prompt or still."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "ai-image-generation",
+        "name": "ai-image-generation",
+        "installs": 349045,
+        "weeklyInstalls": [
+          40546,
+          40923,
+          32776,
+          3367,
+          3010,
+          3038,
+          2949,
+          3935
+        ],
+        "description": "Generate and edit images on RunComfy via the `runcomfy` CLI — a smart router across the full image-model catalog: FLUX 2 (Klein 9B/4B, Pro, Dev, Flash, Turbo, Max), Google Nano Banana 2 / Pro, OpenAI GPT Image 2, ByteDance Seedream 5 / 4-5 / 4-0 and Dreamina 4-0, Alibaba Qwen Image and Z-Image Turbo, Wan 2-7. Covers both text-to-image (t2i) and image-to-image / edit (i2i) endpoints — the skill picks the right model for the user's actual intent (typography precision, photoreal portraits, sub-second iteration, multi-reference brand styling, open-weights workflow) and ships each model's documented prompting patterns plus the minimal `runcomfy run` invoke. Triggers on \"generate image\", \"make a picture\", \"text to image\", \"AI image\", \"make an image of …\", \"image to image\", \"i2i\", or any explicit ask to create or restyle an image."
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-okr",
+        "name": "lark-okr",
+        "installs": 349044,
+        "weeklyInstalls": [
+          28108,
+          28817,
+          30419,
+          30181,
+          12442,
+          9276,
+          7931,
+          7237
+        ],
+        "description": "飞书 OKR：管理目标与关键结果。查看和编辑 OKR 周期、目标、关键结果、对齐关系、量化指标和进展记录。当用户需要查看或创建 OKR、管理目标和关键结果、查看对齐关系时使用。不负责：待办任务管理（lark-task）、日程/会议安排（lark-calendar）、绩效评估"
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "runcomfy-cli",
+        "name": "runcomfy-cli",
+        "installs": 346963,
+        "weeklyInstalls": [
+          40639,
+          40482,
+          32994,
+          3182,
+          2998,
+          3019,
+          2935,
+          3719
+        ],
+        "description": "Run any model on RunComfy from the command line. The `runcomfy` CLI is one binary, one auth, hundreds of model endpoints — image generation, image edit, video generation, image-to-video, lip-sync, face swap, video edit, inpainting, outpainting, extend, ControlNet, relight, upscale, LoRA training and more. Submit a request, poll for status, download the output. This skill teaches the agent how to install, authenticate, discover model schemas, invoke models, stream / poll / no-wait, script in JSON output mode, and handle errors. Triggers on \"runcomfy cli\", \"install runcomfy\", \"runcomfy login\", \"runcomfy run\", \"runcomfy whoami\", \"runcomfy api\", or any explicit ask to call a RunComfy model from a script or terminal. Sibling skills (ai-image-generation, ai-video-generation, image-edit, video-edit, face-swap, lipsync, image-to-video, image-inpainting, image-outpainting, video-extend, controlnet-pose, relight) all dispatch through this CLI."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "ai-avatar-video",
+        "name": "ai-avatar-video",
+        "installs": 346695,
+        "weeklyInstalls": [
+          40202,
+          40768,
+          32723,
+          3379,
+          3002,
+          3028,
+          2943,
+          3747
+        ],
+        "description": "Create AI avatar, talking-head, and lip-sync videos on RunComfy via the `runcomfy` CLI. Routes across ByteDance OmniHuman (audio-driven full-body avatar), Wan-AI Wan 2-7 (audio-driven mouth sync via `audio_url` on a portrait), HappyHorse 1.0 (Arena #1 t2v / i2v with in-pass audio), and Seedance v2 Pro (multi-modal cinematic with reference audio + reference subject). Picks the right model for the user's actual intent — UGC voiceover, virtual presenter, dubbed product demo, lip-synced character, dialog scene — and ships each model's documented prompting patterns plus the minimal `runcomfy run` invoke. Triggers on \"talking head\", \"lip sync\", \"avatar video\", \"make X speak\", \"audio to video\", \"audio driven avatar\", \"virtual presenter\", \"AI spokesperson\", \"dubbed video\", \"UGC avatar\", \"HeyGen alternative\", \"Synthesia alternative\", \"digital human\", \"make this portrait talk\", \"video from voiceover\", or any explicit ask to put words in a face."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "face-swap",
+        "name": "face-swap",
+        "installs": 346660,
+        "weeklyInstalls": [
+          40246,
+          40824,
+          32758,
+          3370,
+          2996,
+          3023,
+          2932,
+          3729
+        ],
+        "description": "Swap a face / character into video or images on RunComfy via the `runcomfy` CLI. Routes across community Wan 2-2 Animate (audio-driven character animation + identity swap), GPT Image 2 Edit (single-shot precise face swap on still images via reference composition), Nano Banana Edit (batch identity-preserving swap), Flux Kontext (single-ref high-fidelity local face edit), and Kling 2-6 Motion Control Pro (transfer motion from one performance onto a target character). Picks the right model for the user's actual intent — single still vs video, full character vs face only, dialog scene vs silent motion. Triggers on \"face swap\", \"swap face\", \"deepfake\", \"face replacement\", \"character swap\", \"head swap\", \"put X's face on Y\", \"make this video star X\", \"replace the actor in this video\", \"swap the character in the photo\", \"deepfake video\", \"ReActor alternative\", or any explicit ask to substitute one identity for another."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "video-inpainting",
+        "name": "video-inpainting",
+        "installs": 344995,
+        "weeklyInstalls": [
+          40699,
+          40540,
+          33055,
+          3186,
+          2993,
+          3019,
+          2934,
+          3725
+        ],
+        "description": "Region edits across video frames on RunComfy via the `runcomfy` CLI — remove an object that appears across many frames, clean up wires or watermarks, replace a region with matching motion. Routes across Wan 2-7 edit-video (default, prompt-driven region edits with spatial language), Lucy Edit Restyle (identity-stable region-aware restyle), and Seedream 4-0 edit-sequential (when treating the clip as a frame stack). Picks the right route based on whether the change is prose-driven, identity-locked, or needs frame-by-frame still inpaint chained into a video. Triggers on \"video inpaint\", \"video inpainting\", \"remove from video\", \"mask region in video\", \"clean up video\", \"remove object from clip\", \"video patch\", \"frame-by-frame edit\", \"remove watermark from video\", \"remove passing person\", or any explicit ask to edit a region across video frames."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "image-inpainting",
+        "name": "image-inpainting",
+        "installs": 344522,
+        "weeklyInstalls": [
+          40518,
+          40812,
+          32914,
+          3169,
+          2997,
+          3020,
+          2935,
+          3713
+        ],
+        "description": "Mask-driven image inpainting on RunComfy via the `runcomfy` CLI. Routes to Tongyi MAI Z-Image Turbo Inpainting (the dedicated inpainting endpoint with mask, strength, and control-scale) and to identity-preserving edit models (Nano Banana 2 Edit, GPT Image 2 Edit, FLUX Kontext Pro) when a mask isn't available and the region must be described instead. Use for object removal, watermark removal, region replacement, blemish cleanup, and any controlled local edit where a binary mask defines the target area. Triggers on \"inpaint\", \"inpainting\", \"image inpaint\", \"remove from image\", \"fill region\", \"mask-driven edit\", \"remove watermark\", \"remove object\", \"patch the photo\", \"fill the hole\", or any explicit ask to edit a specific masked region of a still."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "controlnet-pose",
+        "name": "controlnet-pose",
+        "installs": 344333,
+        "weeklyInstalls": [
+          40366,
+          40658,
+          32906,
+          3171,
+          2993,
+          3022,
+          2934,
+          3703
+        ],
+        "description": "Pose-conditioned generation on RunComfy via the `runcomfy` CLI. Routes across Kling 2-6 Motion Control Pro / Standard (transfer the motion / blocking of a reference video onto a target character), community Wan 2-2 Animate (audio-driven character animation with pose conditioning), and Z-Image Turbo ControlNet LoRA (pose-conditioned image generation from an OpenPose / DWPose / canny / depth control image). Picks the right route based on video vs still and stylized vs photoreal. Triggers on \"controlnet\", \"control net\", \"pose control\", \"openpose\", \"DWPose\", \"transfer pose\", \"motion control\", \"pose driven\", \"character pose\", \"depth control\", \"canny edge\", \"use this pose\", or any explicit ask to condition generation on a pose / skeleton / motion / depth / canny reference."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "lipsync",
+        "name": "lipsync",
+        "installs": 344290,
+        "weeklyInstalls": [
+          40533,
+          40677,
+          33007,
+          3195,
+          2993,
+          3018,
+          2933,
+          3709
+        ],
+        "description": "Lip-sync a face to a specific audio track on RunComfy via the `runcomfy` CLI. Routes across ByteDance OmniHuman (audio-driven full-body avatar from a portrait + audio), Sync Labs sync v2 / Pro (state-of-the-art mouth sync onto a video), Kling lipsync (audio-to- video and text-to-video with synced speech), and Creatify lipsync. The skill picks the right endpoint for the user's actual intent — portrait still + audio (avatar-style), source video + audio (mouth- swap on existing footage), or generate-and-sync from a script. Triggers on \"lip sync\", \"lipsync\", \"make this video speak\", \"match audio to mouth\", \"dub video\", \"sync lips to voice\", \"Sync Labs\", \"voiceover sync\", or any explicit ask to drive a face's mouth from an audio track."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "video-extend",
+        "name": "video-extend",
+        "installs": 343877,
+        "weeklyInstalls": [
+          40299,
+          40616,
+          32674,
+          3349,
+          2994,
+          3021,
+          2934,
+          3711
+        ],
+        "description": "Extend or continue an existing video clip on RunComfy via the `runcomfy` CLI. Routes to Google Veo 3-1's `extend-video` and `fast/extend-video` endpoints — pick the source video plus a prompt describing what should happen next, and the model produces a clip that continues the original with consistent motion, lighting, and subject identity. Use when the user has a short Veo clip and wants it longer, or wants a chained narrative built shot-by-shot from a single seed clip. Triggers on \"extend video\", \"continue video\", \"longer video\", \"video extend\", \"make this clip longer\", \"Veo extend\", \"chain video shots\", \"video continuation\", or any explicit ask to take an existing video and add more frames after it."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "elevenlabs-music-generation",
+        "name": "elevenlabs-music-generation",
+        "installs": 343737,
+        "weeklyInstalls": [
+          40355,
+          40690,
+          32837,
+          3358,
+          2993,
+          3021,
+          2932,
+          3712
+        ],
+        "description": "Generate full songs and instrumental tracks with ElevenLabs Music on RunComfy via the `runcomfy` CLI. ElevenLabs Music turns a style description plus structured lyrics into studio-quality 44.1 kHz stereo audio — 5 seconds to 5 minutes — with section-level control (Intro / Verse / Chorus / Bridge), multilingual vocals, and commercial-friendly output. Generate a backing track, a full vocal song, a jingle, a podcast intro, a game loop, or an instrumental bed. Calls `runcomfy run elevenlabs/elevenlabs/music-generation` through the local RunComfy CLI. Triggers on \"generate music\", \"make a song\", \"AI music\", \"background music\", \"instrumental track\", \"ElevenLabs Music\", \"soundtrack\", \"jingle\", \"theme music\", \"royalty-free music\", \"compose\", or any explicit ask to generate music or a song from a text description."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "image-outpainting",
+        "name": "image-outpainting",
+        "installs": 343612,
+        "weeklyInstalls": [
+          40511,
+          40356,
+          32798,
+          3356,
+          2995,
+          3022,
+          2933,
+          3704
+        ],
+        "description": "Image outpainting on RunComfy via the `runcomfy` CLI — extend a still beyond its original canvas, fill in what the camera didn't capture, change aspect ratio (square → 16:9, portrait → landscape) while preserving the original content. Routes across Nano Banana 2 Edit (default, spatial-language driven), GPT Image 2 Edit (multi-ref with reference-style matching), FLUX Kontext Pro (single-shot maximum-preservation), and the brand edit endpoints (Seedream / Dreamina / Qwen / FLUX 2). Picks the right route based on whether the outpaint is prose-driven, reference-driven, or brand-locked. Triggers on \"outpaint\", \"outpainting\", \"extend image canvas\", \"expand the image\", \"fill in around the photo\", \"uncrop\", \"change aspect ratio\", \"extend frame\", \"wide-screen from square\", or any explicit ask to add canvas around an existing still."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "relight",
+        "name": "relight",
+        "installs": 343538,
+        "weeklyInstalls": [
+          40246,
+          40545,
+          32821,
+          3331,
+          2993,
+          3020,
+          2934,
+          3703
+        ],
+        "description": "Relight a still image — change the lighting setup, color temperature, direction, or mood — on RunComfy via the `runcomfy` CLI. Routes to Qwen Edit 2509's dedicated `relight` LoRA endpoint for purpose-built relighting, with fallback to identity-preserving edit endpoints (Nano Banana 2 Edit, GPT Image 2 Edit, FLUX Kontext Pro) when prose lighting language is enough. Use for product relighting (studio softbox → window light), portrait mood shift (overcast → golden hour), or color-grade change. Triggers on \"relight\", \"relighting\", \"change the lighting\", \"make it golden hour\", \"studio lighting\", \"rim light\", \"blue hour\", \"soft window light\", \"change light direction\", \"color temperature\", or any explicit ask to alter how a still is lit."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "video-outpainting",
+        "name": "video-outpainting",
+        "installs": 343424,
+        "weeklyInstalls": [
+          40534,
+          40470,
+          32776,
+          3335,
+          2993,
+          3022,
+          2933,
+          3706
+        ],
+        "description": "Video outpainting on RunComfy via the `runcomfy` CLI — extend the spatial canvas of a video, change aspect ratio (9:16 vertical to 16:9 horizontal or vice versa), add environment beyond the original frame while preserving the central action. Routes prompt-shaped spatial extension through Wan 2-7 edit-video and points the agent at dedicated ComfyUI outpaint workflows when seam quality matters for hero delivery. Triggers on \"video outpaint\", \"video outpainting\", \"extend video canvas\", \"expand video frame\", \"uncrop video\", \"aspect ratio change\", \"vertical to horizontal video\", \"16:9 from 9:16\", \"TikTok to YouTube\", or any explicit ask to extend a video spatially beyond its original frame."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "wayfinder",
+        "name": "wayfinder",
+        "installs": 341739,
+        "weeklyInstalls": [
+          0,
+          10843,
+          49242,
+          51559,
+          47900,
+          47117,
+          60412,
+          48729
+        ],
+        "description": "Plan a huge chunk of work (more than one agent session can hold) as a shared map of decision tickets on your issue tracker, and resolve them one at a time until the way to the destination is clear."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-cost",
+        "name": "azure-cost",
+        "installs": 336470,
+        "weeklyInstalls": [
+          12990,
+          11689,
+          15755,
+          16397,
+          17048,
+          16291,
+          16018,
+          14905
+        ],
+        "description": "Azure cost management: query costs, forecast spending, optimize to reduce waste. WHEN: \"Azure costs\", \"Azure bill\", \"cost breakdown\", \"how much am I spending\", \"forecast spending\", \"optimize costs\", \"reduce spending\", \"orphaned resources\", \"rightsize VMs\", \"cost spike\", \"reduce storage costs\", \"AKS cost\". DO NOT USE FOR: deploying resources, provisioning, diagnostics, or security audits."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "ai-music",
+        "name": "ai-music",
+        "installs": 335738,
+        "weeklyInstalls": [
+          40457,
+          40876,
+          32778,
+          3363,
+          3012,
+          3042,
+          2940,
+          3730
+        ],
+        "description": "Generate AI music on RunComfy via the `runcomfy` CLI — a smart router across the music-model catalog. Routes to ElevenLabs AI Music Generation (premium 44.1 kHz stereo vocal tracks, 5 s–5 min, $0.0083/s) and ACE Step / ACE Step 1.5 (StepFun-AI open-weights, tag-driven composition, multilingual lyrics, $0.0002–0.0003/s, ~27× cheaper), plus ACE Step audio-inpaint (regenerate a time range inside an existing track) and ACE Step audio-outpaint (extend a track before or after). Picks the right model for the user's actual intent — premium vocal hook, cheap background music library, multilingual pop song, repair a bad chorus, lengthen a 30 s draft into a 2 min cut — and ships each model's documented prompting patterns plus the minimal `runcomfy run` invoke. Triggers on \"generate music\", \"make a song\", \"AI music\", \"background music\", \"instrumental track\", \"soundtrack\", \"jingle\", \"theme music\", \"royalty-free music\", \"compose\", \"music with lyrics\", \"extend music\", \"fix this song\", \"inpaint music\", or any explicit ask to generate or edit music."
+      },
+      {
+        "source": "prime-skills/runcomfy-agent-skills",
+        "skillId": "ace-step",
+        "name": "ace-step",
+        "installs": 335323,
+        "weeklyInstalls": [
+          40484,
+          40620,
+          33035,
+          3175,
+          2994,
+          3021,
+          2935,
+          3705
+        ],
+        "description": "Generate, inpaint, and outpaint music with ACE Step on RunComfy via the `runcomfy` CLI. ACE Step is StepFun-AI's open-weights music foundation model — tag-driven composition (genre, mood, instruments), multilingual lyrics with section markers, 5 s to 4 min stereo output, $0.0002–0.0003 per second (≈ 27× cheaper than ElevenLabs Music). Four endpoints: ACE Step text-to-audio (the default), ACE Step 1.5 text-to-audio (50+ language lyrics, refined structured-lyric handling), ACE Step audio-inpaint (regenerate a time range inside an existing track), ACE Step audio-outpaint (extend an existing track before or after). Triggers on \"ace step\", \"ace-step\", \"acestep\", \"ACE music\", \"open music model\", \"cheap AI music\", \"inpaint audio\", \"audio inpaint\", \"extend music\", \"audio outpaint\", \"lengthen track\", \"music with tags\", or any explicit ask to generate or edit music with ACE Step."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "research",
+        "name": "research",
+        "installs": 335134,
+        "weeklyInstalls": [
+          0,
+          14781,
+          54222,
+          50672,
+          47599,
+          44940,
+          54803,
+          45018
+        ],
+        "description": "Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent."
+      },
+      {
+        "source": "obra/superpowers",
+        "skillId": "brainstorming",
+        "name": "brainstorming",
+        "installs": 332216,
+        "weeklyInstalls": [
+          12454,
+          12626,
+          13367,
+          11833,
+          11341,
+          10824,
+          10207,
+          9594
+        ],
+        "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-markdown",
+        "name": "lark-markdown",
+        "installs": 329377,
+        "weeklyInstalls": [
+          28242,
+          28946,
+          30562,
+          30346,
+          12645,
+          9606,
+          8203,
+          7488
+        ],
+        "description": "飞书 Markdown：查看、创建、上传、编辑和比较 Markdown 文件。当用户需要创建或编辑 Markdown 文件、读取、修改、局部 patch 或比较差异时使用。不负责将 Markdown 导入为飞书在线文档，也不负责文件搜索、权限、评论、移动、删除等云空间管理操作。"
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "to-spec",
+        "name": "to-spec",
+        "installs": 327705,
+        "weeklyInstalls": [
+          0,
+          2,
+          41415,
+          52371,
+          49982,
+          47941,
+          61040,
+          49738
+        ],
+        "description": "Turn the current conversation into a spec and publish it to the project issue tracker: no interview, just synthesis of what you've already discussed."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "resolving-merge-conflicts",
+        "name": "resolving-merge-conflicts",
+        "installs": 324413,
+        "weeklyInstalls": [
+          19816,
+          19945,
+          26825,
+          44629,
+          44683,
+          41736,
+          50799,
+          42167
+        ],
+        "description": "Use when you need to resolve an in-progress git merge/rebase conflict."
+      },
+      {
+        "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+        "skillId": "ui-ux-pro-max",
+        "name": "ui-ux-pro-max",
+        "installs": 322509,
+        "weeklyInstalls": [
+          11513,
+          11144,
+          11964,
+          11808,
+          11236,
+          11152,
+          10991,
+          9936
+        ],
+        "description": "UI/UX design intelligence for web, mobile, and desktop. This skill should be used when designing, building, reviewing, or fixing interfaces, including pages, components, design systems, accessibility, interaction, responsive layout, typography, color, charts, and stack-specific UI implementation. Searchable local data: 79 searchable styles (50 active), 192 product palettes and reasoning profiles, 74 font pairings, 119 UX guidelines, 105 icons, 17 GSAP presets, 25 chart types, and 22 stacks."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "to-tickets",
+        "name": "to-tickets",
+        "installs": 322232,
+        "weeklyInstalls": [
+          0,
+          2,
+          41155,
+          51470,
+          50166,
+          47726,
+          57752,
+          47951
+        ],
+        "description": "Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker (edges as text in one file per ticket locally, or native blocking links on a real tracker)."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "writing-great-skills",
+        "name": "writing-great-skills",
+        "installs": 318883,
+        "weeklyInstalls": [
+          33815,
+          36197,
+          55665,
+          50844,
+          47810,
+          45601,
+          23217,
+          3017
+        ],
+        "description": ""
+      },
+      {
+        "source": "juliusbrussee/caveman",
+        "skillId": "caveman-commit",
+        "name": "caveman-commit",
+        "installs": 312733,
+        "weeklyInstalls": [
+          16281,
+          20867,
+          20036,
+          16638,
+          15849,
+          15213,
+          15525,
+          10645
+        ],
+        "description": "Ultra-compressed commit message generator. Cuts noise from commit messages while preserving intent and reasoning. Conventional Commits format. Subject ≤50 chars, body only when \"why\" isn't obvious. Use when user says \"write a commit\", \"commit message\", \"generate commit\", \"/commit\", or invokes /caveman-commit. Auto-triggers when staging changes."
+      },
+      {
+        "source": "juliusbrussee/caveman",
+        "skillId": "caveman-review",
+        "name": "caveman-review",
+        "installs": 310303,
+        "weeklyInstalls": [
+          16222,
+          20766,
+          19924,
+          16618,
+          15788,
+          15187,
+          15505,
+          10403
+        ],
+        "description": "Ultra-compressed code review comments. Cuts noise from PR feedback while preserving the actionable signal. Each comment is one line: location, problem, fix. Use when user says \"review this PR\", \"code review\", \"review the diff\", \"/review\", or invokes /caveman-review. Auto-triggers when reviewing pull requests."
+      },
+      {
+        "source": "juliusbrussee/caveman",
+        "skillId": "caveman-compress",
+        "name": "caveman-compress",
+        "installs": 308340,
+        "weeklyInstalls": [
+          16129,
+          20726,
+          19905,
+          16435,
+          15639,
+          15015,
+          15570,
+          10610
+        ],
+        "description": "Compress natural language memory files (CLAUDE.md, todos, preferences) into caveman format to save input tokens. Preserves all technical substance, code, URLs, and structure. Compressed version overwrites the original file. Human-readable backup saved as FILE.original.md. Trigger: /caveman-compress FILEPATH or \"compress memory file\""
+      },
+      {
+        "source": "juliusbrussee/caveman",
+        "skillId": "caveman-help",
+        "name": "caveman-help",
+        "installs": 302189,
+        "weeklyInstalls": [
+          16005,
+          20568,
+          19689,
+          16343,
+          15442,
+          14879,
+          15551,
+          10444
+        ],
+        "description": "Quick-reference card for all caveman modes, skills, and commands. One-shot display, not a persistent mode. Trigger: /caveman-help, \"caveman help\", \"what caveman commands\", \"how do I use caveman\"."
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-vc-agent",
+        "name": "lark-vc-agent",
+        "installs": 300037,
+        "weeklyInstalls": [
+          28074,
+          28803,
+          30396,
+          30194,
+          12416,
+          9241,
+          7900,
+          7254
+        ],
+        "description": "飞书视频会议会中能力：用于让应用机器人真实加入或离开正在进行的会议，并读取当前身份可见的会中事件、发送会中文本消息或会中表情。适用于用户询问正在开的会议发生了什么、谁在发言、是否共享内容，或需要发现当前可读的进行中会议 ID。不负责已结束会议搜索、参会人快照、纪要、逐字稿或录制查询，这些使用 lark-vc 技能。"
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "ai-research-explore",
+        "name": "ai-research-explore",
+        "installs": 299095,
+        "weeklyInstalls": [
+          18946,
+          20631,
+          22328,
+          26804,
+          25189,
+          11263,
+          32324,
+          50300
+        ],
+        "description": "Rigor Explore compatible skill slug for meaningful and potentially novel deep learning research candidates. Use when the researcher has chosen the task family, dataset, benchmark, evaluation method, provided SOTA references, and wants candidate-only exploration on top of `current_research` with auditable repo understanding, idea gating, fair comparison, and governed experiments written to `explore_outputs/`. Do not use for README-first trusted reproduction, open-ended direction finding, narrow code-only or run-only exploration, passive repo analysis, verified novelty claims, or implicit experimentation."
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "analyze-project",
+        "name": "analyze-project",
+        "installs": 298998,
+        "weeklyInstalls": [
+          18882,
+          20567,
+          22289,
+          26712,
+          25106,
+          11180,
+          32243,
+          50275
+        ],
+        "description": "Rigor Analyze / Rigor Audit read-only skill for deep learning research repositories. Use when the user wants to read and understand a repository, inspect model structure and training or inference entrypoints, review configs and insertion points, or flag suspicious implementation patterns without modifying code or running heavy jobs. Do not use for active command execution, broad refactoring, speculative code adaptation, or automatic bug fixing."
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "ai-research-reproduction",
+        "name": "ai-research-reproduction",
+        "installs": 298904,
+        "weeklyInstalls": [
+          18863,
+          20528,
+          22267,
+          26717,
+          25099,
+          11179,
+          32246,
+          50263
+        ],
+        "description": "Rigor Reproduce compatible skill slug for README-first deep learning repository reproduction. Use when the user wants an end-to-end, minimal-trustworthy flow that reads the repository first, selects the smallest documented inference or evaluation target, coordinates intake, setup, trusted execution, optional trusted training, optional repository analysis, and optional paper-gap resolution, enforces conservative patch rules, records evidence assumptions deviations and human decision points, and writes the standardized `repro_outputs/` bundle. Do not use for paper summary, generic environment setup, isolated repo scanning, standalone command execution, silent protocol changes, score chasing, or broad research assistance outside repository-grounded reproduction."
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "explore-code",
+        "name": "explore-code",
+        "installs": 298683,
+        "weeklyInstalls": [
+          18849,
+          20515,
+          22260,
+          26708,
+          25083,
+          11168,
+          32233,
+          50243
+        ],
+        "description": "Rigor Improve implementation leaf skill for auditable candidate implementation in deep learning research repositories. Use when the researcher explicitly authorizes exploratory work on an isolated branch or worktree to transplant modules, adapt a backbone, add LoRA or adapter layers, replace a head, or stitch together meaningful low-risk migration ideas with rollback-aware records in `explore_outputs/`. Do not use for end-to-end exploration orchestration on top of `current_research`, trusted baseline reproduction, conservative debugging, environment setup, verified contribution claims, or default repository analysis."
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "safe-debug",
+        "name": "safe-debug",
+        "installs": 298610,
+        "weeklyInstalls": [
+          18846,
+          20506,
+          22249,
+          26705,
+          25083,
+          11165,
+          32225,
+          50255
+        ],
+        "description": "Rigor Debug / Rigor Audit skill for deep learning research work. Use when the user pastes a traceback, terminal error, CUDA OOM, checkpoint load failure, shape mismatch, NaN loss symptom, or training failure and wants conservative diagnosis before any patching, with debug fixes clearly separated from research contributions. Do not use for broad refactoring, speculative adaptation, automatic exploratory patching, or general repository familiarization."
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "run-train",
+        "name": "run-train",
+        "installs": 298551,
+        "weeklyInstalls": [
+          18843,
+          20501,
+          22239,
+          26704,
+          25081,
+          11161,
+          32221,
+          50239
+        ],
+        "description": "Rigor Train skill for deep learning research repositories. Use when a documented or selected training command should be run conservatively for startup verification, short-run verification, full kickoff, or resume, with command, config, seed, log, checkpoint, status, and metric evidence written to standardized `train_outputs/`. Do not use for environment setup, exploratory sweeps, speculative idea implementation, or end-to-end orchestration."
+      },
+      {
+        "source": "lllllllama/rigorpilot-skills",
+        "skillId": "explore-run",
+        "name": "explore-run",
+        "installs": 298542,
+        "weeklyInstalls": [
+          18838,
+          20498,
+          22240,
+          26700,
+          25084,
+          11162,
+          32222,
+          50237
+        ],
+        "description": "Rigor Improve / Rigor Explore run leaf skill for bounded exploratory evidence in deep learning research repositories. Use when the researcher explicitly authorizes exploratory runs such as small-subset validation, short-cycle guess-and-check, batch sweeps, idle-GPU search, or quick transfer-learning trials, with fair-comparison caveats and no-overclaim summaries in `explore_outputs/`. Do not use for end-to-end exploration orchestration on top of `current_research`, trusted baseline execution, conservative training verification, default routing, verified SOTA claims, or implicit experimentation."
+      },
+      {
+        "source": "vercel-labs/agent-skills",
+        "skillId": "vercel-composition-patterns",
+        "name": "vercel-composition-patterns",
+        "installs": 296227,
+        "weeklyInstalls": [
+          8642,
+          9131,
+          9013,
+          8590,
+          8567,
+          9049,
+          9577,
+          8857
+        ],
+        "description": ""
+      },
+      {
+        "source": "heygen-com/hyperframes",
+        "skillId": "hyperframes-core",
+        "name": "hyperframes-core",
+        "installs": 292647,
+        "weeklyInstalls": [
+          30874,
+          27680,
+          30435,
+          43896,
+          38454,
+          39468,
+          26653,
+          27491
+        ],
+        "description": "The HyperFrames composition contract — build one renderable project. Use for composition structure, the `data-*` timing attributes, `class=\"clip\"`, tracks, sub-compositions, variables, framework-owned media playback, deterministic-render rules, and validation. Also covers Tailwind projects and the STORYBOARD.md / SCRIPT.md plan formats. Read before writing composition HTML."
+      },
+      {
+        "source": "heygen-com/hyperframes",
+        "skillId": "hyperframes-animation",
+        "name": "hyperframes-animation",
+        "installs": 290189,
+        "weeklyInstalls": [
+          31099,
+          27871,
+          30492,
+          43322,
+          36709,
+          36380,
+          27458,
+          28486
+        ],
+        "description": "All animation knowledge for HyperFrames — atomic motion rules, multi-phase scene blueprints, scene transitions, broader motion-design techniques, AND the seven runtime adapters (GSAP default, plus Lottie, Three.js, Anime.js, CSS keyframes, Web Animations API, TypeGPU). Use for any motion or animation task: pick 2-4 rules and compose, or load a blueprint, or look up runtime-specific API (e.g. GSAP eases / Lottie player / Three.js mixer). Also covers auditing an existing composition's choreography (animation map) and 24 named text-animation effects. HyperFrames-native: single paused timeline, seek-safe, deterministic."
+      },
+      {
+        "source": "heygen-com/hyperframes",
+        "skillId": "media-use",
+        "name": "media-use",
+        "installs": 290161,
+        "weeklyInstalls": [
+          17290,
+          27467,
+          31145,
+          49141,
+          39920,
+          40022,
+          33673,
+          36304
+        ],
+        "description": "Agent Media OS, the single skill for every media need in a HyperFrames project. Resolve BGM, SFX, image, icon, brand logo, voice, color grade, or LUT into a frozen local file or paste-ready block + ledger record (one verb, `resolve`); generate via TTS / music / image models when the catalog misses; produce voiceover, transcription, captions, and background removal through one shared audio engine; operate on media (cut / reframe / transform); and reuse assets across projects. Also use for vague feedback that real footage looks dark, flat, boring, should feel retro/camcorder/print/ASCII, needs privacy, or needs a media reveal."
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "high-end-visual-design",
+        "name": "high-end-visual-design",
+        "installs": 283360,
+        "weeklyInstalls": [
+          17284,
+          19127,
+          20104,
+          15588,
+          15429,
+          14837,
+          18236,
+          16108
+        ],
+        "description": ""
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "airunway-aks-setup",
+        "name": "airunway-aks-setup",
+        "installs": 280596,
+        "weeklyInstalls": [
+          12911,
+          11607,
+          15695,
+          16347,
+          16865,
+          16190,
+          15950,
+          14851
+        ],
+        "description": "Set up AI Runway on AKS — from bare cluster to running model. Covers cluster verification, controller install, GPU assessment, provider setup, and first deployment. WHEN: \"setup AI Runway\", \"onboard AKS cluster\", \"install AI Runway\", \"airunway setup\", \"deploy model to AKS\", \"GPU inference on AKS\", \"KAITO setup on AKS\", \"run LLM on AKS\", \"vLLM on AKS\", \"set up model serving on AKS\", \"AI Runway controller\"."
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "redesign-existing-projects",
+        "name": "redesign-existing-projects",
+        "installs": 279629,
+        "weeklyInstalls": [
+          17080,
+          18833,
+          20039,
+          15398,
+          15183,
+          14693,
+          18212,
+          16098
+        ],
+        "description": ""
+      },
+      {
+        "source": "shadcn/ui",
+        "skillId": "shadcn",
+        "name": "shadcn",
+        "installs": 271674,
+        "weeklyInstalls": [
+          9996,
+          11201,
+          11103,
+          10204,
+          9815,
+          11347,
+          7947,
+          0
+        ],
+        "description": "Manages shadcn components and projects — adding, searching, fixing, debugging, styling, and composing UI, including chat interfaces. Provides project context, component docs, and usage examples. Applies when working with shadcn/ui, component registries, presets, --preset codes, or any project with a components.json file. Also triggers for \"shadcn init\", \"create an app with --preset\", or \"switch to --preset\"."
+      },
+      {
+        "source": "heygen-com/hyperframes",
+        "skillId": "hyperframes-creative",
+        "name": "hyperframes-creative",
+        "installs": 271591,
+        "weeklyInstalls": [
+          30789,
+          27640,
+          30254,
+          44694,
+          34271,
+          29765,
+          23070,
+          25670
+        ],
+        "description": "Non-animation creative direction for HyperFrames videos. Use for design spec (frame.md / design.md) handling, palettes, typography, narration, beat planning, audio-reactive visuals, composition patterns, and brand / style decisions. For atomic motion patterns and scene blueprints, use `hyperframes-animation`."
+      },
+      {
+        "source": "larksuite/cli",
+        "skillId": "lark-apps",
+        "name": "lark-apps",
+        "installs": 260038,
+        "weeklyInstalls": [
+          28004,
+          28760,
+          30371,
+          30196,
+          12448,
+          9262,
+          7966,
+          7285
+        ],
+        "description": "妙搭（Spark/Miaoda）应用开发与托管：应用创建、本地全栈开发、云端生成迭代、创意设计（UI mockup / 可交互原型 / 线框图 / 落地页 / 仪表盘 / 幻灯片 deck / 视觉探索）、AI相关能力和飞书平台能力或者其他外部能力集成、日志/Trace/监控指标/PV/UV 查询、环境变量管理、应用协作者与协作权限设置、应用角色与成员管理、自动化触发器（定时/记录变更/Webhook/飞书审批）。当用户要开发/新建一个系统·工具·平台·应用，或要本地开发 / 云端开发 / 修改 / 部署 / 发布 / 上线 / 拿可分享链接，或用 HTML 做页面·网站·部署到妙搭，或要设计 / design / mockup / prototype / wireframe / 做 PPT / deck / 视觉探索，或提到妙搭/Spark/Miaoda（应用运行时域名形如 *.aiforce.cloud）、应用数据库、应用文件存储、开放 API Key、可见范围、应用协作者/开发权限、应用角色/角色成员、线上日志、接口请求量、错误量、延迟、访问量、环境变量、给妙搭应用配自动化任务/定时触发/审批通过后自动触发时使用。不负责普通云盘文件上传（lark-drive）、飞书文档编辑（lark-doc）、原生幻灯片创建（lark-slides）。"
+      },
+      {
+        "source": "juliusbrussee/caveman",
+        "skillId": "cavecrew",
+        "name": "cavecrew",
+        "installs": 259888,
+        "weeklyInstalls": [
+          15966,
+          20671,
+          19815,
+          16332,
+          15488,
+          14891,
+          15199,
+          10221
+        ],
+        "description": "Decision guide for delegating to caveman-style subagents. Tells the main thread WHEN to spawn `cavecrew-investigator` (locate code), `cavecrew-builder` (1-2 file edit), or `cavecrew-reviewer` (diff review) instead of doing the work inline or using vanilla `Explore`. Subagent output is caveman-compressed so the tool-result injected back into main context is ~60% smaller — main context lasts longer across long sessions. Trigger: \"delegate to subagent\", \"use cavecrew\", \"spawn investigator/builder/reviewer\", \"save context\", \"compressed agent output\"."
+      },
+      {
+        "source": "juliusbrussee/caveman",
+        "skillId": "caveman-stats",
+        "name": "caveman-stats",
+        "installs": 259265,
+        "weeklyInstalls": [
+          15980,
+          20564,
+          19677,
+          16241,
+          15428,
+          14834,
+          15408,
+          10189
+        ],
+        "description": "Show real token usage and estimated savings for the current session. Reads directly from the Claude Code session log — no AI estimation. Triggers on /caveman-stats. Output is injected by the mode-tracker hook; the model itself does not compute the numbers."
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "minimalist-ui",
+        "name": "minimalist-ui",
+        "installs": 259111,
+        "weeklyInstalls": [
+          15931,
+          17633,
+          18429,
+          14025,
+          13972,
+          13471,
+          16729,
+          14661
+        ],
+        "description": ""
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "entra-agent-id",
+        "name": "entra-agent-id",
+        "installs": 254758,
+        "weeklyInstalls": [
+          12884,
+          11580,
+          15675,
+          16325,
+          16986,
+          16128,
+          15926,
+          14830
+        ],
+        "description": "Provision Microsoft Entra Agent Identity Blueprints, BlueprintPrincipals, and per-instance Agent Identities via Microsoft Graph, and configure OAuth 2.0 token exchange (fmi_path, OBO, cross-tenant) including the Microsoft Entra SDK for AgentID sidecar. USE FOR: Agent Identity Blueprint, BlueprintPrincipal, agent OAuth, fmi_path token exchange, agent OBO, Workload Identity Federation for agents, polyglot agent auth, Microsoft.Identity.Web.AgentIdentities. DO NOT USE FOR: standard Entra app registration (use entra-app-registration), Microsoft Foundry agent authoring (use microsoft-foundry)."
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "full-output-enforcement",
+        "name": "full-output-enforcement",
+        "installs": 246567,
+        "weeklyInstalls": [
+          14913,
+          16651,
+          17336,
+          13306,
+          13152,
+          12709,
+          15709,
+          13763
+        ],
+        "description": ""
+      },
+      {
+        "source": "scrapegraphai/just-scrape",
+        "skillId": "just-scrape",
+        "name": "just-scrape",
+        "installs": 244927,
+        "weeklyInstalls": [
+          19,
+          16571,
+          17112,
+          12,
+          15,
+          11,
+          15,
+          17
+        ],
+        "description": "Search, scrape, crawl, extract structured data, and monitor web pages via the ScrapeGraph AI CLI. Use when the user asks to search the web, scrape a webpage, grab content from a URL, extract JSON from a site, crawl documentation or site sections, monitor a page for changes, inspect request history, check ScrapeGraph credits, or validate API setup."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "git-guardrails-claude-code",
+        "name": "git-guardrails-claude-code",
+        "installs": 242006,
+        "weeklyInstalls": [
+          19002,
+          19089,
+          25126,
+          23296,
+          21729,
+          20379,
+          22344,
+          19342
+        ],
+        "description": "Set up Claude Code hooks to block dangerous git commands (push, reset --hard, clean, branch -D, etc.) before they execute. Use when user wants to prevent destructive git operations, add git safety hooks, or block git push/reset in Claude Code."
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "industrial-brutalist-ui",
+        "name": "industrial-brutalist-ui",
+        "installs": 240566,
+        "weeklyInstalls": [
+          14783,
+          16406,
+          17033,
+          12974,
+          12881,
+          12452,
+          15393,
+          13619
+        ],
+        "description": ""
+      },
+      {
+        "source": "pbakaus/impeccable",
+        "skillId": "impeccable",
+        "name": "impeccable",
+        "installs": 239768,
+        "weeklyInstalls": [
+          7158,
+          8105,
+          8671,
+          7333,
+          8622,
+          9113,
+          9443,
+          9249
+        ],
+        "description": "Use when the user wants to design, redesign, shape, critique, audit, polish, clarify, distill, harden, optimize, adapt, animate, colorize, extract, or otherwise improve a frontend interface. Covers websites, landing pages, dashboards, product UI, app shells, components, forms, settings, onboarding, and empty states. Handles UX review, visual hierarchy, information architecture, cognitive load, accessibility, performance, responsive behavior, theming, anti-patterns, typography, fonts, spacing, layout, alignment, color, motion, micro-interactions, UX copy, error states, edge cases, i18n, and reusable design systems or tokens. Also use for bland designs that need to become bolder or more delightful, loud designs that should become quieter, live browser iteration on UI elements, or ambitious visual effects that should feel technically extraordinary. Not for backend-only or non-UI tasks."
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "stitch-design-taste",
+        "name": "stitch-design-taste",
+        "installs": 239221,
+        "weeklyInstalls": [
+          14558,
+          16194,
+          16842,
+          12892,
+          12804,
+          12379,
+          15296,
+          13585
+        ],
+        "description": ""
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "gpt-taste",
+        "name": "gpt-taste",
+        "installs": 238010,
+        "weeklyInstalls": [
+          15225,
+          17059,
+          17907,
+          13757,
+          13515,
+          12879,
+          15908,
+          14135
+        ],
+        "description": ""
+      },
+      {
+        "source": "skills-101/superpowers",
+        "skillId": "ai-video-generation",
+        "name": "ai-video-generation",
+        "installs": 237966,
+        "weeklyInstalls": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          14114,
+          158346
+        ],
+        "description": "Generate AI videos with Google Veo, Seedance 2.0, HappyHorse, Wan, Grok and 40+ models via inference.sh CLI. Models: Veo 3.1, Veo 3, Seedance 2.0, HappyHorse 1.0, Wan 2.5, Grok Imagine Video, OmniHuman, Fabric, HunyuanVideo. Capabilities: text-to-video, image-to-video, reference-to-video, video editing, lipsync, avatar animation, video upscaling, foley sound. Use for: social media videos, marketing content, explainer videos, product demos, AI avatars. Triggers: video generation, ai video, text to video, image to video, veo, animate image, video from image, ai animation, video generator, generate video, t2v, i2v, ai video maker, create video with ai, runway alternative, pika alternative, sora alternative, kling alternative, seedance, happyhorse"
+      },
+      {
+        "source": "skills-101/superpowers",
+        "skillId": "ai-image-generation",
+        "name": "ai-image-generation",
+        "installs": 237788,
+        "weeklyInstalls": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          14124,
+          158213
+        ],
+        "description": "Generate AI images with GPT-Image-2, FLUX, Gemini, Grok, Seedream, Reve and 50+ models via inference.sh CLI. Models: GPT-Image-2, FLUX Dev LoRA, FLUX.2 Klein LoRA, Gemini 3 Pro Image, Grok Imagine, Seedream 4.5, Reve, ImagineArt. Capabilities: text-to-image, image-to-image, inpainting, LoRA, image editing, upscaling, text rendering. Use for: AI art, product mockups, concept art, social media graphics, marketing visuals, illustrations. Triggers: flux, image generation, ai image, text to image, stable diffusion, generate image, ai art, midjourney alternative, dall-e alternative, text2img, t2i, image generator, ai picture, create image with ai, generative ai, ai illustration, grok image, gemini image, gpt image, openai image, chatgpt image"
+      },
+      {
+        "source": "skills-101/superpowers",
+        "skillId": "ai-avatar-video",
+        "name": "ai-avatar-video",
+        "installs": 237712,
+        "weeklyInstalls": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          14114,
+          158150
+        ],
+        "description": "Create AI avatar and talking head videos via inference.sh CLI. Recommended: P-Video-Avatar (fastest, cheapest, built-in TTS). Also: OmniHuman, Fabric, PixVerse. Audio: Inworld TTS-2 (100+ languages, emotion steering for characters), ElevenLabs, Kokoro. Capabilities: audio-driven avatars, text-to-avatar, lipsync videos, talking head generation, virtual presenters, UGC content. Use for: AI presenters, explainer videos, virtual influencers, dubbing, marketing videos, UGC ads, gaming avatars, NPC dialogue. Triggers: ai avatar, talking head, lipsync, avatar video, virtual presenter, ai spokesperson, audio driven video, heygen alternative, synthesia alternative, talking avatar, lip sync, video avatar, ai presenter, digital human, ugc, ugc video, ugc ad, avatar ugc"
+      },
+      {
+        "source": "skills-101/superpowers",
+        "skillId": "twitter-automation",
+        "name": "twitter-automation",
+        "installs": 237604,
+        "weeklyInstalls": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          14114,
+          158049
+        ],
+        "description": "Automate Twitter/X with posting, engagement, and user management via inference.sh CLI. Apps: x/post-tweet, x/post-create (with media), x/post-like, x/post-retweet, x/dm-send, x/user-follow. Capabilities: post tweets, schedule content, like posts, retweet, send DMs, follow users, get profiles. Use for: social media automation, content scheduling, engagement bots, audience growth, X API. Triggers: twitter api, x api, tweet automation, post to twitter, twitter bot, social media automation, x automation, tweet scheduler, twitter integration, post tweet, twitter post, x post, send tweet"
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "diagnose",
+        "name": "diagnose",
+        "installs": 237229,
+        "weeklyInstalls": [
+          1066,
+          774,
+          1304,
+          919,
+          646,
+          757,
+          1152,
+          733
+        ],
+        "description": ""
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "setup-pre-commit",
+        "name": "setup-pre-commit",
+        "installs": 235371,
+        "weeklyInstalls": [
+          18643,
+          18612,
+          24539,
+          22706,
+          21399,
+          20084,
+          22024,
+          19043
+        ],
+        "description": "Set up Husky pre-commit hooks with lint-staged (Prettier), type checking, and tests in the current repo. Use when user wants to add pre-commit hooks, set up Husky, configure lint-staged, or add commit-time formatting/typechecking/testing."
+      },
+      {
+        "source": "heygen-com/hyperframes",
+        "skillId": "remotion-to-hyperframes",
+        "name": "remotion-to-hyperframes",
+        "installs": 232588,
+        "weeklyInstalls": [
+          30584,
+          27471,
+          21784,
+          15975,
+          15302,
+          11506,
+          12046,
+          9324
+        ],
+        "description": "Port an existing Remotion (React) composition's source to HyperFrames HTML. Use ONLY on an explicit ask to port/convert/migrate/translate a Remotion source — one-way, Remotion-only. A passing Remotion mention, reference-only code, or \"make something like my Remotion video\" is a fresh build (/general-video). Unclear → /hyperframes."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "scaffold-exercises",
+        "name": "scaffold-exercises",
+        "installs": 231640,
+        "weeklyInstalls": [
+          18425,
+          18439,
+          24227,
+          22459,
+          21156,
+          19887,
+          21716,
+          18807
+        ],
+        "description": "Create exercise directory structures with sections, problems, solutions, and explainers that pass linting. Use when user wants to scaffold exercises, create exercise stubs, or set up a new course section."
+      },
+      {
+        "source": "obra/superpowers",
+        "skillId": "systematic-debugging",
+        "name": "systematic-debugging",
+        "installs": 230409,
+        "weeklyInstalls": [
+          9457,
+          9486,
+          10481,
+          9367,
+          8822,
+          8547,
+          8663,
+          7721
+        ],
+        "description": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes"
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "writing-beats",
+        "name": "writing-beats",
+        "installs": 229405,
+        "weeklyInstalls": [
+          18620,
+          18759,
+          24499,
+          22383,
+          21100,
+          19890,
+          21833,
+          18862
+        ],
+        "description": "Writing, exploit; assemble raw material into a journey of beats, grounding each term before a beat leans on it."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "writing-shape",
+        "name": "writing-shape",
+        "installs": 229014,
+        "weeklyInstalls": [
+          18714,
+          18776,
+          24511,
+          22341,
+          21122,
+          19904,
+          21835,
+          18923
+        ],
+        "description": "Writing, exploit: shape raw material into an article, paragraph by paragraph."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "write-a-skill",
+        "name": "write-a-skill",
+        "installs": 228823,
+        "weeklyInstalls": [
+          995,
+          737,
+          1209,
+          876,
+          614,
+          698,
+          1085,
+          702
+        ],
+        "description": ""
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "writing-fragments",
+        "name": "writing-fragments",
+        "installs": 228808,
+        "weeklyInstalls": [
+          18662,
+          18767,
+          24513,
+          22363,
+          21095,
+          19882,
+          21793,
+          18856
+        ],
+        "description": "Writing, explore: mine raw fragments, no structure yet."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "migrate-to-shoehorn",
+        "name": "migrate-to-shoehorn",
+        "installs": 228515,
+        "weeklyInstalls": [
+          18167,
+          18182,
+          23865,
+          22287,
+          20941,
+          19743,
+          21591,
+          18622
+        ],
+        "description": "Migrate test files from `as` type assertions to @total-typescript/shoehorn. Use when user mentions shoehorn, wants to replace `as` in tests, or needs partial test data."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "zoom-out",
+        "name": "zoom-out",
+        "installs": 228241,
+        "weeklyInstalls": [
+          1036,
+          729,
+          1219,
+          841,
+          625,
+          693,
+          1117,
+          707
+        ],
+        "description": ""
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "brandkit",
+        "name": "brandkit",
+        "installs": 228000,
+        "weeklyInstalls": [
+          15497,
+          17450,
+          18100,
+          13916,
+          13927,
+          13390,
+          16444,
+          14488
+        ],
+        "description": "Premium brand-kit image generation skill for creating high-end brand-guidelines boards, logo systems, identity decks, and visual-world presentations. Trained for minimalist, cinematic, editorial, dark-tech, luxury, cultural, security, gaming, developer-tool, and consumer-app brand systems. Optimized for intentional logo concepting, refined composition, sparse typography, strong symbolic meaning, premium mockups, art-directed imagery, and flexible grid layouts."
+      },
+      {
+        "source": "supabase/agent-skills",
+        "skillId": "supabase",
+        "name": "supabase",
+        "installs": 227335,
+        "weeklyInstalls": [
+          10060,
+          10441,
+          10471,
+          10373,
+          9829,
+          11600,
+          12652,
+          12852
+        ],
+        "description": "Use when doing ANY task involving Supabase. Triggers: Supabase products (Database, Auth, Edge Functions, Realtime, Storage, Vectors, Cron, Queues); client libraries and SSR integrations (supabase-js, @supabase/ssr) in Next.js, React, SvelteKit, Astro, Remix; auth issues (login, logout, sessions, JWT, cookies, getSession, getUser, getClaims, RLS); Supabase CLI or MCP server; schema changes, migrations, declarative schemas, security audits, Postgres extensions (pg_graphql, pg_cron, pg_vector); debugging and troubleshooting errors or unexpected behavior on Supabase projects (HTTP errors, Postgres errors, RLS surprises, permission denied, schema cache issues, timeouts, Edge Function crashes, Realtime drops, Storage failures) and reading or querying logs (Logs Explorer, ClickHouse)."
+      },
+      {
+        "source": "obra/superpowers",
+        "skillId": "writing-plans",
+        "name": "writing-plans",
+        "installs": 224349,
+        "weeklyInstalls": [
+          9151,
+          9212,
+          10167,
+          8917,
+          8275,
+          7836,
+          7227,
+          7122
+        ],
+        "description": "Use when you have a spec or requirements for a multi-step task, before touching code"
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "caveman",
+        "name": "caveman",
+        "installs": 222833,
+        "weeklyInstalls": [
+          914,
+          669,
+          1087,
+          760,
+          557,
+          645,
+          1004,
+          658
+        ],
+        "description": ""
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "imagegen-frontend-web",
+        "name": "imagegen-frontend-web",
+        "installs": 222219,
+        "weeklyInstalls": [
+          15077,
+          16871,
+          17604,
+          13517,
+          13312,
+          12890,
+          15815,
+          13993
+        ],
+        "description": "Elite frontend image-direction skill for generating premium, conversion-aware website design references. CRITICAL OUTPUT RULE — generate ONE separate horizontal image FOR EVERY section. A landing page with 8 sections produces 8 images. Never compress multiple sections into one image. Enforces composition variety (not always left-text / right-image), background-image freedom, varied CTAs, varied hero scales (giant / mid / mini minimalist), narrative concept spine, second-read moments, and a single consistent palette across all images. Optimized for landing pages, marketing sites, and product comps that developers or coding models can accurately recreate."
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "image-to-code",
+        "name": "image-to-code",
+        "installs": 221995,
+        "weeklyInstalls": [
+          14855,
+          16544,
+          17251,
+          13210,
+          13148,
+          12683,
+          15570,
+          13895
+        ],
+        "description": ""
+      },
+      {
+        "source": "obra/superpowers",
+        "skillId": "using-superpowers",
+        "name": "using-superpowers",
+        "installs": 221192,
+        "weeklyInstalls": [
+          8710,
+          9071,
+          9665,
+          8427,
+          7898,
+          7424,
+          6980,
+          6699
+        ],
+        "description": "Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions"
+      },
+      {
+        "source": "leonxlnx/taste-skill",
+        "skillId": "imagegen-frontend-mobile",
+        "name": "imagegen-frontend-mobile",
+        "installs": 217348,
+        "weeklyInstalls": [
+          14738,
+          16496,
+          17240,
+          13217,
+          13051,
+          12586,
+          15493,
+          13729
+        ],
+        "description": "Elite mobile app image-generation skill for creating premium, app-native screen concepts and flows. Designed for iOS, Android, and cross-platform mobile products. Prioritizes clean hierarchy, comfortably readable text, strong multi-screen consistency, controlled color palettes, non-generic creative direction, textured surfaces, image-led composition, tasteful custom iconography, and clean phone mockup framing. By default, screens should be shown inside a subtle premium iPhone or similar phone mockup with a visible frame, while the main focus stays on the app content itself. This skill generates images only. It does not write code."
+      },
+      {
+        "source": "emilkowalski/skills",
+        "skillId": "emil-design-eng",
+        "name": "emil-design-eng",
+        "installs": 216713,
+        "weeklyInstalls": [
+          7760,
+          8386,
+          15096,
+          16168,
+          14607,
+          16175,
+          16280,
+          14388
+        ],
+        "description": "This skill encodes Emil Kowalski's philosophy on UI polish, component design, animation decisions, and the invisible details that make software feel great."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "design-an-interface",
+        "name": "design-an-interface",
+        "installs": 214519,
+        "weeklyInstalls": [
+          20128,
+          20098,
+          27027,
+          24877,
+          22828,
+          21464,
+          10632,
+          1181
+        ],
+        "description": ""
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-reliability",
+        "name": "azure-reliability",
+        "installs": 213984,
+        "weeklyInstalls": [
+          12792,
+          11510,
+          15614,
+          16290,
+          16828,
+          16060,
+          15873,
+          14817
+        ],
+        "description": "Assess and improve the reliability posture of PaaS Applications (Azure Functions and Azure App Service). Scans deployed resources for zone redundancy, ZRS storage, health probes, and multi-region failover. Presents a feature-pivoted checklist, then drives staged remediation (CLI or IaC patches) end-to-end with user confirmation. WHEN: \"assess reliability\", \"check reliability\", \"zone redundant\", \"multi-region failover\", \"high availability\", \"disaster recovery\", \"single points of failure\", \"reliability posture\", \"resiliency\"."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "wizard",
+        "name": "wizard",
+        "installs": 209893,
+        "weeklyInstalls": [
+          0,
+          16880,
+          24720,
+          22340,
+          21072,
+          19850,
+          42981,
+          41317
+        ],
+        "description": "Generate an interactive bash wizard that walks a human through steps only they can perform. Use when provisioning infrastructure, setting up credentials or CI secrets, walking an unfamiliar third-party dashboard, or running a one-off migration or cutover. Don't invoke this for steps the agent can perform itself."
+      },
+      {
+        "source": "microsoft/azure-skills",
+        "skillId": "azure-cost-optimization",
+        "name": "azure-cost-optimization",
+        "installs": 209172,
+        "weeklyInstalls": [
+          248,
+          211,
+          167,
+          182,
+          170,
+          153,
+          150,
+          111
+        ],
+        "description": ""
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "request-refactor-plan",
+        "name": "request-refactor-plan",
+        "installs": 207972,
+        "weeklyInstalls": [
+          19777,
+          19658,
+          26076,
+          23759,
+          22044,
+          20704,
+          10190,
+          1139
+        ],
+        "description": ""
+      },
+      {
+        "source": "prisma/skills",
+        "skillId": "prisma-database-setup",
+        "name": "prisma-database-setup",
+        "installs": 207218,
+        "weeklyInstalls": [
+          564,
+          589,
+          1441,
+          2559,
+          41598,
+          43398,
+          43800,
+          41540
+        ],
+        "description": "Guides for configuring Prisma with different database providers (PostgreSQL, MySQL, SQLite, MongoDB, etc.). Use when setting up a new project, changing databases, or troubleshooting connection issues. Triggers on \"configure postgres\", \"connect to mysql\", \"setup mongodb\", \"sqlite setup\"."
+      },
+      {
+        "source": "prisma/skills",
+        "skillId": "prisma-client-api",
+        "name": "prisma-client-api",
+        "installs": 206559,
+        "weeklyInstalls": [
+          502,
+          559,
+          1429,
+          2548,
+          41632,
+          43439,
+          43897,
+          41584
+        ],
+        "description": "Prisma Client API reference covering model queries, filters, operators, and client methods. Use when writing database queries, using CRUD operations, filtering data, or configuring Prisma Client. Triggers on \"prisma query\", \"findMany\", \"create\", \"update\", \"delete\", \"$transaction\"."
+      },
+      {
+        "source": "heygen-com/hyperframes",
+        "skillId": "hyperframes-keyframes",
+        "name": "hyperframes-keyframes",
+        "installs": 206157,
+        "weeklyInstalls": [
+          0,
+          15108,
+          29121,
+          41309,
+          29008,
+          27346,
+          21733,
+          25398
+        ],
+        "description": "Use when a HyperFrames composition needs a punch-in, punch-out, zoom, reframe, Ken Burns treatment, camera move, visual match/whip handoff, or other seek-safe 2D/3D keyframes; also for GSAP, CSS keyframes, Anime.js, WAAPI, FLIP, paths, masks, SVG morph/draw, text trails, 3D depth, or `hyperframes keyframes` diagnostics. Don't use for broad scene strategy, brand design, media sourcing, captions, or general video planning."
+      },
+      {
+        "source": "anthropics/skills",
+        "skillId": "pptx",
+        "name": "pptx",
+        "installs": 204891,
+        "weeklyInstalls": [
+          7486,
+          6494,
+          6437,
+          6308,
+          6147,
+          5963,
+          5495,
+          4872
+        ],
+        "description": "Use this skill any time a .pptx or .potx file is involved in any way — as input, output, or both. This includes: creating slide decks, pitch decks, or presentations; reading, parsing, or extracting text from any .pptx or .potx file (even if the extracted content will be used elsewhere, like in an email or summary); editing, modifying, or updating existing presentations; combining or splitting slide files; working with templates (.potx), layouts, speaker notes, or comments. Trigger whenever the user mentions \"deck,\" \"slides,\" \"presentation,\" or references a .pptx or .potx filename, regardless of what they plan to do with the content afterward. If a .pptx or .potx file needs to be opened, created, or touched, use this skill."
+      },
+      {
+        "source": "obra/superpowers",
+        "skillId": "requesting-code-review",
+        "name": "requesting-code-review",
+        "installs": 204694,
+        "weeklyInstalls": [
+          8343,
+          8608,
+          9618,
+          8322,
+          7784,
+          7311,
+          6787,
+          6711
+        ],
+        "description": "Use when completing tasks, implementing major features, or before merging to verify work meets requirements"
+      },
+      {
+        "source": "prisma/skills",
+        "skillId": "prisma-cli",
+        "name": "prisma-cli",
+        "installs": 204534,
+        "weeklyInstalls": [
+          457,
+          482,
+          1368,
+          2494,
+          41545,
+          43320,
+          43794,
+          41486
+        ],
+        "description": "Prisma ORM CLI commands reference covering init, generate, migrate, db, dev, complete, studio, validate, format, debug, and mcp. Use for ORM/database CLI workflows, not the Prisma Platform CLI. Triggers on \"prisma init\", \"prisma generate\", \"prisma migrate\", \"prisma db\", \"prisma complete\", \"prisma studio\", \"prisma mcp\"."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "qa",
+        "name": "qa",
+        "installs": 203916,
+        "weeklyInstalls": [
+          19680,
+          19598,
+          25989,
+          23909,
+          22167,
+          20906,
+          10207,
+          1100
+        ],
+        "description": ""
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "ubiquitous-language",
+        "name": "ubiquitous-language",
+        "installs": 202590,
+        "weeklyInstalls": [
+          19190,
+          19148,
+          25257,
+          23219,
+          21681,
+          20340,
+          10004,
+          1102
+        ],
+        "description": ""
+      },
+      {
+        "source": "obra/superpowers",
+        "skillId": "test-driven-development",
+        "name": "test-driven-development",
+        "installs": 202475,
+        "weeklyInstalls": [
+          8441,
+          8552,
+          9585,
+          8376,
+          7622,
+          7263,
+          6699,
+          6400
+        ],
+        "description": "Use when implementing any feature or bugfix, before writing implementation code"
+      },
+      {
+        "source": "prisma/skills",
+        "skillId": "prisma-postgres",
+        "name": "prisma-postgres",
+        "installs": 200834,
+        "weeklyInstalls": [
+          341,
+          352,
+          1185,
+          2389,
+          41398,
+          43208,
+          43650,
+          41345
+        ],
+        "description": "Prisma Postgres setup and operations guidance across Console, create-db CLI, Management API, and Management API SDK. Use when creating Prisma Postgres databases, working in Prisma Console, provisioning with create-db/create-pg/create-postgres, or integrating programmatic provisioning with service tokens or OAuth."
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "obsidian-vault",
+        "name": "obsidian-vault",
+        "installs": 200423,
+        "weeklyInstalls": [
+          19152,
+          19311,
+          25423,
+          23497,
+          21928,
+          20673,
+          10062,
+          1047
+        ],
+        "description": ""
+      },
+      {
+        "source": "mattpocock/skills",
+        "skillId": "edit-article",
+        "name": "edit-article",
+        "installs": 196719,
+        "weeklyInstalls": [
+          18887,
+          18917,
+          25045,
+          23122,
+          21511,
+          20372,
+          9950,
+          1050
+        ],
+        "description": ""
+      },
+      {
+        "source": "prisma/skills",
+        "skillId": "prisma-driver-adapter-implementation",
+        "name": "prisma-driver-adapter-implementation",
+        "installs": 196575,
+        "weeklyInstalls": [
+          245,
+          233,
+          1034,
+          2209,
+          41256,
+          43090,
+          43492,
+          41229
+        ],
+        "description": "Required reference for Prisma ORM 7 SQL driver adapter work. Use when implementing or modifying adapters, adding database drivers, or touching SqlDriverAdapter, Transaction, savepoint, result mapping, or DriverAdapterError behavior. Covers current transaction lifecycle, optional savepoint hooks, original database-error preservation, and verification."
+      },
+      {
+        "source": "prisma/skills",
+        "skillId": "prisma-upgrade-v7",
+        "name": "prisma-upgrade-v7",
+        "installs": 196449,
+        "weeklyInstalls": [
+          246,
+          226,
+          1022,
+          2204,
+          41241,
+          43083,
+          43455,
+          41220
+        ],
+        "description": "Complete migration guide from Prisma ORM v6 to v7 covering all breaking changes. Use when upgrading Prisma versions, encountering v7 errors, or migrating existing projects. Triggers on \"upgrade to prisma 7\", \"prisma 7 migration\", \"prisma-client generator\", \"driver adapter required\"."
+      },
+      {
+        "source": "prisma/skills",
+        "skillId": "prisma-postgres-setup",
+        "name": "prisma-postgres-setup",
+        "installs": 195278,
+        "weeklyInstalls": [
+          224,
+          218,
+          1011,
+          2223,
+          41330,
+          43156,
+          43568,
+          41296
+        ],
+        "description": "Set up a new Prisma Postgres database and connect it to a local project using the Management API. Use when asked to \"set up a database\", \"create a Prisma Postgres project\", \"get a connection string\", \"connect my app to Prisma Postgres\", or \"provision a database\"."
+      },
+      {
+        "source": "heygen-com/hyperframes",
+        "skillId": "general-video",
+        "name": "general-video",
+        "installs": 193251,
+        "weeklyInstalls": [
+          30745,
+          27553,
+          23737,
+          19956,
+          22080,
+          22601,
+          14839,
+          12549
+        ],
+        "description": "Author or edit a custom HyperFrames composition when no specialized workflow fits, or when BRIEF.md sets flow: companion. Use for longer or multi-scene pieces, brand and sizzle reels, montages, static loops, static title cards, footage remixes, and freeform builds. Use motion-graphics instead for a short unnarrated motion-first unit, including an animated title. Route fresh creation through hyperframes before using this skill."
+      },
+      {
+        "source": "prisma/skills",
+        "skillId": "prisma-compute",
+        "name": "prisma-compute",
+        "installs": 191859,
+        "weeklyInstalls": [
+          218,
+          223,
+          1004,
+          2174,
+          41230,
+          43052,
+          43410,
+          41201
+        ],
+        "description": "Prisma Compute deployment and hosting guide. Use whenever the user mentions Prisma Compute, `prisma.compute.ts`, `defineComputeConfig`, deploying or hosting a Prisma app, `@prisma/cli app deploy`, `compute:deploy`, `create-prisma --deploy`, `PRISMA_SERVICE_TOKEN`, Compute auth/workspaces, apps/deployments/build logs/domains, localhost vs `0.0.0.0`, deploy port binding, or framework deploy readiness for Hono, Elysia, Next.js, TanStack Start, Astro, Nuxt, Svelte, Nest, Turborepo, or custom/prebuilt artifacts."
+      },
+      {
+        "source": "vercel-labs/agent-skills",
+        "skillId": "vercel-react-native-skills",
+        "name": "vercel-react-native-skills",
+        "installs": 190707,
+        "weeklyInstalls": [
+          5298,
+          5626,
+          5663,
+          5195,
+          5198,
+          4698,
+          4744,
+          4408
+        ],
+        "description": ""
+      }
+    ],
+    "hasMore": true,
+    "total": 9514
+  }
+]
