@@ -3,11 +3,21 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { AppSidebar } from "./app-sidebar";
+import { SidebarProvider } from "./ui/sidebar";
 import { renderWithRouter } from "../test/test-utils";
+
+function renderSidebar(route = "/") {
+  return renderWithRouter(
+    <SidebarProvider>
+      <AppSidebar />
+    </SidebarProvider>,
+    { route },
+  );
+}
 
 describe("AppSidebar", () => {
   it("renders brand and nav items", () => {
-    renderWithRouter(<AppSidebar />);
+    renderSidebar();
 
     expect(screen.getByText("Skillone")).toBeInTheDocument();
     expect(screen.getByText("我的 Skills")).toBeInTheDocument();
@@ -19,7 +29,7 @@ describe("AppSidebar", () => {
   });
 
   it("renders count badges where defined", async () => {
-    renderWithRouter(<AppSidebar />);
+    renderSidebar();
 
     // The 我的 Skills / 我的 Agents badges show the (mock) counts once loaded.
     expect(await screen.findByText("6")).toBeInTheDocument();
@@ -28,20 +38,21 @@ describe("AppSidebar", () => {
   });
 
   it("marks the active route link", () => {
-    renderWithRouter(<AppSidebar />, { route: "/my-skills" });
+    renderSidebar("/my-skills");
 
     const link = screen.getByRole("link", { name: /我的 Skills/ });
-    expect(link.className).toContain("bg-muted");
+    expect(link).toHaveAttribute("data-active", "true");
+    expect(link).toHaveAttribute("aria-current", "page");
   });
 
   it("collapses and expands via the toggle", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<AppSidebar />);
+    renderSidebar();
 
     const toggle = screen.getByTitle("折叠侧边栏");
     await user.click(toggle);
 
-    // Labels are hidden while collapsed.
+    // Labels are unmounted while collapsed.
     expect(screen.queryByText("我的 Skills")).not.toBeInTheDocument();
     expect(screen.getByTitle("展开侧边栏")).toBeInTheDocument();
 

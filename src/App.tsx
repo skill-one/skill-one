@@ -9,6 +9,7 @@ import { ExplorePage } from "./components/explore-page";
 import { MyAgentsPage } from "./components/my-agents-page";
 import { MySkillsPage } from "./components/my-skills-page";
 import { PlaceholderPage } from "./components/placeholder-page";
+import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 
 /**
  * Cached registry data is served for 10 minutes without re-fetching
@@ -59,9 +60,14 @@ export default function App() {
       <HashRouter>
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
           <TitleBar />
-          <div className="flex flex-1 overflow-hidden">
+          {/* The provider defaults to `min-h-svh`; neutralize it so the row
+              fits the space below the 52px title bar instead of overflowing. */}
+          <SidebarProvider
+            style={{ minHeight: 0 }}
+            className="flex-1 overflow-hidden"
+          >
             <AppSidebar />
-            <main className="flex-1 overflow-hidden">
+            <SidebarInset className="overflow-hidden">
               <Routes>
                 <Route path="/" element={<Navigate to="/explore" replace />} />
                 <Route path="/explore" element={<ExplorePage />} />
@@ -79,8 +85,8 @@ export default function App() {
                 />
                 <Route path="*" element={<Navigate to="/explore" replace />} />
               </Routes>
-            </main>
-          </div>
+            </SidebarInset>
+          </SidebarProvider>
         </div>
       </HashRouter>
     </PersistQueryClientProvider>
