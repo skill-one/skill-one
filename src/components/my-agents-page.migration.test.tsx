@@ -4,26 +4,24 @@ import userEvent from "@testing-library/user-event";
 
 import { MyAgentsPage } from "./my-agents-page";
 import { renderWithRouter } from "../test/test-utils";
-import type { AgentLinkResult, InstalledSkill } from "../lib/skills-manager";
+import type { AgentLinkResult } from "../lib/skills-manager";
 
 /**
- * The refusal path only exists behind the native backend: the browser mock
- * store always links successfully. So the data layer is mocked here to drive
- * the "link refused -> confirm migration -> link again with migrate" wiring.
+ * The pre-link detection lives behind the native backend: the browser mock
+ * always links successfully and never reports contained skills. So the data
+ * layer is mocked here to drive the "agent carries skills -> card shows them
+ * and 迁移并链接 -> click migrates directly (no dialog)" wiring.
  */
-const { linkAgent, unlinkAgent, fetchAgentStatus, fetchInstalledSkills } =
-  vi.hoisted(() => ({
-    linkAgent: vi.fn(),
-    unlinkAgent: vi.fn(),
-    fetchAgentStatus: vi.fn(),
-    fetchInstalledSkills: vi.fn(),
-  }));
+const { linkAgent, unlinkAgent, fetchAgentStatus } = vi.hoisted(() => ({
+  linkAgent: vi.fn(),
+  unlinkAgent: vi.fn(),
+  fetchAgentStatus: vi.fn(),
+}));
 
 vi.mock("../lib/local-skills", () => ({
   linkAgent,
   unlinkAgent,
   fetchAgentStatus,
-  fetchInstalledSkills,
 }));
 
 const AGENT_DIR = "/Users/me/.cursor/skills";
@@ -39,26 +37,19 @@ const BASE: AgentLinkResult = {
   message: null,
 };
 
-function installed(name: string): InstalledSkill {
-  return {
-    name,
-    path: `${CANONICAL}/${name}`,
-    scope: "global",
-    agents: [],
-    source: null,
-    sourceUrl: null,
-    sourceType: null,
-  };
-}
-
 describe("MyAgentsPage migration flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Pre-detection reports that cursor carries pdf + xlsx in its own dir.
     fetchAgentStatus.mockResolvedValue([
-      { name: "cursor", display: "Cursor", linked: false, canonical: false },
+      {
+        name: "cursor",
+        display: "Cursor",
+        linked: false,
+        canonical: false,
+        skills: ["pdf", "xlsx"],
+      },
     ]);
-    // The canonical dir already holds xlsx, so migration would skip it.
-    fetchInstalledSkills.mockResolvedValue([installed("xlsx")]);
     linkAgent.mockImplementation(
       async (_name: string, options?: { migrate?: boolean }) => {
         if (options?.migrate) {
@@ -83,80 +74,53 @@ describe("MyAgentsPage migration flow", () => {
     );
   });
 
-  it("opens the migration dialog instead of reporting the refusal", async () => {
+  it("shows the contained skills and a 迁移并链接 button (no dialog)", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MyAgentsPage />);
 
-    await user.click(await screen.findByRole("button", { name: "链接" }));
-
-    const dialog = await screen.findByRole("dialog");
-    expect(dialog).toBeInTheDocument();
-    expect(screen.getByText("pdf")).toBeInTheDocument();
+    expect(await screen.findByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("xlsx")).toBeInTheDocument();
-    // The refusal itself must not surface as a notice.
-    expect(screen.queryByText(/拒绝/)).not.toBeInTheDocument();
-  });
-
-  it("marks the skill the canonical dir already provides", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<MyAgentsPage />);
-
-    await user.click(await screen.findByRole("button", { name: "链接" }));
-    await screen.findByRole("dialog");
-
     expect(
-      await screen.findByText("将跳过，保留规范目录版本"),
+      screen.getByRole("button", { name: "迁移并链接" }),
     ).toBeInTheDocument();
+    // No confirmation dialog is shown before the user acts.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("migrates and links after confirmation", async () => {
+  it("migrates and links directly on 迁移并链接", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MyAgentsPage />);
 
-    await user.click(await screen.findByRole("button", { name: "链接" }));
-    await screen.findByRole("dialog");
-    await user.click(screen.getByRole("button", { name: "确认迁移" }));
+    await user.click(
+      await screen.findByRole("button", { name: "迁移并链接" }),
+    );
 
     await waitFor(() => {
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(linkAgent).toHaveBeenLastCalledWith("cursor", { migrate: true });
     });
-    expect(linkAgent).toHaveBeenLastCalledWith("cursor", { migrate: true });
     expect(
       screen.getByText("Cursor（cursor） 已迁移（移动 1 个，跳过 1 个）"),
     ).toBeInTheDocument();
   });
 
-  it("leaves everything untouched when cancelled", async () => {
+  it("falls back to migration when a plain 链接 is refused", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MyAgentsPage />);
-
-    await user.click(await screen.findByRole("button", { name: "链接" }));
-    await screen.findByRole("dialog");
-    await user.click(screen.getByRole("button", { name: "取消" }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    });
-    expect(linkAgent).toHaveBeenCalledTimes(1);
-    expect(linkAgent).toHaveBeenCalledWith("cursor");
-  });
-
-  it("blocks migration while non-skill files remain", async () => {
-    linkAgent.mockResolvedValue([
+    // Pre-detection missed the contained skills, but the backend still refuses.
+    fetchAgentStatus.mockResolvedValue([
       {
-        ...BASE,
-        status: "refused",
-        skills: ["pdf"],
-        message: `${AGENT_DIR} has existing skills and non-skill files; remove the files (README.md), then rerun with --migrate`,
+        name: "cursor",
+        display: "Cursor",
+        linked: false,
+        canonical: false,
+        skills: [],
       },
     ]);
-    const user = userEvent.setup();
     renderWithRouter(<MyAgentsPage />);
 
     await user.click(await screen.findByRole("button", { name: "链接" }));
-    await screen.findByRole("dialog");
 
-    expect(screen.getByText("README.md")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "确认迁移" })).toBeDisabled();
+    await waitFor(() => {
+      expect(linkAgent).toHaveBeenLastCalledWith("cursor", { migrate: true });
+    });
   });
 });

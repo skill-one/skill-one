@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Link2,
@@ -8,17 +8,8 @@ import {
   Users,
 } from "lucide-react";
 
-import {
-  fetchAgentStatus,
-  fetchInstalledSkills,
-  linkAgent,
-  unlinkAgent,
-} from "../lib/local-skills";
-import type {
-  AgentLinkResult,
-  AgentStatus,
-} from "../lib/skills-manager";
-import { LinkMigrationDialog } from "./link-migration-dialog";
+import { fetchAgentStatus, linkAgent, unlinkAgent } from "../lib/local-skills";
+import type { AgentLinkResult, AgentStatus } from "../lib/skills-manager";
 import { AgentIcon } from "./agent-icon";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -53,15 +44,19 @@ function AgentRow({
   linking,
   unlinking,
   onLink,
+  onMigrate,
   onUnlink,
 }: {
   agent: AgentStatus;
   linking: boolean;
   unlinking: boolean;
   onLink: () => void;
+  onMigrate: () => void;
   onUnlink: () => void;
 }) {
   const busy = linking || unlinking;
+  const migratableSkills =
+    !agent.linked && !agent.canonical ? (agent.skills ?? []) : [];
   return (
     <div className="group flex items-center gap-4 rounded-xl border border-border/70 bg-card p-3.5 transition-all duration-150 hover:border-border hover:shadow-[0_6px_20px_-12px_rgba(15,23,42,0.15)]">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-colors">
@@ -82,8 +77,20 @@ function AgentRow({
             ? "使用原生 skills 目录，无需链接"
             : agent.linked
               ? "已链接到规范 skills 目录"
-              : "尚未链接，点击「链接」接入规范 skills 目录"}
+              : migratableSkills.length > 0
+                ? "尚未链接，目录内含可迁移的 skills"
+                : "尚未链接，点击「链接」接入规范 skills 目录"}
         </p>
+        {migratableSkills.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground">包含 skills：</span>
+            {migratableSkills.map((skill) => (
+              <Badge key={skill} variant="secondary" className="text-[10px]">
+                {skill}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
@@ -115,6 +122,21 @@ function AgentRow({
               )}
               取消链接
             </Button>
+          ) : migratableSkills.length > 0 ? (
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-1.5"
+              disabled={busy}
+              onClick={onMigrate}
+            >
+              {linking ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Link2 className="h-3.5 w-3.5" />
+              )}
+              迁移并链接
+            </Button>
           ) : (
             <Button
               variant="default"
@@ -138,10 +160,6 @@ function AgentRow({
 
 export function MyAgentsPage() {
   const [notice, setNotice] = useState<string | null>(null);
-  /** Set when a link attempt was refused because the agent dir holds skills. */
-  const [pendingRefusal, setPendingRefusal] = useState<AgentLinkResult | null>(
-    null,
-  );
   const queryClient = useQueryClient();
 
   const {
@@ -159,26 +177,26 @@ export function MyAgentsPage() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["agent-status"] });
 
-  // Only fetched while the migration dialog is open: it tells which skills the
-  // canonical dir already provides, so migration would skip them.
-  const { data: installedSkills } = useQuery({
-    queryKey: ["installed-skills"],
-    queryFn: fetchInstalledSkills,
-    enabled: pendingRefusal != null,
+  const migrateMutation = useMutation({
+    mutationFn: (name: string) => linkAgent(name, { migrate: true }),
+    onSuccess: (results) => {
+      invalidate();
+      // Migration moves skills into the canonical dir, so that list is stale.
+      queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
+      setNotice(formatLinkMessage(results[0]));
+    },
+    onError: (err) =>
+      setNotice(`迁移失败：${err instanceof Error ? err.message : String(err)}`),
   });
-  const installedNames = useMemo(
-    () => (installedSkills ?? []).map((skill) => skill.name),
-    [installedSkills],
-  );
 
   const linkMutation = useMutation({
     mutationFn: (name: string) => linkAgent(name),
     onSuccess: (results) => {
       const result = results[0];
-      // A refusal is recoverable: offer to migrate the existing skills rather
-      // than reporting it as a failure.
+      // Pre-detection routes skill-carrying agents to 迁移并链接, but if a plain
+      // link is still refused, migrate directly so the action always succeeds.
       if (result?.status === "refused") {
-        setPendingRefusal(result);
+        migrateMutation.mutate(result.agent);
         return;
       }
       invalidate();
@@ -186,21 +204,6 @@ export function MyAgentsPage() {
     },
     onError: (err) =>
       setNotice(`链接失败：${err instanceof Error ? err.message : String(err)}`),
-  });
-
-  const migrateMutation = useMutation({
-    mutationFn: (name: string) => linkAgent(name, { migrate: true }),
-    onSuccess: (results) => {
-      invalidate();
-      // Migration moves skills into the canonical dir, so that list is stale.
-      queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
-      setPendingRefusal(null);
-      setNotice(formatLinkMessage(results[0]));
-    },
-    onError: (err) => {
-      setPendingRefusal(null);
-      setNotice(`迁移失败：${err instanceof Error ? err.message : String(err)}`);
-    },
   });
 
   const unlinkMutation = useMutation({
@@ -292,6 +295,7 @@ export function MyAgentsPage() {
                   unlinkMutation.variables === agent.name
                 }
                 onLink={() => linkMutation.mutate(agent.name)}
+                onMigrate={() => migrateMutation.mutate(agent.name)}
                 onUnlink={() => unlinkMutation.mutate(agent.name)}
               />
             ))}
@@ -303,16 +307,6 @@ export function MyAgentsPage() {
           </div>
         )}
       </div>
-
-      <LinkMigrationDialog
-        refused={pendingRefusal}
-        installedNames={installedNames}
-        migrating={migrateMutation.isPending}
-        onConfirm={() => {
-          if (pendingRefusal) migrateMutation.mutate(pendingRefusal.agent);
-        }}
-        onCancel={() => setPendingRefusal(null)}
-      />
     </div>
   );
 }

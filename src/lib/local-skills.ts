@@ -54,12 +54,55 @@ export async function updateInstalledSkill(name: string): Promise<void> {
   void name;
 }
 
-/** Per-agent link status for the global skills directory. */
+/**
+ * Per-agent link status for the global skills directory.
+ *
+ * In Tauri this additionally runs a one-time pre-link probe: for each unlinked,
+ * non-canonical agent it attempts a plain link. A refusal means the agent's own
+ * directory already holds skills, which we surface as `status.skills` so the UI
+ * can preview them and offer "迁移并链接" instead of a bare "链接".
+ *
+ * A side effect of that probe is that an *empty* agent dir gets linked. We undo
+ * it immediately (the agent is reverted to its unlinked state) so the card shows
+ * the true status and "取消链接" keeps working. Agents that genuinely carry
+ * skills are never linked by the probe (the link is refused), so their skills
+ * are preserved.
+ */
 export async function fetchAgentStatus(): Promise<AgentStatus[]> {
-  if (isTauri()) {
-    return getLinkStatus({ global: true });
+  if (!isTauri()) {
+    return getMockAgentStatus();
   }
-  return getMockAgentStatus();
+  const statuses = await getLinkStatus({ global: true });
+  const enriched = await Promise.all(
+    statuses.map(async (status) => {
+      if (status.linked || status.canonical) return status;
+      try {
+        const res = await linkAgents([status.name], { global: true });
+        const r = res.results[0];
+        if (!r) return status;
+        if (r.status === "refused") {
+          // Agent dir holds skills; the link was refused, so nothing changed.
+          return { ...status, linked: false, skills: r.skills };
+        }
+        if (r.status === "linked") {
+          // The probe linked an empty-dir agent as a side effect: undo it so the
+          // card reflects the real unlinked state and 取消链接 stays effective.
+          try {
+            await unlinkAgents([status.name], { global: true });
+            return { ...status, linked: false, skills: [] };
+          } catch {
+            // Could not revert: report the actual linked state.
+            return { ...status, linked: true, skills: [] };
+          }
+        }
+        // alreadyLinked / skipped: nothing changed, no skills to surface.
+        return { ...status, linked: false, skills: [] };
+      } catch {
+        return status;
+      }
+    }),
+  );
+  return enriched;
 }
 
 /**

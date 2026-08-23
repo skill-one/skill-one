@@ -88,6 +88,12 @@ export interface AgentStatus {
   display: string;
   linked: boolean;
   canonical: boolean;
+  /**
+   * Skills already living inside the agent's own directory. Only meaningful for
+   * unlinked, non-canonical agents: it surfaces what a `link --migrate` would
+   * move into the canonical dir, so the UI can preview them on the card.
+   */
+  skills?: string[];
 }
 
 interface ManagerOptions {

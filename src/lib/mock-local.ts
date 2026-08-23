@@ -79,16 +79,42 @@ export function resetMockInstalledSkills(): void {
 // `agents-skills` library's built-in agent table, so the browser mock
 // mirrors the order the backend returns in a Tauri build.
 
-const mockAgentRows = [
+const mockAgentRows: Array<{
+  name: string;
+  display: string;
+  linked: boolean;
+  canonical: boolean;
+  skills?: string[];
+}> = [
   {
     name: "claude-code",
     display: "Claude Code",
     linked: true,
     canonical: false,
+    skills: [],
   },
-  { name: "cursor", display: "Cursor", linked: false, canonical: false },
-  { name: "gemini-cli", display: "Gemini CLI", linked: false, canonical: false },
-  { name: "windsurf", display: "Windsurf", linked: false, canonical: true },
+  {
+    name: "cursor",
+    display: "Cursor",
+    linked: false,
+    canonical: false,
+    // Carries skills in its own dir → card previews them and offers 迁移并链接.
+    skills: ["pdf", "docx"],
+  },
+  {
+    name: "gemini-cli",
+    display: "Gemini CLI",
+    linked: false,
+    canonical: false,
+    skills: [],
+  },
+  {
+    name: "windsurf",
+    display: "Windsurf",
+    linked: false,
+    canonical: true,
+    skills: [],
+  },
 ];
 
 function buildMockAgentStatus(): AgentStatus[] {
@@ -97,6 +123,7 @@ function buildMockAgentStatus(): AgentStatus[] {
     display: a.display,
     linked: a.linked,
     canonical: a.canonical,
+    skills: a.skills,
   }));
 }
 
