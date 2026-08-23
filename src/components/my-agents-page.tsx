@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Bot,
   Link2,
   Link2Off,
   Loader2,
@@ -20,6 +19,7 @@ import type {
   AgentStatus,
 } from "../lib/skills-manager";
 import { LinkMigrationDialog } from "./link-migration-dialog";
+import { AgentIcon } from "./agent-icon";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 
@@ -65,7 +65,7 @@ function AgentRow({
   return (
     <div className="group flex items-center gap-4 rounded-xl border border-border/70 bg-card p-3.5 transition-all duration-150 hover:border-border hover:shadow-[0_6px_20px_-12px_rgba(15,23,42,0.15)]">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-colors">
-        <Bot className="h-5 w-5" />
+        <AgentIcon agentName={agent.name} className="h-7 w-7" />
       </div>
 
       <div className="min-w-0 flex-1">
