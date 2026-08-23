@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-import {
-  fetchSkillDetail,
-  parseFrontmatter,
-  simplifiedSkillId,
-} from "./skill-detail-api";
+import { fetchSkillDetail, parseFrontmatter } from "./skill-detail-api";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -17,17 +13,6 @@ function ok(body: string) {
 /** A 404 response stub. */
 function notFound() {
   return { ok: false, status: 404 } as Response;
-}
-
-/** A successful GitHub API tree response stub. */
-function tree(paths: string[]) {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => ({
-      tree: paths.map((path) => ({ type: "blob", path })),
-    }),
-  } as Response;
 }
 
 afterEach(() => {
@@ -86,28 +71,19 @@ Body`;
   });
 });
 
-describe("simplifiedSkillId", () => {
-  it("drops a leading lowercase word", () => {
-    expect(simplifiedSkillId("vercel-react-best-practices")).toBe(
-      "react-best-practices",
-    );
-    expect(simplifiedSkillId("a-b")).toBe("b");
-  });
-
-  it("keeps ids without a usable prefix", () => {
-    expect(simplifiedSkillId("pdf")).toBeNull();
-    expect(simplifiedSkillId("My-Skill")).toBeNull();
-    expect(simplifiedSkillId("-x")).toBeNull();
-  });
-});
-
 describe("fetchSkillDetail", () => {
-  it("probes conventional paths on main first", async () => {
+  it("fetches the SKILL.md directly from the known index path", async () => {
     fetchMock.mockImplementation(async (url: string) =>
-      String(url).endsWith("skills/pdf/SKILL.md") ? ok("---\nname: pdf\n---\n\nBody") : notFound(),
+      String(url).endsWith("skills/pdf/SKILL.md")
+        ? ok("---\nname: pdf\n---\n\nBody")
+        : notFound(),
     );
 
-    const detail = await fetchSkillDetail("anthropics/skills", "pdf");
+    const detail = await fetchSkillDetail(
+      "anthropics/skills",
+      "pdf",
+      "skills/pdf",
+    );
 
     expect(detail).toEqual({
       name: "pdf",
@@ -120,58 +96,44 @@ describe("fetchSkillDetail", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/anthropics/skills/main/skills/pdf/SKILL.md",
+      "https://cdn.jsdmirror.com/gh/anthropics/skills@main/skills/pdf/SKILL.md",
     );
   });
 
-  it("falls back to the simplified id when the full id misses", async () => {
+  it("strips a trailing slash from the known path", async () => {
     fetchMock.mockImplementation(async (url: string) =>
-      String(url).endsWith("skills/react-best-practices/SKILL.md")
-        ? ok("---\nname: react-best-practices\n---\n\nBody")
+      String(url).endsWith("skills/pdf/SKILL.md")
+        ? ok("---\nname: pdf\n---\n\nBody")
         : notFound(),
     );
 
     const detail = await fetchSkillDetail(
-      "vercel-labs/skills",
-      "vercel-react-best-practices",
+      "anthropics/skills",
+      "pdf",
+      "skills/pdf/",
     );
 
-    expect(detail.path).toBe("skills/react-best-practices/SKILL.md");
-    // Full-id patterns were tried first, then the simplified id hit.
-    expect(fetchMock).toHaveBeenCalledTimes(5);
-  });
-
-  it("falls back to the master branch", async () => {
-    fetchMock.mockImplementation(async (url: string) =>
-      String(url).includes("/master/") ? ok("Body without frontmatter") : notFound(),
+    expect(detail.path).toBe("skills/pdf/SKILL.md");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://cdn.jsdmirror.com/gh/anthropics/skills@main/skills/pdf/SKILL.md",
     );
-
-    const detail = await fetchSkillDetail("owner/repo", "pdf");
-    expect(detail.instructions).toBe("Body without frontmatter");
-    expect(detail.name).toBe("pdf");
   });
 
-  it("searches the repo tree as a last resort", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      const u = String(url);
-      if (u.startsWith("https://api.github.com/")) {
-        return tree(["README.md", "docs/skills/pdf/SKILL.md"]);
-      }
-      return u.endsWith("docs/skills/pdf/SKILL.md")
-        ? ok("---\nname: pdf\n---\n\nBody")
-        : notFound();
-    });
-
-    const detail = await fetchSkillDetail("owner/repo", "pdf");
-    expect(detail.path).toBe("docs/skills/pdf/SKILL.md");
-    expect(detail.instructions).toBe("Body");
+  it("rejects when the index path is missing", async () => {
+    await expect(fetchSkillDetail("anthropics/skills", "pdf")).rejects.toThrow(
+      "SKILL.md for pdf not found in anthropics/skills",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("rejects when nothing is found anywhere", async () => {
+  it("rejects when the SKILL.md is not found at the known path", async () => {
     fetchMock.mockResolvedValue(notFound());
 
-    await expect(fetchSkillDetail("owner/repo", "pdf")).rejects.toThrow(
-      "SKILL.md for pdf not found in owner/repo",
+    await expect(
+      fetchSkillDetail("owner/repo", "pdf", "skills/pdf"),
+    ).rejects.toThrow("SKILL.md for pdf not found in owner/repo");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://cdn.jsdmirror.com/gh/owner/repo@main/skills/pdf/SKILL.md",
     );
   });
 });

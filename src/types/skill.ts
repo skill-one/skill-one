@@ -11,6 +11,12 @@ export interface Skill {
   description: string;
   /** Popularity metric, sourced from skills.sh install counts (e.g. 2_991_984). */
   stars: number;
+  /**
+   * Skill directory inside the repo as recorded by the registry index (e.g.
+   * "skills/find-skills"); absent on the old skills.sh snapshot. Used to fetch
+   * the SKILL.md directly without path probing.
+   */
+  path?: string;
 }
 
 /**

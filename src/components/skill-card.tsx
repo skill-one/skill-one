@@ -4,6 +4,7 @@ import { Star, Check, Download } from "lucide-react";
 import { cn, formatStars } from "../lib/utils";
 import type { Skill } from "../types/skill";
 import { Button } from "./ui/button";
+import { OwnerAvatar } from "./owner-avatar";
 
 /**
  * A single curated skill card.
@@ -26,7 +27,6 @@ export function SkillCard({
   const [installed, setInstalled] = useState(false);
 
   const owner = skill.repo.split("/")[0];
-  const avatarUrl = `https://github.com/${owner}.png`;
 
   return (
     <article
@@ -42,19 +42,14 @@ export function SkillCard({
       aria-label={onSelect ? `查看 ${skill.name} 详情` : undefined}
       className={cn(
         "group relative flex flex-col rounded-xl border border-border/70 bg-card p-4 transition-all duration-150",
-        onSelect && "cursor-pointer hover:-translate-y-0.5 hover:border-border hover:shadow-[0_10px_30px_-14px_rgba(15,23,42,0.18)]",
+        onSelect &&
+          "cursor-pointer hover:-translate-y-0.5 hover:border-border hover:shadow-[0_10px_30px_-14px_rgba(15,23,42,0.18)]",
         selected && "border-primary ring-1 ring-primary",
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <img
-            src={avatarUrl}
-            alt={`${owner} 的头像`}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            className="h-9 w-9 shrink-0 rounded-full border border-border/60 bg-muted"
-          />
+          <OwnerAvatar owner={owner} className="h-9 w-9 text-[15px]" />
           <div className="min-w-0">
             <h3 className="truncate text-[15px] font-semibold tracking-tight text-foreground">
               {skill.name}

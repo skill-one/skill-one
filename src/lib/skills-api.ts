@@ -1,10 +1,18 @@
-import { invoke } from "@tauri-apps/api/core";
-
-import mockPagesData from "../data/skills-mock.json";
 import type { Skill } from "../types/skill";
-import { isTauri } from "./tauri";
 
-/** Raw skill shape as returned by the Tauri `fetch_skills_page` command. */
+/**
+ * Full skills index (JSONL, one JSON object per line) published by the
+ * skills-index repo to its orphan `dist` branch. Served through JSDMirror —
+ * a jsDelivr mirror that sends CORS headers (unlike GitHub release assets) —
+ * so it is fetchable directly from the WebView and a plain browser alike.
+ */
+const INDEX_URL =
+  "https://cdn.jsdmirror.com/gh/luckie2076/skills-index@dist/index.jsonl";
+
+/** Number of skills returned per page (matches the previous Rust page size). */
+const PAGE_SIZE = 200;
+
+/** Raw skill shape as stored in one JSONL index line. */
 interface RawSkill {
   source: string;
   skillId: string;
@@ -14,13 +22,8 @@ interface RawSkill {
   weeklyInstalls: number[];
   /** Provided by the JSONL index; may be missing on individual entries. */
   description?: string;
-}
-
-/** Raw single page as returned by the Tauri `fetch_skills_page` command. */
-interface RawPage {
-  skills: RawSkill[];
-  hasMore: boolean;
-  total: number | null;
+  /** Skill directory inside the repo, e.g. "skills/find-skills". */
+  path?: string;
 }
 
 /** A page of skills mapped to the app's Skill model. */
@@ -29,14 +32,6 @@ export interface SkillsPage {
   hasMore: boolean;
   total: number | null;
 }
-
-/**
- * First 200 skills of the live JSONL index (single page) for plain browser
- * dev: the index is served from release-assets.githubusercontent.com without
- * CORS headers, so cross-origin reads are blocked and the UI is driven from
- * this static file instead of a live request.
- */
-const MOCK_PAGES = mockPagesData as RawPage[];
 
 /**
  * Whether a source is a GitHub repo in "owner/repo" form.
@@ -67,34 +62,66 @@ function toSkill(raw: RawSkill): Skill {
     // when an entry lacks one so the card layout stays stable.
     description: raw.description ?? "",
     stars: raw.installs,
+    path: raw.path,
   };
 }
 
-function toSkillsPage(raw: RawPage): SkillsPage {
-  return {
-    skills: raw.skills.filter((s) => isGitHubRepo(s.source)).map(toSkill),
-    hasMore: raw.hasMore,
-    total: raw.total,
-  };
+/**
+ * Parse the JSONL index into a list of GitHub skills, skipping blank lines
+ * and entries that are malformed or not GitHub repos.
+ */
+function parseIndex(text: string): Skill[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line) as RawSkill];
+      } catch {
+        return [];
+      }
+    })
+    .filter((raw) => isGitHubRepo(raw.source))
+    .map(toSkill);
+}
+
+/**
+ * Cached download of the full index. The JSONL file (~12MB) is fetched once
+ * per session and shared across pagination requests; a failed download clears
+ * the cache so the next call retries. Freshness across restarts is delegated
+ * to the data-fetching layer (TanStack Query).
+ */
+let indexPromise: Promise<Skill[]> | null = null;
+
+function loadIndex(): Promise<Skill[]> {
+  indexPromise ??= fetch(INDEX_URL)
+    .then((resp) => {
+      if (!resp.ok) throw new Error(`index request failed: ${resp.status}`);
+      return resp.text();
+    })
+    .then(parseIndex)
+    .catch((err: unknown) => {
+      indexPromise = null;
+      throw err;
+    });
+  return indexPromise;
 }
 
 /**
  * Fetch one page (0-indexed) of skills.
  *
- * Inside a Tauri shell this goes through the `fetch_skills_page` command, which
- * downloads the full skills index (JSONL) from the skills-index GitHub release,
- * caches it and slices it into pages. In a plain browser (dev) it reads the
- * static snapshot above (the release CDN blocks cross-origin reads, so no live
- * request is attempted).
- * Caching is delegated to the data-fetching layer (TanStack Query) which owns
- * the freshness window and background revalidation.
+ * Downloads the full index from JSDMirror on first call (then cached) and
+ * slices it locally. Caching of page data is delegated to TanStack Query,
+ * which owns the freshness window and background revalidation.
  */
 export async function fetchSkillsPage(page: number): Promise<SkillsPage> {
-  if (isTauri()) {
-    return toSkillsPage(await invoke<RawPage>("fetch_skills_page", { page }));
-  }
-  // Pages past the snapshot are empty, which ends pagination naturally.
-  const mock = MOCK_PAGES[page];
-  if (!mock) return { skills: [], hasMore: false, total: null };
-  return toSkillsPage(mock);
+  const skills = await loadIndex();
+  const start = page * PAGE_SIZE;
+  const slice = skills.slice(start, start + PAGE_SIZE);
+  return {
+    skills: slice,
+    hasMore: start + PAGE_SIZE < skills.length,
+    total: skills.length,
+  };
 }

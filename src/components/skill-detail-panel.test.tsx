@@ -78,6 +78,7 @@ describe("SkillDetailPanel", () => {
     expect(mockFetchSkillDetail).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
+      undefined,
     );
   });
 

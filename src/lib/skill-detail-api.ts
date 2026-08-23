@@ -1,18 +1,5 @@
 import type { SkillDetail } from "../types/skill";
 
-/**
- * Repo layouts probed for a skill's SKILL.md, in order of prevalence.
- */
-const SKILL_PATH_PATTERNS = [
-  "skills/{id}/SKILL.md",
-  "{id}/SKILL.md",
-  ".skills/{id}/SKILL.md",
-  "agent-skills/{id}/SKILL.md",
-] as const;
-
-/** Branches probed in order; "main" covers modern repos, "master" older ones. */
-const BRANCHES = ["main", "master"] as const;
-
 /** Frontmatter fields surfaced in the detail view. */
 const FRONTMATTER_FIELDS = [
   "name",
@@ -26,50 +13,33 @@ type FrontmatterField = (typeof FRONTMATTER_FIELDS)[number];
 
 type Frontmatter = Partial<Record<FrontmatterField, string>>;
 
+/** CDN mirror of GitHub repo files (jsDelivr mirror) with CORS headers. */
+const GH_CDN = "https://cdn.jsdmirror.com/gh";
+
 /**
  * Fetch a skill's SKILL.md from its source GitHub repo.
  *
- * raw.githubusercontent.com and api.github.com both serve CORS headers, so
- * this works identically in a plain browser and inside the Tauri WebView —
- * unlike the registry index, which needs the Rust proxy. Caching (and
+ * The file is fetched through JSDMirror (a jsDelivr mirror sending CORS
+ * headers), which works identically in a plain browser and inside the Tauri
+ * WebView and is reliably reachable from mainland China. Caching (and
  * persistence across restarts) is delegated to TanStack Query.
+ *
+ * `knownPath` is the skill's directory as recorded in the registry index
+ * (e.g. "skills/find-skills") and always present for registry skills, so the
+ * SKILL.md resolves in a single request. A missing or stale path throws.
  */
 export async function fetchSkillDetail(
   repo: string,
   skillId: string,
+  knownPath?: string,
 ): Promise<SkillDetail> {
-  const ids = [skillId];
-  const simplified = simplifiedSkillId(skillId);
-  if (simplified) ids.push(simplified);
-
-  for (const branch of BRANCHES) {
-    for (const id of ids) {
-      for (const pattern of SKILL_PATH_PATTERNS) {
-        const path = pattern.replace("{id}", id);
-        const raw = await fetchText(
-          `https://raw.githubusercontent.com/${repo}/${branch}/${path}`,
-        );
-        if (raw != null) return toDetail(raw, skillId, path);
-      }
-    }
+  if (!knownPath) {
+    throw new Error(`SKILL.md for ${skillId} not found in ${repo}`);
   }
-
-  const detail = await findInTree(repo, skillId);
-  if (detail) return detail;
-
+  const path = `${knownPath.replace(/\/+$/, "")}/SKILL.md`;
+  const raw = await fetchText(`${GH_CDN}/${repo}@main/${path}`);
+  if (raw != null) return toDetail(raw, skillId, path);
   throw new Error(`SKILL.md for ${skillId} not found in ${repo}`);
-}
-
-/**
- * Drop a leading lowercase word from the skill id: registry ids often prefix
- * the repo's own directory name ("vercel-react-best-practices" →
- * "react-best-practices").
- */
-export function simplifiedSkillId(skillId: string): string | null {
-  const idx = skillId.indexOf("-");
-  if (idx <= 0) return null;
-  const prefix = skillId.slice(0, idx);
-  return /^[a-z]+$/.test(prefix) ? skillId.slice(idx + 1) : null;
 }
 
 /**
@@ -107,7 +77,13 @@ export function parseFrontmatter(raw: string): {
       frontmatter[key as FrontmatterField] = value;
     }
   }
-  return { frontmatter, body: lines.slice(end + 1).join("\n").trim() };
+  return {
+    frontmatter,
+    body: lines
+      .slice(end + 1)
+      .join("\n")
+      .trim(),
+  };
 }
 
 /** GET a URL and return its text body, or null for any error/non-2xx. */
@@ -142,44 +118,4 @@ function toDetail(raw: string, skillId: string, path: string): SkillDetail {
     instructions: body,
     path,
   };
-}
-
-interface TreeEntry {
-  type: string;
-  path: string;
-}
-
-/**
- * Last resort: search the whole repo tree for any SKILL.md via the GitHub
- * API, covering repos with non-standard layouts. Unauthenticated API calls
- * are rate limited (60/h per IP), so this only runs when every conventional
- * path has failed.
- */
-async function findInTree(
-  repo: string,
-  skillId: string,
-): Promise<SkillDetail | null> {
-  for (const branch of BRANCHES) {
-    try {
-      const resp = await fetch(
-        `https://api.github.com/repos/${repo}/git/trees/${branch}?recursive=1`,
-        { headers: { Accept: "application/vnd.github.v3+json" } },
-      );
-      if (!resp.ok) continue;
-      const { tree } = (await resp.json()) as { tree: TreeEntry[] };
-      const entry = tree.find(
-        (item) =>
-          item.type === "blob" &&
-          (item.path === "SKILL.md" || item.path.endsWith("/SKILL.md")),
-      );
-      if (!entry) continue;
-      const raw = await fetchText(
-        `https://raw.githubusercontent.com/${repo}/${branch}/${entry.path}`,
-      );
-      if (raw != null) return toDetail(raw, skillId, entry.path);
-    } catch {
-      continue;
-    }
-  }
-  return null;
 }

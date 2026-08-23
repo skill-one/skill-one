@@ -7,6 +7,7 @@ import { formatStars } from "../lib/utils";
 import type { Skill } from "../types/skill";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { OwnerAvatar } from "./owner-avatar";
 
 interface SkillDetailPanelProps {
   /** The skill to show; null renders nothing. */
@@ -37,7 +38,7 @@ export function SkillDetailPanel({
     refetch,
   } = useQuery({
     queryKey: ["skill-detail", skill?.repo, skill?.name],
-    queryFn: () => fetchSkillDetail(skill!.repo, skill!.name),
+    queryFn: () => fetchSkillDetail(skill!.repo, skill!.name, skill!.path),
     enabled: skill != null,
   });
 
@@ -78,13 +79,7 @@ export function SkillDetailPanel({
         </div>
 
         <div className="flex items-center gap-3">
-          <img
-            src={`https://github.com/${owner}.png`}
-            alt={`${owner} 的头像`}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            className="h-11 w-11 shrink-0 rounded-full border border-border/60 bg-muted"
-          />
+          <OwnerAvatar owner={owner} className="h-11 w-11 text-[18px]" />
           <div className="min-w-0">
             <h2 className="truncate text-[17px] font-semibold tracking-tight text-foreground">
               {skill.name}
@@ -99,7 +94,9 @@ export function SkillDetailPanel({
           {detail?.version && (
             <Badge variant="secondary">v{detail.version}</Badge>
           )}
-          {detail?.license && <Badge variant="secondary">{detail.license}</Badge>}
+          {detail?.license && (
+            <Badge variant="secondary">{detail.license}</Badge>
+          )}
           {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
           <span className="ml-0.5 flex items-center gap-1 text-[12px] text-muted-foreground">
             <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
