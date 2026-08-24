@@ -1,19 +1,14 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import {
-  Bot,
-  Boxes,
-  FolderHeart,
-  PanelLeft,
-  PanelLeftClose,
-  PlusCircle,
-  RefreshCw,
+  Search,
   Settings,
-  Tags,
-  Wrench,
+  Sparkles,
+  Building2,
+  LayoutGrid,
+  Globe,
+  Folder,
 } from "lucide-react";
 
-import { fetchAgentStatus, fetchInstalledSkills } from "../lib/local-skills";
 import {
   Sidebar,
   SidebarContent,
@@ -26,10 +21,10 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
   SidebarSeparator,
-  useSidebar,
 } from "./ui/sidebar";
+import { Input } from "./ui/input";
+import { isTauri } from "../lib/tauri";
 
 interface NavItem {
   path: string;
@@ -38,16 +33,19 @@ interface NavItem {
   count?: number;
 }
 
-const adminItems: NavItem[] = [
-  { path: "/tags", label: "标签", icon: Tags, count: 0 },
-  { path: "/tools", label: "工具", icon: Wrench, count: 46 },
-  { path: "/updates", label: "更新", icon: RefreshCw, count: 0 },
+const shopItems: NavItem[] = [
+  { path: "/explore", label: "精选", icon: Sparkles, count: 12 },
+  { path: "/explore", label: "官方", icon: Building2, count: 12 },
+  { path: "/explore", label: "全部", icon: LayoutGrid, count: 12 },
+];
+
+const mySkillsItems: NavItem[] = [
+  { path: "/my-skills", label: "全局", icon: Globe, count: 3 },
+  { path: "/my-skills", label: "项目", icon: Folder, count: 3 },
 ];
 
 function NavMenuItem({ item }: { item: NavItem }) {
   const location = useLocation();
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
   const isActive = location.pathname === item.path;
   const Icon = item.icon;
 
@@ -55,8 +53,8 @@ function NavMenuItem({ item }: { item: NavItem }) {
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
         <NavLink to={item.path}>
-          <Icon />
-          {!collapsed && <span>{item.label}</span>}
+          <Icon className="h-4 w-4" />
+          <span>{item.label}</span>
         </NavLink>
       </SidebarMenuButton>
       {item.count !== undefined && (
@@ -69,92 +67,50 @@ function NavMenuItem({ item }: { item: NavItem }) {
 }
 
 function BrandHeader() {
-  const { state, toggleSidebar } = useSidebar();
-  const collapsed = state === "collapsed";
-
   return (
     <SidebarHeader>
-      <div className="flex items-center gap-2.5 px-1 py-1.5">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm group-data-[collapsible=icon]:hidden">
-          <Boxes className="size-[18px]" />
+      {/* Reserve the macOS traffic-light zone (Overlay title bar) and make
+          it draggable so the window can be moved from the sidebar top. */}
+      {isTauri() && <div data-tauri-drag-region className="h-6 shrink-0" />}
+      <div className="flex items-center gap-2.5 px-1 py-2">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold shadow-sm">
+          S
         </div>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold leading-tight text-foreground">
-              Skillone
-            </p>
-            <p className="truncate text-[11px] text-muted-foreground">
-              技能同步工作台
-            </p>
-          </div>
-        )}
-        <button
-          onClick={toggleSidebar}
-          title={collapsed ? "展开侧边栏" : "折叠侧边栏"}
-          aria-label={collapsed ? "展开侧边栏" : "折叠侧边栏"}
-          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          {collapsed ? (
-            <PanelLeft className="size-4" />
-          ) : (
-            <PanelLeftClose className="size-4" />
-          )}
-        </button>
+        <span className="text-[14px] font-semibold text-foreground">
+          SkillOne
+        </span>
+      </div>
+      <div className="px-1 pb-2">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="搜索 Skill" className="h-8 pl-8 text-[12px]" />
+        </div>
       </div>
     </SidebarHeader>
   );
 }
 
 export function AppSidebar() {
-  // Live counts for the workspace badges (hidden while the queries load).
-  const { data: installedSkills } = useQuery({
-    queryKey: ["installed-skills"],
-    queryFn: fetchInstalledSkills,
-    staleTime: 0,
-  });
-  const { data: agents } = useQuery({
-    queryKey: ["agent-status"],
-    queryFn: fetchAgentStatus,
-    staleTime: 0,
-  });
-
-  const workspaceItems: NavItem[] = [
-    {
-      path: "/my-skills",
-      label: "我的 Skills",
-      icon: FolderHeart,
-      count: installedSkills ? installedSkills.length : undefined,
-    },
-    {
-      path: "/my-agents",
-      label: "我的 Agents",
-      icon: Bot,
-      count: agents ? agents.length : undefined,
-    },
-    { path: "/explore", label: "添加 Skills", icon: PlusCircle },
-  ];
-
   return (
-    // The shadcn sidebar is viewport-fixed; offset it below the 52px title bar.
-    <Sidebar collapsible="icon" style={{ top: 52, height: "auto" }}>
+    <Sidebar collapsible="none">
       <BrandHeader />
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>工作区</SidebarGroupLabel>
+          <SidebarGroupLabel>商店</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {workspaceItems.map((item) => (
-                <NavMenuItem key={item.path} item={item} />
+              {shopItems.map((item) => (
+                <NavMenuItem key={item.label} item={item} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>管理中心</SidebarGroupLabel>
+          <SidebarGroupLabel>我的SKILLS</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {adminItems.map((item) => (
-                <NavMenuItem key={item.path} item={item} />
+              {mySkillsItems.map((item) => (
+                <NavMenuItem key={item.label} item={item} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -163,10 +119,11 @@ export function AppSidebar() {
       <SidebarSeparator />
       <SidebarFooter>
         <SidebarMenu>
-          <NavMenuItem item={{ path: "/settings", label: "设置", icon: Settings }} />
+          <NavMenuItem
+            item={{ path: "/settings", label: "设置", icon: Settings }}
+          />
         </SidebarMenu>
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   );
 }

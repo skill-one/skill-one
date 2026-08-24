@@ -1,9 +1,16 @@
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect } from "react";
+import {
+  HashRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 
-import { TitleBar } from "./components/title-bar";
 import { AppSidebar } from "./components/app-sidebar";
 import { ExplorePage } from "./components/explore-page";
 import { MyAgentsPage } from "./components/my-agents-page";
@@ -11,6 +18,7 @@ import { MySkillsPage } from "./components/my-skills-page";
 import { PlaceholderPage } from "./components/placeholder-page";
 import { SettingsPage } from "./components/settings-page";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
+import { isTauri } from "./lib/tauri";
 
 /**
  * Cached registry data is served for 10 minutes without re-fetching
@@ -52,6 +60,49 @@ const persister = createSyncStoragePersister({
   },
 });
 
+/** Route path -> native window title. */
+const PAGE_TITLES: Record<string, string> = {
+  "/explore": "添加 Skills",
+  "/my-skills": "我的 Skills",
+  "/my-agents": "我的 Agents",
+  "/tags": "标签",
+  "/tools": "工具",
+  "/updates": "更新",
+  "/settings": "设置",
+};
+
+/**
+ * Drag strip across the top of the content column (the Overlay title bar has
+ * no native bar to drag from). The whole strip is marked as a drag region so
+ * the window can be moved, and the current page name is centered on top of it
+ * (traffic-light zone on the left is not clickable). The native window title
+ * is still synced for Mission Control (no-op in browser).
+ */
+function WindowTitle() {
+  const location = useLocation();
+  const title = PAGE_TITLES[location.pathname] ?? "Skillone";
+
+  useEffect(() => {
+    if (isTauri()) {
+      void getCurrentWindow().setTitle(title);
+    }
+  }, [title]);
+
+  return (
+    <div
+      data-tauri-drag-region
+      className="absolute inset-x-0 top-0 flex h-9 items-center justify-center"
+    >
+      <span
+        data-tauri-drag-region
+        className="text-[13px] font-medium text-muted-foreground"
+      >
+        {title}
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <PersistQueryClientProvider
@@ -60,17 +111,18 @@ export default function App() {
     >
       <HashRouter>
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
-          <TitleBar />
-          {/* The provider defaults to `min-h-svh`; neutralize it so the row
-              fits the space below the 52px title bar instead of overflowing. */}
           <SidebarProvider
             style={{ minHeight: 0 }}
             className="flex-1 overflow-hidden"
           >
             <AppSidebar />
-            <SidebarInset className="overflow-hidden">
+            <SidebarInset className="overflow-hidden pt-9">
+              <WindowTitle />
               <Routes>
-                <Route path="/" element={<Navigate to="/explore" replace />} />
+                <Route
+                  path="/"
+                  element={<Navigate to="/my-skills" replace />}
+                />
                 <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/my-skills" element={<MySkillsPage />} />
                 <Route path="/my-agents" element={<MyAgentsPage />} />
@@ -87,7 +139,10 @@ export default function App() {
                   element={<PlaceholderPage title="更新" />}
                 />
                 <Route path="/settings" element={<SettingsPage />} />
-                <Route path="*" element={<Navigate to="/explore" replace />} />
+                <Route
+                  path="*"
+                  element={<Navigate to="/my-skills" replace />}
+                />
               </Routes>
             </SidebarInset>
           </SidebarProvider>
