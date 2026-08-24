@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { fetchSkillDetail } from "../lib/skill-detail-api";
+import { openExternal } from "../lib/open-external";
 import type { Skill } from "../types/skill";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
@@ -11,7 +12,12 @@ vi.mock("../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
 }));
 
+vi.mock("../lib/open-external", () => ({
+  openExternal: vi.fn(),
+}));
+
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
+const mockOpenExternal = vi.mocked(openExternal);
 
 const skill: Skill = {
   name: "pdf",
@@ -51,6 +57,7 @@ beforeEach(() => {
     defaultOptions: { queries: { retry: false } },
   });
   mockFetchSkillDetail.mockReset();
+  mockOpenExternal.mockReset();
 });
 
 describe("SkillDetailPanel", () => {
@@ -79,6 +86,48 @@ describe("SkillDetailPanel", () => {
       "anthropics/skills",
       "pdf",
       undefined,
+    );
+  });
+
+  it("links the source repo to the skill's GitHub directory when known", async () => {
+    mockFetchSkillDetail.mockResolvedValue(detail);
+    renderPanel({ skill: { ...skill, path: "skills/pdf" } });
+
+    await screen.findByText("Use this skill for PDFs.");
+    expect(
+      screen.getByRole("link", { name: /anthropics\/skills/ }),
+    ).toHaveAttribute(
+      "href",
+      "https://github.com/anthropics/skills/tree/HEAD/skills/pdf",
+    );
+    // The file path links to the exact SKILL.md on GitHub.
+    expect(
+      screen.getByRole("link", { name: /skills\/pdf\/SKILL\.md/ }),
+    ).toHaveAttribute(
+      "href",
+      "https://github.com/anthropics/skills/blob/HEAD/skills/pdf/SKILL.md",
+    );
+  });
+
+  it("links the source repo to the GitHub repo root when the path is unknown", async () => {
+    mockFetchSkillDetail.mockResolvedValue(detail);
+    renderPanel({ skill });
+
+    await screen.findByText("Use this skill for PDFs.");
+    expect(
+      screen.getByRole("link", { name: /anthropics\/skills/ }),
+    ).toHaveAttribute("href", "https://github.com/anthropics/skills");
+  });
+
+  it("opens the source link through the system browser on click", async () => {
+    const user = userEvent.setup();
+    mockFetchSkillDetail.mockResolvedValue(detail);
+    renderPanel({ skill: { ...skill, path: "skills/pdf" } });
+
+    await screen.findByText("Use this skill for PDFs.");
+    await user.click(screen.getByRole("link", { name: /anthropics\/skills/ }));
+    expect(mockOpenExternal).toHaveBeenCalledWith(
+      "https://github.com/anthropics/skills/tree/HEAD/skills/pdf",
     );
   });
 
