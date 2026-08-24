@@ -103,10 +103,10 @@ function AgentIconButton({
       : "bg-muted-foreground";
   const statusText = isLinked ? "已链接" : "未链接";
   const description = isLinked
-    ? "可使用已安装的所有 skills"
+    ? "可使用所有已安装 skills"
     : showBadge
-      ? `目录内已有 ${skillCount} 个 skills，链接后将自动导入并统一管理：`
-      : "链接后可使用已安装的所有 skills";
+      ? `链接后,将自动导入以下 skills 并统一管理：`
+      : "链接后,可使用所有已安装 skills";
 
   const button = (
     <button
