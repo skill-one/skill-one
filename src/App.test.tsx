@@ -41,52 +41,36 @@ describe("App routing", () => {
     // The sync-storage persister is wired up once at module load.
     expect(mockCreateSyncStoragePersister).toHaveBeenCalledTimes(1);
 
-    // Await the provider's async restore so its state update settles inside
-    // act() and doesn't leak a warning.
-    await screen.findByRole("tab", { name: "在线探索" });
+    // Default route is /my-skills; wait for its content to settle.
+    await screen.findByText("守门人");
   });
 
-  it("redirects the root route to /explore", async () => {
+  it("redirects the root route to /my-skills", async () => {
     render(<App />);
 
-    // ExplorePage renders its source tabs once the route lands.
-    expect(
-      await screen.findByRole("tab", { name: "在线探索" }),
-    ).toBeInTheDocument();
+    // MySkillsPage renders mock skill cards synchronously.
+    expect(await screen.findByText("守门人")).toBeInTheDocument();
   });
 
-  it("navigates to My Skills via the sidebar", async () => {
+  it("navigates between routes via the sidebar", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("link", { name: /我的 Skills/ }));
+    // Navigate to Settings.
+    await user.click(screen.getByRole("link", { name: /设置/ }));
 
-    // MySkillsPage renders its subtitle.
-    expect(
-      await screen.findByText("管理已安装的技能：检查来源、更新或移除。"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/配置技能数据的下载源/)).toBeInTheDocument();
+
+    // Navigate back to My Skills (全局).
+    await user.click(screen.getByRole("link", { name: /全局/ }));
+
+    expect(await screen.findByText("守门人")).toBeInTheDocument();
   });
 
-  it("navigates to My Agents via the sidebar", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(screen.getByRole("link", { name: /我的 Agents/ }));
-
-    // MyAgentsPage renders its subtitle.
-    expect(
-      await screen.findByText(
-        "查看各 AI 编码代理的 skills 目录链接状态，并将它们的 skills 目录链接到统一位置。",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("redirects unknown routes back to /explore", async () => {
+  it("redirects unknown routes back to /my-skills", async () => {
     window.location.hash = "#/does-not-exist";
     render(<App />);
 
-    expect(
-      await screen.findByRole("tab", { name: "在线探索" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("守门人")).toBeInTheDocument();
   });
 });

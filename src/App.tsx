@@ -2,6 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Sparkles, Building2, Folder } from "lucide-react";
 import { useEffect } from "react";
 import {
   HashRouter,
@@ -13,7 +14,6 @@ import {
 
 import { AppSidebar } from "./components/app-sidebar";
 import { ExplorePage } from "./components/explore-page";
-import { MyAgentsPage } from "./components/my-agents-page";
 import { MySkillsPage } from "./components/my-skills-page";
 import { PlaceholderPage } from "./components/placeholder-page";
 import { SettingsPage } from "./components/settings-page";
@@ -60,14 +60,10 @@ const persister = createSyncStoragePersister({
   },
 });
 
-/** Route path -> native window title. */
+/** Route path -> native window title. 尚未实现的页面暂时留空标题。 */
 const PAGE_TITLES: Record<string, string> = {
   "/explore": "添加 Skills",
   "/my-skills": "我的 Skills",
-  "/my-agents": "我的 Agents",
-  "/tags": "标签",
-  "/tools": "工具",
-  "/updates": "更新",
   "/settings": "设置",
 };
 
@@ -80,7 +76,7 @@ const PAGE_TITLES: Record<string, string> = {
  */
 function WindowTitle() {
   const location = useLocation();
-  const title = PAGE_TITLES[location.pathname] ?? "Skillone";
+  const title = PAGE_TITLES[location.pathname] ?? "";
 
   useEffect(() => {
     if (isTauri()) {
@@ -125,18 +121,17 @@ export default function App() {
                 />
                 <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/my-skills" element={<MySkillsPage />} />
-                <Route path="/my-agents" element={<MyAgentsPage />} />
                 <Route
-                  path="/tags"
-                  element={<PlaceholderPage title="标签" />}
+                  path="/explore/featured"
+                  element={<PlaceholderPage icon={Sparkles} title="精选" />}
                 />
                 <Route
-                  path="/tools"
-                  element={<PlaceholderPage title="工具" />}
+                  path="/explore/official"
+                  element={<PlaceholderPage icon={Building2} title="官方" />}
                 />
                 <Route
-                  path="/updates"
-                  element={<PlaceholderPage title="更新" />}
+                  path="/my-skills/project"
+                  element={<PlaceholderPage icon={Folder} title="项目" />}
                 />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route

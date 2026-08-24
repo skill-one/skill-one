@@ -34,14 +34,14 @@ interface NavItem {
 }
 
 const shopItems: NavItem[] = [
-  { path: "/explore", label: "精选", icon: Sparkles, count: 12 },
-  { path: "/explore", label: "官方", icon: Building2, count: 12 },
+  { path: "/explore/featured", label: "精选", icon: Sparkles, count: 12 },
+  { path: "/explore/official", label: "官方", icon: Building2, count: 12 },
   { path: "/explore", label: "全部", icon: LayoutGrid, count: 12 },
 ];
 
 const mySkillsItems: NavItem[] = [
   { path: "/my-skills", label: "全局", icon: Globe, count: 3 },
-  { path: "/my-skills", label: "项目", icon: Folder, count: 3 },
+  { path: "/my-skills/project", label: "项目", icon: Folder, count: 3 },
 ];
 
 function NavMenuItem({ item }: { item: NavItem }) {
