@@ -10,15 +10,7 @@ jobs:
   publish-tauri:
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-14 # Apple Silicon
-            args: --target aarch64-apple-darwin
-          - platform: macos-13 # Intel
-            args: --target x86_64-apple-darwin
-    runs-on: ${{ matrix.platform }}
+    runs-on: macos-14 # Apple Silicon (arm64)
     steps:
       - uses: actions/checkout@v4
 
@@ -29,8 +21,6 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-14' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
 
       - uses: swatinem/rust-cache@v2
 
@@ -45,4 +35,3 @@ jobs:
           tagName: v__VERSION__
           releaseName: "Skillone v__VERSION__"
           releaseDraft: false
-          args: ${{ matrix.args }}
