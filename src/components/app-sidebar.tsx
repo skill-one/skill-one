@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  Search,
   Settings,
   Sparkles,
   Building2,
@@ -24,7 +23,6 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "./ui/sidebar";
-import { Input } from "./ui/input";
 import { isTauri } from "../lib/tauri";
 import { fetchInstalledSkills } from "../lib/local-skills";
 import { fetchSkillsPage } from "../lib/skills-api";
@@ -118,12 +116,6 @@ function BrandHeader() {
         <span className="text-[14px] font-semibold text-foreground">
           SkillOne
         </span>
-      </div>
-      <div className="px-1 pb-2">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="搜索 Skill" className="h-8 pl-8 text-[12px]" />
-        </div>
       </div>
     </SidebarHeader>
   );
