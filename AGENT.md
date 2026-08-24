@@ -14,4 +14,5 @@
 # 项目要求
 
 1. 基于 tauri+vite+shadcn/ui+react-router+typescript
-2. 优先使用 shadcn/ui 组件
+2. 优先使用 shadcn/ui 组件, 而非自定义组件
+3. 优先使用默认样式, 而非自定义样式
