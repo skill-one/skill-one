@@ -12,7 +12,7 @@ import {
   useLocation,
 } from "react-router-dom";
 
-import { AppSidebar } from "./components/app-sidebar";
+import { AppSidebar, navLabelFor } from "./components/app-sidebar";
 import { ExplorePage } from "./components/explore-page";
 import { MySkillsPage } from "./components/my-skills-page";
 import { PlaceholderPage } from "./components/placeholder-page";
@@ -60,23 +60,18 @@ const persister = createSyncStoragePersister({
   },
 });
 
-/** Route path -> native window title. 尚未实现的页面暂时留空标题。 */
-const PAGE_TITLES: Record<string, string> = {
-  "/explore": "添加 Skills",
-  "/my-skills": "我的 Skills",
-  "/settings": "设置",
-};
-
 /**
  * Drag strip across the top of the content column (the Overlay title bar has
  * no native bar to drag from). The whole strip is marked as a drag region so
  * the window can be moved, and the current page name is centered on top of it
  * (traffic-light zone on the left is not clickable). The native window title
  * is still synced for Mission Control (no-op in browser).
+ *
+ * 标题取自侧边栏的同一份导航配置（navLabelFor），保证与侧边栏页面同名。
  */
 function WindowTitle() {
   const location = useLocation();
-  const title = PAGE_TITLES[location.pathname] ?? "";
+  const title = navLabelFor(location.pathname);
 
   useEffect(() => {
     if (isTauri()) {

@@ -1,9 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 
+import { fetchSkillsPage } from "../lib/skills-api";
 import { AppSidebar } from "./app-sidebar";
 import { SidebarProvider } from "./ui/sidebar";
 import { renderWithRouter } from "../test/test-utils";
+
+vi.mock("../lib/skills-api", () => ({ fetchSkillsPage: vi.fn() }));
+
+const mockFetchSkillsPage = vi.mocked(fetchSkillsPage);
 
 function renderSidebar(route = "/") {
   return renderWithRouter(
@@ -13,6 +18,16 @@ function renderSidebar(route = "/") {
     { route },
   );
 }
+
+beforeEach(() => {
+  mockFetchSkillsPage.mockReset();
+  // Registry reports 400 skills total, so the 全部 badge shows 400.
+  mockFetchSkillsPage.mockResolvedValue({
+    skills: [],
+    hasMore: false,
+    total: 400,
+  });
+});
 
 describe("AppSidebar", () => {
   it("renders brand and nav items", () => {
@@ -27,13 +42,24 @@ describe("AppSidebar", () => {
     expect(screen.getByText("设置")).toBeInTheDocument();
   });
 
-  it("renders count badges where defined", () => {
+  it("shows the registry total on 全部, installed count on 全局", async () => {
     renderSidebar();
 
-    // Shop items (精选, 官方, 全部) each show count 12.
-    expect(screen.getAllByText("12")).toHaveLength(3);
-    // My-skills items (全局, 项目) each show count 3.
-    expect(screen.getAllByText("3")).toHaveLength(2);
+    // Mock skills are installed (see ../lib/mock-local): only 全部 shows the
+    // registry total (400); 精选/官方/项目 are unimplemented and show none.
+    expect(await screen.findByText("400")).toBeInTheDocument();
+    expect(screen.getByText("6")).toBeInTheDocument();
+    expect(screen.queryByText("12")).not.toBeInTheDocument();
+  });
+
+  it("omits badges for unimplemented pages and hides badges before data loads", async () => {
+    mockFetchSkillsPage.mockImplementation(() => new Promise(() => {}));
+    renderSidebar();
+
+    // No registry data yet → no 400 badge; installed skills render sync from
+    // the mock store, so 全局 still shows 6.
+    expect(screen.queryByText("400")).not.toBeInTheDocument();
+    expect(await screen.findByText("6")).toBeInTheDocument();
   });
 
   it("marks the active route link", () => {
