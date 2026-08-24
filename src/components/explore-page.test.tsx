@@ -1,7 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, act, waitFor, within, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  render,
+  screen,
+  waitFor,
+  within,
+  fireEvent,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HashRouter, Route, Routes } from "react-router-dom";
 
 import { fetchSkillsPage } from "../lib/skills-api";
 import { fetchSkillDetail } from "../lib/skill-detail-api";
@@ -15,14 +22,7 @@ vi.mock("../lib/skill-detail-api", () => ({
 const mockFetchSkillsPage = vi.mocked(fetchSkillsPage);
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 
-// The IntersectionObserver mock defined in test/setup.ts exposes its
-// instances so tests can fire intersection callbacks manually. Each render
-// cycle may create a new observer, so tests always trigger the latest one.
-const ioMock = globalThis.IntersectionObserver as unknown as {
-  instances: Array<{ trigger: (intersecting?: boolean) => void }>;
-};
-
-/** Build a raw skills.sh page of `count` skills, offset for key uniqueness. */
+/** Build a slice of `count` skills starting at global index `offset`. */
 function makeSkills(count: number, offset: number) {
   return Array.from({ length: count }, (_, i) => ({
     name: `skill-${offset + i}`,
@@ -32,11 +32,22 @@ function makeSkills(count: number, offset: number) {
   }));
 }
 
-/** A full raw page (200 skills) with a successor — the realistic case. */
-const page0 = { skills: makeSkills(200, 0), hasMore: true, total: 400 };
-const page1 = { skills: makeSkills(200, 200), hasMore: false, total: 400 };
-/** A page with no successor — used to verify fetching stops. */
-const lastPage = { skills: makeSkills(200, 0), hasMore: false, total: 200 };
+/**
+ * Mock fetchSkillsPage to serve 24-per-page slices from a registry with
+ * `total` skills — mirrors the real implementation's slice semantics.
+ */
+function mockRegistry(total: number) {
+  mockFetchSkillsPage.mockImplementation(async (page: number, pageSize) => {
+    const size = pageSize ?? 24;
+    const start = page * size;
+    const count = Math.max(0, Math.min(size, total - start));
+    return {
+      skills: makeSkills(count, start),
+      hasMore: start + size < total,
+      total,
+    };
+  });
+}
 
 let queryClient: QueryClient;
 
@@ -48,11 +59,12 @@ function renderExplorePage() {
   );
 }
 
-/** Fire the sentinel intersection callback on the newest observer instance. */
-async function fireSentinel() {
-  await act(async () => {
-    ioMock.instances[ioMock.instances.length - 1].trigger(true);
-  });
+/** Click through to a given numbered page by clicking its page link. */
+async function goToPage(
+  user: ReturnType<typeof userEvent.setup>,
+  page: number,
+) {
+  await user.click(screen.getByRole("link", { name: String(page) }));
 }
 
 beforeEach(() => {
@@ -62,112 +74,158 @@ beforeEach(() => {
     defaultOptions: { queries: { staleTime: 10 * 60 * 1000, retry: false } },
   });
   mockFetchSkillsPage.mockReset();
-  // The detail sheet resolves instantly for any skill in these tests.
   mockFetchSkillDetail.mockReset();
-  mockFetchSkillDetail.mockImplementation(async (_repo: string, id: string) => ({
-    name: id,
-    description: `Description of ${id}.`,
-    instructions: `Instructions for ${id}.`,
-    path: `skills/${id}/SKILL.md`,
-  }));
-});
-
-afterEach(() => {
-  ioMock.instances.length = 0;
+  mockFetchSkillDetail.mockImplementation(
+    async (_repo: string, id: string) => ({
+      name: id,
+      description: `Description of ${id}.`,
+      instructions: `Instructions for ${id}.`,
+      path: `skills/${id}/SKILL.md`,
+    }),
+  );
 });
 
 describe("ExplorePage", () => {
-  it("loads the first raw page but only renders the first 30 skills", async () => {
-    mockFetchSkillsPage.mockResolvedValueOnce(page0);
+  it("renders the first 24 skills of the first page with a total hint", async () => {
+    mockRegistry(50);
     renderExplorePage();
 
-    // The 200 fetched skills are sliced to RENDER_CHUNK (30) on mount, so
-    // skill-30 must not be mounted yet even though it is already in memory.
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
-    expect(screen.getByText("skill-29")).toBeInTheDocument();
-    expect(screen.queryByText("skill-30")).not.toBeInTheDocument();
+    expect(screen.getByText("skill-23")).toBeInTheDocument();
+    // Page 1 holds exactly 24 skills; skill-24 belongs to page 2.
+    expect(screen.queryByText("skill-24")).not.toBeInTheDocument();
     expect(mockFetchSkillsPage).toHaveBeenCalledTimes(1);
-    expect(mockFetchSkillsPage).toHaveBeenCalledWith(0);
-
-    // The header hint shows the registry-wide total reported by the page.
-    expect(screen.getByText(/共 400 个技能/)).toBeInTheDocument();
+    expect(mockFetchSkillsPage).toHaveBeenCalledWith(0, 24);
   });
 
-  it("renders the next batch when the sentinel fires without refetching", async () => {
-    mockFetchSkillsPage.mockResolvedValueOnce(page0);
+  it("disables previous on the first page and enables next", async () => {
+    mockRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
-    expect(mockFetchSkillsPage).toHaveBeenCalledTimes(1);
 
-    await fireSentinel();
-    expect(await screen.findByText("skill-30")).toBeInTheDocument();
-    expect(screen.queryByText("skill-60")).not.toBeInTheDocument();
-    // 170 skills remain unrendered in the cache, so no network call happens.
-    expect(mockFetchSkillsPage).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("link", { name: "上一页" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("link", { name: "下一页" })).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
   });
 
-  it("fetches the next raw page only after everything rendered so far is on screen", async () => {
-    mockFetchSkillsPage.mockResolvedValueOnce(page0).mockResolvedValueOnce(page1);
+  it("fetches and renders the next page via the next control", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
-    expect(mockFetchSkillsPage).toHaveBeenCalledTimes(1);
 
-    // Five more sentinel fires reveal batches up to 180 (skills 0-179); the
-    // sixth reaches 200, covering everything fetched so far.
-    for (let i = 0; i < 5; i++) {
-      await fireSentinel();
-    }
-    expect(await screen.findByText("skill-179")).toBeInTheDocument();
-    expect(screen.queryByText("skill-180")).not.toBeInTheDocument();
-    expect(mockFetchSkillsPage).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("link", { name: "下一页" }));
 
-    await fireSentinel();
-    await waitFor(() => expect(mockFetchSkillsPage).toHaveBeenCalledTimes(2));
-    expect(mockFetchSkillsPage).toHaveBeenLastCalledWith(1);
-    await screen.findByText("skill-199");
+    expect(await screen.findByText("skill-24")).toBeInTheDocument();
+    expect(screen.getByText("skill-47")).toBeInTheDocument();
+    expect(screen.queryByText("skill-48")).not.toBeInTheDocument();
+    expect(mockFetchSkillsPage).toHaveBeenLastCalledWith(1, 24);
+  });
 
-    // page1 (400 skills) is now in memory but visibleCount is still 200, so
-    // skill-200 is not mounted; one more fire reveals the next batch.
-    await fireSentinel();
-    expect(await screen.findByText("skill-200")).toBeInTheDocument();
-    expect(screen.queryByText("skill-230")).not.toBeInTheDocument();
+  it("jumps to a page by clicking its numbered button", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50);
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    await goToPage(user, 3);
+
+    expect(await screen.findByText("skill-48")).toBeInTheDocument();
+    expect(screen.getByText("skill-49")).toBeInTheDocument();
+    expect(mockFetchSkillsPage).toHaveBeenLastCalledWith(2, 24);
     expect(mockFetchSkillsPage).toHaveBeenCalledTimes(2);
   });
 
-  it("does not fetch again once hasMore is false", async () => {
-    mockFetchSkillsPage.mockResolvedValueOnce(lastPage);
+  it("disables next on the last page", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
-    expect(mockFetchSkillsPage).toHaveBeenCalledTimes(1);
 
-    // Seven fires render all 200 skills; hasMore is false, so no raw page is
-    // ever requested again.
-    for (let i = 0; i < 7; i++) {
-      await fireSentinel();
-    }
-    expect(await screen.findByText("skill-199")).toBeInTheDocument();
-    expect(mockFetchSkillsPage).toHaveBeenCalledTimes(1);
+    await goToPage(user, 3);
+    await screen.findByText("skill-48");
+
+    expect(screen.getByRole("link", { name: "下一页" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("link", { name: "上一页" })).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
   });
 
-  it("reuses the query cache on remount without re-requesting", async () => {
-    mockFetchSkillsPage.mockResolvedValueOnce(page0);
-    const { unmount } = renderExplorePage();
-    await screen.findByText("skill-0");
-    expect(mockFetchSkillsPage).toHaveBeenCalledTimes(1);
-    unmount();
-
-    // The 10-minute freshness window keeps the cached query fresh: remounting
-    // within it renders from cache with zero network calls.
-    mockFetchSkillsPage.mockClear();
+  it("shows every page number directly when there are few pages", async () => {
+    mockRegistry(216); // 9 pages — exactly the "show all" threshold
     renderExplorePage();
     await screen.findByText("skill-0");
-    expect(mockFetchSkillsPage).not.toHaveBeenCalled();
+
+    // All nine page links are rendered, with no ellipsis in the bar.
+    for (let p = 1; p <= 9; p++) {
+      expect(screen.getByRole("link", { name: String(p) })).toBeInTheDocument();
+    }
+    expect(screen.queryByText("More pages")).not.toBeInTheDocument();
+  });
+
+  it("collapses distant page numbers into an ellipsis window", async () => {
+    const user = userEvent.setup();
+    mockRegistry(240); // 10 pages
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    // Page 1 keeps the first page, a window (1..3) and the last page,
+    // collapsing the gap 3..10 into a single ellipsis.
+    expect(screen.getByRole("link", { name: "1" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "3" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "10" })).toBeInTheDocument();
+    expect(screen.getByText("More pages")).toBeInTheDocument();
+
+    // Jump to a visible page (3); the window now stretches further and the
+    // ellipsis shrinks, proving the window follows the current page.
+    await goToPage(user, 3);
+    await screen.findByText("skill-48");
+    expect(screen.getByRole("link", { name: "4" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "5" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "3" })).toBeInTheDocument();
+    expect(screen.getByText("More pages")).toBeInTheDocument();
+  });
+
+  it("jumps directly to a typed page number", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50); // 3 pages
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
+    await user.type(jump, "3");
+    await user.keyboard("{Enter}");
+
+    expect(await screen.findByText("skill-48")).toBeInTheDocument();
+    expect(mockFetchSkillsPage).toHaveBeenLastCalledWith(2, 24);
+  });
+
+  it("clamps an out-of-range jump to the last page", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50); // 3 pages
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
+    await user.type(jump, "99");
+    await user.keyboard("{Enter}");
+
+    expect(await screen.findByText("skill-48")).toBeInTheDocument();
   });
 
   it("shows an error state and recovers via retry", async () => {
     const user = userEvent.setup();
     mockFetchSkillsPage.mockRejectedValueOnce(new Error("network error"));
-    mockFetchSkillsPage.mockResolvedValueOnce(page0);
+    mockRegistry(50);
     renderExplorePage();
 
     expect(
@@ -178,10 +236,42 @@ describe("ExplorePage", () => {
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
   });
 
+  it("does not navigate away under HashRouter when clicking a page link", async () => {
+    // Regression: the app runs under <HashRouter>, so a pagination anchor's
+    // default href="#" navigation would push a new hash route and remount the
+    // page. onClick must preventDefault to keep the hash (and the route) fixed.
+    const user = userEvent.setup();
+    mockRegistry(50);
+    window.history.replaceState(null, "", "#/explore");
+    render(
+      <QueryClientProvider client={queryClient}>
+        <HashRouter>
+          <Routes>
+            <Route path="/explore" element={<ExplorePage />} />
+            <Route path="/" element={<div>landing</div>} />
+          </Routes>
+        </HashRouter>
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText("skill-0");
+    const hashBefore = window.location.hash;
+
+    await goToPage(user, 2);
+    await screen.findByText("skill-24");
+
+    // The hash (and therefore the active route) must be unchanged.
+    expect(window.location.hash).toBe(hashBefore);
+    // Page 2 still loads its own data, proving the click handled the page turn
+    // without relying on a route change.
+    expect(screen.getByText("skill-47")).toBeInTheDocument();
+  });
+
   it("switches between source tabs", async () => {
     const user = userEvent.setup();
-    mockFetchSkillsPage.mockResolvedValueOnce(page0);
+    mockRegistry(50);
     renderExplorePage();
+    await screen.findByText("skill-0");
 
     await user.click(screen.getByRole("tab", { name: "Git 仓库" }));
     expect(
@@ -196,7 +286,7 @@ describe("ExplorePage", () => {
 
   it("opens the detail panel when a card is clicked", async () => {
     const user = userEvent.setup();
-    mockFetchSkillsPage.mockResolvedValueOnce(page0);
+    mockRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -213,17 +303,19 @@ describe("ExplorePage", () => {
 
   it("switches skills inside the panel via card clicks", async () => {
     const user = userEvent.setup();
-    mockFetchSkillsPage.mockResolvedValueOnce(page0);
+    mockRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
     await user.click(screen.getByText("skill-0"));
-    expect(await screen.findByText("Instructions for skill-0.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Instructions for skill-0."),
+    ).toBeInTheDocument();
 
     // Clicking another card while the panel is open swaps the skill in place.
-    await user.click(screen.getByText("skill-29"));
+    await user.click(screen.getByText("skill-23"));
     expect(
-      await screen.findByText("Instructions for skill-29."),
+      await screen.findByText("Instructions for skill-23."),
     ).toBeInTheDocument();
   });
 
@@ -232,7 +324,7 @@ describe("ExplorePage", () => {
     const scrollIntoView = vi
       .spyOn(Element.prototype, "scrollIntoView")
       .mockImplementation(() => {});
-    mockFetchSkillsPage.mockResolvedValueOnce(page0);
+    mockRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -245,8 +337,8 @@ describe("ExplorePage", () => {
 
     // Switching to another card while the panel is already open keeps the
     // layout stable — no scroll adjustment.
-    await user.click(screen.getByText("skill-29"));
-    await screen.findByText("Instructions for skill-29.");
+    await user.click(screen.getByText("skill-23"));
+    await screen.findByText("Instructions for skill-23.");
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
 
     scrollIntoView.mockRestore();
@@ -254,7 +346,7 @@ describe("ExplorePage", () => {
 
   it("closes the panel via the X button and Escape", async () => {
     const user = userEvent.setup();
-    mockFetchSkillsPage.mockResolvedValueOnce(page0);
+    mockRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 

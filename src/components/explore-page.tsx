@@ -1,29 +1,63 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { SearchX, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { SearchX, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { fetchSkillsPage } from "../lib/skills-api";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+} from "./ui/pagination";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { SkillCard } from "./skill-card";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
-/**
- * Number of skills rendered per batch. A raw page holds 200 skills; mounting
- * all of them at once is wasteful, so only this many are rendered initially
- * and more are appended as the user scrolls.
- */
-const RENDER_CHUNK = 30;
+/** Number of skills shown per page in the paginated registry view. */
+const PAGE_SIZE = 24;
 
 /**
  * The persisted cache key for the explore list. The sync-storage persister
  * keeps this query in localStorage forever (`gcTime`/`maxAge: Infinity`), so
  * bumping the version invalidates caches captured from an older data source
- * or with a stale `hasMore` state — otherwise a stale cache would freeze
- * infinite pagination after a data-source switch.
+ * or with a stale page shape — otherwise a stale cache would freeze the list.
  */
-const SKILLS_QUERY_KEY = ["skills", 2] as const;
+const SKILLS_QUERY_KEY = ["skills", 3] as const;
+
+/**
+ * Collapse the pagination bar once there are too many pages to list: keep the
+ * first and last pages plus a window of pages around the current one, inserting
+ * "…" for each gap, so a wide range stays reachable without rendering hundreds
+ * of buttons. When there are few pages (≤ SHOW_ALL_THRESHOLD) every page number
+ * is shown directly.
+ */
+const SHOW_ALL_THRESHOLD = 9;
+const PAGE_WINDOW = 2;
+
+function pageRange(current: number, total: number): Array<number | "..."> {
+  if (total <= SHOW_ALL_THRESHOLD) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages = new Set<number>([1, total]);
+  for (let i = current - PAGE_WINDOW; i <= current + PAGE_WINDOW; i++) {
+    pages.add(i);
+  }
+  const sorted = [...pages]
+    .filter((p) => p >= 1 && p <= total)
+    .sort((a, b) => a - b);
+  const out: Array<number | "..."> = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (p - prev > 1) out.push("...");
+    out.push(p);
+    prev = p;
+  }
+  return out;
+}
 
 function Placeholder({
   message,
@@ -45,39 +79,21 @@ const tabClass =
   "rounded-none border-b-2 border-transparent bg-transparent px-1 pb-2 pt-1.5 shadow-none transition-colors data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground text-muted-foreground hover:text-foreground";
 
 export function ExplorePage() {
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useInfiniteQuery({
-    queryKey: SKILLS_QUERY_KEY,
-    queryFn: ({ pageParam }) => fetchSkillsPage(pageParam),
-    initialPageParam: 0,
-    // Pages are fetched sequentially and appended in order, so the next page
-    // index equals the number of pages loaded so far.
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage?.hasMore ? allPages.length : undefined,
+  // 1-based current page; switching pages resets the open detail panel.
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: [...SKILLS_QUERY_KEY, page],
+    queryFn: () => fetchSkillsPage(page - 1, PAGE_SIZE),
   });
 
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  // Flatten the fetched pages (in fetch order) into the card list.
-  const skills = useMemo(
-    () => data?.pages.flatMap((p) => p.skills) ?? [],
-    [data],
-  );
-
-  // Number of skills rendered so far. Grows by RENDER_CHUNK as the user
-  // scrolls, so only a slice of each raw 200-skill page is ever mounted.
-  const [visibleCount, setVisibleCount] = useState(RENDER_CHUNK);
-  const visibleSkills = skills.slice(0, visibleCount);
+  // The current page's skills; `total` is the registry-wide count reported by
+  // the API (null past the mock snapshot in plain-browser dev), which drives
+  // how many numbered pages exist.
+  const skills = data?.skills ?? [];
+  const total = data?.total ?? null;
+  const totalPages =
+    total != null ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : 1;
 
   // Index into `skills` of the skill shown in the detail panel; null keeps
   // the panel closed (full-width grid). Clicking a card while the panel is
@@ -86,25 +102,41 @@ export function ExplorePage() {
   const [selected, setSelected] = useState<number | null>(null);
   const selectedSkill = selected != null ? (skills[selected] ?? null) : null;
 
-  const handlePrev = () =>
-    setSelected((i) => (i == null ? i : Math.max(0, i - 1)));
+  const gridRef = useRef<HTMLDivElement>(null);
 
-  const handleNext = () => {
-    if (selected == null) return;
-    const next = selected + 1;
-    if (next >= skills.length) return;
-    // Navigating past the rendered slice reveals another batch of cards.
-    if (next >= visibleCount) {
-      setVisibleCount((c) => Math.min(skills.length, c + RENDER_CHUNK));
-    }
-    setSelected(next);
+  // Go to a numbered page and close any open detail panel.
+  const handlePage = (p: number) => {
+    setSelected(null);
+    setPage(p);
   };
 
-  // Registry-wide total reported by the API, stable across pages. In
-  // plain-browser dev this comes from the mock snapshot and reports the number
-  // of skills the snapshot actually holds; it is null past the snapshot, in
-  // which case the header line simply omits the count.
-  const total = data?.pages[0]?.total ?? null;
+  // Direct page jump: parse the typed number, clamp to [1, totalPages].
+  const [jump, setJump] = useState("");
+  const submitJump = (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = Math.floor(Number(jump));
+    if (!Number.isFinite(n)) return;
+    handlePage(Math.min(totalPages, Math.max(1, n)));
+    setJump("");
+  };
+
+  // Anchor-based pagination controls have no `disabled` attribute, so guard
+  // against navigating past the first/last page here.
+  const goPrev = () => {
+    if (page > 1) handlePage(page - 1);
+  };
+  const goNext = () => {
+    if (page < totalPages) handlePage(page + 1);
+  };
+
+  const handlePrev = () => {
+    if (selected != null) setSelected(Math.max(0, selected - 1));
+  };
+
+  const handleNext = () => {
+    if (selected == null || selected + 1 >= skills.length) return;
+    setSelected(selected + 1);
+  };
 
   // Scroll the selected card into view only when the detail panel opens
   // (null → index): collapsing the grid from 3 columns to 1 shifts every
@@ -116,69 +148,11 @@ export function ExplorePage() {
     const wasClosed = prevSelectedRef.current == null;
     prevSelectedRef.current = selected;
     if (selected == null || !wasClosed) return;
-    const card = gridRef.current?.children[selected] as
-      | HTMLElement
-      | undefined;
+    const card = gridRef.current?.children[selected] as HTMLElement | undefined;
     card?.scrollIntoView({ block: "start" });
-  }, [selected]);
+  }, [selected, skills]);
 
-  // Render the next batch once the sentinel approaches the visible area.
-  // The sentinel lives inside the scrollable list, so it is observed against
-  // that container (root) rather than the window: with a window root a broken
-  // height chain inside a WebView can leave the sentinel permanently
-  // "offscreen" and freeze pagination. rootMargin widens the trigger area
-  // well before the list actually ends.
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    const scrollRoot = scrollRef.current;
-    if (!sentinel) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setVisibleCount((c) => Math.min(skills.length, c + RENDER_CHUNK));
-        }
-      },
-      { root: scrollRoot, rootMargin: "400px 0px" },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [skills.length]);
-
-  // Belt-and-braces fallback for WebViews whose IntersectionObserver callback
-  // fires unreliably (notably WKWebView): also grow the rendered batch when
-  // the list is scrolled close to its end, so the prefetch effect below can
-  // never stall waiting for an intersection event.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 600) {
-        setVisibleCount((c) => Math.min(skills.length, c + RENDER_CHUNK));
-      }
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, [skills.length]);
-
-  // Once everything fetched so far has been rendered, pull in the next raw
-  // page of 200 skills from the registry. Guarded on skills.length > 0 so the
-  // initial load (which useInfiniteQuery performs itself) is never doubled.
-  useEffect(() => {
-    if (
-      skills.length > 0 &&
-      visibleCount >= skills.length &&
-      hasNextPage &&
-      !isFetchingNextPage
-    ) {
-      void fetchNextPage();
-    }
-  }, [
-    visibleCount,
-    skills.length,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
-  ]);
+  const range = pageRange(page, totalPages);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
@@ -203,22 +177,8 @@ export function ExplorePage() {
               right while a skill is selected. */}
           <div className="flex h-full min-h-0 flex-row">
             <div className="flex h-full min-w-0 flex-1 flex-col">
-              {/* Hint line */}
-              <p className="pb-4 text-[12px] leading-relaxed text-muted-foreground/90">
-                数据来自{" "}
-                <span className="font-medium text-muted-foreground">
-                  skills.sh
-                </span>{" "}
-                注册表
-                {total != null && <> · 共 {total.toLocaleString()} 个技能</>}·
-                滚动到底部自动加载更多
-              </p>
-
               {/* Grid */}
-              <div
-                ref={scrollRef}
-                className="min-h-0 flex-1 overflow-y-auto pb-6 pr-1"
-              >
+              <div className="min-h-0 flex-1 overflow-y-auto pb-6 pr-1">
                 {isError ? (
                   <Placeholder
                     message={`加载失败：${error instanceof Error ? error.message : "未知错误"}`}
@@ -232,7 +192,7 @@ export function ExplorePage() {
                       重试
                     </Button>
                   </Placeholder>
-                ) : visibleSkills.length === 0 ? (
+                ) : skills.length === 0 ? (
                   isLoading ? (
                     <div className="flex h-full min-h-[320px] items-center justify-center text-muted-foreground">
                       <Loader2 className="h-6 w-6 animate-spin" />
@@ -252,7 +212,7 @@ export function ExplorePage() {
                         : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
                     )}
                   >
-                    {visibleSkills.map((skill, index) => (
+                    {skills.map((skill, index) => (
                       <SkillCard
                         key={`${skill.repo}/${skill.name}`}
                         skill={skill}
@@ -262,23 +222,92 @@ export function ExplorePage() {
                     ))}
                   </div>
                 )}
-
-                {/* Always-mounted sentinel so the render observer never misses it. */}
-                <div ref={sentinelRef} aria-hidden="true" />
-                {visibleSkills.length > 0 && isFetchingNextPage && (
-                  <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-[12px]">加载中...</span>
-                  </div>
-                )}
-                {visibleSkills.length > 0 &&
-                  !isFetchingNextPage &&
-                  !hasNextPage && (
-                    <p className="py-6 text-center text-[12px] text-muted-foreground/80">
-                      已加载全部技能
-                    </p>
-                  )}
               </div>
+
+              {/* Pagination bar: previous / numbered pages (with ellipsis) /
+                  next, plus an inline "jump to page" input — shown once a page
+                  of data is available. */}
+              {data && totalPages > 1 && (
+                <div className="flex items-center justify-center gap-4 border-t border-border py-2.5">
+                  <Pagination className="w-auto">
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationLink
+                          size="icon"
+                          href="#"
+                          aria-label="上一页"
+                          aria-disabled={page <= 1}
+                          className={cn(
+                            "h-8 w-8",
+                            page <= 1 && "pointer-events-none opacity-50",
+                          )}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            goPrev();
+                          }}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </PaginationLink>
+                      </PaginationItem>
+                      {range.map((p, i) =>
+                        p === "..." ? (
+                          <PaginationItem key={`ellipsis-${i}`}>
+                            <PaginationEllipsis className="h-8 w-8" />
+                          </PaginationItem>
+                        ) : (
+                          <PaginationItem key={p}>
+                            <PaginationLink
+                              size="icon"
+                              href="#"
+                              className="h-8 w-8"
+                              isActive={p === page}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handlePage(p);
+                              }}
+                            >
+                              {p}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ),
+                      )}
+                      <PaginationItem>
+                        <PaginationLink
+                          size="icon"
+                          href="#"
+                          aria-label="下一页"
+                          aria-disabled={page >= totalPages}
+                          className={cn(
+                            "h-8 w-8",
+                            page >= totalPages &&
+                              "pointer-events-none opacity-50",
+                          )}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            goNext();
+                          }}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </PaginationLink>
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                  <form
+                    onSubmit={submitJump}
+                    className="flex items-center gap-1.5 text-[12px] text-muted-foreground"
+                  >
+                    <span>第</span>
+                    <Input
+                      value={jump}
+                      onChange={(e) => setJump(e.target.value)}
+                      inputMode="numeric"
+                      aria-label="跳转到第几页"
+                      className="h-8 w-14 px-2 text-center text-[12px]"
+                    />
+                    <span>/ {totalPages} 页</span>
+                  </form>
+                </div>
+              )}
             </div>
 
             <SkillDetailPanel

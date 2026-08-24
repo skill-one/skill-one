@@ -109,19 +109,32 @@ function loadIndex(): Promise<Skill[]> {
 }
 
 /**
+ * Load the full skills index (cached per session). Exposed for callers that
+ * need to join installed skills with registry metadata (downloads,
+ * descriptions) rather than paginate, e.g. the "my skills" page.
+ */
+export function fetchFullIndex(): Promise<Skill[]> {
+  return loadIndex();
+}
+
+/**
  * Fetch one page (0-indexed) of skills.
  *
  * Downloads the full index once (cached) through the configurable download
- * source, then slices it locally. Caching of page data is delegated to TanStack
- * Query, which owns the freshness window and background revalidation.
+ * source, then slices it locally using the configured page size. Caching of
+ * page data is delegated to TanStack Query, which owns the freshness window
+ * and background revalidation.
  */
-export async function fetchSkillsPage(page: number): Promise<SkillsPage> {
+export async function fetchSkillsPage(
+  page: number,
+  pageSize: number = PAGE_SIZE,
+): Promise<SkillsPage> {
   const skills = await loadIndex();
-  const start = page * PAGE_SIZE;
-  const slice = skills.slice(start, start + PAGE_SIZE);
+  const start = page * pageSize;
+  const slice = skills.slice(start, start + pageSize);
   return {
     skills: slice,
-    hasMore: start + PAGE_SIZE < skills.length,
+    hasMore: start + pageSize < skills.length,
     total: skills.length,
   };
 }
