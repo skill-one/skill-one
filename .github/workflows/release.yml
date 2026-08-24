@@ -46,6 +46,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="$(node --eval 'process.stdout.write(require("./package.json").version)')"
+          TAG="v${VERSION}"
           DMG="src-tauri/target/release/bundle/dmg/Skillone_${VERSION}_aarch64.dmg"
-          ls -la "$DMG"
-          gh release create "v${VERSION}" "Skillone v${VERSION}" "$DMG" --repo "$GITHUB_REPOSITORY"
+          gh release create "${TAG}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --generate-notes
+          gh release upload "${TAG}" "${DMG}" --repo "$GITHUB_REPOSITORY"
