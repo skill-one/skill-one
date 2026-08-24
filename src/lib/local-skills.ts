@@ -9,7 +9,6 @@
  */
 
 import { isTauri } from "./tauri";
-import { fetchFirstText, fileCandidates } from "./cdn-config";
 import {
   getLinkStatus,
   installSkill,
@@ -39,26 +38,20 @@ export async function fetchInstalledSkills(): Promise<InstalledSkill[]> {
 }
 
 /**
- * Install a single skill from its source GitHub repo. Only the named skill is
- * installed, never the entire repo.
+ * Install a single skill from its source GitHub repo (`owner/repo`). Only the
+ * named skill is installed, never the entire repo.
  *
- * The frontend resolves a reachable URL for the skill's SKILL.md (direct GitHub
- * raw by default, CDN fallback) and hands it to the backend: `install_skill`
- * downloads that single file and writes it into the canonical skills dir. In
- * the browser this records the install in the mock store instead.
+ * In Tauri the `owner/repo` source is handed straight to the backend, which
+ * uses agents-skills' GitHub install (clones the repo, pulling the skill's
+ * supporting files along) rather than downloading a single SKILL.md. In the
+ * browser this records the install in the mock store instead.
  */
 export async function installSkillFromSource(
   repo: string,
   name: string,
-  path?: string,
 ): Promise<void> {
-  const skillDir = path && path.trim() ? path : name;
-  const skillMd = `${skillDir.replace(/\/+$/, "")}/SKILL.md`;
   if (isTauri()) {
-    const { url } = await fetchFirstText(
-      fileCandidates({ repo, path: skillMd }),
-    );
-    await installSkill(url, { global: true, skills: [name] });
+    await installSkill(repo, { global: true, skills: [name] });
     return;
   }
   installMockSkill(repo, name);

@@ -51,7 +51,7 @@ export function SkillCard({
     setInstallState("installing");
     setInstallError(null);
     try {
-      await installSkillFromSource(skill.repo, skill.name, skill.path);
+      await installSkillFromSource(skill.repo, skill.name);
       setInstallState("installed");
     } catch (err) {
       setInstallState("error");

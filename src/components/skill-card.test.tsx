@@ -54,7 +54,6 @@ describe("SkillCard", () => {
     expect(installSkillFromSource).toHaveBeenCalledWith(
       skill.repo,
       skill.name,
-      skill.path,
     );
     expect(
       await screen.findByRole("button", { name: "已安装" }),

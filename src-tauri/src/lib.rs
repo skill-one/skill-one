@@ -6,6 +6,7 @@ mod skills;
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             skills::install_skill,
             skills::list_installed_skills,
