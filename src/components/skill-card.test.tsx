@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SkillCard } from "./skill-card";
 import { installSkillFromSource } from "../lib/local-skills";
+import { renderWithRouter } from "../test/test-utils";
 import type { Skill } from "../types/skill";
 
 vi.mock("../lib/local-skills", () => ({
@@ -19,7 +20,7 @@ const skill: Skill = {
 
 describe("SkillCard", () => {
   it("renders name, repo, description and formatted stars", () => {
-    render(<SkillCard skill={skill} />);
+    renderWithRouter(<SkillCard skill={skill} />);
 
     expect(screen.getByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
@@ -30,7 +31,7 @@ describe("SkillCard", () => {
   });
 
   it("renders with an empty description placeholder", () => {
-    render(<SkillCard skill={{ ...skill, description: "" }} />);
+    renderWithRouter(<SkillCard skill={{ ...skill, description: "" }} />);
 
     expect(screen.getByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
@@ -39,7 +40,7 @@ describe("SkillCard", () => {
   });
 
   it("shows an install button initially", () => {
-    render(<SkillCard skill={skill} />);
+    renderWithRouter(<SkillCard skill={skill} />);
     const button = screen.getByRole("button", { name: "安装" });
     expect(button).toBeEnabled();
     expect(button).toHaveTextContent("安装");
@@ -48,13 +49,10 @@ describe("SkillCard", () => {
   it("installs the skill and switches to a disabled 'installed' state", async () => {
     const user = userEvent.setup();
     vi.mocked(installSkillFromSource).mockResolvedValue(undefined);
-    render(<SkillCard skill={skill} />);
+    renderWithRouter(<SkillCard skill={skill} />);
 
     await user.click(screen.getByRole("button", { name: "安装" }));
-    expect(installSkillFromSource).toHaveBeenCalledWith(
-      skill.repo,
-      skill.name,
-    );
+    expect(installSkillFromSource).toHaveBeenCalledWith(skill.repo, skill.name);
     expect(
       await screen.findByRole("button", { name: "已安装" }),
     ).toBeDisabled();
@@ -65,7 +63,7 @@ describe("SkillCard", () => {
     vi.mocked(installSkillFromSource).mockRejectedValue(
       new Error("clone failed: network unreachable"),
     );
-    render(<SkillCard skill={skill} />);
+    renderWithRouter(<SkillCard skill={skill} />);
 
     await user.click(screen.getByRole("button", { name: "安装" }));
     expect(await screen.findByRole("button", { name: "重试" })).toBeEnabled();
@@ -77,7 +75,7 @@ describe("SkillCard", () => {
   it("opens the detail sheet when the card is clicked", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    render(<SkillCard skill={skill} onSelect={onSelect} />);
+    renderWithRouter(<SkillCard skill={skill} onSelect={onSelect} />);
 
     await user.click(screen.getByText("pdf"));
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -86,7 +84,7 @@ describe("SkillCard", () => {
   it("supports keyboard activation via Enter", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    render(<SkillCard skill={skill} onSelect={onSelect} />);
+    renderWithRouter(<SkillCard skill={skill} onSelect={onSelect} />);
 
     screen.getByRole("button", { name: "查看 pdf 详情" }).focus();
     await user.keyboard("{Enter}");
@@ -96,14 +94,14 @@ describe("SkillCard", () => {
   it("does not open the detail sheet when clicking install", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    render(<SkillCard skill={skill} onSelect={onSelect} />);
+    renderWithRouter(<SkillCard skill={skill} onSelect={onSelect} />);
 
     await user.click(screen.getByRole("button", { name: "安装" }));
     expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("highlights the selected card", () => {
-    render(<SkillCard skill={skill} selected onSelect={() => {}} />);
+    renderWithRouter(<SkillCard skill={skill} selected onSelect={() => {}} />);
     expect(screen.getByRole("button", { name: "查看 pdf 详情" })).toHaveClass(
       "ring-primary",
     );

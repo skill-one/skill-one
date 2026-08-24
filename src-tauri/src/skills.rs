@@ -6,8 +6,8 @@
 use serde::Serialize;
 
 use agents_skills::{
-    AddRequest, LinkOutcome, LinkRequest, ListRequest, Manager, RemoveRequest, Scope,
-    UpdateRequest,
+    AddRequest, AgentRequest, DisableRequest, EnableRequest, LinkOutcome, ListRequest, Manager,
+    RemoveRequest, Scope, UpdateRequest,
 };
 
 /// Build a `Manager` targeting `cwd` (empty/`None` = the process's own cwd).
@@ -66,6 +66,26 @@ pub struct UpdateResult {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DisableResult {
+    pub installed: Vec<String>,
+    pub requested: Vec<String>,
+    pub disabled: Vec<String>,
+    pub already: Vec<String>,
+    pub missing: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnableResult {
+    pub disabled: Vec<String>,
+    pub requested: Vec<String>,
+    pub enabled: Vec<String>,
+    pub already: Vec<String>,
+    pub missing: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentLinkResultDto {
     pub agent: String,
     pub display: String,
@@ -92,7 +112,102 @@ pub struct AgentStatusDto {
     pub canonical: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListedSkillDto {
+    pub name: String,
+    pub path: String,
+    pub scope: String,
+    pub agents: Vec<String>,
+    pub source: Option<String>,
+    pub source_url: Option<String>,
+    pub source_type: Option<String>,
+    /// Short human-readable description extracted from the on-disk SKILL.md
+    /// frontmatter; `None` when the file is missing or has no description.
+    pub description: Option<String>,
+    pub enabled: bool,
+}
+
 // ============================ Conversion helpers ============================
+
+/// Read a skill's SKILL.md on disk and return its frontmatter `description`.
+/// The backend's `list` does not expose descriptions, so they are extracted
+/// here for the UI. Handles single-line values, quoted values, and YAML block
+/// scalars (`description: |` / `description: >`). `None` when the file is
+/// unreadable or the frontmatter has no description.
+fn extract_description(skill_dir: &std::path::Path) -> Option<String> {
+    let raw = std::fs::read_to_string(skill_dir.join("SKILL.md")).ok()?;
+    let content = raw.strip_prefix('\u{feff}').unwrap_or(&raw);
+    let frontmatter = content.strip_prefix("---")?.split_once("\n---")?.0;
+    let mut lines = frontmatter.lines();
+    while let Some(line) = lines.next() {
+        let Some(rest) = line.trim_start().strip_prefix("description:") else {
+            continue;
+        };
+        let value = rest.trim().trim_matches(['"', '\'']).trim();
+        // Block scalars (`|` / `>`) are markers, not the description itself.
+        if !value.is_empty() && value != "|" && value != ">" {
+            return Some(value.to_string());
+        }
+        // Empty value or a block scalar (`|` / `>`): fold the following
+        // indented lines into a single line.
+        let mut block: Vec<&str> = Vec::new();
+        for next in lines.by_ref() {
+            if next.trim().is_empty() {
+                continue;
+            }
+            if !next.starts_with(' ') && !next.starts_with('\t') {
+                break;
+            }
+            block.push(next.trim().trim_matches(['"', '\'']).trim());
+        }
+        let folded = block.join(" ");
+        if !folded.is_empty() {
+            return Some(folded);
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    fn skill_dir_with(skill_md: &str) -> tempfile::TempDir {
+        let dir = tempdir().expect("tempdir");
+        fs::write(dir.path().join("SKILL.md"), skill_md).expect("write SKILL.md");
+        dir
+    }
+
+    #[test]
+    fn extracts_single_line_description() {
+        let dir = skill_dir_with("---\nname: pdf\ndescription: 读取 PDF 文件。\n---\n正文");
+        assert_eq!(extract_description(dir.path()).as_deref(), Some("读取 PDF 文件。"));
+    }
+
+    #[test]
+    fn extracts_quoted_description() {
+        let dir = skill_dir_with("---\ndescription: \"a quoted description\"\n---\n");
+        assert_eq!(extract_description(dir.path()).as_deref(), Some("a quoted description"));
+    }
+
+    #[test]
+    fn folds_block_scalar_description() {
+        let dir = skill_dir_with("---\ndescription: |\n  第一行描述\n  第二行描述\n---\n");
+        assert_eq!(
+            extract_description(dir.path()).as_deref(),
+            Some("第一行描述 第二行描述")
+        );
+    }
+
+    #[test]
+    fn tolerates_bom_and_missing_description() {
+        let dir = skill_dir_with("\u{feff}---\nname: x\n---\n正文");
+        assert_eq!(extract_description(dir.path()), None);
+    }
+}
 
 fn link_outcome_fields(
     outcome: LinkOutcome,
@@ -162,20 +277,35 @@ pub async fn install_skill(
 }
 
 /// List installed skills (project scope by default, pass `global` for the
-/// user-level install). Returns the same camelCase shape as `list --json`.
+/// user-level install). Returns the same camelCase shape as `list --json`,
+/// plus a `description` extracted from each skill's on-disk SKILL.md.
 #[tauri::command]
 pub async fn list_installed_skills(
     global: Option<bool>,
     agents: Option<Vec<String>>,
     cwd: Option<String>,
-) -> Result<Vec<agents_skills::ListedSkill>, String> {
+) -> Result<Vec<ListedSkillDto>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let manager = manager(cwd.as_deref());
         let req = ListRequest {
             global: global.unwrap_or(false),
             agents: agents.unwrap_or_default(),
         };
-        manager.list(&req).map_err(|e| e.to_string())
+        let listed = manager.list(&req).map_err(|e| e.to_string())?;
+        Ok(listed
+            .into_iter()
+            .map(|s| ListedSkillDto {
+                name: s.name,
+                path: s.path.display().to_string(),
+                scope: s.scope,
+                agents: s.agents,
+                source: s.source,
+                source_url: s.source_url,
+                source_type: s.source_type,
+                description: extract_description(&s.path),
+                enabled: s.enabled,
+            })
+            .collect())
     })
     .await
     .map_err(|e| format!("list task failed: {e}"))?
@@ -240,6 +370,64 @@ pub async fn update_skills(
     .map_err(|e| format!("update task failed: {e}"))?
 }
 
+/// Disable installed skills (moves them out of the canonical dir). With no
+/// `skills` and no `all`, only reports what is currently enabled.
+#[tauri::command]
+pub async fn disable_skills(
+    skills: Option<Vec<String>>,
+    global: Option<bool>,
+    all: Option<bool>,
+    cwd: Option<String>,
+) -> Result<DisableResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let manager = manager(cwd.as_deref());
+        let req = DisableRequest {
+            skills: skills.unwrap_or_default(),
+            global: global.unwrap_or(false),
+            all: all.unwrap_or(false),
+        };
+        let outcome = manager.disable(&req).map_err(|e| e.to_string())?;
+        Ok(DisableResult {
+            installed: outcome.installed,
+            requested: outcome.requested,
+            disabled: outcome.disabled,
+            already: outcome.already,
+            missing: outcome.missing,
+        })
+    })
+    .await
+    .map_err(|e| format!("disable task failed: {e}"))?
+}
+
+/// Enable disabled skills (moves them back into the canonical dir). With no
+/// `skills` and no `all`, only reports what is currently disabled.
+#[tauri::command]
+pub async fn enable_skills(
+    skills: Option<Vec<String>>,
+    global: Option<bool>,
+    all: Option<bool>,
+    cwd: Option<String>,
+) -> Result<EnableResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let manager = manager(cwd.as_deref());
+        let req = EnableRequest {
+            skills: skills.unwrap_or_default(),
+            global: global.unwrap_or(false),
+            all: all.unwrap_or(false),
+        };
+        let outcome = manager.enable(&req).map_err(|e| e.to_string())?;
+        Ok(EnableResult {
+            disabled: outcome.disabled,
+            requested: outcome.requested,
+            enabled: outcome.enabled,
+            already: outcome.already,
+            missing: outcome.missing,
+        })
+    })
+    .await
+    .map_err(|e| format!("enable task failed: {e}"))?
+}
+
 /// Link/unlink agents' skills directories to the canonical dir.
 #[tauri::command]
 pub async fn link_agents(
@@ -251,13 +439,13 @@ pub async fn link_agents(
 ) -> Result<LinkResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let manager = manager(cwd.as_deref());
-        let req = LinkRequest {
+        let req = AgentRequest {
             agents: agents.unwrap_or_default(),
             global: global.unwrap_or(false),
             unlink: unlink.unwrap_or(false),
             migrate: migrate.unwrap_or(false),
         };
-        let outcome = manager.link(&req).map_err(|e| e.to_string())?;
+        let outcome = manager.agent(&req).map_err(|e| e.to_string())?;
         Ok(LinkResult {
             global: outcome.global,
             results: outcome
@@ -292,7 +480,7 @@ pub async fn link_status(
     tauri::async_runtime::spawn_blocking(move || {
         let manager = manager(cwd.as_deref());
         Ok(manager
-            .link_status(global.unwrap_or(false))
+            .agent_status(global.unwrap_or(false))
             .into_iter()
             .map(|s| AgentStatusDto {
                 name: s.name,

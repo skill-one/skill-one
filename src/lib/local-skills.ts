@@ -10,13 +10,14 @@
 
 import { isTauri } from "./tauri";
 import {
+  disableSkills,
+  enableSkills,
   getLinkStatus,
   installSkill,
   linkAgents,
   listInstalledSkills,
   removeSkills,
   unlinkAgents,
-  updateSkills,
   type AgentLinkResult,
   type AgentStatus,
   type InstalledSkill,
@@ -27,6 +28,7 @@ import {
   installMockSkill,
   removeMockSkill,
   setMockAgentLinked,
+  setMockSkillEnabled,
 } from "./mock-local";
 
 /** All skills installed into the global skills directory. */
@@ -43,15 +45,26 @@ export async function fetchInstalledSkills(): Promise<InstalledSkill[]> {
  *
  * In Tauri the `owner/repo` source is handed straight to the backend, which
  * uses agents-skills' GitHub install (clones the repo, pulling the skill's
- * supporting files along) rather than downloading a single SKILL.md. In the
- * browser this records the install in the mock store instead.
+ * supporting files along) rather than downloading a single SKILL.md. The
+ * backend reports the outcome via `installed`/`failed` — an Ok response alone
+ * does not mean anything was installed (the name may fail to match, or the
+ * clone/install can fail), so failures are surfaced here instead of being
+ * silently swallowed. In the browser this records the install in the mock
+ * store instead.
  */
 export async function installSkillFromSource(
   repo: string,
   name: string,
 ): Promise<void> {
   if (isTauri()) {
-    await installSkill(repo, { global: true, skills: [name] });
+    const result = await installSkill(repo, { global: true, skills: [name] });
+    if (result.failed.length > 0) {
+      const f = result.failed[0];
+      throw new Error(f.error || `安装失败：${f.skill}`);
+    }
+    if (result.installed.length === 0) {
+      throw new Error(`未在 ${repo} 中找到可安装的技能 ${name}`);
+    }
     return;
   }
   installMockSkill(repo, name);
@@ -64,16 +77,6 @@ export async function removeInstalledSkill(name: string): Promise<void> {
     return;
   }
   removeMockSkill(name);
-}
-
-/** Re-install a skill from its recorded source (no-op in the mock store). */
-export async function updateInstalledSkill(name: string): Promise<void> {
-  if (isTauri()) {
-    await updateSkills([name], { scope: "global" });
-    return;
-  }
-  // Locally-sourced skills cannot be re-installed; nothing to do in the mock.
-  void name;
 }
 
 /**
@@ -181,4 +184,26 @@ export async function unlinkAgent(name: string): Promise<AgentLinkResult[]> {
 
 function mockDisplayOf(name: string): string {
   return getMockAgentStatus().find((a) => a.name === name)?.display ?? name;
+}
+
+// ---------------------------------------------------------------- enable/disable
+// Enablement is a real backend state: the agents-skills library moves a
+// skill's directory between the canonical dir and `disabled-skills`, which is
+// exactly what `list` reports back via `InstalledSkill.enabled`. The UI has no
+// separate client-side preference.
+
+/** Enable or disable an installed skill (backend in Tauri, mock store in the browser). */
+export async function setSkillEnabled(
+  name: string,
+  enabled: boolean,
+): Promise<void> {
+  if (isTauri()) {
+    if (enabled) {
+      await enableSkills([name], { global: true });
+    } else {
+      await disableSkills([name], { global: true });
+    }
+    return;
+  }
+  setMockSkillEnabled(name, enabled);
 }

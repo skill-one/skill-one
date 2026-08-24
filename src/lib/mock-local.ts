@@ -57,6 +57,8 @@ function buildMockSkills(): InstalledSkill[] {
     source: row.source,
     sourceUrl: null,
     sourceType: row.sourceType,
+    description: row.description,
+    enabled: true,
   }));
 }
 
@@ -73,10 +75,11 @@ export function removeMockSkill(name: string): void {
 /**
  * Record a mock install of a single skill from a GitHub source (`owner/repo`).
  * Mirrors a successful install in the browser without cloning a repo.
- * Already-installed sources/names are left untouched.
+ * Already-installed names are left untouched (multiple skills can come from
+ * the same repo, so only the name is checked).
  */
 export function installMockSkill(repo: string, name: string): void {
-  if (mockSkills.some((s) => s.name === name || s.source === repo)) return;
+  if (mockSkills.some((s) => s.name === name)) return;
   mockSkills = [
     {
       name,
@@ -86,9 +89,38 @@ export function installMockSkill(repo: string, name: string): void {
       source: repo,
       sourceUrl: null,
       sourceType: "github",
+      enabled: true,
     },
     ...mockSkills,
   ];
+}
+
+/**
+ * Record a mock install of a skill with no source record, mirroring a skill
+ * placed manually into the global directory (no lock entry → `sourceType` is
+ * `null`).
+ */
+export function addMockLocalSkill(name: string): void {
+  if (mockSkills.some((s) => s.name === name)) return;
+  mockSkills = [
+    {
+      name,
+      path: `~/.agents/skills/${name}`,
+      scope: "global",
+      agents: [],
+      source: null,
+      sourceUrl: null,
+      sourceType: null,
+      description: "本地 skill 的描述。",
+      enabled: true,
+    },
+    ...mockSkills,
+  ];
+}
+
+/** Flip a mock skill's enabled state, mirroring the backend's disable/enable. */
+export function setMockSkillEnabled(name: string, enabled: boolean): void {
+  mockSkills = mockSkills.map((s) => (s.name === name ? { ...s, enabled } : s));
 }
 
 export function resetMockInstalledSkills(): void {

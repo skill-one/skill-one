@@ -23,6 +23,13 @@ export interface InstalledSkill {
   source: string | null;
   sourceUrl: string | null;
   sourceType: string | null;
+  /**
+   * Whether the skill is enabled (`true`) or parked in the disabled dir
+   * (`false`). Set by the backend from the on-disk state, not a UI preference.
+   */
+  enabled: boolean;
+  /** Short human-readable description; absent when the skill has no metadata. */
+  description?: string;
 }
 
 export interface InstalledSkillDto {
@@ -55,6 +62,22 @@ export interface UpdateResult {
   failed: number;
   updatedNames: string[];
   failures: string[];
+}
+
+export interface DisableResult {
+  installed: string[];
+  requested: string[];
+  disabled: string[];
+  already: string[];
+  missing: string[];
+}
+
+export interface EnableResult {
+  disabled: string[];
+  requested: string[];
+  enabled: string[];
+  already: string[];
+  missing: string[];
 }
 
 export type AgentLinkStatus =
@@ -191,6 +214,40 @@ export async function updateSkills(
   return invoke<UpdateResult>("update_skills", {
     skills,
     scope: options.scope,
+    cwd: options.cwd,
+  });
+}
+
+/** Disable installed skills (moves them out of the canonical dir). */
+export async function disableSkills(
+  skills: string[] = [],
+  options: {
+    global?: boolean;
+    all?: boolean;
+  } & ManagerOptions = {},
+): Promise<DisableResult> {
+  requireTauri();
+  return invoke<DisableResult>("disable_skills", {
+    skills,
+    global: options.global,
+    all: options.all,
+    cwd: options.cwd,
+  });
+}
+
+/** Enable disabled skills (moves them back into the canonical dir). */
+export async function enableSkills(
+  skills: string[] = [],
+  options: {
+    global?: boolean;
+    all?: boolean;
+  } & ManagerOptions = {},
+): Promise<EnableResult> {
+  requireTauri();
+  return invoke<EnableResult>("enable_skills", {
+    skills,
+    global: options.global,
+    all: options.all,
     cwd: options.cwd,
   });
 }

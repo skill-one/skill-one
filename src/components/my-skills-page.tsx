@@ -1,56 +1,122 @@
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, RefreshCw, Trash2, Users } from "lucide-react";
+import { Puzzle, RefreshCw, Trash2, Users } from "lucide-react";
 
 import {
   fetchInstalledSkills,
   removeInstalledSkill,
-  updateInstalledSkill,
+  setSkillEnabled,
 } from "../lib/local-skills";
+import { fetchFullIndex } from "../lib/skills-api";
 import type { InstalledSkill } from "../lib/skills-manager";
+import type { Skill } from "../types/skill";
+import { cn } from "../lib/utils";
 import { AgentIconGrid } from "./agent-icon-grid";
+import { OwnerAvatar } from "./owner-avatar";
 import { Button } from "./ui/button";
+import { Switch } from "./ui/switch";
+
+/**
+ * Join installed skills with their registry entry. Each registry skill is
+ * indexed under both its skillId and skill-dir basename (prefixed with the
+ * repo), so a locally-installed skill whose SKILL.md name differs from the
+ * registry skillId still matches for description fallback.
+ */
+function buildIndexMap(index: Skill[]): Map<string, Skill> {
+  const map = new Map<string, Skill>();
+  for (const entry of index) {
+    map.set(`${entry.repo}/${entry.name}`, entry);
+    const base = entry.path?.split("/").pop();
+    if (base) map.set(`${entry.repo}/${base}`, entry);
+  }
+  return map;
+}
+
+function sourceLabelFor(skill: InstalledSkill): string {
+  // No source record (e.g. placed manually into the global directory) or an
+  // explicit local source both mean this is a local skill.
+  if (!skill.sourceType || skill.sourceType === "local") return "本地";
+  return skill.source || skill.sourceType || "本地";
+}
 
 function SkillCardItem({
   skill,
+  enabled,
+  onToggle,
   onRemove,
-  onUpdate,
   removing,
-  updating,
+  description,
 }: {
   skill: InstalledSkill;
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
   onRemove: () => void;
-  onUpdate: () => void;
   removing: boolean;
-  updating: boolean;
+  description: string;
 }) {
   return (
-    <div className="flex flex-col rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:border-border hover:shadow-[0_6px_20px_-12px_rgba(15,23,42,0.15)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-[14px] font-semibold text-foreground">
+    <div
+      className={cn(
+        "relative rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:border-border hover:shadow-[0_6px_20px_-12px_rgba(15,23,42,0.15)]",
+        !enabled && "opacity-60",
+      )}
+    >
+      {/* 顶部：头像 + 名称 + 来源；右侧留空给右上角的开关。 */}
+      <div className="flex items-start gap-3 pr-12">
+        {skill.sourceType !== "local" && skill.source?.includes("/") ? (
+          <OwnerAvatar
+            owner={skill.source.split("/")[0]}
+            className="h-10 w-10 text-[16px]"
+          />
+        ) : (
+          <div
+            aria-label="skill 头像"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-muted-foreground"
+          >
+            <Puzzle className="h-5 w-5" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1 pt-1.5">
+          <h3
+            className={cn(
+              "truncate text-[14px] font-semibold",
+              enabled ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
             {skill.name}
           </h3>
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-            {skill.source ?? "本地来源"}
+          <p
+            className={cn(
+              "mt-0.5 truncate text-[12px]",
+              enabled ? "text-muted-foreground" : "text-muted-foreground/70",
+            )}
+          >
+            {sourceLabelFor(skill)}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+      </div>
+
+      {/* 右上角：开关 */}
+      <div className="absolute right-4 top-4">
+        <Switch
+          checked={enabled}
+          onCheckedChange={onToggle}
+          aria-label={`${enabled ? "关闭" : "开启"} ${skill.name}`}
+        />
+      </div>
+
+      {/* 描述：本地取磁盘 SKILL.md 提取的描述；商店来源回退到 registry 描述。 */}
+      <p className="mt-3 line-clamp-2 min-h-[2.5em] text-[12px] leading-relaxed text-muted-foreground">
+        {description || "暂无描述"}
+      </p>
+
+      {/* 底部：右侧操作（移除）。 */}
+      <div className="mt-3 flex items-center justify-end">
+        <div className="flex shrink-0 items-center gap-0.5">
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
-            title="更新"
-            disabled={updating}
-            onClick={onUpdate}
-          >
-            <Download
-              className={updating ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"}
-            />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-destructive hover:text-destructive"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
             title="移除"
             disabled={removing}
             onClick={onRemove}
@@ -76,6 +142,29 @@ export function MySkillsPage() {
     queryFn: fetchInstalledSkills,
   });
 
+  // Registry metadata (downloads / descriptions) for store-sourced skills.
+  // Best-effort: the index fetch needs the network, so a failure degrades to
+  // an empty join (downloads hidden, disk-extracted descriptions still shown).
+  const { data: index = [] } = useQuery({
+    queryKey: ["skills-index"],
+    queryFn: async () => {
+      try {
+        return await fetchFullIndex();
+      } catch {
+        return [];
+      }
+    },
+  });
+  const indexMap = useMemo(() => buildIndexMap(index), [index]);
+
+  // Enablement is a real backend state (the agents-skills library moves the
+  // skill between the canonical and disabled dirs), reported by `skill.enabled`.
+  // We keep a small optimistic override while a toggle mutation is in flight;
+  // once the list refetches after the mutation, `skill.enabled` is the truth.
+  const [pendingEnabled, setPendingEnabled] = useState<Record<string, boolean>>(
+    {},
+  );
+
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
 
@@ -84,9 +173,19 @@ export function MySkillsPage() {
     onSuccess: invalidate,
   });
 
-  const updateMutation = useMutation({
-    mutationFn: (name: string) => updateInstalledSkill(name),
-    onSuccess: invalidate,
+  const toggleMutation = useMutation({
+    mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
+      setSkillEnabled(name, enabled),
+    onMutate: ({ name, enabled }) =>
+      setPendingEnabled((prev) => ({ ...prev, [name]: enabled })),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
+      setPendingEnabled({});
+    },
+    onError: () => {
+      setPendingEnabled({});
+      invalidate();
+    },
   });
 
   const list = skills ?? [];
@@ -123,22 +222,29 @@ export function MySkillsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-              {list.map((skill) => (
-                <SkillCardItem
-                  key={skill.name}
-                  skill={skill}
-                  onRemove={() => removeMutation.mutate(skill.name)}
-                  onUpdate={() => updateMutation.mutate(skill.name)}
-                  removing={
-                    removeMutation.isPending &&
-                    removeMutation.variables === skill.name
-                  }
-                  updating={
-                    updateMutation.isPending &&
-                    updateMutation.variables === skill.name
-                  }
-                />
-              ))}
+              {list.map((skill) => {
+                const indexEntry = indexMap.get(
+                  `${skill.source}/${skill.name}`,
+                );
+                return (
+                  <SkillCardItem
+                    key={skill.name}
+                    skill={skill}
+                    enabled={pendingEnabled[skill.name] ?? skill.enabled}
+                    onToggle={(enabled) =>
+                      toggleMutation.mutate({ name: skill.name, enabled })
+                    }
+                    onRemove={() => removeMutation.mutate(skill.name)}
+                    removing={
+                      removeMutation.isPending &&
+                      removeMutation.variables === skill.name
+                    }
+                    description={
+                      skill.description ?? indexEntry?.description ?? ""
+                    }
+                  />
+                );
+              })}
             </div>
           )}
         </div>

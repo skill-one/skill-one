@@ -10,7 +10,9 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "agents-skills"
-version = "0.4.0"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1295c80f663d7b667e7f0d47446a4e801a12edb5702ca7527a5d80dbac5646c7"
 dependencies = [
  "clap",
  "dirs",
@@ -129,6 +131,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "tempfile",
 ]
 
 [[package]]

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Star, Check, Download, Loader2, RefreshCw } from "lucide-react";
 
 import { installSkillFromSource } from "../lib/local-skills";
@@ -42,6 +43,8 @@ export function SkillCard({
   const [installState, setInstallState] = useState<InstallState>("idle");
   const [installError, setInstallError] = useState<string | null>(null);
 
+  const queryClient = useQueryClient();
+
   const owner = skill.repo.split("/")[0];
 
   const handleInstall = async (e: React.MouseEvent) => {
@@ -52,6 +55,10 @@ export function SkillCard({
     setInstallError(null);
     try {
       await installSkillFromSource(skill.repo, skill.name);
+      // The "my skills" page caches its list for 10 minutes (staleTime) and
+      // never GCs it, so invalidate here to make the newly installed skill
+      // show up there on the next visit.
+      await queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
       setInstallState("installed");
     } catch (err) {
       setInstallState("error");

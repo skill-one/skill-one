@@ -5,8 +5,11 @@ import userEvent from "@testing-library/user-event";
 import { MySkillsPage } from "./my-skills-page";
 import { renderWithRouter } from "../test/test-utils";
 import {
+  addMockLocalSkill,
+  installMockSkill,
   resetMockAgentStatus,
   resetMockInstalledSkills,
+  setMockSkillEnabled,
 } from "../lib/mock-local";
 
 // The page reads installed skills through local-skills, which falls back to
@@ -27,13 +30,15 @@ describe("MySkillsPage", () => {
     expect(screen.getByText("已安装")).toBeInTheDocument();
   });
 
-  it("renders each installed skill with its source", async () => {
+  it("renders each installed skill", async () => {
     renderWithRouter(<MySkillsPage />);
 
     expect(await screen.findByText("pdf")).toBeInTheDocument();
-    // 5 skills come from anthropics/skills, 1 from obra/superpowers.
-    expect(screen.getAllByText("anthropics/skills")).toHaveLength(5);
-    expect(screen.getByText("obra/superpowers")).toBeInTheDocument();
+    expect(screen.getByText("docx")).toBeInTheDocument();
+    expect(screen.getByText("pptx")).toBeInTheDocument();
+    expect(screen.getByText("mcp-builder")).toBeInTheDocument();
+    expect(screen.getByText("code-review")).toBeInTheDocument();
+    expect(screen.getByText("frontend-design")).toBeInTheDocument();
   });
 
   it("removes a skill from the list and updates the stats", async () => {
@@ -69,10 +74,82 @@ describe("MySkillsPage", () => {
     expect(await screen.findByText("还没有安装任何技能")).toBeInTheDocument();
   });
 
-  it("offers an update action per row", async () => {
+  it("offers an enable toggle per row, all on by default", async () => {
     renderWithRouter(<MySkillsPage />);
 
-    expect(await screen.findAllByTitle("更新")).toHaveLength(6);
+    const switches = await screen.findAllByRole("switch");
+    expect(switches).toHaveLength(6);
+    switches.forEach((sw) =>
+      expect(sw).toHaveAttribute("aria-checked", "true"),
+    );
+  });
+
+  it("toggles a skill off and back on", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+
+    const pdfOn = await screen.findByRole("switch", { name: "关闭 pdf" });
+    await user.click(pdfOn);
+
+    const pdfOff = await screen.findByRole("switch", { name: "开启 pdf" });
+    expect(pdfOff).toHaveAttribute("aria-checked", "false");
+
+    await user.click(pdfOff);
+    expect(
+      await screen.findByRole("switch", { name: "关闭 pdf" }),
+    ).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("shows a backend-disabled skill as switched off", async () => {
+    // A skill parked in the backend's disabled dir is reported with
+    // enabled=false; the switch must reflect that instead of assuming on.
+    setMockSkillEnabled("pdf", false);
+    renderWithRouter(<MySkillsPage />);
+
+    const pdf = await screen.findByRole("switch", { name: "开启 pdf" });
+    expect(pdf).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("shows each skill's description", async () => {
+    renderWithRouter(<MySkillsPage />);
+
+    expect(
+      await screen.findByText("PDF 文档读取、生成、合并、拆分与标注。"),
+    ).toBeInTheDocument();
+  });
+
+  it("uses '暂无描述' as a placeholder when a skill has no description", async () => {
+    installMockSkill("test/repo", "no-desc-skill");
+    renderWithRouter(<MySkillsPage />);
+
+    expect(await screen.findByText("no-desc-skill")).toBeInTheDocument();
+    expect(screen.getByText("暂无描述")).toBeInTheDocument();
+  });
+
+  it("shows the source under the title", async () => {
+    renderWithRouter(<MySkillsPage />);
+
+    await screen.findByText("pdf");
+    // 5 of the 6 mock skills come from anthropics/skills, 1 from
+    // obra/superpowers.
+    expect(screen.getAllByText("anthropics/skills")).toHaveLength(5);
+    expect(screen.getByText("obra/superpowers")).toBeInTheDocument();
+  });
+
+  it("shows the repo owner's avatar for store-sourced skills", async () => {
+    renderWithRouter(<MySkillsPage />);
+
+    await screen.findByText("pdf");
+    expect(screen.getAllByAltText("anthropics 的头像")).toHaveLength(5);
+    expect(screen.getByAltText("obra 的头像")).toBeInTheDocument();
+  });
+
+  it("labels skills without a source record as 本地", async () => {
+    addMockLocalSkill("local-skill");
+    renderWithRouter(<MySkillsPage />);
+
+    await screen.findByText("local-skill");
+    expect(screen.getByText("本地")).toBeInTheDocument();
   });
 
   it("renders the agent icon grid with a warning badge for inner skills", async () => {
