@@ -40,10 +40,11 @@ jobs:
         run: echo "version=$(node -p -e \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${{ steps.ver.outputs.version }}" \
-            "Skillone v${{ steps.ver.outputs.version }}" \
-            src-tauri/target/release/bundle/dmg/*.dmg \
-            --repo "$GITHUB_REPOSITORY"
+          VERSION="$(node -p -e 'require("./package.json").version')"
+          DMG="src-tauri/target/release/bundle/dmg/Skillone_${VERSION}_aarch64.dmg"
+          ls -la "$DMG"
+          gh release create "v${VERSION}" "Skillone v${VERSION}" "$DMG" --repo "$GITHUB_REPOSITORY"
