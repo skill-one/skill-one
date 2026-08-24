@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Star, X } from "lucide-react";
+import { ExternalLink, Loader2, Star, X } from "lucide-react";
 
 import { fetchSkillDetail } from "../lib/skill-detail-api";
+import { openExternal } from "../lib/open-external";
 import { formatStars } from "../lib/utils";
 import type { Skill } from "../types/skill";
 import { Badge } from "./ui/badge";
@@ -58,6 +59,11 @@ export function SkillDetailPanel({
 
   const owner = skill.repo.split("/")[0];
   const description = detail?.description || skill.description;
+  // Link to the skill's folder in GitHub; without a known path, the repo root.
+  const sourcePath = skill.path?.replace(/^\/+|\/+$/g, "");
+  const sourceHref = sourcePath
+    ? `https://github.com/${skill.repo}/tree/HEAD/${sourcePath}`
+    : `https://github.com/${skill.repo}`;
 
   return (
     <aside
@@ -84,9 +90,18 @@ export function SkillDetailPanel({
             <h2 className="truncate text-[17px] font-semibold tracking-tight text-foreground">
               {skill.name}
             </h2>
-            <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
-              {skill.repo}
-            </p>
+            <a
+              href={sourceHref}
+              onClick={(e) => {
+                e.preventDefault();
+                void openExternal(sourceHref);
+              }}
+              title="在 GitHub 中打开该技能的目录"
+              className="mt-0.5 flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <span className="truncate">{skill.repo}</span>
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </a>
           </div>
         </div>
 
@@ -137,9 +152,20 @@ export function SkillDetailPanel({
               </p>
             )}
             <div>
-              <p className="mb-2 font-mono text-[11px] text-muted-foreground/70">
-                {detail.path}
-              </p>
+              <a
+                href={`https://github.com/${skill.repo}/blob/HEAD/${detail.path.replace(/^\/+|\/+$/g, "")}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void openExternal(
+                    `https://github.com/${skill.repo}/blob/HEAD/${detail.path.replace(/^\/+|\/+$/g, "")}`,
+                  );
+                }}
+                title="在 GitHub 中打开 SKILL.md"
+                className="mb-2 flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground"
+              >
+                <span className="truncate">{detail.path}</span>
+                <ExternalLink className="h-3 w-3 shrink-0" />
+              </a>
               <pre className="whitespace-pre-wrap break-words font-mono text-[12.5px] leading-relaxed text-foreground/90">
                 {detail.instructions || "（SKILL.md 无正文内容）"}
               </pre>
