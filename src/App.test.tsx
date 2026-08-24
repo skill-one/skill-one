@@ -42,14 +42,14 @@ describe("App routing", () => {
     expect(mockCreateSyncStoragePersister).toHaveBeenCalledTimes(1);
 
     // Default route is /my-skills; wait for its content to settle.
-    await screen.findByText("守门人");
+    await screen.findByText("已安装");
   });
 
   it("redirects the root route to /my-skills", async () => {
     render(<App />);
 
     // MySkillsPage renders mock skill cards synchronously.
-    expect(await screen.findByText("守门人")).toBeInTheDocument();
+    expect(await screen.findByText("已安装")).toBeInTheDocument();
   });
 
   it("navigates between routes via the sidebar", async () => {
@@ -64,13 +64,13 @@ describe("App routing", () => {
     // Navigate back to My Skills (全局).
     await user.click(screen.getByRole("link", { name: /全局/ }));
 
-    expect(await screen.findByText("守门人")).toBeInTheDocument();
+    expect(await screen.findByText("已安装")).toBeInTheDocument();
   });
 
   it("redirects unknown routes back to /my-skills", async () => {
     window.location.hash = "#/does-not-exist";
     render(<App />);
 
-    expect(await screen.findByText("守门人")).toBeInTheDocument();
+    expect(await screen.findByText("已安装")).toBeInTheDocument();
   });
 });

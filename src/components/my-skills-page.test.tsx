@@ -1,10 +1,13 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { MySkillsPage } from "./my-skills-page";
 import { renderWithRouter } from "../test/test-utils";
-import { resetMockInstalledSkills } from "../lib/mock-local";
+import {
+  resetMockAgentStatus,
+  resetMockInstalledSkills,
+} from "../lib/mock-local";
 
 // The page reads installed skills through local-skills, which falls back to
 // the mutable mock store in the browser (this test env), so mutations below
@@ -13,6 +16,7 @@ import { resetMockInstalledSkills } from "../lib/mock-local";
 describe("MySkillsPage", () => {
   afterEach(() => {
     resetMockInstalledSkills();
+    resetMockAgentStatus();
   });
 
   it("renders the stats card with the installed count", async () => {
@@ -20,7 +24,7 @@ describe("MySkillsPage", () => {
 
     // Wait for the (mock) query to land: 6 skills installed globally.
     expect(await screen.findByText("6")).toBeInTheDocument();
-    expect(screen.getByText("已安装（全局）")).toBeInTheDocument();
+    expect(screen.getByText("已安装")).toBeInTheDocument();
   });
 
   it("renders each installed skill with its source", async () => {
@@ -30,13 +34,6 @@ describe("MySkillsPage", () => {
     // 5 skills come from anthropics/skills, 1 from obra/superpowers.
     expect(screen.getAllByText("anthropics/skills")).toHaveLength(5);
     expect(screen.getByText("obra/superpowers")).toBeInTheDocument();
-  });
-
-  it("shows which agents a skill is linked to", async () => {
-    renderWithRouter(<MySkillsPage />);
-
-    // pdf is linked to claude-code in the mock store.
-    expect(await screen.findByText(/已链接 claude-code/)).toBeInTheDocument();
   });
 
   it("removes a skill from the list and updates the stats", async () => {
@@ -51,7 +48,10 @@ describe("MySkillsPage", () => {
     await waitFor(() => {
       expect(screen.queryByText("pdf")).not.toBeInTheDocument();
     });
-    expect(screen.getByText("5")).toBeInTheDocument();
+    // Stats count lives in the installed-skills section.
+    const statsSection = screen.getByText("已安装").closest("div")
+      ?.parentElement as HTMLElement;
+    expect(within(statsSection).getByText("5")).toBeInTheDocument();
   });
 
   it("shows the empty state after removing every skill", async () => {
@@ -66,15 +66,84 @@ describe("MySkillsPage", () => {
       });
     }
 
-    expect(
-      await screen.findByText("还没有安装任何技能"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "去探索" })).toBeInTheDocument();
+    expect(await screen.findByText("还没有安装任何技能")).toBeInTheDocument();
   });
 
   it("offers an update action per row", async () => {
     renderWithRouter(<MySkillsPage />);
 
     expect(await screen.findAllByTitle("更新")).toHaveLength(6);
+  });
+
+  it("renders the agent icon grid with a warning badge for inner skills", async () => {
+    renderWithRouter(<MySkillsPage />);
+
+    // Cursor carries 2 skills in its own dir in the mock → warning badge.
+    const cursor = await screen.findByLabelText("Cursor，点击链接");
+    expect(cursor).toBeInTheDocument();
+    expect(
+      within(cursor).getByLabelText("该 agent 目录内已有 2 个 skills"),
+    ).toBeInTheDocument();
+
+    // Linked agents offer 取消链接; canonical ones explain on click instead.
+    expect(
+      screen.getByLabelText("Claude Code，点击取消链接"),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Claude Code，点击链接/)).toBeNull();
+    expect(screen.getByLabelText("Windsurf，点击取消链接")).toBeInTheDocument();
+  });
+
+  it("shows a structured info tooltip on agent icon hover", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+
+    const claude = await screen.findByLabelText("Claude Code，点击取消链接");
+    await user.hover(claude);
+
+    expect(await screen.findByText("Claude Code")).toBeInTheDocument();
+    expect(screen.getByText("已链接")).toBeInTheDocument();
+    expect(screen.getByText("可使用已安装的所有 skills")).toBeInTheDocument();
+  });
+
+  it("explains why a canonical agent cannot be unlinked on click", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+
+    const windsurf = await screen.findByLabelText("Windsurf，点击取消链接");
+    await user.click(windsurf);
+
+    expect(
+      await screen.findByText("Windsurf 使用原生 skills 目录，无法取消链接"),
+    ).toBeInTheDocument();
+  });
+
+  it("unlinks a linked agent on icon click and shows a notice", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+
+    const claude = await screen.findByLabelText("Claude Code，点击取消链接");
+    await user.click(claude);
+
+    // After unlinking, the agent is offered as linkable again and a result
+    // notice is shown in the grid.
+    expect(
+      await screen.findByLabelText("Claude Code，点击链接"),
+    ).toBeInTheDocument();
+    expect(await screen.findByText(/已取消链接/)).toBeInTheDocument();
+  });
+
+  it("links an unlinked agent on icon click and shows a notice", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+
+    const gemini = await screen.findByLabelText("Gemini CLI，点击链接");
+    await user.click(gemini);
+
+    // After linking, the agent is no longer offered as a clickable action and a
+    // result notice is shown in the grid.
+    await waitFor(() => {
+      expect(screen.queryByLabelText(/Gemini CLI，点击链接/)).toBeNull();
+    });
+    expect(await screen.findByText("Gemini CLI 已链接")).toBeInTheDocument();
   });
 });
