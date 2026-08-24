@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   CircleX,
   Loader2,
@@ -135,15 +136,17 @@ function AgentIconButton({
         <span
           aria-label="已链接"
           title="已链接"
-          className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card"
-        />
+          className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-card"
+        >
+          <Check className="h-2.5 w-2.5 text-white" strokeWidth={3.5} />
+        </span>
       )}
 
       {showBadge && (
         <span
           aria-label={`该 agent 目录内已有 ${skillCount} 个 skills`}
           title={`目录内已有 ${skillCount} 个 skills`}
-          className="absolute -bottom-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-none text-white ring-2 ring-card"
+          className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-none text-white ring-2 ring-card"
         >
           {skillCount}
         </span>
