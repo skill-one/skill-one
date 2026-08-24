@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  publish-tauri:
+  publish:
     permissions:
       contents: write
     runs-on: macos-14 # Apple Silicon (arm64)
@@ -17,7 +17,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -25,13 +26,20 @@ jobs:
       - uses: swatinem/rust-cache@v2
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Build and publish
-        uses: tauri-apps/tauri-action@v0
+      - name: Build app bundle
+        run: npm run tauri -- build
+
+      - name: Get version
+        id: ver
+        run: echo "version=$(node -p -e \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: v__VERSION__
-          releaseName: "Skillone v__VERSION__"
-          releaseDraft: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.ver.outputs.version }}" \
+            "Skillone v${{ steps.ver.outputs.version }}" \
+            src-tauri/target/release/bundle/dmg/*.dmg \
+            --repo "$GITHUB_REPOSITORY"
