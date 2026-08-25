@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import mockPagesData from "../data/skills-mock.json";
 
 const INDEX_URL =
-  "https://raw.githubusercontent.com/luckie2076/skills-index/dist/index.jsonl";
+  "https://raw.githubusercontent.com/skill-one/skills-index/dist/index.jsonl";
 
 const mockPages = mockPagesData as Array<{
   skills: {

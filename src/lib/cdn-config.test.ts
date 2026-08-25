@@ -46,13 +46,13 @@ describe("fileCandidates", () => {
   it("uses an explicit ref for both origin and CDN forms", () => {
     expect(
       fileCandidates({
-        repo: "luckie2076/skills-index",
+        repo: "skill-one/skills-index",
         path: "index.jsonl",
         ref: "dist",
       }),
     ).toEqual([
-      "https://raw.githubusercontent.com/luckie2076/skills-index/dist/index.jsonl",
-      `${DEFAULT_CDN_BASE}/gh/luckie2076/skills-index@dist/index.jsonl`,
+      "https://raw.githubusercontent.com/skill-one/skills-index/dist/index.jsonl",
+      `${DEFAULT_CDN_BASE}/gh/skill-one/skills-index@dist/index.jsonl`,
     ]);
   });
 });

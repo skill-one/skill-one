@@ -179,7 +179,7 @@ describe("MySkillsPage", () => {
 
     expect(await screen.findByText("Claude Code")).toBeInTheDocument();
     expect(screen.getByText("已链接")).toBeInTheDocument();
-    expect(screen.getByText("可使用已安装的所有 skills")).toBeInTheDocument();
+    expect(screen.getByText("可使用所有已安装 skills")).toBeInTheDocument();
   });
 
   it("explains why a canonical agent cannot be unlinked on click", async () => {

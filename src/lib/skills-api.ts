@@ -8,7 +8,7 @@ import { fetchFirstText, fileCandidates } from "./cdn-config";
  * so it is fetchable from the WebView and a plain browser alike.
  */
 const INDEX_SPEC = {
-  repo: "luckie2076/skills-index",
+  repo: "skill-one/skills-index",
   path: "index.jsonl",
   ref: "dist",
 } as const;
