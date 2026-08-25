@@ -1,4 +1,4 @@
-# SkillOne
+# Skill One
 
 这是一个帮助用户查找/安装/管理 agent skill 的软件
 

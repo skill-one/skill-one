@@ -114,7 +114,7 @@ function BrandHeader() {
           S
         </div>
         <span className="text-[14px] font-semibold text-foreground">
-          SkillOne
+          Skill One
         </span>
       </div>
     </SidebarHeader>

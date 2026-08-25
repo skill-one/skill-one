@@ -1,4 +1,4 @@
-# SkillOne
+# Skill One
 
 一个用于查找、安装和管理 agent skills 的桌面应用。基于 Tauri v2 构建，前端使用 React + shadcn/ui，后端由 Rust（`agents-skills` 库）提供技能安装与 agent 链接能力。
 
