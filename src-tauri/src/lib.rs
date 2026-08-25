@@ -1,4 +1,4 @@
-// Skillone — minimal Tauri entry. All network reads (skills index, SKILL.md)
+// SkillOne — minimal Tauri entry. All network reads (skills index, SKILL.md)
 // happen in the frontend via CORS-enabled CDN mirrors (JSDMirror / jsDelivr);
 // the Rust side only exposes local skills install / agent management.
 

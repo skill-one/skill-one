@@ -1,10 +1,10 @@
 [package]
 name = "app"
 version = "0.1.0"
-description = "Skillone"
+description = "SkillOne"
 authors = ["you"]
 license = ""
-repository = "https://github.com/luckie2076/skillone"
+repository = "https://github.com/skill-one/skill-one"
 edition = "2021"
 # agents-skills requires rustc >= 1.88 (edition 2024).
 rust-version = "1.88"

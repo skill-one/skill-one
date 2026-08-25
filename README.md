@@ -61,7 +61,7 @@ npm run tauri build
 ## 项目结构
 
 ```
-skillone/
+skill-one/
 ├── src/                    # 前端（React + TypeScript）
 │   ├── components/         # 页面与 UI 组件
 │   │   └── ui/             # shadcn/ui 组件
