@@ -14,7 +14,6 @@ vi.mock("./skills-manager", () => ({
   unlinkAgents: vi.fn(),
   listInstalledSkills: vi.fn(),
   removeSkills: vi.fn(),
-  updateSkills: vi.fn(),
 }));
 
 describe("fetchAgentStatus (Tauri)", () => {

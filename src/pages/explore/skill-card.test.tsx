@@ -3,11 +3,11 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SkillCard } from "./skill-card";
-import { installSkillFromSource } from "../lib/local-skills";
-import { renderWithRouter } from "../test/test-utils";
-import type { Skill } from "../types/skill";
+import { installSkillFromSource } from "../../lib/local-skills";
+import { renderWithRouter } from "../../test/test-utils";
+import type { Skill } from "../../types/skill";
 
-vi.mock("../lib/local-skills", () => ({
+vi.mock("../../lib/local-skills", () => ({
   installSkillFromSource: vi.fn(),
 }));
 

@@ -45,8 +45,16 @@ npm run tauri build  # 构建发布包
 ```
 skill-one/
 ├── src/                    # 前端（React + TypeScript）
-│   ├── components/         # 页面与 UI 组件
-│   │   └── ui/             # shadcn/ui 组件
+│   ├── components/         # 跨页面共享组件
+│   │   ├── ui/             # shadcn/ui 组件
+│   │   ├── app-sidebar.tsx # 侧边栏导航（路由 + 标题栏共用）
+│   │   ├── agent-icon.tsx  # agent 品牌图标
+│   │   ├── owner-avatar.tsx# 仓库头像
+│   │   └── placeholder-page.tsx # 未实现页面的占位
+│   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
+│   │   ├── explore/        # 商店探索页（skill-card / skill-detail-panel）
+│   │   ├── my-skills/      # 我的 Skills 页（agent-icon-grid / stray-files-dialog）
+│   │   └── settings/       # 设置页
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层
 │   ├── types/              # 类型定义

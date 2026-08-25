@@ -10,12 +10,12 @@ import {
 import userEvent from "@testing-library/user-event";
 import { HashRouter, Route, Routes } from "react-router-dom";
 
-import { fetchSkillsPage } from "../lib/skills-api";
-import { fetchSkillDetail } from "../lib/skill-detail-api";
+import { fetchSkillsPage } from "../../lib/skills-api";
+import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { ExplorePage } from "./explore-page";
 
-vi.mock("../lib/skills-api", () => ({ fetchSkillsPage: vi.fn() }));
-vi.mock("../lib/skill-detail-api", () => ({
+vi.mock("../../lib/skills-api", () => ({ fetchSkillsPage: vi.fn() }));
+vi.mock("../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
 }));
 

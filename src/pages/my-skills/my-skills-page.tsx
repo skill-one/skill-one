@@ -6,15 +6,15 @@ import {
   fetchInstalledSkills,
   removeInstalledSkill,
   setSkillEnabled,
-} from "../lib/local-skills";
-import { fetchFullIndex } from "../lib/skills-api";
-import type { InstalledSkill } from "../lib/skills-manager";
-import type { Skill } from "../types/skill";
-import { cn } from "../lib/utils";
+} from "../../lib/local-skills";
+import { fetchFullIndex } from "../../lib/skills-api";
+import type { InstalledSkill } from "../../lib/skills-manager";
+import type { Skill } from "../../types/skill";
+import { cn } from "../../lib/utils";
 import { AgentIconGrid } from "./agent-icon-grid";
-import { OwnerAvatar } from "./owner-avatar";
-import { Button } from "./ui/button";
-import { Switch } from "./ui/switch";
+import { OwnerAvatar } from "../../components/owner-avatar";
+import { Button } from "../../components/ui/button";
+import { Switch } from "../../components/ui/switch";
 
 /**
  * Join installed skills with their registry entry. Each registry skill is

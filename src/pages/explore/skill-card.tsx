@@ -2,11 +2,11 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Star, Check, Download, Loader2, RefreshCw } from "lucide-react";
 
-import { installSkillFromSource } from "../lib/local-skills";
-import { cn, formatStars } from "../lib/utils";
-import type { Skill } from "../types/skill";
-import { Button } from "./ui/button";
-import { OwnerAvatar } from "./owner-avatar";
+import { installSkillFromSource } from "../../lib/local-skills";
+import { cn, formatStars } from "../../lib/utils";
+import type { Skill } from "../../types/skill";
+import { Button } from "../../components/ui/button";
+import { OwnerAvatar } from "../../components/owner-avatar";
 
 /** Install button state machine: idle → installing → installed | error. */
 type InstallState = "idle" | "installing" | "installed" | "error";

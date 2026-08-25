@@ -2,13 +2,13 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Loader2, Star, X } from "lucide-react";
 
-import { fetchSkillDetail } from "../lib/skill-detail-api";
-import { openExternal } from "../lib/open-external";
-import { formatStars } from "../lib/utils";
-import type { Skill } from "../types/skill";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import { OwnerAvatar } from "./owner-avatar";
+import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { openExternal } from "../../lib/open-external";
+import { formatStars } from "../../lib/utils";
+import type { Skill } from "../../types/skill";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { OwnerAvatar } from "../../components/owner-avatar";
 
 interface SkillDetailPanelProps {
   /** The skill to show; null renders nothing. */

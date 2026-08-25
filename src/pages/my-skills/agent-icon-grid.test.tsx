@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { renderWithRouter } from "../test/test-utils";
-import { fetchAgentStatus, linkAgent } from "../lib/local-skills";
-import type { AgentLinkResult } from "../lib/skills-manager";
+import { renderWithRouter } from "../../test/test-utils";
+import { fetchAgentStatus, linkAgent } from "../../lib/local-skills";
+import type { AgentLinkResult } from "../../lib/skills-manager";
 import { AgentIconGrid } from "./agent-icon-grid";
 
-vi.mock("../lib/local-skills", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../lib/local-skills")>();
+vi.mock("../../lib/local-skills", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/local-skills")>();
   return {
     ...actual,
     fetchAgentStatus: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock("../lib/local-skills", async (importOriginal) => {
     unlinkAgent: vi.fn(),
   };
 });
-vi.mock("../lib/open-external", () => ({
+vi.mock("../../lib/open-external", () => ({
   openPathInSystem: vi.fn(),
   openExternal: vi.fn(),
 }));

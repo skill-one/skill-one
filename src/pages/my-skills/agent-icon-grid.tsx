@@ -9,23 +9,23 @@ import {
   Users,
 } from "lucide-react";
 
-import { fetchAgentStatus, linkAgent, unlinkAgent } from "../lib/local-skills";
+import { fetchAgentStatus, linkAgent, unlinkAgent } from "../../lib/local-skills";
 import {
   parseMigrateStrays,
   parseStrayDir,
   parseStrays,
-} from "../lib/link-migration";
-import { openPathInSystem } from "../lib/open-external";
-import type { AgentLinkResult, AgentStatus } from "../lib/skills-manager";
-import { cn } from "../lib/utils";
-import { AgentIcon } from "./agent-icon";
+} from "../../lib/link-migration";
+import { openPathInSystem } from "../../lib/open-external";
+import type { AgentLinkResult, AgentStatus } from "../../lib/skills-manager";
+import { cn } from "../../lib/utils";
+import { AgentIcon } from "../../components/agent-icon";
 import { StrayFilesDialog, type StrayFilesTarget } from "./stray-files-dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "./ui/tooltip";
+} from "../../components/ui/tooltip";
 
 type NoticeKind = "success" | "warning" | "error";
 

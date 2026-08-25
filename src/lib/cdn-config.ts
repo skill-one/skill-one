@@ -101,8 +101,3 @@ export async function fetchFirstText(
   throw new Error("无法连接数据源：已尝试直连 GitHub 与 CDN 镜像");
 }
 
-/** Resolve the first reachable URL for a file, following the CDN config. */
-export async function resolveFileUrl(spec: FileSpec): Promise<string> {
-  const { url } = await fetchFirstText(fileCandidates(spec));
-  return url;
-}

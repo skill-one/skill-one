@@ -3,16 +3,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { fetchSkillDetail } from "../lib/skill-detail-api";
-import { openExternal } from "../lib/open-external";
-import type { Skill } from "../types/skill";
+import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { openExternal } from "../../lib/open-external";
+import type { Skill } from "../../types/skill";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
-vi.mock("../lib/skill-detail-api", () => ({
+vi.mock("../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
 }));
 
-vi.mock("../lib/open-external", () => ({
+vi.mock("../../lib/open-external", () => ({
   openExternal: vi.fn(),
 }));
 

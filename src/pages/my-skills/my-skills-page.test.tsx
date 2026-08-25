@@ -3,14 +3,14 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { MySkillsPage } from "./my-skills-page";
-import { renderWithRouter } from "../test/test-utils";
+import { renderWithRouter } from "../../test/test-utils";
 import {
   addMockLocalSkill,
   installMockSkill,
   resetMockAgentStatus,
   resetMockInstalledSkills,
   setMockSkillEnabled,
-} from "../lib/mock-local";
+} from "../../lib/mock-local";
 
 // The page reads installed skills through local-skills, which falls back to
 // the mutable mock store in the browser (this test env), so mutations below

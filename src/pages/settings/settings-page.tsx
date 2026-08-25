@@ -5,9 +5,9 @@ import {
   DEFAULT_CDN_BASE,
   getCdnBase,
   setCdnBase,
-} from "../lib/cdn-config";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
+} from "../../lib/cdn-config";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
 
 /**
  * Settings page. Currently hosts the configurable CDN download source.

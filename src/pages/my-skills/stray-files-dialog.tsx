@@ -1,6 +1,6 @@
 import { AlertTriangle, FolderOpen } from "lucide-react";
 
-import { Button } from "./ui/button";
+import { Button } from "../../components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "./ui/dialog";
+} from "../../components/ui/dialog";
 
 /** What the dialog shows: which agent is blocked, by which non-skill files. */
 export interface StrayFilesTarget {

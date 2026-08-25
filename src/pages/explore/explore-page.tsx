@@ -2,18 +2,18 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SearchX, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 
-import { fetchSkillsPage } from "../lib/skills-api";
-import { cn } from "../lib/utils";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
+import { fetchSkillsPage } from "../../lib/skills-api";
+import { cn } from "../../lib/utils";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
 import {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
   PaginationItem,
   PaginationLink,
-} from "./ui/pagination";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
+} from "../../components/ui/pagination";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
 import { SkillCard } from "./skill-card";
 import { SkillDetailPanel } from "./skill-detail-panel";
 

@@ -11,9 +11,6 @@ import { isTauri } from "./tauri";
  * `.agents/skills` under that directory, and its lockfile drives list/update.
  */
 
-/** Scope filter for updates: auto-detect, global (user-level) or project. */
-export type SkillsScope = "auto" | "global" | "project";
-
 /** A listed skill, enriched with lock metadata (mirrors `list --json`). */
 export interface InstalledSkill {
   name: string;
@@ -54,14 +51,6 @@ export interface RemoveResult {
   installed: string[];
   requested: string[];
   removed: string[];
-}
-
-export interface UpdateResult {
-  global: boolean;
-  updated: number;
-  failed: number;
-  updatedNames: string[];
-  failures: string[];
 }
 
 export interface DisableResult {
@@ -157,17 +146,6 @@ export async function installSkill(
   });
 }
 
-/** Preview which skills a source would install, without installing anything. */
-export function previewSource(
-  source: string,
-  options: {
-    global?: boolean;
-    fullDepth?: boolean;
-  } & ManagerOptions = {},
-): Promise<InstallResult> {
-  return installSkill(source, { ...options, listOnly: true });
-}
-
 /** List installed skills (project scope by default). */
 export async function listInstalledSkills(
   options: {
@@ -199,21 +177,6 @@ export async function removeSkills(
     skills,
     global: options.global,
     all: options.all,
-    cwd: options.cwd,
-  });
-}
-
-/** Re-install skills from their recorded sources (skips locally-sourced ones). */
-export async function updateSkills(
-  skills: string[] = [],
-  options: {
-    scope?: SkillsScope;
-  } & ManagerOptions = {},
-): Promise<UpdateResult> {
-  requireTauri();
-  return invoke<UpdateResult>("update_skills", {
-    skills,
-    scope: options.scope,
     cwd: options.cwd,
   });
 }

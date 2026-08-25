@@ -13,12 +13,12 @@ import {
 } from "react-router-dom";
 
 import { AppSidebar, navLabelFor } from "./components/app-sidebar";
-import { ExplorePage } from "./components/explore-page";
-import { MySkillsPage } from "./components/my-skills-page";
 import { PlaceholderPage } from "./components/placeholder-page";
-import { SettingsPage } from "./components/settings-page";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 import { isTauri } from "./lib/tauri";
+import { ExplorePage } from "./pages/explore/explore-page";
+import { MySkillsPage } from "./pages/my-skills/my-skills-page";
+import { SettingsPage } from "./pages/settings/settings-page";
 
 /**
  * Cached registry data is served for 10 minutes without re-fetching
