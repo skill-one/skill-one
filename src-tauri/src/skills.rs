@@ -110,6 +110,7 @@ pub struct AgentStatusDto {
     pub display: String,
     pub linked: bool,
     pub canonical: bool,
+    pub internal_skills: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -487,6 +488,7 @@ pub async fn link_status(
                 display: s.display,
                 linked: s.linked,
                 canonical: s.canonical,
+                internal_skills: s.internal_skills,
             })
             .collect())
     })

@@ -88,7 +88,7 @@ function AgentIconButton({
   busy: boolean;
   onClick: () => void;
 }) {
-  const skillCount = agent.skills?.length ?? 0;
+  const skillCount = agent.internalSkills?.length ?? 0;
   // canonical（规范目录本身）在数据上 linked=false，但对用户而言等价于已接入：
   // 图标保持全彩，点击时提示无法取消链接的原因。
   const isLinked = agent.linked || agent.canonical;
@@ -172,7 +172,7 @@ function AgentIconButton({
             <p>{description}</p>
             {showBadge && (
               <ul className="list-disc space-y-0.5 pl-4">
-                {(agent.skills ?? []).map((skill) => (
+                {(agent.internalSkills ?? []).map((skill) => (
                   <li key={skill}>{skill}</li>
                 ))}
               </ul>
@@ -270,7 +270,7 @@ export function AgentIconGrid() {
       unlinkMutation.mutate(agent.name);
       return;
     }
-    const skillCount = agent.skills?.length ?? 0;
+    const skillCount = agent.internalSkills?.length ?? 0;
     if (skillCount > 0) {
       migrateMutation.mutate(agent.name);
     } else {

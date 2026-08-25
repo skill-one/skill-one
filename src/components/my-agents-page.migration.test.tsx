@@ -47,7 +47,7 @@ describe("MyAgentsPage migration flow", () => {
         display: "Cursor",
         linked: false,
         canonical: false,
-        skills: ["pdf", "xlsx"],
+        internalSkills: ["pdf", "xlsx"],
       },
     ]);
     linkAgent.mockImplementation(
@@ -91,9 +91,7 @@ describe("MyAgentsPage migration flow", () => {
     const user = userEvent.setup();
     renderWithRouter(<MyAgentsPage />);
 
-    await user.click(
-      await screen.findByRole("button", { name: "迁移并链接" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "迁移并链接" }));
 
     await waitFor(() => {
       expect(linkAgent).toHaveBeenLastCalledWith("cursor", { migrate: true });
@@ -112,7 +110,7 @@ describe("MyAgentsPage migration flow", () => {
         display: "Cursor",
         linked: false,
         canonical: false,
-        skills: [],
+        internalSkills: [],
       },
     ]);
     renderWithRouter(<MyAgentsPage />);

@@ -56,7 +56,7 @@ function AgentRow({
 }) {
   const busy = linking || unlinking;
   const migratableSkills =
-    !agent.linked && !agent.canonical ? (agent.skills ?? []) : [];
+    !agent.linked && !agent.canonical ? (agent.internalSkills ?? []) : [];
   return (
     <div className="group flex items-center gap-4 rounded-xl border border-border/70 bg-card p-3.5 transition-all duration-150 hover:border-border hover:shadow-[0_6px_20px_-12px_rgba(15,23,42,0.15)]">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-colors">

@@ -137,14 +137,14 @@ const mockAgentRows: Array<{
   display: string;
   linked: boolean;
   canonical: boolean;
-  skills?: string[];
+  internalSkills?: string[];
 }> = [
   {
     name: "claude-code",
     display: "Claude Code",
     linked: true,
     canonical: false,
-    skills: [],
+    internalSkills: [],
   },
   {
     name: "cursor",
@@ -152,21 +152,21 @@ const mockAgentRows: Array<{
     linked: false,
     canonical: false,
     // Carries skills in its own dir → card previews them and offers 迁移并链接.
-    skills: ["pdf", "docx"],
+    internalSkills: ["pdf", "docx"],
   },
   {
     name: "gemini-cli",
     display: "Gemini CLI",
     linked: false,
     canonical: false,
-    skills: [],
+    internalSkills: [],
   },
   {
     name: "windsurf",
     display: "Windsurf",
     linked: false,
     canonical: true,
-    skills: [],
+    internalSkills: [],
   },
 ];
 
@@ -176,7 +176,7 @@ function buildMockAgentStatus(): AgentStatus[] {
     display: a.display,
     linked: a.linked,
     canonical: a.canonical,
-    skills: a.skills,
+    internalSkills: a.internalSkills,
   }));
 }
 

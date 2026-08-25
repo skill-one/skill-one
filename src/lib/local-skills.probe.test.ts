@@ -2,17 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { fetchAgentStatus } from "./local-skills";
 
-const {
-  isTauri,
-  getLinkStatus,
-  linkAgents,
-  unlinkAgents,
-  listInstalledSkills,
-  removeSkills,
-  updateSkills,
-} = vi.hoisted(() => ({
+const { isTauri, getLinkStatus } = vi.hoisted(() => ({
   isTauri: vi.fn(),
   getLinkStatus: vi.fn(),
+}));
+
+vi.mock("./tauri", () => ({ isTauri }));
+vi.mock("./skills-manager", () => ({
+  getLinkStatus,
   linkAgents: vi.fn(),
   unlinkAgents: vi.fn(),
   listInstalledSkills: vi.fn(),
@@ -20,102 +17,55 @@ const {
   updateSkills: vi.fn(),
 }));
 
-vi.mock("./tauri", () => ({ isTauri }));
-vi.mock("./skills-manager", () => ({
-  getLinkStatus,
-  linkAgents,
-  unlinkAgents,
-  listInstalledSkills,
-  removeSkills,
-  updateSkills,
-}));
-
-function refusedResult(skills: string[]) {
-  return {
-    agents: ["cursor"],
-    results: [
-      {
-        agent: "cursor",
-        display: "Cursor",
-        status: "refused",
-        moved: [],
-        skipped: [],
-        skills,
-        message: null,
-      },
-    ],
-  };
-}
-
-describe("fetchAgentStatus pre-link probe (Tauri)", () => {
+describe("fetchAgentStatus (Tauri)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isTauri.mockReturnValue(true);
   });
 
-  it("surfaces contained skills when the link is refused", async () => {
+  it("returns internalSkills from the backend without probing", async () => {
     getLinkStatus.mockResolvedValue([
-      { name: "cursor", display: "Cursor", linked: false, canonical: false },
+      {
+        name: "cursor",
+        display: "Cursor",
+        linked: false,
+        canonical: false,
+        internalSkills: ["pdf", "docx"],
+      },
     ]);
-    linkAgents.mockResolvedValue(refusedResult(["pdf", "docx"]));
 
     const statuses = await fetchAgentStatus();
 
-    expect(linkAgents).toHaveBeenCalledWith(["cursor"], { global: true });
-    expect(unlinkAgents).not.toHaveBeenCalled();
-    expect(statuses[0]).toMatchObject({ name: "cursor", linked: false, skills: ["pdf", "docx"] });
+    expect(getLinkStatus).toHaveBeenCalledWith({ global: true });
+    expect(statuses[0]).toMatchObject({
+      name: "cursor",
+      linked: false,
+      internalSkills: ["pdf", "docx"],
+    });
   });
 
-  it("reverts the link when the probe linked an empty agent dir", async () => {
+  it("returns empty internalSkills for linked/canonical agents", async () => {
     getLinkStatus.mockResolvedValue([
-      { name: "gemini-cli", display: "Gemini CLI", linked: false, canonical: false },
-    ]);
-    linkAgents.mockResolvedValue({
-      agents: ["gemini-cli"],
-      results: [
-        {
-          agent: "gemini-cli",
-          display: "Gemini CLI",
-          status: "linked",
-          moved: [],
-          skipped: [],
-          skills: [],
-          message: null,
-        },
-      ],
-    });
-    unlinkAgents.mockResolvedValue({
-      agents: ["gemini-cli"],
-      results: [
-        {
-          agent: "gemini-cli",
-          display: "Gemini CLI",
-          status: "unlinked",
-          moved: [],
-          skipped: [],
-          skills: [],
-          message: null,
-        },
-      ],
-    });
-
-    const statuses = await fetchAgentStatus();
-
-    expect(unlinkAgents).toHaveBeenCalledWith(["gemini-cli"], { global: true });
-    // Agent ends up unlinked so 取消链接 stays effective.
-    expect(statuses[0]).toMatchObject({ name: "gemini-cli", linked: false, skills: [] });
-  });
-
-  it("does not probe already-linked or canonical agents", async () => {
-    getLinkStatus.mockResolvedValue([
-      { name: "claude-code", display: "Claude Code", linked: true, canonical: false },
-      { name: "windsurf", display: "Windsurf", linked: false, canonical: true },
+      {
+        name: "claude-code",
+        display: "Claude Code",
+        linked: true,
+        canonical: false,
+        internalSkills: [],
+      },
+      {
+        name: "windsurf",
+        display: "Windsurf",
+        linked: false,
+        canonical: true,
+        internalSkills: [],
+      },
     ]);
 
     const statuses = await fetchAgentStatus();
 
-    expect(linkAgents).not.toHaveBeenCalled();
-    expect(unlinkAgents).not.toHaveBeenCalled();
     expect(statuses).toHaveLength(2);
+    expect(statuses[0].internalSkills).toEqual([]);
+    expect(statuses[1].internalSkills).toEqual([]);
   });
 });
