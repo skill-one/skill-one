@@ -30,6 +30,7 @@ pub fn run() {
             skills::enable_skills,
             skills::link_agents,
             skills::link_status,
+            skills::remove_stray_files,
             open_directory,
         ])
         .run(tauri::generate_context!())

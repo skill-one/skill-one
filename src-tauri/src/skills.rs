@@ -9,6 +9,7 @@ use agents_skills::{
     AddRequest, AgentRequest, DisableRequest, EnableRequest, LinkOutcome, ListRequest, Manager,
     RemoveRequest, Scope, UpdateRequest,
 };
+use agents_skills::core::agents::{agent_skills_dir, get_agent};
 
 /// Build a `Manager` targeting `cwd` (empty/`None` = the process's own cwd).
 ///
@@ -111,6 +112,12 @@ pub struct AgentStatusDto {
     pub linked: bool,
     pub canonical: bool,
     pub internal_skills: Vec<String>,
+    /// Non-directory entries inside the agent's own skills dir (strays that a
+    /// migrate cannot move). Empty for linked/canonical agents.
+    pub internal_files: Vec<String>,
+    /// Absolute path to the agent's own skills dir; `None` for linked/canonical
+    /// agents or when the dir cannot be resolved.
+    pub dir_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -207,6 +214,78 @@ mod tests {
     fn tolerates_bom_and_missing_description() {
         let dir = skill_dir_with("\u{feff}---\nname: x\n---\n正文");
         assert_eq!(extract_description(dir.path()), None);
+    }
+
+    #[test]
+    fn removes_stray_files() {
+        let dir = tempdir().expect("tempdir");
+        fs::write(dir.path().join("a.txt"), "x").expect("write a");
+        fs::write(dir.path().join("b.txt"), "y").expect("write b");
+        let removed = remove_strays(dir.path(), &["a.txt".into(), "b.txt".into()]).unwrap();
+        assert_eq!(removed, vec!["a.txt", "b.txt"]);
+        assert!(!dir.path().join("a.txt").exists());
+        assert!(!dir.path().join("b.txt").exists());
+    }
+
+    #[test]
+    fn skips_already_missing_files() {
+        let dir = tempdir().expect("tempdir");
+        fs::write(dir.path().join("a.txt"), "x").expect("write a");
+        let removed =
+            remove_strays(dir.path(), &["a.txt".into(), "gone.txt".into()]).unwrap();
+        assert_eq!(removed, vec!["a.txt"]);
+    }
+
+    #[test]
+    fn rejects_files_outside_the_dir() {
+        let dir = tempdir().expect("tempdir");
+        let outside = tempdir().expect("outside");
+        fs::write(outside.path().join("secret.txt"), "s").expect("write secret");
+        let name = format!(
+            "../{}/secret.txt",
+            outside.path().file_name().unwrap().to_string_lossy()
+        );
+        let err = remove_strays(dir.path(), &[name]).unwrap_err();
+        assert!(err.contains("拒绝"), "unexpected error: {err}");
+        // The out-of-dir file must be left untouched.
+        assert!(outside.path().join("secret.txt").exists());
+    }
+
+    #[test]
+    fn rejects_directories() {
+        let dir = tempdir().expect("tempdir");
+        fs::create_dir(dir.path().join("sub")).expect("mkdir sub");
+        let err = remove_strays(dir.path(), &["sub".into()]).unwrap_err();
+        assert!(err.contains("拒绝删除目录"), "unexpected error: {err}");
+        assert!(dir.path().join("sub").is_dir());
+    }
+
+    #[test]
+    fn scans_only_non_dir_entries_as_strays() {
+        let dir = tempdir().expect("tempdir");
+        fs::create_dir_all(dir.path().join("skill-a")).expect("mkdir skill-a");
+        fs::write(dir.path().join("skill-a/SKILL.md"), "x").expect("write SKILL.md");
+        fs::write(dir.path().join("README.txt"), "x").expect("write README");
+        fs::write(dir.path().join("notes.md"), "y").expect("write notes");
+        // A symlink to a directory counts as a skill, not a stray.
+        fs::create_dir_all(dir.path().join("hub/target")).expect("mkdir hub");
+        std::os::unix::fs::symlink(
+            dir.path().join("hub/target"),
+            dir.path().join("linked-skill"),
+        )
+        .expect("symlink dir");
+        // A symlink to a file is a stray.
+        std::os::unix::fs::symlink(dir.path().join("notes.md"), dir.path().join("link.txt"))
+            .expect("symlink file");
+        let files = scan_internal_files(dir.path());
+        assert_eq!(files, vec!["README.txt", "link.txt", "notes.md"]);
+    }
+
+    #[test]
+    fn scans_none_when_dir_is_missing_or_empty() {
+        let dir = tempdir().expect("tempdir");
+        assert!(scan_internal_files(&dir.path().join("nope")).is_empty());
+        assert!(scan_internal_files(dir.path()).is_empty());
     }
 }
 
@@ -480,18 +559,101 @@ pub async fn link_status(
 ) -> Result<Vec<AgentStatusDto>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let manager = manager(cwd.as_deref());
+        let global = global.unwrap_or(false);
         Ok(manager
-            .agent_status(global.unwrap_or(false))
+            .agent_status(global)
             .into_iter()
-            .map(|s| AgentStatusDto {
-                name: s.name,
-                display: s.display,
-                linked: s.linked,
-                canonical: s.canonical,
-                internal_skills: s.internal_skills,
+            .map(|s| {
+                // Strays and the dir path only matter for unlinked agents that
+                // own content the UI must preview before linking; linked and
+                // canonical agents share the canonical dir (shown by `list`).
+                let (internal_files, dir_path) = if s.linked || s.canonical {
+                    (Vec::new(), None)
+                } else {
+                    match get_agent(&s.name)
+                        .and_then(|a| agent_skills_dir(a, global, manager.env()))
+                    {
+                        Some(dir) => (scan_internal_files(&dir), Some(dir.display().to_string())),
+                        None => (Vec::new(), None),
+                    }
+                };
+                AgentStatusDto {
+                    name: s.name,
+                    display: s.display,
+                    linked: s.linked,
+                    canonical: s.canonical,
+                    internal_skills: s.internal_skills,
+                    internal_files,
+                    dir_path,
+                }
             })
             .collect())
     })
     .await
     .map_err(|e| format!("link status task failed: {e}"))?
+}
+
+/// Non-directory entries directly inside `dir` (the strays a migrate cannot
+/// move). Mirrors `agents-skills`' link logic, where only directories —
+/// including symlinks whose target is a directory — count as skills. A symlink
+/// to a directory therefore is not a stray, while a plain file (or a symlink
+/// to a file) is. Returns the names sorted for stable output.
+fn scan_internal_files(dir: &std::path::Path) -> Vec<String> {
+    let mut files: Vec<String> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let is_dir = std::fs::metadata(&path)
+                .map(|m| m.is_dir())
+                .unwrap_or(false);
+            if !is_dir {
+                files.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+    }
+    files.sort();
+    files
+}
+
+/// Remove stray non-skill files from an agent's skills dir (the "one-click
+/// delete" button in the stray-files dialog).
+///
+/// Safety: each name must resolve to a plain file directly inside `dir`.
+/// Anything outside it (via `..` or a symlink) is rejected and left untouched,
+/// and directories are never deleted. Files that no longer exist are treated
+/// as already removed (idempotent), so a retry works after the user removed
+/// some of them by hand. Returns the names that were actually removed.
+fn remove_strays(base: &std::path::Path, files: &[String]) -> Result<Vec<String>, String> {
+    let base_canon = base
+        .canonicalize()
+        .map_err(|e| format!("无法访问目录 {}: {e}", base.display()))?;
+    if !base_canon.is_dir() {
+        return Err(format!("不是目录: {}", base.display()));
+    }
+    let mut removed = Vec::new();
+    for name in files {
+        let Ok(canon) = base.join(name).canonicalize() else {
+            continue; // 已不存在 → 视为已删除
+        };
+        if !canon.starts_with(&base_canon) {
+            return Err(format!("拒绝删除目录外的文件: {name}"));
+        }
+        if canon.is_dir() {
+            return Err(format!("拒绝删除目录: {name}"));
+        }
+        std::fs::remove_file(&canon)
+            .map_err(|e| format!("删除 {name} 失败: {e}"))?;
+        removed.push(name.clone());
+    }
+    Ok(removed)
+}
+
+#[tauri::command]
+pub async fn remove_stray_files(
+    dir: String,
+    files: Vec<String>,
+) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || remove_strays(std::path::Path::new(&dir), &files))
+        .await
+        .map_err(|e| format!("remove strays task failed: {e}"))?
 }

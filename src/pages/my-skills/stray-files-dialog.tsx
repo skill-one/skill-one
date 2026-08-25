@@ -1,5 +1,3 @@
-import { AlertTriangle, FolderOpen } from "lucide-react";
-
 import { Button } from "../../components/ui/button";
 import {
   Dialog,
@@ -10,32 +8,31 @@ import {
   DialogTitle,
 } from "../../components/ui/dialog";
 
-/** What the dialog shows: which agent is blocked, by which non-skill files. */
+/** What the dialog shows before linking an agent whose dir already has content. */
 export interface StrayFilesTarget {
   name: string;
   display: string;
-  /** Non-skill file names that must be removed by hand. */
+  /** Skills inside the agent's dir that an import would move into the canonical dir. */
+  skills: string[];
+  /** Non-skill files that must be removed before a link can succeed. */
   files: string[];
-  /** Absolute path to the agent's skills dir; `null` hides the open button. */
+  /** Absolute path to the agent's skills dir; used by the hover tooltip actions. */
   dirPath: string | null;
 }
 
 /**
- * Explains why a link could not be created when the agent's skills dir holds
- * non-skill files. Migration only moves skill directories, so these strays
- * must be removed by hand; the dialog lists them and offers to reveal the dir
- * in the file manager.
+ * Link guidance dialog. Clicking an agent whose skills dir already holds skills
+ * or non-skill files opens this instead of linking blindly. The contents and
+ * actions (一键导入 / 进入目录 / 一键删除) live in the agent's hover tooltip,
+ * so this dialog only points the user there instead of duplicating the list.
  */
 export function StrayFilesDialog({
   target,
-  onOpenDir,
   onClose,
 }: {
   target: StrayFilesTarget | null;
-  onOpenDir: (path: string) => void;
   onClose: () => void;
 }) {
-  const dirPath = target?.dirPath ?? null;
   return (
     <Dialog
       open={target != null}
@@ -44,56 +41,20 @@ export function StrayFilesDialog({
       }}
     >
       {target && (
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>链接失败：存在无法迁移的文件</DialogTitle>
+            <DialogTitle>
+              链接 {target.display}（{target.name}）
+            </DialogTitle>
             <DialogDescription>
-              {target.display}（{target.name}）的 skills 目录中带有非 skill
-              文件，链接无法自动清理它们。
-              {dirPath && (
-                <>
-                  {" "}
-                  目录：
-                  <strong className="select-all font-semibold text-foreground">
-                    {dirPath}
-                  </strong>
-                </>
-              )}
+              该 agent 的 skills 目录中已有内容。请将鼠标悬停在该图标上，在浮窗中选择处理方式（一键导入
+              skills、进入目录或一键删除文件）后完成链接。
             </DialogDescription>
           </DialogHeader>
-
-          <div className="flex flex-col gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5">
-            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              需要手动移除这些文件后重试
-            </div>
-            <ul className="flex flex-wrap gap-1 pt-0.5">
-              {target.files.map((file) => (
-                <li
-                  key={file}
-                  className="rounded bg-destructive/15 px-1.5 py-0.5 font-mono text-[11px] text-destructive"
-                >
-                  {file}
-                </li>
-              ))}
-            </ul>
-          </div>
-
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={onClose}>
               知道了
             </Button>
-            {dirPath && (
-              <Button
-                variant="default"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => onOpenDir(dirPath)}
-              >
-                <FolderOpen className="h-3.5 w-3.5" />
-                打开目录
-              </Button>
-            )}
           </DialogFooter>
         </DialogContent>
       )}

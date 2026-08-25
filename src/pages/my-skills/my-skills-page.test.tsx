@@ -152,14 +152,18 @@ describe("MySkillsPage", () => {
     expect(screen.getByText("本地")).toBeInTheDocument();
   });
 
-  it("renders the agent icon grid with a warning badge for inner skills", async () => {
+  it("renders the agent icon grid with a minimal warning badge for inner content", async () => {
     renderWithRouter(<MySkillsPage />);
 
-    // Cursor carries 2 skills in its own dir in the mock → warning badge.
+    // Cursor carries 2 skills and 1 stray file in its own dir in the mock:
+    // the badge is a minimal warning without counts, details live in the
+    // hover tooltip and the link-preview dialog.
     const cursor = await screen.findByLabelText("Cursor，点击链接");
     expect(cursor).toBeInTheDocument();
     expect(
-      within(cursor).getByLabelText("该 agent 目录内已有 2 个 skills"),
+      within(cursor).getByLabelText(
+        "该 agent 目录内已有 skills 或其他文件，点击查看详情",
+      ),
     ).toBeInTheDocument();
 
     // Linked agents offer 取消链接; canonical ones explain on click instead.
@@ -168,6 +172,39 @@ describe("MySkillsPage", () => {
     ).toBeInTheDocument();
     expect(screen.queryByLabelText(/Claude Code，点击链接/)).toBeNull();
     expect(screen.getByLabelText("Windsurf，点击取消链接")).toBeInTheDocument();
+  });
+
+  it("lists the specific skills and files in the agent hover tooltip", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+
+    const cursor = await screen.findByLabelText("Cursor，点击链接");
+    await user.hover(cursor);
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(within(tooltip).getByText("Cursor")).toBeInTheDocument();
+    expect(within(tooltip).getByText("pdf")).toBeInTheDocument();
+    expect(within(tooltip).getByText("docx")).toBeInTheDocument();
+    expect(within(tooltip).getByText("README.md")).toBeInTheDocument();
+  });
+
+  it("offers segmented actions in the hover tooltip: 一键导入 for skills, 进入目录 / 一键删除 for files", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+
+    const cursor = await screen.findByLabelText("Cursor，点击链接");
+    await user.hover(cursor);
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(
+      within(tooltip).getByRole("button", { name: "一键导入" }),
+    ).toBeInTheDocument();
+    expect(
+      within(tooltip).getByRole("button", { name: "进入目录" }),
+    ).toBeInTheDocument();
+    expect(
+      within(tooltip).getByRole("button", { name: "一键删除" }),
+    ).toBeInTheDocument();
   });
 
   it("shows a structured info tooltip on agent icon hover", async () => {

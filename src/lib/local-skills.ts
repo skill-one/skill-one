@@ -17,6 +17,7 @@ import {
   linkAgents,
   listInstalledSkills,
   removeSkills,
+  removeStrayFiles,
   unlinkAgents,
   type AgentLinkResult,
   type AgentStatus,
@@ -143,6 +144,21 @@ export async function unlinkAgent(name: string): Promise<AgentLinkResult[]> {
       message: null,
     },
   ];
+}
+
+/**
+ * Delete stray non-skill files from an agent's skills dir (one-click delete in
+ * the stray-files dialog). Backend in Tauri; no-op in a plain browser since
+ * the mock store has no real files to remove.
+ */
+export async function removeAgentStrayFiles(
+  dir: string,
+  files: string[],
+): Promise<string[]> {
+  if (isTauri()) {
+    return removeStrayFiles(dir, files);
+  }
+  return files;
 }
 
 function mockDisplayOf(name: string): string {

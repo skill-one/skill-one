@@ -52,7 +52,7 @@ beforeEach(() => {
 });
 
 describe("AgentIconGrid stray-files dialog", () => {
-  it("shows the dialog, with 打开目录, when a plain 链接 is refused on non-skill files", async () => {
+  it("shows the guidance dialog when a plain 链接 is refused on non-skill files", async () => {
     const user = userEvent.setup();
     linkAgentMock.mockResolvedValue([refused(["README.md"])]);
     renderWithRouter(<AgentIconGrid />);
@@ -60,15 +60,21 @@ describe("AgentIconGrid stray-files dialog", () => {
     await user.click(await screen.findByRole("button", { name: /Cursor，点击链接/ }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText("README.md")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "打开目录" })).toBeInTheDocument();
+    // The dialog only points at the hover tooltip; the strays list and the
+    // 打开目录 action live in the tooltip, not here.
+    expect(screen.getByText(/请将鼠标悬停在该图标上/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "知道了" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "打开目录" }),
+    ).not.toBeInTheDocument();
     // Strays can't be migrated, so we never auto-retry with --migrate.
     expect(linkAgentMock).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the dialog when a migration fails on non-skill files", async () => {
+  it("reopens the guidance dialog when a migrate from the hover tooltip fails on strays", async () => {
     const user = userEvent.setup();
-    // Skills present → clicking an icon goes down the migrate path.
+    // Skills present → the icon click opens the link-preview dialog instead of
+    // linking, so migration is triggered from the tooltip's 一键导入 action.
     fetchAgentStatusMock.mockResolvedValue([
       {
         name: "cursor",
@@ -91,11 +97,15 @@ describe("AgentIconGrid stray-files dialog", () => {
     ]);
     renderWithRouter(<AgentIconGrid />);
 
-    await user.click(await screen.findByRole("button", { name: /Cursor，点击链接/ }));
+    const cursor = await screen.findByRole("button", { name: /Cursor，点击链接/ });
+    await user.hover(cursor);
+    await user.click(await screen.findByRole("button", { name: "一键导入" }));
+    // Two-step confirm inside the tooltip.
+    await user.click(screen.getByRole("button", { name: "确认导入？" }));
 
+    // The migrate fails on strays → the guidance dialog opens again.
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText("README.txt")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "打开目录" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "知道了" })).toBeInTheDocument();
     expect(linkAgentMock).toHaveBeenCalledWith("cursor", { migrate: true });
   });
 });

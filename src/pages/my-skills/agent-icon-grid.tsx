@@ -2,14 +2,22 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowRight,
   Check,
   CheckCircle2,
   CircleX,
+  FolderOpen,
   Loader2,
+  Trash2,
   Users,
 } from "lucide-react";
 
-import { fetchAgentStatus, linkAgent, unlinkAgent } from "../../lib/local-skills";
+import {
+  fetchAgentStatus,
+  linkAgent,
+  removeAgentStrayFiles,
+  unlinkAgent,
+} from "../../lib/local-skills";
 import {
   parseMigrateStrays,
   parseStrayDir,
@@ -19,6 +27,7 @@ import { openPathInSystem } from "../../lib/open-external";
 import type { AgentLinkResult, AgentStatus } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
 import { AgentIcon } from "../../components/agent-icon";
+import { Button } from "../../components/ui/button";
 import { StrayFilesDialog, type StrayFilesTarget } from "./stray-files-dialog";
 import {
   Tooltip,
@@ -90,22 +99,38 @@ function AgentIconButton({
   agent,
   busy,
   onClick,
+  onOpenDir,
+  onMigrate,
+  onRemove,
 }: {
   agent: AgentStatus;
   busy: boolean;
   onClick: () => void;
+  onOpenDir: (path: string) => void;
+  onMigrate: () => void;
+  onRemove: () => void;
 }) {
   const skillCount = agent.internalSkills?.length ?? 0;
+  const fileCount = agent.internalFiles?.length ?? 0;
+  const dirPath = agent.dirPath ?? null;
+  // 浮窗内的破坏性操作（导入/删除）先点一次进入"确认"态，再点一次才执行。
+  const [confirming, setConfirming] = useState<"migrate" | "remove" | null>(
+    null,
+  );
   // canonical（规范目录本身）在数据上 linked=false，但对用户而言等价于已接入：
   // 图标保持全彩，点击时提示无法取消链接的原因。
   const isLinked = agent.linked || agent.canonical;
   const showBadge = !isLinked && skillCount > 0;
+  const showFileBadge = !isLinked && fileCount > 0;
+  // 目录内已有内容（skills 或其他文件）时只挂一个极简警告角标，不显示计数；
+  // 具体文件清单在悬停浮窗与链接预览浮窗里展开。
+  const showWarning = showBadge || showFileBadge;
   const disabled = busy;
 
   // 悬停浮窗文案按状态区分：说明、状态行（置底）。
   const dotColor = isLinked
     ? "bg-emerald-500"
-    : showBadge
+    : showWarning
       ? "bg-amber-500"
       : "bg-muted-foreground";
   const statusText = isLinked ? "已链接" : "未链接";
@@ -149,13 +174,25 @@ function AgentIconButton({
         </span>
       )}
 
-      {showBadge && (
+      {showWarning && (
+        // 极简警告角标：仅提示目录内已有内容（skills / 其他文件），不加计数，
+        // 具体清单交给悬停浮窗与链接预览浮窗展开。感叹号用无圆环的 SVG 拼出
+        // （竖条 + 圆点），避免 lucide 的 AlertCircle 在圆形徽章里形成双圆，
+        // 也避免字体渲染把 "!" 看成数字 "1"。
         <span
-          aria-label={`该 agent 目录内已有 ${skillCount} 个 skills`}
-          title={`目录内已有 ${skillCount} 个 skills`}
-          className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-none text-white ring-2 ring-card"
+          aria-label="该 agent 目录内已有 skills 或其他文件，点击查看详情"
+          title="目录内已有 skills 或其他文件，点击查看详情"
+          className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 ring-2 ring-card"
         >
-          {skillCount}
+          <svg
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+            className="h-3 w-3 text-white"
+          >
+            <path d="M12 3.5a2 2 0 0 0-2 2v9a2 2 0 0 0 4 0v-9a2 2 0 0 0-2-2Z" />
+            <circle cx="12" cy="19.5" r="2" />
+          </svg>
         </span>
       )}
 
@@ -171,23 +208,97 @@ function AgentIconButton({
     <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent side="bottom" className="w-60 px-3 py-2.5">
-          <p className="text-[12px] font-medium text-popover-foreground">
-            {agent.display}
-          </p>
-          <div className="mt-1 space-y-1.5 text-[11px] leading-relaxed text-muted-foreground">
-            <p>{description}</p>
-            {showBadge && (
-              <ul className="list-disc space-y-0.5 pl-4">
-                {(agent.internalSkills ?? []).map((skill) => (
-                  <li key={skill}>{skill}</li>
-                ))}
-              </ul>
-            )}
+        <TooltipContent
+          side="bottom"
+          className="w-64 px-3 py-2.5"
+          onPointerLeave={() => setConfirming(null)}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[12px] font-medium text-popover-foreground">
+              {agent.display}
+            </p>
+            <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
+              <span className={cn("h-1.5 w-1.5 rounded-full", dotColor)} />
+              {statusText}
+            </span>
           </div>
-          <div className="mt-2 flex items-center gap-1.5 border-t border-border/60 pt-2 text-[11px]">
-            <span className={cn("h-1.5 w-1.5 rounded-full", dotColor)} />
-            {statusText}
+          <div className="mt-1.5 space-y-2 text-[11px] leading-relaxed text-muted-foreground">
+            <p>{description}</p>
+
+            {/* skills 段落：清单 + 一键导入 */}
+            {showBadge && (
+              <div className="space-y-1.5 rounded-lg border border-border/70 bg-muted/40 p-2.5">
+                <p className="font-medium text-foreground">
+                  可导入的 skills（{skillCount}）
+                </p>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  {(agent.internalSkills ?? []).map((skill) => (
+                    <li key={skill}>{skill}</li>
+                  ))}
+                </ul>
+                {(fileCount === 0 || dirPath) && (
+                  <Button
+                    size="sm"
+                    className="h-6 gap-1 px-2 text-[10px]"
+                    onClick={() => {
+                      if (confirming === "migrate") {
+                        onMigrate();
+                        setConfirming(null);
+                      } else {
+                        setConfirming("migrate");
+                      }
+                    }}
+                  >
+                    <ArrowRight className="h-3 w-3" />
+                    {confirming === "migrate" ? "确认导入？" : "一键导入"}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* 其他文件段落：清单 + 进入目录 / 一键删除 */}
+            {showFileBadge && (
+              <div className="space-y-1.5 rounded-lg border border-destructive/25 bg-destructive/5 p-2.5">
+                <p className="flex items-center gap-1.5 font-medium text-destructive">
+                  <AlertTriangle className="h-3 w-3" />
+                  需处理的其他文件（{fileCount}）
+                </p>
+                <ul className="list-disc space-y-0.5 pl-4 font-mono text-[10px]">
+                  {(agent.internalFiles ?? []).map((file) => (
+                    <li key={file}>{file}</li>
+                  ))}
+                </ul>
+                {dirPath && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 gap-1 px-2 text-[10px]"
+                      onClick={() => onOpenDir(dirPath)}
+                    >
+                      <FolderOpen className="h-3 w-3" />
+                      进入目录
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-6 gap-1 px-2 text-[10px]"
+                      onClick={() => {
+                        if (confirming === "remove") {
+                          onRemove();
+                          setConfirming(null);
+                        } else {
+                          setConfirming("remove");
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      {confirming === "remove" ? "确认删除？" : "一键删除"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </TooltipContent>
       </Tooltip>
@@ -216,35 +327,51 @@ export function AgentIconGrid() {
     queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
   };
 
-  /** Build the stray-files warning for an agent, or `null` when none are named. */
-  const buildStrayTarget = (
-    name: string,
-    display: string,
-    files: string[],
-    message: string | null | undefined,
-  ): StrayFilesTarget | null => {
-    if (files.length === 0) return null;
-    return { name, display, files, dirPath: parseStrayDir(message) };
+  /** Build the link-preview target for an agent, or `null` when its dir is empty. */
+  const buildStrayTarget = (agent: AgentStatus): StrayFilesTarget | null => {
+    const skills = agent.internalSkills ?? [];
+    const files = agent.internalFiles ?? [];
+    if (skills.length === 0 && files.length === 0) return null;
+    return {
+      name: agent.name,
+      display: agent.display,
+      skills,
+      files,
+      dirPath: agent.dirPath ?? null,
+    };
   };
 
   const migrateMutation = useMutation({
     mutationFn: (name: string) => linkAgent(name, { migrate: true }),
     onSuccess: (results) => {
       const result = results[0];
-      // A migrate of a dir with non-skill files fails to move them; surface a
-      // dialog that guides the user to remove them by hand instead of a toast.
       if (result?.status === "failed") {
-        const target = buildStrayTarget(
-          result.agent,
-          result.display,
-          parseMigrateStrays(result.message),
-          result.message,
-        );
-        if (target) {
-          setStrayTarget(target);
+        // A migrate of a dir with non-skill files fails to move them; keep the
+        // dialog open and refresh it with the strays the backend named.
+        const files = parseMigrateStrays(result.message);
+        if (files.length > 0) {
+          setStrayTarget((current) =>
+            current
+              ? {
+                  ...current,
+                  files,
+                  dirPath: parseStrayDir(result.message) ?? current.dirPath,
+                }
+              : {
+                  // The dialog was already closed (e.g. a migrate from a direct
+                  // click); rebuild it from the backend message so the user can
+                  // clean up and retry.
+                  name: result.agent,
+                  display: result.display,
+                  skills: [],
+                  files,
+                  dirPath: parseStrayDir(result.message),
+                },
+          );
           return;
         }
       }
+      setStrayTarget(null);
       invalidate();
       setNotice(formatLinkMessage(result));
     },
@@ -255,21 +382,25 @@ export function AgentIconGrid() {
     onSuccess: (results) => {
       const result = results[0];
       if (result?.status === "refused") {
-        // Non-skill files block migration (it only moves skill dirs), so there
-        // is no point migrating yet: prompt the user to clear them by hand.
-        const target = buildStrayTarget(
-          result.agent,
-          result.display,
-          parseStrays(result.message, result.skills ?? []),
-          result.message,
-        );
-        if (target) {
+        // Strays block a plain link too; surface them in the dialog so the user
+        // can delete or migrate them instead of linking again blindly.
+        const skills = result.skills ?? [];
+        const files = parseStrays(result.message, skills);
+        const target = {
+          name: result.agent,
+          display: result.display,
+          skills,
+          files,
+          dirPath: parseStrayDir(result.message),
+        };
+        if (target.files.length > 0 || target.skills.length > 0) {
           setStrayTarget(target);
           return;
         }
         migrateMutation.mutate(result.agent);
         return;
       }
+      setStrayTarget(null);
       invalidate();
       setNotice(formatLinkMessage(result));
     },
@@ -279,6 +410,32 @@ export function AgentIconGrid() {
         kind: "error",
       }),
   });
+
+  /** 一键删除（hover tooltip）: remove the agent dir's strays, then refresh. */
+  const handleRemoveStrays = async (agent: AgentStatus) => {
+    const files = agent.internalFiles ?? [];
+    const dirPath = agent.dirPath;
+    if (files.length === 0 || !dirPath) {
+      setNotice({
+        text: "无法确定目录位置，请先手动处理这些文件",
+        kind: "error",
+      });
+      return;
+    }
+    try {
+      await removeAgentStrayFiles(dirPath, files);
+      invalidate();
+      setNotice({
+        text: `已删除 ${agent.display} 目录中的 ${files.length} 个文件`,
+        kind: "success",
+      });
+    } catch (err) {
+      setNotice({
+        text: `删除文件失败：${err instanceof Error ? err.message : String(err)}`,
+        kind: "error",
+      });
+    }
+  };
 
   const unlinkMutation = useMutation({
     mutationFn: (name: string) => unlinkAgent(name),
@@ -311,12 +468,14 @@ export function AgentIconGrid() {
       unlinkMutation.mutate(agent.name);
       return;
     }
-    const skillCount = agent.internalSkills?.length ?? 0;
-    if (skillCount > 0) {
-      migrateMutation.mutate(agent.name);
-    } else {
-      linkMutation.mutate(agent.name);
+    // A dir that already holds skills or strays opens the preview dialog so the
+    // user picks how to proceed; only an empty dir links directly.
+    const target = buildStrayTarget(agent);
+    if (target) {
+      setStrayTarget(target);
+      return;
     }
+    linkMutation.mutate(agent.name);
   };
 
   const list = agents ?? [];
@@ -378,6 +537,9 @@ export function AgentIconGrid() {
               agent={agent}
               busy={busyFor(agent.name)}
               onClick={() => handleClick(agent)}
+              onOpenDir={(path) => void openPathInSystem(path)}
+              onMigrate={() => migrateMutation.mutate(agent.name)}
+              onRemove={() => void handleRemoveStrays(agent)}
             />
           ))}
         </div>
@@ -385,7 +547,6 @@ export function AgentIconGrid() {
 
       <StrayFilesDialog
         target={strayTarget}
-        onOpenDir={(path) => void openPathInSystem(path)}
         onClose={() => setStrayTarget(null)}
       />
     </div>

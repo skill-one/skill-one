@@ -138,6 +138,8 @@ const mockAgentRows: Array<{
   linked: boolean;
   canonical: boolean;
   internalSkills?: string[];
+  internalFiles?: string[];
+  dirPath?: string | null;
 }> = [
   {
     name: "claude-code",
@@ -151,14 +153,18 @@ const mockAgentRows: Array<{
     display: "Cursor",
     linked: false,
     canonical: false,
-    // Carries skills in its own dir → card previews them and offers 迁移并链接.
+    // Carries skills and a stray file in its own dir → clicking the card opens
+    // the preview dialog offering 一键迁移 / 进入目录 / 一键删除.
     internalSkills: ["pdf", "docx"],
+    internalFiles: ["README.md"],
+    dirPath: "/Users/me/.cursor/skills",
   },
   {
     name: "gemini-cli",
     display: "Gemini CLI",
     linked: false,
     canonical: false,
+    // Empty dir → clicking links directly, no preview dialog.
     internalSkills: [],
   },
   {
@@ -177,6 +183,8 @@ function buildMockAgentStatus(): AgentStatus[] {
     linked: a.linked,
     canonical: a.canonical,
     internalSkills: a.internalSkills,
+    internalFiles: a.internalFiles,
+    dirPath: a.dirPath,
   }));
 }
 

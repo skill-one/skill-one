@@ -106,6 +106,13 @@ export interface AgentStatus {
    * move into the canonical dir, so the UI can preview them on the card.
    */
   internalSkills?: string[];
+  /**
+   * Non-directory entries (strays) inside the agent's own skills dir that a
+   * migrate cannot move. Only populated for unlinked, non-canonical agents.
+   */
+  internalFiles?: string[];
+  /** Absolute path to the agent's own skills dir; absent when unknown. */
+  dirPath?: string | null;
 }
 
 interface ManagerOptions {
@@ -259,4 +266,18 @@ export async function getLinkStatus(
     global: options.global,
     cwd: options.cwd,
   });
+}
+
+/**
+ * Remove stray non-skill files from an agent's skills dir (the one-click
+ * delete in the stray-files dialog). The backend only deletes plain files
+ * directly inside `dir`; anything outside it is rejected. Returns the names
+ * that were actually removed.
+ */
+export async function removeStrayFiles(
+  dir: string,
+  files: string[],
+): Promise<string[]> {
+  requireTauri();
+  return invoke<string[]>("remove_stray_files", { dir, files });
 }
