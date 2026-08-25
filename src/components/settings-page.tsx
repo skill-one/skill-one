@@ -35,7 +35,7 @@ export function SettingsPage() {
         配置技能数据的下载源（索引、SKILL.md 详情、安装统一生效）。
       </p>
       <p className="mt-0.5 text-[11px] text-muted-foreground/80">
-        Skill One v0.0.0
+        skillone v0.0.0
       </p>
 
       <div className="mt-6 flex flex-col gap-4">

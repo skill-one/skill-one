@@ -44,7 +44,7 @@ jobs:
         id: dmg
         shell: bash
         run: |
-          DMG=$(ls src-tauri/target/release/bundle/dmg/Skill\ One_*.dmg | head -n1)
+          DMG=$(ls src-tauri/target/release/bundle/dmg/skillone_*.dmg | head -n1)
           echo "path=${DMG}" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "${DMG}")" >> "$GITHUB_OUTPUT"
 
@@ -80,10 +80,10 @@ cask "skillone" do
   sha256 "${SHA256}"
 
   url "${DMG_URL}"
-  name "Skill One"
+  name "skillone"
   desc "Find, install and manage agent skills (Tauri v2 desktop app)"
-  homepage "https://github.com/skill-one/skill-one"
-  app "Skill One.app"
+  homepage "https://github.com/skill-one/skillone"
+  app "skillone.app"
 end
 RUBY
 

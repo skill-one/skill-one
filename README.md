@@ -1,4 +1,4 @@
-# Skill One
+# skillone
 
 一个用于查找、安装和管理 agent skills 的桌面应用。基于 Tauri v2 构建，前端使用 React + shadcn/ui，后端由 Rust（`agents-skills` 库）提供技能安装与 agent 链接能力。
 
@@ -13,14 +13,14 @@
 
 ## 技术栈
 
-| 层 | 技术 |
-| --- | --- |
-| 桌面运行时 | [Tauri v2](https://v2.tauri.app/) + Rust |
-| UI | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/)（Radix UI + Tailwind CSS） |
-| 路由 | [react-router-dom v7](https://reactrouter.com/)（HashRouter） |
-| 数据请求 | [TanStack Query v5](https://tanstack.com/query)（持久化到 localStorage） |
-| 构建 | [Vite 5](https://vitejs.dev/) + TypeScript 5.7 |
-| 测试 | [Vitest 2](https://vitest.dev/) + Testing Library |
+| 层         | 技术                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------- |
+| 桌面运行时 | [Tauri v2](https://v2.tauri.app/) + Rust                                                        |
+| UI         | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/)（Radix UI + Tailwind CSS） |
+| 路由       | [react-router-dom v7](https://reactrouter.com/)（HashRouter）                                   |
+| 数据请求   | [TanStack Query v5](https://tanstack.com/query)（持久化到 localStorage）                        |
+| 构建       | [Vite 5](https://vitejs.dev/) + TypeScript 5.7                                                  |
+| 测试       | [Vitest 2](https://vitest.dev/) + Testing Library                                               |
 
 ## 环境要求
 
@@ -51,14 +51,14 @@ npm run tauri build
 
 ## 常用脚本
 
-| 命令 | 说明 |
-| --- | --- |
-| `npm run dev` | 启动 Vite 开发服务器（端口 5173） |
-| `npm run build` | 类型检查 + 前端构建 |
-| `npm run preview` | 预览构建产物 |
-| `npm run tauri dev` | 启动桌面应用（开发模式） |
-| `npm run tauri build` | 打包桌面应用 |
-| `npm run test` / `test:run` / `test:coverage` | 运行 / 单次运行 / 覆盖率测试 |
+| 命令                                          | 说明                              |
+| --------------------------------------------- | --------------------------------- |
+| `npm run dev`                                 | 启动 Vite 开发服务器（端口 5173） |
+| `npm run build`                               | 类型检查 + 前端构建               |
+| `npm run preview`                             | 预览构建产物                      |
+| `npm run tauri dev`                           | 启动桌面应用（开发模式）          |
+| `npm run tauri build`                         | 打包桌面应用                      |
+| `npm run test` / `test:run` / `test:coverage` | 运行 / 单次运行 / 覆盖率测试      |
 
 ## 项目结构
 
@@ -101,18 +101,18 @@ skill-one/
 ### Homebrew（macOS, Apple Silicon）
 
 ```bash
-brew install --cask skill-one/skill-one/skill-one
+brew install --cask skill-one/tap/skillone
 ```
 
 或先添加 tap 再安装：
 
 ```bash
-brew tap skill-one/skill-one
-brew install --cask skill-one
+brew tap skill-one/homebrew-tap
+brew install --cask skillone
 ```
 
-每次发布新版本（打 `v*` tag）时，GitHub Actions 会自动构建 `.dmg` 并发布 cask 到 [`skill-one/homebrew-skill-one`](https://github.com/skill-one/homebrew-skill-one) tap 仓库。
+每次发布新版本（打 `v*` tag）时，GitHub Actions 会自动构建 `.dmg` 并发布 cask 到 [`skill-one/homebrew-tap`](https://github.com/skill-one/homebrew-tap) tap 仓库。
 
 ### 手动下载
 
-从 [Releases](https://github.com/skill-one/skill-one/releases) 页面下载对应平台的安装包（`.dmg` / `.msi`）。
+从 [Releases](https://github.com/skill-one/skillone/releases) 页面下载对应平台的安装包（`.dmg` / `.msi`）。

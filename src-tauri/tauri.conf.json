@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Skill One",
+  "productName": "skillone",
   "version": "0.1.0",
   "identifier": "com.skillone.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Skill One",
+        "title": "skillone",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "width": 1080,
