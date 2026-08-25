@@ -62,7 +62,7 @@ jobs:
         shell: bash
         env:
           TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
-          TAP_REPO: skill-one/homebrew-skill-one
+          TAP_REPO: skill-one/homebrew-tap
         run: |
           VERSION="$(node --eval 'process.stdout.write(require("./package.json").version)')"
           TAG="v${VERSION}"
@@ -74,8 +74,8 @@ jobs:
           git clone "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPO}.git" "$TMP"
           cd "$TMP"
 
-          cat > skill-one.rb <<RUBY
-cask "skill-one" do
+          cat > skillone.rb <<RUBY
+cask "skillone" do
   version "${VERSION}"
   sha256 "${SHA256}"
 
@@ -89,6 +89,6 @@ RUBY
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add skill-one.rb
-          git commit -m "skill-one ${VERSION}" || echo "no changes"
+          git add skillone.rb
+          git commit -m "skillone ${VERSION}" || echo "no changes"
           git push origin main
