@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { classifySkills, parseStrays } from "./link-migration";
+import {
+  classifySkills,
+  parseMigrateStrays,
+  parseStrayDir,
+  parseStrays,
+} from "./link-migration";
 
 // The reason strings below are the four shapes produced by `link_agent` in the
 // `agents-skills` crate, reproduced verbatim apart from the paths.
@@ -42,6 +47,46 @@ describe("parseStrays", () => {
   it("ignores an unrecognised reason", () => {
     expect(parseStrays("something else entirely", ["pdf"])).toEqual([]);
     expect(parseStrays("something else entirely", [])).toEqual([]);
+  });
+});
+
+describe("parseStrayDir", () => {
+  it("reads the path from a strays-only refusal", () => {
+    const message = `${AGENT_DIR} contains non-skill files; move them out and rerun (migrate only moves skill directories): README.md`;
+    expect(parseStrayDir(message)).toBe(AGENT_DIR);
+  });
+
+  it("reads the path from a skills-and-strays refusal", () => {
+    const message = `${AGENT_DIR} has existing skills and non-skill files; remove the files (README.md), then rerun with --migrate`;
+    expect(parseStrayDir(message)).toBe(AGENT_DIR);
+  });
+
+  it("reads the path from a migrate error", () => {
+    const message = `cannot migrate ${AGENT_DIR}: non-skill entries: README.md, notes.txt`;
+    expect(parseStrayDir(message)).toBe(AGENT_DIR);
+  });
+
+  it("returns null for messages without a path", () => {
+    expect(parseStrayDir("symlink /x -> /y: permission denied")).toBeNull();
+    expect(parseStrayDir(null)).toBeNull();
+    expect(parseStrayDir(undefined)).toBeNull();
+  });
+});
+
+describe("parseMigrateStrays", () => {
+  it("reads the files a migrate refusal reports", () => {
+    const error = `cannot migrate ${AGENT_DIR}: non-skill entries: README.md, notes.txt`;
+    expect(parseMigrateStrays(error)).toEqual(["README.md", "notes.txt"]);
+  });
+
+  it("handles a single stray", () => {
+    const error = `cannot migrate ${AGENT_DIR}: non-skill entries: README.txt`;
+    expect(parseMigrateStrays(error)).toEqual(["README.txt"]);
+  });
+
+  it("ignores errors that do not name non-skill entries", () => {
+    expect(parseMigrateStrays("move /x/y: permission denied")).toEqual([]);
+    expect(parseMigrateStrays(null)).toEqual([]);
   });
 });
 

@@ -57,6 +57,49 @@ export function parseStrays(
   return splitNames(message.slice(marker + STRAYS_ONLY_MARKER.length));
 }
 
+/**
+ * Non-skill files named in the error a `--migrate` link returns. Migration
+ * refuses every stray (it only moves skill directories) and reports them after
+ * `non-skill entries: `. Returns an empty array when none are named.
+ */
+const MIGRATE_STRAYS_MARKER = "non-skill entries: ";
+
+export function parseMigrateStrays(
+  error: string | null | undefined,
+): string[] {
+  if (!error) return [];
+  const idx = error.indexOf(MIGRATE_STRAYS_MARKER);
+  if (idx === -1) return [];
+  return splitNames(error.slice(idx + MIGRATE_STRAYS_MARKER.length));
+}
+
+/**
+ * Agent skills-dir path embedded in a refusal reason or a `--migrate` error.
+ *
+ * The backend always prefixes those messages with the affected dir (`<dir>
+ * contains non-skill files…`, `<dir> has existing skills…`, or `cannot migrate
+ * <dir>: non-skill entries: …`), so the path can be read back for "open this
+ * directory" without a dedicated field. Returns `null` when no path is present.
+ */
+const REFUSE_MARKERS = [" contains non-skill files", " has existing skills"];
+const MIGRATE_ERROR_PREFIX = "cannot migrate ";
+
+export function parseStrayDir(
+  message: string | null | undefined,
+): string | null {
+  if (!message) return null;
+  for (const marker of REFUSE_MARKERS) {
+    const i = message.indexOf(marker);
+    if (i !== -1) return message.slice(0, i);
+  }
+  if (message.startsWith(MIGRATE_ERROR_PREFIX)) {
+    const rest = message.slice(MIGRATE_ERROR_PREFIX.length);
+    const end = rest.indexOf(": non-skill");
+    if (end !== -1) return rest.slice(0, end);
+  }
+  return null;
+}
+
 /** A skill awaiting migration, plus whether the backend will skip it. */
 export interface MigrationSkill {
   name: string;

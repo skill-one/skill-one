@@ -10,9 +10,16 @@ import {
 } from "lucide-react";
 
 import { fetchAgentStatus, linkAgent, unlinkAgent } from "../lib/local-skills";
+import {
+  parseMigrateStrays,
+  parseStrayDir,
+  parseStrays,
+} from "../lib/link-migration";
+import { openPathInSystem } from "../lib/open-external";
 import type { AgentLinkResult, AgentStatus } from "../lib/skills-manager";
 import { cn } from "../lib/utils";
 import { AgentIcon } from "./agent-icon";
+import { StrayFilesDialog, type StrayFilesTarget } from "./stray-files-dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -190,6 +197,7 @@ function AgentIconButton({
 
 export function AgentIconGrid() {
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [strayTarget, setStrayTarget] = useState<StrayFilesTarget | null>(null);
   const queryClient = useQueryClient();
 
   const {
@@ -208,17 +216,38 @@ export function AgentIconGrid() {
     queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
   };
 
+  /** Build the stray-files warning for an agent, or `null` when none are named. */
+  const buildStrayTarget = (
+    name: string,
+    display: string,
+    files: string[],
+    message: string | null | undefined,
+  ): StrayFilesTarget | null => {
+    if (files.length === 0) return null;
+    return { name, display, files, dirPath: parseStrayDir(message) };
+  };
+
   const migrateMutation = useMutation({
     mutationFn: (name: string) => linkAgent(name, { migrate: true }),
     onSuccess: (results) => {
+      const result = results[0];
+      // A migrate of a dir with non-skill files fails to move them; surface a
+      // dialog that guides the user to remove them by hand instead of a toast.
+      if (result?.status === "failed") {
+        const target = buildStrayTarget(
+          result.agent,
+          result.display,
+          parseMigrateStrays(result.message),
+          result.message,
+        );
+        if (target) {
+          setStrayTarget(target);
+          return;
+        }
+      }
       invalidate();
-      setNotice(formatLinkMessage(results[0]));
+      setNotice(formatLinkMessage(result));
     },
-    onError: (err) =>
-      setNotice({
-        text: `迁移失败：${err instanceof Error ? err.message : String(err)}`,
-        kind: "error",
-      }),
   });
 
   const linkMutation = useMutation({
@@ -226,6 +255,18 @@ export function AgentIconGrid() {
     onSuccess: (results) => {
       const result = results[0];
       if (result?.status === "refused") {
+        // Non-skill files block migration (it only moves skill dirs), so there
+        // is no point migrating yet: prompt the user to clear them by hand.
+        const target = buildStrayTarget(
+          result.agent,
+          result.display,
+          parseStrays(result.message, result.skills ?? []),
+          result.message,
+        );
+        if (target) {
+          setStrayTarget(target);
+          return;
+        }
         migrateMutation.mutate(result.agent);
         return;
       }
@@ -341,6 +382,12 @@ export function AgentIconGrid() {
           ))}
         </div>
       )}
+
+      <StrayFilesDialog
+        target={strayTarget}
+        onOpenDir={(path) => void openPathInSystem(path)}
+        onClose={() => setStrayTarget(null)}
+      />
     </div>
   );
 }
