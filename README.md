@@ -2,6 +2,8 @@
 
 一个用于查找、安装和管理 agent skills 的桌面应用。基于 Tauri v2 构建，前端使用 React + shadcn/ui，后端由 Rust（`agents-skills` 库）提供技能安装与 agent 链接能力。
 
+> 由 **skill-one** 组织维护：<https://github.com/skill-one>
+
 ## 功能
 
 - **商店 / 探索**：浏览 skills 注册表，查看每个 skill 的说明（`SKILL.md`）并一键安装。
@@ -93,3 +95,24 @@ skill-one/
 ## 测试
 
 测试使用 Vitest + Testing Library，运行在 `jsdom` 环境。组件测试与 `src/lib` 下的单元测试均遵循「一个文件对应一个 `*.test.ts(x)`」的约定，可通过 `npm run test:run` 一键运行。
+
+## 安装
+
+### Homebrew（macOS, Apple Silicon）
+
+```bash
+brew install --cask skill-one/skill-one/skill-one
+```
+
+或先添加 tap 再安装：
+
+```bash
+brew tap skill-one/skill-one
+brew install --cask skill-one
+```
+
+每次发布新版本（打 `v*` tag）时，GitHub Actions 会自动构建 `.dmg` 并发布 cask 到 [`skill-one/homebrew-skill-one`](https://github.com/skill-one/homebrew-skill-one) tap 仓库。
+
+### 手动下载
+
+从 [Releases](https://github.com/skill-one/skill-one/releases) 页面下载对应平台的安装包（`.dmg` / `.msi`）。
