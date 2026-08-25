@@ -40,6 +40,14 @@ jobs:
         shell: bash
         run: echo "version=$(node --eval 'process.stdout.write(require("./package.json").version)')" >> "$GITHUB_OUTPUT"
 
+      - name: Locate DMG
+        id: dmg
+        shell: bash
+        run: |
+          DMG=$(ls src-tauri/target/release/bundle/dmg/Skill\ One_*.dmg | head -n1)
+          echo "path=${DMG}" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "${DMG}")" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         shell: bash
         env:
@@ -47,6 +55,40 @@ jobs:
         run: |
           VERSION="$(node --eval 'process.stdout.write(require("./package.json").version)')"
           TAG="v${VERSION}"
-          DMG="src-tauri/target/release/bundle/dmg/Skillone_${VERSION}_aarch64.dmg"
           gh release create "${TAG}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --generate-notes
-          gh release upload "${TAG}" "${DMG}" --repo "$GITHUB_REPOSITORY"
+          gh release upload "${TAG}" "${{ steps.dmg.outputs.path }}" --repo "$GITHUB_REPOSITORY"
+
+      - name: Publish Homebrew Cask
+        shell: bash
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          TAP_REPO: skill-one/homebrew-skill-one
+        run: |
+          VERSION="$(node --eval 'process.stdout.write(require("./package.json").version)')"
+          TAG="v${VERSION}"
+          DMG_NAME="${{ steps.dmg.outputs.name }}"
+          DMG_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${DMG_NAME}"
+          SHA256=$(shasum -a 256 "${{ steps.dmg.outputs.path }}" | awk '{print $1}')
+
+          TMP=$(mktemp -d)
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/${TAP_REPO}.git" "$TMP"
+          cd "$TMP"
+
+          cat > skill-one.rb <<RUBY
+cask "skill-one" do
+  version "${VERSION}"
+  sha256 "${SHA256}"
+
+  url "${DMG_URL}"
+  name "Skill One"
+  desc "Find, install and manage agent skills (Tauri v2 desktop app)"
+  homepage "https://github.com/skill-one/skill-one"
+  app "Skill One.app"
+end
+RUBY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add skill-one.rb
+          git commit -m "skill-one ${VERSION}" || echo "no changes"
+          git push origin main
