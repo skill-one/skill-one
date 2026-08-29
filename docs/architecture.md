@@ -1,75 +1,77 @@
-# 架构说明
+# Architecture
 
-## 概览
+[English](architecture.md) | [简体中文](zh-CN/architecture.md)
 
-Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数据读取，后端（Rust）负责所有会修改本地文件系统的操作。
+## Overview
+
+Skill One is a Tauri v2 desktop app. The frontend (React) handles rendering and data reads; the backend (Rust) handles every operation that modifies the local filesystem.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     React 前端 (WebView)                  │
+│                   React frontend (WebView)              │
 │  components / hooks / lib                               │
-│   ├── 读取: skills-api.ts, skill-detail-api.ts           │
-│   │         └─ cdn-config.ts (直连 GitHub / CDN 镜像)    │
-│   ├── 写入: local-skills.ts ──► skills-manager.ts        │
-│   │                             └─ invoke (Tauri IPC)    │
-│   └── 兜底: mock-local.ts (浏览器模式内存数据)            │
+│   ├── Read: skills-api.ts, skill-detail-api.ts          │
+│   │         └─ cdn-config.ts (direct GitHub / CDN)      │
+│   ├── Write: local-skills.ts ──► skills-manager.ts      │
+│   │                             └─ invoke (Tauri IPC)   │
+│   └── Fallback: mock-local.ts (in-memory, browser mode) │
 └──────────────────────────┬──────────────────────────────┘
                            │ Tauri IPC
 ┌──────────────────────────▼──────────────────────────────┐
-│                    Rust 后端 (src-tauri)                 │
-│   skills.rs: install / list / remove / update / link     │
-│   └─ agents-skills 库 (crates.io 依赖)                  │
+│                   Rust backend (src-tauri)              │
+│   skills.rs: install / list / remove / update / link    │
+│   └─ agents-skills library (crates.io dependency)       │
 └─────────────────────────────────────────────────────────┘
 ```
 
-## 职责划分
+## Division of Responsibilities
 
-### 前端（读取）
+### Frontend (reads)
 
-- **`src/lib/skills-api.ts`**：拉取并解析 skills 注册表索引（JSONL），按页返回技能列表。
-- **`src/lib/skill-detail-api.ts`**：按需拉取单个 skill 的 `SKILL.md`，解析 frontmatter 与正文。
-- **`src/lib/cdn-config.ts`**：管理下载源。默认直连 `raw.githubusercontent.com`，失败后回退到 CDN 镜像（`cdn.jsdmirror.com`），并支持用户在「设置」中配置自定义 CDN。候选地址按优先级依次尝试，配置持久化到 localStorage。
+- **`src/lib/skills-api.ts`**: Fetches and parses the skills registry index (JSONL) and returns paginated skill lists.
+- **`src/lib/skill-detail-api.ts`**: Fetches a single skill's `SKILL.md` on demand and parses its frontmatter and body.
+- **`src/lib/cdn-config.ts`**: Manages download sources. Defaults to direct `raw.githubusercontent.com` access, falls back to a CDN mirror (`cdn.jsdmirror.com`) on failure, and lets users configure a custom CDN in "Settings". Candidate URLs are tried in priority order, and the configuration is persisted to localStorage.
 
-读取数据通过 TanStack Query 统一缓存与持久化（`staleTime` 10 分钟、`gcTime` 无限），重启后可先从缓存渲染再后台刷新。每个候选请求带 10 秒超时，避免源站挂起时无 CDN 回退。持久化会排除全量索引（`skills-index`）查询——解析后的索引体积超出 WebView localStorage 配额，且每次会话都会重新拉取；只有探索页、已安装列表、agent 状态等小体量查询会落盘。
+Read data is cached and persisted uniformly through TanStack Query (`staleTime` 10 minutes, `gcTime` infinite), so after a restart the app can render from cache first and refresh in the background. Each candidate request has a 10-second timeout to avoid hanging on the origin when no CDN fallback is available. Persistence excludes the full-index (`skills-index`) query — the parsed index is too large for the WebView localStorage quota and is re-fetched every session; only small queries such as the explore page, the installed list, and agent status are written to disk.
 
-### 后端（写入）
+### Backend (writes)
 
-- **`src-tauri/src/skills.rs`**：暴露 9 个 Tauri 命令（`install_skill`、`list_installed_skills`、`remove_skills`、`update_skills`、`disable_skills`、`enable_skills`、`link_agents`、`link_status`、`remove_stray_files`），全部通过 `spawn_blocking` 将阻塞操作（git clone、install、link 等）移出主线程。此外 `lib.rs` 另有一个 `open_directory` 命令（在系统文件管理器中打开目录，不经 `agents-skills`）。
-- 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。
+- **`src-tauri/src/skills.rs`**: Exposes 9 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `update_skills`, `disable_skills`, `enable_skills`, `link_agents`, `link_status`, `remove_stray_files`), all of which use `spawn_blocking` to move blocking operations (git clone, install, link, etc.) off the main thread. In addition, `lib.rs` provides one more command, `open_directory` (opens a directory in the system file manager, bypassing `agents-skills`).
+- Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend.
 
-### 前端写入封装
+### Frontend write wrapper
 
-- **`src/lib/skills-manager.ts`**：对 Tauri 命令的类型化封装（`invoke`）。
-- **`src/lib/local-skills.ts`**：面向 UI 的数据访问层，统一处理「Tauri 后端 / 浏览器 mock」两套实现，对组件透明。
+- **`src/lib/skills-manager.ts`**: Typed wrapper (`invoke`) around the Tauri commands.
+- **`src/lib/local-skills.ts`**: UI-facing data-access layer that uniformly handles the two implementations — "Tauri backend / browser mock" — transparently to components.
 
-### 浏览器兜底
+### Browser fallback
 
-当应用不在 Tauri 环境（如 `pnpm dev` 或 Vitest 测试）时，`isTauri()` 返回 `false`，`local-skills.ts` 会回退到 `mock-local.ts` 的内存数据，使 UI 与交互流程无需原生环境即可完整预览。
+When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest tests), `isTauri()` returns `false` and `local-skills.ts` falls back to the in-memory data in `mock-local.ts`, so the UI and interaction flows can be fully previewed without a native environment.
 
-## 关键文件
+## Key Files
 
-| 文件 | 职责 |
+| File | Responsibility |
 | --- | --- |
-| `src/App.tsx` | 路由、布局、TanStack Query Provider 与缓存持久化 |
-| `src/components/app-sidebar.tsx` | 侧边栏导航（路由与标题共用同一份配置） |
-| `src/lib/tauri.ts` | 判断是否运行在 Tauri WebView 中 |
-| `src/lib/open-external.ts` | 在系统浏览器中打开外链（Tauri 需 opener 插件） |
-| `src-tauri/tauri.conf.json` | 窗口、构建与打包配置 |
-| `src-tauri/capabilities/default.json` | 权限声明（`core:default`、`opener:default`、窗口标题） |
+| `src/App.tsx` | Routing, layout, TanStack Query provider, and cache persistence |
+| `src/components/app-sidebar.tsx` | Sidebar navigation (routes and titles share one config) |
+| `src/lib/tauri.ts` | Detects whether the app runs inside the Tauri WebView |
+| `src/lib/open-external.ts` | Opens external links in the system browser (Tauri needs the opener plugin) |
+| `src-tauri/tauri.conf.json` | Window, build, and packaging configuration |
+| `src-tauri/capabilities/default.json` | Permission declarations (`core:default`, `opener:default`, window title) |
 
-## 数据流示例
+## Data Flow Examples
 
-**安装一个 skill**：
+**Installing a skill**:
 
-1. 用户在探索页点击「安装」。
-2. `local-skills.installSkillFromSource(repo, name)` 判断环境。
-3. Tauri 环境 → `skills-manager.installSkill` → `invoke("install_skill", ...)` → Rust `install_skill` 命令 → `agents-skills::Manager.add`。
-4. 完成后前端刷新 `installed-skills` 查询缓存。
-5. 浏览器环境 → 写入 `mock-local.installMockSkill`。
+1. The user clicks "Install" on the explore page.
+2. `local-skills.installSkillFromSource(repo, name)` checks the environment.
+3. Tauri environment → `skills-manager.installSkill` → `invoke("install_skill", ...)` → Rust `install_skill` command → `agents-skills::Manager.add`.
+4. When finished, the frontend refreshes the `installed-skills` query cache.
+5. Browser environment → writes via `mock-local.installMockSkill`.
 
-**探索技能列表**：
+**Browsing the skill list**:
 
-1. `explore-page` 通过 `fetchSkillsPage(page)` 请求数据。
-2. `skills-api.ts` 首次拉取完整索引（按会话缓存），本地切片分页。
-3. `cdn-config.ts` 依序尝试直连 GitHub 与 CDN 镜像。
-4. TanStack Query 缓存结果并持久化，翻页与重启后优先命中缓存。
+1. `explore-page` requests data via `fetchSkillsPage(page)`.
+2. `skills-api.ts` fetches the full index once (cached per session) and paginates locally.
+3. `cdn-config.ts` tries direct GitHub access and CDN mirrors in order.
+4. TanStack Query caches and persists the result; paging and restarts hit the cache first.

@@ -1,45 +1,47 @@
 # skillone
 
-一个用于查找、安装和管理 agent skills 的桌面应用。基于 Tauri v2 构建，前端使用 React + shadcn/ui，后端由 Rust（`agents-skills` 库）提供技能安装与 agent 链接能力。
+[English](README.md) | [简体中文](docs/zh-CN/README.md)
 
-> 由 **skill-one** 组织维护：<https://github.com/skill-one>
+A desktop app for finding, installing, and managing agent skills. Built on Tauri v2 with a React + shadcn/ui frontend; the Rust backend (the `agents-skills` library) provides skill installation and agent-linking capabilities.
 
-## 功能
+> Maintained by the **skill-one** organization: <https://github.com/skill-one>
 
-- **商店 / 探索**：浏览 skills 注册表，查看每个 skill 的说明（`SKILL.md`）并一键安装。
-- **我的 Skills**：查看、更新与卸载已安装的技能。
-- **Agent 链接**：将各类 agent（Claude Code、Cursor、Gemini CLI 等）的技能目录链接到统一目录，支持迁移已有技能。
-- **设置**：可配置注册表文件的下载源（直连 GitHub 或 CDN 镜像）。
+## Features
 
-## 安装
+- **Store / Explore**: Browse the skills registry, view each skill's description (`SKILL.md`), and install with one click.
+- **My Skills**: View, update, and uninstall installed skills.
+- **Agent Linking**: Link the skill directories of various agents (Claude Code, Cursor, Gemini CLI, etc.) to a unified directory, with support for migrating existing skills.
+- **Settings**: Configure the download source for registry files (direct GitHub or a CDN mirror).
 
-### Homebrew（macOS, Apple Silicon）
+## Installation
+
+### Homebrew (macOS, Apple Silicon)
 
 ```bash
 brew install --cask skill-one/tap/skillone
 ```
 
-更新：
+To update:
 
 ```bash
 brew update && brew upgrade --cask skillone
 ```
 
-每次发布新版本（打 `v*` tag）时，GitHub Actions 会自动构建 `.dmg` 并发布 cask 到 [`skill-one/homebrew-tap`](https://github.com/skill-one/homebrew-tap) tap 仓库。
+Whenever a new version is released (a `v*` tag is pushed), GitHub Actions automatically builds the `.dmg` and publishes the cask to the [`skill-one/homebrew-tap`](https://github.com/skill-one/homebrew-tap) tap repository.
 
-### 手动下载
+### Manual download
 
-从 [Releases](https://github.com/skill-one/skillone/releases) 页面下载对应平台的安装包（`.dmg` / `.msi`）。
+Download the installer for your platform (`.dmg` / `.msi`) from the [Releases](https://github.com/skill-one/skillone/releases) page.
 
-## 使用
+## Usage
 
-启动应用后，通过左侧导航在以下页面间切换：
+After launching the app, use the left sidebar to switch between the following pages:
 
-1. **商店 / 探索**：浏览并安装 skills。
-2. **我的 Skills**：更新或卸载已安装技能。
-3. **Agent 链接**：管理各 agent 的技能目录链接与迁移。
-4. **设置**：切换注册表下载源（直连 GitHub 或 CDN 镜像）。
+1. **Store / Explore**: Browse and install skills.
+2. **My Skills**: Update or uninstall installed skills.
+3. **Agent Linking**: Manage skill-directory links and migration for each agent.
+4. **Settings**: Switch the registry download source (direct GitHub or a CDN mirror).
 
-## 开发
+## Development
 
-面向开发者的构建、架构与测试说明见 [docs/development.md](docs/development.md)。
+For developer-facing build, architecture, and testing docs, see [docs/development.md](docs/development.md).

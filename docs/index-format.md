@@ -1,10 +1,13 @@
-# 注册表索引（index.jsonl）
+# Registry index (index.jsonl)
 
-商店内容来自 [skill-one/skills-index](https://github.com/skill-one/skills-index) 发布的 `index.jsonl`（JSONL 格式，发布在 `dist` 分支，每行一个技能）。
+[English](index-format.md) | [简体中文](zh-CN/index-format.md)
 
-## 格式
+The store content comes from the `index.jsonl` published by
+[skill-one/skills-index](https://github.com/skill-one/skills-index) (JSONL format, published on the `dist` branch, one skill per line).
 
-每行一个 JSON 对象：
+## Format
+
+One JSON object per line:
 
 ```json
 {
@@ -17,24 +20,24 @@
 }
 ```
 
-| 字段              | 类型       | 说明                                                        |
-| ----------------- | ---------- | ----------------------------------------------------------- |
-| `source`          | `string`   | 源仓库，`owner/repo` 形式                                   |
-| `skillId`         | `string`   | 技能标识，同时作为技能名（无单独 `name` 字段）              |
-| `installs`        | `number`   | 总安装量                                                    |
-| `weeklyInstalls`  | `number[]` | 近几周安装量                                                |
-| `path`            | `string`   | 技能在仓库内的相对目录（用于拼 `SKILL.md` 地址）            |
-| `description`     | `string`   | 技能说明（可选，缺失时为空）                                |
+| Field             | Type       | Description                                                  |
+| ----------------- | ---------- | ------------------------------------------------------------ |
+| `source`          | `string`   | Source repository, in `owner/repo` form                      |
+| `skillId`         | `string`   | Skill identifier; also used as the skill name (no separate `name` field) |
+| `installs`        | `number`   | Total installs                                               |
+| `weeklyInstalls`  | `number[]` | Installs over recent weeks                                   |
+| `path`            | `string`   | Skill's directory relative to the repo root (used to build the `SKILL.md` URL) |
+| `description`     | `string`   | Skill description (optional, empty when missing)             |
 
-> `source` / `skillId` / `installs` / `weeklyInstalls` 来自 skills.sh；`path` / `description` 由仓库扫描得到。
+> `source` / `skillId` / `installs` / `weeklyInstalls` come from skills.sh; `path` / `description` are obtained by scanning the repositories.
 
-## 当前使用方式
+## How it is used today
 
-见 [src/lib/skills-api.ts](../src/lib/skills-api.ts)：
+See [src/lib/skills-api.ts](../src/lib/skills-api.ts):
 
-- `INDEX_SPEC` 指定 `repo` / `path: "index.jsonl"` / `ref: "dist"`。
-- 通过可配置下载源拉取（直连 GitHub raw 或 CDN 镜像），见 [src/lib/cdn-config.ts](../src/lib/cdn-config.ts)。
-- 解析后过滤掉非 GitHub 仓库（`source` 含 `.` 视为域名），映射为 `Skill` 模型：`name = name ?? skillId`、`stars = installs`。
-- 整份索引按会话缓存一次，本地切片分页（默认 200/页），缓存与刷新交由 TanStack Query 管理。
+- `INDEX_SPEC` specifies `repo` / `path: "index.jsonl"` / `ref: "dist"`.
+- The index is fetched through the configurable download source (direct GitHub raw or a CDN mirror); see [src/lib/cdn-config.ts](../src/lib/cdn-config.ts).
+- After parsing, non-GitHub repositories are filtered out (a `source` containing `.` is treated as a domain) and entries are mapped to the `Skill` model: `name = name ?? skillId`, `stars = installs`.
+- The full index is cached once per session and paginated locally (200 per page by default); caching and refreshing are handled by TanStack Query.
 
-技能详情 `SKILL.md` 由 `source + path` 单独拉取，见 [src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。
+A skill's `SKILL.md` is fetched separately from `source + path`; see [src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts).
