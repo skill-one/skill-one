@@ -10,6 +10,7 @@ use agents_skills::{
     RemoveRequest, Scope, UpdateRequest,
 };
 use agents_skills::core::agents::{agent_skills_dir, get_agent};
+use agents_skills::core::discover::parse_skill_md_inner;
 
 /// Build a `Manager` targeting `cwd` (empty/`None` = the process's own cwd).
 ///
@@ -140,41 +141,18 @@ pub struct ListedSkillDto {
 
 /// Read a skill's SKILL.md on disk and return its frontmatter `description`.
 /// The backend's `list` does not expose descriptions, so they are extracted
-/// here for the UI. Handles single-line values, quoted values, and YAML block
-/// scalars (`description: |` / `description: >`). `None` when the file is
-/// unreadable or the frontmatter has no description.
+/// here for the UI — via the library's own frontmatter parser, so quoted and
+/// block-scalar values are handled exactly like the rest of `agents-skills`.
+/// Block scalars are folded to a single line (the old UI contract), and the
+/// result is `None` when the file is unreadable, the frontmatter lacks a
+/// `name`/`description`, or a UTF-8 BOM precedes the `---` fence (the
+/// library's parser does not strip one).
 fn extract_description(skill_dir: &std::path::Path) -> Option<String> {
-    let raw = std::fs::read_to_string(skill_dir.join("SKILL.md")).ok()?;
-    let content = raw.strip_prefix('\u{feff}').unwrap_or(&raw);
-    let frontmatter = content.strip_prefix("---")?.split_once("\n---")?.0;
-    let mut lines = frontmatter.lines();
-    while let Some(line) = lines.next() {
-        let Some(rest) = line.trim_start().strip_prefix("description:") else {
-            continue;
-        };
-        let value = rest.trim().trim_matches(['"', '\'']).trim();
-        // Block scalars (`|` / `>`) are markers, not the description itself.
-        if !value.is_empty() && value != "|" && value != ">" {
-            return Some(value.to_string());
-        }
-        // Empty value or a block scalar (`|` / `>`): fold the following
-        // indented lines into a single line.
-        let mut block: Vec<&str> = Vec::new();
-        for next in lines.by_ref() {
-            if next.trim().is_empty() {
-                continue;
-            }
-            if !next.starts_with(' ') && !next.starts_with('\t') {
-                break;
-            }
-            block.push(next.trim().trim_matches(['"', '\'']).trim());
-        }
-        let folded = block.join(" ");
-        if !folded.is_empty() {
-            return Some(folded);
-        }
-    }
-    None
+    // `include_internal = true`: internal skills are still listed, so their
+    // descriptions must be too — only the parser's gating is bypassed here.
+    let skill = parse_skill_md_inner(&skill_dir.join("SKILL.md"), true)?;
+    let folded = skill.description.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!folded.is_empty()).then(|| folded)
 }
 
 #[cfg(test)]
@@ -197,17 +175,28 @@ mod tests {
 
     #[test]
     fn extracts_quoted_description() {
-        let dir = skill_dir_with("---\ndescription: \"a quoted description\"\n---\n");
+        let dir = skill_dir_with("---\nname: pdf\ndescription: \"a quoted description\"\n---\n");
         assert_eq!(extract_description(dir.path()).as_deref(), Some("a quoted description"));
     }
 
     #[test]
     fn folds_block_scalar_description() {
-        let dir = skill_dir_with("---\ndescription: |\n  第一行描述\n  第二行描述\n---\n");
+        let dir = skill_dir_with(
+            "---\nname: pdf\ndescription: |\n  第一行描述\n  第二行描述\n---\n",
+        );
         assert_eq!(
             extract_description(dir.path()).as_deref(),
             Some("第一行描述 第二行描述")
         );
+    }
+
+    #[test]
+    fn missing_name_field_yields_none() {
+        // The library's parser requires a `name` alongside `description`
+        // (both are mandatory in the agents skill format), so a frontmatter
+        // with only a description shows no description in the UI.
+        let dir = skill_dir_with("---\ndescription: \"no name here\"\n---\n");
+        assert_eq!(extract_description(dir.path()), None);
     }
 
     #[test]
@@ -633,7 +622,7 @@ fn remove_strays(base: &std::path::Path, files: &[String]) -> Result<Vec<String>
     let mut removed = Vec::new();
     for name in files {
         let Ok(canon) = base.join(name).canonicalize() else {
-            continue; // 已不存在 → 视为已删除
+            continue; // already gone → treat as removed
         };
         if !canon.starts_with(&base_canon) {
             return Err(format!("拒绝删除目录外的文件: {name}"));
