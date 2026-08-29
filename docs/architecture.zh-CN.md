@@ -1,6 +1,6 @@
 # 架构说明
 
-[English](../architecture.md) | [简体中文](architecture.md)
+[English](architecture.md) | [简体中文](architecture.zh-CN.md)
 
 ## 概览
 

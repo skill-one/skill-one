@@ -1,6 +1,6 @@
 # agents-skills 接口使用
 
-[English](../agents-skills-api.md) | [简体中文](agents-skills-api.md)
+[English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
 本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.7 的
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/struct.Manager.html)

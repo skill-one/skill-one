@@ -1,6 +1,6 @@
 # Development
 
-[English](development.md) | [简体中文](zh-CN/development.md)
+[English](development.md) | [简体中文](development.zh-CN.md)
 
 Build, tech stack, architecture, testing, and release notes for developers. For user-facing docs, see the [README](../README.md).
 

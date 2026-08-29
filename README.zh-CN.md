@@ -1,6 +1,6 @@
 # skillone
 
-[English](../../README.md) | [简体中文](README.md)
+[English](README.md) | [简体中文](README.zh-CN.md)
 
 一个用于查找、安装和管理 agent skills 的桌面应用。基于 Tauri v2 构建，前端使用 React + shadcn/ui，后端由 Rust（`agents-skills` 库）提供技能安装与 agent 链接能力。
 
@@ -44,4 +44,4 @@ brew update && brew upgrade --cask skillone
 
 ## 开发
 
-面向开发者的构建、架构与测试说明见 [development.md](development.md)。
+面向开发者的构建、架构与测试说明见 [development.zh-CN.md](docs/development.zh-CN.md)。

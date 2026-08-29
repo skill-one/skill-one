@@ -1,8 +1,8 @@
 # 开发说明
 
-[English](../development.md) | [简体中文](development.md)
+[English](development.md) | [简体中文](development.zh-CN.md)
 
-面向开发者的构建、技术栈、架构、测试与发布说明。使用者说明见 [README](../../README.md)。
+面向开发者的构建、技术栈、架构、测试与发布说明。使用者说明见 [README](../README.md)。
 
 ## 技术栈
 
@@ -81,7 +81,7 @@ skillone/
 - **写入**：技能的安装、更新、卸载，以及 agent 目录的链接/迁移，均通过 Tauri 命令委托给 Rust 侧的 `agents-skills` 库。
 - **浏览器兜底**：在纯浏览器环境（开发服务器 / 测试）下，写入操作回退到内存 mock，保证 UI 可完整体验。
 
-详细说明见 [`architecture.md`](architecture.md)；后端用到的 `agents-skills` 接口见 [`agents-skills-api.md`](agents-skills-api.md)；商店注册表索引的格式与用法见 [`index-format.md`](index-format.md)。
+详细说明见 [`architecture.zh-CN.md`](architecture.zh-CN.md)；后端用到的 `agents-skills` 接口见 [`agents-skills-api.zh-CN.md`](agents-skills-api.zh-CN.md)；商店注册表索引的格式与用法见 [`index-format.zh-CN.md`](index-format.zh-CN.md)。
 
 ## 测试
 
@@ -89,7 +89,7 @@ skillone/
 
 ## 发布
 
-发布流程由 [GitHub Actions](../../.github/workflows/release.yml) 自动完成，步骤如下：
+发布流程由 [GitHub Actions](../.github/workflows/release.yml) 自动完成，步骤如下：
 
 1. **更新版本号**：修改 `package.json` 中的 `version`，并同步 `src-tauri/tauri.conf.json` 与 `src-tauri/Cargo.toml` 的 `version`（三处必须一致，`Cargo.lock` 会随构建自动更新）。
 2. **打 tag 并推送**：tag 形如 `v<version>`（例如 `v0.1.1`）。

@@ -1,6 +1,6 @@
 # 注册表索引（index.jsonl）
 
-[English](../index-format.md) | [简体中文](index-format.md)
+[English](index-format.md) | [简体中文](index-format.zh-CN.md)
 
 商店内容来自 [skill-one/skills-index](https://github.com/skill-one/skills-index) 发布的 `index.jsonl`（JSONL 格式，发布在 `dist` 分支，每行一个技能）。
 
@@ -32,11 +32,11 @@
 
 ## 当前使用方式
 
-见 [../../src/lib/skills-api.ts](../../src/lib/skills-api.ts)：
+见 [../src/lib/skills-api.ts](../src/lib/skills-api.ts)：
 
 - `INDEX_SPEC` 指定 `repo` / `path: "index.jsonl"` / `ref: "dist"`。
-- 通过可配置下载源拉取（直连 GitHub raw 或 CDN 镜像），见 [../../src/lib/cdn-config.ts](../../src/lib/cdn-config.ts)。
+- 通过可配置下载源拉取（直连 GitHub raw 或 CDN 镜像），见 [../src/lib/cdn-config.ts](../src/lib/cdn-config.ts)。
 - 解析后过滤掉非 GitHub 仓库（`source` 含 `.` 视为域名），映射为 `Skill` 模型：`name = name ?? skillId`、`stars = installs`。
 - 整份索引按会话缓存一次，本地切片分页（默认 200/页），缓存与刷新交由 TanStack Query 管理。
 
-技能详情 `SKILL.md` 由 `source + path` 单独拉取，见 [../../src/lib/skill-detail-api.ts](../../src/lib/skill-detail-api.ts)。
+技能详情 `SKILL.md` 由 `source + path` 单独拉取，见 [../src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。

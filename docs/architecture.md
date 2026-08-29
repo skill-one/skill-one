@@ -1,6 +1,6 @@
 # Architecture
 
-[English](architecture.md) | [简体中文](zh-CN/architecture.md)
+[English](architecture.md) | [简体中文](architecture.zh-CN.md)
 
 ## Overview
 

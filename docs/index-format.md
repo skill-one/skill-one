@@ -1,6 +1,6 @@
 # Registry index (index.jsonl)
 
-[English](index-format.md) | [简体中文](zh-CN/index-format.md)
+[English](index-format.md) | [简体中文](index-format.zh-CN.md)
 
 The store content comes from the `index.jsonl` published by
 [skill-one/skills-index](https://github.com/skill-one/skills-index) (JSONL format, published on the `dist` branch, one skill per line).

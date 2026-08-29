@@ -1,6 +1,6 @@
 # Using the agents-skills API
 
-[English](agents-skills-api.md) | [简体中文](zh-CN/agents-skills-api.md)
+[English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
 Through the Tauri backend (`src-tauri/src/skills.rs`), this project calls the
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/struct.Manager.html)

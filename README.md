@@ -1,6 +1,6 @@
 # skillone
 
-[English](README.md) | [简体中文](docs/zh-CN/README.md)
+[English](README.md) | [简体中文](README.zh-CN.md)
 
 A desktop app for finding, installing, and managing agent skills. Built on Tauri v2 with a React + shadcn/ui frontend; the Rust backend (the `agents-skills` library) provides skill installation and agent-linking capabilities.
 
