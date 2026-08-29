@@ -48,22 +48,23 @@ export const footerItems: NavItem[] = [
   { path: "/settings", label: "设置", icon: Settings },
 ];
 
-/** 全部导航项：侧边栏与标题栏共用同一份页面标题。 */
+/** All nav items: the sidebar and the window title share this page-label config. */
 export const navItems: NavItem[] = [
   ...shopItems,
   ...mySkillsItems,
   ...footerItems,
 ];
 
-/** 按路由路径查找侧边栏页面标题；未知路径返回空串。 */
+/** Look up a sidebar page label by route path; unknown paths yield an empty string. */
 export function navLabelFor(path: string): string {
   return navItems.find((item) => item.path === path)?.label ?? "";
 }
 
 /**
- * 侧边栏徽标的真实数字：商店「全部」= 注册表总量，「我的 Skills → 全局」=
- * 已安装技能数量。仅这两个入口有对应的真实数据源；精选/官方/项目等未实现
- * 页面不显示数字。数据未加载完成时不渲染徽标，避免闪现 0。
+ * Real badge counts: Shop "全部" = registry total, "My Skills → 全局" =
+ * installed skill count. Only these two entries have a real data source;
+ * unimplemented pages (featured / official / project) show no badge. The
+ * badge is not rendered while its data is loading, avoiding a flash of 0.
  */
 function useNavCounts(): Partial<Record<string, number>> {
   const { data: registryTotal } = useQuery({

@@ -61,7 +61,7 @@ function SkillCardItem({
         !enabled && "opacity-60",
       )}
     >
-      {/* 顶部：头像 + 名称 + 来源；右侧留空给右上角的开关。 */}
+      {/* Top: avatar + name + source; the right side stays empty for the toggle in the top-right corner. */}
       <div className="flex items-start gap-3 pr-12">
         {skill.sourceType !== "local" && skill.source?.includes("/") ? (
           <OwnerAvatar
@@ -96,7 +96,7 @@ function SkillCardItem({
         </div>
       </div>
 
-      {/* 右上角：开关 */}
+      {/* Top-right corner: enable toggle */}
       <div className="absolute right-4 top-4">
         <Switch
           checked={enabled}
@@ -105,12 +105,13 @@ function SkillCardItem({
         />
       </div>
 
-      {/* 描述：本地取磁盘 SKILL.md 提取的描述；商店来源回退到 registry 描述。 */}
+      {/* Description: the disk-extracted SKILL.md description for local skills;
+          store-sourced ones fall back to the registry description. */}
       <p className="mt-3 line-clamp-2 min-h-[2.5em] text-[12px] leading-relaxed text-muted-foreground">
         {description || "暂无描述"}
       </p>
 
-      {/* 底部：右侧操作（移除）。 */}
+      {/* Bottom: right-aligned actions (remove). */}
       <div className="mt-3 flex items-center justify-end">
         <div className="flex shrink-0 items-center gap-0.5">
           <Button
@@ -193,7 +194,7 @@ export function MySkillsPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto p-4">
-        {/* 摘要带：agent 链接状态一目了然 */}
+        {/* Summary strip: agent link status at a glance */}
         <div className="border-b border-border/70 pb-4">
           <AgentIconGrid />
         </div>

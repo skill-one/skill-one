@@ -8,7 +8,7 @@ interface PlaceholderPageProps {
   className?: string;
 }
 
-/** 未实现页面的占位：显示图标与"即将上线"提示。 */
+/** Placeholder for pages not yet implemented: shows an icon and a "coming soon" hint. */
 export function PlaceholderPage({
   icon: Icon,
   title,
