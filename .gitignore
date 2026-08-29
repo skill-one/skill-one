@@ -14,17 +14,13 @@ dist-ssr
 src-tauri/target
 src-tauri/gen/schemas
 
-# Tooling / local state
-.trae/
-.codebuddy/
-.playwright-cli/
-.playwright/
+# Ignore dotfiles and dot-directories by default; re-include the few that
+# belong in version control (.gitignore files and the GitHub workflows).
+.*
+!.gitignore
+!.github/
 
-# Editor / OS
-.DS_Store
-.idea
-.vscode/*
-!.vscode/extensions.json
+# Editor / OS leftovers without a leading dot
 *.suo
 *.ntvs*
 *.njsproj
