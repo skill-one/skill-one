@@ -11,6 +11,10 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
+import {
+  defaultShouldDehydrateQuery,
+  type Query,
+} from "@tanstack/react-query";
 
 import { AppSidebar, navLabelFor } from "./components/app-sidebar";
 import { PlaceholderPage } from "./components/placeholder-page";
@@ -48,6 +52,11 @@ const queryClient = new QueryClient({
  * never discarded for being old, they are always restored and then
  * revalidated when stale (see `staleTime`).
  *
+ * The full registry index (`skills-index`, the whole parsed ~12MB JSONL) is
+ * excluded: it would exceed the WebView's localStorage quota on every write,
+ * and it is refetched once per session anyway. Only the bounded queries —
+ * explore pages, installed skills, agent status — are persisted.
+ *
  * The storage adapter accesses `window.localStorage` lazily (inside the
  * methods) so merely wiring up persistence never touches the getter — Node's
  * experimental global localStorage emits an ExperimentalWarning when read.
@@ -60,6 +69,17 @@ const persister = createSyncStoragePersister({
   },
 });
 
+const persistOptions = {
+  persister,
+  maxAge: Infinity,
+  dehydrateOptions: {
+    // Large blobs only; see the persister comment above.
+    shouldDehydrateQuery: (query: Query) =>
+      defaultShouldDehydrateQuery(query) &&
+      query.queryKey[0] !== "skills-index",
+  },
+};
+
 /**
  * Drag strip across the top of the content column (the Overlay title bar has
  * no native bar to drag from). The whole strip is marked as a drag region so
@@ -67,7 +87,8 @@ const persister = createSyncStoragePersister({
  * (traffic-light zone on the left is not clickable). The native window title
  * is still synced for Mission Control (no-op in browser).
  *
- * 标题取自侧边栏的同一份导航配置（navLabelFor），保证与侧边栏页面同名。
+ * The title comes from the same nav config as the sidebar (navLabelFor), so it
+ * always matches the sidebar's page name.
  */
 function WindowTitle() {
   const location = useLocation();
@@ -98,7 +119,7 @@ export default function App() {
   return (
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{ persister, maxAge: Infinity }}
+      persistOptions={persistOptions}
     >
       <HashRouter>
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
