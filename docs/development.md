@@ -15,35 +15,36 @@
 
 ## 环境要求
 
-- **Node.js**（≥ 18）与 npm（或 pnpm）
+- **Node.js**（≥ 18）与 [pnpm](https://pnpm.io/)（版本由 `package.json` 的 `packageManager` 字段锁定）
 - **Rust** 工具链，`rustc >= 1.88`
 - **Tauri 系统依赖**：参见 [Tauri 前置依赖](https://v2.tauri.app/start/prerequisites/)
 
 ## 快速开始
 
 ```bash
-npm install          # 安装依赖
-npm run dev          # 仅启动前端（浏览器模式，内存 mock 数据）
-npm run tauri dev    # 启动桌面应用（Tauri 开发模式）
-npm run test:run     # 单次运行测试
-npm run tauri build  # 构建发布包
+pnpm install         # 安装依赖
+pnpm dev             # 仅启动前端（浏览器模式，内存 mock 数据）
+pnpm tauri dev       # 启动桌面应用（Tauri 开发模式）
+pnpm test:run        # 单次运行测试
+pnpm tauri build     # 构建发布包
 ```
 
 ## 常用脚本
 
-| 命令                                          | 说明                              |
-| --------------------------------------------- | --------------------------------- |
-| `npm run dev`                                 | 启动 Vite 开发服务器（端口 5173） |
-| `npm run build`                               | 类型检查 + 前端构建               |
-| `npm run preview`                             | 预览构建产物                      |
-| `npm run tauri dev`                           | 启动桌面应用（开发模式）          |
-| `npm run tauri build`                         | 打包桌面应用                      |
-| `npm run test` / `test:run` / `test:coverage` | 运行 / 单次运行 / 覆盖率测试      |
+| 命令                                            | 说明                              |
+| ----------------------------------------------- | --------------------------------- |
+| `pnpm dev`                                      | 启动 Vite 开发服务器（端口 5173） |
+| `pnpm build`                                    | 类型检查 + 前端构建               |
+| `pnpm typecheck`                                | 仅运行 TypeScript 类型检查        |
+| `pnpm preview`                                  | 预览构建产物                      |
+| `pnpm tauri dev`                                | 启动桌面应用（开发模式）          |
+| `pnpm tauri build`                              | 打包桌面应用                      |
+| `pnpm test` / `test:run` / `test:coverage`      | 运行 / 单次运行 / 覆盖率测试      |
 
 ## 项目结构
 
 ```
-skill-one/
+skillone/
 ├── src/                    # 前端（React + TypeScript）
 │   ├── components/         # 跨页面共享组件
 │   │   ├── ui/             # shadcn/ui 组件
@@ -53,7 +54,7 @@ skill-one/
 │   │   └── placeholder-page.tsx # 未实现页面的占位
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
 │   │   ├── explore/        # 商店探索页（skill-card / skill-detail-panel）
-│   │   ├── my-skills/      # 我的 Skills 页（agent-icon-grid / stray-files-dialog）
+│   │   ├── my-skills/      # 我的 Skills 页（agent-icon-grid / agent-icon-button / stray-files-dialog 等）
 │   │   └── settings/       # 设置页
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层
@@ -82,22 +83,22 @@ skill-one/
 
 ## 测试
 
-测试使用 Vitest + Testing Library，运行在 `jsdom` 环境。组件测试与 `src/lib` 下的单元测试均遵循「一个文件对应一个 `*.test.ts(x)`」的约定，可通过 `npm run test:run` 一键运行。
+测试使用 Vitest + Testing Library，运行在 `jsdom` 环境。组件测试与 `src/lib` 下的单元测试均遵循「一个文件对应一个 `*.test.ts(x)`」的约定，可通过 `pnpm test:run` 一键运行。
 
 ## 发布
 
 发布流程由 [GitHub Actions](../.github/workflows/release.yml) 自动完成，步骤如下：
 
-1. **更新版本号**：修改 `package.json` 中的 `version`（与 `src-tauri/tauri.conf.json` 的 `version` 保持一致）。
+1. **更新版本号**：修改 `package.json` 中的 `version`，并同步 `src-tauri/tauri.conf.json` 与 `src-tauri/Cargo.toml` 的 `version`（三处必须一致，`Cargo.lock` 会随构建自动更新）。
 2. **打 tag 并推送**：tag 形如 `v<version>`（例如 `v0.1.1`）。
 3. 推送 `v*` tag 或手动触发 workflow 后，CI 自动执行：
-   - 在 `macos-14`（arm64）上执行 `pnpm run tauri build` 产出 `.dmg`。
+   - 在 `macos-14`（arm64）上执行 `pnpm tauri build` 产出 `.dmg`。
    - 创建 GitHub Release 并上传 `.dmg`。
    - 计算 SHA256 后，更新 [skill-one/homebrew-tap](https://github.com/skill-one/homebrew-tap) 仓库中的 `skillone.rb` cask 并推送，用户即可通过 Homebrew 升级。
 
 ```bash
 # 本地完成版本号修改后
-git add package.json src-tauri/tauri.conf.json
+git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
 git commit -m "chore: bump version to 0.1.1"
 git tag v0.1.1
 git push origin main --tags
