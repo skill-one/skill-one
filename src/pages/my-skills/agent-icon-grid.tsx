@@ -23,8 +23,10 @@ import { StrayFilesDialog, type StrayFilesTarget } from "./stray-files-dialog";
 /**
  * The agent-link strip on the "my skills" page: one icon per agent, plus the
  * mutations behind it (link / migrate / unlink / stray cleanup), the result
- * toasts and the stray-files guidance dialog. The icon + hover tooltip UI
- * lives in `agent-icon-button.tsx`, toast wording in `link-notice.ts`.
+ * toasts and the link decision dialog. Division of labor: the icon's hover
+ * tooltip is a read-only preview; clicking a dir that already holds content
+ * opens the decision dialog, which owns all actions. Toast wording lives in
+ * `link-notice.ts`.
  */
 export function AgentIconGrid() {
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -78,9 +80,9 @@ export function AgentIconGrid() {
                   dirPath: parseStrayDir(result.message) ?? current.dirPath,
                 }
               : {
-                  // The dialog was already closed (e.g. a migrate from a direct
-                  // click); rebuild it from the backend message so the user can
-                  // clean up and retry.
+                  // The dialog was closed before the migrate finished; rebuild
+                  // it from the backend message so the user can clean up and
+                  // retry.
                   name: result.agent,
                   display: result.display,
                   skills: [],
@@ -102,22 +104,19 @@ export function AgentIconGrid() {
     onSuccess: (results) => {
       const result = results[0];
       if (result?.status === "refused") {
-        // Strays block a plain link too; surface them in the dialog so the user
-        // can delete or migrate them instead of linking again blindly.
+        // The status snapshot was stale: the dir gained content between fetch
+        // and click. Always show the decision dialog — never migrate without
+        // the user seeing (and choosing on) what is in the dir. Stray files
+        // only appear inside the refusal text, so they are parsed from it
+        // until the backend exposes them as structured fields.
         const skills = result.skills ?? [];
-        const files = parseStrays(result.message, skills);
-        const target = {
+        setStrayTarget({
           name: result.agent,
           display: result.display,
           skills,
-          files,
+          files: parseStrays(result.message, skills),
           dirPath: parseStrayDir(result.message),
-        };
-        if (target.files.length > 0 || target.skills.length > 0) {
-          setStrayTarget(target);
-          return;
-        }
-        migrateMutation.mutate(result.agent);
+        });
         return;
       }
       setStrayTarget(null);
@@ -131,31 +130,42 @@ export function AgentIconGrid() {
       }),
   });
 
-  /** One-click stray deletion from the hover tooltip: remove the agent dir's strays, then refresh. */
-  const handleRemoveStrays = async (agent: AgentStatus) => {
-    const files = agent.internalFiles ?? [];
-    const dirPath = agent.dirPath;
-    if (files.length === 0 || !dirPath) {
-      setNotice({
-        text: "无法确定目录位置，请先手动处理这些文件",
-        kind: "error",
-      });
-      return;
-    }
-    try {
-      await removeAgentStrayFiles(dirPath, files);
+  /** One-click stray deletion from the decision dialog, then refresh. */
+  const removeStraysMutation = useMutation({
+    mutationFn: (target: StrayFilesTarget) => {
+      if (!target.dirPath || target.files.length === 0) {
+        return Promise.reject(
+          new Error("无法确定目录位置，请先手动处理这些文件"),
+        );
+      }
+      return removeAgentStrayFiles(target.dirPath, target.files);
+    },
+    onSuccess: (removed, target) => {
       invalidate();
       setNotice({
-        text: `已删除 ${agent.display} 目录中的 ${files.length} 个文件`,
+        text: `已删除 ${target.display} 目录中的 ${removed.length} 个文件`,
         kind: "success",
       });
-    } catch (err) {
+      // The dialog opened from a link click, so finishing the link is the
+      // user's standing intent: with nothing left to import, link directly;
+      // otherwise keep the dialog open for the import step.
+      if (target.skills.length === 0) {
+        setStrayTarget(null);
+        linkMutation.mutate(target.name);
+      } else {
+        setStrayTarget((current) =>
+          current && current.name === target.name
+            ? { ...current, files: [] }
+            : current,
+        );
+      }
+    },
+    onError: (err) =>
       setNotice({
         text: `删除文件失败：${err instanceof Error ? err.message : String(err)}`,
         kind: "error",
-      });
-    }
-  };
+      }),
+  });
 
   const unlinkMutation = useMutation({
     mutationFn: (name: string) => unlinkAgent(name),
@@ -188,8 +198,8 @@ export function AgentIconGrid() {
       unlinkMutation.mutate(agent.name);
       return;
     }
-    // A dir that already holds skills or strays opens the preview dialog so the
-    // user picks how to proceed; only an empty dir links directly.
+    // A dir that already holds skills or strays opens the decision dialog so
+    // the user picks how to proceed; only an empty dir links directly.
     const target = buildStrayTarget(agent);
     if (target) {
       setStrayTarget(target);
@@ -203,6 +213,9 @@ export function AgentIconGrid() {
     (linkMutation.isPending && linkMutation.variables === name) ||
     (migrateMutation.isPending && migrateMutation.variables === name) ||
     (unlinkMutation.isPending && unlinkMutation.variables === name);
+  const dialogBusy = strayTarget
+    ? busyFor(strayTarget.name) || removeStraysMutation.isPending
+    : false;
 
   return (
     <div>
@@ -258,9 +271,6 @@ export function AgentIconGrid() {
               agent={agent}
               busy={busyFor(agent.name)}
               onClick={() => handleClick(agent)}
-              onOpenDir={(path) => void openPathInSystem(path)}
-              onMigrate={() => migrateMutation.mutate(agent.name)}
-              onRemove={() => void handleRemoveStrays(agent)}
             />
           ))}
         </div>
@@ -268,6 +278,16 @@ export function AgentIconGrid() {
 
       <StrayFilesDialog
         target={strayTarget}
+        busy={dialogBusy}
+        onMigrate={() => {
+          if (strayTarget) migrateMutation.mutate(strayTarget.name);
+        }}
+        onRemoveStrays={() => {
+          if (strayTarget) removeStraysMutation.mutate(strayTarget);
+        }}
+        onOpenDir={() => {
+          if (strayTarget?.dirPath) void openPathInSystem(strayTarget.dirPath);
+        }}
         onClose={() => setStrayTarget(null)}
       />
     </div>

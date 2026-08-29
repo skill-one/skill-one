@@ -3,7 +3,11 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithRouter } from "../../test/test-utils";
-import { fetchAgentStatus, linkAgent } from "../../lib/local-skills";
+import {
+  fetchAgentStatus,
+  linkAgent,
+  removeAgentStrayFiles,
+} from "../../lib/local-skills";
 import type { AgentLinkResult } from "../../lib/skills-manager";
 import { AgentIconGrid } from "./agent-icon-grid";
 
@@ -14,6 +18,7 @@ vi.mock("../../lib/local-skills", async (importOriginal) => {
     fetchAgentStatus: vi.fn(),
     linkAgent: vi.fn(),
     unlinkAgent: vi.fn(),
+    removeAgentStrayFiles: vi.fn(),
   };
 });
 vi.mock("../../lib/open-external", () => ({
@@ -23,6 +28,7 @@ vi.mock("../../lib/open-external", () => ({
 
 const fetchAgentStatusMock = vi.mocked(fetchAgentStatus);
 const linkAgentMock = vi.mocked(linkAgent);
+const removeAgentStrayFilesMock = vi.mocked(removeAgentStrayFiles);
 
 const AGENT_DIR = "/Users/me/.cursor/skills";
 
@@ -51,30 +57,27 @@ beforeEach(() => {
   ]);
 });
 
-describe("AgentIconGrid stray-files dialog", () => {
-  it("shows the guidance dialog when a plain 链接 is refused on non-skill files", async () => {
+describe("AgentIconGrid link decision dialog", () => {
+  it("opens the decision dialog with the strays when a plain 链接 is refused", async () => {
     const user = userEvent.setup();
     linkAgentMock.mockResolvedValue([refused(["README.md"])]);
     renderWithRouter(<AgentIconGrid />);
 
     await user.click(await screen.findByRole("button", { name: /Cursor，点击链接/ }));
 
+    // The dialog lists the strays and offers the actions itself; the refusal
+    // never auto-retries with --migrate.
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    // The dialog only points at the hover tooltip; the strays list and the
-    // 打开目录 action live in the tooltip, not here.
-    expect(screen.getByText(/请将鼠标悬停在该图标上/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "知道了" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "打开目录" }),
-    ).not.toBeInTheDocument();
-    // Strays can't be migrated, so we never auto-retry with --migrate.
+    expect(screen.getByText("需先处理的其他文件（1）")).toBeInTheDocument();
+    expect(screen.getByText("README.md")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "删除 1 个文件" })).toBeInTheDocument();
     expect(linkAgentMock).toHaveBeenCalledTimes(1);
   });
 
-  it("reopens the guidance dialog when a migrate from the hover tooltip fails on strays", async () => {
+  it("opens the decision dialog from the icon click and migrates from it", async () => {
     const user = userEvent.setup();
-    // Skills present → the icon click opens the link-preview dialog instead of
-    // linking, so migration is triggered from the tooltip's 一键导入 action.
+    // Skills present → the icon click opens the decision dialog instead of
+    // linking, and the import runs from the dialog.
     fetchAgentStatusMock.mockResolvedValue([
       {
         name: "cursor",
@@ -97,15 +100,84 @@ describe("AgentIconGrid stray-files dialog", () => {
     ]);
     renderWithRouter(<AgentIconGrid />);
 
-    const cursor = await screen.findByRole("button", { name: /Cursor，点击链接/ });
-    await user.hover(cursor);
-    await user.click(await screen.findByRole("button", { name: "一键导入" }));
-    // Two-step confirm inside the tooltip.
-    await user.click(screen.getByRole("button", { name: "确认导入？" }));
+    await user.click(await screen.findByRole("button", { name: /Cursor，点击链接/ }));
+    await user.click(
+      await screen.findByRole("button", { name: "导入 1 个 skills 并链接" }),
+    );
 
-    // The migrate fails on strays → the guidance dialog opens again.
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "知道了" })).toBeInTheDocument();
+    // The migrate fails on strays → the dialog refreshes with them.
+    expect(await screen.findByText("需先处理的其他文件（1）")).toBeInTheDocument();
+    expect(screen.getByText("README.txt")).toBeInTheDocument();
     expect(linkAgentMock).toHaveBeenCalledWith("cursor", { migrate: true });
+  });
+
+  it("auto-links after the strays are deleted from the dialog when no skills remain", async () => {
+    const user = userEvent.setup();
+    fetchAgentStatusMock.mockResolvedValue([
+      {
+        name: "cursor",
+        display: "Cursor",
+        linked: false,
+        canonical: false,
+        internalSkills: [],
+        internalFiles: ["README.txt"],
+        dirPath: AGENT_DIR,
+      },
+    ]);
+    removeAgentStrayFilesMock.mockResolvedValue(["README.txt"]);
+    linkAgentMock.mockResolvedValue([
+      {
+        agent: "cursor",
+        display: "Cursor",
+        status: "linked",
+        moved: [],
+        skipped: [],
+        skills: [],
+        message: null,
+      },
+    ]);
+    renderWithRouter(<AgentIconGrid />);
+
+    await user.click(await screen.findByRole("button", { name: /Cursor，点击链接/ }));
+    await user.click(await screen.findByRole("button", { name: "删除 1 个文件" }));
+    // Two-step confirm for the irreversible deletion.
+    await user.click(screen.getByRole("button", { name: "确认删除？" }));
+
+    // The click intent was to link: with the dir now empty the link follows
+    // automatically, without a migrate.
+    expect(removeAgentStrayFilesMock).toHaveBeenCalledWith(AGENT_DIR, [
+      "README.txt",
+    ]);
+    const linked = await screen.findByText("Cursor 已链接");
+    expect(linked).toBeInTheDocument();
+    expect(linkAgentMock).toHaveBeenCalledWith("cursor");
+  });
+
+  it("keeps the dialog open for the import step when skills remain after deletion", async () => {
+    const user = userEvent.setup();
+    fetchAgentStatusMock.mockResolvedValue([
+      {
+        name: "cursor",
+        display: "Cursor",
+        linked: false,
+        canonical: false,
+        internalSkills: ["pdf"],
+        internalFiles: ["README.txt"],
+        dirPath: AGENT_DIR,
+      },
+    ]);
+    removeAgentStrayFilesMock.mockResolvedValue(["README.txt"]);
+    renderWithRouter(<AgentIconGrid />);
+
+    await user.click(await screen.findByRole("button", { name: /Cursor，点击链接/ }));
+    await user.click(await screen.findByRole("button", { name: "删除 1 个文件" }));
+    await user.click(screen.getByRole("button", { name: "确认删除？" }));
+
+    // Skills still await import: the dialog stays open and the import button
+    // becomes enabled instead of the blocked placeholder.
+    expect(
+      await screen.findByRole("button", { name: "导入 1 个 skills 并链接" }),
+    ).toBeEnabled();
+    expect(linkAgentMock).not.toHaveBeenCalled();
   });
 });

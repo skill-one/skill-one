@@ -154,7 +154,7 @@ const mockAgentRows: Array<{
     linked: false,
     canonical: false,
     // Carries skills and a stray file in its own dir → clicking the card opens
-    // the preview dialog offering 一键迁移 / 进入目录 / 一键删除.
+    // the decision dialog offering 导入并链接 / 删除文件 / 进入目录.
     internalSkills: ["pdf", "docx"],
     internalFiles: ["README.md"],
     dirPath: "/Users/me/.cursor/skills",

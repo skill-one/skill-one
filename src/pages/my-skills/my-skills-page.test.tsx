@@ -171,7 +171,9 @@ describe("MySkillsPage", () => {
       screen.getByLabelText("Claude Code，点击取消链接"),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText(/Claude Code，点击链接/)).toBeNull();
-    expect(screen.getByLabelText("Windsurf，点击取消链接")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Windsurf，原生使用全局 skills 目录"),
+    ).toBeInTheDocument();
   });
 
   it("lists the specific skills and files in the agent hover tooltip", async () => {
@@ -188,23 +190,38 @@ describe("MySkillsPage", () => {
     expect(within(tooltip).getByText("README.md")).toBeInTheDocument();
   });
 
-  it("offers segmented actions in the hover tooltip: 一键导入 for skills, 进入目录 / 一键删除 for files", async () => {
+  it("keeps the hover tooltip read-only and offers the actions in the dialog", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
 
     const cursor = await screen.findByLabelText("Cursor，点击链接");
     await user.hover(cursor);
 
+    // The tooltip previews the content but never hosts actions — those live
+    // in the decision dialog opened by the click.
     const tooltip = await screen.findByRole("tooltip");
+    expect(within(tooltip).getByText("Cursor")).toBeInTheDocument();
+    expect(within(tooltip).getByText("pdf")).toBeInTheDocument();
+    expect(within(tooltip).getByText("README.md")).toBeInTheDocument();
     expect(
-      within(tooltip).getByRole("button", { name: "一键导入" }),
+      within(tooltip).queryByRole("button", { name: "一键导入" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(tooltip).queryByRole("button", { name: "一键删除" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(cursor);
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("button", { name: "删除 1 个文件" }),
     ).toBeInTheDocument();
     expect(
-      within(tooltip).getByRole("button", { name: "进入目录" }),
+      within(dialog).getByRole("button", { name: "进入目录" }),
     ).toBeInTheDocument();
+    // Stray files block the import until they are deleted.
     expect(
-      within(tooltip).getByRole("button", { name: "一键删除" }),
-    ).toBeInTheDocument();
+      within(dialog).getByRole("button", { name: "先处理其他文件" }),
+    ).toBeDisabled();
   });
 
   it("shows a structured info tooltip on agent icon hover", async () => {
@@ -223,7 +240,9 @@ describe("MySkillsPage", () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
 
-    const windsurf = await screen.findByLabelText("Windsurf，点击取消链接");
+    const windsurf = await screen.findByLabelText(
+      "Windsurf，原生使用全局 skills 目录",
+    );
     await user.click(windsurf);
 
     expect(

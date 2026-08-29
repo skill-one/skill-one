@@ -1,17 +1,12 @@
-import { useState } from "react";
 import {
   AlertTriangle,
-  ArrowRight,
   Check,
-  FolderOpen,
   Loader2,
-  Trash2,
 } from "lucide-react";
 
 import type { AgentStatus } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
 import { AgentIcon } from "../../components/agent-icon";
-import { Button } from "../../components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -19,45 +14,31 @@ import {
   TooltipTrigger,
 } from "../../components/ui/tooltip";
 
+/** Hover lists are capped; the full lists live in the link-preview dialog. */
+const TOOLTIP_LIST_CAP = 5;
+
 /**
- * One agent's icon button with its hover tooltip: link status, the skills /
- * stray files living in the agent's own directory, and the in-tooltip actions
- * (一键导入 / 进入目录 / 一键删除). Destructive tooltip actions use a two-step
- * confirm: the first click arms the button, the second executes.
+ * One agent's icon button with its read-only hover tooltip: link status plus a
+ * preview of the skills / stray files inside the agent's own directory. All
+ * actions (导入 / 删除 / 进入目录) live in the link-preview dialog that opens
+ * on click — never in this transient hover layer.
  */
 export function AgentIconButton({
   agent,
   busy,
   onClick,
-  onOpenDir,
-  onMigrate,
-  onRemove,
 }: {
   agent: AgentStatus;
   busy: boolean;
   onClick: () => void;
-  onOpenDir: (path: string) => void;
-  onMigrate: () => void;
-  onRemove: () => void;
 }) {
   const skillCount = agent.internalSkills?.length ?? 0;
   const fileCount = agent.internalFiles?.length ?? 0;
-  const dirPath = agent.dirPath ?? null;
-  // Destructive tooltip actions (import / delete) arm on the first click and
-  // only execute on the second.
-  const [confirming, setConfirming] = useState<"migrate" | "remove" | null>(
-    null,
-  );
   // The canonical dir itself reports linked=false, but to users it is
   // effectively linked: the icon stays full-color, and clicking explains
   // why it cannot be unlinked.
   const isLinked = agent.linked || agent.canonical;
-  const showBadge = !isLinked && skillCount > 0;
-  const showFileBadge = !isLinked && fileCount > 0;
-  // When the dir already holds content (skills or other files), show only a
-  // minimal warning badge — no count. The full lists live in the hover
-  // tooltip and the link-preview dialog.
-  const showWarning = showBadge || showFileBadge;
+  const showWarning = !isLinked && (skillCount > 0 || fileCount > 0);
   const disabled = busy;
 
   // Hover tooltip copy varies by status: description plus a status line.
@@ -66,24 +47,33 @@ export function AgentIconButton({
     : showWarning
       ? "bg-amber-500"
       : "bg-muted-foreground";
-  const statusText = isLinked ? "已链接" : "未链接";
-  const description = isLinked
-    ? "可使用所有已安装 skills"
-    : showBadge
-      ? `链接后,将自动导入以下 skills 并统一管理：`
-      : "链接后,可使用所有已安装 skills";
+  const statusText = agent.canonical ? "原生" : isLinked ? "已链接" : "未链接";
+  const description = agent.canonical
+    ? "原生使用全局 skills 目录，始终可用所有已安装 skills"
+    : isLinked
+      ? "可使用所有已安装 skills"
+      : showWarning
+        ? "目录中已有内容，链接前需先处理"
+        : "链接后,可使用所有已安装 skills";
+
+  const ariaLabel = agent.canonical
+    ? `${agent.display}，原生使用全局 skills 目录`
+    : isLinked
+      ? `${agent.display}，点击取消链接`
+      : `${agent.display}，点击链接`;
 
   const button = (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-label={`${agent.display}${
-        isLinked ? "，点击取消链接" : "，点击链接"
-      }`}
+      aria-label={ariaLabel}
       className={cn(
         "group relative flex h-12 w-12 items-center justify-center rounded-xl border border-border/70 bg-muted transition-all duration-150",
-        "cursor-pointer hover:scale-105 hover:border-border hover:shadow-[0_8px_20px_-12px_rgba(15,23,42,0.25)] active:scale-95",
+        // A canonical agent offers no toggle: no hover/press affordance.
+        !agent.canonical &&
+          "cursor-pointer hover:scale-105 hover:border-border hover:shadow-[0_8px_20px_-12px_rgba(15,23,42,0.25)] active:scale-95",
+        agent.canonical && "cursor-default",
       )}
     >
       {/* Link status is the primary signal: unlinked agents are grayed out,
@@ -144,11 +134,7 @@ export function AgentIconButton({
     <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent
-          side="bottom"
-          className="w-64 px-3 py-2.5"
-          onPointerLeave={() => setConfirming(null)}
-        >
+        <TooltipContent side="bottom" className="w-64 px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[12px] font-medium text-popover-foreground">
               {agent.display}
@@ -161,79 +147,47 @@ export function AgentIconButton({
           <div className="mt-1.5 space-y-2 text-[11px] leading-relaxed text-muted-foreground">
             <p>{description}</p>
 
-            {/* Skills section: list + one-click import */}
-            {showBadge && (
-              <div className="space-y-1.5 rounded-lg border border-border/70 bg-muted/40 p-2.5">
+            {/* Read-only preview of what a link would import. */}
+            {!isLinked && skillCount > 0 && (
+              <div className="rounded-lg border border-border/70 bg-muted/40 p-2.5">
                 <p className="font-medium text-foreground">
                   可导入的 skills（{skillCount}）
                 </p>
                 <ul className="list-disc space-y-0.5 pl-4">
-                  {(agent.internalSkills ?? []).map((skill) => (
-                    <li key={skill}>{skill}</li>
-                  ))}
+                  {(agent.internalSkills ?? [])
+                    .slice(0, TOOLTIP_LIST_CAP)
+                    .map((skill) => (
+                      <li key={skill}>{skill}</li>
+                    ))}
                 </ul>
-                {(fileCount === 0 || dirPath) && (
-                  <Button
-                    size="sm"
-                    className="h-6 gap-1 px-2 text-[10px]"
-                    onClick={() => {
-                      if (confirming === "migrate") {
-                        onMigrate();
-                        setConfirming(null);
-                      } else {
-                        setConfirming("migrate");
-                      }
-                    }}
-                  >
-                    <ArrowRight className="h-3 w-3" />
-                    {confirming === "migrate" ? "确认导入？" : "一键导入"}
-                  </Button>
+                {skillCount > TOOLTIP_LIST_CAP && (
+                  <p className="pl-4 text-[10px]">…等 {skillCount} 个</p>
                 )}
               </div>
             )}
 
-            {/* Other-files section: list + open dir / one-click delete */}
-            {showFileBadge && (
-              <div className="space-y-1.5 rounded-lg border border-destructive/25 bg-destructive/5 p-2.5">
+            {/* Read-only preview of what blocks the link. */}
+            {!isLinked && fileCount > 0 && (
+              <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-2.5">
                 <p className="flex items-center gap-1.5 font-medium text-destructive">
                   <AlertTriangle className="h-3 w-3" />
                   需处理的其他文件（{fileCount}）
                 </p>
                 <ul className="list-disc space-y-0.5 pl-4 font-mono text-[10px]">
-                  {(agent.internalFiles ?? []).map((file) => (
-                    <li key={file}>{file}</li>
-                  ))}
+                  {(agent.internalFiles ?? [])
+                    .slice(0, TOOLTIP_LIST_CAP)
+                    .map((file) => (
+                      <li key={file}>{file}</li>
+                    ))}
                 </ul>
-                {dirPath && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-6 gap-1 px-2 text-[10px]"
-                      onClick={() => onOpenDir(dirPath)}
-                    >
-                      <FolderOpen className="h-3 w-3" />
-                      进入目录
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="h-6 gap-1 px-2 text-[10px]"
-                      onClick={() => {
-                        if (confirming === "remove") {
-                          onRemove();
-                          setConfirming(null);
-                        } else {
-                          setConfirming("remove");
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      {confirming === "remove" ? "确认删除？" : "一键删除"}
-                    </Button>
-                  </div>
+                {fileCount > TOOLTIP_LIST_CAP && (
+                  <p className="pl-4 text-[10px]">…等 {fileCount} 个</p>
                 )}
               </div>
+            )}
+
+            {showWarning && (
+              <p className="text-[10px]">点击图标选择处理方式（导入 / 删除 / 进入目录）。</p>
             )}
           </div>
         </TooltipContent>
