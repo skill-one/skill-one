@@ -3,10 +3,12 @@
   "private": true,
   "version": "0.1.4",
   "type": "module",
+  "packageManager": "pnpm@11.24.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "typecheck": "tsc -b",
     "tauri": "tauri",
     "test": "vitest",
     "test:run": "vitest run",
