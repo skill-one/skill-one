@@ -97,6 +97,7 @@ describe("fetchSkillDetail", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://raw.githubusercontent.com/anthropics/skills/HEAD/skills/pdf/SKILL.md",
+      { signal: expect.anything() },
     );
   });
 
@@ -116,6 +117,7 @@ describe("fetchSkillDetail", () => {
     expect(detail.path).toBe("skills/pdf/SKILL.md");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://raw.githubusercontent.com/anthropics/skills/HEAD/skills/pdf/SKILL.md",
+      { signal: expect.anything() },
     );
   });
 
@@ -134,6 +136,23 @@ describe("fetchSkillDetail", () => {
     ).rejects.toThrow("SKILL.md for pdf not found in owner/repo");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://raw.githubusercontent.com/owner/repo/HEAD/skills/pdf/SKILL.md",
+      { signal: expect.anything() },
     );
+  });
+
+  it("reports the underlying cause on a network failure instead of 'not found'", async () => {
+    fetchMock.mockRejectedValue(new TypeError("network down"));
+
+    await expect(
+      fetchSkillDetail("owner/repo", "pdf", "skills/pdf"),
+    ).rejects.toThrow(/无法获取 pdf 的 SKILL\.md.*无法连接数据源/);
+  });
+
+  it("reports the underlying cause on a server error instead of 'not found'", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 502 } as Response);
+
+    await expect(
+      fetchSkillDetail("owner/repo", "pdf", "skills/pdf"),
+    ).rejects.toThrow(/无法获取 pdf 的 SKILL\.md.*HTTP 502/);
   });
 });

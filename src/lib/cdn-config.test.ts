@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 
 import {
   DEFAULT_CDN_BASE,
+  SourceFetchError,
   fileCandidates,
   fetchFirstText,
   getCdnBase,
@@ -86,10 +87,37 @@ describe("fetchFirstText", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("throws when every candidate fails", async () => {
+  it("throws a typed http error when every candidate answers non-OK", async () => {
     fetchMock.mockResolvedValue(bad());
-    await expect(fetchFirstText([ORIGIN, DEFAULT_CDN])).rejects.toThrow(
-      /无法连接数据源/,
+    const err = await fetchFirstText([ORIGIN, DEFAULT_CDN]).catch((e) => e);
+    expect(err).toBeInstanceOf(SourceFetchError);
+    expect(err.kind).toBe("http");
+    expect(err.status).toBe(404);
+    expect(err.message).toMatch(/HTTP 404/);
+  });
+
+  it("throws a typed network error when a candidate never responds", async () => {
+    fetchMock.mockRejectedValue(new TypeError("network down"));
+    const err = await fetchFirstText([ORIGIN, DEFAULT_CDN]).catch((e) => e);
+    expect(err).toBeInstanceOf(SourceFetchError);
+    expect(err.kind).toBe("network");
+    expect(err.status).toBeUndefined();
+    expect(err.message).toMatch(/无法连接数据源/);
+  });
+
+  it("classifies a mixed failure (one 404, one network error) as network", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === ORIGIN ? bad() : Promise.reject(new TypeError("network down")),
     );
+    const err = await fetchFirstText([ORIGIN, DEFAULT_CDN]).catch((e) => e);
+    expect(err.kind).toBe("network");
+  });
+
+  it("passes an abort timeout signal to each request", async () => {
+    fetchMock.mockResolvedValue(ok());
+    await fetchFirstText([ORIGIN]);
+    expect(fetchMock).toHaveBeenCalledWith(ORIGIN, {
+      signal: expect.anything(),
+    });
   });
 });

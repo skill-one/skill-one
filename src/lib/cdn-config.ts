@@ -84,20 +84,72 @@ export function fileCandidates(spec: FileSpec): string[] {
   return [...new Set(ordered)];
 }
 
+/**
+ * Per-request timeout for each candidate. Without it a hanging
+ * `raw.githubusercontent.com` connection would stall the whole data layer
+ * indefinitely (there is no user-facing cancel), and the CDN fallback would
+ * never get its turn.
+ */
+const FETCH_TIMEOUT_MS = 10_000;
+
+/**
+ * Abort each request after `FETCH_TIMEOUT_MS`. `AbortSignal.timeout` is
+ * unavailable on older WebView/macOS builds; those simply keep the previous
+ * no-timeout behavior rather than breaking the fetch entirely.
+ */
+function fetchSignal(): AbortSignal | undefined {
+  return typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+    ? AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    : undefined;
+}
+
+export type SourceFetchErrorKind = "network" | "http";
+
+/**
+ * Thrown by `fetchFirstText` when no candidate URL could serve the file.
+ * `kind` lets callers distinguish "the file is not there" (every candidate
+ * answered with a non-OK status) from "we could not reach the source" (at
+ * least one candidate failed before responding).
+ */
+export class SourceFetchError extends Error {
+  readonly kind: SourceFetchErrorKind;
+  /** Status of the last candidate that responded; absent on network failure. */
+  readonly status?: number;
+
+  constructor(kind: SourceFetchErrorKind, message: string, status?: number) {
+    super(message);
+    this.name = "SourceFetchError";
+    this.kind = kind;
+    this.status = status;
+  }
+}
+
 /** Fetch the text of the first reachable candidate. */
 export async function fetchFirstText(
   urls: string[],
 ): Promise<{ url: string; text: string }> {
+  let status: number | undefined;
+  let networkFailure = false;
   for (const url of urls) {
     try {
-      const resp = await fetch(url);
+      const resp = await fetch(url, { signal: fetchSignal() });
       if (resp.ok) {
         return { url, text: await resp.text() };
       }
+      status = resp.status;
     } catch {
-      // Try the next candidate.
+      networkFailure = true;
     }
   }
-  throw new Error("无法连接数据源：已尝试直连 GitHub 与 CDN 镜像");
+  throw networkFailure
+    ? new SourceFetchError(
+        "network",
+        "无法连接数据源：已尝试直连 GitHub 与 CDN 镜像",
+      )
+    : new SourceFetchError(
+        "http",
+        `数据源请求失败（HTTP ${status ?? "未知"}）`,
+        status,
+      );
 }
 

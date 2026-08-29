@@ -63,7 +63,9 @@ describe("fetchSkillsPage", () => {
     const skill = (await fetchSkillsPage(0)).skills[0];
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith(INDEX_URL);
+    expect(fetchMock).toHaveBeenCalledWith(INDEX_URL, {
+      signal: expect.anything(),
+    });
     expect(skill).toEqual({
       name: "find-skills",
       repo: "vercel-labs/skills",
@@ -177,6 +179,6 @@ describe("fetchSkillsPage", () => {
     const fetchSkillsPage = await freshModule();
     fetchMock.mockResolvedValue({ ok: false, status: 404 } as Response);
 
-    await expect(fetchSkillsPage(0)).rejects.toThrow(/无法连接数据源/);
+    await expect(fetchSkillsPage(0)).rejects.toThrow(/HTTP 404/);
   });
 });

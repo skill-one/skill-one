@@ -1,5 +1,5 @@
 import type { SkillDetail } from "../types/skill";
-import { fetchFirstText, fileCandidates } from "./cdn-config";
+import { SourceFetchError, fetchFirstText, fileCandidates } from "./cdn-config";
 
 /** Frontmatter fields surfaced in the detail view. */
 const FRONTMATTER_FIELDS = [
@@ -39,8 +39,17 @@ export async function fetchSkillDetail(
   try {
     const { text } = await fetchFirstText(fileCandidates({ repo, path }));
     return toDetail(text, skillId, path);
-  } catch {
-    throw new Error(`SKILL.md for ${skillId} not found in ${repo}`);
+  } catch (err) {
+    // A 404 on every candidate means the index path is stale or the file was
+    // removed — worth a precise "not found". Anything else (network failure,
+    // timeout, server error) is a connectivity problem, so name the underlying
+    // cause instead of misreporting it as a missing file.
+    if (err instanceof SourceFetchError && err.kind === "http" && err.status === 404) {
+      throw new Error(`SKILL.md for ${skillId} not found in ${repo}`);
+    }
+    throw new Error(
+      `无法获取 ${skillId} 的 SKILL.md：${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
