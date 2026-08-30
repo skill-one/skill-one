@@ -36,6 +36,7 @@ import {
   PaginationItem,
   PaginationLink,
 } from "../../components/ui/pagination";
+import { Sheet } from "../../components/ui/sheet";
 import { SkillCard } from "./skill-card";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
@@ -187,8 +188,6 @@ export function ExplorePage() {
     setSort(order);
   };
 
-  const gridRef = useRef<HTMLDivElement>(null);
-
   // Go to a numbered page and close any open detail panel.
   const handlePage = (p: number) => {
     setSelected(null);
@@ -227,20 +226,6 @@ export function ExplorePage() {
     if (selected == null || selected + 1 >= skills.length) return;
     setSelected(selected + 1);
   };
-
-  // Scroll the selected card into view only when the detail panel opens
-  // (null → index): collapsing the grid from 3 columns to 1 shifts every
-  // card's position, so the clicked card would otherwise land off-screen.
-  // Switching skills while the panel is already open keeps the layout
-  // stable, so no scroll adjustment happens then.
-  const prevSelectedRef = useRef<number | null>(null);
-  useEffect(() => {
-    const wasClosed = prevSelectedRef.current == null;
-    prevSelectedRef.current = selected;
-    if (selected == null || !wasClosed) return;
-    const card = gridRef.current?.children[selected] as HTMLElement | undefined;
-    card?.scrollIntoView({ block: "start" });
-  }, [selected, skills]);
 
   const range = pageRange(page, totalPages);
 
@@ -310,12 +295,16 @@ export function ExplorePage() {
         </div>
       </div>
 
-      {/* Split layout: skill grid on the left, fixed detail panel on the
-          right while a skill is selected. */}
-      <div className="flex min-h-0 flex-1 flex-row">
+      {/* Skill grid; the modal detail drawer overlays it without reflowing
+          it or moving its scroll position. */}
+      <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex h-full min-w-0 flex-1 flex-col">
-          {/* Grid */}
-          <div className="min-h-0 flex-1 overflow-y-auto pb-6 pr-1">
+          {/* Grid. The 4px top/left padding (+ matching negative margins,
+              so content position and card widths are unchanged) keeps the
+              cards' outside-painted ink — the selected ring and the focus
+              outline — from being clipped by the scroll container at the
+              flush top/left edges. */}
+          <div className="min-h-0 flex-1 -ml-1 -mt-1 overflow-y-auto pb-6 pl-1 pr-1 pt-1">
             {isError ? (
               <Placeholder
                 message={`加载失败：${error instanceof Error ? error.message : "未知错误"}`}
@@ -342,17 +331,7 @@ export function ExplorePage() {
                 }
               />
             ) : (
-              <div
-                ref={gridRef}
-                className={cn(
-                  "grid gap-4",
-                  // The detail panel takes ~440px, so the grid collapses
-                  // to a single column while it is open.
-                  selectedSkill
-                    ? "grid-cols-1"
-                    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
-                )}
-              >
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {skills.map((hit, i) => (
                   <SkillCard
                     key={`${hit.skill.repo}/${hit.skill.name}`}
@@ -481,14 +460,22 @@ export function ExplorePage() {
             </div>
           )}
         </div>
+      </div>
 
+      {/* Standard shadcn Sheet: modal drawer with dimmed overlay; opening or
+          closing it never reflows the grid. */}
+      <Sheet
+        open={selectedSkill != null}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
+        }}
+      >
         <SkillDetailPanel
           skill={selectedSkill}
           onPrev={handlePrev}
           onNext={handleNext}
-          onClose={() => setSelected(null)}
         />
-      </div>
+      </Sheet>
     </div>
   );
 }

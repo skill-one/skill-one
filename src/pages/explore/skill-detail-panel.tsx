@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, ExternalLink, Loader2, Star, X } from "lucide-react";
+import { Download, ExternalLink, Loader2, Star } from "lucide-react";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { openExternal } from "../../lib/open-external";
@@ -8,6 +8,12 @@ import { formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import {
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "../../components/ui/sheet";
 import { Markdown } from "../../components/markdown";
 import { OwnerAvatar } from "../../components/owner-avatar";
 
@@ -16,22 +22,31 @@ interface SkillDetailPanelProps {
   skill: Skill | null;
   onPrev: () => void;
   onNext: () => void;
-  onClose: () => void;
 }
 
 /**
- * Fixed right-hand detail panel shown next to the skill grid in a split
- * layout. Switching skills happens by clicking another card in the left
- * grid. Escape or the X button closes the panel and restores the
- * full-width grid. Each skill's SKILL.md is fetched through TanStack Query
- * and cached independently, so revisits are instant.
+ * Detail drawer for one skill, shown as a standard shadcn Sheet over the
+ * right edge of the skill grid. The grid itself never reflows — opening or
+ * closing the drawer leaves its layout and scroll position untouched. The
+ * drawer is modal (dimmed overlay, focus trap, scroll lock); Escape, the
+ * X button, or clicking the overlay closes it, and ←/→ switch skills.
+ * Each skill's SKILL.md is fetched through TanStack Query and cached
+ * independently, so revisits are instant.
  */
 export function SkillDetailPanel({
   skill,
   onPrev,
   onNext,
-  onClose,
 }: SkillDetailPanelProps) {
+  // Keep the last selected skill while the drawer plays its exit
+  // animation: `skill` is already null by the time Radix starts closing,
+  // and an unmounting parent would cut the slide-out short.
+  const [lastSkill, setLastSkill] = useState<Skill | null>(skill);
+  useEffect(() => {
+    if (skill) setLastSkill(skill);
+  }, [skill]);
+  const shown = skill ?? lastSkill;
+
   const {
     data: detail,
     isPending,
@@ -39,77 +54,59 @@ export function SkillDetailPanel({
     error,
     refetch,
   } = useQuery({
-    queryKey: ["skill-detail", skill?.repo, skill?.name],
-    queryFn: () => fetchSkillDetail(skill!.repo, skill!.name, skill!.path),
-    enabled: skill != null,
+    queryKey: ["skill-detail", shown?.repo, shown?.name],
+    queryFn: () => fetchSkillDetail(shown!.repo, shown!.name, shown!.path),
+    enabled: shown != null,
   });
 
-  // Escape closes the panel; ←/→ switch skills (delegated to the page).
+  // ←/→ switch skills (delegated to the page); Escape is Radix's dismiss.
   useEffect(() => {
     if (!skill) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") onPrev();
+      if (e.key === "ArrowLeft") onPrev();
       else if (e.key === "ArrowRight") onNext();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [skill, onPrev, onNext, onClose]);
+  }, [skill, onPrev, onNext]);
 
-  if (!skill) return null;
-
-  const owner = skill.repo.split("/")[0];
-  const description = detail?.description || skill.description;
+  // Always render the SheetContent — Radix mounts and unmounts it with the
+  // Sheet's open state, keeping the drawer alive through the close
+  // animation. With no skill (and no latch yet) the drawer is empty, which
+  // only happens before the first selection.
+  const owner = shown?.repo.split("/")[0] ?? "";
+  const description = detail?.description || shown?.description;
   // Link to the skill's folder in GitHub; without a known path, the repo root.
-  const sourcePath = skill.path?.replace(/^\/+|\/+$/g, "");
-  const sourceHref = sourcePath
-    ? `https://github.com/${skill.repo}/tree/HEAD/${sourcePath}`
-    : `https://github.com/${skill.repo}`;
+  const sourcePath = shown?.path?.replace(/^\/+|\/+$/g, "");
+  const sourceHref = !shown
+    ? ""
+    : sourcePath
+      ? `https://github.com/${shown.repo}/tree/HEAD/${sourcePath}`
+      : `https://github.com/${shown.repo}`;
   // Repo-relative SKILL.md path, reused for the GitHub file link and to
   // resolve relative URLs inside the markdown body.
   const filePath = detail?.path.replace(/^\/+|\/+$/g, "") ?? "";
 
   return (
-    <aside
-      role="complementary"
-      aria-label="技能详情"
-      className="flex h-full w-[440px] shrink-0 animate-in slide-in-from-right flex-col border-l border-border bg-card duration-200"
-    >
-      <div className="flex flex-col gap-4 border-b border-border p-6 pb-5">
-        <div className="flex items-center justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label="关闭"
-            className="h-7 w-7 p-0"
-            onClick={onClose}
+    <SheetContent side="right" className="flex flex-col">
+      <SheetHeader>
+        <OwnerAvatar owner={owner} className="h-11 w-11 text-[18px]" />
+        <SheetTitle className="truncate">{shown?.name}</SheetTitle>
+        <SheetDescription asChild>
+          <a
+            href={sourceHref}
+            onClick={(e) => {
+              e.preventDefault();
+              void openExternal(sourceHref);
+            }}
+            title="在 GitHub 中打开该技能的目录"
+            className="min-w-0 items-center gap-1"
           >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <OwnerAvatar owner={owner} className="h-11 w-11 text-[18px]" />
-          <div className="min-w-0">
-            <h2 className="truncate text-[17px] font-semibold tracking-tight text-foreground">
-              {skill.name}
-            </h2>
-            <a
-              href={sourceHref}
-              onClick={(e) => {
-                e.preventDefault();
-                void openExternal(sourceHref);
-              }}
-              title="在 GitHub 中打开该技能的目录"
-              className="mt-0.5 flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <span className="truncate">{skill.repo}</span>
-              <ExternalLink className="h-3 w-3 shrink-0" />
-            </a>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
+            <span className="truncate">{shown?.repo}</span>
+            <ExternalLink className="h-3 w-3 shrink-0" />
+          </a>
+        </SheetDescription>
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
           {detail?.version && (
             <Badge variant="secondary">v{detail.version}</Badge>
           )}
@@ -120,19 +117,19 @@ export function SkillDetailPanel({
           <span className="ml-0.5 flex items-center gap-1 text-[12px] text-muted-foreground">
             <Download className="h-3.5 w-3.5" />
             <span className="font-medium tabular-nums">
-              {formatCount(skill.downloads)}
+              {formatCount(shown?.downloads ?? 0)}
             </span>
           </span>
           <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
             <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
             <span className="font-medium tabular-nums">
-              {formatCount(skill.stars)}
+              {formatCount(shown?.stars ?? 0)}
             </span>
           </span>
         </div>
-      </div>
+      </SheetHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-6">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {isPending ? (
           <div className="flex h-40 items-center justify-center text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -155,7 +152,7 @@ export function SkillDetailPanel({
             </Button>
           </div>
         ) : detail ? (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-5 pt-2">
             {description && (
               <p className="whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground">
                 {description}
@@ -163,11 +160,11 @@ export function SkillDetailPanel({
             )}
             <div>
               <a
-                href={`https://github.com/${skill.repo}/blob/HEAD/${filePath}`}
+                href={`https://github.com/${shown?.repo}/blob/HEAD/${filePath}`}
                 onClick={(e) => {
                   e.preventDefault();
                   void openExternal(
-                    `https://github.com/${skill.repo}/blob/HEAD/${filePath}`,
+                    `https://github.com/${shown?.repo}/blob/HEAD/${filePath}`,
                   );
                 }}
                 title="在 GitHub 中打开 SKILL.md"
@@ -177,7 +174,7 @@ export function SkillDetailPanel({
                 <ExternalLink className="h-3 w-3 shrink-0" />
               </a>
               {detail.instructions ? (
-                <Markdown repo={skill.repo} filePath={filePath}>
+                <Markdown repo={shown?.repo ?? ""} filePath={filePath}>
                   {detail.instructions}
                 </Markdown>
               ) : (
@@ -189,6 +186,6 @@ export function SkillDetailPanel({
           </div>
         ) : null}
       </div>
-    </aside>
+    </SheetContent>
   );
 }

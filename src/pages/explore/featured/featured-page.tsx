@@ -8,7 +8,7 @@ import {
 } from "../../../lib/skills-api";
 import { FEATURED_CATEGORIES } from "../../../data/featured-content";
 import { Button } from "../../../components/ui/button";
-import { cn } from "../../../lib/utils";
+import { Sheet } from "../../../components/ui/sheet";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../explore-page";
 import { SkillCard } from "../skill-card";
@@ -109,8 +109,7 @@ export function FeaturedPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
-      <div className="flex min-h-0 flex-1 flex-row">
-        <div className="min-h-0 flex-1 overflow-y-auto pb-6 pr-1">
+      <div className="min-h-0 flex-1 overflow-y-auto pb-6 pr-1">
           {isError ? (
             <Placeholder
               message={`加载失败：${error instanceof Error ? error.message : "未知错误"}`}
@@ -136,14 +135,9 @@ export function FeaturedPage() {
                   <h2 className="mb-4 text-xl font-bold tracking-tight text-foreground">
                     {section.title}
                   </h2>
-                  <div
-                    className={cn(
-                      "grid gap-4 sm:grid-cols-2",
-                      // The detail panel takes ~440px; drop to two columns
-                      // while it is open so the cards keep a readable width.
-                      selectedSkill == null && "lg:grid-cols-3",
-                    )}
-                  >
+                  {/* The detail drawer overlays the grid; the layout never
+                      changes when it opens or closes. */}
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {section.skills.map(({ skill, index: i }) => (
                       <SkillCard
                         key={`${skill.repo}/${skill.name}`}
@@ -159,13 +153,20 @@ export function FeaturedPage() {
           )}
         </div>
 
+      {/* Standard shadcn Sheet: modal drawer with dimmed overlay; opening or
+          closing it never reflows the grid. */}
+      <Sheet
+        open={selectedSkill != null}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
+        }}
+      >
         <SkillDetailPanel
           skill={selectedSkill}
           onPrev={handlePrev}
           onNext={handleNext}
-          onClose={() => setSelected(null)}
         />
-      </div>
+      </Sheet>
     </div>
   );
 }

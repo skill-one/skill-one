@@ -86,7 +86,7 @@ describe("FeaturedPage", () => {
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(
       0,
     );
-    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows an error state and recovers via retry", async () => {
@@ -165,7 +165,7 @@ describe("FeaturedPage", () => {
     expect(
       await screen.findByText(`Instructions for ${first}.`),
     ).toBeInTheDocument();
-    const panel = screen.getByRole("complementary", { name: "技能详情" });
+    const panel = screen.getByRole("dialog");
     expect(within(panel).getByText(first)).toBeInTheDocument();
   });
 
@@ -189,9 +189,9 @@ describe("FeaturedPage", () => {
       await screen.findByText(`Instructions for ${second}.`),
     ).toBeInTheDocument();
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() =>
-      expect(screen.queryByRole("complementary")).not.toBeInTheDocument(),
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
   });
 });

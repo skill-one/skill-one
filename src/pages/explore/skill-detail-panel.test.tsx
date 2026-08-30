@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -6,6 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { openExternal } from "../../lib/open-external";
 import type { Skill } from "../../types/skill";
+import { Sheet } from "../../components/ui/sheet";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
 vi.mock("../../lib/skill-detail-api", () => ({
@@ -39,18 +41,39 @@ const detail = {
 
 let queryClient: QueryClient;
 
-function renderPanel(props: Partial<Parameters<typeof SkillDetailPanel>[0]>) {
-  return render(
+/**
+ * The panel renders the content side of a modal Sheet, so the tests mount
+ * it inside a stateful open Sheet exactly like the explore page does. The
+ * sheet starts open only when a skill is present, mirroring the page's
+ * `open = skill != null` wiring.
+ */
+function Drawer({
+  skill,
+  onPrev,
+  onNext,
+}: {
+  skill: Skill | null;
+  onPrev?: () => void;
+  onNext?: () => void;
+}) {
+  const [open, setOpen] = useState(skill != null);
+  return (
     <QueryClientProvider client={queryClient}>
-      <SkillDetailPanel
-        skill={null}
-        onPrev={() => {}}
-        onNext={() => {}}
-        onClose={() => {}}
-        {...props}
-      />
-    </QueryClientProvider>,
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SkillDetailPanel
+          skill={skill}
+          onPrev={onPrev ?? (() => {})}
+          onNext={onNext ?? (() => {})}
+        />
+      </Sheet>
+    </QueryClientProvider>
   );
+}
+
+function renderDrawer(
+  props: Partial<Parameters<typeof Drawer>[0]> & { skill?: Skill | null },
+) {
+  return render(<Drawer skill={skill} {...props} />);
 }
 
 beforeEach(() => {
@@ -63,20 +86,20 @@ beforeEach(() => {
 
 describe("SkillDetailPanel", () => {
   it("renders nothing when no skill is selected", () => {
-    renderPanel({});
-    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+    renderDrawer({ skill: null });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(mockFetchSkillDetail).not.toHaveBeenCalled();
   });
 
   it("shows skill info and the fetched SKILL.md", async () => {
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderPanel({ skill });
+    renderDrawer({});
 
     // Await the async detail content first; the rest renders with it.
     expect(
       await screen.findByText("Use this skill for PDFs."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("complementary")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
     expect(screen.getByText("v1.2.0")).toBeInTheDocument();
@@ -95,7 +118,7 @@ describe("SkillDetailPanel", () => {
 
   it("links the source repo to the skill's GitHub directory when known", async () => {
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderPanel({ skill: { ...skill, path: "skills/pdf" } });
+    renderDrawer({ skill: { ...skill, path: "skills/pdf" } });
 
     await screen.findByText("Use this skill for PDFs.");
     expect(
@@ -115,7 +138,7 @@ describe("SkillDetailPanel", () => {
 
   it("links the source repo to the GitHub repo root when the path is unknown", async () => {
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderPanel({ skill });
+    renderDrawer({});
 
     await screen.findByText("Use this skill for PDFs.");
     expect(
@@ -126,7 +149,7 @@ describe("SkillDetailPanel", () => {
   it("opens the source link through the system browser on click", async () => {
     const user = userEvent.setup();
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderPanel({ skill: { ...skill, path: "skills/pdf" } });
+    renderDrawer({ skill: { ...skill, path: "skills/pdf" } });
 
     await screen.findByText("Use this skill for PDFs.");
     await user.click(screen.getByRole("link", { name: /anthropics\/skills/ }));
@@ -140,7 +163,7 @@ describe("SkillDetailPanel", () => {
     mockFetchSkillDetail.mockRejectedValueOnce(
       new Error("SKILL.md for pdf not found"),
     );
-    renderPanel({ skill });
+    renderDrawer({});
 
     expect(
       await screen.findByText(/SKILL.md for pdf not found/),
@@ -157,7 +180,7 @@ describe("SkillDetailPanel", () => {
     const onPrev = vi.fn();
     const onNext = vi.fn();
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderPanel({ skill, onPrev, onNext });
+    renderDrawer({ onPrev, onNext });
 
     await screen.findByText("Use this skill for PDFs.");
     fireEvent.keyDown(window, { key: "ArrowRight" });
@@ -168,22 +191,24 @@ describe("SkillDetailPanel", () => {
 
   it("closes via the X button", async () => {
     const user = userEvent.setup();
-    const onClose = vi.fn();
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderPanel({ skill, onClose });
+    renderDrawer({});
 
     await screen.findByText("Use this skill for PDFs.");
-    await user.click(screen.getByRole("button", { name: "关闭" }));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await vi.waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
   });
 
   it("closes via the Escape key", async () => {
-    const onClose = vi.fn();
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderPanel({ skill, onClose });
+    renderDrawer({});
 
     await screen.findByText("Use this skill for PDFs.");
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await vi.waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
   });
 });

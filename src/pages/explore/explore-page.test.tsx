@@ -633,52 +633,30 @@ describe("ExplorePage", () => {
     expect(
       await screen.findByText("Instructions for skill-0."),
     ).toBeInTheDocument();
-    const panel = screen.getByRole("complementary");
+    const panel = screen.getByRole("dialog");
     expect(within(panel).getByText("skill-0")).toBeInTheDocument();
     expect(within(panel).getByText("repo-0/skills")).toBeInTheDocument();
   });
 
-  it("switches skills inside the panel via card clicks", async () => {
-    const user = userEvent.setup();
+  it("switches skills inside the panel via the arrow keys", async () => {
     mockRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
-    await user.click(screen.getByText("skill-0"));
+    await userEvent.setup().click(screen.getByText("skill-0"));
     expect(
       await screen.findByText("Instructions for skill-0."),
     ).toBeInTheDocument();
 
-    // Clicking another card while the panel is open swaps the skill in place.
-    await user.click(screen.getByText("skill-23"));
+    // While the modal drawer is open, ←/→ switch skills in place.
+    fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(
-      await screen.findByText("Instructions for skill-23."),
+      await screen.findByText("Instructions for skill-1."),
     ).toBeInTheDocument();
-  });
-
-  it("scrolls the card into view when the panel opens, but not when switching skills", async () => {
-    const user = userEvent.setup();
-    const scrollIntoView = vi
-      .spyOn(Element.prototype, "scrollIntoView")
-      .mockImplementation(() => {});
-    mockRegistry(50);
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    // Opening the panel (null → index) collapses the grid and must scroll
-    // the clicked card back into view.
-    await user.click(screen.getByText("skill-5"));
-    await screen.findByText("Instructions for skill-5.");
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
-
-    // Switching to another card while the panel is already open keeps the
-    // layout stable — no scroll adjustment.
-    await user.click(screen.getByText("skill-23"));
-    await screen.findByText("Instructions for skill-23.");
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-
-    scrollIntoView.mockRestore();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(
+      await screen.findByText("Instructions for skill-0."),
+    ).toBeInTheDocument();
   });
 
   it("closes the panel via the X button and Escape", async () => {
@@ -687,20 +665,49 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("skill-0");
 
-    // X button restores the full-width grid.
+    // X button closes the drawer.
     await user.click(screen.getByText("skill-0"));
-    expect(await screen.findByRole("complementary")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "关闭" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() =>
-      expect(screen.queryByRole("complementary")).not.toBeInTheDocument(),
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
 
-    // Escape also closes the panel.
+    // Escape also closes the panel (Radix's document-level dismiss).
     await user.click(screen.getByText("skill-1"));
-    expect(await screen.findByRole("complementary")).toBeInTheDocument();
-    fireEvent.keyDown(window, { key: "Escape" });
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() =>
-      expect(screen.queryByRole("complementary")).not.toBeInTheDocument(),
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("opens the drawer without reflowing the grid", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50);
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    const grid = screen.getByText("skill-0").closest(".grid")!;
+    expect(grid.className).toBe(
+      "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+    );
+
+    // Opening the drawer overlays the grid: the grid's classes — and with
+    // them its layout and scroll position — stay exactly the same while
+    // the drawer is open and after it closes.
+    await user.click(screen.getByText("skill-0"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(grid.className).toBe(
+      "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(grid.className).toBe(
+      "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
     );
   });
 });
