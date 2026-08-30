@@ -74,8 +74,46 @@ describe("fetchSkillsPage", () => {
       description: "helps you find skills",
       stars: 29975,
       downloads: 2991984,
+      weeklyInstalls: 113781,
       path: "skills/find-skills",
     });
+  });
+
+  it("keeps the most recent week of the weekly install series", async () => {
+    const fetchSkillsPage = await freshModule();
+    // The series is chronological, so the last entry is the current week; an
+    // entry without weekly data surfaces as undefined rather than 0 so the
+    // rankings can tell "no data" and "zero installs" apart. Live index lines
+    // exist both with an empty series and without the field at all.
+    fetchMock.mockResolvedValueOnce(
+      ok(
+        jsonl(
+          {
+            source: "owner/repo",
+            skillId: "trending",
+            installs: 100,
+            weeklyInstalls: [30, 20, 50],
+          },
+          {
+            source: "owner/repo",
+            skillId: "no-weekly",
+            installs: 5,
+            weeklyInstalls: [],
+          },
+          {
+            source: "owner/repo",
+            skillId: "field-missing",
+            installs: 7,
+          },
+        ),
+      ),
+    );
+
+    const page = await fetchSkillsPage(0);
+
+    expect(page.skills[0].weeklyInstalls).toBe(50);
+    expect(page.skills[1].weeklyInstalls).toBeUndefined();
+    expect(page.skills[2].weeklyInstalls).toBeUndefined();
   });
 
   it("normalizes missing stars/installs to 0", async () => {
