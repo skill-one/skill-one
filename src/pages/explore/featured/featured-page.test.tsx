@@ -1,11 +1,14 @@
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { within } from "@testing-library/react";
+import { act, within } from "@testing-library/react";
 
 import { FEATURED_CATEGORIES } from "../../../data/featured-content";
 import { renderWithRouter, screen, waitFor } from "../../../test/test-utils";
 import { fetchSkillDetail } from "../../../lib/skill-detail-api";
-import { fetchFullIndex } from "../../../lib/skills-api";
+import {
+  fetchFullIndex,
+  subscribeIndexProgress,
+} from "../../../lib/skills-api";
 import type { Skill } from "../../../types/skill";
 import { FeaturedPage } from "./featured-page";
 
@@ -28,15 +31,17 @@ vi.mock("embla-carousel-react", () => ({
 }));
 
 vi.mock("../../../lib/skills-api", () => ({
-  // The page spreads this into its query key; keep it a stable array.
-  SKILLS_QUERY_KEY: ["skills", 5],
+  // The hook passes this straight into its query key; keep it a stable array.
+  SKILLS_QUERY_KEY: ["skills", 6],
   fetchFullIndex: vi.fn(),
+  subscribeIndexProgress: vi.fn(),
 }));
 vi.mock("../../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
 }));
 
 const mockFetchFullIndex = vi.mocked(fetchFullIndex);
+const mockSubscribeIndexProgress = vi.mocked(subscribeIndexProgress);
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 
 const [efficiency, design, development, writing] = FEATURED_CATEGORIES;
@@ -76,6 +81,10 @@ beforeEach(() => {
       path: `skills/${name}/SKILL.md`,
     }),
   );
+  // By default no progress is reported: data arrives complete when
+  // fetchFullIndex resolves, matching the pre-streaming behavior.
+  mockSubscribeIndexProgress.mockReset();
+  mockSubscribeIndexProgress.mockImplementation(() => () => {});
 });
 
 describe("FeaturedPage", () => {
@@ -87,6 +96,45 @@ describe("FeaturedPage", () => {
       0,
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps the skeleton while the registry is still streaming in", async () => {
+    let resolveIndex: (skills: Skill[]) => void = () => {};
+    mockFetchFullIndex.mockImplementation(
+      () =>
+        new Promise<Skill[]>((resolve) => {
+          resolveIndex = resolve;
+        }),
+    );
+    let progress: ((skills: Skill[]) => void) | null = null;
+    mockSubscribeIndexProgress.mockImplementation((listener) => {
+      progress = listener;
+      return () => {
+        progress = null;
+      };
+    });
+    const { container } = renderWithRouter(<FeaturedPage />);
+    await act(async () => {});
+
+    // Partial data arrives — rankings over an incomplete registry would be
+    // wrong, so the page must not render any of it yet.
+    await act(async () => {
+      progress?.(curatedIndex().slice(0, 4));
+    });
+    expect(
+      container.querySelectorAll(".animate-pulse").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole("region", { name: "精选推荐" }),
+    ).not.toBeInTheDocument();
+
+    // Completion unlocks the real content.
+    await act(async () => {
+      resolveIndex(curatedIndex());
+    });
+    expect(
+      await screen.findByRole("region", { name: "精选推荐" }),
+    ).toBeInTheDocument();
   });
 
   it("shows an error state and recovers via retry", async () => {

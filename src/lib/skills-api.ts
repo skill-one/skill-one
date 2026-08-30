@@ -1,5 +1,5 @@
 import type { Skill } from "../types/skill";
-import { fetchFirstText, fileCandidates } from "./cdn-config";
+import { fetchFirstStream, fileCandidates } from "./cdn-config";
 
 /**
  * The skills-index repo publishes the full index (JSONL, one object per line)
@@ -17,13 +17,21 @@ const INDEX_SPEC = {
 const PAGE_SIZE = 200;
 
 /**
- * The TanStack Query cache key for the parsed full registry index. Explore and
- * featured share it so both pages read the same cached download; the trailing
- * version invalidates caches captured with a stale shape. The entry is
- * excluded from localStorage persistence in App.tsx (the parsed index is far
- * too large), so it never survives a restart.
+ * The TanStack Query cache key for the registry index. Explore and featured
+ * share it so both pages read the same cached download; the trailing version
+ * invalidates caches captured with a stale shape (6: the cache now holds
+ * `{ skills, complete }` so pages can render while the download streams). The
+ * entry is excluded from localStorage persistence in App.tsx (the parsed
+ * index is far too large), so it never survives a restart.
  */
-export const SKILLS_QUERY_KEY = ["skills", 5] as const;
+export const SKILLS_QUERY_KEY = ["skills", 6] as const;
+
+/** The registry-index shape cached under `SKILLS_QUERY_KEY`. */
+export interface SkillsIndexData {
+  skills: Skill[];
+  /** False while the index download is still streaming in. */
+  complete: boolean;
+}
 
 /** Raw skill shape as stored in one JSONL index line. */
 interface RawSkill {
@@ -93,50 +101,170 @@ function toSkill(raw: RawSkill): Skill {
 }
 
 /**
- * Parse the JSONL index into a list of GitHub skills, skipping blank lines
- * and entries that are malformed or not GitHub repos.
+ * Parse one JSONL index line into a GitHub skill. Returns null for blank
+ * lines, malformed JSON, and entries that are not GitHub repos — the same
+ * skips the previous whole-text parse applied.
  */
-function parseIndex(text: string): Skill[] {
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .flatMap((line) => {
-      try {
-        return [JSON.parse(line) as RawSkill];
-      } catch {
-        return [];
-      }
-    })
-    .filter((raw) => isGitHubRepo(raw.source))
-    .map(toSkill);
+function parseSkillLine(line: string): Skill | null {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) return null;
+  let raw: RawSkill;
+  try {
+    raw = JSON.parse(trimmed) as RawSkill;
+  } catch {
+    return null;
+  }
+  return isGitHubRepo(raw.source) ? toSkill(raw) : null;
 }
 
 /**
- * Cached download of the full index. The JSONL file (~12MB) is fetched once
- * per session and shared across pagination requests; a failed download clears
- * the cache so the next call retries. Freshness across restarts is delegated
- * to the data-fetching layer (TanStack Query).
+ * Silence allowed between body chunks before the read is treated as stalled.
+ * `fetchFirstStream` only guards the response headers, so this is what keeps
+ * a dead connection from hanging the load forever.
  */
-let indexPromise: Promise<Skill[]> | null = null;
+const CHUNK_TIMEOUT_MS = 15_000;
 
-function loadIndex(): Promise<Skill[]> {
-  indexPromise ??= fetchFirstText(fileCandidates({ ...INDEX_SPEC }))
-    .then(({ text }) => parseIndex(text))
-    .catch((err: unknown) => {
-      indexPromise = null;
+/**
+ * Read a response body as decoded text lines, delivering each complete line
+ * to `onLine` as it arrives. Decoding uses `TextDecoder`'s streaming mode
+ * rather than `TextDecoderStream`, which is missing on older WebKit builds
+ * the app still supports.
+ */
+async function readLines(
+  body: ReadableStream<Uint8Array>,
+  onLine: (line: string) => void,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  type ReadResult = Awaited<ReturnType<typeof reader.read>>;
+  let buffer = "";
+  try {
+    for (;;) {
+      const { done, value } = await new Promise<ReadResult>(
+        (resolve, reject) => {
+          const stall = setTimeout(
+            () => reject(new Error("response stalled")),
+            CHUNK_TIMEOUT_MS,
+          );
+          reader.read().then(
+            (result) => {
+              clearTimeout(stall);
+              resolve(result);
+            },
+            (err: unknown) => {
+              clearTimeout(stall);
+              reject(err);
+            },
+          );
+        },
+      );
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // Only complete lines are parseable; the trailing fragment stays
+      // buffered until its remainder arrives.
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) onLine(line);
+    }
+    // A final line without a trailing newline is still a line.
+    buffer += decoder.decode();
+    if (buffer.length > 0) onLine(buffer);
+  } finally {
+    // Release the connection when abandoning a half-read body (the candidate
+    // fallback has moved on to another source).
+    reader.cancel().catch(() => {});
+  }
+}
+
+/** How often partial results are pushed to subscribers while streaming. */
+const PROGRESS_INTERVAL_MS = 400;
+
+/**
+ * In-flight index download shared by every consumer in the session. `skills`
+ * accumulates the lines parsed so far; `listeners` receive throttled
+ * cumulative snapshots while the stream runs (and one immediate snapshot —
+ * everything parsed so far — when joining a download that already finished).
+ */
+interface IndexLoad {
+  promise: Promise<Skill[]>;
+  skills: Skill[];
+  listeners: Set<(skills: Skill[]) => void>;
+}
+
+let load: IndexLoad | null = null;
+
+function startLoad(): IndexLoad {
+  const state: IndexLoad = {
+    promise: null as unknown as Promise<Skill[]>,
+    skills: [],
+    listeners: new Set(),
+  };
+  state.promise = (async () => {
+    let lastNotify = 0;
+    const notify = () => {
+      if (state.skills.length === 0) return;
+      // Leading edge: the very first skills notify immediately so the UI can
+      // paint page one while the rest of the file is still in flight.
+      const now = Date.now();
+      if (now - lastNotify < PROGRESS_INTERVAL_MS) return;
+      lastNotify = now;
+      const snapshot = [...state.skills];
+      for (const listener of state.listeners) listener(snapshot);
+    };
+    try {
+      await fetchFirstStream(fileCandidates({ ...INDEX_SPEC }), async (body) => {
+        // A candidate that fails mid-stream restarts the parse from scratch
+        // on the next candidate.
+        state.skills = [];
+        await readLines(body, (line) => {
+          const skill = parseSkillLine(line);
+          if (skill) {
+            state.skills.push(skill);
+            notify();
+          }
+        });
+      });
+      return state.skills;
+    } catch (err: unknown) {
+      // Clear the cache so the next call retries, as before.
+      load = null;
       throw err;
-    });
-  return indexPromise;
+    }
+  })();
+  return state;
 }
 
 /**
- * Load the full skills index (cached per session). Exposed for callers that
- * need to join installed skills with registry metadata (downloads,
- * descriptions) rather than paginate, e.g. the "my skills" page.
+ * Observe the index while it streams in. The listener receives a cumulative
+ * snapshot of the skills parsed so far — immediately on subscription (so a
+ * page mounting mid-download paints from the current snapshot) and then at
+ * most once per progress interval. Returns an unsubscribe function.
+ *
+ * Starts the download if it has not started; joining an in-flight or finished
+ * download never refetches.
+ */
+export function subscribeIndexProgress(
+  listener: (skills: Skill[]) => void,
+): () => void {
+  load ??= startLoad();
+  load.listeners.add(listener);
+  if (load.skills.length > 0) listener([...load.skills]);
+  const state = load;
+  return () => {
+    state.listeners.delete(listener);
+  };
+}
+
+/**
+ * Load the full skills index (cached per session; the promise resolves once
+ * the stream completes). Exposed for callers that need the whole registry at
+ * once — joining installed skills with registry metadata, ranking the
+ * featured page, or slicing numbered pages — rather than progressive
+ * rendering.
  */
 export function fetchFullIndex(): Promise<Skill[]> {
-  return loadIndex();
+  load ??= startLoad();
+  return load.promise;
 }
 
 /**
@@ -151,7 +279,7 @@ export async function fetchSkillsPage(
   page: number,
   pageSize: number = PAGE_SIZE,
 ): Promise<SkillsPage> {
-  const skills = await loadIndex();
+  const skills = await fetchFullIndex();
   const start = page * pageSize;
   const slice = skills.slice(start, start + pageSize);
   return {

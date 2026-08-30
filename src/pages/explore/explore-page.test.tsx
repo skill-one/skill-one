@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  act,
   render,
   screen,
   waitFor,
@@ -10,20 +11,23 @@ import {
 import userEvent from "@testing-library/user-event";
 import { HashRouter, Route, Routes } from "react-router-dom";
 
-import { fetchFullIndex } from "../../lib/skills-api";
+import { fetchFullIndex, subscribeIndexProgress } from "../../lib/skills-api";
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import type { Skill } from "../../types/skill";
 import { ExplorePage } from "./explore-page";
 
 vi.mock("../../lib/skills-api", () => ({
-  // The page spreads this into its query key; keep it a stable array.
-  SKILLS_QUERY_KEY: ["skills", 5],
+  // The hook passes this straight into its query key; keep it a stable array.
+  SKILLS_QUERY_KEY: ["skills", 6],
   fetchFullIndex: vi.fn(),
+  subscribeIndexProgress: vi.fn(),
 }));
 vi.mock("../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
 }));
 
 const mockFetchFullIndex = vi.mocked(fetchFullIndex);
+const mockSubscribeIndexProgress = vi.mocked(subscribeIndexProgress);
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 
 /** Build a slice of `count` skills starting at global index `offset`. */
@@ -46,12 +50,12 @@ function mockRegistry(total: number) {
 }
 
 /**
- * Mock a registry of one distinctive "gadget" skill among 49 filler "tool"
- * skills. The names are mutually distant enough that fuzzy search stays
- * deterministic: "gadget" matches exactly one skill, never the fillers.
+ * A registry of one distinctive "gadget" skill among 49 filler "tool" skills.
+ * The names are mutually distant enough that fuzzy search stays deterministic:
+ * "gadget" matches exactly one skill, never the fillers.
  */
-function mockGadgetRegistry() {
-  mockFetchFullIndex.mockResolvedValue([
+function gadgetRegistry(): Skill[] {
+  return [
     {
       name: "gadget-master",
       repo: "acme/gadgets",
@@ -66,7 +70,11 @@ function mockGadgetRegistry() {
       stars: 10,
       downloads: 10,
     })),
-  ]);
+  ];
+}
+
+function mockGadgetRegistry() {
+  mockFetchFullIndex.mockResolvedValue(gadgetRegistry());
 }
 
 let queryClient: QueryClient;
@@ -103,6 +111,10 @@ beforeEach(() => {
       path: `skills/${id}/SKILL.md`,
     }),
   );
+  // By default no progress is reported: data arrives complete when
+  // fetchFullIndex resolves, matching the pre-streaming behavior.
+  mockSubscribeIndexProgress.mockReset();
+  mockSubscribeIndexProgress.mockImplementation(() => () => {});
 });
 
 describe("ExplorePage", () => {
@@ -709,5 +721,94 @@ describe("ExplorePage", () => {
     expect(grid.className).toBe(
       "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
     );
+  });
+});
+
+describe("ExplorePage streaming", () => {
+  /** The progress listener the page's hook registered, or null. */
+  let progress: ((skills: Skill[]) => void) | null;
+
+  /** Emit a progress snapshot from the (mocked) streaming index. */
+  async function emitProgress(skills: Skill[]) {
+    await act(async () => {
+      progress?.(skills);
+    });
+  }
+
+  beforeEach(() => {
+    progress = null;
+    mockSubscribeIndexProgress.mockImplementation((listener) => {
+      progress = listener;
+      return () => {
+        progress = null;
+      };
+    });
+  });
+
+  it("renders page one from progress snapshots while the index is still streaming", async () => {
+    // The download never finishes within the test — only snapshots arrive.
+    mockFetchFullIndex.mockImplementation(
+      () => new Promise<Skill[]>(() => {}),
+    );
+    renderExplorePage();
+    await act(async () => {});
+
+    await emitProgress(makeSkills(30, 0));
+
+    // Page one paints from the partial data; the count reports what has
+    // loaded so far and says it is still loading.
+    expect(await screen.findByText("skill-0")).toBeInTheDocument();
+    expect(screen.getByText("skill-23")).toBeInTheDocument();
+    expect(screen.queryByText("skill-24")).not.toBeInTheDocument();
+    expect(screen.getByText(/共 30 个/)).toBeInTheDocument();
+    expect(screen.getByText(/加载中/)).toBeInTheDocument();
+
+    // A later snapshot grows the registry (and the count) in place.
+    await emitProgress(makeSkills(60, 0));
+    expect(await screen.findByText(/共 60 个/)).toBeInTheDocument();
+    expect(screen.getByText("共 60 个 · 加载中")).toBeInTheDocument();
+  });
+
+  it("falls back to substring search while streaming and fuzzy search once complete", async () => {
+    let resolveIndex: ((skills: Skill[]) => void) | undefined;
+    mockFetchFullIndex.mockImplementation(
+      () =>
+        new Promise<Skill[]>((resolve) => {
+          resolveIndex = resolve;
+        }),
+    );
+    renderExplorePage();
+    await act(async () => {});
+
+    // Only the first 10 skills have streamed in, including the gadget.
+    await emitProgress(gadgetRegistry().slice(0, 10));
+    await screen.findByText("gadget-master");
+
+    const user = userEvent.setup();
+    const input = screen.getByRole("textbox", { name: "搜索 Skill" });
+
+    // Exact substring still matches during streaming...
+    await user.type(input, "gadget");
+    expect(
+      await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/共 1 个/)).toBeInTheDocument();
+
+    // ...but a typo cannot, since the fallback has no fuzzy matching.
+    await user.clear(input);
+    await user.type(input, "gadgt");
+    expect(
+      await screen.findByText("未找到匹配“gadgt”的 Skill"),
+    ).toBeInTheDocument();
+
+    // The stream completes; the MiniSearch index builds over the full
+    // registry and the same typo now fuzzy-matches.
+    await act(async () => {
+      resolveIndex?.(gadgetRegistry());
+    });
+    expect(
+      await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/加载中/)).not.toBeInTheDocument();
   });
 });

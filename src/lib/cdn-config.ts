@@ -124,6 +124,23 @@ export class SourceFetchError extends Error {
   }
 }
 
+/** Shared failure classification for the candidate loops below. */
+function throwSourceError(
+  status: number | undefined,
+  networkFailure: boolean,
+): never {
+  throw networkFailure
+    ? new SourceFetchError(
+        "network",
+        "无法连接数据源：已尝试直连 GitHub 与 CDN 镜像",
+      )
+    : new SourceFetchError(
+        "http",
+        `数据源请求失败（HTTP ${status ?? "未知"}）`,
+        status,
+      );
+}
+
 /** Fetch the text of the first reachable candidate. */
 export async function fetchFirstText(
   urls: string[],
@@ -141,15 +158,41 @@ export async function fetchFirstText(
       networkFailure = true;
     }
   }
-  throw networkFailure
-    ? new SourceFetchError(
-        "network",
-        "无法连接数据源：已尝试直连 GitHub 与 CDN 镜像",
-      )
-    : new SourceFetchError(
-        "http",
-        `数据源请求失败（HTTP ${status ?? "未知"}）`,
-        status,
-      );
+  throwSourceError(status, networkFailure);
+}
+
+/**
+ * Fetch the first reachable candidate and hand its response body to `consume`
+ * for streaming reads. Fallback covers the whole streaming window: a body that
+ * fails mid-download (or a `consume` that throws) moves on to the next
+ * candidate, which calls `consume` again from scratch.
+ *
+ * Unlike `fetchFirstText`, the per-candidate timeout only guards the response
+ * headers. A multi-megabyte body legitimately outlasts any fixed cap, so
+ * stream consumers enforce their own stall detection between chunks.
+ */
+export async function fetchFirstStream(
+  urls: string[],
+  consume: (body: ReadableStream<Uint8Array>) => Promise<void>,
+): Promise<void> {
+  let status: number | undefined;
+  let networkFailure = false;
+  for (const url of urls) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const resp = await fetch(url, { signal: controller.signal });
+      if (resp.ok && resp.body) {
+        await consume(resp.body);
+        return;
+      }
+      if (!resp.ok) status = resp.status;
+    } catch {
+      networkFailure = true;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throwSourceError(status, networkFailure);
 }
 

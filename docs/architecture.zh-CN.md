@@ -28,11 +28,11 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 ### 前端（读取）
 
-- **`src/lib/skills-api.ts`**：拉取并解析 skills 注册表索引（JSONL）；由调用方在客户端完成过滤、排序与分页。
+- **`src/lib/skills-api.ts`**：以流式方式拉取并解析 skills 注册表索引（JSONL），下载进行中即可逐步拿到已解析的 skill；由调用方在客户端完成过滤、排序与分页。
 - **`src/lib/skill-detail-api.ts`**：按需拉取单个 skill 的 `SKILL.md`，解析 frontmatter 与正文。
-- **`src/lib/cdn-config.ts`**：管理下载源。默认直连 `raw.githubusercontent.com`，失败后回退到 CDN 镜像（`cdn.jsdmirror.com`），并支持用户在「设置」中配置自定义 CDN。候选地址按优先级依次尝试，配置持久化到 localStorage。
+- **`src/lib/cdn-config.ts`**：管理下载源。默认直连 `raw.githubusercontent.com`，失败后回退到 CDN 镜像（`cdn.jsdmirror.com`），并支持用户在「设置」中配置自定义 CDN。候选地址按优先级依次尝试——包括响应体中途失败时——配置持久化到 localStorage。
 
-读取数据通过 TanStack Query 统一缓存与持久化（`staleTime` 10 分钟、`gcTime` 无限），重启后可先从缓存渲染再后台刷新。每个候选请求带 10 秒超时，避免源站挂起时无 CDN 回退。持久化会排除全量索引查询（`skills-index`，以及探索页存整份解析列表的 `skills` 查询）——解析后的索引体积超出 WebView localStorage 配额，且每次会话都会重新拉取；只有已安装列表、agent 状态等小体量查询会落盘。
+读取数据通过 TanStack Query 统一缓存与持久化（`staleTime` 10 分钟、`gcTime` 无限），重启后可先从缓存渲染再后台刷新。每个候选请求带 10 秒超时，仅守护响应头；流式响应体另有分块间的停滞超时（数 MB 的下载本就可能超过任何固定上限）。持久化会排除全量索引查询（`skills-index`，以及探索页存解析列表及其完成标志的 `skills` 查询）——解析后的索引体积超出 WebView localStorage 配额，且每次会话都会重新拉取；只有已安装列表、agent 状态等小体量查询会落盘。
 
 ### 后端（写入）
 
@@ -73,13 +73,14 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 **探索技能列表**：
 
-1. `explore-page` 通过 `fetchFullIndex()` 请求完整索引。
-2. `skills-api.ts` 首次拉取完整索引（按会话缓存）；搜索、排序与分页均在客户端计算。
-3. `cdn-config.ts` 依序尝试直连 GitHub 与 CDN 镜像。
-4. TanStack Query 在内存中缓存结果（体积过大，不落盘）；翻页与会话内导航优先命中缓存。
+1. `explore-page` 通过 `useSkillsIndex` hook 订阅索引，hook 负责启动下载，并把每个进度快照以 `{ skills, complete: false }` 的形式镜像进 TanStack Query 缓存。
+2. `skills-api.ts` 流式拉取索引（按会话缓存），每收到一行就解析一行；页面直接用部分数据渲染——部分列表始终是完整列表的前缀，因此翻页与默认排序保持稳定，仅总数不断上涨。
+3. 流式期间搜索退化为普通子串匹配；MiniSearch 模糊索引在流结束后构建（`complete: true`）——每个快照都重建索引的代价高于下载本身。
+4. `cdn-config.ts` 依序尝试直连 GitHub 与 CDN 镜像。
+5. TanStack Query 在内存中缓存结果（体积过大，不落盘）；翻页与会话内导航优先命中缓存。
 
 **精选页**：
 
-1. `featured-page` 与探索页共享同一份缓存索引（共用 query key）。
+1. `featured-page` 与探索页共享同一份缓存索引（共用 query key），但流式期间保持骨架屏——基于不完整注册表的排名是错误的。
 2. Hero 轮播由索引实时计算（`featured-rankings.ts`）：周安装量、历史总安装量、周增量占比；解析层将每个 skill 最近一周的安装量保留为 `weeklyInstalls`。
 3. 分类区块将 `featured-content.ts` 中的人工策划引用与索引联结；解析不到的引用自动跳过，空分类整体隐藏。

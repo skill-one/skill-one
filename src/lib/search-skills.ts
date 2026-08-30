@@ -88,6 +88,27 @@ export function createSkillSearch(skills: Skill[]): SkillSearch {
   return search;
 }
 
+/**
+ * Plain case-insensitive substring search over the same fields, used while
+ * the registry is still streaming in: building the MiniSearch index for
+ * every progress snapshot would cost more than the whole streaming window.
+ * No ranking and no highlighting (matched stays empty) — results settle into
+ * the full fuzzy search once the index finishes loading.
+ */
+export function containsSearch(
+  skills: Skill[],
+  query: string,
+): SkillSearchHit[] {
+  const q = query.toLowerCase();
+  return skills
+    .filter((skill) =>
+      [skill.name, skill.repo, skill.description].some((field) =>
+        field.toLowerCase().includes(q),
+      ),
+    )
+    .map((skill) => ({ skill, matched: {} }));
+}
+
 function buildSkillSearch(skills: Skill[]): SkillSearch {
   const miniSearch = new MiniSearch<IndexedSkill>({
     fields: ["name", "repo", "description"],
