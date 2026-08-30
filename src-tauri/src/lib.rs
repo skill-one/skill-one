@@ -16,7 +16,6 @@ pub fn run() {
             skills::install_skill,
             skills::list_installed_skills,
             skills::remove_skills,
-            skills::update_skills,
             skills::disable_skills,
             skills::enable_skills,
             skills::link_agents,

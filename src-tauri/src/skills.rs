@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use agents_skills::{
     AddRequest, AgentRequest, DisableRequest, EnableRequest, LinkOutcome, ListRequest, Manager,
-    RemoveRequest, Scope, UpdateRequest,
+    RemoveRequest,
 };
 
 /// Build a `Manager` targeting `cwd` (empty/`None` = the process's own cwd).
@@ -19,6 +19,20 @@ fn manager(cwd: Option<&str>) -> Manager {
         Some(p) => Manager::builder().cwd(p).build(),
         None => Manager::new(),
     }
+}
+
+/// Run a blocking manager operation off the async runtime (git clone, install,
+/// link, ...), mapping a failed join to the command error string. `task` names
+/// the operation for that message ("install", "list", ...). Every command's
+/// backend work goes through here.
+async fn run_blocking<T, F>(cwd: Option<String>, task: &str, f: F) -> Result<T, String>
+where
+    F: FnOnce(&Manager) -> Result<T, String> + Send + 'static,
+    T: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(move || f(&manager(cwd.as_deref())))
+        .await
+        .map_err(|e| format!("{task} task failed: {e}"))?
 }
 
 // ============================ DTOs (serialized to the frontend) ============================
@@ -52,16 +66,6 @@ pub struct RemoveResult {
     pub installed: Vec<String>,
     pub requested: Vec<String>,
     pub removed: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateResult {
-    pub global: bool,
-    pub updated: usize,
-    pub failed: usize,
-    pub updated_names: Vec<String>,
-    pub failures: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -199,124 +203,67 @@ fn extract_description(skill_dir: &std::path::Path) -> Option<String> {
     (!folded.is_empty()).then_some(folded)
 }
 
-/// Map a library link outcome to the flat DTO the frontend consumes.
+/// Map a library link outcome to the flat DTO the frontend consumes. Every
+/// variant starts from the same empty base and fills only the fields it
+/// carries, so per-status field sets stay aligned with the DTO docs.
 fn agent_link_result(result: agents_skills::AgentLinkResult) -> AgentLinkResultDto {
-    let (status, moved, skipped, parked_skills, parked_others, backup_dir, restored, restored_from, message) =
-        match result.outcome {
-            LinkOutcome::Linked {
-                parked_skills,
-                parked_others,
-                backup_dir,
-            } => (
-                "linked",
-                vec![],
-                vec![],
-                parked_skills,
-                parked_others,
-                backup_dir,
-                vec![],
-                None,
-                None,
-            ),
-            LinkOutcome::AlreadyLinked => (
-                "alreadyLinked",
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                None,
-                vec![],
-                None,
-                None,
-            ),
-            LinkOutcome::Migrated {
-                moved,
-                skipped,
-                parked_others,
-                backup_dir,
-            } => (
-                "migrated",
-                moved,
-                skipped,
-                vec![],
-                parked_others,
-                backup_dir,
-                vec![],
-                None,
-                None,
-            ),
-            LinkOutcome::Refused { reason } => (
-                "refused",
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                None,
-                vec![],
-                None,
-                Some(reason),
-            ),
-            LinkOutcome::Skipped => (
-                "skipped",
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                None,
-                vec![],
-                None,
-                None,
-            ),
-            LinkOutcome::Failed { error } => (
-                "failed",
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                None,
-                vec![],
-                None,
-                Some(error),
-            ),
-            LinkOutcome::Unlinked {
-                restored,
-                restored_from,
-            } => (
-                "unlinked",
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                None,
-                restored,
-                restored_from,
-                None,
-            ),
-            LinkOutcome::NotLinked => (
-                "notLinked",
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                None,
-                vec![],
-                None,
-                None,
-            ),
-        };
-    AgentLinkResultDto {
+    let mut dto = AgentLinkResultDto {
         agent: result.agent,
         display: result.display,
-        status: status.to_string(),
-        moved,
-        skipped,
-        parked_skills,
-        parked_others,
-        backup_dir: backup_dir.map(|p| p.display().to_string()),
-        restored,
-        restored_from: restored_from.map(|p| p.display().to_string()),
-        message,
+        status: String::new(),
+        moved: vec![],
+        skipped: vec![],
+        parked_skills: vec![],
+        parked_others: vec![],
+        backup_dir: None,
+        restored: vec![],
+        restored_from: None,
+        message: None,
+    };
+    match result.outcome {
+        LinkOutcome::Linked {
+            parked_skills,
+            parked_others,
+            backup_dir,
+        } => {
+            dto.status = "linked".into();
+            dto.parked_skills = parked_skills;
+            dto.parked_others = parked_others;
+            dto.backup_dir = backup_dir.map(|p| p.display().to_string());
+        }
+        LinkOutcome::AlreadyLinked => dto.status = "alreadyLinked".into(),
+        LinkOutcome::Migrated {
+            moved,
+            skipped,
+            parked_others,
+            backup_dir,
+        } => {
+            dto.status = "migrated".into();
+            dto.moved = moved;
+            dto.skipped = skipped;
+            dto.parked_others = parked_others;
+            dto.backup_dir = backup_dir.map(|p| p.display().to_string());
+        }
+        LinkOutcome::Refused { reason } => {
+            dto.status = "refused".into();
+            dto.message = Some(reason);
+        }
+        LinkOutcome::Skipped => dto.status = "skipped".into(),
+        LinkOutcome::Failed { error } => {
+            dto.status = "failed".into();
+            dto.message = Some(error);
+        }
+        LinkOutcome::Unlinked {
+            restored,
+            restored_from,
+        } => {
+            dto.status = "unlinked".into();
+            dto.restored = restored;
+            dto.restored_from = restored_from.map(|p| p.display().to_string());
+        }
+        LinkOutcome::NotLinked => dto.status = "notLinked".into(),
     }
+    dto
 }
 
 // ============================ Tests ============================
@@ -433,8 +380,7 @@ pub async fn install_skill(
     list_only: Option<bool>,
     cwd: Option<String>,
 ) -> Result<InstallResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let manager = manager(cwd.as_deref());
+    run_blocking(cwd, "install", move |manager| {
         let req = AddRequest {
             source,
             global: global.unwrap_or(false),
@@ -464,7 +410,6 @@ pub async fn install_skill(
         })
     })
     .await
-    .map_err(|e| format!("install task failed: {e}"))?
 }
 
 /// List installed skills (project scope by default, pass `global` for the
@@ -476,8 +421,7 @@ pub async fn list_installed_skills(
     agents: Option<Vec<String>>,
     cwd: Option<String>,
 ) -> Result<Vec<ListedSkillDto>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let manager = manager(cwd.as_deref());
+    run_blocking(cwd, "list", move |manager| {
         let req = ListRequest {
             global: global.unwrap_or(false),
             agents: agents.unwrap_or_default(),
@@ -499,7 +443,6 @@ pub async fn list_installed_skills(
             .collect())
     })
     .await
-    .map_err(|e| format!("list task failed: {e}"))?
 }
 
 /// Remove installed skills. With no `skills` and no `all`, only reports what is
@@ -511,8 +454,7 @@ pub async fn remove_skills(
     all: Option<bool>,
     cwd: Option<String>,
 ) -> Result<RemoveResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let manager = manager(cwd.as_deref());
+    run_blocking(cwd, "remove", move |manager| {
         let req = RemoveRequest {
             skills: skills.unwrap_or_default(),
             global: global.unwrap_or(false),
@@ -526,39 +468,6 @@ pub async fn remove_skills(
         })
     })
     .await
-    .map_err(|e| format!("remove task failed: {e}"))?
-}
-
-/// Update installed skills from their recorded sources. `scope` is one of
-/// `"auto" | "global" | "project"`.
-#[tauri::command]
-pub async fn update_skills(
-    skills: Option<Vec<String>>,
-    scope: Option<String>,
-    cwd: Option<String>,
-) -> Result<UpdateResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let manager = manager(cwd.as_deref());
-        let scope = match scope.as_deref() {
-            Some("global") => Scope::Global,
-            Some("project") => Scope::Project,
-            _ => Scope::Auto,
-        };
-        let req = UpdateRequest {
-            skills: skills.unwrap_or_default(),
-            scope,
-        };
-        let outcome = manager.update(&req).map_err(|e| e.to_string())?;
-        Ok(UpdateResult {
-            global: outcome.global,
-            updated: outcome.updated,
-            failed: outcome.failed,
-            updated_names: outcome.updated_names,
-            failures: outcome.failures,
-        })
-    })
-    .await
-    .map_err(|e| format!("update task failed: {e}"))?
 }
 
 /// Disable installed skills (moves them out of the canonical dir). With no
@@ -570,8 +479,7 @@ pub async fn disable_skills(
     all: Option<bool>,
     cwd: Option<String>,
 ) -> Result<DisableResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let manager = manager(cwd.as_deref());
+    run_blocking(cwd, "disable", move |manager| {
         let req = DisableRequest {
             skills: skills.unwrap_or_default(),
             global: global.unwrap_or(false),
@@ -587,7 +495,6 @@ pub async fn disable_skills(
         })
     })
     .await
-    .map_err(|e| format!("disable task failed: {e}"))?
 }
 
 /// Enable disabled skills (moves them back into the canonical dir). With no
@@ -599,8 +506,7 @@ pub async fn enable_skills(
     all: Option<bool>,
     cwd: Option<String>,
 ) -> Result<EnableResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let manager = manager(cwd.as_deref());
+    run_blocking(cwd, "enable", move |manager| {
         let req = EnableRequest {
             skills: skills.unwrap_or_default(),
             global: global.unwrap_or(false),
@@ -616,7 +522,6 @@ pub async fn enable_skills(
         })
     })
     .await
-    .map_err(|e| format!("enable task failed: {e}"))?
 }
 
 /// Link/unlink agents' skills directories to the canonical dir. With `migrate`,
@@ -630,8 +535,7 @@ pub async fn link_agents(
     migrate: Option<bool>,
     cwd: Option<String>,
 ) -> Result<LinkResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let manager = manager(cwd.as_deref());
+    run_blocking(cwd, "link", move |manager| {
         let req = AgentRequest {
             agents: agents.unwrap_or_default(),
             global: global.unwrap_or(false),
@@ -645,7 +549,6 @@ pub async fn link_agents(
         })
     })
     .await
-    .map_err(|e| format!("link task failed: {e}"))?
 }
 
 /// Report per-agent link status (linked / canonical / not linked), including
@@ -655,11 +558,9 @@ pub async fn link_status(
     global: Option<bool>,
     cwd: Option<String>,
 ) -> Result<Vec<AgentStatusDto>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let manager = manager(cwd.as_deref());
-        let global = global.unwrap_or(false);
+    run_blocking(cwd, "link status", move |manager| {
         Ok(manager
-            .agent_status(global)
+            .agent_status(global.unwrap_or(false))
             .into_iter()
             .map(|s| AgentStatusDto {
                 name: s.name,
@@ -676,5 +577,4 @@ pub async fn link_status(
             .collect())
     })
     .await
-    .map_err(|e| format!("link status task failed: {e}"))?
 }
