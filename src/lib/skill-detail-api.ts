@@ -1,3 +1,5 @@
+import { parse as parseYaml } from "yaml";
+
 import type { SkillDetail } from "../types/skill";
 import { SourceFetchError, fetchFirstText, fileCandidates } from "./cdn-config";
 
@@ -56,9 +58,10 @@ export async function fetchSkillDetail(
 /**
  * Split a SKILL.md into frontmatter fields and the markdown body.
  *
- * Only single-line `key: value` scalars are supported (optionally quoted) —
- * enough for the flat frontmatter agents write. Block scalars (`>`, `|`),
- * comments and unknown keys are ignored, and a file without frontmatter is
+ * The frontmatter block is parsed with the `yaml` package, so block scalars
+ * (`>`, `|`), quoted values, comments and nesting all follow the YAML spec.
+ * Only the flat string fields the detail view shows are kept — everything
+ * else is ignored. A file without frontmatter (or with unparsable YAML) is
  * treated as pure body text.
  */
 export function parseFrontmatter(raw: string): {
@@ -76,17 +79,19 @@ export function parseFrontmatter(raw: string): {
   if (end === -1) return { frontmatter: {}, body: raw.trim() };
 
   const frontmatter: Frontmatter = {};
-  for (const line of lines.slice(0, end)) {
-    if (line.trimStart().startsWith("#")) continue;
-    const colon = line.indexOf(":");
-    if (colon === -1) continue;
-    const key = line.slice(0, colon).trim();
-    const value = unquote(line.slice(colon + 1).trim());
-    const isField = (FRONTMATTER_FIELDS as readonly string[]).includes(key);
-    const isBlockScalar = value.startsWith(">") || value.startsWith("|");
-    if (isField && value && !isBlockScalar) {
-      frontmatter[key as FrontmatterField] = value;
+  try {
+    const data: unknown = parseYaml(lines.slice(0, end).join("\n"));
+    if (data && typeof data === "object") {
+      const record = data as Record<string, unknown>;
+      for (const field of FRONTMATTER_FIELDS) {
+        const value = record[field];
+        if (typeof value === "string") frontmatter[field] = value;
+        // YAML parses `version: 2` as a number; keep it displayable.
+        else if (typeof value === "number") frontmatter[field] = String(value);
+      }
     }
+  } catch {
+    // Malformed YAML should not hide the body — drop the fields only.
   }
   return {
     frontmatter,
@@ -95,17 +100,6 @@ export function parseFrontmatter(raw: string): {
       .join("\n")
       .trim(),
   };
-}
-
-/** Strip one pair of matching surrounding single or double quotes. */
-function unquote(value: string): string {
-  if (value.length >= 2) {
-    const first = value[0];
-    if ((first === '"' || first === "'") && value.at(-1) === first) {
-      return value.slice(1, -1);
-    }
-  }
-  return value;
 }
 
 function toDetail(raw: string, skillId: string, path: string): SkillDetail {
