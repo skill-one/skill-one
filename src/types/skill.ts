@@ -5,12 +5,12 @@ export interface Skill {
   repo: string;
   /**
    * Short human-readable description (shown truncated to 2 lines on the card).
-   * The skills.sh API does not expose descriptions yet, so this is kept as an
-   * empty placeholder for future expansion.
    */
   description: string;
-  /** Popularity metric, sourced from skills.sh install counts (e.g. 2_991_984). */
+  /** GitHub star count of the source repo; 0 when the index entry lacks it. */
   stars: number;
+  /** Lifetime install count recorded by the registry; 0 when absent. */
+  downloads: number;
   /**
    * Skill directory inside the repo as recorded by the registry index (e.g.
    * "skills/find-skills"); absent on the old skills.sh snapshot. Used to fetch

@@ -12,18 +12,21 @@ const skills: Skill[] = [
     repo: "acme/other-tools",
     description: "Keeps your cache warm.",
     stars: 10,
+    downloads: 10,
   },
   {
     name: "deploy-scripts",
     repo: "acme/redis-toolkit",
     description: "Deployment automation for servers.",
     stars: 10,
+    downloads: 10,
   },
   {
     name: "doc-writer",
     repo: "acme/docs",
     description: "Generates docs that mention redis.",
     stars: 10,
+    downloads: 10,
   },
 ];
 
@@ -38,7 +41,7 @@ describe("createSkillSearch", () => {
     ]);
   });
 
-  it("ranks equally relevant matches by star count", () => {
+  it("ranks equally relevant matches by install count", () => {
     // Both skills match "redis" in their name with the same token shape, so
     // the relevance scores are identical and popularity decides the order.
     const results = createSkillSearch([
@@ -46,13 +49,15 @@ describe("createSkillSearch", () => {
         name: "alpha-redis-tool",
         repo: "acme/alpha",
         description: "Utilities.",
-        stars: 5_000_000,
+        stars: 10,
+        downloads: 5_000_000,
       },
       {
         name: "beta-redis-clip",
         repo: "acme/beta",
         description: "Utilities.",
         stars: 10,
+        downloads: 10,
       },
     ])("redis");
 
@@ -64,20 +69,22 @@ describe("createSkillSearch", () => {
 
   it("keeps match quality ahead of popularity across field tiers", () => {
     // Popularity may cross one priority tier (repo match over name match)
-    // but never two: even a maximal-star description match loses to a
-    // zero-star name match.
+    // but never two: even a maximal-install description match loses to a
+    // zero-install name match.
     const results = createSkillSearch([
       {
         name: "redis-cache-helper",
         repo: "acme/other-tools",
         description: "Keeps your cache warm.",
         stars: 0,
+        downloads: 0,
       },
       {
         name: "doc-writer",
         repo: "acme/docs",
         description: "Generates docs that mention redis.",
         stars: 5_000_000,
+        downloads: 5_000_000,
       },
     ])("redis");
 

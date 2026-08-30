@@ -6,10 +6,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Format a popularity count compactly, e.g. 169600 -> "169.6K", 12300 -> "12.3K". */
-export function formatStars(stars: number): string {
+/** Format a count compactly, e.g. 169600 -> "169.6K", 12300 -> "12.3K". */
+export function formatCount(count: number): string {
   return new Intl.NumberFormat("en", {
     notation: "compact",
     maximumFractionDigits: 1,
-  }).format(stars);
+  }).format(count);
 }

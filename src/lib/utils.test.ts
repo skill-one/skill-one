@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { cn, formatStars } from "./utils";
+import { cn, formatCount } from "./utils";
 
 describe("cn", () => {
   it("joins truthy class values", () => {
@@ -21,14 +21,14 @@ describe("cn", () => {
   });
 });
 
-describe("formatStars", () => {
+describe("formatCount", () => {
   it("formats large counts with compact notation", () => {
-    expect(formatStars(169600)).toBe("169.6K");
-    expect(formatStars(12300)).toBe("12.3K");
+    expect(formatCount(169600)).toBe("169.6K");
+    expect(formatCount(12300)).toBe("12.3K");
   });
 
   it("formats smaller counts without a suffix", () => {
-    expect(formatStars(999)).toBe("999");
-    expect(formatStars(0)).toBe("0");
+    expect(formatCount(999)).toBe("999");
+    expect(formatCount(0)).toBe("0");
   });
 });

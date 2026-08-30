@@ -29,6 +29,7 @@ function makeSkills(count: number, offset: number) {
     repo: `repo-${offset + i}/skills`,
     description: "",
     stars: 1000,
+    downloads: 1000,
   }));
 }
 
@@ -52,12 +53,14 @@ function mockGadgetRegistry() {
       repo: "acme/gadgets",
       description: "Builds tiny gadgets.",
       stars: 99,
+      downloads: 99,
     },
     ...Array.from({ length: 49 }, (_, i) => ({
       name: `tool-${i}`,
       repo: `acme/tool-${i}`,
       description: "A general purpose utility.",
       stars: 10,
+      downloads: 10,
     })),
   ]);
 }
@@ -353,18 +356,21 @@ describe("ExplorePage", () => {
         repo: "acme/unrelated",
         description: "Packs widgets nicely.",
         stars: 1,
+        downloads: 1,
       },
       {
         name: "misc-tools",
         repo: "acme/widget-lab",
         description: "Various utilities.",
         stars: 1,
+        downloads: 1,
       },
       {
         name: "docgen",
         repo: "acme/docs",
         description: "Turns code into a widget spec.",
         stars: 1,
+        downloads: 1,
       },
     ]);
     renderExplorePage();
@@ -385,10 +391,10 @@ describe("ExplorePage", () => {
     expect(cardOrder()).toEqual(["widget-pack", "misc-tools", "docgen"]);
   });
 
-  it("ranks search results by star count among equally relevant matches", async () => {
+  it("ranks search results by install count among equally relevant matches", async () => {
     const user = userEvent.setup();
     // Registry order deliberately opposes the popularity order: without a
-    // search the cards render as beta → alpha, so only the search's star
+    // search the cards render as beta → alpha, so only the search's install
     // boost can flip them to alpha → beta.
     mockFetchFullIndex.mockResolvedValue([
       {
@@ -396,12 +402,14 @@ describe("ExplorePage", () => {
         repo: "acme/beta",
         description: "Utilities.",
         stars: 10,
+        downloads: 10,
       },
       {
         name: "alpha-redis-tool",
         repo: "acme/alpha",
         description: "Utilities.",
-        stars: 5_000_000,
+        stars: 10,
+        downloads: 5_000_000,
       },
     ]);
     renderExplorePage();
@@ -456,9 +464,9 @@ describe("ExplorePage", () => {
   it("sorts skills by downloads and by name from the toolbar", async () => {
     const user = userEvent.setup();
     mockFetchFullIndex.mockResolvedValue([
-      { name: "alpha", repo: "o/alpha", description: "", stars: 5 },
-      { name: "beta", repo: "o/beta", description: "", stars: 300 },
-      { name: "gamma", repo: "o/gamma", description: "", stars: 50 },
+      { name: "alpha", repo: "o/alpha", description: "", stars: 0, downloads: 5 },
+      { name: "beta", repo: "o/beta", description: "", stars: 0, downloads: 300 },
+      { name: "gamma", repo: "o/gamma", description: "", stars: 0, downloads: 50 },
     ]);
     renderExplorePage();
     await screen.findByText("alpha");

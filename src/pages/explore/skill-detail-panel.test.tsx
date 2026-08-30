@@ -24,6 +24,7 @@ const skill: Skill = {
   repo: "anthropics/skills",
   description: "Read and merge PDF documents.",
   stars: 169600,
+  downloads: 2991984,
 };
 
 const detail = {
@@ -82,6 +83,9 @@ describe("SkillDetailPanel", () => {
     expect(screen.getByText("MIT")).toBeInTheDocument();
     expect(screen.getByText("Anthropic")).toBeInTheDocument();
     expect(screen.getByText("skills/pdf/SKILL.md")).toBeInTheDocument();
+    // Both popularity metrics render in the badge row.
+    expect(screen.getByText("3M")).toBeInTheDocument();
+    expect(screen.getByText("169.6K")).toBeInTheDocument();
     expect(mockFetchSkillDetail).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",

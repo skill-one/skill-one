@@ -6,7 +6,7 @@ import type { Skill } from "../types/skill";
  * Client-side fuzzy search over the skill registry, powered by MiniSearch
  * (inverted index + BM25+ ranking). Relevance is computed per field with
  * field boosts keeping the priority name > repo > description, and a
- * log-scale popularity boost nudges skills with more stars upward —
+ * log-scale popularity boost nudges heavily installed skills upward —
  * relevance stays the primary signal.
  */
 
@@ -36,7 +36,7 @@ type IndexedSkill = Skill & { id: number };
 // are relative magnitudes, not weights that must sum to 1. The ratios are
 // tuned against the popularity boost (max ~2.3×): popularity can outweigh
 // one step of field priority (2×) but never two (4×) — a hugely popular
-// repo match may outrank a zero-star name match, while a description match
+// repo match may outrank a zero-install name match, while a description match
 // cannot.
 const FIELD_BOOSTS = { name: 4, repo: 2, description: 1 };
 
@@ -46,13 +46,13 @@ const FIELD_BOOSTS = { name: 4, repo: 2, description: 1 };
 const POPULARITY_DIVISOR = 5;
 
 /**
- * Log-scale popularity multiplier: more stars rank higher, but huge install
+ * Log-scale popularity multiplier: more installs rank higher, but huge
  * counts stay comparable instead of drowning out match quality. Guarded
  * against missing/negative values so the result is always ≥ 1 (a falsy
  * boost would drop the document from the results entirely).
  */
-function popularityBoost(stars: number): number {
-  return 1 + Math.log10(1 + Math.max(0, stars || 0)) / POPULARITY_DIVISOR;
+function popularityBoost(downloads: number): number {
+  return 1 + Math.log10(1 + Math.max(0, downloads || 0)) / POPULARITY_DIVISOR;
 }
 
 /**
@@ -97,8 +97,8 @@ function buildSkillSearch(skills: Skill[]): SkillSearch {
       // term length).
       prefix: true,
       fuzzy: 0.2,
-      // Popularity: multiply each document's score by its star-count boost.
-      boostDocument: (id) => popularityBoost(skills[id].stars),
+      // Popularity: multiply each document's score by its install-count boost.
+      boostDocument: (id) => popularityBoost(skills[id].downloads),
     },
   });
   miniSearch.addAll(skills.map((skill, id) => ({ ...skill, id })));

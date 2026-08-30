@@ -4,7 +4,7 @@ import { Star, Check, Download, Loader2, RefreshCw } from "lucide-react";
 
 import { installSkillFromSource } from "../../lib/local-skills";
 import type { SkillSearchField } from "../../lib/search-skills";
-import { cn, formatStars } from "../../lib/utils";
+import { cn, formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { Button } from "../../components/ui/button";
 import { OwnerAvatar } from "../../components/owner-avatar";
@@ -187,10 +187,18 @@ export function SkillCard({
         </p>
       )}
 
-      <div className="mt-3 flex items-center gap-1 text-[12px] text-muted-foreground">
-        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-        <span className="font-medium tabular-nums">
-          {formatStars(skill.stars)}
+      <div className="mt-3 flex items-center gap-4 text-[12px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <Download className="h-3.5 w-3.5" />
+          <span className="font-medium tabular-nums">
+            {formatCount(skill.downloads)}
+          </span>
+        </span>
+        <span className="flex items-center gap-1">
+          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+          <span className="font-medium tabular-nums">
+            {formatCount(skill.stars)}
+          </span>
         </span>
       </div>
 

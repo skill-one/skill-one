@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Loader2, Star, X } from "lucide-react";
+import { Download, ExternalLink, Loader2, Star, X } from "lucide-react";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { openExternal } from "../../lib/open-external";
-import { formatStars } from "../../lib/utils";
+import { formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -114,9 +114,15 @@ export function SkillDetailPanel({
           )}
           {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
           <span className="ml-0.5 flex items-center gap-1 text-[12px] text-muted-foreground">
+            <Download className="h-3.5 w-3.5" />
+            <span className="font-medium tabular-nums">
+              {formatCount(skill.downloads)}
+            </span>
+          </span>
+          <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
             <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
             <span className="font-medium tabular-nums">
-              {formatStars(skill.stars)}
+              {formatCount(skill.stars)}
             </span>
           </span>
         </div>

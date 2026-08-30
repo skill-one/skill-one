@@ -13,6 +13,7 @@ const mockPages = mockPagesData as Array<{
     installs: number;
     weeklyInstalls: number[];
     description?: string;
+    stars?: number;
   }[];
 }>;
 
@@ -54,6 +55,7 @@ describe("fetchSkillsPage", () => {
           skillId: "find-skills",
           installs: 2991984,
           weeklyInstalls: [113781],
+          stars: 29975,
           description: "helps you find skills",
           path: "skills/find-skills",
         }),
@@ -70,9 +72,55 @@ describe("fetchSkillsPage", () => {
       name: "find-skills",
       repo: "vercel-labs/skills",
       description: "helps you find skills",
-      stars: 2991984,
+      stars: 29975,
+      downloads: 2991984,
       path: "skills/find-skills",
     });
+  });
+
+  it("normalizes missing stars/installs to 0", async () => {
+    const fetchSkillsPage = await freshModule();
+    // Old snapshot entries carry installs but no stars; sparse index entries
+    // may lack installs. Both must surface as 0, not undefined.
+    fetchMock.mockResolvedValueOnce(
+      ok(
+        jsonl(
+          {
+            source: "vercel-labs/skills",
+            skillId: "snapshot-entry",
+            installs: 42,
+            weeklyInstalls: [],
+          },
+          {
+            source: "owner/repo",
+            skillId: "sparse-entry",
+            weeklyInstalls: [],
+            stars: 7,
+          },
+        ),
+      ),
+    );
+
+    const page = await fetchSkillsPage(0);
+
+    expect(page.skills).toEqual([
+      {
+        name: "snapshot-entry",
+        repo: "vercel-labs/skills",
+        description: "",
+        stars: 0,
+        downloads: 42,
+        path: undefined,
+      },
+      {
+        name: "sparse-entry",
+        repo: "owner/repo",
+        description: "",
+        stars: 7,
+        downloads: 0,
+        path: undefined,
+      },
+    ]);
   });
 
   it("filters out non-GitHub sources, skips malformed lines and defaults missing descriptions", async () => {

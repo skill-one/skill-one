@@ -45,9 +45,9 @@ const PAGE_SIZE = 24;
  * keeps this query in localStorage forever (`gcTime`/`maxAge: Infinity`), so
  * bumping the version invalidates caches captured from an older data source
  * or with a stale shape — this entry now stores the full index instead of a
- * single page slice.
+ * single page slice, and v5 moved stars/downloads onto their own fields.
  */
-const SKILLS_QUERY_KEY = ["skills", 4] as const;
+const SKILLS_QUERY_KEY = ["skills", 5] as const;
 
 /**
  * Sort orders offered by the toolbar dropdown. "default" keeps the registry
@@ -150,7 +150,7 @@ export function ExplorePage() {
     if (sort === "default") return filtered;
     const out = [...filtered];
     if (sort === "downloads") {
-      out.sort((a, b) => b.skill.stars - a.skill.stars);
+      out.sort((a, b) => b.skill.downloads - a.skill.downloads);
     } else {
       out.sort((a, b) => a.skill.name.localeCompare(b.skill.name));
     }

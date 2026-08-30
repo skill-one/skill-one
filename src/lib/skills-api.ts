@@ -28,6 +28,8 @@ interface RawSkill {
   description?: string;
   /** Skill directory inside the repo, e.g. "skills/find-skills". */
   path?: string;
+  /** GitHub stars of the source repo; absent on the old skills.sh snapshot. */
+  stars?: number;
 }
 
 /** A page of skills mapped to the app's Skill model. */
@@ -65,7 +67,10 @@ function toSkill(raw: RawSkill): Skill {
     // The JSONL index exposes descriptions; fall back to an empty placeholder
     // when an entry lacks one so the card layout stays stable.
     description: raw.description ?? "",
-    stars: raw.installs,
+    // GitHub stars and install counts are separate metrics; entries missing
+    // either (e.g. the old skills.sh snapshot) normalize to 0.
+    stars: raw.stars ?? 0,
+    downloads: raw.installs ?? 0,
     path: raw.path,
   };
 }

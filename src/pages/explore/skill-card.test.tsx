@@ -16,10 +16,11 @@ const skill: Skill = {
   repo: "anthropics/skills",
   description: "Read and merge PDF documents.",
   stars: 169600,
+  downloads: 2991984,
 };
 
 describe("SkillCard", () => {
-  it("renders name, repo, description and formatted stars", () => {
+  it("renders name, repo, description, downloads and stars", () => {
     renderWithRouter(<SkillCard skill={skill} />);
 
     expect(screen.getByText("pdf")).toBeInTheDocument();
@@ -27,7 +28,18 @@ describe("SkillCard", () => {
     expect(
       screen.getByText("Read and merge PDF documents."),
     ).toBeInTheDocument();
+    // Both popularity metrics render side by side.
+    expect(screen.getByText("3M")).toBeInTheDocument();
     expect(screen.getByText("169.6K")).toBeInTheDocument();
+  });
+
+  it("renders downloads and stars of 0 when the metrics are missing", () => {
+    renderWithRouter(
+      <SkillCard skill={{ ...skill, downloads: 0, stars: 0 }} />,
+    );
+
+    // Both stats render as "0" instead of being hidden.
+    expect(screen.getAllByText("0")).toHaveLength(2);
   });
 
   it("renders with an empty description placeholder", () => {
