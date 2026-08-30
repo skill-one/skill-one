@@ -19,10 +19,10 @@ jobs:
         with:
           node-version: 22
 
+      # No `version` input: pnpm/action-setup reads `packageManager` from
+      # package.json, and passing a conflicting pin errors the workflow.
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
