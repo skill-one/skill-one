@@ -234,6 +234,18 @@ describe("ExplorePage", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the skill count on the pagination row instead of the toolbar", async () => {
+    mockRegistry(50); // 3 pages
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    // The count shares the bottom row with the pagination controls.
+    const count = screen.getByText("共 50 个");
+    expect(
+      count.closest("div")?.querySelector('nav[aria-label="pagination"]'),
+    ).not.toBeNull();
+  });
+
   it("jumps directly to a typed page number", async () => {
     const user = userEvent.setup();
     mockRegistry(50); // 3 pages
