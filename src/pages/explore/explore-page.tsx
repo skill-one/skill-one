@@ -9,7 +9,10 @@ import {
   SearchX,
 } from "lucide-react";
 
-import { fetchFullIndex } from "../../lib/skills-api";
+import {
+  fetchFullIndex,
+  SKILLS_QUERY_KEY,
+} from "../../lib/skills-api";
 import {
   createSkillSearch,
   type SkillSearchHit,
@@ -38,15 +41,6 @@ import { SkillDetailPanel } from "./skill-detail-panel";
 
 /** Number of skills shown per page in the paginated registry view. */
 const PAGE_SIZE = 24;
-
-/**
- * The persisted cache key for the explore list. The sync-storage persister
- * keeps this query in localStorage forever (`gcTime`/`maxAge: Infinity`), so
- * bumping the version invalidates caches captured from an older data source
- * or with a stale shape — this entry now stores the full index instead of a
- * single page slice, and v5 moved stars/downloads onto their own fields.
- */
-const SKILLS_QUERY_KEY = ["skills", 5] as const;
 
 /**
  * Sort orders offered by the toolbar dropdown. "default" keeps the registry
@@ -91,7 +85,11 @@ function pageRange(current: number, total: number): Array<number | "..."> {
   return out;
 }
 
-function Placeholder({
+/**
+ * Centered "nothing to show" state with an optional retry action, shared by
+ * the explore and featured pages (search misses, load failures, empty lists).
+ */
+export function Placeholder({
   message,
   children,
 }: {

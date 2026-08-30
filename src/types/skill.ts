@@ -12,6 +12,12 @@ export interface Skill {
   /** Lifetime install count recorded by the registry; 0 when absent. */
   downloads: number;
   /**
+   * Installs recorded over the most recent week (the last entry of the
+   * registry's weekly install series); absent when the entry carries no
+   * weekly data.
+   */
+  weeklyInstalls?: number;
+  /**
    * Skill directory inside the repo as recorded by the registry index (e.g.
    * "skills/find-skills"); absent on the old skills.sh snapshot. Used to fetch
    * the SKILL.md directly without path probing.

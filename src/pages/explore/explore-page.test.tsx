@@ -14,7 +14,11 @@ import { fetchFullIndex } from "../../lib/skills-api";
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { ExplorePage } from "./explore-page";
 
-vi.mock("../../lib/skills-api", () => ({ fetchFullIndex: vi.fn() }));
+vi.mock("../../lib/skills-api", () => ({
+  // The page spreads this into its query key; keep it a stable array.
+  SKILLS_QUERY_KEY: ["skills", 5],
+  fetchFullIndex: vi.fn(),
+}));
 vi.mock("../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
 }));

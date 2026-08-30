@@ -56,12 +56,13 @@ skillone/
 │   │   └── placeholder-page.tsx # 未实现页面的占位
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
 │   │   ├── explore/        # 商店探索页（skill-card / skill-detail-panel）
+│   │   │   └── featured/   # 精选页（hero 榜单轮播 + 分类区块）
 │   │   ├── my-skills/      # 我的 Skills 页（agent-icon-grid / agent-icon-button / link-confirm-dialog 等）
 │   │   └── settings/       # 设置页
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层
 │   ├── types/              # 类型定义
-│   ├── data/               # mock 数据
+│   ├── data/               # 静态数据（测试 mock 索引 + 精选页策划分类）
 │   ├── test/               # 测试工具与 setup
 │   ├── App.tsx             # 路由与布局
 │   └── main.tsx            # 入口

@@ -56,12 +56,13 @@ skillone/
 │   │   └── placeholder-page.tsx # Placeholder for unimplemented pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)
 │   │   ├── explore/        # Store explore page (skill-card / skill-detail-panel)
+│   │   │   └── featured/   # Curated featured page (hero leaderboards + category sections)
 │   │   ├── my-skills/      # My Skills page (agent-icon-grid / agent-icon-button / link-confirm-dialog, etc.)
 │   │   └── settings/       # Settings page
 │   ├── hooks/              # Custom hooks
 │   ├── lib/                # API / business logic layer
 │   ├── types/              # Type definitions
-│   ├── data/               # Mock data
+│   ├── data/               # Static data (test mock index + curated featured categories)
 │   ├── test/               # Test utilities and setup
 │   ├── App.tsx             # Routing and layout
 │   └── main.tsx            # Entry point

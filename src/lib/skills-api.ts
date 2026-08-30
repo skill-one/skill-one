@@ -16,6 +16,15 @@ const INDEX_SPEC = {
 /** Number of skills returned per page (matches the previous Rust page size). */
 const PAGE_SIZE = 200;
 
+/**
+ * The TanStack Query cache key for the parsed full registry index. Explore and
+ * featured share it so both pages read the same cached download; the trailing
+ * version invalidates caches captured with a stale shape. The entry is
+ * excluded from localStorage persistence in App.tsx (the parsed index is far
+ * too large), so it never survives a restart.
+ */
+export const SKILLS_QUERY_KEY = ["skills", 5] as const;
+
 /** Raw skill shape as stored in one JSONL index line. */
 interface RawSkill {
   source: string;
@@ -23,7 +32,8 @@ interface RawSkill {
   /** Present in the old skills.sh snapshot; absent in the JSONL index. */
   name?: string;
   installs: number;
-  weeklyInstalls: number[];
+  /** Absent on some live index lines despite always being drawn. */
+  weeklyInstalls?: number[];
   /** Provided by the JSONL index; may be missing on individual entries. */
   description?: string;
   /** Skill directory inside the repo, e.g. "skills/find-skills". */
@@ -71,6 +81,13 @@ function toSkill(raw: RawSkill): Skill {
     // either (e.g. the old skills.sh snapshot) normalize to 0.
     stars: raw.stars ?? 0,
     downloads: raw.installs ?? 0,
+    // The registry records a weekly install series in chronological order;
+    // the featured page ranks by the most recent week, its last entry. The
+    // field is absent on some index lines, so guard before reading it.
+    weeklyInstalls:
+      raw.weeklyInstalls && raw.weeklyInstalls.length > 0
+        ? raw.weeklyInstalls[raw.weeklyInstalls.length - 1]
+        : undefined,
     path: raw.path,
   };
 }

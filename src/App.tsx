@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { Sparkles, Building2, Folder } from "lucide-react";
+import { Building2, Folder } from "lucide-react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import {
   defaultShouldDehydrateQuery,
@@ -12,6 +12,7 @@ import { AppSidebar } from "./components/app-sidebar";
 import { PlaceholderPage } from "./components/placeholder-page";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 import { ExplorePage } from "./pages/explore/explore-page";
+import { FeaturedPage } from "./pages/explore/featured/featured-page";
 import { MySkillsPage } from "./pages/my-skills/my-skills-page";
 import { SettingsPage } from "./pages/settings/settings-page";
 
@@ -97,7 +98,7 @@ export default function App() {
                 <Route path="/my-skills" element={<MySkillsPage />} />
                 <Route
                   path="/explore/featured"
-                  element={<PlaceholderPage icon={Sparkles} title="精选" />}
+                  element={<FeaturedPage />}
                 />
                 <Route
                   path="/explore/official"

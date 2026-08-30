@@ -54,6 +54,8 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 | --- | --- |
 | `src/App.tsx` | Routing, layout, TanStack Query provider, and cache persistence |
 | `src/components/app-sidebar.tsx` | Sidebar navigation (routes and titles share one config) |
+| `src/pages/explore/featured/` | Curated landing page: computed leaderboard hero carousel plus curated category sections |
+| `src/data/featured-content.ts` | Hand-picked category → skill references for the featured page (the registry index carries no categories) |
 | `src/lib/tauri.ts` | Detects whether the app runs inside the Tauri WebView |
 | `src/lib/open-external.ts` | Opens external links in the system browser (Tauri needs the opener plugin) |
 | `src-tauri/tauri.conf.json` | Window, build, and packaging configuration |
@@ -75,3 +77,9 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 2. `skills-api.ts` downloads the index once (cached per session); search, sort, and pagination are computed client-side.
 3. `cdn-config.ts` tries direct GitHub access and CDN mirrors in order.
 4. TanStack Query caches the result in memory (not persisted — too large); paging and in-session navigation hit the cache first.
+
+**Curated featured page**:
+
+1. `featured-page` reads the same cached index as explore (shared query key).
+2. The hero carousels are computed from the index (`featured-rankings.ts`): weekly installs, lifetime installs, and the weekly/lifetime share; the parser keeps each skill's most recent week as `weeklyInstalls`.
+3. Category sections join the hand-picked references in `featured-content.ts` against the index; unresolved references are skipped and empty sections hidden.
