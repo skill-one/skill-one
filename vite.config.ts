@@ -25,6 +25,14 @@ export default defineConfig({
   // Env variables starting with TAURI_ are exposed to the client.
   envPrefix: ["VITE_", "TAURI_"],
   build: {
+    // Multi-page build: the menu bar popover window gets its own entry
+    // (see popover.html / src/popover/).
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        popover: "popover.html",
+      },
+    },
     // Tauri supports es2021.
     target: "es2021",
     // Disable minify for debug builds.

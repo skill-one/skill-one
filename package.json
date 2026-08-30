@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "tauri": "tauri",
+    "dev:test": "tauri dev --config src-tauri/tauri.dev-test.conf.json",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage"
