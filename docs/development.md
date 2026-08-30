@@ -12,8 +12,8 @@ Build, tech stack, architecture, testing, and release notes for developers. For 
 | UI             | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/) (Radix UI + Tailwind CSS)  |
 | Routing        | [react-router-dom v7](https://reactrouter.com/) (HashRouter)                                    |
 | Data fetching  | [TanStack Query v5](https://tanstack.com/query) (persisted to localStorage)                     |
-| Build          | [Vite 5](https://vitejs.dev/) + TypeScript 5.7                                                  |
-| Testing        | [Vitest 2](https://vitest.dev/) + Testing Library                                               |
+| Build          | [Vite 8](https://vite.dev/) + TypeScript 7.0                                                    |
+| Testing        | [Vitest 4](https://vitest.dev/) + Testing Library                                               |
 
 ## Prerequisites
 

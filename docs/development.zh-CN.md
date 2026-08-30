@@ -12,8 +12,8 @@
 | UI         | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/)（Radix UI + Tailwind CSS） |
 | 路由       | [react-router-dom v7](https://reactrouter.com/)（HashRouter）                                   |
 | 数据请求   | [TanStack Query v5](https://tanstack.com/query)（持久化到 localStorage）                        |
-| 构建       | [Vite 5](https://vitejs.dev/) + TypeScript 5.7                                                  |
-| 测试       | [Vitest 2](https://vitest.dev/) + Testing Library                                               |
+| 构建       | [Vite 8](https://vite.dev/) + TypeScript 7.0                                                    |
+| 测试       | [Vitest 4](https://vitest.dev/) + Testing Library                                               |
 
 ## 环境要求
 

@@ -17,12 +17,6 @@ export default defineConfig({
       "@": path.resolve(srcDir, "./src"),
     },
   },
-  css: {
-    // This worktree lives inside the parent checkout, whose tailwind v3
-    // postcss.config.js would otherwise be picked up. Tailwind v4 runs
-    // through the @tailwindcss/vite plugin, so keep PostCSS empty here.
-    postcss: { plugins: [] },
-  },
   test: {
     environment: "jsdom",
     globals: true,
@@ -44,7 +38,7 @@ export default defineConfig({
   build: {
     // Multi-page build: the menu bar popover window gets its own entry
     // (see popover.html / src/popover/).
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         main: "index.html",
         popover: "popover.html",
@@ -52,8 +46,8 @@ export default defineConfig({
     },
     // Tauri supports es2021.
     target: "es2021",
-    // Disable minify for debug builds.
-    minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
+    // Disable minify (default Oxc minifier) for debug builds.
+    minify: !process.env.TAURI_DEBUG,
     // Produce sourcemaps for debug builds.
     sourcemap: !!process.env.TAURI_DEBUG,
   },
