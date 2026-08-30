@@ -54,6 +54,8 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 | --- | --- |
 | `src/App.tsx` | 路由、布局、TanStack Query Provider 与缓存持久化 |
 | `src/components/app-sidebar.tsx` | 侧边栏导航（路由与标题共用同一份配置） |
+| `src/pages/explore/featured/` | 精选页：计算生成的榜单 hero 轮播 + 本地策划的分类区块 |
+| `src/data/featured-content.ts` | 精选页的分类 → skill 策划引用（注册表索引不含分类字段） |
 | `src/lib/tauri.ts` | 判断是否运行在 Tauri WebView 中 |
 | `src/lib/open-external.ts` | 在系统浏览器中打开外链（Tauri 需 opener 插件） |
 | `src-tauri/tauri.conf.json` | 窗口、构建与打包配置 |
@@ -75,3 +77,9 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 2. `skills-api.ts` 首次拉取完整索引（按会话缓存）；搜索、排序与分页均在客户端计算。
 3. `cdn-config.ts` 依序尝试直连 GitHub 与 CDN 镜像。
 4. TanStack Query 在内存中缓存结果（体积过大，不落盘）；翻页与会话内导航优先命中缓存。
+
+**精选页**：
+
+1. `featured-page` 与探索页共享同一份缓存索引（共用 query key）。
+2. Hero 轮播由索引实时计算（`featured-rankings.ts`）：周安装量、历史总安装量、周增量占比；解析层将每个 skill 最近一周的安装量保留为 `weeklyInstalls`。
+3. 分类区块将 `featured-content.ts` 中的人工策划引用与索引联结；解析不到的引用自动跳过，空分类整体隐藏。
