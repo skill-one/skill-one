@@ -25,9 +25,9 @@ if (typeof window !== "undefined" && !window.matchMedia) {
   })) as unknown as typeof window.matchMedia;
 }
 
-// jsdom does not implement IntersectionObserver, which the explore page uses
-// to prefetch the next page. Provide a controllable mock: instances are
-// tracked so tests can fire intersection callbacks manually.
+// jsdom does not implement IntersectionObserver. Provide a controllable
+// mock: instances are tracked so tests can fire intersection callbacks
+// manually if a component needs it.
 class IntersectionObserverMock {
   static instances: IntersectionObserverMock[] = [];
   private readonly elements = new Set<Element>();

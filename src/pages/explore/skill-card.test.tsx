@@ -106,4 +106,48 @@ describe("SkillCard", () => {
       "ring-primary",
     );
   });
+
+  it("wraps matched name tokens in <mark> and keeps the name intact", () => {
+    const { container } = renderWithRouter(
+      <SkillCard
+        skill={{ ...skill, name: "pdf-tools" }}
+        matched={{ name: ["pdf"] }}
+      />,
+    );
+
+    const mark = screen.getByText("pdf");
+    expect(mark.tagName).toBe("MARK");
+    // The name remains one logical string across the highlight segments.
+    expect(container.querySelector("h3")).toHaveTextContent("pdf-tools");
+  });
+
+  it("highlights repo and description matches case-insensitively", () => {
+    renderWithRouter(
+      <SkillCard
+        skill={skill}
+        matched={{ repo: ["anthropics"], description: ["pdf"] }}
+      />,
+    );
+
+    // The description token "PDF" matches the lowercased term "pdf"; the
+    // original casing is preserved inside the mark.
+    expect(screen.getByText("anthropics").tagName).toBe("MARK");
+    expect(screen.getByText("PDF").tagName).toBe("MARK");
+  });
+
+  it("does not mark tokens that only partially match a term", () => {
+    const { container } = renderWithRouter(
+      <SkillCard skill={skill} matched={{ name: ["pd"] }} />,
+    );
+
+    // Matched terms are always whole indexed tokens; "pd" is not.
+    expect(container.querySelector("mark")).toBeNull();
+    expect(screen.getByText("pdf")).toBeInTheDocument();
+  });
+
+  it("renders without any <mark> when nothing matched", () => {
+    const { container } = renderWithRouter(<SkillCard skill={skill} />);
+
+    expect(container.querySelector("mark")).toBeNull();
+  });
 });

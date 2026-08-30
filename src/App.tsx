@@ -38,15 +38,17 @@ const queryClient = new QueryClient({
 });
 
 /**
- * Persist the query cache to localStorage so the explore list survives app
- * restarts. `maxAge: Infinity` mirrors `gcTime` above: persisted entries are
- * never discarded for being old, they are always restored and then
- * revalidated when stale (see `staleTime`).
+ * Persist the query cache to localStorage so small read queries (installed
+ * skills, agent status) survive app restarts. `maxAge: Infinity` mirrors
+ * `gcTime` above: persisted entries are never discarded for being old, they
+ * are always restored and then revalidated when stale (see `staleTime`).
  *
- * The full registry index (`skills-index`, the whole parsed ~12MB JSONL) is
- * excluded: it would exceed the WebView's localStorage quota on every write,
- * and it is refetched once per session anyway. Only the bounded queries —
- * explore pages, installed skills, agent status — are persisted.
+ * The full registry index is excluded — both the `skills-index` join query
+ * and the explore page's `skills` entry, which since the toolbar feature
+ * stores the whole parsed ~12MB JSONL: either would exceed the WebView's
+ * localStorage quota on every write, and it is refetched once per session
+ * anyway. Only the bounded queries — installed skills, agent status — are
+ * persisted.
  *
  * The storage adapter accesses `window.localStorage` lazily (inside the
  * methods) so merely wiring up persistence never touches the getter — Node's
@@ -67,7 +69,8 @@ const persistOptions = {
     // Large blobs only; see the persister comment above.
     shouldDehydrateQuery: (query: Query) =>
       defaultShouldDehydrateQuery(query) &&
-      query.queryKey[0] !== "skills-index",
+      query.queryKey[0] !== "skills-index" &&
+      query.queryKey[0] !== "skills",
   },
 };
 

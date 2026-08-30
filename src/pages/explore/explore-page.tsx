@@ -1,10 +1,30 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SearchX, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Search,
+  SearchX,
+} from "lucide-react";
 
-import { fetchSkillsPage } from "../../lib/skills-api";
+import { fetchFullIndex } from "../../lib/skills-api";
+import {
+  createSkillSearch,
+  type SkillSearchHit,
+} from "../../lib/search-skills";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
 import {
   Pagination,
@@ -13,7 +33,7 @@ import {
   PaginationItem,
   PaginationLink,
 } from "../../components/ui/pagination";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
+import { Separator } from "../../components/ui/separator";
 import { SkillCard } from "./skill-card";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
@@ -24,9 +44,22 @@ const PAGE_SIZE = 24;
  * The persisted cache key for the explore list. The sync-storage persister
  * keeps this query in localStorage forever (`gcTime`/`maxAge: Infinity`), so
  * bumping the version invalidates caches captured from an older data source
- * or with a stale page shape — otherwise a stale cache would freeze the list.
+ * or with a stale shape — this entry now stores the full index instead of a
+ * single page slice.
  */
-const SKILLS_QUERY_KEY = ["skills", 3] as const;
+const SKILLS_QUERY_KEY = ["skills", 4] as const;
+
+/**
+ * Sort orders offered by the toolbar dropdown. "default" keeps the registry
+ * index order; the other orders sort the filtered list client-side.
+ */
+type SortOrder = "default" | "downloads" | "name";
+
+const SORT_OPTIONS: Array<{ value: SortOrder; label: string }> = [
+  { value: "default", label: "默认排序" },
+  { value: "downloads", label: "按下载量" },
+  { value: "name", label: "按名称" },
+];
 
 /**
  * Collapse the pagination bar once there are too many pages to list: keep the
@@ -75,32 +108,89 @@ function Placeholder({
   );
 }
 
-const tabClass =
-  "rounded-none border-b-2 border-transparent bg-transparent px-1 pb-2 pt-1.5 shadow-none transition-colors data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground text-muted-foreground hover:text-foreground";
-
 export function ExplorePage() {
-  // 1-based current page; switching pages resets the open detail panel.
+  // 1-based current page.
   const [page, setPage] = useState(1);
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: [...SKILLS_QUERY_KEY, page],
-    queryFn: () => fetchSkillsPage(page - 1, PAGE_SIZE),
+  // Search text and sort order; any change invalidates the page/selection
+  // because the result list (and the meaning of a card index) changes.
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortOrder>("default");
+
+  const {
+    data: index,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: [...SKILLS_QUERY_KEY],
+    queryFn: fetchFullIndex,
   });
 
-  // The current page's skills; `total` is the registry-wide count reported by
-  // the API (null past the mock snapshot in plain-browser dev), which drives
-  // how many numbered pages exist.
-  const skills = data?.skills ?? [];
-  const total = data?.total ?? null;
-  const totalPages =
-    total != null ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : 1;
+  // Reusable fuzzy-search index over the registry (weighted name > repo >
+  // description, with a popularity boost from star counts). The built search
+  // is cached per data reference inside search-skills, so remounting this
+  // page never rebuilds the index — only a fresh fetch does.
+  const skillSearch = useMemo(() => createSkillSearch(index ?? []), [index]);
+
+  // Search filter: fuzzy match over name, repo and description, applied on
+  // every keystroke — the index is ~24k entries. Keeping the search text out
+  // of the query key also avoids persisting a localStorage cache entry per
+  // search term. An empty query bypasses the search and keeps the full
+  // registry in its original order, with nothing highlighted.
+  const filtered = useMemo((): SkillSearchHit[] => {
+    const q = search.trim();
+    if (!q) return (index ?? []).map((skill) => ({ skill, matched: {} }));
+    return skillSearch(q);
+  }, [skillSearch, search]);
+
+  // "default" keeps the (filtered) relevance order; the others sort a copy.
+  const sorted = useMemo(() => {
+    if (sort === "default") return filtered;
+    const out = [...filtered];
+    if (sort === "downloads") {
+      out.sort((a, b) => b.skill.stars - a.skill.stars);
+    } else {
+      out.sort((a, b) => a.skill.name.localeCompare(b.skill.name));
+    }
+    return out;
+  }, [filtered, sort]);
+
+  // Client-side pagination over the filtered+sorted list. `total` is the
+  // registry-wide count (null until the index has loaded); the toolbar count
+  // reports the filtered total instead.
+  const total = index?.length ?? null;
+  const filteredTotal = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE));
+  const skills = useMemo(
+    () => sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [sorted, page],
+  );
+
+  // A background refetch can shrink the index below the current page.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   // Index into `skills` of the skill shown in the detail panel; null keeps
   // the panel closed (full-width grid). Clicking a card while the panel is
   // open simply swaps the selection, so switching skills never replays the
   // slide-in animation.
   const [selected, setSelected] = useState<number | null>(null);
-  const selectedSkill = selected != null ? (skills[selected] ?? null) : null;
+  const selectedSkill =
+    selected != null ? (skills[selected]?.skill ?? null) : null;
+
+  const handleSearch = (q: string) => {
+    setSelected(null);
+    setPage(1);
+    setSearch(q);
+  };
+  const handleSort = (order: SortOrder) => {
+    setSelected(null);
+    setPage(1);
+    setSort(order);
+  };
 
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -156,177 +246,229 @@ export function ExplorePage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
-      <Tabs defaultValue="explore" className="flex h-full flex-col">
-        <TabsList className="h-auto w-full justify-start gap-7 border-b border-border bg-transparent p-0">
-          <TabsTrigger value="explore" className={tabClass}>
-            在线探索
-          </TabsTrigger>
-          <TabsTrigger value="git" className={tabClass}>
-            Git 仓库
-          </TabsTrigger>
-          <TabsTrigger value="local" className={tabClass}>
-            本地目录
-          </TabsTrigger>
-        </TabsList>
+      {/* Toolbar: search on the left; category, sort and the filtered skill
+          count on the right. */}
+      <div className="mb-4 flex items-center gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder="搜索 Skill..."
+            aria-label="搜索 Skill"
+            className="h-9 rounded-full pl-9"
+          />
+        </div>
 
-        {/* NOTE: keep `flex` off this element — Tailwind's `.flex` would
-            override the `[hidden]` attribute on inactive tabs and make every
-            panel render at once. The layout is delegated to an inner wrapper. */}
-        <TabsContent value="explore" className="mt-0 min-h-0 flex-1">
-          {/* Split layout: skill grid on the left, fixed detail panel on the
-              right while a skill is selected. */}
-          <div className="flex h-full min-h-0 flex-row">
-            <div className="flex h-full min-w-0 flex-1 flex-col">
-              {/* Grid */}
-              <div className="min-h-0 flex-1 overflow-y-auto pb-6 pr-1">
-                {isError ? (
-                  <Placeholder
-                    message={`加载失败：${error instanceof Error ? error.message : "未知错误"}`}
+        <div className="ml-auto flex items-center gap-2">
+          {/* Placeholder: the registry index carries no category field, so
+              "全部" is the only selectable entry until the data source grows
+              real categories. The radio group without onValueChange keeps the
+              item permanently selected. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="rounded-full px-4">
+                分类
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup value="all">
+                <DropdownMenuRadioItem value="all">
+                  全部
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled>
+                更多分类 · 即将上线
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="rounded-full px-4">
+                {SORT_OPTIONS.find((option) => option.value === sort)?.label}
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup
+                value={sort}
+                onValueChange={(value) => handleSort(value as SortOrder)}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <DropdownMenuRadioItem
+                    key={option.value}
+                    value={option.value}
                   >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => void refetch()}
-                    >
-                      重试
-                    </Button>
-                  </Placeholder>
-                ) : skills.length === 0 ? (
-                  isLoading ? (
-                    <div className="flex h-full min-h-[320px] items-center justify-center text-muted-foreground">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    </div>
-                  ) : (
-                    <Placeholder message="暂无技能" />
-                  )
-                ) : (
-                  <div
-                    ref={gridRef}
-                    className={cn(
-                      "grid gap-4",
-                      // The detail panel takes ~440px, so the grid collapses
-                      // to a single column while it is open.
-                      selectedSkill
-                        ? "grid-cols-1"
-                        : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
-                    )}
-                  >
-                    {skills.map((skill, index) => (
-                      <SkillCard
-                        key={`${skill.repo}/${skill.name}`}
-                        skill={skill}
-                        selected={index === selected}
-                        onSelect={() => setSelected(index)}
-                      />
-                    ))}
-                  </div>
-                )}
+                    {option.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {total != null && (
+            <>
+              <Separator orientation="vertical" className="h-5" />
+              <span className="whitespace-nowrap text-sm text-muted-foreground tabular-nums">
+                共 {filteredTotal} 个
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Split layout: skill grid on the left, fixed detail panel on the
+          right while a skill is selected. */}
+      <div className="flex min-h-0 flex-1 flex-row">
+        <div className="flex h-full min-w-0 flex-1 flex-col">
+          {/* Grid */}
+          <div className="min-h-0 flex-1 overflow-y-auto pb-6 pr-1">
+            {isError ? (
+              <Placeholder
+                message={`加载失败：${error instanceof Error ? error.message : "未知错误"}`}
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => void refetch()}
+                >
+                  重试
+                </Button>
+              </Placeholder>
+            ) : isLoading ? (
+              <div className="flex h-full min-h-[320px] items-center justify-center text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-
-              {/* Pagination bar: previous / numbered pages (with ellipsis) /
-                  next, plus an inline "jump to page" input — shown once a page
-                  of data is available. */}
-              {data && totalPages > 1 && (
-                <div className="flex items-center justify-center gap-4 border-t border-border py-2.5">
-                  <Pagination className="w-auto">
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationLink
-                          size="icon"
-                          href="#"
-                          aria-label="上一页"
-                          aria-disabled={page <= 1}
-                          className={cn(
-                            "h-8 w-8",
-                            page <= 1 && "pointer-events-none opacity-50",
-                          )}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            goPrev();
-                          }}
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </PaginationLink>
-                      </PaginationItem>
-                      {range.map((p, i) =>
-                        p === "..." ? (
-                          <PaginationItem key={`ellipsis-${i}`}>
-                            <PaginationEllipsis className="h-8 w-8" />
-                          </PaginationItem>
-                        ) : (
-                          <PaginationItem key={p}>
-                            <PaginationLink
-                              size="icon"
-                              href="#"
-                              className="h-8 w-8"
-                              isActive={p === page}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handlePage(p);
-                              }}
-                            >
-                              {p}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ),
-                      )}
-                      <PaginationItem>
-                        <PaginationLink
-                          size="icon"
-                          href="#"
-                          aria-label="下一页"
-                          aria-disabled={page >= totalPages}
-                          className={cn(
-                            "h-8 w-8",
-                            page >= totalPages &&
-                              "pointer-events-none opacity-50",
-                          )}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            goNext();
-                          }}
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </PaginationLink>
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                  <form
-                    onSubmit={submitJump}
-                    className="flex items-center gap-1.5 text-[12px] text-muted-foreground"
-                  >
-                    <span>第</span>
-                    <Input
-                      value={jump}
-                      onChange={(e) => setJump(e.target.value)}
-                      inputMode="numeric"
-                      aria-label="跳转到第几页"
-                      className="h-8 w-14 px-2 text-center text-[12px]"
-                    />
-                    <span>/ {totalPages} 页</span>
-                  </form>
-                </div>
-              )}
-            </div>
-
-            <SkillDetailPanel
-              skill={selectedSkill}
-              onPrev={handlePrev}
-              onNext={handleNext}
-              onClose={() => setSelected(null)}
-            />
+            ) : skills.length === 0 ? (
+              <Placeholder
+                message={
+                  search.trim()
+                    ? `未找到匹配“${search.trim()}”的 Skill`
+                    : "暂无技能"
+                }
+              />
+            ) : (
+              <div
+                ref={gridRef}
+                className={cn(
+                  "grid gap-4",
+                  // The detail panel takes ~440px, so the grid collapses
+                  // to a single column while it is open.
+                  selectedSkill
+                    ? "grid-cols-1"
+                    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+                )}
+              >
+                {skills.map((hit, i) => (
+                  <SkillCard
+                    key={`${hit.skill.repo}/${hit.skill.name}`}
+                    skill={hit.skill}
+                    matched={hit.matched}
+                    selected={i === selected}
+                    onSelect={() => setSelected(i)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        </TabsContent>
 
-        <TabsContent value="git" className="mt-0 min-h-0 flex-1">
-          <Placeholder message="通过 Git 仓库添加技能 — 即将上线" />
-        </TabsContent>
+          {/* Pagination bar: previous / numbered pages (with ellipsis) /
+              next, plus an inline "jump to page" input — shown once a page
+              of data is available. */}
+          {index && totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4 border-t border-border py-2">
+              <Pagination className="w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationLink
+                      size="icon"
+                      href="#"
+                      aria-label="上一页"
+                      aria-disabled={page <= 1}
+                      className={cn(
+                        "h-8 w-8",
+                        page <= 1 && "pointer-events-none opacity-50",
+                      )}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        goPrev();
+                      }}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </PaginationLink>
+                  </PaginationItem>
+                  {range.map((p, i) =>
+                    p === "..." ? (
+                      <PaginationItem key={`ellipsis-${i}`}>
+                        <PaginationEllipsis className="h-8 w-8" />
+                      </PaginationItem>
+                    ) : (
+                      <PaginationItem key={p}>
+                        <PaginationLink
+                          size="icon"
+                          href="#"
+                          className="h-8 w-8"
+                          isActive={p === page}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handlePage(p);
+                          }}
+                        >
+                          {p}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ),
+                  )}
+                  <PaginationItem>
+                    <PaginationLink
+                      size="icon"
+                      href="#"
+                      aria-label="下一页"
+                      aria-disabled={page >= totalPages}
+                      className={cn(
+                        "h-8 w-8",
+                        page >= totalPages &&
+                          "pointer-events-none opacity-50",
+                      )}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        goNext();
+                      }}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </PaginationLink>
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+              <form
+                onSubmit={submitJump}
+                className="flex items-center gap-1.5 text-[12px] text-muted-foreground"
+              >
+                <span>第</span>
+                <Input
+                  value={jump}
+                  onChange={(e) => setJump(e.target.value)}
+                  inputMode="numeric"
+                  aria-label="跳转到第几页"
+                  className="h-8 w-14 px-2 text-center text-[12px]"
+                />
+                <span>/ {totalPages} 页</span>
+              </form>
+            </div>
+          )}
+        </div>
 
-        <TabsContent value="local" className="mt-0 min-h-0 flex-1">
-          <Placeholder message="从本地目录扫描技能 — 即将上线" />
-        </TabsContent>
-      </Tabs>
+        <SkillDetailPanel
+          skill={selectedSkill}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onClose={() => setSelected(null)}
+        />
+      </div>
     </div>
   );
 }

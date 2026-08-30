@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Star, Check, Download, Loader2, RefreshCw } from "lucide-react";
 
 import { installSkillFromSource } from "../../lib/local-skills";
+import type { SkillSearchField } from "../../lib/search-skills";
 import { cn, formatStars } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { Button } from "../../components/ui/button";
@@ -10,6 +11,50 @@ import { OwnerAvatar } from "../../components/owner-avatar";
 
 /** Install button state machine: idle → installing → installed | error. */
 type InstallState = "idle" | "installing" | "installed" | "error";
+
+/** Matched indexed terms per field, from the search that produced this hit. */
+export type SkillCardMatched = Partial<
+  Record<SkillSearchField, readonly string[]>
+>;
+
+/**
+ * Splits text on the same separator class MiniSearch's default tokenizer
+ * uses, so each non-separator segment is exactly one indexed token and can
+ * be compared to the matched terms (which are always whole tokens).
+ */
+const TOKEN_SPLIT = /([\n\r\p{Z}\p{P}]+)/u;
+
+/**
+ * Text with search-match highlighting: tokens present in `terms` are wrapped
+ * in `<mark>`. Without terms the text renders as a single node, keeping the
+ * non-search DOM identical to before.
+ */
+function HighlightedText({
+  text,
+  terms,
+}: {
+  text: string;
+  terms?: readonly string[];
+}) {
+  if (!terms?.length) return text;
+  const matched = new Set(terms);
+  return (
+    <>
+      {text.split(TOKEN_SPLIT).map((segment, i) =>
+        matched.has(segment.toLowerCase()) ? (
+          <mark
+            key={i}
+            className="rounded-[2px] bg-primary/15 text-inherit dark:bg-primary/25"
+          >
+            {segment}
+          </mark>
+        ) : (
+          segment
+        ),
+      )}
+    </>
+  );
+}
 
 /** Best-effort message from a rejection; Tauri rejects with a non-`Error` value. */
 function toErrorMessage(err: unknown): string {
@@ -31,10 +76,13 @@ function toErrorMessage(err: unknown): string {
  */
 export function SkillCard({
   skill,
+  matched,
   selected = false,
   onSelect,
 }: {
   skill: Skill;
+  /** Search-hit highlights; absent outside a search (nothing highlighted). */
+  matched?: SkillCardMatched;
   /** Whether this card is the one shown in the detail panel. */
   selected?: boolean;
   /** Opens the skill detail panel. */
@@ -90,10 +138,10 @@ export function SkillCard({
           <OwnerAvatar owner={owner} className="h-9 w-9 text-[15px]" />
           <div className="min-w-0">
             <h3 className="truncate text-[15px] font-semibold tracking-tight text-foreground">
-              {skill.name}
+              <HighlightedText text={skill.name} terms={matched?.name} />
             </h3>
             <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
-              {skill.repo}
+              <HighlightedText text={skill.repo} terms={matched?.repo} />
             </p>
           </div>
         </div>
@@ -132,7 +180,10 @@ export function SkillCard({
 
       {skill.description && (
         <p className="mt-3 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">
-          {skill.description}
+          <HighlightedText
+            text={skill.description}
+            terms={matched?.description}
+          />
         </p>
       )}
 

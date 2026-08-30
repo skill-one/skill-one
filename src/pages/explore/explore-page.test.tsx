@@ -10,16 +10,16 @@ import {
 import userEvent from "@testing-library/user-event";
 import { HashRouter, Route, Routes } from "react-router-dom";
 
-import { fetchSkillsPage } from "../../lib/skills-api";
+import { fetchFullIndex } from "../../lib/skills-api";
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { ExplorePage } from "./explore-page";
 
-vi.mock("../../lib/skills-api", () => ({ fetchSkillsPage: vi.fn() }));
+vi.mock("../../lib/skills-api", () => ({ fetchFullIndex: vi.fn() }));
 vi.mock("../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
 }));
 
-const mockFetchSkillsPage = vi.mocked(fetchSkillsPage);
+const mockFetchFullIndex = vi.mocked(fetchFullIndex);
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 
 /** Build a slice of `count` skills starting at global index `offset`. */
@@ -33,20 +33,33 @@ function makeSkills(count: number, offset: number) {
 }
 
 /**
- * Mock fetchSkillsPage to serve 24-per-page slices from a registry with
- * `total` skills — mirrors the real implementation's slice semantics.
+ * Mock fetchFullIndex to serve a registry of `total` skills. The page owns
+ * filtering, sorting and slicing, so the mock always returns the full list.
  */
 function mockRegistry(total: number) {
-  mockFetchSkillsPage.mockImplementation(async (page: number, pageSize) => {
-    const size = pageSize ?? 24;
-    const start = page * size;
-    const count = Math.max(0, Math.min(size, total - start));
-    return {
-      skills: makeSkills(count, start),
-      hasMore: start + size < total,
-      total,
-    };
-  });
+  mockFetchFullIndex.mockResolvedValue(makeSkills(total, 0));
+}
+
+/**
+ * Mock a registry of one distinctive "gadget" skill among 49 filler "tool"
+ * skills. The names are mutually distant enough that fuzzy search stays
+ * deterministic: "gadget" matches exactly one skill, never the fillers.
+ */
+function mockGadgetRegistry() {
+  mockFetchFullIndex.mockResolvedValue([
+    {
+      name: "gadget-master",
+      repo: "acme/gadgets",
+      description: "Builds tiny gadgets.",
+      stars: 99,
+    },
+    ...Array.from({ length: 49 }, (_, i) => ({
+      name: `tool-${i}`,
+      repo: `acme/tool-${i}`,
+      description: "A general purpose utility.",
+      stars: 10,
+    })),
+  ]);
 }
 
 let queryClient: QueryClient;
@@ -73,7 +86,7 @@ beforeEach(() => {
   queryClient = new QueryClient({
     defaultOptions: { queries: { staleTime: 10 * 60 * 1000, retry: false } },
   });
-  mockFetchSkillsPage.mockReset();
+  mockFetchFullIndex.mockReset();
   mockFetchSkillDetail.mockReset();
   mockFetchSkillDetail.mockImplementation(
     async (_repo: string, id: string) => ({
@@ -86,7 +99,7 @@ beforeEach(() => {
 });
 
 describe("ExplorePage", () => {
-  it("renders the first 24 skills of the first page with a total hint", async () => {
+  it("renders the first 24 skills with the total count", async () => {
     mockRegistry(50);
     renderExplorePage();
 
@@ -94,8 +107,9 @@ describe("ExplorePage", () => {
     expect(screen.getByText("skill-23")).toBeInTheDocument();
     // Page 1 holds exactly 24 skills; skill-24 belongs to page 2.
     expect(screen.queryByText("skill-24")).not.toBeInTheDocument();
-    expect(mockFetchSkillsPage).toHaveBeenCalledTimes(1);
-    expect(mockFetchSkillsPage).toHaveBeenCalledWith(0, 24);
+    // The whole index is fetched once; paging is client-side from here on.
+    expect(mockFetchFullIndex).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("共 50 个")).toBeInTheDocument();
   });
 
   it("disables previous on the first page and enables next", async () => {
@@ -113,7 +127,7 @@ describe("ExplorePage", () => {
     );
   });
 
-  it("fetches and renders the next page via the next control", async () => {
+  it("renders the next page via the next control without refetching", async () => {
     const user = userEvent.setup();
     mockRegistry(50);
     renderExplorePage();
@@ -124,7 +138,7 @@ describe("ExplorePage", () => {
     expect(await screen.findByText("skill-24")).toBeInTheDocument();
     expect(screen.getByText("skill-47")).toBeInTheDocument();
     expect(screen.queryByText("skill-48")).not.toBeInTheDocument();
-    expect(mockFetchSkillsPage).toHaveBeenLastCalledWith(1, 24);
+    expect(mockFetchFullIndex).toHaveBeenCalledTimes(1);
   });
 
   it("jumps to a page by clicking its numbered button", async () => {
@@ -137,8 +151,7 @@ describe("ExplorePage", () => {
 
     expect(await screen.findByText("skill-48")).toBeInTheDocument();
     expect(screen.getByText("skill-49")).toBeInTheDocument();
-    expect(mockFetchSkillsPage).toHaveBeenLastCalledWith(2, 24);
-    expect(mockFetchSkillsPage).toHaveBeenCalledTimes(2);
+    expect(mockFetchFullIndex).toHaveBeenCalledTimes(1);
   });
 
   it("disables next on the last page", async () => {
@@ -206,7 +219,6 @@ describe("ExplorePage", () => {
     await user.keyboard("{Enter}");
 
     expect(await screen.findByText("skill-48")).toBeInTheDocument();
-    expect(mockFetchSkillsPage).toHaveBeenLastCalledWith(2, 24);
   });
 
   it("clamps an out-of-range jump to the last page", async () => {
@@ -224,7 +236,7 @@ describe("ExplorePage", () => {
 
   it("shows an error state and recovers via retry", async () => {
     const user = userEvent.setup();
-    mockFetchSkillsPage.mockRejectedValueOnce(new Error("network error"));
+    mockFetchFullIndex.mockRejectedValueOnce(new Error("network error"));
     mockRegistry(50);
     renderExplorePage();
 
@@ -267,21 +279,227 @@ describe("ExplorePage", () => {
     expect(screen.getByText("skill-47")).toBeInTheDocument();
   });
 
-  it("switches between source tabs", async () => {
+  it("filters skills by search text and resets to the first page", async () => {
+    const user = userEvent.setup();
+    mockGadgetRegistry();
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    // Move to page 2 first so the reset is observable.
+    await goToPage(user, 2);
+    await screen.findByText("tool-24");
+
+    await user.type(
+      screen.getByRole("textbox", { name: "搜索 Skill" }),
+      "gadget",
+    );
+
+    // Highlighting splits the name into <mark> segments, so match the card
+    // via its aria-label, which stays intact.
+    expect(
+      await screen.findByRole("button", {
+        name: "查看 gadget-master 详情",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("共 1 个")).toBeInTheDocument();
+    // The grid went back to its first page and shows only the match.
+    expect(screen.queryByText("tool-24")).not.toBeInTheDocument();
+    // A single result fits on one page, so the pagination bar disappears.
+    expect(
+      screen.queryByRole("link", { name: "下一页" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("restores the full registry when the search is cleared", async () => {
+    const user = userEvent.setup();
+    mockGadgetRegistry();
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    const input = screen.getByRole("textbox", { name: "搜索 Skill" });
+    await user.type(input, "gadget");
+    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
+
+    await user.clear(input);
+
+    expect(await screen.findByText("tool-0")).toBeInTheDocument();
+    expect(screen.getByText("共 50 个")).toBeInTheDocument();
+  });
+
+  it("shows a no-match empty state for a search with no results", async () => {
     const user = userEvent.setup();
     mockRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
-    await user.click(screen.getByRole("tab", { name: "Git 仓库" }));
-    expect(
-      screen.getByText("通过 Git 仓库添加技能 — 即将上线"),
-    ).toBeInTheDocument();
+    await user.type(
+      screen.getByRole("textbox", { name: "搜索 Skill" }),
+      "zzzzzzqqqq",
+    );
 
-    await user.click(screen.getByRole("tab", { name: "本地目录" }));
     expect(
-      screen.getByText("从本地目录扫描技能 — 即将上线"),
+      await screen.findByText("未找到匹配“zzzzzzqqqq”的 Skill"),
     ).toBeInTheDocument();
+  });
+
+  it("orders search results by field weight (name > repo > description)", async () => {
+    const user = userEvent.setup();
+    // "widget" appears verbatim in exactly one field of each skill — name,
+    // repo and description respectively — so the ranking is decided by the
+    // field weights alone.
+    mockFetchFullIndex.mockResolvedValue([
+      {
+        name: "widget-pack",
+        repo: "acme/unrelated",
+        description: "Packs widgets nicely.",
+        stars: 1,
+      },
+      {
+        name: "misc-tools",
+        repo: "acme/widget-lab",
+        description: "Various utilities.",
+        stars: 1,
+      },
+      {
+        name: "docgen",
+        repo: "acme/docs",
+        description: "Turns code into a widget spec.",
+        stars: 1,
+      },
+    ]);
+    renderExplorePage();
+    await screen.findByText("widget-pack");
+
+    await user.type(
+      screen.getByRole("textbox", { name: "搜索 Skill" }),
+      "widget",
+    );
+
+    expect(await screen.findByText("docgen")).toBeInTheDocument();
+    // Cards appear in DOM order; read each card's aria-label, which stays
+    // intact even when highlighted names are split across <mark> segments.
+    const cardOrder = () =>
+      screen
+        .getAllByRole("button", { name: /查看 .+ 详情/ })
+        .map((el) => el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""));
+    expect(cardOrder()).toEqual(["widget-pack", "misc-tools", "docgen"]);
+  });
+
+  it("ranks search results by star count among equally relevant matches", async () => {
+    const user = userEvent.setup();
+    // Registry order deliberately opposes the popularity order: without a
+    // search the cards render as beta → alpha, so only the search's star
+    // boost can flip them to alpha → beta.
+    mockFetchFullIndex.mockResolvedValue([
+      {
+        name: "beta-redis-clip",
+        repo: "acme/beta",
+        description: "Utilities.",
+        stars: 10,
+      },
+      {
+        name: "alpha-redis-tool",
+        repo: "acme/alpha",
+        description: "Utilities.",
+        stars: 5_000_000,
+      },
+    ]);
+    renderExplorePage();
+    await screen.findByText("beta-redis-clip");
+
+    // Cards appear in DOM order; read each card's aria-label, which stays
+    // intact even when highlighted names are split across <mark> segments.
+    const cardOrder = () =>
+      screen
+        .getAllByRole("button", { name: /查看 .+ 详情/ })
+        .map((el) => el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""));
+    expect(cardOrder()).toEqual(["beta-redis-clip", "alpha-redis-tool"]);
+
+    await user.type(
+      screen.getByRole("textbox", { name: "搜索 Skill" }),
+      "redis",
+    );
+
+    expect(
+      await screen.findByRole("button", {
+        name: "查看 alpha-redis-tool 详情",
+      }),
+    ).toBeInTheDocument();
+    expect(cardOrder()).toEqual(["alpha-redis-tool", "beta-redis-clip"]);
+  });
+
+  it("highlights matched terms on search results only", async () => {
+    const user = userEvent.setup();
+    mockGadgetRegistry();
+    const { container } = renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    // Without a search nothing is highlighted.
+    expect(container.querySelector("mark")).toBeNull();
+
+    await user.type(
+      screen.getByRole("textbox", { name: "搜索 Skill" }),
+      "gadget",
+    );
+
+    // The name's matched token is wrapped in a <mark>; the full name stays
+    // one logical string across the highlight segments.
+    const mark = await screen.findByText("gadget");
+    expect(mark.tagName).toBe("MARK");
+    const heading = screen
+      .getByRole("button", { name: "查看 gadget-master 详情" })
+      .querySelector("h3");
+    expect(heading).not.toBeNull();
+    expect(heading?.textContent).toBe("gadget-master");
+  });
+
+  it("sorts skills by downloads and by name from the toolbar", async () => {
+    const user = userEvent.setup();
+    mockFetchFullIndex.mockResolvedValue([
+      { name: "alpha", repo: "o/alpha", description: "", stars: 5 },
+      { name: "beta", repo: "o/beta", description: "", stars: 300 },
+      { name: "gamma", repo: "o/gamma", description: "", stars: 50 },
+    ]);
+    renderExplorePage();
+    await screen.findByText("alpha");
+
+    // Cards appear in DOM order; exact-match the names so the repo subtitles
+    // ("o/alpha") don't interfere.
+    const cardOrder = () =>
+      screen
+        .getAllByText(/^(alpha|beta|gamma)$/)
+        .map((el) => el.textContent);
+
+    expect(cardOrder()).toEqual(["alpha", "beta", "gamma"]);
+
+    // Sort by downloads: 300 → 50 → 5.
+    await user.click(screen.getByRole("button", { name: "默认排序" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "按下载量" }));
+    expect(cardOrder()).toEqual(["beta", "gamma", "alpha"]);
+
+    // Sort by name; the trigger label follows the active order.
+    await user.click(screen.getByRole("button", { name: "按下载量" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
+    expect(cardOrder()).toEqual(["alpha", "beta", "gamma"]);
+  });
+
+  it("offers the category placeholder menu with 全部 preselected", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50);
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    await user.click(screen.getByRole("button", { name: "分类" }));
+
+    // The registry index has no category field: 全部 is the only selectable
+    // entry (permanently checked) and the rest is a disabled coming-soon hint.
+    expect(screen.getByRole("menuitemradio", { name: "全部" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(
+      screen.getByRole("menuitem", { name: "更多分类 · 即将上线" }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 
   it("opens the detail panel when a card is clicked", async () => {
