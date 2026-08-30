@@ -48,18 +48,6 @@ export const footerItems: NavItem[] = [
   { path: "/settings", label: "设置", icon: Settings },
 ];
 
-/** All nav items: the sidebar and the window title share this page-label config. */
-export const navItems: NavItem[] = [
-  ...shopItems,
-  ...mySkillsItems,
-  ...footerItems,
-];
-
-/** Look up a sidebar page label by route path; unknown paths yield an empty string. */
-export function navLabelFor(path: string): string {
-  return navItems.find((item) => item.path === path)?.label ?? "";
-}
-
 /**
  * Real badge counts: Shop "全部" = registry total, "My Skills → 全局" =
  * installed skill count. Only these two entries have a real data source;

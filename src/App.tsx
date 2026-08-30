@@ -1,25 +1,16 @@
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sparkles, Building2, Folder } from "lucide-react";
-import { useEffect } from "react";
-import {
-  HashRouter,
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-} from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import {
   defaultShouldDehydrateQuery,
   type Query,
 } from "@tanstack/react-query";
 
-import { AppSidebar, navLabelFor } from "./components/app-sidebar";
+import { AppSidebar } from "./components/app-sidebar";
 import { PlaceholderPage } from "./components/placeholder-page";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
-import { isTauri } from "./lib/tauri";
 import { ExplorePage } from "./pages/explore/explore-page";
 import { MySkillsPage } from "./pages/my-skills/my-skills-page";
 import { SettingsPage } from "./pages/settings/settings-page";
@@ -79,41 +70,6 @@ const persistOptions = {
       query.queryKey[0] !== "skills-index",
   },
 };
-
-/**
- * Drag strip across the top of the content column (the Overlay title bar has
- * no native bar to drag from). The whole strip is marked as a drag region so
- * the window can be moved, and the current page name is centered on top of it
- * (traffic-light zone on the left is not clickable). The native window title
- * is still synced for Mission Control (no-op in browser).
- *
- * The title comes from the same nav config as the sidebar (navLabelFor), so it
- * always matches the sidebar's page name.
- */
-function WindowTitle() {
-  const location = useLocation();
-  const title = navLabelFor(location.pathname);
-
-  useEffect(() => {
-    if (isTauri()) {
-      void getCurrentWindow().setTitle(title);
-    }
-  }, [title]);
-
-  return (
-    <div
-      data-tauri-drag-region
-      className="absolute inset-x-0 top-0 flex h-9 items-center justify-center"
-    >
-      <span
-        data-tauri-drag-region
-        className="text-[13px] font-medium text-muted-foreground"
-      >
-        {title}
-      </span>
-    </div>
-  );
-}
 
 export default function App() {
   return (
