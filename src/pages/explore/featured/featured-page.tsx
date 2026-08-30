@@ -1,11 +1,7 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 
 import { Skeleton } from "../../../components/ui/skeleton";
-import {
-  fetchFullIndex,
-  SKILLS_QUERY_KEY,
-} from "../../../lib/skills-api";
+import { useSkillsIndex } from "../../../hooks/use-skills-index";
 import { FEATURED_CATEGORIES } from "../../../data/featured-content";
 import { Button } from "../../../components/ui/button";
 import { Sheet } from "../../../components/ui/sheet";
@@ -58,12 +54,17 @@ export function FeaturedPage() {
     isError,
     error,
     refetch,
-  } = useQuery({
-    queryKey: [...SKILLS_QUERY_KEY],
-    queryFn: fetchFullIndex,
-  });
+  } = useSkillsIndex();
 
-  const slides = useMemo(() => buildHeroSlides(index ?? []), [index]);
+  // Rankings and curated joins only mean anything against the whole
+  // registry, so the page keeps its skeleton until the stream completes —
+  // unlike the explore page, it never renders partial data.
+  const registry = useMemo(
+    () => (index?.complete ? index.skills : []),
+    [index],
+  );
+
+  const slides = useMemo(() => buildHeroSlides(registry), [registry]);
 
   const sections = useMemo<FeaturedSection[]>(() => {
     const resolved = FEATURED_CATEGORIES.map((category) => ({
@@ -71,7 +72,7 @@ export function FeaturedPage() {
       title: category.title,
       skills: category.skills
         .map((ref) =>
-          index?.find((s) => s.repo === ref.repo && s.name === ref.name),
+          registry.find((s) => s.repo === ref.repo && s.name === ref.name),
         )
         .filter((skill): skill is Skill => skill != null),
     })).filter((category) => category.skills.length > 0);
@@ -85,7 +86,7 @@ export function FeaturedPage() {
         index: next++,
       })),
     }));
-  }, [index]);
+  }, [registry]);
 
   const flat = useMemo(
     () => sections.flatMap((section) => section.skills),
@@ -123,7 +124,7 @@ export function FeaturedPage() {
                 重试
               </Button>
             </Placeholder>
-          ) : isLoading || !index ? (
+          ) : isLoading || !index?.complete ? (
             <FeaturedSkeleton />
           ) : sections.length === 0 ? (
             <Placeholder message="暂无精选内容" />

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
 import {
   ChevronDown,
   ChevronLeft,
@@ -9,11 +8,9 @@ import {
   SearchX,
 } from "lucide-react";
 
+import { useSkillsIndex } from "../../hooks/use-skills-index";
 import {
-  fetchFullIndex,
-  SKILLS_QUERY_KEY,
-} from "../../lib/skills-api";
-import {
+  containsSearch,
   createSkillSearch,
   type SkillSearchHit,
 } from "../../lib/search-skills";
@@ -121,16 +118,25 @@ export function ExplorePage() {
     isError,
     error,
     refetch,
-  } = useQuery({
-    queryKey: [...SKILLS_QUERY_KEY],
-    queryFn: fetchFullIndex,
-  });
+  } = useSkillsIndex();
+
+  // The registry browses progressively: while the index download streams in,
+  // `registry` holds the skills parsed so far (always a prefix of the final
+  // list, so pagination and the default order stay stable as it grows).
+  const registry = useMemo(() => index?.skills ?? [], [index]);
+  const complete = index?.complete ?? false;
 
   // Reusable fuzzy-search index over the registry (weighted name > repo >
-  // description, with a popularity boost from star counts). The built search
-  // is cached per data reference inside search-skills, so remounting this
-  // page never rebuilds the index — only a fresh fetch does.
-  const skillSearch = useMemo(() => createSkillSearch(index ?? []), [index]);
+  // description, with a popularity boost from star counts). Building it is
+  // expensive (hundreds of ms for ~24k entries), so it is only built once the
+  // stream completes — never per progress snapshot. Until then search falls
+  // back to plain substring matching below. The built search is cached per
+  // data reference inside search-skills, so remounting this page never
+  // rebuilds the index — only a fresh fetch does.
+  const skillSearch = useMemo(
+    () => (complete ? createSkillSearch(registry) : null),
+    [complete, registry],
+  );
 
   // Search filter: fuzzy match over name, repo and description, applied on
   // every keystroke — the index is ~24k entries. Keeping the search text out
@@ -139,9 +145,11 @@ export function ExplorePage() {
   // registry in its original order, with nothing highlighted.
   const filtered = useMemo((): SkillSearchHit[] => {
     const q = search.trim();
-    if (!q) return (index ?? []).map((skill) => ({ skill, matched: {} }));
-    return skillSearch(q);
-  }, [skillSearch, search]);
+    if (!q) return registry.map((skill) => ({ skill, matched: {} }));
+    // While streaming: substring match over what has loaded so far. The
+    // results (and the reported total) settle once the full index lands.
+    return skillSearch ? skillSearch(q) : containsSearch(registry, q);
+  }, [skillSearch, registry, search]);
 
   // "default" keeps the (filtered) relevance order; the others sort a copy.
   const sorted = useMemo(() => {
@@ -164,7 +172,9 @@ export function ExplorePage() {
     [sorted, page],
   );
 
-  // A background refetch can shrink the index below the current page.
+  // A background refetch can shrink the index below the current page; while
+  // the index is still streaming in, pages beyond the loaded prefix are also
+  // clamped away until more data arrives.
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
@@ -453,9 +463,10 @@ export function ExplorePage() {
                 </Pagination>
               )}
               {/* Absolute positioning keeps the pager centered regardless of
-                  how wide the count or the page window gets. */}
+                  how wide the count or the page window gets. While the index
+                  is streaming in the count climbs, so say so. */}
               <span className="absolute right-0 whitespace-nowrap text-sm text-muted-foreground tabular-nums">
-                共 {filteredTotal} 个
+                共 {filteredTotal} 个{complete ? "" : " · 加载中"}
               </span>
             </div>
           )}

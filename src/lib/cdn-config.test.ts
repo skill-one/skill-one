@@ -4,6 +4,7 @@ import {
   DEFAULT_CDN_BASE,
   SourceFetchError,
   fileCandidates,
+  fetchFirstStream,
   fetchFirstText,
   getCdnBase,
   setCdnBase,
@@ -116,6 +117,108 @@ describe("fetchFirstText", () => {
   it("passes an abort timeout signal to each request", async () => {
     fetchMock.mockResolvedValue(ok());
     await fetchFirstText([ORIGIN]);
+    expect(fetchMock).toHaveBeenCalledWith(ORIGIN, {
+      signal: expect.anything(),
+    });
+  });
+});
+
+describe("fetchFirstStream", () => {
+  const encoder = new TextEncoder();
+
+  /** A 200 response whose body streams out the given text chunks. */
+  function streamOk(chunks: string[]): Response {
+    let sent = 0;
+    return new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (sent >= chunks.length) {
+            controller.close();
+            return;
+          }
+          controller.enqueue(encoder.encode(chunks[sent++]));
+        },
+      }),
+    );
+  }
+
+  /** A 200 response whose body errors once `errorAfter` chunks were read. */
+  function streamErrorAfter(chunks: string[], errorAfter: number): Response {
+    let sent = 0;
+    return new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (sent >= errorAfter) {
+            controller.error(new Error("connection dropped"));
+            return;
+          }
+          controller.enqueue(encoder.encode(chunks[sent++]));
+        },
+      }),
+    );
+  }
+
+  /** Collect a streamed body into decoded text. */
+  async function drain(body: ReadableStream<Uint8Array>): Promise<string> {
+    const decoder = new TextDecoder();
+    const reader = body.getReader();
+    let text = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+    return text;
+  }
+
+  it("streams the first reachable candidate's body to the consumer", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === ORIGIN ? streamOk(["hello ", "world"]) : bad(),
+    );
+    const consumed: string[] = [];
+    await fetchFirstStream([ORIGIN, DEFAULT_CDN], async (body) => {
+      consumed.push(await drain(body));
+    });
+    expect(consumed).toEqual(["hello world"]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the next candidate when the stream fails mid-download", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === ORIGIN ? streamErrorAfter(["partial"], 1) : streamOk(["whole"]),
+    );
+    const consumed: string[] = [];
+    await fetchFirstStream([ORIGIN, DEFAULT_CDN], async (body) => {
+      consumed.push(await drain(body));
+    });
+    // The consumer restarts from scratch on the fallback candidate.
+    expect(consumed).toEqual(["whole"]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws a typed http error when every candidate answers non-OK", async () => {
+    fetchMock.mockResolvedValue(bad());
+    const err = await fetchFirstStream([ORIGIN, DEFAULT_CDN], async () => {
+      throw new Error("should not be called");
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(SourceFetchError);
+    expect(err.kind).toBe("http");
+    expect(err.status).toBe(404);
+  });
+
+  it("throws a typed network error when a candidate never responds", async () => {
+    fetchMock.mockRejectedValue(new TypeError("network down"));
+    const err = await fetchFirstStream([ORIGIN, DEFAULT_CDN], async () => {
+      throw new Error("should not be called");
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(SourceFetchError);
+    expect(err.kind).toBe("network");
+    expect(err.status).toBeUndefined();
+  });
+
+  it("passes an abort timeout signal to each request", async () => {
+    fetchMock.mockResolvedValue(streamOk(["body"]));
+    await fetchFirstStream([ORIGIN], async () => {});
     expect(fetchMock).toHaveBeenCalledWith(ORIGIN, {
       signal: expect.anything(),
     });

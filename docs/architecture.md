@@ -28,11 +28,11 @@ Skill One is a Tauri v2 desktop app. The frontend (React) handles rendering and 
 
 ### Frontend (reads)
 
-- **`src/lib/skills-api.ts`**: Fetches and parses the skills registry index (JSONL); consumers filter, sort, and paginate it client-side.
+- **`src/lib/skills-api.ts`**: Fetches and parses the skills registry index (JSONL) as a stream, so skills become available progressively while the download is still running; consumers filter, sort, and paginate them client-side.
 - **`src/lib/skill-detail-api.ts`**: Fetches a single skill's `SKILL.md` on demand and parses its frontmatter and body.
-- **`src/lib/cdn-config.ts`**: Manages download sources. Defaults to direct `raw.githubusercontent.com` access, falls back to a CDN mirror (`cdn.jsdmirror.com`) on failure, and lets users configure a custom CDN in "Settings". Candidate URLs are tried in priority order, and the configuration is persisted to localStorage.
+- **`src/lib/cdn-config.ts`**: Manages download sources. Defaults to direct `raw.githubusercontent.com` access, falls back to a CDN mirror (`cdn.jsdmirror.com`) on failure, and lets users configure a custom CDN in "Settings". Candidate URLs are tried in priority order — including mid-stream, when a body fails partway through — and the configuration is persisted to localStorage.
 
-Read data is cached and persisted uniformly through TanStack Query (`staleTime` 10 minutes, `gcTime` infinite), so after a restart the app can render from cache first and refresh in the background. Each candidate request has a 10-second timeout to avoid hanging on the origin when no CDN fallback is available. Persistence excludes the full-index queries (`skills-index`, and the explore page's `skills` entry that stores the whole parsed list) — the parsed index is too large for the WebView localStorage quota and is re-fetched every session; only small queries such as the installed list and agent status are written to disk.
+Read data is cached and persisted uniformly through TanStack Query (`staleTime` 10 minutes, `gcTime` infinite), so after a restart the app can render from cache first and refresh in the background. Each candidate request has a 10-second timeout guarding the response headers; streamed bodies additionally enforce a stall timeout between chunks (a multi-megabyte download legitimately outlasts any fixed cap). Persistence excludes the full-index queries (`skills-index`, and the explore page's `skills` entry that stores the parsed list with a completion flag) — the parsed index is too large for the WebView localStorage quota and is re-fetched every session; only small queries such as the installed list and agent status are written to disk.
 
 ### Backend (writes)
 
@@ -73,13 +73,14 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 
 **Browsing the skill list**:
 
-1. `explore-page` requests the full index via `fetchFullIndex()`.
-2. `skills-api.ts` downloads the index once (cached per session); search, sort, and pagination are computed client-side.
-3. `cdn-config.ts` tries direct GitHub access and CDN mirrors in order.
-4. TanStack Query caches the result in memory (not persisted — too large); paging and in-session navigation hit the cache first.
+1. `explore-page` subscribes to the index through the `useSkillsIndex` hook, which starts the download and mirrors every progress snapshot into the TanStack Query cache as `{ skills, complete: false }`.
+2. `skills-api.ts` streams the index (cached per session) and parses each line as it arrives; pages render from the partial list right away — partial lists are always prefixes of the final one, so pagination and the default order stay stable while the count climbs.
+3. While streaming, search falls back to plain substring matching; the MiniSearch fuzzy index is built once the stream completes (`complete: true`), because rebuilding it per snapshot would cost more than the download itself.
+4. `cdn-config.ts` tries direct GitHub access and CDN mirrors in order.
+5. TanStack Query caches the result in memory (not persisted — too large); paging and in-session navigation hit the cache first.
 
 **Curated featured page**:
 
-1. `featured-page` reads the same cached index as explore (shared query key).
+1. `featured-page` reads the same cached index as explore (shared query key), but keeps its skeleton until the stream completes — rankings over an incomplete registry would be wrong.
 2. The hero carousels are computed from the index (`featured-rankings.ts`): weekly installs, lifetime installs, and the weekly/lifetime share; the parser keeps each skill's most recent week as `weeklyInstalls`.
 3. Category sections join the hand-picked references in `featured-content.ts` against the index; unresolved references are skipped and empty sections hidden.
