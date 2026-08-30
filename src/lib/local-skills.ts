@@ -31,6 +31,9 @@ import {
   setMockSkillEnabled,
 } from "./mock-local";
 
+/** Simulated clone duration for browser mock installs, in milliseconds. */
+export const MOCK_INSTALL_DELAY_MS = 1200;
+
 /** All skills installed into the global skills directory. */
 export async function fetchInstalledSkills(): Promise<InstalledSkill[]> {
   if (isTauri()) {
@@ -67,6 +70,9 @@ export async function installSkillFromSource(
     }
     return;
   }
+  // Simulate a realistic clone duration so the installing state is observable
+  // in the browser demo; the real Tauri install clones over the network.
+  await new Promise((resolve) => setTimeout(resolve, MOCK_INSTALL_DELAY_MS));
   installMockSkill(repo, name);
 }
 

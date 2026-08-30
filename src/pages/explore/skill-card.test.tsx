@@ -1,13 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SkillCard } from "./skill-card";
-import { installSkillFromSource } from "../../lib/local-skills";
+import {
+  fetchInstalledSkills,
+  installSkillFromSource,
+} from "../../lib/local-skills";
+import type { InstalledSkill } from "../../lib/skills-manager";
 import { renderWithRouter } from "../../test/test-utils";
 import type { Skill } from "../../types/skill";
 
 vi.mock("../../lib/local-skills", () => ({
+  fetchInstalledSkills: vi.fn(),
   installSkillFromSource: vi.fn(),
 }));
 
@@ -19,7 +24,23 @@ const skill: Skill = {
   downloads: 2991984,
 };
 
+const installedSkill: InstalledSkill = {
+  name: "pdf",
+  path: "~/.agents/skills/pdf",
+  scope: "global",
+  agents: [],
+  source: "anthropics/skills",
+  sourceUrl: null,
+  sourceType: "github",
+  enabled: true,
+};
+
 describe("SkillCard", () => {
+  beforeEach(() => {
+    // No skills are installed unless a test says otherwise.
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
+  });
+
   it("renders name, repo, description, downloads and stars", () => {
     renderWithRouter(<SkillCard skill={skill} />);
 
@@ -51,11 +72,40 @@ describe("SkillCard", () => {
     expect(screen.getByRole("button", { name: "安装" })).toBeEnabled();
   });
 
-  it("shows an install button initially", () => {
+  it("shows an icon-only install button with an accessible label", () => {
     renderWithRouter(<SkillCard skill={skill} />);
     const button = screen.getByRole("button", { name: "安装" });
     expect(button).toBeEnabled();
-    expect(button).toHaveTextContent("安装");
+    // Icon-only: a Download icon plus a visually hidden label, no visible text.
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    expect(screen.getByText("安装")).toHaveClass("sr-only");
+  });
+
+  it("reveals an '安装' tooltip when hovering the icon-only button", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SkillCard skill={skill} />);
+
+    await user.hover(screen.getByRole("button", { name: "安装" }));
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("安装");
+  });
+
+  it("renders the installed state for skills already present on disk", async () => {
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([installedSkill]);
+    renderWithRouter(<SkillCard skill={skill} />);
+
+    const button = await screen.findByRole("button", { name: "已安装" });
+    expect(button).toBeDisabled();
+  });
+
+  it("keeps the install button when only the name matches but the source differs", async () => {
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([
+      { ...installedSkill, source: "other-owner/other-repo" },
+    ]);
+    renderWithRouter(<SkillCard skill={skill} />);
+
+    // The installed list resolves without flipping this card's button.
+    expect(await screen.findByRole("button", { name: "安装" })).toBeEnabled();
   });
 
   it("installs the skill and switches to a disabled 'installed' state", async () => {
@@ -68,6 +118,8 @@ describe("SkillCard", () => {
     expect(
       await screen.findByRole("button", { name: "已安装" }),
     ).toBeDisabled();
+    // Every state stays icon-only; the label remains visually hidden.
+    expect(screen.getByText("已安装")).toHaveClass("sr-only");
   });
 
   it("returns to '重试' and surfaces the error when the install fails", async () => {
