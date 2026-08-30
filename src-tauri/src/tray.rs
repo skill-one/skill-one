@@ -32,6 +32,9 @@ pub const NAVIGATE_EVENT: &str = "popover-navigate";
 const BLUR_GRACE: Duration = Duration::from_millis(250);
 /// Gap between the menu bar and the popover's top edge.
 const POPOVER_GAP: f64 = 6.0;
+/// Popover logical size, mirroring `tauri.conf.json` (`width`/`height`).
+/// Only used as a fallback when reading the real window size fails.
+const POPOVER_LOGICAL_SIZE: (f64, f64) = (320.0, 400.0);
 
 /// Timestamp of the last popover show, shared so the blur handler can apply
 /// the grace window.
@@ -142,9 +145,10 @@ fn toggle_popover<R: Runtime>(app: &AppHandle<R>, rect: &Rect, cursor: PhysicalP
     }
 
     let scale = popover.scale_factor().unwrap_or(1.0);
-    let size = popover
-        .inner_size()
-        .unwrap_or(PhysicalSize::new(360, 520));
+    let size = popover.inner_size().unwrap_or(PhysicalSize::new(
+        (POPOVER_LOGICAL_SIZE.0 * scale) as u32,
+        (POPOVER_LOGICAL_SIZE.1 * scale) as u32,
+    ));
     let origin = popover_origin(
         rect_px(rect, scale),
         (size.width as f64, size.height as f64),
@@ -242,42 +246,47 @@ mod tests {
         (712.0, 0.0, 32.0, 24.0)
     }
 
+    /// Matches `POPOVER_LOGICAL_SIZE` / `tauri.conf.json`.
+    fn popover_size() -> (f64, f64) {
+        (320.0, 400.0)
+    }
+
     fn monitor() -> (f64, f64, f64, f64) {
         (0.0, 0.0, 1440.0, 900.0)
     }
 
     #[test]
     fn centers_below_the_tray_icon() {
-        let origin = popover_origin(mac_tray(), (360.0, 520.0), monitor());
-        assert_eq!(origin.x, 548); // 712 + (32 - 360) / 2
+        let origin = popover_origin(mac_tray(), popover_size(), monitor());
+        assert_eq!(origin.x, 568); // 712 + (32 - 320) / 2
         assert_eq!(origin.y, 30); // 0 + 24 + gap 6
     }
 
     #[test]
     fn clamps_to_the_right_screen_edge() {
         let tray = (1400.0, 0.0, 32.0, 24.0);
-        let origin = popover_origin(tray, (360.0, 520.0), monitor());
-        assert_eq!(origin.x, 1080); // 1440 - 360
+        let origin = popover_origin(tray, popover_size(), monitor());
+        assert_eq!(origin.x, 1120); // 1440 - 320
         assert_eq!(origin.y, 30);
     }
 
     #[test]
     fn clamps_to_the_left_screen_edge() {
         let tray = (0.0, 0.0, 32.0, 24.0);
-        let origin = popover_origin(tray, (360.0, 520.0), monitor());
+        let origin = popover_origin(tray, popover_size(), monitor());
         assert_eq!(origin.x, 0);
     }
 
     #[test]
     fn clamps_to_the_bottom_screen_edge() {
         let tray = (712.0, 876.0, 32.0, 24.0); // dock-position tray (unrealistic but exercises the clamp)
-        let origin = popover_origin(tray, (360.0, 520.0), monitor());
-        assert_eq!(origin.y, 380); // 900 - 520
+        let origin = popover_origin(tray, popover_size(), monitor());
+        assert_eq!(origin.y, 500); // 900 - 400
     }
 
     #[test]
     fn rounds_fractional_positions() {
-        let origin = popover_origin((713.0, 0.0, 31.0, 24.0), (360.0, 520.0), monitor());
-        assert_eq!(origin.x, 549); // 713 + (31 - 360) / 2 = 548.5
+        let origin = popover_origin((713.0, 0.0, 31.0, 24.0), popover_size(), monitor());
+        assert_eq!(origin.x, 569); // 713 + (31 - 320) / 2 = 568.5
     }
 }
