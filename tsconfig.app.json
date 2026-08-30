@@ -16,7 +16,11 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "strict": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src"]
 }
