@@ -1,8 +1,15 @@
-import { QueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+import { listen } from "@tauri-apps/api/event";
 import { Building2, Folder } from "lucide-react";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  HashRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+} from "react-router-dom";
 import {
   defaultShouldDehydrateQuery,
   type Query,
@@ -11,32 +18,15 @@ import {
 import { AppSidebar } from "./components/app-sidebar";
 import { PlaceholderPage } from "./components/placeholder-page";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
+import { createQueryClient } from "./lib/query-client";
+import { isTauri } from "./lib/tauri";
 import { ExplorePage } from "./pages/explore/explore-page";
 import { FeaturedPage } from "./pages/explore/featured/featured-page";
 import { MySkillsPage } from "./pages/my-skills/my-skills-page";
 import { SettingsPage } from "./pages/settings/settings-page";
+import { POPOVER_NAVIGATE_EVENT } from "./popover/popover-events";
 
-/**
- * Cached registry data is served for 10 minutes without re-fetching
- * (`staleTime`); beyond that it is shown first and revalidated in the
- * background, and the UI updates to the fresh data when the request lands.
- * Retries are left to the UI's retry button so a network hiccup doesn't pile
- * up hidden requests.
- *
- * `gcTime: Infinity` disables garbage collection: cached pages stay in memory
- * (and in localStorage) forever, so every revisit — including after a restart
- * — paints from cache first and refreshes in the background. Only a manual
- * cache clear ever drops the data.
- */
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 10 * 60 * 1000,
-      gcTime: Infinity,
-      retry: false,
-    },
-  },
-});
+const queryClient = createQueryClient();
 
 /**
  * Persist the query cache to localStorage so small read queries (installed
@@ -82,6 +72,7 @@ export default function App() {
       persistOptions={persistOptions}
     >
       <HashRouter>
+        <PopoverNavigation />
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
           <SidebarProvider
             style={{ minHeight: 0 }}
@@ -120,4 +111,24 @@ export default function App() {
       </HashRouter>
     </PersistQueryClientProvider>
   );
+}
+
+/**
+ * Menu bar popover → main window routing. The popover asks Rust to show +
+ * focus this window (native side) and emits the target path; this listener
+ * performs the actual navigation.
+ */
+function PopoverNavigation() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!isTauri()) return;
+    const unlisten = listen<{ path: string }>(
+      POPOVER_NAVIGATE_EVENT,
+      (event) => navigate(event.payload.path),
+    );
+    return () => {
+      void unlisten.then((dispose) => dispose());
+    };
+  }, [navigate]);
+  return null;
 }

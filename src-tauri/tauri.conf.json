@@ -21,11 +21,28 @@
         "minHeight": 600,
         "resizable": true,
         "fullscreen": false
+      },
+      {
+        "label": "popover",
+        "url": "popover.html",
+        "title": "SkillOne",
+        "theme": "light",
+        "width": 320,
+        "height": 400,
+        "visible": false,
+        "focus": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "alwaysOnTop": true
       }
     ],
     "security": {
       "csp": null
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,

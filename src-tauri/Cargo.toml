@@ -19,7 +19,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# tray-icon: menu bar tray; image-png: load the template tray icon from bytes;
+# macos-private-api: required by the transparent popover window (macOSPrivateApi).
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 # Opens external links (skill sources) in the system browser.
 tauri-plugin-opener = "2"
 # Skills install / agent management backed by the agents-skills library.
@@ -28,6 +30,13 @@ serde = { version = "1", features = ["derive"] }
 # Frontmatter parsing for description extraction (same parser agents-skills uses;
 # the library's own parser is private since 0.8).
 serde_yaml = "0.9"
+window-vibrancy = "0.8.0"
 
 [dev-dependencies]
 tempfile = "3"
+
+# Activate the app when the tray popover opens: without real activation the
+# previous frontmost app reclaims key focus and the popover blur-dismisses.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = "0.3"

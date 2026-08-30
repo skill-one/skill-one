@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>skillone</title>
+    <!-- The popover window is transparent (frosted-glass vibrancy behind the
+         webview, rounded corners over the desktop); the page background must
+         stay transparent for it to show through. `!important` beats the
+         opaque `body { @apply bg-background }` that index.css injects later. -->
+    <style>
+      html,
+      body {
+        background: transparent !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="popover-root"></div>
+    <script type="module" src="/src/popover/popover-main.tsx"></script>
+  </body>
+</html>
