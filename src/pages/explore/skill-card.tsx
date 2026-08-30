@@ -1,8 +1,11 @@
 import { useState, type ReactElement } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Star, Check, Download, Loader2, RefreshCw } from "lucide-react";
 
-import { installSkillFromSource } from "../../lib/local-skills";
+import {
+  fetchInstalledSkills,
+  installSkillFromSource,
+} from "../../lib/local-skills";
 import type { SkillSearchField } from "../../lib/search-skills";
 import { cn, formatStars } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
@@ -118,8 +121,30 @@ export function SkillCard({
 
   const queryClient = useQueryClient();
 
+  // The install button reflects the persisted install state, not just this
+  // session: skills already present in the global skills directory render as
+  // 已安装 (disabled) before any click. Sharing the "my skills" query key
+  // keeps store cards in sync with installs/removals done elsewhere; React
+  // Query dedupes the shared key so a page of cards issues a single fetch.
+  const { data: installedSkills } = useQuery({
+    queryKey: ["installed-skills"],
+    queryFn: fetchInstalledSkills,
+  });
+
   const owner = skill.repo.split("/")[0];
-  const installMeta = INSTALL_BUTTON[installState];
+
+  const installing = installState === "installing";
+  const isInstalled =
+    installState === "installed" ||
+    !!installedSkills?.some(
+      (s) => s.name === skill.name && s.source === skill.repo,
+    );
+  const effectiveState: InstallState = installing
+    ? "installing"
+    : isInstalled
+      ? "installed"
+      : installState;
+  const installMeta = INSTALL_BUTTON[effectiveState];
 
   const handleInstall = async (e: React.MouseEvent) => {
     // Keep the click from opening the detail panel.
@@ -177,9 +202,7 @@ export function SkillCard({
               <Button
                 size="icon"
                 variant={installMeta.variant}
-                disabled={
-                  installState === "installing" || installState === "installed"
-                }
+                disabled={installing || isInstalled}
                 onClick={(e) => void handleInstall(e)}
                 className="h-7 w-7 shrink-0"
               >

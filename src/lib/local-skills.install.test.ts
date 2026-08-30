@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { installSkillFromSource } from "./local-skills";
+import {
+  installSkillFromSource,
+  MOCK_INSTALL_DELAY_MS,
+} from "./local-skills";
 
 const { isTauri, installSkill, installMockSkill } = vi.hoisted(() => ({
   isTauri: vi.fn(),
@@ -14,6 +17,10 @@ vi.mock("./mock-local", () => ({ installMockSkill }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("installSkillFromSource", () => {
@@ -63,11 +70,27 @@ describe("installSkillFromSource", () => {
   });
 
   it("records the install in the mock store outside Tauri", async () => {
+    vi.useFakeTimers();
     isTauri.mockReturnValue(false);
 
-    await installSkillFromSource("anthropics/skills", "pdf");
+    const pending = installSkillFromSource("anthropics/skills", "pdf");
+    await vi.advanceTimersByTimeAsync(MOCK_INSTALL_DELAY_MS);
+    await pending;
 
     expect(installMockSkill).toHaveBeenCalledWith("anthropics/skills", "pdf");
     expect(installSkill).not.toHaveBeenCalled();
+  });
+
+  it("delays the mock install so the installing state stays observable", async () => {
+    vi.useFakeTimers();
+    isTauri.mockReturnValue(false);
+
+    const pending = installSkillFromSource("anthropics/skills", "pdf");
+    await vi.advanceTimersByTimeAsync(MOCK_INSTALL_DELAY_MS - 1);
+    expect(installMockSkill).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    expect(installMockSkill).toHaveBeenCalledTimes(1);
   });
 });

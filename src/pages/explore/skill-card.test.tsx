@@ -1,13 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SkillCard } from "./skill-card";
-import { installSkillFromSource } from "../../lib/local-skills";
+import {
+  fetchInstalledSkills,
+  installSkillFromSource,
+} from "../../lib/local-skills";
+import type { InstalledSkill } from "../../lib/skills-manager";
 import { renderWithRouter } from "../../test/test-utils";
 import type { Skill } from "../../types/skill";
 
 vi.mock("../../lib/local-skills", () => ({
+  fetchInstalledSkills: vi.fn(),
   installSkillFromSource: vi.fn(),
 }));
 
@@ -18,7 +23,23 @@ const skill: Skill = {
   stars: 169600,
 };
 
+const installedSkill: InstalledSkill = {
+  name: "pdf",
+  path: "~/.agents/skills/pdf",
+  scope: "global",
+  agents: [],
+  source: "anthropics/skills",
+  sourceUrl: null,
+  sourceType: "github",
+  enabled: true,
+};
+
 describe("SkillCard", () => {
+  beforeEach(() => {
+    // No skills are installed unless a test says otherwise.
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
+  });
+
   it("renders name, repo, description and formatted stars", () => {
     renderWithRouter(<SkillCard skill={skill} />);
 
@@ -55,6 +76,24 @@ describe("SkillCard", () => {
     await user.hover(screen.getByRole("button", { name: "安装" }));
 
     expect(await screen.findByRole("tooltip")).toHaveTextContent("安装");
+  });
+
+  it("renders the installed state for skills already present on disk", async () => {
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([installedSkill]);
+    renderWithRouter(<SkillCard skill={skill} />);
+
+    const button = await screen.findByRole("button", { name: "已安装" });
+    expect(button).toBeDisabled();
+  });
+
+  it("keeps the install button when only the name matches but the source differs", async () => {
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([
+      { ...installedSkill, source: "other-owner/other-repo" },
+    ]);
+    renderWithRouter(<SkillCard skill={skill} />);
+
+    // The installed list resolves without flipping this card's button.
+    expect(await screen.findByRole("button", { name: "安装" })).toBeEnabled();
   });
 
   it("installs the skill and switches to a disabled 'installed' state", async () => {
