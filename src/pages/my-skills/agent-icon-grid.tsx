@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, CircleX, Loader2, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronUp,
+  CircleX,
+  Loader2,
+  Users,
+} from "lucide-react";
 
 import {
   fetchAgentStatus,
@@ -10,6 +17,8 @@ import {
 import type { AgentStatus } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
 import { AgentIconButton } from "./agent-icon-button";
+import { AgentAvatarGroup, AVATAR_GROUP_MAX } from "./agent-avatar-group";
+import { Button } from "../../components/ui/button";
 import { formatLinkMessage, type Notice } from "./link-notice";
 import {
   LinkConfirmDialog,
@@ -23,6 +32,12 @@ import {
  * clicking a dir that already holds content opens the confirm dialog, which
  * explains what confirming will do. Toast wording lives in `link-notice.ts`.
  *
+ * When more than AVATAR_GROUP_MAX agents are detected, the strip starts
+ * collapsed (see `AgentAvatarGroup`): a compact avatar row with a +N count
+ * that expands into the full interactive grid below; a collapse button in the
+ * expanded grid folds it back. With few agents the grid renders directly —
+ * there is nothing to fold.
+ *
  * Since `agents-skills` 0.9 nothing blocks a link and nothing needs choosing:
  * confirming links the agent and the backend handles the content — skills are
  * adopted into the canonical dir, everything else parks into the agent's
@@ -31,6 +46,7 @@ import {
  */
 export function AgentIconGrid() {
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<LinkConfirmTarget | null>(
     null,
   );
@@ -194,6 +210,8 @@ export function AgentIconGrid() {
           <Users className="h-7 w-7 opacity-40" />
           <p className="text-[12px]">未检测到可用的 agent</p>
         </div>
+      ) : list.length > AVATAR_GROUP_MAX && !expanded ? (
+        <AgentAvatarGroup agents={list} onExpand={() => setExpanded(true)} />
       ) : (
         <div className="flex flex-wrap gap-3">
           {list.map((agent) => (
@@ -204,6 +222,18 @@ export function AgentIconGrid() {
               onClick={() => handleClick(agent)}
             />
           ))}
+          {list.length > AVATAR_GROUP_MAX && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="收起"
+              title="收起"
+              className="size-9 self-center text-muted-foreground"
+              onClick={() => setExpanded(false)}
+            >
+              <ChevronUp />
+            </Button>
+          )}
         </div>
       )}
 

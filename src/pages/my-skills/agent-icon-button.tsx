@@ -9,6 +9,7 @@ import {
 import type { AgentStatus } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
 import { AgentIcon } from "../../components/agent-icon";
+import { agentLinkState, agentStateDotClass, agentStateLabel } from "./agent-link-state";
 import {
   Tooltip,
   TooltipContent,
@@ -38,20 +39,14 @@ export function AgentIconButton({
   const skillCount = agent.internalSkills?.length ?? 0;
   const fileCount = agent.internalOthers?.length ?? 0;
   const backupItems = agent.pendingBackup?.items ?? [];
-  // The canonical dir itself reports linked=false, but to users it is
-  // effectively linked: the icon stays full-color, and clicking explains
-  // why it cannot be unlinked.
-  const isLinked = agent.linked || agent.canonical;
-  const showWarning = !isLinked && (skillCount > 0 || fileCount > 0);
+  const state = agentLinkState(agent);
+  const isLinked = state === "linked";
+  const showWarning = state === "warning";
   const disabled = busy;
 
   // Hover tooltip copy varies by status: description plus a status line.
-  const dotColor = isLinked
-    ? "bg-emerald-500"
-    : showWarning
-      ? "bg-amber-500"
-      : "bg-muted-foreground";
-  const statusText = agent.canonical ? "原生" : isLinked ? "已链接" : "未链接";
+  const dotColor = agentStateDotClass[state];
+  const statusText = agentStateLabel(agent);
   const description = agent.canonical
     ? "原生使用全局 skills 目录，始终可用所有已安装 skills"
     : isLinked

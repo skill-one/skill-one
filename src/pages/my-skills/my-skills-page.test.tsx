@@ -16,6 +16,17 @@ import {
 // the mutable mock store in the browser (this test env), so mutations below
 // actually change the data the page re-fetches after invalidate.
 
+/**
+ * The agent strip starts collapsed once more than AVATAR_GROUP_MAX agents
+ * exist (the mock store detects 5); the agent-level tests drive the full
+ * interactive grid, so expand it first.
+ */
+async function expandAgentStrip() {
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: /^展开全部/ }));
+}
+
 describe("MySkillsPage", () => {
   afterEach(() => {
     resetMockInstalledSkills();
@@ -154,6 +165,7 @@ describe("MySkillsPage", () => {
 
   it("renders the agent icon grid with a minimal warning badge for inner content", async () => {
     renderWithRouter(<MySkillsPage />);
+    await expandAgentStrip();
 
     // Cursor carries 2 skills and 1 stray file in its own dir in the mock:
     // the badge is a minimal warning without counts, details live in the
@@ -179,6 +191,7 @@ describe("MySkillsPage", () => {
   it("lists the specific skills and files in the agent hover tooltip", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
+    await expandAgentStrip();
 
     const cursor = await screen.findByLabelText("Cursor，点击链接");
     await user.hover(cursor);
@@ -200,6 +213,7 @@ describe("MySkillsPage", () => {
   it("shows the parked backup as a warning segment in a linked agent's tooltip", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
+    await expandAgentStrip();
 
     const codex = await screen.findByLabelText("Codex，点击取消链接");
     await user.hover(codex);
@@ -217,6 +231,7 @@ describe("MySkillsPage", () => {
   it("keeps the hover tooltip read-only and offers the actions in the dialog", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
+    await expandAgentStrip();
 
     const cursor = await screen.findByLabelText("Cursor，点击链接");
     await user.hover(cursor);
@@ -245,6 +260,7 @@ describe("MySkillsPage", () => {
   it("shows a structured info tooltip on agent icon hover", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
+    await expandAgentStrip();
 
     const claude = await screen.findByLabelText("Claude Code，点击取消链接");
     await user.hover(claude);
@@ -257,6 +273,7 @@ describe("MySkillsPage", () => {
   it("explains why a canonical agent cannot be unlinked on click", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
+    await expandAgentStrip();
 
     const windsurf = await screen.findByLabelText(
       "Windsurf，原生使用全局 skills 目录",
@@ -271,6 +288,7 @@ describe("MySkillsPage", () => {
   it("unlinks a linked agent on icon click and shows a notice", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
+    await expandAgentStrip();
 
     const claude = await screen.findByLabelText("Claude Code，点击取消链接");
     await user.click(claude);
@@ -286,6 +304,7 @@ describe("MySkillsPage", () => {
   it("links an unlinked agent on icon click and shows a notice", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
+    await expandAgentStrip();
 
     const gemini = await screen.findByLabelText("Gemini CLI，点击链接");
     await user.click(gemini);
