@@ -6,6 +6,7 @@ import { renderWithRouter } from "../../test/test-utils";
 import { fetchAgentStatus, linkAgent, unlinkAgent } from "../../lib/local-skills";
 import type { AgentLinkResult, AgentStatus } from "../../lib/skills-manager";
 import { AgentIconGrid } from "./agent-icon-grid";
+import { AVATAR_GROUP_MAX } from "./agent-avatar-group";
 
 vi.mock("../../lib/local-skills", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../lib/local-skills")>();
@@ -171,5 +172,80 @@ describe("AgentIconGrid link confirm dialog", () => {
       await screen.findByText(/Cursor 拒绝链接：a previous backup is still parked/),
     ).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+describe("AgentIconGrid collapse / expand", () => {
+  function manyAgents(count: number): AgentStatus[] {
+    return Array.from({ length: count }, (_, i) =>
+      agent({ name: `agent-${i}`, display: `Agent ${i}` }),
+    );
+  }
+
+  it("keeps the plain interactive grid for a small agent list", async () => {
+    renderWithRouter(<AgentIconGrid />);
+
+    expect(
+      await screen.findByRole("button", { name: /Cursor，点击链接/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^展开全部/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("starts collapsed behind a +N count when the list exceeds the cap", async () => {
+    const total = AVATAR_GROUP_MAX + 2;
+    fetchAgentStatusMock.mockResolvedValue(manyAgents(total));
+    renderWithRouter(<AgentIconGrid />);
+
+    expect(
+      await screen.findByRole("button", { name: `展开全部 ${total} 个 agent` }),
+    ).toBeInTheDocument();
+    // The interactive grid stays hidden while collapsed.
+    expect(
+      screen.queryByRole("button", { name: /，点击链接|，点击取消链接/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("expands into the full interactive grid and folds back", async () => {
+    const user = userEvent.setup();
+    const total = AVATAR_GROUP_MAX + 2;
+    fetchAgentStatusMock.mockResolvedValue(manyAgents(total));
+    renderWithRouter(<AgentIconGrid />);
+
+    await user.click(
+      await screen.findByRole("button", { name: `展开全部 ${total} 个 agent` }),
+    );
+
+    expect(
+      await screen.findAllByRole("button", { name: /，点击链接|，点击取消链接/ }),
+    ).toHaveLength(total);
+    expect(
+      screen.queryByRole("button", { name: /^展开全部/ }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "收起" }));
+    expect(
+      await screen.findByRole("button", { name: `展开全部 ${total} 个 agent` }),
+    ).toBeInTheDocument();
+  });
+
+  it("performs link actions from the expanded grid", async () => {
+    const user = userEvent.setup();
+    fetchAgentStatusMock.mockResolvedValue(manyAgents(AVATAR_GROUP_MAX + 2));
+    linkAgentMock.mockResolvedValue([
+      result("linked", { agent: "agent-0", display: "Agent 0" }),
+    ]);
+    renderWithRouter(<AgentIconGrid />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /^展开全部/ }),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Agent 0，点击链接" }),
+    );
+
+    expect(await screen.findByText("Agent 0 已链接")).toBeInTheDocument();
+    expect(linkAgentMock).toHaveBeenCalledWith("agent-0");
   });
 });
