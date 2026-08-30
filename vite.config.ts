@@ -1,4 +1,5 @@
 /// <reference types="vitest/config" />
+import { configDefaults } from "vitest/config";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -10,6 +11,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    // Git worktrees under .worktrees carry their own (stale) test copies;
+    // running them here fails on duplicated React resolution.
+    exclude: [...configDefaults.exclude, "**/.worktrees/**"],
   },
   // Tauri expects a fixed dev server port and a clean terminal.
   clearScreen: false,
