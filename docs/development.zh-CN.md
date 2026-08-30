@@ -84,6 +84,24 @@ skillone/
 
 详细说明见 [`architecture.zh-CN.md`](architecture.zh-CN.md)；后端用到的 `agents-skills` 接口见 [`agents-skills-api.zh-CN.md`](agents-skills-api.zh-CN.md)；商店注册表索引的格式与用法见 [`index-format.zh-CN.md`](index-format.zh-CN.md)。
 
+## 主题
+
+应用支持浅色、深色与跟随系统三种外观，可在「设置 → 外观」卡片中切换。
+
+shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 与 `.dark` 两套 oklch 变量，并声明了 `@custom-variant dark (&:is(.dark *))`，`src/components/ui/` 下的组件全部读取语义化 token。因此支持暗黑模式只需在 `<html>` 上切换 `dark` 类，这正是 [next-themes](https://github.com/pacocoursey/next-themes) 所做的事：
+
+- `src/components/theme-provider.tsx` —— 唯一的共享配置（`attribute="class"`、`defaultTheme="system"`、`enableColorScheme`、`storageKey="skillone-theme"`），并负责把主题同步到原生窗口。
+- `src/components/theme-mode-toggle.tsx` —— 设置页上的三选 `ToggleGroup` 分段控件。
+- `src/hooks/use-native-theme.ts` —— 在 Tauri 环境中调用 `getCurrentWindow().setTheme()`，让系统绘制的部分（标题栏、滚动条、表单控件、菜单栏 popover 的毛玻璃材质）一并跟随；`system` 映射为 `null`，交由操作系统自行决定。
+
+两个窗口入口都需要挂载 Provider：`src/main.tsx`（主窗口）与 `src/popover/popover-main.tsx`（菜单栏 popover）。它们各自是独立的 HTML 文档、拥有各自的 `<html>`，但共享同一个 localStorage 源，因此记住的是同一个选择。
+
+新增 UI 样式时的约定：
+
+- 使用语义化 token（`bg-background`、`text-muted-foreground`、`border-border`），不要直接写调色板颜色，这样切换主题无需改动组件。
+- 只有当颜色位于品牌渐变或图片之上、两种主题下观感一致时，才可以使用固定色（例如精选页 hero）。
+- 确实无法避免时（如 `text-emerald-600` 这类状态文案），必须同时补上 `dark:` 变体。
+
 ## 测试
 
 测试使用 Vitest + Testing Library，运行在 `jsdom` 环境。组件测试与 `src/lib` 下的单元测试均遵循「一个文件对应一个 `*.test.ts(x)`」的约定，可通过 `pnpm test:run` 一键运行。

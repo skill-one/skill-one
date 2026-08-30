@@ -242,7 +242,7 @@ export function SkillCard({
       {installState === "error" && installError && (
         <p
           role="alert"
-          className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-red-600"
+          className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-destructive"
         >
           {installError}
         </p>

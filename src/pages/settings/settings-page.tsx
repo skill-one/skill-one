@@ -8,9 +8,11 @@ import {
 } from "../../lib/cdn-config";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { ThemeModeToggle } from "../../components/theme-mode-toggle";
 
 /**
- * Settings page. Currently hosts the configurable CDN download source.
+ * Settings page. Hosts the appearance picker and the configurable CDN
+ * download source.
  *
  * The CDN base is persisted to localStorage; `""` means "direct GitHub first"
  * (with the default CDN as a fallback). Changes take effect immediately on the
@@ -39,6 +41,16 @@ export function SettingsPage() {
       </p>
 
       <div className="mt-6 flex flex-col gap-4">
+        <div className="rounded-xl border border-border/70 bg-card p-4">
+          <h3 className="text-[13px] font-medium text-foreground">外观</h3>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            选择应用的配色方案，「跟随系统」会随系统外观设置自动切换。
+          </p>
+          <div className="mt-3">
+            <ThemeModeToggle />
+          </div>
+        </div>
+
         <div className="rounded-xl border border-border/70 bg-card p-4">
           <div className="flex items-baseline justify-between gap-3">
             <label

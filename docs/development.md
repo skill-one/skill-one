@@ -84,6 +84,24 @@ The app follows a layered split: "frontend reads, backend writes":
 
 For details see [`architecture.md`](architecture.md); for the `agents-skills` API used by the backend see [`agents-skills-api.md`](agents-skills-api.md); for the format and usage of the store registry index see [`index-format.md`](index-format.md).
 
+## Theming
+
+The app supports light, dark, and system-following appearance, switchable from the **Settings → Appearance** card.
+
+shadcn/ui ships the dark palette out of the box: `src/index.css` defines both a `:root` and a `.dark` set of oklch variables plus the `@custom-variant dark (&:is(.dark *))` rule, and every component under `src/components/ui/` reads semantic tokens. Supporting dark mode is therefore only a matter of toggling the `dark` class on `<html>` — which is what [next-themes](https://github.com/pacocoursey/next-themes) does:
+
+- `src/components/theme-provider.tsx` — the single shared configuration (`attribute="class"`, `defaultTheme="system"`, `enableColorScheme`, `storageKey="skillone-theme"`), also responsible for mirroring the theme onto the native window.
+- `src/components/theme-mode-toggle.tsx` — the three-way `ToggleGroup` on the settings page.
+- `src/hooks/use-native-theme.ts` — calls `getCurrentWindow().setTheme()` inside Tauri so OS-drawn surfaces (title bar, scrollbars, form controls, the tray popover's vibrancy) follow along. `system` maps to `null`, leaving that case to the OS.
+
+Both window entries mount the provider: `src/main.tsx` (main window) and `src/popover/popover-main.tsx` (menu bar popover). They are separate HTML documents with their own `<html>`, but share a localStorage origin and therefore the same stored choice.
+
+Conventions when styling new UI:
+
+- Use semantic tokens (`bg-background`, `text-muted-foreground`, `border-border`) rather than raw palette colors, so a theme switch needs no per-component work.
+- A raw color is acceptable only when it sits on a brand gradient or image that reads the same in both themes (for example the featured page hero).
+- Where a raw color is unavoidable (status text such as `text-emerald-600`), pair it with a `dark:` variant.
+
 ## Testing
 
 Tests use Vitest + Testing Library and run in the `jsdom` environment. Component tests and unit tests under `src/lib` follow the "one file, one `*.test.ts(x)`" convention and can be run in one go with `pnpm test:run`.

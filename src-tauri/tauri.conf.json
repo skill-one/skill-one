@@ -26,7 +26,6 @@
         "label": "popover",
         "url": "popover.html",
         "title": "SkillOne",
-        "theme": "Light",
         "width": 320,
         "height": 400,
         "visible": false,

@@ -152,7 +152,7 @@ export function AgentIconButton({
                 emphatic segments as the link confirm dialog. */}
             {!isLinked && skillCount > 0 && (
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5">
-                <p className="flex items-center gap-1.5 font-medium text-emerald-600">
+                <p className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
                   <FolderInput className="h-3 w-3" />
                   以下 skill 将导入（{skillCount}）
                 </p>
@@ -171,7 +171,7 @@ export function AgentIconButton({
 
             {!isLinked && fileCount > 0 && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
-                <p className="flex items-center gap-1.5 font-medium text-amber-600">
+                <p className="flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400">
                   <Archive className="h-3 w-3" />
                   以下文件将备份（{fileCount}）
                 </p>

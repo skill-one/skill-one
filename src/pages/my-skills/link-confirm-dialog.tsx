@@ -69,7 +69,7 @@ export function LinkConfirmDialog({
           <div className="space-y-3 text-[12px]">
             {hasSkills && (
               <div className="space-y-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5">
-                <p className="flex items-center gap-1.5 font-medium text-emerald-600">
+                <p className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
                   <FolderInput className="h-3.5 w-3.5" />
                   以下 skill 将导入（{target.skills.length}）
                 </p>
@@ -86,7 +86,7 @@ export function LinkConfirmDialog({
 
             {hasOthers && (
               <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
-                <p className="flex items-center gap-1.5 font-medium text-amber-600">
+                <p className="flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400">
                   <Archive className="h-3.5 w-3.5" />
                   以下文件将备份（{target.others.length}）
                 </p>
