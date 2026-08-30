@@ -141,58 +141,78 @@ function throwSourceError(
       );
 }
 
-/** Fetch the text of the first reachable candidate. */
-export async function fetchFirstText(
+/** Internal marker: a candidate answered, but with a non-OK status. */
+class CandidateStatusError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP ${status}`);
+  }
+}
+
+/**
+ * Try each candidate URL in order until `attempt` succeeds. The failure
+ * bookkeeping is shared: a non-OK answer records its status (HTTP failure),
+ * anything else (connection refused, dropped body, ...) marks the run as a
+ * network failure — both feed the typed error thrown when every candidate
+ * has failed.
+ */
+async function firstCandidateSuccess<T>(
   urls: string[],
-): Promise<{ url: string; text: string }> {
+  attempt: (url: string) => Promise<T>,
+): Promise<T> {
   let status: number | undefined;
   let networkFailure = false;
   for (const url of urls) {
     try {
-      const resp = await fetch(url, { signal: fetchSignal() });
-      if (resp.ok) {
-        return { url, text: await resp.text() };
+      return await attempt(url);
+    } catch (err) {
+      if (err instanceof CandidateStatusError) {
+        status = err.status;
+      } else {
+        networkFailure = true;
       }
-      status = resp.status;
-    } catch {
-      networkFailure = true;
     }
   }
   throwSourceError(status, networkFailure);
+}
+
+/** Fetch the text of the first reachable candidate. */
+export async function fetchFirstText(
+  urls: string[],
+): Promise<{ url: string; text: string }> {
+  return firstCandidateSuccess(urls, async (url) => {
+    const resp = await fetch(url, { signal: fetchSignal() });
+    if (!resp.ok) throw new CandidateStatusError(resp.status);
+    return { url, text: await resp.text() };
+  });
 }
 
 /**
  * Fetch the first reachable candidate and hand its response body to `consume`
  * for streaming reads. Fallback covers the whole streaming window: a body that
  * fails mid-download (or a `consume` that throws) moves on to the next
- * candidate, which calls `consume` again from scratch.
+ * candidate, which is attempted again from scratch.
  *
- * Unlike `fetchFirstText`, the per-candidate timeout only guards the response
- * headers. A multi-megabyte body legitimately outlasts any fixed cap, so
- * stream consumers enforce their own stall detection between chunks.
+ * The per-candidate timeout only guards the response headers: the timer stops
+ * as soon as `fetch` resolves, so a legitimately long body download is never
+ * aborted mid-stream. Stream consumers enforce their own stall detection
+ * between chunks instead.
  */
 export async function fetchFirstStream(
   urls: string[],
   consume: (body: ReadableStream<Uint8Array>) => Promise<void>,
 ): Promise<void> {
-  let status: number | undefined;
-  let networkFailure = false;
-  for (const url of urls) {
+  return firstCandidateSuccess(urls, async (url) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    let resp: Response;
     try {
-      const resp = await fetch(url, { signal: controller.signal });
-      if (resp.ok && resp.body) {
-        await consume(resp.body);
-        return;
-      }
-      if (!resp.ok) status = resp.status;
-    } catch {
-      networkFailure = true;
+      resp = await fetch(url, { signal: controller.signal });
     } finally {
       clearTimeout(timer);
     }
-  }
-  throwSourceError(status, networkFailure);
+    if (!resp.ok) throw new CandidateStatusError(resp.status);
+    if (!resp.body) throw new Error("response has no body");
+    await consume(resp.body);
+  });
 }
 

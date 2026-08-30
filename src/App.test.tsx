@@ -4,10 +4,15 @@ import userEvent from "@testing-library/user-event";
 
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
-import { fetchSkillsPage } from "./lib/skills-api";
+import { fetchFullIndex } from "./lib/skills-api";
 import App from "./App";
 
-vi.mock("./lib/skills-api", () => ({ fetchSkillsPage: vi.fn() }));
+vi.mock("./lib/skills-api", () => ({
+  // The hook passes this straight into its query key; keep it a stable array.
+  SKILLS_QUERY_KEY: ["skills", 6],
+  fetchFullIndex: vi.fn(),
+  subscribeIndexProgress: vi.fn(() => () => {}),
+}));
 
 // The real persister would read/write localStorage during provider restoration;
 // stub it with a no-op persister so the routing tests stay deterministic and
@@ -21,18 +26,18 @@ vi.mock("@tanstack/query-sync-storage-persister", () => ({
 }));
 
 const mockCreateSyncStoragePersister = vi.mocked(createSyncStoragePersister);
-const mockFetchSkillsPage = vi.mocked(fetchSkillsPage);
+const mockFetchFullIndex = vi.mocked(fetchFullIndex);
 
-// Keep the ExplorePage query pending so its async state update never fires
-// outside act() in these routing-only tests.
-mockFetchSkillsPage.mockImplementation(() => new Promise(() => {}));
+// Keep the registry-index query (sidebar badge + explore) pending so its async
+// state updates never fire outside act() in these routing-only tests.
+mockFetchFullIndex.mockImplementation(() => new Promise(() => {}));
 
 describe("App routing", () => {
   afterEach(() => {
     // Reset the hash so each test starts from a clean route.
     window.location.hash = "";
-    mockFetchSkillsPage.mockReset();
-    mockFetchSkillsPage.mockImplementation(() => new Promise(() => {}));
+    mockFetchFullIndex.mockReset();
+    mockFetchFullIndex.mockImplementation(() => new Promise(() => {}));
   });
 
   it("persists the query cache to localStorage", async () => {

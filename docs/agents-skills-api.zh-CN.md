@@ -34,7 +34,6 @@ let manager = Manager::new();                    // 使用进程当前工作目�
 | 安装 / 预览技能 | `add` | `AddRequest` | `AddOutcome` |
 | 列出已安装技能 | `list` | `ListRequest` | `Vec<ListedSkill>` |
 | 卸载技能 | `remove` | `RemoveRequest` | `RemoveOutcome` |
-| 更新技能 | `update` | `UpdateRequest` | `UpdateOutcome` |
 | 停用技能 | `disable` | `DisableRequest` | `DisableOutcome` |
 | 启用技能 | `enable` | `EnableRequest` | `EnableOutcome` |
 | 链接 / 取消链接 agent | `agent` | `AgentRequest` | `AgentOutcome` |
@@ -47,7 +46,6 @@ let manager = Manager::new();                    // 使用进程当前工作目�
 | `install_skill` | `AddRequest { source, global, skills, list_only }` |
 | `list_installed_skills` | `ListRequest { global, agents }` |
 | `remove_skills` | `RemoveRequest { skills, global, all }` |
-| `update_skills` | `UpdateRequest { skills, scope: Scope }` |
 | `disable_skills` | `DisableRequest { skills, global, all }` |
 | `enable_skills` | `EnableRequest { skills, global, all }` |
 | `link_agents` | `AgentRequest { agents, global, unlink, migrate }` |

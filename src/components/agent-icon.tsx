@@ -1,6 +1,7 @@
 import { Bot } from "lucide-react";
 
 import { getAgentIconUrl } from "../lib/agent-icons";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 interface AgentIconProps {
   agentName: string;
@@ -9,24 +10,18 @@ interface AgentIconProps {
 
 /**
  * Renders a colored brand icon for the given agent (from LobeHub's static-svg
- * `-color` assets). Falls back to a generic Bot glyph when no dedicated icon
- * is available.
+ * `-color` assets) as a shadcn avatar. Falls back to a generic Bot glyph when
+ * no dedicated icon is available (or while the image loads).
  */
 export function AgentIcon({ agentName, className }: AgentIconProps) {
   const iconUrl = getAgentIconUrl(agentName);
 
-  if (!iconUrl) {
-    return <Bot className={className} aria-label={agentName} />;
-  }
-
   return (
-    <img
-      src={iconUrl}
-      alt=""
-      aria-hidden
-      className={className}
-      width={28}
-      height={28}
-    />
+    <Avatar className={className}>
+      {iconUrl && <AvatarImage src={iconUrl} alt="" />}
+      <AvatarFallback>
+        <Bot aria-label={agentName} />
+      </AvatarFallback>
+    </Avatar>
   );
 }

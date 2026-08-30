@@ -1,5 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation } from "react-router";
 import {
   Settings,
   Sparkles,
@@ -24,8 +23,8 @@ import {
   SidebarSeparator,
 } from "./ui/sidebar";
 import { isTauri } from "../lib/tauri";
-import { fetchInstalledSkills } from "../lib/local-skills";
-import { fetchSkillsPage } from "../lib/skills-api";
+import { useInstalledSkills } from "../hooks/use-installed-skills";
+import { useSkillsIndex } from "../hooks/use-skills-index";
 
 export interface NavItem {
   path: string;
@@ -55,19 +54,12 @@ export const footerItems: NavItem[] = [
  * badge is not rendered while its data is loading, avoiding a flash of 0.
  */
 function useNavCounts(): Partial<Record<string, number>> {
-  const { data: registryTotal } = useQuery({
-    queryKey: ["skills-total"],
-    queryFn: async () => {
-      const page = await fetchSkillsPage(0);
-      return page.total;
-    },
-  });
-  const { data: installedSkills } = useQuery({
-    queryKey: ["installed-skills"],
-    queryFn: fetchInstalledSkills,
-  });
+  // Both counts read the shared streaming index query: the badge stays
+  // hidden until the download completes, then shows the full registry size.
+  const { data: index } = useSkillsIndex();
+  const { data: installedSkills } = useInstalledSkills();
   return {
-    "/explore": registryTotal ?? undefined,
+    "/explore": index?.complete ? index.skills.length : undefined,
     "/my-skills": installedSkills?.length,
   };
 }

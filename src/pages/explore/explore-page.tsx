@@ -33,9 +33,8 @@ import {
   PaginationItem,
   PaginationLink,
 } from "../../components/ui/pagination";
-import { Sheet } from "../../components/ui/sheet";
 import { SkillCard } from "./skill-card";
-import { SkillDetailPanel } from "./skill-detail-panel";
+import { SkillDetailSheet } from "./skill-detail-sheet";
 
 /** Number of skills shown per page in the paginated registry view. */
 const PAGE_SIZE = 24;
@@ -184,8 +183,8 @@ export function ExplorePage() {
   // open simply swaps the selection, so switching skills never replays the
   // slide-in animation.
   const [selected, setSelected] = useState<number | null>(null);
-  const selectedSkill =
-    selected != null ? (skills[selected]?.skill ?? null) : null;
+  // The sheet indexes a plain Skill list (the paged search hits, unwrapped).
+  const pageSkills = useMemo(() => skills.map((hit) => hit.skill), [skills]);
 
   const handleSearch = (q: string) => {
     setSelected(null);
@@ -226,15 +225,6 @@ export function ExplorePage() {
   };
   const goNext = () => {
     if (page < totalPages) handlePage(page + 1);
-  };
-
-  const handlePrev = () => {
-    if (selected != null) setSelected(Math.max(0, selected - 1));
-  };
-
-  const handleNext = () => {
-    if (selected == null || selected + 1 >= skills.length) return;
-    setSelected(selected + 1);
   };
 
   const range = pageRange(page, totalPages);
@@ -473,20 +463,13 @@ export function ExplorePage() {
         </div>
       </div>
 
-      {/* Standard shadcn Sheet: modal drawer with dimmed overlay; opening or
-          closing it never reflows the grid. */}
-      <Sheet
-        open={selectedSkill != null}
-        onOpenChange={(open) => {
-          if (!open) setSelected(null);
-        }}
-      >
-        <SkillDetailPanel
-          skill={selectedSkill}
-          onPrev={handlePrev}
-          onNext={handleNext}
-        />
-      </Sheet>
+      {/* Modal detail drawer; the wiring (open/close, prev/next bounds) is
+          shared with the featured page. */}
+      <SkillDetailSheet
+        skills={pageSkills}
+        selected={selected}
+        onSelect={setSelected}
+      />
     </div>
   );
 }

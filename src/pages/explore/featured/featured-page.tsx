@@ -4,11 +4,10 @@ import { Skeleton } from "../../../components/ui/skeleton";
 import { useSkillsIndex } from "../../../hooks/use-skills-index";
 import { FEATURED_CATEGORIES } from "../../../data/featured-content";
 import { Button } from "../../../components/ui/button";
-import { Sheet } from "../../../components/ui/sheet";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../explore-page";
 import { SkillCard } from "../skill-card";
-import { SkillDetailPanel } from "../skill-detail-panel";
+import { SkillDetailSheet } from "../skill-detail-sheet";
 import { FeaturedHero } from "./featured-hero";
 import { buildHeroSlides } from "./featured-rankings";
 
@@ -94,19 +93,9 @@ export function FeaturedPage() {
   );
 
   // Index into `flat` of the skill shown in the detail panel; null keeps the
-  // panel closed. A stale index (e.g. after a shrinking refetch) resolves to
-  // null, which just closes the panel.
+  // panel closed (open/close, prev/next bounds live in `SkillDetailSheet`).
   const [selected, setSelected] = useState<number | null>(null);
-  const selectedSkill =
-    selected != null ? (flat[selected]?.skill ?? null) : null;
-
-  const handlePrev = () => {
-    if (selected != null) setSelected(Math.max(0, selected - 1));
-  };
-  const handleNext = () => {
-    if (selected == null || selected + 1 >= flat.length) return;
-    setSelected(selected + 1);
-  };
+  const flatSkills = useMemo(() => flat.map((s) => s.skill), [flat]);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
@@ -154,20 +143,12 @@ export function FeaturedPage() {
           )}
         </div>
 
-      {/* Standard shadcn Sheet: modal drawer with dimmed overlay; opening or
-          closing it never reflows the grid. */}
-      <Sheet
-        open={selectedSkill != null}
-        onOpenChange={(open) => {
-          if (!open) setSelected(null);
-        }}
-      >
-        <SkillDetailPanel
-          skill={selectedSkill}
-          onPrev={handlePrev}
-          onNext={handleNext}
-        />
-      </Sheet>
+      {/* Modal detail drawer shared with the explore page. */}
+      <SkillDetailSheet
+        skills={flatSkills}
+        selected={selected}
+        onSelect={setSelected}
+      />
     </div>
   );
 }

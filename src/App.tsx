@@ -9,7 +9,7 @@ import {
   Route,
   Navigate,
   useNavigate,
-} from "react-router-dom";
+} from "react-router";
 import {
   defaultShouldDehydrateQuery,
   type Query,
@@ -34,9 +34,8 @@ const queryClient = createQueryClient();
  * `gcTime` above: persisted entries are never discarded for being old, they
  * are always restored and then revalidated when stale (see `staleTime`).
  *
- * The full registry index is excluded — both the `skills-index` join query
- * and the explore page's `skills` entry, which since the toolbar feature
- * stores the whole parsed ~12MB JSONL: either would exceed the WebView's
+ * The full registry index is excluded — the explore page's `skills` entry
+ * stores the whole parsed ~12MB JSONL: it would exceed the WebView's
  * localStorage quota on every write, and it is refetched once per session
  * anyway. Only the bounded queries — installed skills, agent status — are
  * persisted.
@@ -60,7 +59,6 @@ const persistOptions = {
     // Large blobs only; see the persister comment above.
     shouldDehydrateQuery: (query: Query) =>
       defaultShouldDehydrateQuery(query) &&
-      query.queryKey[0] !== "skills-index" &&
       query.queryKey[0] !== "skills",
   },
 };

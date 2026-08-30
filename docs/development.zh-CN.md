@@ -10,7 +10,7 @@
 | ---------- | ----------------------------------------------------------------------------------------------- |
 | 桌面运行时 | [Tauri v2](https://v2.tauri.app/) + Rust                                                        |
 | UI         | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/)（Radix UI + Tailwind CSS） |
-| 路由       | [react-router-dom v7](https://reactrouter.com/)（HashRouter）                                   |
+| 路由       | [react-router v7](https://reactrouter.com/)（HashRouter）                                       |
 | 数据请求   | [TanStack Query v5](https://tanstack.com/query)（持久化到 localStorage）                        |
 | 构建       | [Vite 8](https://vite.dev/) + TypeScript 7.0                                                    |
 | 测试       | [Vitest 4](https://vitest.dev/) + Testing Library                                               |
@@ -36,6 +36,7 @@ pnpm tauri build     # 构建发布包
 | 命令                                            | 说明                              |
 | ----------------------------------------------- | --------------------------------- |
 | `pnpm dev`                                      | 启动 Vite 开发服务器（端口 5173） |
+| `pnpm dev:test`                                 | 在 5273 端口启动第二个桌面开发实例，测试/开发时不占用主端口 5173 |
 | `pnpm build`                                    | 类型检查 + 前端构建               |
 | `pnpm typecheck`                                | 仅运行 TypeScript 类型检查        |
 | `pnpm preview`                                  | 预览构建产物                      |

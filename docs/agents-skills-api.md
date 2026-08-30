@@ -36,7 +36,6 @@ let manager = Manager::new();                    // process current working dire
 | Install / preview skills | `add` | `AddRequest` | `AddOutcome` |
 | List installed skills | `list` | `ListRequest` | `Vec<ListedSkill>` |
 | Uninstall skills | `remove` | `RemoveRequest` | `RemoveOutcome` |
-| Update skills | `update` | `UpdateRequest` | `UpdateOutcome` |
 | Disable skills | `disable` | `DisableRequest` | `DisableOutcome` |
 | Enable skills | `enable` | `EnableRequest` | `EnableOutcome` |
 | Link / unlink agents | `agent` | `AgentRequest` | `AgentOutcome` |
@@ -49,7 +48,6 @@ let manager = Manager::new();                    // process current working dire
 | `install_skill` | `AddRequest { source, global, skills, list_only }` |
 | `list_installed_skills` | `ListRequest { global, agents }` |
 | `remove_skills` | `RemoveRequest { skills, global, all }` |
-| `update_skills` | `UpdateRequest { skills, scope: Scope }` |
 | `disable_skills` | `DisableRequest { skills, global, all }` |
 | `enable_skills` | `EnableRequest { skills, global, all }` |
 | `link_agents` | `AgentRequest { agents, global, unlink, migrate }` |

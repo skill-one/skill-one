@@ -10,7 +10,7 @@ Build, tech stack, architecture, testing, and release notes for developers. For 
 | -------------- | ----------------------------------------------------------------------------------------------- |
 | Desktop runtime | [Tauri v2](https://v2.tauri.app/) + Rust                                                        |
 | UI             | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/) (Radix UI + Tailwind CSS)  |
-| Routing        | [react-router-dom v7](https://reactrouter.com/) (HashRouter)                                    |
+| Routing        | [react-router v7](https://reactrouter.com/) (HashRouter)                                        |
 | Data fetching  | [TanStack Query v5](https://tanstack.com/query) (persisted to localStorage)                     |
 | Build          | [Vite 8](https://vite.dev/) + TypeScript 7.0                                                    |
 | Testing        | [Vitest 4](https://vitest.dev/) + Testing Library                                               |
@@ -36,6 +36,7 @@ pnpm tauri build     # Build release packages
 | Command                                         | Description                                       |
 | ----------------------------------------------- | ------------------------------------------------- |
 | `pnpm dev`                                      | Start the Vite dev server (port 5173)             |
+| `pnpm dev:test`                                 | Second desktop dev instance on port 5273, so test/dev sessions never occupy the main 5173 port |
 | `pnpm build`                                    | Type check + frontend build                       |
 | `pnpm typecheck`                                | Run the TypeScript type check only                |
 | `pnpm preview`                                  | Preview the build output                          |

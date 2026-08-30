@@ -19,7 +19,7 @@ Skill One is a Tauri v2 desktop app. The frontend (React) handles rendering and 
                            │ Tauri IPC
 ┌──────────────────────────▼──────────────────────────────┐
 │                   Rust backend (src-tauri)              │
-│   skills.rs: install / list / remove / update / link    │
+│   skills.rs: install / list / remove / enable / link     │
 │   └─ agents-skills library (crates.io dependency)       │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -32,11 +32,11 @@ Skill One is a Tauri v2 desktop app. The frontend (React) handles rendering and 
 - **`src/lib/skill-detail-api.ts`**: Fetches a single skill's `SKILL.md` on demand and parses its frontmatter and body.
 - **`src/lib/cdn-config.ts`**: Manages download sources. Defaults to direct `raw.githubusercontent.com` access, falls back to a CDN mirror (`cdn.jsdmirror.com`) on failure, and lets users configure a custom CDN in "Settings". Candidate URLs are tried in priority order — including mid-stream, when a body fails partway through — and the configuration is persisted to localStorage.
 
-Read data is cached and persisted uniformly through TanStack Query (`staleTime` 10 minutes, `gcTime` infinite), so after a restart the app can render from cache first and refresh in the background. Each candidate request has a 10-second timeout guarding the response headers; streamed bodies additionally enforce a stall timeout between chunks (a multi-megabyte download legitimately outlasts any fixed cap). Persistence excludes the full-index queries (`skills-index`, and the explore page's `skills` entry that stores the parsed list with a completion flag) — the parsed index is too large for the WebView localStorage quota and is re-fetched every session; only small queries such as the installed list and agent status are written to disk.
+Read data is cached and persisted uniformly through TanStack Query (`staleTime` 10 minutes, `gcTime` infinite), so after a restart the app can render from cache first and refresh in the background. Each candidate request has a 10-second timeout guarding the response headers; streamed bodies additionally enforce a stall timeout between chunks (a multi-megabyte download legitimately outlasts any fixed cap). Persistence excludes the full-index query (`skills`, the shared streaming entry that stores the parsed list with a completion flag) — the parsed index is too large for the WebView localStorage quota and is re-fetched every session; only small queries such as the installed list and agent status are written to disk.
 
 ### Backend (writes)
 
-- **`src-tauri/src/skills.rs`**: Exposes 8 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `update_skills`, `disable_skills`, `enable_skills`, `link_agents`, `link_status`), all of which use `spawn_blocking` to move blocking operations (git clone, install, link, etc.) off the main thread.
+- **`src-tauri/src/skills.rs`**: Exposes 7 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `disable_skills`, `enable_skills`, `link_agents`, `link_status`), all of which route their blocking work (git clone, install, link, etc.) through a shared `spawn_blocking` helper to keep it off the async runtime.
 - Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Since `agents-skills` 0.9, linking never refuses because of existing content: pre-existing agent content is parked into a backup slot (adopted into the canonical dir with migrate) and restored on unlink, so the former `remove_stray_files` command is gone.
 
 ### Frontend write wrapper
@@ -59,7 +59,7 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 | `src/lib/tauri.ts` | Detects whether the app runs inside the Tauri WebView |
 | `src/lib/open-external.ts` | Opens external links in the system browser (Tauri needs the opener plugin) |
 | `src-tauri/tauri.conf.json` | Window, build, and packaging configuration |
-| `src-tauri/capabilities/default.json` | Permission declarations (`core:default`, `opener:default`, window title) |
+| `src-tauri/capabilities/default.json` | Permission declarations (`core:default`, `opener:default`) |
 
 ## Data Flow Examples
 

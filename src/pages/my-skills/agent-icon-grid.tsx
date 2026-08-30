@@ -16,6 +16,7 @@ import {
 } from "../../lib/local-skills";
 import type { AgentStatus } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
+import { INSTALLED_SKILLS_QUERY_KEY } from "../../hooks/use-installed-skills";
 import { AgentIconButton } from "./agent-icon-button";
 import { AgentAvatarGroup, AVATAR_GROUP_MAX } from "./agent-avatar-group";
 import { Button } from "../../components/ui/button";
@@ -65,7 +66,7 @@ export function AgentIconGrid() {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["agent-status"] });
-    queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
+    queryClient.invalidateQueries({ queryKey: INSTALLED_SKILLS_QUERY_KEY });
   };
 
   /** Build the confirm target for an unlinked agent, or `null` when its dir is empty. */

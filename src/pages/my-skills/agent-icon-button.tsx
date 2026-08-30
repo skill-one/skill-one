@@ -82,7 +82,8 @@ export function AgentIconButton({
       <AgentIcon
         agentName={agent.name}
         className={cn(
-          "h-7 w-7 transition-all duration-150",
+          // `size-7` (not h/w) so it reliably overrides the Avatar's size-8.
+          "size-7 transition-all duration-150",
           !isLinked && "opacity-40 grayscale",
           !isLinked &&
             "group-hover:opacity-80 group-hover:grayscale-[0.4] group-active:opacity-60",

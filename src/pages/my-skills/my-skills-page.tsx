@@ -1,16 +1,19 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Puzzle, RefreshCw, Trash2, Users } from "lucide-react";
 
 import {
-  fetchInstalledSkills,
   removeInstalledSkill,
   setSkillEnabled,
 } from "../../lib/local-skills";
-import { fetchFullIndex } from "../../lib/skills-api";
 import type { InstalledSkill } from "../../lib/skills-manager";
 import type { Skill } from "../../types/skill";
 import { cn } from "../../lib/utils";
+import {
+  INSTALLED_SKILLS_QUERY_KEY,
+  useInstalledSkills,
+} from "../../hooks/use-installed-skills";
+import { useSkillsIndex } from "../../hooks/use-skills-index";
 import { AgentIconGrid } from "./agent-icon-grid";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { Button } from "../../components/ui/button";
@@ -138,24 +141,15 @@ export function MySkillsPage() {
     isLoading,
     isError,
     error,
-  } = useQuery({
-    queryKey: ["installed-skills"],
-    queryFn: fetchInstalledSkills,
-  });
+  } = useInstalledSkills();
 
   // Registry metadata (downloads / descriptions) for store-sourced skills.
   // Best-effort: the index fetch needs the network, so a failure degrades to
   // an empty join (downloads hidden, disk-extracted descriptions still shown).
-  const { data: index = [] } = useQuery({
-    queryKey: ["skills-index"],
-    queryFn: async () => {
-      try {
-        return await fetchFullIndex();
-      } catch {
-        return [];
-      }
-    },
-  });
+  // The join only starts once the streamed index is complete, matching the
+  // all-or-nothing descriptions the full download used to provide.
+  const { data: indexData } = useSkillsIndex();
+  const index = indexData?.complete ? indexData.skills : [];
   const indexMap = useMemo(() => buildIndexMap(index), [index]);
 
   // Enablement is a real backend state (the agents-skills library moves the
@@ -167,7 +161,7 @@ export function MySkillsPage() {
   );
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
+    queryClient.invalidateQueries({ queryKey: INSTALLED_SKILLS_QUERY_KEY });
 
   const removeMutation = useMutation({
     mutationFn: (name: string) => removeInstalledSkill(name),
@@ -180,7 +174,9 @@ export function MySkillsPage() {
     onMutate: ({ name, enabled }) =>
       setPendingEnabled((prev) => ({ ...prev, [name]: enabled })),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
+      await queryClient.invalidateQueries({
+        queryKey: INSTALLED_SKILLS_QUERY_KEY,
+      });
       setPendingEnabled({});
     },
     onError: () => {
