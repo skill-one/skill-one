@@ -1,13 +1,7 @@
-import { Bot } from "lucide-react";
-
 import type { AgentStatus } from "../../lib/skills-manager";
-import { getAgentIconUrl } from "../../lib/agent-icons";
 import { cn } from "../../lib/utils";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "../../components/ui/avatar";
+import { AgentIcon } from "../../components/agent-icon";
+import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
@@ -81,7 +75,6 @@ function CollapsedAgentAvatar({
   overlap: boolean;
   onExpand: () => void;
 }) {
-  const iconUrl = getAgentIconUrl(agent.name);
   const state = agentLinkState(agent);
 
   return (
@@ -96,12 +89,7 @@ function CollapsedAgentAvatar({
             overlap && "-ml-2",
           )}
         >
-          <Avatar className="ring-2 ring-background">
-            {iconUrl && <AvatarImage src={iconUrl} alt="" />}
-            <AvatarFallback>
-              <Bot />
-            </AvatarFallback>
-          </Avatar>
+          <AgentIcon agentName={agent.name} className="ring-2 ring-background" />
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="px-2.5 py-1.5">

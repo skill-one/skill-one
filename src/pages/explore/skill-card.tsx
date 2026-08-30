@@ -1,11 +1,12 @@
 import { useState, type ReactElement } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Star, Check, Download, Loader2, RefreshCw } from "lucide-react";
 
+import { installSkillFromSource } from "../../lib/local-skills";
 import {
-  fetchInstalledSkills,
-  installSkillFromSource,
-} from "../../lib/local-skills";
+  INSTALLED_SKILLS_QUERY_KEY,
+  useInstalledSkills,
+} from "../../hooks/use-installed-skills";
 import type { SkillSearchField } from "../../lib/search-skills";
 import { cn, formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
@@ -123,13 +124,10 @@ export function SkillCard({
 
   // The install button reflects the persisted install state, not just this
   // session: skills already present in the global skills directory render as
-  // 已安装 (disabled) before any click. Sharing the "my skills" query key
-  // keeps store cards in sync with installs/removals done elsewhere; React
-  // Query dedupes the shared key so a page of cards issues a single fetch.
-  const { data: installedSkills } = useQuery({
-    queryKey: ["installed-skills"],
-    queryFn: fetchInstalledSkills,
-  });
+  // 已安装 (disabled) before any click. Sharing the "my skills" query keeps
+  // store cards in sync with installs/removals done elsewhere; React Query
+  // dedupes the shared key so a page of cards issues a single fetch.
+  const { data: installedSkills } = useInstalledSkills();
 
   const owner = skill.repo.split("/")[0];
 
@@ -157,7 +155,9 @@ export function SkillCard({
       // The "my skills" page caches its list for 10 minutes (staleTime) and
       // never GCs it, so invalidate here to make the newly installed skill
       // show up there on the next visit.
-      await queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
+      await queryClient.invalidateQueries({
+        queryKey: INSTALLED_SKILLS_QUERY_KEY,
+      });
       setInstallState("installed");
     } catch (err) {
       setInstallState("error");

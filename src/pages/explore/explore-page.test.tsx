@@ -9,7 +9,7 @@ import {
   fireEvent,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { HashRouter, Route, Routes } from "react-router";
 
 import { fetchFullIndex, subscribeIndexProgress } from "../../lib/skills-api";
 import { fetchSkillDetail } from "../../lib/skill-detail-api";

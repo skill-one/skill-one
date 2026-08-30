@@ -1,14 +1,31 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 
-import { fetchSkillsPage } from "../lib/skills-api";
+import { fetchFullIndex } from "../lib/skills-api";
 import { AppSidebar } from "./app-sidebar";
 import { SidebarProvider } from "./ui/sidebar";
 import { renderWithRouter } from "../test/test-utils";
+import type { Skill } from "../types/skill";
 
-vi.mock("../lib/skills-api", () => ({ fetchSkillsPage: vi.fn() }));
+vi.mock("../lib/skills-api", () => ({
+  // The hook passes this straight into its query key; keep it a stable array.
+  SKILLS_QUERY_KEY: ["skills", 6],
+  fetchFullIndex: vi.fn(),
+  subscribeIndexProgress: vi.fn(() => () => {}),
+}));
 
-const mockFetchSkillsPage = vi.mocked(fetchSkillsPage);
+const mockFetchFullIndex = vi.mocked(fetchFullIndex);
+
+/** Minimal registry entries; only the count matters for the badge. */
+function registryOf(count: number): Skill[] {
+  return Array.from({ length: count }, (_, i) => ({
+    name: `skill-${String(i).padStart(3, "0")}`,
+    repo: `owner-${i % 7}/repo-${i % 11}`,
+    description: "",
+    stars: 0,
+    downloads: 0,
+  }));
+}
 
 function renderSidebar(route = "/") {
   return renderWithRouter(
@@ -20,13 +37,9 @@ function renderSidebar(route = "/") {
 }
 
 beforeEach(() => {
-  mockFetchSkillsPage.mockReset();
-  // Registry reports 400 skills total, so the 全部 badge shows 400.
-  mockFetchSkillsPage.mockResolvedValue({
-    skills: [],
-    hasMore: false,
-    total: 400,
-  });
+  mockFetchFullIndex.mockReset();
+  // Registry reports 400 skills, so the 全部 badge shows 400.
+  mockFetchFullIndex.mockResolvedValue(registryOf(400));
 });
 
 describe("AppSidebar", () => {
@@ -53,7 +66,7 @@ describe("AppSidebar", () => {
   });
 
   it("omits badges for unimplemented pages and hides badges before data loads", async () => {
-    mockFetchSkillsPage.mockImplementation(() => new Promise(() => {}));
+    mockFetchFullIndex.mockImplementation(() => new Promise(() => {}));
     renderSidebar();
 
     // No registry data yet → no 400 badge; installed skills render sync from

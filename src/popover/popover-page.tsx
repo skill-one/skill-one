@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { emit } from "@tauri-apps/api/event";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -9,7 +8,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { Skeleton } from "../components/ui/skeleton";
-import { fetchInstalledSkills } from "../lib/local-skills";
+import { useInstalledSkills } from "../hooks/use-installed-skills";
 import { isTauri } from "../lib/tauri";
 import { POPOVER_NAVIGATE_EVENT, STORE_PATH } from "./popover-events";
 
@@ -49,10 +48,7 @@ export function PopoverPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["installed-skills"],
-    queryFn: fetchInstalledSkills,
-  });
+  const { data, isLoading, isError, error } = useInstalledSkills();
   const skills = data ?? [];
 
   useLayoutEffect(() => {

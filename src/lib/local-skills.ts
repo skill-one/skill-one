@@ -100,6 +100,28 @@ export async function fetchAgentStatus(): Promise<AgentStatus[]> {
   return getLinkStatus({ global: true });
 }
 
+/** Mock-store stand-in result for linking/unlinking one agent. */
+function mockLinkResult(
+  name: string,
+  status: "linked" | "unlinked",
+): AgentLinkResult[] {
+  return [
+    {
+      agent: name,
+      display: mockDisplayOf(name),
+      status,
+      moved: [],
+      skipped: [],
+      parkedSkills: [],
+      parkedOthers: [],
+      backupDir: null,
+      restored: [],
+      restoredFrom: null,
+      message: null,
+    },
+  ];
+}
+
 /**
  * Link one agent's skills dir (backend in Tauri, mock store in the browser).
  *
@@ -121,21 +143,7 @@ export async function linkAgent(
     return result.results;
   }
   setMockAgentLinked(name, true);
-  return [
-    {
-      agent: name,
-      display: mockDisplayOf(name),
-      status: "linked",
-      moved: [],
-      skipped: [],
-      parkedSkills: [],
-      parkedOthers: [],
-      backupDir: null,
-      restored: [],
-      restoredFrom: null,
-      message: null,
-    },
-  ];
+  return mockLinkResult(name, "linked");
 }
 
 /** Unlink one agent's skills dir (backend in Tauri, mock store in the browser). */
@@ -145,21 +153,7 @@ export async function unlinkAgent(name: string): Promise<AgentLinkResult[]> {
     return result.results;
   }
   setMockAgentLinked(name, false);
-  return [
-    {
-      agent: name,
-      display: mockDisplayOf(name),
-      status: "unlinked",
-      moved: [],
-      skipped: [],
-      parkedSkills: [],
-      parkedOthers: [],
-      backupDir: null,
-      restored: [],
-      restoredFrom: null,
-      message: null,
-    },
-  ];
+  return mockLinkResult(name, "unlinked");
 }
 
 function mockDisplayOf(name: string): string {

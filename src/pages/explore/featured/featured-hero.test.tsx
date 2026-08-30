@@ -1,6 +1,6 @@
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router";
 
 import { renderWithRouter, screen, waitFor } from "../../../test/test-utils";
 import type { Skill } from "../../../types/skill";
