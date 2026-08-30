@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Star, Check, Download, Loader2, RefreshCw } from "lucide-react";
 
@@ -7,10 +7,35 @@ import type { SkillSearchField } from "../../lib/search-skills";
 import { cn, formatStars } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { Button } from "../../components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import { OwnerAvatar } from "../../components/owner-avatar";
 
 /** Install button state machine: idle → installing → installed | error. */
 type InstallState = "idle" | "installing" | "installed" | "error";
+
+/**
+ * Icon-only install button content per state. The label doubles as the
+ * sr-only accessible name and the hover tooltip text, since the button
+ * itself renders no visible text.
+ */
+const INSTALL_BUTTON: Record<
+  InstallState,
+  { label: string; icon: ReactElement; variant: "default" | "secondary" }
+> = {
+  idle: { label: "安装", icon: <Download />, variant: "default" },
+  installing: {
+    label: "安装中",
+    icon: <Loader2 className="animate-spin" />,
+    variant: "default",
+  },
+  installed: { label: "已安装", icon: <Check />, variant: "secondary" },
+  error: { label: "重试", icon: <RefreshCw />, variant: "default" },
+};
 
 /** Matched indexed terms per field, from the search that produced this hit. */
 export type SkillCardMatched = Partial<
@@ -94,6 +119,7 @@ export function SkillCard({
   const queryClient = useQueryClient();
 
   const owner = skill.repo.split("/")[0];
+  const installMeta = INSTALL_BUTTON[installState];
 
   const handleInstall = async (e: React.MouseEvent) => {
     // Keep the click from opening the detail panel.
@@ -145,37 +171,25 @@ export function SkillCard({
             </p>
           </div>
         </div>
-        <Button
-          size="sm"
-          variant={installState === "installed" ? "secondary" : "default"}
-          disabled={
-            installState === "installing" || installState === "installed"
-          }
-          onClick={(e) => void handleInstall(e)}
-          className={cn("h-7 shrink-0 px-2.5 text-[12px]")}
-        >
-          {installState === "installing" ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              安装中
-            </>
-          ) : installState === "installed" ? (
-            <>
-              <Check className="h-3.5 w-3.5" />
-              已安装
-            </>
-          ) : installState === "error" ? (
-            <>
-              <RefreshCw className="h-3.5 w-3.5" />
-              重试
-            </>
-          ) : (
-            <>
-              <Download className="h-3.5 w-3.5" />
-              安装
-            </>
-          )}
-        </Button>
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant={installMeta.variant}
+                disabled={
+                  installState === "installing" || installState === "installed"
+                }
+                onClick={(e) => void handleInstall(e)}
+                className="h-7 w-7 shrink-0"
+              >
+                {installMeta.icon}
+                <span className="sr-only">{installMeta.label}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{installMeta.label}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {skill.description && (

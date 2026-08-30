@@ -39,11 +39,22 @@ describe("SkillCard", () => {
     expect(screen.getByRole("button", { name: "安装" })).toBeEnabled();
   });
 
-  it("shows an install button initially", () => {
+  it("shows an icon-only install button with an accessible label", () => {
     renderWithRouter(<SkillCard skill={skill} />);
     const button = screen.getByRole("button", { name: "安装" });
     expect(button).toBeEnabled();
-    expect(button).toHaveTextContent("安装");
+    // Icon-only: a Download icon plus a visually hidden label, no visible text.
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    expect(screen.getByText("安装")).toHaveClass("sr-only");
+  });
+
+  it("reveals an '安装' tooltip when hovering the icon-only button", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SkillCard skill={skill} />);
+
+    await user.hover(screen.getByRole("button", { name: "安装" }));
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("安装");
   });
 
   it("installs the skill and switches to a disabled 'installed' state", async () => {
@@ -56,6 +67,8 @@ describe("SkillCard", () => {
     expect(
       await screen.findByRole("button", { name: "已安装" }),
     ).toBeDisabled();
+    // Every state stays icon-only; the label remains visually hidden.
+    expect(screen.getByText("已安装")).toHaveClass("sr-only");
   });
 
   it("returns to '重试' and surfaces the error when the install fails", async () => {
