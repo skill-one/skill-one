@@ -28,6 +28,7 @@ One JSON object per line:
 | `weeklyInstalls`  | `number[]` | Installs over recent weeks                                   |
 | `path`            | `string`   | Skill's directory relative to the repo root (used to build the `SKILL.md` URL) |
 | `description`     | `string`   | Skill description (optional, empty when missing)             |
+| `stars`           | `number`   | GitHub stars of the source repo (optional; normalized to 0 when missing) |
 
 > `source` / `skillId` / `installs` / `weeklyInstalls` come from skills.sh; `path` / `description` are obtained by scanning the repositories.
 
@@ -37,7 +38,7 @@ See [src/lib/skills-api.ts](../src/lib/skills-api.ts):
 
 - `INDEX_SPEC` specifies `repo` / `path: "index.jsonl"` / `ref: "dist"`.
 - The index is fetched through the configurable download source (direct GitHub raw or a CDN mirror); see [src/lib/cdn-config.ts](../src/lib/cdn-config.ts).
-- After parsing, non-GitHub repositories are filtered out (a `source` containing `.` is treated as a domain) and entries are mapped to the `Skill` model: `name = name ?? skillId`, `stars = installs`.
-- The full index is cached once per session and paginated locally (200 per page by default); caching and refreshing are handled by TanStack Query.
+- After parsing, non-GitHub repositories are filtered out (a `source` containing `.` is treated as a domain) and entries are mapped to the `Skill` model: `name = name ?? skillId`, `stars = stars ?? 0` (the index carries a separate `stars` field for entries that have one).
+- The full index is cached once per session and paginated locally (200 per page at the API level; the UI shows 24 cards per page); caching and refreshing are handled by TanStack Query.
 
 A skill's `SKILL.md` is fetched separately from `source + path`; see [src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts).

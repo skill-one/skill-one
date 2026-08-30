@@ -27,6 +27,7 @@
 | `weeklyInstalls`  | `number[]` | 近几周安装量                                                |
 | `path`            | `string`   | 技能在仓库内的相对目录（用于拼 `SKILL.md` 地址）            |
 | `description`     | `string`   | 技能说明（可选，缺失时为空）                                |
+| `stars`           | `number`   | 源仓库的 GitHub star 数（可选，缺失时归一为 0）             |
 
 > `source` / `skillId` / `installs` / `weeklyInstalls` 来自 skills.sh；`path` / `description` 由仓库扫描得到。
 
@@ -36,7 +37,7 @@
 
 - `INDEX_SPEC` 指定 `repo` / `path: "index.jsonl"` / `ref: "dist"`。
 - 通过可配置下载源拉取（直连 GitHub raw 或 CDN 镜像），见 [../src/lib/cdn-config.ts](../src/lib/cdn-config.ts)。
-- 解析后过滤掉非 GitHub 仓库（`source` 含 `.` 视为域名），映射为 `Skill` 模型：`name = name ?? skillId`、`stars = installs`。
-- 整份索引按会话缓存一次，本地切片分页（默认 200/页），缓存与刷新交由 TanStack Query 管理。
+- 解析后过滤掉非 GitHub 仓库（`source` 含 `.` 视为域名），映射为 `Skill` 模型：`name = name ?? skillId`、`stars = stars ?? 0`（索引中有单独的 `stars` 字段，仅部分条目携带）。
+- 整份索引按会话缓存一次，本地切片分页（API 层默认 200/页；界面每页展示 24 张卡片），缓存与刷新交由 TanStack Query 管理。
 
 技能详情 `SKILL.md` 由 `source + path` 单独拉取，见 [../src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。

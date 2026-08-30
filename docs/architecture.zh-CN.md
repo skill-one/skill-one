@@ -19,7 +19,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
                            │ Tauri IPC
 ┌──────────────────────────▼──────────────────────────────┐
 │                    Rust 后端 (src-tauri)                 │
-│   skills.rs: install / list / remove / update / link     │
+│   skills.rs: install / list / remove / enable / link     │
 │   └─ agents-skills 库 (crates.io 依赖)                  │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -32,11 +32,11 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 - **`src/lib/skill-detail-api.ts`**：按需拉取单个 skill 的 `SKILL.md`，解析 frontmatter 与正文。
 - **`src/lib/cdn-config.ts`**：管理下载源。默认直连 `raw.githubusercontent.com`，失败后回退到 CDN 镜像（`cdn.jsdmirror.com`），并支持用户在「设置」中配置自定义 CDN。候选地址按优先级依次尝试——包括响应体中途失败时——配置持久化到 localStorage。
 
-读取数据通过 TanStack Query 统一缓存与持久化（`staleTime` 10 分钟、`gcTime` 无限），重启后可先从缓存渲染再后台刷新。每个候选请求带 10 秒超时，仅守护响应头；流式响应体另有分块间的停滞超时（数 MB 的下载本就可能超过任何固定上限）。持久化会排除全量索引查询（`skills-index`，以及探索页存解析列表及其完成标志的 `skills` 查询）——解析后的索引体积超出 WebView localStorage 配额，且每次会话都会重新拉取；只有已安装列表、agent 状态等小体量查询会落盘。
+读取数据通过 TanStack Query 统一缓存与持久化（`staleTime` 10 分钟、`gcTime` 无限），重启后可先从缓存渲染再后台刷新。每个候选请求带 10 秒超时，仅守护响应头；流式响应体另有分块间的停滞超时（数 MB 的下载本就可能超过任何固定上限）。持久化会排除全量索引查询（`skills`，即共享的流式查询，存解析列表及其完成标志）——解析后的索引体积超出 WebView localStorage 配额，且每次会话都会重新拉取；只有已安装列表、agent 状态等小体量查询会落盘。
 
 ### 后端（写入）
 
-- **`src-tauri/src/skills.rs`**：暴露 8 个 Tauri 命令（`install_skill`、`list_installed_skills`、`remove_skills`、`update_skills`、`disable_skills`、`enable_skills`、`link_agents`、`link_status`），全部通过 `spawn_blocking` 将阻塞操作（git clone、install、link 等）移出主线程。
+- **`src-tauri/src/skills.rs`**：暴露 7 个 Tauri 命令（`install_skill`、`list_installed_skills`、`remove_skills`、`disable_skills`、`enable_skills`、`link_agents`、`link_status`），全部经由共享的 `spawn_blocking` 辅助函数把阻塞操作（git clone、install、link 等）移出异步运行时。
 - 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。自 `agents-skills` 0.9 起，链接不再因目录已有内容而拒绝：agent 既有内容会被移入备份槽（带 migrate 时采纳进全局目录），取消链接时恢复，原先的 `remove_stray_files` 命令随之移除。
 
 ### 前端写入封装
@@ -59,7 +59,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 | `src/lib/tauri.ts` | 判断是否运行在 Tauri WebView 中 |
 | `src/lib/open-external.ts` | 在系统浏览器中打开外链（Tauri 需 opener 插件） |
 | `src-tauri/tauri.conf.json` | 窗口、构建与打包配置 |
-| `src-tauri/capabilities/default.json` | 权限声明（`core:default`、`opener:default`、窗口标题） |
+| `src-tauri/capabilities/default.json` | 权限声明（`core:default`、`opener:default`） |
 
 ## 数据流示例
 
