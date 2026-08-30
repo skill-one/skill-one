@@ -33,37 +33,37 @@ describe("AgentAvatarGroup", () => {
   });
 
   it("omits the count when every agent fits inline", () => {
-    renderWithRouter(<AgentAvatarGroup agents={agents(3)} onExpand={() => {}} />);
+    renderWithRouter(
+      <AgentAvatarGroup agents={agents(AVATAR_GROUP_MAX)} onExpand={() => {}} />,
+    );
 
-    expect(screen.getAllByRole("button")).toHaveLength(3);
+    expect(screen.getAllByRole("button")).toHaveLength(AVATAR_GROUP_MAX);
     expect(screen.queryByRole("button", { name: /^展开全部/ })).not.toBeInTheDocument();
   });
 
   it("exposes each agent's link state through the avatar label", () => {
-    renderWithRouter(
-      <AgentAvatarGroup
-        agents={[
-          agent({ name: "codex", display: "Codex", linked: true }),
-          agent({ name: "windsurf", display: "Windsurf", canonical: true }),
-          agent({ name: "goose", display: "Goose", internalSkills: ["pdf"] }),
-          agent({ name: "cursor", display: "Cursor" }),
-        ]}
-        onExpand={() => {}}
-      />,
-    );
+    // Only the first AVATAR_GROUP_MAX agents render inline, so each state is
+    // asserted in the visible slot one render at a time.
+    const cases: Array<[AgentStatus[], string]> = [
+      [[agent({ name: "codex", display: "Codex", linked: true })], "Codex，已链接，点击展开"],
+      [
+        [agent({ name: "windsurf", display: "Windsurf", canonical: true })],
+        "Windsurf，原生，点击展开",
+      ],
+      [
+        [agent({ name: "goose", display: "Goose", internalSkills: ["pdf"] })],
+        "Goose，未链接，点击展开",
+      ],
+      [[agent({ name: "cursor", display: "Cursor" })], "Cursor，未链接，点击展开"],
+    ];
 
-    expect(
-      screen.getByRole("button", { name: "Codex，已链接，点击展开" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Windsurf，原生，点击展开" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Goose，未链接，点击展开" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Cursor，未链接，点击展开" }),
-    ).toBeInTheDocument();
+    for (const [list, label] of cases) {
+      const { unmount } = renderWithRouter(
+        <AgentAvatarGroup agents={list} onExpand={() => {}} />,
+      );
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it("expands on any click and never acts on the agent itself", async () => {
@@ -72,7 +72,7 @@ describe("AgentAvatarGroup", () => {
     renderWithRouter(<AgentAvatarGroup agents={agents(10)} onExpand={onExpand} />);
 
     await user.click(
-      screen.getByRole("button", { name: "Agent 2，未链接，点击展开" }),
+      screen.getByRole("button", { name: "Agent 1，未链接，点击展开" }),
     );
     expect(onExpand).toHaveBeenCalledTimes(1);
 

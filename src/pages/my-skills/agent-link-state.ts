@@ -27,16 +27,9 @@ export function agentStateLabel(agent: AgentStatus): string {
   return agentLinkState(agent) === "linked" ? "已链接" : "未链接";
 }
 
-/** Status dot color used in tooltips (expanded grid). */
+/** Status dot color used in tooltips (expanded grid and collapsed preview). */
 export const agentStateDotClass: Record<AgentLinkState, string> = {
   linked: "bg-emerald-500",
   warning: "bg-amber-500",
   unlinked: "bg-muted-foreground",
-};
-
-/** Ring color carrying the status on the collapsed group's avatars. */
-export const agentStateRingClass: Record<AgentLinkState, string> = {
-  linked: "ring-emerald-500",
-  warning: "ring-amber-500",
-  unlinked: "ring-border",
 };

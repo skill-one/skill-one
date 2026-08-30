@@ -3,31 +3,31 @@ import { Bot } from "lucide-react";
 import type { AgentStatus } from "../../lib/skills-manager";
 import { getAgentIconUrl } from "../../lib/agent-icons";
 import { cn } from "../../lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "../../components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "../../components/ui/tooltip";
-import {
-  agentLinkState,
-  agentStateDotClass,
-  agentStateLabel,
-  agentStateRingClass,
-} from "./agent-link-state";
+import { agentLinkState, agentStateDotClass, agentStateLabel } from "./agent-link-state";
 
 /** Agents shown inline before the strip collapses the rest into a +N count. */
-export const AVATAR_GROUP_MAX = 8;
+export const AVATAR_GROUP_MAX = 2;
 
 /**
  * The collapsed form of the agent link strip: the first AVATAR_GROUP_MAX
- * agents as overlapping circular avatars plus a +N count for the rest, so a
- * machine with many detected agents keeps the strip to one short row. The
- * ring color carries the link status. This layer is a read-only glance —
- * hover previews the status, any click (avatar or count) hands over to the
- * full interactive grid, keeping link/unlink away from the tight overlap
- * where a misclick would silently unlink an agent.
+ * agents as overlapping default-styled shadcn avatars (brand icon, Bot
+ * fallback, ring-background separation) plus a +N count built from a plain
+ * AvatarFallback, so a machine with many detected agents keeps the strip to
+ * one short row. The avatars carry no status styling of their own — hover
+ * previews name and link state, and any click (avatar or count) hands over
+ * to the full interactive grid, keeping link/unlink away from the tight
+ * overlap where a misclick would silently unlink an agent.
  */
 export function AgentAvatarGroup({
   agents,
@@ -57,11 +57,13 @@ export function AgentAvatarGroup({
             title={`共 ${agents.length} 个 agent`}
             aria-label={`展开全部 ${agents.length} 个 agent`}
             className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground ring-2 ring-border transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring",
+              "relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring",
               visible.length > 0 && "-ml-2",
             )}
           >
-            +{hiddenCount}
+            <Avatar className="ring-2 ring-background">
+              <AvatarFallback>+{hiddenCount}</AvatarFallback>
+            </Avatar>
           </button>
         )}
       </div>
@@ -69,7 +71,7 @@ export function AgentAvatarGroup({
   );
 }
 
-/** One avatar in the collapsed strip: status ring + name/status tooltip. */
+/** One avatar in the collapsed strip: default styling + name/status tooltip. */
 function CollapsedAgentAvatar({
   agent,
   overlap,
@@ -79,8 +81,8 @@ function CollapsedAgentAvatar({
   overlap: boolean;
   onExpand: () => void;
 }) {
-  const state = agentLinkState(agent);
   const iconUrl = getAgentIconUrl(agent.name);
+  const state = agentLinkState(agent);
 
   return (
     <Tooltip>
@@ -90,21 +92,14 @@ function CollapsedAgentAvatar({
           onClick={onExpand}
           aria-label={`${agent.display}，${agentStateLabel(agent)}，点击展开`}
           className={cn(
-            "relative shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring",
             overlap && "-ml-2",
           )}
         >
-          <Avatar
-            className={cn(
-              "size-10 bg-muted ring-2",
-              agentStateRingClass[state],
-              // Unlinked agents fade out, mirroring the expanded grid's icons.
-              state !== "linked" && "grayscale opacity-70",
-            )}
-          >
+          <Avatar className="ring-2 ring-background">
             {iconUrl && <AvatarImage src={iconUrl} alt="" />}
             <AvatarFallback>
-              <Bot className="size-5 text-muted-foreground" />
+              <Bot />
             </AvatarFallback>
           </Avatar>
         </button>

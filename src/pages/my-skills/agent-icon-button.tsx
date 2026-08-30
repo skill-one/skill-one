@@ -9,7 +9,7 @@ import {
 import type { AgentStatus } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
 import { AgentIcon } from "../../components/agent-icon";
-import { agentLinkState, agentStateLabel } from "./agent-link-state";
+import { agentLinkState, agentStateDotClass, agentStateLabel } from "./agent-link-state";
 import {
   Tooltip,
   TooltipContent,
@@ -45,11 +45,7 @@ export function AgentIconButton({
   const disabled = busy;
 
   // Hover tooltip copy varies by status: description plus a status line.
-  const dotColor = isLinked
-    ? "bg-emerald-500"
-    : showWarning
-      ? "bg-amber-500"
-      : "bg-muted-foreground";
+  const dotColor = agentStateDotClass[state];
   const statusText = agentStateLabel(agent);
   const description = agent.canonical
     ? "原生使用全局 skills 目录，始终可用所有已安装 skills"
