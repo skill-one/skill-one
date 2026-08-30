@@ -33,7 +33,6 @@ import {
   PaginationItem,
   PaginationLink,
 } from "../../components/ui/pagination";
-import { Separator } from "../../components/ui/separator";
 import { SkillCard } from "./skill-card";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
@@ -157,10 +156,8 @@ export function ExplorePage() {
     return out;
   }, [filtered, sort]);
 
-  // Client-side pagination over the filtered+sorted list. `total` is the
-  // registry-wide count (null until the index has loaded); the toolbar count
-  // reports the filtered total instead.
-  const total = index?.length ?? null;
+  // Client-side pagination over the filtered+sorted list; the count shown on
+  // the pagination row reports the filtered total.
   const filteredTotal = sorted.length;
   const totalPages = Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE));
   const skills = useMemo(
@@ -200,15 +197,20 @@ export function ExplorePage() {
     setPage(p);
   };
 
-  // Direct page jump: parse the typed number, clamp to [1, totalPages].
-  const [jump, setJump] = useState("");
-  const submitJump = (e: React.FormEvent) => {
-    e.preventDefault();
-    const n = Math.floor(Number(jump));
-    if (!Number.isFinite(n)) return;
+  // The current page number renders as an editable box: typing a number there
+  // and committing (Enter or blur) jumps straight to that page, clamped to
+  // [1, totalPages]; Escape (or an empty value) keeps the current page.
+  // `draft` holds the value being typed; null shows the committed page number.
+  const [draft, setDraft] = useState<string | null>(null);
+  const commitDraft = (value: string) => {
+    setDraft(null);
+    const n = Math.floor(Number(value));
+    if (value.trim() === "" || !Number.isFinite(n)) return;
     handlePage(Math.min(totalPages, Math.max(1, n)));
-    setJump("");
   };
+  // Escape discards the draft, but the blur it triggers would otherwise
+  // commit the just-discarded value — suppress that one commit.
+  const escapeReverted = useRef(false);
 
   // Anchor-based pagination controls have no `disabled` attribute, so guard
   // against navigating past the first/last page here.
@@ -246,8 +248,7 @@ export function ExplorePage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
-      {/* Toolbar: search on the left; category, sort and the filtered skill
-          count on the right. */}
+      {/* Toolbar: search on the left; category and sort on the right. */}
       <div className="mb-4 flex items-center gap-3">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -308,15 +309,6 @@ export function ExplorePage() {
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {total != null && (
-            <>
-              <Separator orientation="vertical" className="h-5" />
-              <span className="whitespace-nowrap text-sm text-muted-foreground tabular-nums">
-                共 {filteredTotal} 个
-              </span>
-            </>
-          )}
         </div>
       </div>
 
@@ -376,88 +368,118 @@ export function ExplorePage() {
             )}
           </div>
 
-          {/* Pagination bar: previous / numbered pages (with ellipsis) /
-              next, plus an inline "jump to page" input — shown once a page
-              of data is available. */}
-          {index && totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 border-t border-border py-2">
-              <Pagination className="w-auto">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationLink
-                      size="icon"
-                      href="#"
-                      aria-label="上一页"
-                      aria-disabled={page <= 1}
-                      className={cn(
-                        "h-8 w-8",
-                        page <= 1 && "pointer-events-none opacity-50",
-                      )}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        goPrev();
-                      }}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </PaginationLink>
-                  </PaginationItem>
-                  {range.map((p, i) =>
-                    p === "..." ? (
-                      <PaginationItem key={`ellipsis-${i}`}>
-                        <PaginationEllipsis className="h-8 w-8" />
-                      </PaginationItem>
-                    ) : (
-                      <PaginationItem key={p}>
-                        <PaginationLink
-                          size="icon"
-                          href="#"
-                          className="h-8 w-8"
-                          isActive={p === page}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handlePage(p);
-                          }}
-                        >
-                          {p}
-                        </PaginationLink>
-                      </PaginationItem>
-                    ),
-                  )}
-                  <PaginationItem>
-                    <PaginationLink
-                      size="icon"
-                      href="#"
-                      aria-label="下一页"
-                      aria-disabled={page >= totalPages}
-                      className={cn(
-                        "h-8 w-8",
-                        page >= totalPages &&
-                          "pointer-events-none opacity-50",
-                      )}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        goNext();
-                      }}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </PaginationLink>
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-              <form
-                onSubmit={submitJump}
-                className="flex items-center gap-1.5 text-[12px] text-muted-foreground"
-              >
-                <span>第</span>
-                <Input
-                  value={jump}
-                  onChange={(e) => setJump(e.target.value)}
-                  inputMode="numeric"
-                  aria-label="跳转到第几页"
-                  className="h-8 w-14 px-2 text-center text-[12px]"
-                />
-                <span>/ {totalPages} 页</span>
-              </form>
+          {/* Pagination row: previous / numbered pages (with ellipsis) / next
+              — the current page number doubles as an editable jump box — with
+              the filtered skill count pinned to the right. Shown once the
+              index has loaded; the controls appear only when there is more
+              than one page, so the count survives single-page searches. */}
+          {index && (
+            <div className="relative flex items-center justify-center border-t border-border py-2">
+              {totalPages > 1 && (
+                <Pagination className="w-auto">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationLink
+                        size="icon"
+                        href="#"
+                        aria-label="上一页"
+                        aria-disabled={page <= 1}
+                        className={cn(
+                          "h-8 w-8",
+                          page <= 1 && "pointer-events-none opacity-50",
+                        )}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          goPrev();
+                        }}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </PaginationLink>
+                    </PaginationItem>
+                    {range.map((p, i) =>
+                      p === "..." ? (
+                        <PaginationItem key={`ellipsis-${i}`}>
+                          <PaginationEllipsis className="h-8 w-8" />
+                        </PaginationItem>
+                      ) : (
+                        <PaginationItem key={p}>
+                          {p === page ? (
+                            <Input
+                              value={draft ?? String(page)}
+                              onChange={(e) =>
+                                setDraft(e.target.value.replace(/\D/g, ""))
+                              }
+                              onFocus={(e) => e.currentTarget.select()}
+                              onBlur={(e) => {
+                                if (escapeReverted.current) {
+                                  escapeReverted.current = false;
+                                  return;
+                                }
+                                commitDraft(e.currentTarget.value);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  e.currentTarget.blur();
+                                } else if (e.key === "Escape") {
+                                  escapeReverted.current = true;
+                                  setDraft(null);
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              inputMode="numeric"
+                              aria-label="跳转到第几页"
+                              className="h-8 px-1.5 text-center tabular-nums"
+                              style={{
+                                width: `max(2rem, ${
+                                  (draft ?? String(page)).length
+                                }ch + 0.75rem)`,
+                              }}
+                            />
+                          ) : (
+                            <PaginationLink
+                              size="icon"
+                              href="#"
+                              className="h-8 w-8"
+                              isActive={p === page}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handlePage(p);
+                              }}
+                            >
+                              {p}
+                            </PaginationLink>
+                          )}
+                        </PaginationItem>
+                      ),
+                    )}
+                    <PaginationItem>
+                      <PaginationLink
+                        size="icon"
+                        href="#"
+                        aria-label="下一页"
+                        aria-disabled={page >= totalPages}
+                        className={cn(
+                          "h-8 w-8",
+                          page >= totalPages &&
+                            "pointer-events-none opacity-50",
+                        )}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          goNext();
+                        }}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </PaginationLink>
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
+              {/* Absolute positioning keeps the pager centered regardless of
+                  how wide the count or the page window gets. */}
+              <span className="absolute right-0 whitespace-nowrap text-sm text-muted-foreground tabular-nums">
+                共 {filteredTotal} 个
+              </span>
             </div>
           )}
         </div>

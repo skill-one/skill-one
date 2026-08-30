@@ -181,8 +181,11 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("skill-0");
 
-    // All nine page links are rendered, with no ellipsis in the bar.
-    for (let p = 1; p <= 9; p++) {
+    // All nine page numbers are rendered, with no ellipsis in the bar. The
+    // active page (1) is the editable jump box, not a link.
+    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
+    expect(jump).toHaveValue("1");
+    for (let p = 2; p <= 9; p++) {
       expect(screen.getByRole("link", { name: String(p) })).toBeInTheDocument();
     }
     expect(screen.queryByText("More pages")).not.toBeInTheDocument();
@@ -195,20 +198,52 @@ describe("ExplorePage", () => {
     await screen.findByText("skill-0");
 
     // Page 1 keeps the first page, a window (1..3) and the last page,
-    // collapsing the gap 3..10 into a single ellipsis.
-    expect(screen.getByRole("link", { name: "1" })).toBeInTheDocument();
+    // collapsing the gap 3..10 into a single ellipsis. Page 1 is the
+    // editable jump box rather than a link.
+    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
+    expect(jump).toHaveValue("1");
     expect(screen.getByRole("link", { name: "3" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "10" })).toBeInTheDocument();
     expect(screen.getByText("More pages")).toBeInTheDocument();
 
     // Jump to a visible page (3); the window now stretches further and the
     // ellipsis shrinks, proving the window follows the current page.
-    await goToPage(user, 3);
+    await user.clear(jump);
+    await user.type(jump, "3");
+    await user.keyboard("{Enter}");
     await screen.findByText("skill-48");
     expect(screen.getByRole("link", { name: "4" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "5" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "3" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
+      "3",
+    );
     expect(screen.getByText("More pages")).toBeInTheDocument();
+  });
+
+  it("replaces the standalone jump form with the editable current page box", async () => {
+    mockRegistry(50); // 3 pages
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    // The old "第 [input] / N 页" form is gone entirely; the only way to
+    // jump is the current page number box itself.
+    expect(screen.queryByText("第")).not.toBeInTheDocument();
+    expect(screen.queryByText("/ 3 页")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "跳转到第几页" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the skill count on the pagination row instead of the toolbar", async () => {
+    mockRegistry(50); // 3 pages
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    // The count shares the bottom row with the pagination controls.
+    const count = screen.getByText("共 50 个");
+    expect(
+      count.closest("div")?.querySelector('nav[aria-label="pagination"]'),
+    ).not.toBeNull();
   });
 
   it("jumps directly to a typed page number", async () => {
@@ -218,10 +253,14 @@ describe("ExplorePage", () => {
     await screen.findByText("skill-0");
 
     const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
+    await user.clear(jump);
     await user.type(jump, "3");
     await user.keyboard("{Enter}");
 
     expect(await screen.findByText("skill-48")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
+      "3",
+    );
   });
 
   it("clamps an out-of-range jump to the last page", async () => {
@@ -231,10 +270,78 @@ describe("ExplorePage", () => {
     await screen.findByText("skill-0");
 
     const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
+    await user.clear(jump);
     await user.type(jump, "99");
     await user.keyboard("{Enter}");
 
     expect(await screen.findByText("skill-48")).toBeInTheDocument();
+  });
+
+  it("commits a typed jump on blur", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50); // 3 pages
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
+    await user.clear(jump);
+    await user.type(jump, "2");
+    await user.tab(); // Move focus away → blur commits.
+
+    expect(await screen.findByText("skill-24")).toBeInTheDocument();
+  });
+
+  it("keeps the current page while a number is typed but not committed", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50); // 3 pages
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
+    await user.clear(jump);
+    await user.type(jump, "2");
+
+    // Still on page 1 until the value is committed.
+    expect(screen.getByText("skill-23")).toBeInTheDocument();
+    expect(screen.queryByText("skill-24")).not.toBeInTheDocument();
+    expect(jump).toHaveValue("2");
+  });
+
+  it("reverts to the current page on Escape", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50); // 3 pages
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
+    await user.clear(jump);
+    await user.type(jump, "3");
+    await user.keyboard("{Escape}");
+
+    // Still on page 1, and the box shows the current page again — the
+    // discarded draft must not be committed by the blur that Escape causes.
+    expect(screen.getByText("skill-23")).toBeInTheDocument();
+    expect(screen.queryByText("skill-24")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
+      "1",
+    );
+  });
+
+  it("reverts an empty commit to the current page", async () => {
+    const user = userEvent.setup();
+    mockRegistry(50); // 3 pages
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
+    await user.clear(jump);
+    await user.keyboard("{Enter}");
+
+    // An empty value means "no jump": page 1 stays, box restores "1".
+    expect(screen.getByText("skill-23")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
+      "1",
+    );
   });
 
   it("shows an error state and recovers via retry", async () => {
