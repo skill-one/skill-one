@@ -87,8 +87,7 @@ export default function App() {
             className="flex-1 overflow-hidden"
           >
             <AppSidebar />
-            <SidebarInset className="overflow-hidden pt-9">
-              <WindowTitle />
+            <SidebarInset className="overflow-hidden">
               <Routes>
                 <Route
                   path="/"
