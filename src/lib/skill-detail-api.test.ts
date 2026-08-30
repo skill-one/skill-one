@@ -50,18 +50,47 @@ Use this skill for PDFs.`;
     expect(body).toBe("# Just markdown\n\nBody");
   });
 
-  it("ignores comments, unknown keys and block scalars", () => {
+  it("parses block scalars, comments and unknown keys per the YAML spec", () => {
     const raw = `---
 # a comment
 name: pdf
 tags: [a, b]
+metadata:
+  authors:
+    - someone
 description: >-
-  folded
+  Comprehensive PDF
+  processing toolkit
+version: 2
 ---
 Body`;
 
     const { frontmatter } = parseFrontmatter(raw);
-    expect(frontmatter).toEqual({ name: "pdf" });
+    expect(frontmatter).toEqual({
+      name: "pdf",
+      description: "Comprehensive PDF processing toolkit",
+      version: "2",
+    });
+  });
+
+  it("preserves line breaks in literal-block descriptions", () => {
+    const raw = `---
+description: |
+  Line one.
+  Line two.
+---
+Body`;
+
+    const { frontmatter } = parseFrontmatter(raw);
+    expect(frontmatter.description).toBe("Line one.\nLine two.\n");
+  });
+
+  it("falls back to no frontmatter when the YAML is malformed", () => {
+    const raw = "---\nname: [unclosed\n---\nBody text";
+
+    const { frontmatter, body } = parseFrontmatter(raw);
+    expect(frontmatter).toEqual({});
+    expect(body).toBe("Body text");
   });
 
   it("falls back to the whole text when the fence is never closed", () => {

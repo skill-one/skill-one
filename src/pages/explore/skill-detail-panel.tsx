@@ -8,6 +8,7 @@ import { formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { Markdown } from "../../components/markdown";
 import { OwnerAvatar } from "../../components/owner-avatar";
 
 interface SkillDetailPanelProps {
@@ -64,6 +65,9 @@ export function SkillDetailPanel({
   const sourceHref = sourcePath
     ? `https://github.com/${skill.repo}/tree/HEAD/${sourcePath}`
     : `https://github.com/${skill.repo}`;
+  // Repo-relative SKILL.md path, reused for the GitHub file link and to
+  // resolve relative URLs inside the markdown body.
+  const filePath = detail?.path.replace(/^\/+|\/+$/g, "") ?? "";
 
   return (
     <aside
@@ -153,17 +157,17 @@ export function SkillDetailPanel({
         ) : detail ? (
           <div className="flex flex-col gap-5">
             {description && (
-              <p className="text-[13px] leading-relaxed text-muted-foreground">
+              <p className="whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground">
                 {description}
               </p>
             )}
             <div>
               <a
-                href={`https://github.com/${skill.repo}/blob/HEAD/${detail.path.replace(/^\/+|\/+$/g, "")}`}
+                href={`https://github.com/${skill.repo}/blob/HEAD/${filePath}`}
                 onClick={(e) => {
                   e.preventDefault();
                   void openExternal(
-                    `https://github.com/${skill.repo}/blob/HEAD/${detail.path.replace(/^\/+|\/+$/g, "")}`,
+                    `https://github.com/${skill.repo}/blob/HEAD/${filePath}`,
                   );
                 }}
                 title="在 GitHub 中打开 SKILL.md"
@@ -172,9 +176,15 @@ export function SkillDetailPanel({
                 <span className="truncate">{detail.path}</span>
                 <ExternalLink className="h-3 w-3 shrink-0" />
               </a>
-              <pre className="whitespace-pre-wrap break-words font-mono text-[12.5px] leading-relaxed text-foreground/90">
-                {detail.instructions || "（SKILL.md 无正文内容）"}
-              </pre>
+              {detail.instructions ? (
+                <Markdown repo={skill.repo} filePath={filePath}>
+                  {detail.instructions}
+                </Markdown>
+              ) : (
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  （SKILL.md 无正文内容）
+                </p>
+              )}
             </div>
           </div>
         ) : null}
