@@ -56,7 +56,7 @@ skillone/
 │   │   └── placeholder-page.tsx # Placeholder for unimplemented pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)
 │   │   ├── explore/        # Store explore page (skill-card / skill-detail-panel)
-│   │   ├── my-skills/      # My Skills page (agent-icon-grid / agent-icon-button / stray-files-dialog, etc.)
+│   │   ├── my-skills/      # My Skills page (agent-icon-grid / agent-icon-button / link-confirm-dialog, etc.)
 │   │   └── settings/       # Settings page
 │   ├── hooks/              # Custom hooks
 │   ├── lib/                # API / business logic layer

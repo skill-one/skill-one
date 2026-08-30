@@ -56,7 +56,7 @@ skillone/
 │   │   └── placeholder-page.tsx # 未实现页面的占位
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
 │   │   ├── explore/        # 商店探索页（skill-card / skill-detail-panel）
-│   │   ├── my-skills/      # 我的 Skills 页（agent-icon-grid / agent-icon-button / stray-files-dialog 等）
+│   │   ├── my-skills/      # 我的 Skills 页（agent-icon-grid / agent-icon-button / link-confirm-dialog 等）
 │   │   └── settings/       # 设置页
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层

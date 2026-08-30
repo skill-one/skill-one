@@ -183,11 +183,35 @@ describe("MySkillsPage", () => {
     const cursor = await screen.findByLabelText("Cursor，点击链接");
     await user.hover(cursor);
 
+    // The tooltip preview reuses the confirm dialog's two emphatic segments.
     const tooltip = await screen.findByRole("tooltip");
     expect(within(tooltip).getByText("Cursor")).toBeInTheDocument();
+    expect(
+      within(tooltip).getByText("以下 skill 将导入（2）"),
+    ).toBeInTheDocument();
     expect(within(tooltip).getByText("pdf")).toBeInTheDocument();
     expect(within(tooltip).getByText("docx")).toBeInTheDocument();
+    expect(
+      within(tooltip).getByText("以下文件将备份（1）"),
+    ).toBeInTheDocument();
     expect(within(tooltip).getByText("README.md")).toBeInTheDocument();
+  });
+
+  it("shows the parked backup as a warning segment in a linked agent's tooltip", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+
+    const codex = await screen.findByLabelText("Codex，点击取消链接");
+    await user.hover(codex);
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(
+      within(tooltip).getByText("备份待处理（2）"),
+    ).toBeInTheDocument();
+    expect(within(tooltip).getByText("old-pdf")).toBeInTheDocument();
+    expect(
+      within(tooltip).getByText("取消链接时自动恢复原内容。"),
+    ).toBeInTheDocument();
   });
 
   it("keeps the hover tooltip read-only and offers the actions in the dialog", async () => {
@@ -212,16 +236,10 @@ describe("MySkillsPage", () => {
 
     await user.click(cursor);
     const dialog = await screen.findByRole("dialog");
-    expect(
-      within(dialog).getByRole("button", { name: "删除 1 个文件" }),
-    ).toBeInTheDocument();
-    expect(
-      within(dialog).getByRole("button", { name: "进入目录" }),
-    ).toBeInTheDocument();
-    // Stray files block the import until they are deleted.
-    expect(
-      within(dialog).getByRole("button", { name: "先处理其他文件" }),
-    ).toBeDisabled();
+    // Confirming handles everything at once — skills migrate, the rest is
+    // backed up — so the dialog offers nothing but 确认 / 取消.
+    expect(within(dialog).getByRole("button", { name: "确认" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "取消" })).toBeInTheDocument();
   });
 
   it("shows a structured info tooltip on agent icon hover", async () => {

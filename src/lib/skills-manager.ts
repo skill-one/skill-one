@@ -83,9 +83,24 @@ export interface AgentLinkResult {
   agent: string;
   display: string;
   status: AgentLinkStatus;
+  /** Skills moved into the canonical dir (`migrated`). */
   moved: string[];
+  /** Skills left parked because the canonical dir already has them (`migrated`). */
   skipped: string[];
-  skills: string[];
+  /**
+   * Skills parked in the backup slot (`linked`/`migrated`): a later migrate
+   * adopts them into the canonical dir, unlink restores them.
+   */
+  parkedSkills: string[];
+  /** Non-skill entries parked in the backup slot (`linked`/`migrated`). */
+  parkedOthers: string[];
+  /** Backup slot dir holding the parked content (`linked`/`migrated`), if any. */
+  backupDir: string | null;
+  /** Entries restored from the backup slot (`unlinked`). */
+  restored: string[];
+  /** Backup slot dir the restored content came from (`unlinked`). */
+  restoredFrom: string | null;
+  /** Refusal reason or error message (`refused`/`failed`). */
   message: string | null;
 }
 
@@ -94,7 +109,15 @@ export interface LinkResult {
   results: AgentLinkResult[];
 }
 
-/** Per-agent link status (from `link --status`). */
+/** Content parked by a previous link, waiting for unlink to restore. */
+export interface PendingBackup {
+  /** Backup slot dir (`.agents/backup-skills/<agent>`). */
+  path: string;
+  /** Names of the entries parked in the slot. */
+  items: string[];
+}
+
+/** Per-agent link status (from `agent --status`). */
 export interface AgentStatus {
   name: string;
   display: string;
@@ -102,17 +125,22 @@ export interface AgentStatus {
   canonical: boolean;
   /**
    * Skills already living inside the agent's own directory. Only populated for
-   * unlinked, non-canonical agents: it surfaces what a `link --migrate` would
-   * move into the canonical dir, so the UI can preview them on the card.
+   * unlinked, non-canonical agents: it surfaces what a migrate would move into
+   * the canonical dir, so the UI can preview them on the card.
    */
   internalSkills?: string[];
   /**
-   * Non-directory entries (strays) inside the agent's own skills dir that a
-   * migrate cannot move. Only populated for unlinked, non-canonical agents.
+   * Non-skill entries (files, symlinks to non-directories) inside the agent's
+   * own skills dir. Same population rules as `internalSkills`; a link parks
+   * them into the backup slot, a migrate never adopts them.
    */
-  internalFiles?: string[];
-  /** Absolute path to the agent's own skills dir; absent when unknown. */
-  dirPath?: string | null;
+  internalOthers?: string[];
+  /**
+   * Backup slot with content parked by a previous link; unlink restores it,
+   * a migrate adopts the skills. Only populated for unlinked, non-canonical
+   * agents.
+   */
+  pendingBackup?: PendingBackup | null;
 }
 
 interface ManagerOptions {
@@ -139,7 +167,6 @@ export async function installSkill(
     global?: boolean;
     skills?: string[];
     listOnly?: boolean;
-    fullDepth?: boolean;
   } & ManagerOptions = {},
 ): Promise<InstallResult> {
   requireTauri();
@@ -148,7 +175,6 @@ export async function installSkill(
     global: options.global,
     skills: options.skills,
     listOnly: options.listOnly,
-    fullDepth: options.fullDepth,
     cwd: options.cwd,
   });
 }
@@ -266,18 +292,4 @@ export async function getLinkStatus(
     global: options.global,
     cwd: options.cwd,
   });
-}
-
-/**
- * Remove stray non-skill files from an agent's skills dir (the one-click
- * delete in the stray-files dialog). The backend only deletes plain files
- * directly inside `dir`; anything outside it is rejected. Returns the names
- * that were actually removed.
- */
-export async function removeStrayFiles(
-  dir: string,
-  files: string[],
-): Promise<string[]> {
-  requireTauri();
-  return invoke<string[]>("remove_stray_files", { dir, files });
 }

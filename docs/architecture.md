@@ -28,16 +28,16 @@ Skill One is a Tauri v2 desktop app. The frontend (React) handles rendering and 
 
 ### Frontend (reads)
 
-- **`src/lib/skills-api.ts`**: Fetches and parses the skills registry index (JSONL) and returns paginated skill lists.
+- **`src/lib/skills-api.ts`**: Fetches and parses the skills registry index (JSONL); consumers filter, sort, and paginate it client-side.
 - **`src/lib/skill-detail-api.ts`**: Fetches a single skill's `SKILL.md` on demand and parses its frontmatter and body.
 - **`src/lib/cdn-config.ts`**: Manages download sources. Defaults to direct `raw.githubusercontent.com` access, falls back to a CDN mirror (`cdn.jsdmirror.com`) on failure, and lets users configure a custom CDN in "Settings". Candidate URLs are tried in priority order, and the configuration is persisted to localStorage.
 
-Read data is cached and persisted uniformly through TanStack Query (`staleTime` 10 minutes, `gcTime` infinite), so after a restart the app can render from cache first and refresh in the background. Each candidate request has a 10-second timeout to avoid hanging on the origin when no CDN fallback is available. Persistence excludes the full-index (`skills-index`) query — the parsed index is too large for the WebView localStorage quota and is re-fetched every session; only small queries such as the explore page, the installed list, and agent status are written to disk.
+Read data is cached and persisted uniformly through TanStack Query (`staleTime` 10 minutes, `gcTime` infinite), so after a restart the app can render from cache first and refresh in the background. Each candidate request has a 10-second timeout to avoid hanging on the origin when no CDN fallback is available. Persistence excludes the full-index queries (`skills-index`, and the explore page's `skills` entry that stores the whole parsed list) — the parsed index is too large for the WebView localStorage quota and is re-fetched every session; only small queries such as the installed list and agent status are written to disk.
 
 ### Backend (writes)
 
-- **`src-tauri/src/skills.rs`**: Exposes 9 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `update_skills`, `disable_skills`, `enable_skills`, `link_agents`, `link_status`, `remove_stray_files`), all of which use `spawn_blocking` to move blocking operations (git clone, install, link, etc.) off the main thread. In addition, `lib.rs` provides one more command, `open_directory` (opens a directory in the system file manager, bypassing `agents-skills`).
-- Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend.
+- **`src-tauri/src/skills.rs`**: Exposes 8 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `update_skills`, `disable_skills`, `enable_skills`, `link_agents`, `link_status`), all of which use `spawn_blocking` to move blocking operations (git clone, install, link, etc.) off the main thread.
+- Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Since `agents-skills` 0.9, linking never refuses because of existing content: pre-existing agent content is parked into a backup slot (adopted into the canonical dir with migrate) and restored on unlink, so the former `remove_stray_files` command is gone.
 
 ### Frontend write wrapper
 
@@ -71,7 +71,7 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 
 **Browsing the skill list**:
 
-1. `explore-page` requests data via `fetchSkillsPage(page)`.
-2. `skills-api.ts` fetches the full index once (cached per session) and paginates locally.
+1. `explore-page` requests the full index via `fetchFullIndex()`.
+2. `skills-api.ts` downloads the index once (cached per session); search, sort, and pagination are computed client-side.
 3. `cdn-config.ts` tries direct GitHub access and CDN mirrors in order.
-4. TanStack Query caches and persists the result; paging and restarts hit the cache first.
+4. TanStack Query caches the result in memory (not persisted — too large); paging and in-session navigation hit the cache first.

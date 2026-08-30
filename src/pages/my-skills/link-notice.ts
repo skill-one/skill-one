@@ -16,23 +16,46 @@ const STATUS_NOTICES: Record<
   AgentLinkResult["status"],
   { kind: NoticeKind; text: (result: AgentLinkResult) => string }
 > = {
-  linked: { kind: "success", text: (r) => `${r.display} 已链接` },
+  linked: {
+    kind: "success",
+    text: (r) =>
+      r.parkedSkills.length + r.parkedOthers.length > 0
+        ? `${r.display} 已链接（原有内容已备份，取消链接可恢复）`
+        : `${r.display} 已链接`,
+  },
   alreadyLinked: { kind: "success", text: (r) => `${r.display} 已链接过` },
   migrated: {
     kind: "success",
-    text: (r) =>
-      `${r.display} 已迁移（移动 ${r.moved.length} 个，跳过 ${r.skipped.length} 个）`,
+    text: (r) => {
+      // The common confirm flow adopts skills and parks the rest; with no
+      // skills to adopt the outcome is effectively a backed-up link.
+      if (r.moved.length === 0) {
+        return r.parkedOthers.length > 0
+          ? `${r.display} 已链接（原有文件已备份，取消链接可恢复）`
+          : `${r.display} 已链接`;
+      }
+      const parts = [`移动 ${r.moved.length} 个 skills`];
+      if (r.skipped.length > 0) parts.push(`同名跳过 ${r.skipped.length} 个`);
+      if (r.parkedOthers.length > 0) parts.push("其余文件已备份");
+      return `${r.display} 已导入（${parts.join("，")}）`;
+    },
   },
   refused: {
     kind: "warning",
-    text: (r) => `${r.display} 拒绝：${r.message ?? "未提供原因"}`,
+    text: (r) => `${r.display} 拒绝链接：${r.message ?? "未提供原因"}`,
   },
   skipped: { kind: "success", text: (r) => `${r.display} 已跳过` },
   failed: {
     kind: "error",
     text: (r) => `${r.display} 失败：${r.message ?? "未知错误"}`,
   },
-  unlinked: { kind: "success", text: (r) => `${r.display} 已取消链接` },
+  unlinked: {
+    kind: "success",
+    text: (r) =>
+      r.restored.length > 0
+        ? `${r.display} 已取消链接（已恢复 ${r.restored.length} 项备份内容）`
+        : `${r.display} 已取消链接`,
+  },
   notLinked: { kind: "warning", text: (r) => `${r.display} 未链接` },
 };
 

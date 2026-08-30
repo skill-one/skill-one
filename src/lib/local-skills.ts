@@ -17,7 +17,6 @@ import {
   linkAgents,
   listInstalledSkills,
   removeSkills,
-  removeStrayFiles,
   unlinkAgents,
   type AgentLinkResult,
   type AgentStatus,
@@ -83,9 +82,10 @@ export async function removeInstalledSkill(name: string): Promise<void> {
 /**
  * Per-agent link status for the global skills directory.
  *
- * The backend scans each unlinked agent's own skills directory and reports any
- * skills found as `internalSkills`, so the UI can preview them and offer
- * "迁移并链接" instead of a bare "链接".
+ * For each unlinked agent the backend classifies the contents of its own
+ * skills directory (`internalSkills` / `internalOthers`) and reports any
+ * backup slot parked by a previous link (`pendingBackup`), so the UI can
+ * preview them and offer 导入并链接 / 直接链接 instead of a bare 链接.
  */
 export async function fetchAgentStatus(): Promise<AgentStatus[]> {
   if (!isTauri()) {
@@ -97,9 +97,11 @@ export async function fetchAgentStatus(): Promise<AgentStatus[]> {
 /**
  * Link one agent's skills dir (backend in Tauri, mock store in the browser).
  *
- * With `migrate`, existing skills inside the agent's own directory are moved
- * into the canonical dir instead of the link being refused. Callers should only
- * pass it after the user confirmed the migration.
+ * Pre-existing content is never destroyed: without `migrate` everything parks
+ * into the agent's backup slot; with `migrate` the skills move into the
+ * canonical dir first (name clashes keep the canonical copy) and only the
+ * non-skill entries park. Rerunning with `migrate` on an already linked agent
+ * adopts skills parked by an earlier link.
  */
 export async function linkAgent(
   name: string,
@@ -120,7 +122,11 @@ export async function linkAgent(
       status: "linked",
       moved: [],
       skipped: [],
-      skills: [],
+      parkedSkills: [],
+      parkedOthers: [],
+      backupDir: null,
+      restored: [],
+      restoredFrom: null,
       message: null,
     },
   ];
@@ -140,25 +146,14 @@ export async function unlinkAgent(name: string): Promise<AgentLinkResult[]> {
       status: "unlinked",
       moved: [],
       skipped: [],
-      skills: [],
+      parkedSkills: [],
+      parkedOthers: [],
+      backupDir: null,
+      restored: [],
+      restoredFrom: null,
       message: null,
     },
   ];
-}
-
-/**
- * Delete stray non-skill files from an agent's skills dir (one-click delete in
- * the stray-files dialog). Backend in Tauri; no-op in a plain browser since
- * the mock store has no real files to remove.
- */
-export async function removeAgentStrayFiles(
-  dir: string,
-  files: string[],
-): Promise<string[]> {
-  if (isTauri()) {
-    return removeStrayFiles(dir, files);
-  }
-  return files;
 }
 
 function mockDisplayOf(name: string): string {

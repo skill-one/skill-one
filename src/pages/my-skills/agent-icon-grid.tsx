@@ -5,32 +5,35 @@ import { AlertTriangle, CheckCircle2, CircleX, Loader2, Users } from "lucide-rea
 import {
   fetchAgentStatus,
   linkAgent,
-  removeAgentStrayFiles,
   unlinkAgent,
 } from "../../lib/local-skills";
-import {
-  parseMigrateStrays,
-  parseStrayDir,
-  parseStrays,
-} from "../../lib/link-migration";
-import { openPathInSystem } from "../../lib/open-external";
 import type { AgentStatus } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
 import { AgentIconButton } from "./agent-icon-button";
 import { formatLinkMessage, type Notice } from "./link-notice";
-import { StrayFilesDialog, type StrayFilesTarget } from "./stray-files-dialog";
+import {
+  LinkConfirmDialog,
+  type LinkConfirmTarget,
+} from "./link-confirm-dialog";
 
 /**
  * The agent-link strip on the "my skills" page: one icon per agent, plus the
- * mutations behind it (link / migrate / unlink / stray cleanup), the result
- * toasts and the link decision dialog. Division of labor: the icon's hover
- * tooltip is a read-only preview; clicking a dir that already holds content
- * opens the decision dialog, which owns all actions. Toast wording lives in
- * `link-notice.ts`.
+ * mutations behind it (link / confirm-link / unlink) and the link confirm
+ * dialog. Division of labor: the icon's hover tooltip is a read-only preview;
+ * clicking a dir that already holds content opens the confirm dialog, which
+ * explains what confirming will do. Toast wording lives in `link-notice.ts`.
+ *
+ * Since `agents-skills` 0.9 nothing blocks a link and nothing needs choosing:
+ * confirming links the agent and the backend handles the content — skills are
+ * adopted into the canonical dir, everything else parks into the agent's
+ * backup slot and is restored on unlink. Clicking a linked agent unlinks
+ * directly (parked content is restored automatically).
  */
 export function AgentIconGrid() {
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [strayTarget, setStrayTarget] = useState<StrayFilesTarget | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<LinkConfirmTarget | null>(
+    null,
+  );
   const queryClient = useQueryClient();
 
   const {
@@ -49,79 +52,26 @@ export function AgentIconGrid() {
     queryClient.invalidateQueries({ queryKey: ["installed-skills"] });
   };
 
-  /** Build the link-preview target for an agent, or `null` when its dir is empty. */
-  const buildStrayTarget = (agent: AgentStatus): StrayFilesTarget | null => {
+  /** Build the confirm target for an unlinked agent, or `null` when its dir is empty. */
+  const buildConfirmTarget = (agent: AgentStatus): LinkConfirmTarget | null => {
     const skills = agent.internalSkills ?? [];
-    const files = agent.internalFiles ?? [];
-    if (skills.length === 0 && files.length === 0) return null;
+    const others = agent.internalOthers ?? [];
+    if (skills.length === 0 && others.length === 0) return null;
     return {
       name: agent.name,
       display: agent.display,
       skills,
-      files,
-      dirPath: agent.dirPath ?? null,
+      others,
+      backup: agent.pendingBackup ?? null,
     };
   };
 
-  const migrateMutation = useMutation({
+  const confirmMutation = useMutation({
     mutationFn: (name: string) => linkAgent(name, { migrate: true }),
     onSuccess: (results) => {
-      const result = results[0];
-      if (result?.status === "failed") {
-        // A migrate of a dir with non-skill files fails to move them; keep the
-        // dialog open and refresh it with the strays the backend named.
-        const files = parseMigrateStrays(result.message);
-        if (files.length > 0) {
-          setStrayTarget((current) =>
-            current
-              ? {
-                  ...current,
-                  files,
-                  dirPath: parseStrayDir(result.message) ?? current.dirPath,
-                }
-              : {
-                  // The dialog was closed before the migrate finished; rebuild
-                  // it from the backend message so the user can clean up and
-                  // retry.
-                  name: result.agent,
-                  display: result.display,
-                  skills: [],
-                  files,
-                  dirPath: parseStrayDir(result.message),
-                },
-          );
-          return;
-        }
-      }
-      setStrayTarget(null);
+      setConfirmTarget(null);
       invalidate();
-      setNotice(formatLinkMessage(result));
-    },
-  });
-
-  const linkMutation = useMutation({
-    mutationFn: (name: string) => linkAgent(name),
-    onSuccess: (results) => {
-      const result = results[0];
-      if (result?.status === "refused") {
-        // The status snapshot was stale: the dir gained content between fetch
-        // and click. Always show the decision dialog — never migrate without
-        // the user seeing (and choosing on) what is in the dir. Stray files
-        // only appear inside the refusal text, so they are parsed from it
-        // until the backend exposes them as structured fields.
-        const skills = result.skills ?? [];
-        setStrayTarget({
-          name: result.agent,
-          display: result.display,
-          skills,
-          files: parseStrays(result.message, skills),
-          dirPath: parseStrayDir(result.message),
-        });
-        return;
-      }
-      setStrayTarget(null);
-      invalidate();
-      setNotice(formatLinkMessage(result));
+      setNotice(formatLinkMessage(results[0]));
     },
     onError: (err) =>
       setNotice({
@@ -130,39 +80,15 @@ export function AgentIconGrid() {
       }),
   });
 
-  /** One-click stray deletion from the decision dialog, then refresh. */
-  const removeStraysMutation = useMutation({
-    mutationFn: (target: StrayFilesTarget) => {
-      if (!target.dirPath || target.files.length === 0) {
-        return Promise.reject(
-          new Error("无法确定目录位置，请先手动处理这些文件"),
-        );
-      }
-      return removeAgentStrayFiles(target.dirPath, target.files);
-    },
-    onSuccess: (removed, target) => {
+  const linkMutation = useMutation({
+    mutationFn: (name: string) => linkAgent(name),
+    onSuccess: (results) => {
       invalidate();
-      setNotice({
-        text: `已删除 ${target.display} 目录中的 ${removed.length} 个文件`,
-        kind: "success",
-      });
-      // The dialog opened from a link click, so finishing the link is the
-      // user's standing intent: with nothing left to import, link directly;
-      // otherwise keep the dialog open for the import step.
-      if (target.skills.length === 0) {
-        setStrayTarget(null);
-        linkMutation.mutate(target.name);
-      } else {
-        setStrayTarget((current) =>
-          current && current.name === target.name
-            ? { ...current, files: [] }
-            : current,
-        );
-      }
+      setNotice(formatLinkMessage(results[0]));
     },
     onError: (err) =>
       setNotice({
-        text: `删除文件失败：${err instanceof Error ? err.message : String(err)}`,
+        text: `链接失败：${err instanceof Error ? err.message : String(err)}`,
         kind: "error",
       }),
   });
@@ -195,14 +121,16 @@ export function AgentIconGrid() {
       return;
     }
     if (agent.linked) {
+      // Parked content is restored automatically by the backend; the toast
+      // reports it.
       unlinkMutation.mutate(agent.name);
       return;
     }
-    // A dir that already holds skills or strays opens the decision dialog so
-    // the user picks how to proceed; only an empty dir links directly.
-    const target = buildStrayTarget(agent);
+    // A dir that already holds skills or other files opens the confirm dialog
+    // (which shows what confirming will do); an empty dir links directly.
+    const target = buildConfirmTarget(agent);
     if (target) {
-      setStrayTarget(target);
+      setConfirmTarget(target);
       return;
     }
     linkMutation.mutate(agent.name);
@@ -211,11 +139,14 @@ export function AgentIconGrid() {
   const list = agents ?? [];
   const busyFor = (name: string) =>
     (linkMutation.isPending && linkMutation.variables === name) ||
-    (migrateMutation.isPending && migrateMutation.variables === name) ||
+    (confirmMutation.isPending && confirmMutation.variables === name) ||
     (unlinkMutation.isPending && unlinkMutation.variables === name);
-  const dialogBusy = strayTarget
-    ? busyFor(strayTarget.name) || removeStraysMutation.isPending
-    : false;
+  // Only one confirm dialog exists at a time, so any pending mutation
+  // disables it.
+  const dialogBusy =
+    linkMutation.isPending ||
+    confirmMutation.isPending ||
+    unlinkMutation.isPending;
 
   return (
     <div>
@@ -276,19 +207,13 @@ export function AgentIconGrid() {
         </div>
       )}
 
-      <StrayFilesDialog
-        target={strayTarget}
+      <LinkConfirmDialog
+        target={confirmTarget}
         busy={dialogBusy}
-        onMigrate={() => {
-          if (strayTarget) migrateMutation.mutate(strayTarget.name);
+        onConfirm={() => {
+          if (confirmTarget) confirmMutation.mutate(confirmTarget.name);
         }}
-        onRemoveStrays={() => {
-          if (strayTarget) removeStraysMutation.mutate(strayTarget);
-        }}
-        onOpenDir={() => {
-          if (strayTarget?.dirPath) void openPathInSystem(strayTarget.dirPath);
-        }}
-        onClose={() => setStrayTarget(null)}
+        onClose={() => setConfirmTarget(null)}
       />
     </div>
   );

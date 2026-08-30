@@ -1,6 +1,8 @@
 import {
   AlertTriangle,
+  Archive,
   Check,
+  FolderInput,
   Loader2,
 } from "lucide-react";
 
@@ -19,9 +21,10 @@ const TOOLTIP_LIST_CAP = 5;
 
 /**
  * One agent's icon button with its read-only hover tooltip: link status plus a
- * preview of the skills / stray files inside the agent's own directory. All
- * actions (导入 / 删除 / 进入目录) live in the link-preview dialog that opens
- * on click — never in this transient hover layer.
+ * preview of the private content inside the agent's own directory. The preview
+ * reuses the link confirm dialog's two emphatic segments (以下 skill 将导入 /
+ * 以下文件将备份) so hover and click tell one story; all actions live in the
+ * dialog that opens on click — never in this transient hover layer.
  */
 export function AgentIconButton({
   agent,
@@ -33,7 +36,8 @@ export function AgentIconButton({
   onClick: () => void;
 }) {
   const skillCount = agent.internalSkills?.length ?? 0;
-  const fileCount = agent.internalFiles?.length ?? 0;
+  const fileCount = agent.internalOthers?.length ?? 0;
+  const backupItems = agent.pendingBackup?.items ?? [];
   // The canonical dir itself reports linked=false, but to users it is
   // effectively linked: the icon stays full-color, and clicking explains
   // why it cannot be unlinked.
@@ -51,9 +55,11 @@ export function AgentIconButton({
   const description = agent.canonical
     ? "原生使用全局 skills 目录，始终可用所有已安装 skills"
     : isLinked
-      ? "可使用所有已安装 skills"
+      ? backupItems.length > 0
+        ? "已链接；有内容等待处理"
+        : "可使用所有已安装 skills"
       : showWarning
-        ? "目录中已有内容，链接前需先处理"
+        ? "目录中已有内容，确认链接后自动导入与备份"
         : "链接后,可使用所有已安装 skills";
 
   const ariaLabel = agent.canonical
@@ -147,11 +153,13 @@ export function AgentIconButton({
           <div className="mt-1.5 space-y-2 text-[11px] leading-relaxed text-muted-foreground">
             <p>{description}</p>
 
-            {/* Read-only preview of what a link would import. */}
+            {/* Read-only preview of what confirming will import — same two
+                emphatic segments as the link confirm dialog. */}
             {!isLinked && skillCount > 0 && (
-              <div className="rounded-lg border border-border/70 bg-muted/40 p-2.5">
-                <p className="font-medium text-foreground">
-                  可导入的 skills（{skillCount}）
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5">
+                <p className="flex items-center gap-1.5 font-medium text-emerald-600">
+                  <FolderInput className="h-3 w-3" />
+                  以下 skill 将导入（{skillCount}）
                 </p>
                 <ul className="list-disc space-y-0.5 pl-4">
                   {(agent.internalSkills ?? [])
@@ -166,15 +174,14 @@ export function AgentIconButton({
               </div>
             )}
 
-            {/* Read-only preview of what blocks the link. */}
             {!isLinked && fileCount > 0 && (
-              <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-2.5">
-                <p className="flex items-center gap-1.5 font-medium text-destructive">
-                  <AlertTriangle className="h-3 w-3" />
-                  需处理的其他文件（{fileCount}）
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
+                <p className="flex items-center gap-1.5 font-medium text-amber-600">
+                  <Archive className="h-3 w-3" />
+                  以下文件将备份（{fileCount}）
                 </p>
                 <ul className="list-disc space-y-0.5 pl-4 font-mono text-[10px]">
-                  {(agent.internalFiles ?? [])
+                  {(agent.internalOthers ?? [])
                     .slice(0, TOOLTIP_LIST_CAP)
                     .map((file) => (
                       <li key={file}>{file}</li>
@@ -186,8 +193,31 @@ export function AgentIconButton({
               </div>
             )}
 
+            {/* Read-only preview of content parked by a previous link. */}
+            {backupItems.length > 0 && (
+              <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-2.5">
+                <p className="flex items-center gap-1.5 font-medium text-destructive">
+                  <AlertTriangle className="h-3 w-3" />
+                  备份待处理（{backupItems.length}）
+                </p>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  {backupItems.slice(0, TOOLTIP_LIST_CAP).map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+                {backupItems.length > TOOLTIP_LIST_CAP && (
+                  <p className="pl-4 text-[10px]">…等 {backupItems.length} 个</p>
+                )}
+                <p className="text-[10px]">
+                  {isLinked
+                    ? "取消链接时自动恢复原内容。"
+                    : "处理备份前，链接会被拒绝。"}
+                </p>
+              </div>
+            )}
+
             {showWarning && (
-              <p className="text-[10px]">点击图标选择处理方式（导入 / 删除 / 进入目录）。</p>
+              <p className="text-[10px]">点击图标确认链接，自动完成导入与备份。</p>
             )}
           </div>
         </TooltipContent>

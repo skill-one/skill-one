@@ -138,8 +138,8 @@ const mockAgentRows: Array<{
   linked: boolean;
   canonical: boolean;
   internalSkills?: string[];
-  internalFiles?: string[];
-  dirPath?: string | null;
+  internalOthers?: string[];
+  pendingBackup?: { path: string; items: string[] } | null;
 }> = [
   {
     name: "claude-code",
@@ -149,15 +149,27 @@ const mockAgentRows: Array<{
     internalSkills: [],
   },
   {
+    name: "codex",
+    display: "Codex",
+    linked: true,
+    canonical: false,
+    internalSkills: [],
+    // Linked without importing: its original content sits in the backup slot
+    // until a migrate adopts the skills or an unlink restores them.
+    pendingBackup: {
+      path: "/Users/me/.agents/backup-skills/codex",
+      items: ["old-pdf", "notes.md"],
+    },
+  },
+  {
     name: "cursor",
     display: "Cursor",
     linked: false,
     canonical: false,
-    // Carries skills and a stray file in its own dir → clicking the card opens
-    // the decision dialog offering 导入并链接 / 删除文件 / 进入目录.
+    // Carries skills and non-skill files in its own dir → clicking the card
+    // opens the decision dialog offering 导入并链接 / 直接链接.
     internalSkills: ["pdf", "docx"],
-    internalFiles: ["README.md"],
-    dirPath: "/Users/me/.cursor/skills",
+    internalOthers: ["README.md"],
   },
   {
     name: "gemini-cli",
@@ -183,8 +195,8 @@ function buildMockAgentStatus(): AgentStatus[] {
     linked: a.linked,
     canonical: a.canonical,
     internalSkills: a.internalSkills,
-    internalFiles: a.internalFiles,
-    dirPath: a.dirPath,
+    internalOthers: a.internalOthers,
+    pendingBackup: a.pendingBackup,
   }));
 }
 
