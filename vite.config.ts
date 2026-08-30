@@ -1,11 +1,28 @@
 /// <reference types="vitest/config" />
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { configDefaults } from "vitest/config";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+
+const srcDir = path.dirname(fileURLToPath(import.meta.url));
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [tailwindcss(), react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(srcDir, "./src"),
+    },
+  },
+  css: {
+    // This worktree lives inside the parent checkout, whose tailwind v3
+    // postcss.config.js would otherwise be picked up. Tailwind v4 runs
+    // through the @tailwindcss/vite plugin, so keep PostCSS empty here.
+    postcss: { plugins: [] },
+  },
   test: {
     environment: "jsdom",
     globals: true,
