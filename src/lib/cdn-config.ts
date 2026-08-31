@@ -125,11 +125,11 @@ export class SourceFetchError extends Error {
 }
 
 /** Shared failure classification for the candidate loops below. */
-function throwSourceError(
+function sourceFetchError(
   status: number | undefined,
   networkFailure: boolean,
-): never {
-  throw networkFailure
+): SourceFetchError {
+  return networkFailure
     ? new SourceFetchError(
         "network",
         "无法连接数据源：已尝试直连 GitHub 与 CDN 镜像",
@@ -139,6 +139,13 @@ function throwSourceError(
         `数据源请求失败（HTTP ${status ?? "未知"}）`,
         status,
       );
+}
+
+function throwSourceError(
+  status: number | undefined,
+  networkFailure: boolean,
+): never {
+  throw sourceFetchError(status, networkFailure);
 }
 
 /** Internal marker: a candidate answered, but with a non-OK status. */
@@ -187,32 +194,110 @@ export async function fetchFirstText(
 }
 
 /**
- * Fetch the first reachable candidate and hand its response body to `consume`
- * for streaming reads. Fallback covers the whole streaming window: a body that
- * fails mid-download (or a `consume` that throws) moves on to the next
- * candidate, which is attempted again from scratch.
+ * Resolve with the first candidate to answer with a usable (OK, streamed)
+ * response, racing every candidate in parallel. Each candidate carries the
+ * same header timeout as a sequential attempt would; one that answers non-OK
+ * or never answers simply loses, and the typed aggregate error is raised only
+ * once every candidate has lost.
+ */
+function raceFirstBody(
+  urls: string[],
+): Promise<{ url: string; body: ReadableStream<Uint8Array> }> {
+  return new Promise((resolve, reject) => {
+    const controllers = new Map<string, AbortController>();
+    let pending = urls.length;
+    let status: number | undefined;
+    let networkFailure = false;
+    // Once a winner has been resolved, late events — a slower candidate's
+    // answer, or the rejection induced by aborting it — must not touch the
+    // outcome again.
+    let settled = false;
+
+    const lose = (url: string, err: unknown) => {
+      if (err instanceof CandidateStatusError) {
+        status = err.status;
+      } else {
+        networkFailure = true;
+      }
+      if (--pending === 0 && !settled) {
+        settled = true;
+        reject(sourceFetchError(status, networkFailure));
+      }
+    };
+
+    if (pending === 0) {
+      settled = true;
+      reject(sourceFetchError(undefined, false));
+      return;
+    }
+
+    for (const url of urls) {
+      const controller = new AbortController();
+      controllers.set(url, controller);
+      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      fetch(url, { signal: controller.signal }).then(
+        (resp) => {
+          clearTimeout(timer);
+          if (resp.ok && resp.body) {
+            if (settled) {
+              // A slower candidate answered after a winner: drop its body.
+              resp.body.cancel().catch(() => {});
+              return;
+            }
+            settled = true;
+            // Only one ~12MB body should keep downloading: kill every other
+            // in-flight request. The winner's own timer is already cleared,
+            // so its stream continues unharmed.
+            for (const [candidate, other] of controllers) {
+              if (candidate !== url) other.abort();
+            }
+            resolve({ url, body: resp.body });
+          } else {
+            lose(url, new CandidateStatusError(resp.status));
+          }
+        },
+        (err: unknown) => {
+          clearTimeout(timer);
+          lose(url, err);
+        },
+      );
+    }
+  });
+}
+
+/**
+ * Fetch the first candidate to answer with a usable response and hand its
+ * response body to `consume` for streaming reads. Candidates race in
+ * parallel rather than taking turns: the index download is the app's
+ * cold-start critical path, and a sequential walk pays the first
+ * candidate's full connection penalty (a hanging `raw.githubusercontent.com`
+ * burns its whole timeout) before the CDN mirror even gets its turn. Racing
+ * costs one extra request per load and always lands on whichever source
+ * answers first — the direct origin when it is reachable (freshest data),
+ * a mirror when it is not.
  *
- * The per-candidate timeout only guards the response headers: the timer stops
- * as soon as `fetch` resolves, so a legitimately long body download is never
- * aborted mid-stream. Stream consumers enforce their own stall detection
- * between chunks instead.
+ * Fallback still covers the whole streaming window: a body that fails
+ * mid-download (or a `consume` that throws) races the remaining candidates
+ * afresh, and the consumer restarts its parse from scratch per attempt.
+ *
+ * The per-candidate timeout only guards the response headers: the timer
+ * stops as soon as `fetch` resolves, so a legitimately long body download is
+ * never aborted mid-stream. Stream consumers enforce their own stall
+ * detection between chunks instead.
  */
 export async function fetchFirstStream(
   urls: string[],
   consume: (body: ReadableStream<Uint8Array>) => Promise<void>,
 ): Promise<void> {
-  return firstCandidateSuccess(urls, async (url) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    let resp: Response;
-    try {
-      resp = await fetch(url, { signal: controller.signal });
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!resp.ok) throw new CandidateStatusError(resp.status);
-    if (!resp.body) throw new Error("response has no body");
-    await consume(resp.body);
-  });
+  const { url, body } = await raceFirstBody(urls);
+  try {
+    await consume(body);
+  } catch {
+    // The winning body failed mid-download; the remaining candidates race
+    // again (an exhausted list raises the aggregate error, as before).
+    await raceFirstBody(urls.filter((candidate) => candidate !== url)).then(
+      ({ body }) => consume(body),
+    );
+  }
 }
 
