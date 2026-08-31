@@ -14,7 +14,7 @@ import {
   useInstalledSkills,
 } from "../../hooks/use-installed-skills";
 import { useSkillsIndex } from "../../hooks/use-skills-index";
-import { AgentIconGrid } from "./agent-icon-grid";
+import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { Button } from "../../components/ui/button";
 import { Switch } from "../../components/ui/switch";
@@ -190,9 +190,10 @@ export function MySkillsPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto p-4">
-        {/* Summary strip: agent link status at a glance */}
+        {/* Summary strip: agent link status at a glance, with the link
+            actions inside the avatar group's dropdown menu. */}
         <div className="border-b border-border/70 pb-4">
-          <AgentIconGrid />
+          <AgentAvatarMenu />
         </div>
 
         <div className="mt-4">

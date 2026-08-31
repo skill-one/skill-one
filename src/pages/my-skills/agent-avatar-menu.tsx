@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronUp,
   CircleX,
   Loader2,
   Users,
@@ -17,9 +16,18 @@ import {
 import type { AgentStatus } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
 import { INSTALLED_SKILLS_QUERY_KEY } from "../../hooks/use-installed-skills";
-import { AgentIconButton } from "./agent-icon-button";
-import { AgentAvatarGroup, AVATAR_GROUP_MAX } from "./agent-avatar-group";
-import { Button } from "../../components/ui/button";
+import { AgentIcon } from "../../components/agent-icon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
+import { AgentAvatarGroup } from "./agent-avatar-group";
+import { agentLinkState, agentStateDotClass, agentStateLabel } from "./agent-link-state";
 import { formatLinkMessage, type Notice } from "./link-notice";
 import {
   LinkConfirmDialog,
@@ -27,27 +35,23 @@ import {
 } from "./link-confirm-dialog";
 
 /**
- * The agent-link strip on the "my skills" page: one icon per agent, plus the
- * mutations behind it (link / confirm-link / unlink) and the link confirm
- * dialog. Division of labor: the icon's hover tooltip is a read-only preview;
- * clicking a dir that already holds content opens the confirm dialog, which
- * explains what confirming will do. Toast wording lives in `link-notice.ts`.
- *
- * When more than AVATAR_GROUP_MAX agents are detected, the strip starts
- * collapsed (see `AgentAvatarGroup`): a compact avatar row with a +N count
- * that expands into the full interactive grid below; a collapse button in the
- * expanded grid folds it back. With few agents the grid renders directly —
- * there is nothing to fold.
+ * The agent link strip on the "my skills" page: a shadcn avatar group that
+ * opens one dropdown menu listing every detected agent, plus the mutations
+ * behind it (link / confirm-link / unlink) and the link confirm dialog.
  *
  * Since `agents-skills` 0.9 nothing blocks a link and nothing needs choosing:
  * confirming links the agent and the backend handles the content — skills are
  * adopted into the canonical dir, everything else parks into the agent's
  * backup slot and is restored on unlink. Clicking a linked agent unlinks
- * directly (parked content is restored automatically).
+ * directly (parked content is restored automatically); a canonical agent only
+ * explains itself.
+ *
+ * Every action funnels through the menu, so the strip itself stays a single
+ * click target and each agent keeps the same treatment no matter how many are
+ * detected — the group only ever shows a prefix of them inline.
  */
-export function AgentIconGrid() {
+export function AgentAvatarMenu() {
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [expanded, setExpanded] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<LinkConfirmTarget | null>(
     null,
   );
@@ -129,7 +133,7 @@ export function AgentIconGrid() {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  const handleClick = (agent: AgentStatus) => {
+  const handleSelect = (agent: AgentStatus) => {
     if (agent.canonical) {
       setNotice({
         text: `${agent.display} 使用原生 skills 目录，无法取消链接`,
@@ -147,7 +151,9 @@ export function AgentIconGrid() {
     // (which shows what confirming will do); an empty dir links directly.
     const target = buildConfirmTarget(agent);
     if (target) {
-      setConfirmTarget(target);
+      // Radix hands focus back to the trigger as the menu closes; opening the
+      // dialog one frame later keeps the two from fighting over it.
+      requestAnimationFrame(() => setConfirmTarget(target));
       return;
     }
     linkMutation.mutate(agent.name);
@@ -211,31 +217,54 @@ export function AgentIconGrid() {
           <Users className="h-7 w-7 opacity-40" />
           <p className="text-[12px]">未检测到可用的 agent</p>
         </div>
-      ) : list.length > AVATAR_GROUP_MAX && !expanded ? (
-        <AgentAvatarGroup agents={list} onExpand={() => setExpanded(true)} />
       ) : (
-        <div className="flex flex-wrap gap-3">
-          {list.map((agent) => (
-            <AgentIconButton
-              key={agent.name}
-              agent={agent}
-              busy={busyFor(agent.name)}
-              onClick={() => handleClick(agent)}
-            />
-          ))}
-          {list.length > AVATAR_GROUP_MAX && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="收起"
-              title="收起"
-              className="size-9 self-center text-muted-foreground"
-              onClick={() => setExpanded(false)}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`管理 agent 链接（共 ${list.length} 个）`}
+              className="rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <ChevronUp />
-            </Button>
-          )}
-        </div>
+              <AgentAvatarGroup agents={list} />
+            </button>
+          </DropdownMenuTrigger>
+
+          {/* The menu lists every agent, including the ones the strip folds
+              into its +N count, so all of them are handled the same way. */}
+          <DropdownMenuContent align="start" className="min-w-56">
+            <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
+              Agents
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              {list.map((agent) => (
+                <DropdownMenuItem
+                  key={agent.name}
+                  disabled={busyFor(agent.name)}
+                  onSelect={() => handleSelect(agent)}
+                  className="gap-2.5"
+                >
+                  <AgentIcon agentName={agent.name} size="sm" />
+                  <span className="min-w-0 flex-1 truncate text-[13px]">
+                    {agent.display}
+                  </span>{" "}
+                  {/* Whitespace-only node: keeps the item's accessible name
+                      readable ("Cursor 已链接") instead of running the two
+                      labels together. Ignored by the flex layout. */}
+                  <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 rounded-full",
+                        agentStateDotClass[agentLinkState(agent)],
+                      )}
+                    />
+                    {agentStateLabel(agent)}
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
 
       <LinkConfirmDialog

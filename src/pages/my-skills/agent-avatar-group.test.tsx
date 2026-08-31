@@ -1,8 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { describe, it, expect } from "vitest";
+import { render } from "@testing-library/react";
 
-import { renderWithRouter } from "../../test/test-utils";
 import type { AgentStatus } from "../../lib/skills-manager";
 import { AgentAvatarGroup, AVATAR_GROUP_MAX } from "./agent-avatar-group";
 
@@ -22,73 +20,69 @@ function agents(count: number): AgentStatus[] {
   );
 }
 
+/** Avatars and the +N count carry no text of their own, so query by slot. */
+function slots(container: HTMLElement, slot: string): Element[] {
+  return Array.from(container.querySelectorAll(`[data-slot="${slot}"]`));
+}
+
 describe("AgentAvatarGroup", () => {
   it("shows at most AVATAR_GROUP_MAX avatars plus a +N count", () => {
     const total = AVATAR_GROUP_MAX + 3;
-    renderWithRouter(<AgentAvatarGroup agents={agents(total)} onExpand={() => {}} />);
+    const { container } = render(<AgentAvatarGroup agents={agents(total)} />);
 
-    expect(screen.getAllByRole("button")).toHaveLength(AVATAR_GROUP_MAX + 1);
-    const count = screen.getByRole("button", { name: `展开全部 ${total} 个 agent` });
-    expect(count).toHaveTextContent("+3");
+    expect(slots(container, "avatar")).toHaveLength(AVATAR_GROUP_MAX);
+    const count = slots(container, "avatar-group-count");
+    expect(count).toHaveLength(1);
+    expect(count[0]).toHaveTextContent("+3");
   });
 
   it("omits the count when every agent fits inline", () => {
-    renderWithRouter(
-      <AgentAvatarGroup agents={agents(AVATAR_GROUP_MAX)} onExpand={() => {}} />,
+    const { container } = render(
+      <AgentAvatarGroup agents={agents(AVATAR_GROUP_MAX)} />,
     );
 
-    expect(screen.getAllByRole("button")).toHaveLength(AVATAR_GROUP_MAX);
-    expect(screen.queryByRole("button", { name: /^展开全部/ })).not.toBeInTheDocument();
+    expect(slots(container, "avatar")).toHaveLength(AVATAR_GROUP_MAX);
+    expect(slots(container, "avatar-group-count")).toHaveLength(0);
   });
 
-  it("exposes each agent's link state through the avatar label", () => {
-    // Only the first AVATAR_GROUP_MAX agents render inline, so each state is
-    // asserted in the visible slot one render at a time.
-    const cases: Array<[AgentStatus[], string]> = [
-      [[agent({ name: "codex", display: "Codex", linked: true })], "Codex，已链接，点击展开"],
-      [
-        [agent({ name: "windsurf", display: "Windsurf", canonical: true })],
-        "Windsurf，原生，点击展开",
-      ],
-      [
-        [agent({ name: "goose", display: "Goose", internalSkills: ["pdf"] })],
-        "Goose，未链接，点击展开",
-      ],
-      [[agent({ name: "cursor", display: "Cursor" })], "Cursor，未链接，点击展开"],
-    ];
+  it("renders no avatars without agents", () => {
+    const { container } = render(<AgentAvatarGroup agents={[]} />);
 
-    for (const [list, label] of cases) {
-      const { unmount } = renderWithRouter(
-        <AgentAvatarGroup agents={list} onExpand={() => {}} />,
-      );
-      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
-      unmount();
-    }
+    expect(slots(container, "avatar")).toHaveLength(0);
+    expect(slots(container, "avatar-group-count")).toHaveLength(0);
   });
 
-  it("expands on any click and never acts on the agent itself", async () => {
-    const user = userEvent.setup();
-    const onExpand = vi.fn();
-    renderWithRouter(<AgentAvatarGroup agents={agents(10)} onExpand={onExpand} />);
+  it("keeps every avatar a direct child of the group so the overlap ring applies", () => {
+    const { container } = render(<AgentAvatarGroup agents={agents(2)} />);
 
-    await user.click(
-      screen.getByRole("button", { name: "Agent 1，未链接，点击展开" }),
-    );
-    expect(onExpand).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByRole("button", { name: "展开全部 10 个 agent" }));
-    expect(onExpand).toHaveBeenCalledTimes(2);
+    const group = container.querySelector('[data-slot="avatar-group"]');
+    expect(group).not.toBeNull();
+    // AvatarGroup styles its children through the data-slot selector, so a
+    // wrapper element around an avatar would silently drop the ring.
+    expect(
+      Array.from(group!.children).map((child) => child.getAttribute("data-slot")),
+    ).toEqual(["avatar", "avatar"]);
   });
 
-  it("previews the status on hover", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(
-      <AgentAvatarGroup agents={[agent({ linked: true })]} onExpand={() => {}} />,
+  it("marks each avatar's link state with a status badge", () => {
+    const { container } = render(
+      <AgentAvatarGroup
+        agents={[
+          agent({ name: "codex", display: "Codex", linked: true }),
+          agent({ name: "goose", display: "Goose", internalSkills: ["pdf"] }),
+          agent({ name: "windsurf", display: "Windsurf", canonical: true }),
+          agent({ name: "cursor", display: "Cursor" }),
+        ]}
+      />,
     );
 
-    await user.hover(
-      screen.getByRole("button", { name: "Cursor，已链接，点击展开" }),
-    );
-    expect(await screen.findByText("点击展开全部 agent")).toBeInTheDocument();
+    // Badges follow avatar order: linked, content waiting (amber), canonical
+    // (counts as linked), plain unlinked (muted).
+    expect(slots(container, "avatar-badge").map((badge) => badge.className)).toEqual([
+      expect.stringContaining("bg-emerald-500"),
+      expect.stringContaining("bg-amber-500"),
+      expect.stringContaining("bg-emerald-500"),
+      expect.stringContaining("bg-muted-foreground"),
+    ]);
   });
 });
