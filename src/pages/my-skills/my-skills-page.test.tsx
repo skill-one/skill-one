@@ -16,16 +16,16 @@ import {
 // the mutable mock store in the browser (this test env), so mutations below
 // actually change the data the page re-fetches after invalidate.
 
-/**
- * The agent strip starts collapsed once more than AVATAR_GROUP_MAX agents
- * exist (the mock store detects 5); the agent-level tests drive the full
- * interactive grid, so expand it first.
- */
-async function expandAgentStrip() {
-  await userEvent
-    .setup()
-    .click(await screen.findByRole("button", { name: /^展开全部/ }));
+/** The agent strip is one avatar group; its dropdown menu carries the actions. */
+async function openAgentMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(
+    await screen.findByRole("button", { name: /^管理 agent 链接/ }),
+  );
 }
+
+/** Menu items read as "<display> <state>" — the status dot holds no text. */
+const menuItem = (display: string, state: string) =>
+  screen.findByRole("menuitem", { name: new RegExp(`${display}\\s+${state}`) });
 
 describe("MySkillsPage", () => {
   afterEach(() => {
@@ -163,157 +163,76 @@ describe("MySkillsPage", () => {
     expect(screen.getByText("本地")).toBeInTheDocument();
   });
 
-  it("renders the agent icon grid with a minimal warning badge for inner content", async () => {
-    renderWithRouter(<MySkillsPage />);
-    await expandAgentStrip();
-
-    // Cursor carries 2 skills and 1 stray file in its own dir in the mock:
-    // the badge is a minimal warning without counts, details live in the
-    // hover tooltip and the link-preview dialog.
-    const cursor = await screen.findByLabelText("Cursor，点击链接");
-    expect(cursor).toBeInTheDocument();
-    expect(
-      within(cursor).getByLabelText(
-        "该 agent 目录内已有 skills 或其他文件，点击查看详情",
-      ),
-    ).toBeInTheDocument();
-
-    // Linked agents offer 取消链接; canonical ones explain on click instead.
-    expect(
-      screen.getByLabelText("Claude Code，点击取消链接"),
-    ).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Claude Code，点击链接/)).toBeNull();
-    expect(
-      screen.getByLabelText("Windsurf，原生使用全局 skills 目录"),
-    ).toBeInTheDocument();
-  });
-
-  it("lists the specific skills and files in the agent hover tooltip", async () => {
+  it("lists every detected agent in the strip's dropdown menu", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
-    await expandAgentStrip();
 
-    const cursor = await screen.findByLabelText("Cursor，点击链接");
-    await user.hover(cursor);
+    await openAgentMenu(user);
 
-    // The tooltip preview reuses the confirm dialog's two emphatic segments.
-    const tooltip = await screen.findByRole("tooltip");
-    expect(within(tooltip).getByText("Cursor")).toBeInTheDocument();
-    expect(
-      within(tooltip).getByText("以下 skill 将导入（2）"),
-    ).toBeInTheDocument();
-    expect(within(tooltip).getByText("pdf")).toBeInTheDocument();
-    expect(within(tooltip).getByText("docx")).toBeInTheDocument();
-    expect(
-      within(tooltip).getByText("以下文件将备份（1）"),
-    ).toBeInTheDocument();
-    expect(within(tooltip).getByText("README.md")).toBeInTheDocument();
+    // The strip only ever shows a prefix inline (the mock detects 5 agents);
+    // the menu carries all of them, each with its link state.
+    expect(await screen.findAllByRole("menuitem")).toHaveLength(5);
+    expect(await menuItem("Claude Code", "已链接")).toBeInTheDocument();
+    expect(await menuItem("Codex", "已链接")).toBeInTheDocument();
+    expect(await menuItem("Cursor", "未链接")).toBeInTheDocument();
+    expect(await menuItem("Gemini CLI", "未链接")).toBeInTheDocument();
+    expect(await menuItem("Windsurf", "原生")).toBeInTheDocument();
   });
 
-  it("shows the parked backup as a warning segment in a linked agent's tooltip", async () => {
+  it("explains why a canonical agent cannot be unlinked", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
-    await expandAgentStrip();
+    await openAgentMenu(user);
 
-    const codex = await screen.findByLabelText("Codex，点击取消链接");
-    await user.hover(codex);
-
-    const tooltip = await screen.findByRole("tooltip");
-    expect(
-      within(tooltip).getByText("备份待处理（2）"),
-    ).toBeInTheDocument();
-    expect(within(tooltip).getByText("old-pdf")).toBeInTheDocument();
-    expect(
-      within(tooltip).getByText("取消链接时自动恢复原内容。"),
-    ).toBeInTheDocument();
-  });
-
-  it("keeps the hover tooltip read-only and offers the actions in the dialog", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
-    await expandAgentStrip();
-
-    const cursor = await screen.findByLabelText("Cursor，点击链接");
-    await user.hover(cursor);
-
-    // The tooltip previews the content but never hosts actions — those live
-    // in the decision dialog opened by the click.
-    const tooltip = await screen.findByRole("tooltip");
-    expect(within(tooltip).getByText("Cursor")).toBeInTheDocument();
-    expect(within(tooltip).getByText("pdf")).toBeInTheDocument();
-    expect(within(tooltip).getByText("README.md")).toBeInTheDocument();
-    expect(
-      within(tooltip).queryByRole("button", { name: "一键导入" }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(tooltip).queryByRole("button", { name: "一键删除" }),
-    ).not.toBeInTheDocument();
-
-    await user.click(cursor);
-    const dialog = await screen.findByRole("dialog");
-    // Confirming handles everything at once — skills migrate, the rest is
-    // backed up — so the dialog offers nothing but 确认 / 取消.
-    expect(within(dialog).getByRole("button", { name: "确认" })).toBeEnabled();
-    expect(within(dialog).getByRole("button", { name: "取消" })).toBeInTheDocument();
-  });
-
-  it("shows a structured info tooltip on agent icon hover", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
-    await expandAgentStrip();
-
-    const claude = await screen.findByLabelText("Claude Code，点击取消链接");
-    await user.hover(claude);
-
-    expect(await screen.findByText("Claude Code")).toBeInTheDocument();
-    expect(screen.getByText("已链接")).toBeInTheDocument();
-    expect(screen.getByText("可使用所有已安装 skills")).toBeInTheDocument();
-  });
-
-  it("explains why a canonical agent cannot be unlinked on click", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
-    await expandAgentStrip();
-
-    const windsurf = await screen.findByLabelText(
-      "Windsurf，原生使用全局 skills 目录",
-    );
-    await user.click(windsurf);
+    await user.click(await menuItem("Windsurf", "原生"));
 
     expect(
       await screen.findByText("Windsurf 使用原生 skills 目录，无法取消链接"),
     ).toBeInTheDocument();
   });
 
-  it("unlinks a linked agent on icon click and shows a notice", async () => {
+  it("links an unlinked agent from the menu and shows a notice", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
-    await expandAgentStrip();
+    await openAgentMenu(user);
 
-    const claude = await screen.findByLabelText("Claude Code，点击取消链接");
-    await user.click(claude);
+    await user.click(await menuItem("Gemini CLI", "未链接"));
 
-    // After unlinking, the agent is offered as linkable again and a result
-    // notice is shown in the grid.
-    expect(
-      await screen.findByLabelText("Claude Code，点击链接"),
-    ).toBeInTheDocument();
-    expect(await screen.findByText(/已取消链接/)).toBeInTheDocument();
+    expect(await screen.findByText("Gemini CLI 已链接")).toBeInTheDocument();
   });
 
-  it("links an unlinked agent on icon click and shows a notice", async () => {
+  it("unlinks a linked agent from the menu and shows a notice", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
-    await expandAgentStrip();
+    await openAgentMenu(user);
 
-    const gemini = await screen.findByLabelText("Gemini CLI，点击链接");
-    await user.click(gemini);
+    await user.click(await menuItem("Claude Code", "已链接"));
 
-    // After linking, the agent is no longer offered as a clickable action and a
-    // result notice is shown in the grid.
-    await waitFor(() => {
-      expect(screen.queryByLabelText(/Gemini CLI，点击链接/)).toBeNull();
-    });
-    expect(await screen.findByText("Gemini CLI 已链接")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Claude Code 已取消链接"),
+    ).toBeInTheDocument();
+  });
+
+  it("spells out what linking will do for a dir that already holds content", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await openAgentMenu(user);
+
+    // Cursor carries 2 skills and 1 stray file in its own dir in the mock:
+    // the confirm dialog is the single place those details are spelled out.
+    await user.click(await menuItem("Cursor", "未链接"));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText("以下 skill 将导入（2）"),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("以下文件将备份（1）"),
+    ).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "确认" }));
+
+    expect(await screen.findByText("Cursor 已链接")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
