@@ -99,7 +99,11 @@ let queryClient: QueryClient;
 function renderExplorePage() {
   return render(
     <QueryClientProvider client={queryClient}>
-      <ExplorePage />
+      {/* The real app mounts pages under a HashRouter; the page reads
+          `?repo=` (a repos-page card click) via useSearchParams. */}
+      <HashRouter>
+        <ExplorePage />
+      </HashRouter>
     </QueryClientProvider>,
   );
 }

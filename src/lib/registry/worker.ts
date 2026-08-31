@@ -23,6 +23,7 @@ self.onmessage = (event: MessageEvent<RegistryWorkerMessage>) => {
     controller.reload(message.payload);
   } else if (
     message.type === "getPage" ||
+    message.type === "getRepos" ||
     message.type === "getFeatured" ||
     message.type === "getRanking" ||
     message.type === "lookupSkills"

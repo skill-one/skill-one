@@ -1,16 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  SearchX,
-} from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChevronDown, Search, SearchX } from "lucide-react";
+import { useSearchParams } from "react-router";
 
 import { useRegistryPage } from "../../hooks/use-registry-page";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
+import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import type { SearchHit, SortOrder } from "../../lib/registry/protocol";
-import { cn } from "../../lib/utils";
 import { Button } from "../../components/ui/button";
 import {
   DropdownMenu,
@@ -23,15 +18,9 @@ import {
 } from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-} from "../../components/ui/pagination";
 import { SkillCard } from "./skill-card";
 import { SkillDetailDrawer } from "./skill-detail-drawer";
+import { RegistryPager } from "./registry-pager";
 
 /** Number of skills shown per page in the paginated registry view. */
 const PAGE_SIZE = 24;
@@ -48,37 +37,6 @@ const SORT_OPTIONS: Array<{ value: SortOrder; label: string }> = [
   { value: "downloads", label: "按下载量" },
   { value: "name", label: "按名称" },
 ];
-
-/**
- * Collapse the pagination bar once there are too many pages to list: keep the
- * first and last pages plus a window of pages around the current one, inserting
- * "…" for each gap, so a wide range stays reachable without rendering hundreds
- * of buttons. When there are few pages (≤ SHOW_ALL_THRESHOLD) every page number
- * is shown directly.
- */
-const SHOW_ALL_THRESHOLD = 9;
-const PAGE_WINDOW = 2;
-
-function pageRange(current: number, total: number): Array<number | "..."> {
-  if (total <= SHOW_ALL_THRESHOLD) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-  const pages = new Set<number>([1, total]);
-  for (let i = current - PAGE_WINDOW; i <= current + PAGE_WINDOW; i++) {
-    pages.add(i);
-  }
-  const sorted = [...pages]
-    .filter((p) => p >= 1 && p <= total)
-    .sort((a, b) => a - b);
-  const out: Array<number | "..."> = [];
-  let prev = 0;
-  for (const p of sorted) {
-    if (p - prev > 1) out.push("...");
-    out.push(p);
-    prev = p;
-  }
-  return out;
-}
 
 /**
  * Centered "nothing to show" state with an optional retry action, shared by
@@ -98,19 +56,6 @@ export function Placeholder({
       {children}
     </div>
   );
-}
-
-/**
- * Keep a value one `delayMs` behind the input: keystrokes stay instant while
- * the (debounced) search query only reaches the worker once typing settles.
- */
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
 }
 
 /**
@@ -138,7 +83,10 @@ export function ExplorePage() {
 
   // Search text and sort order; any change invalidates the page/selection
   // because the result list (and the meaning of a card index) changes.
-  const [search, setSearch] = useState("");
+  // A `?repo=<owner/repo>` query (a repos-page card click) seeds the search
+  // once on mount; the user is then free to edit or clear it.
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("repo") ?? "");
   const [sort, setSort] = useState<SortOrder>("default");
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
 
@@ -208,32 +156,6 @@ export function ExplorePage() {
     setSelected(null);
     setPage(p);
   };
-
-  // The current page number renders as an editable box: typing a number there
-  // and committing (Enter or blur) jumps straight to that page, clamped to
-  // [1, totalPages]; Escape (or an empty value) keeps the current page.
-  // `draft` holds the value being typed; null shows the committed page number.
-  const [draft, setDraft] = useState<string | null>(null);
-  const commitDraft = (value: string) => {
-    setDraft(null);
-    const n = Math.floor(Number(value));
-    if (value.trim() === "" || !Number.isFinite(n)) return;
-    handlePage(Math.min(totalPages, Math.max(1, n)));
-  };
-  // Escape discards the draft, but the blur it triggers would otherwise
-  // commit the just-discarded value — suppress that one commit.
-  const escapeReverted = useRef(false);
-
-  // Anchor-based pagination controls have no `disabled` attribute, so guard
-  // against navigating past the first/last page here.
-  const goPrev = () => {
-    if (page > 1) handlePage(page - 1);
-  };
-  const goNext = () => {
-    if (page < totalPages) handlePage(page + 1);
-  };
-
-  const range = pageRange(page, totalPages);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
@@ -352,119 +274,18 @@ export function ExplorePage() {
 
           {/* Pagination row: previous / numbered pages (with ellipsis) / next
               — the current page number doubles as an editable jump box — with
-              the skill count pinned to the right. The controls appear only
-              when there is more than one page, so the count survives
-              single-page searches. */}
+              the skill count pinned to the right (shared with the repos
+              page). While the index is streaming in the count climbs, so say
+              so. */}
           {(stats.count > 0 || stats.complete) && (
-            <div className="relative flex items-center justify-center border-t border-border py-2">
-              {totalPages > 1 && (
-                <Pagination className="w-auto">
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationLink
-                        size="icon"
-                        href="#"
-                        aria-label="上一页"
-                        aria-disabled={page <= 1}
-                        className={cn(
-                          "h-8 w-8",
-                          page <= 1 && "pointer-events-none opacity-50",
-                        )}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          goPrev();
-                        }}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </PaginationLink>
-                    </PaginationItem>
-                    {range.map((p, i) =>
-                      p === "..." ? (
-                        <PaginationItem key={`ellipsis-${i}`}>
-                          <PaginationEllipsis className="h-8 w-8" />
-                        </PaginationItem>
-                      ) : (
-                        <PaginationItem key={p}>
-                          {p === page ? (
-                            <Input
-                              value={draft ?? String(page)}
-                              onChange={(e) =>
-                                setDraft(e.target.value.replace(/\D/g, ""))
-                              }
-                              onFocus={(e) => e.currentTarget.select()}
-                              onBlur={(e) => {
-                                if (escapeReverted.current) {
-                                  escapeReverted.current = false;
-                                  return;
-                                }
-                                commitDraft(e.currentTarget.value);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  e.currentTarget.blur();
-                                } else if (e.key === "Escape") {
-                                  escapeReverted.current = true;
-                                  setDraft(null);
-                                  e.currentTarget.blur();
-                                }
-                              }}
-                              inputMode="numeric"
-                              aria-label="跳转到第几页"
-                              className="h-8 px-1.5 text-center tabular-nums"
-                              style={{
-                                width: `max(2rem, ${
-                                  (draft ?? String(page)).length
-                                }ch + 0.75rem)`,
-                              }}
-                            />
-                          ) : (
-                            <PaginationLink
-                              size="icon"
-                              href="#"
-                              className="h-8 w-8"
-                              isActive={p === page}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handlePage(p);
-                              }}
-                            >
-                              {p}
-                            </PaginationLink>
-                          )}
-                        </PaginationItem>
-                      ),
-                    )}
-                    <PaginationItem>
-                      <PaginationLink
-                        size="icon"
-                        href="#"
-                        aria-label="下一页"
-                        aria-disabled={page >= totalPages}
-                        className={cn(
-                          "h-8 w-8",
-                          page >= totalPages &&
-                            "pointer-events-none opacity-50",
-                        )}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          goNext();
-                        }}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </PaginationLink>
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              )}
-              {/* Absolute positioning keeps the pager centered regardless of
-                  how wide the count or the page window gets. While the index
-                  is streaming in the count climbs, so say so. */}
-              <span className="absolute right-0 whitespace-nowrap text-sm text-muted-foreground tabular-nums">
-                共 {total} 个{stats.complete ? "" : " · 加载中"}
-                {stats.indexing ? " · 索引中" : ""}
-              </span>
-            </div>
+            <RegistryPager
+              page={page}
+              totalPages={totalPages}
+              onPage={handlePage}
+              count={`共 ${total} 个${stats.complete ? "" : " · 加载中"}${
+                stats.indexing ? " · 索引中" : ""
+              }`}
+            />
           )}
         </div>
       </div>

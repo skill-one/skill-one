@@ -72,11 +72,43 @@ export interface RankingData {
   total: number;
 }
 
+/** Repos-page sort orders (mirrored by the worker's cached aggregation). */
+export type RepoSortOrder = "default" | "skills" | "downloads" | "name";
+
+/** One aggregated source repository, for the repos page. */
+export interface RepoInfo {
+  /** Source repository in "owner/repo" form. */
+  repo: string;
+  /** Number of registry skills that live in this repository. */
+  skills: number;
+  /** Sum of the repositories' skills' install counts. */
+  downloads: number;
+  /** GitHub star count of the repository (identical across its skills). */
+  stars: number;
+}
+
+/** Parameters of a paged repos request. */
+export interface ReposRequest {
+  /** Trimmed search text matched against the repo name; empty browses all. */
+  query: string;
+  sort: RepoSortOrder;
+  /** 0-based page index. */
+  page: number;
+  pageSize: number;
+}
+
+/** One page of repos results. `total` covers the whole (filtered) list. */
+export interface RepoPageData {
+  repos: RepoInfo[];
+  total: number;
+}
+
 /** Main-thread → worker messages. */
 export type RegistryRequest =
   | { type: "init"; payload: { cdnBase: string } }
   | { type: "reload"; payload: { cdnBase: string } }
   | { type: "getPage"; id: number; payload: PageRequest }
+  | { type: "getRepos"; id: number; payload: ReposRequest }
   | { type: "getFeatured"; id: number }
   | { type: "getRanking"; id: number; payload: RankingRequest }
   | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } };
