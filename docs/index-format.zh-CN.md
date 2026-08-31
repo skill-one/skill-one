@@ -38,6 +38,9 @@
 - `INDEX_SPEC` 指定 `repo` / `path: "index.jsonl"` / `ref: "dist"`。
 - 通过可配置下载源拉取（直连 GitHub raw 或 CDN 镜像），见 [../src/lib/cdn-config.ts](../src/lib/cdn-config.ts)。
 - 解析后过滤掉非 GitHub 仓库（`source` 含 `.` 视为域名），映射为 `Skill` 模型：`name = name ?? skillId`、`stars = stars ?? 0`（索引中有单独的 `stars` 字段，仅部分条目携带）。
-- 整份索引按会话缓存一次，本地切片分页（API 层默认 200/页；界面每页展示 24 张卡片），缓存与刷新交由 TanStack Query 管理。
+- 下载是流式的：响应体逐行解码，每凑齐一行就立即解析，界面不必等待整份约 12MB 的文件。已解析内容的快照以最多每 400ms 一次的频率推送给订阅者（见 `subscribeIndexProgress`）；当某个下载源中途失败、切换到下一个候选源重新解析时，活动缓冲区会被清空，因此推送出去的快照是单调的，永远只增不减。
+- 整份索引按会话缓存一次，本地切片分页（API 层默认 200/页；界面每页展示 24 张卡片），缓存与刷新交由 TanStack Query 管理。缓存条目形如 `{ skills, complete }`，流式下载尚未结束时 `complete` 为 false。
+- 探索页依据这些快照渐进渲染（下载未完成时计数显示为「N · 加载中」），侧边栏「全部」的数字展示已解析的技能数，并随下载推进持续增长；若下载失败则重新隐藏该数字，因为 React Query 会在 `data` 中保留最后一个快照。
+- 依赖全量数据的页面——精选页的榜单排名与精选 join、以及「我的技能」的元数据 join——仍以 `complete` 为门控，在流式下载完成前保持骨架屏，因为部分数据会导致排名错误。
 
 技能详情 `SKILL.md` 由 `source + path` 单独拉取，见 [../src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。
