@@ -65,7 +65,7 @@ describe("AppSidebar", () => {
 
     expect(screen.getByText("Skill One")).toBeInTheDocument();
     expect(screen.getByText("精选")).toBeInTheDocument();
-    expect(screen.getByText("官方")).toBeInTheDocument();
+    expect(screen.getByText("仓库")).toBeInTheDocument();
     expect(screen.getByText("全部")).toBeInTheDocument();
     expect(screen.getByText("全局")).toBeInTheDocument();
     expect(screen.getByText("项目")).toBeInTheDocument();
@@ -79,7 +79,7 @@ describe("AppSidebar", () => {
     renderSidebar();
 
     // Mock skills are installed (see ../lib/mock-local): only 全部 shows the
-    // registry total (400); 精选/官方/项目 are unimplemented and show none.
+    // registry total (400); 精选/仓库/项目 have no count source and show none.
     expect(await screen.findByText("400")).toBeInTheDocument();
     expect(await screen.findByText("6")).toBeInTheDocument();
     expect(screen.queryByText("12")).not.toBeInTheDocument();

@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router";
 import {
   Settings,
   Sparkles,
-  Building2,
+  GitFork,
   LayoutGrid,
   Globe,
   Folder,
@@ -34,7 +34,7 @@ export interface NavItem {
 
 export const shopItems: NavItem[] = [
   { path: "/explore/featured", label: "精选", icon: Sparkles },
-  { path: "/explore/official", label: "官方", icon: Building2 },
+  { path: "/explore/repos", label: "仓库", icon: GitFork },
   { path: "/explore", label: "全部", icon: LayoutGrid },
 ];
 
@@ -50,7 +50,7 @@ export const footerItems: NavItem[] = [
 /**
  * Real badge counts: Shop "全部" = registry total, "My Skills → 全局" =
  * installed skill count. Only these two entries have a real data source;
- * unimplemented pages (featured / official / project) show no badge. The
+ * pages without a count source (精选 / 仓库 / 项目) show no badge. The
  * badge is not rendered while its data is loading, avoiding a flash of 0.
  *
  * The registry count is progressive: it mirrors the registry worker's

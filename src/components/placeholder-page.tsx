@@ -5,6 +5,8 @@ import { cn } from "../lib/utils";
 interface PlaceholderPageProps {
   icon: LucideIcon;
   title: string;
+  /** Secondary line; defaults to the generic "coming soon" hint. */
+  description?: string;
   className?: string;
 }
 
@@ -12,6 +14,7 @@ interface PlaceholderPageProps {
 export function PlaceholderPage({
   icon: Icon,
   title,
+  description = "即将上线，敬请期待",
   className,
 }: PlaceholderPageProps) {
   return (
@@ -25,7 +28,7 @@ export function PlaceholderPage({
         <Icon className="h-8 w-8" strokeWidth={1.5} />
       </div>
       <p className="text-[14px] font-medium text-foreground">{title}</p>
-      <p className="text-[12px]">即将上线，敬请期待</p>
+      <p className="text-[12px]">{description}</p>
     </div>
   );
 }

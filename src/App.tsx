@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { listen } from "@tauri-apps/api/event";
-import { Building2, Folder } from "lucide-react";
+import { Folder, GitFork } from "lucide-react";
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppSidebar } from "./components/app-sidebar";
@@ -69,8 +69,14 @@ export default function App() {
                 <Route path="/my-skills" element={<MySkillsPage />} />
                 <Route path="/explore/featured" element={<FeaturedPage />} />
                 <Route
-                  path="/explore/official"
-                  element={<PlaceholderPage icon={Building2} title="官方" />}
+                  path="/explore/repos"
+                  element={
+                    <PlaceholderPage
+                      icon={GitFork}
+                      title="仓库"
+                      description="按仓库浏览 Skill，每个仓库显示其中的 Skill 数量 · 即将上线"
+                    />
+                  }
                 />
                 <Route
                   path="/my-skills/project"
