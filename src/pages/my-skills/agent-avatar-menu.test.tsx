@@ -3,7 +3,12 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithRouter } from "../../test/test-utils";
-import { fetchAgentStatus, linkAgent, unlinkAgent } from "../../lib/local-skills";
+import {
+  fetchAgentStatus,
+  linkAgent,
+  linkAllAgents,
+  unlinkAgent,
+} from "../../lib/local-skills";
 import type { AgentLinkResult, AgentStatus } from "../../lib/skills-manager";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { AVATAR_GROUP_MAX } from "./agent-avatar-group";
@@ -14,12 +19,14 @@ vi.mock("../../lib/local-skills", async (importOriginal) => {
     ...actual,
     fetchAgentStatus: vi.fn(),
     linkAgent: vi.fn(),
+    linkAllAgents: vi.fn(),
     unlinkAgent: vi.fn(),
   };
 });
 
 const fetchAgentStatusMock = vi.mocked(fetchAgentStatus);
 const linkAgentMock = vi.mocked(linkAgent);
+const linkAllAgentsMock = vi.mocked(linkAllAgents);
 const unlinkAgentMock = vi.mocked(unlinkAgent);
 
 function agent(overrides: Partial<AgentStatus>): AgentStatus {
@@ -65,9 +72,13 @@ async function openMenu(user: ReturnType<typeof userEvent.setup>) {
   );
 }
 
-/** Menu items read as "<display> <state>" — the status dot holds no text. */
+/**
+ * Menu items read as "<display> [pending counts] <state>" — the status dot
+ * holds no text, and agents with content in their dir carry badge text between
+ * the display name and the state.
+ */
 const menuItem = (display: string, state: string) =>
-  screen.findByRole("menuitem", { name: new RegExp(`${display}\\s+${state}`) });
+  screen.findByRole("menuitem", { name: new RegExp(`${display}.*${state}`) });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -136,6 +147,127 @@ describe("AgentAvatarMenu strip and menu", () => {
     renderWithRouter(<AgentAvatarMenu />);
 
     expect(await screen.findByText("未检测到可用的 agent")).toBeInTheDocument();
+  });
+});
+
+describe("AgentAvatarMenu header and pending counts", () => {
+  it("shows the total agent count in the header", async () => {
+    const user = userEvent.setup();
+    fetchAgentStatusMock.mockResolvedValue(manyAgents(3));
+    renderWithRouter(<AgentAvatarMenu />);
+
+    await openMenu(user);
+
+    expect(await screen.findByText(/共 3 个/)).toBeInTheDocument();
+  });
+
+  it("surfaces each agent's pending import / backup counts", async () => {
+    const user = userEvent.setup();
+    fetchAgentStatusMock.mockResolvedValue([
+      agent({
+        name: "cursor",
+        display: "Cursor",
+        internalSkills: ["pdf", "docx"],
+        internalOthers: ["README.md"],
+      }),
+    ]);
+    renderWithRouter(<AgentAvatarMenu />);
+
+    await openMenu(user);
+
+    const item = await menuItem("Cursor", "未链接");
+    expect(within(item).getByText("2 个 skill 待导入")).toBeInTheDocument();
+    expect(within(item).getByText("1 个文件待备份")).toBeInTheDocument();
+  });
+
+  it("keeps the item clean when the agent's dir holds nothing", async () => {
+    const user = userEvent.setup();
+    fetchAgentStatusMock.mockResolvedValue([agent({})]);
+    renderWithRouter(<AgentAvatarMenu />);
+
+    await openMenu(user);
+
+    const item = await menuItem("Cursor", "未链接");
+    expect(within(item).queryByText(/待导入/)).not.toBeInTheDocument();
+    expect(within(item).queryByText(/待备份/)).not.toBeInTheDocument();
+  });
+
+  it("disables 一键链接 when every agent is linked or canonical", async () => {
+    const user = userEvent.setup();
+    fetchAgentStatusMock.mockResolvedValue([
+      agent({ name: "claude", display: "Claude Code", linked: true }),
+      agent({ name: "windsurf", display: "Windsurf", canonical: true }),
+    ]);
+    renderWithRouter(<AgentAvatarMenu />);
+
+    await openMenu(user);
+
+    expect(
+      await screen.findByRole("button", { name: "一键链接" }),
+    ).toBeDisabled();
+  });
+});
+
+describe("AgentAvatarMenu bulk link", () => {
+  it("links every unlinked non-canonical agent in one call", async () => {
+    const user = userEvent.setup();
+    fetchAgentStatusMock.mockResolvedValue([
+      agent({ name: "claude-code", display: "Claude Code", linked: true }),
+      agent({ name: "windsurf", display: "Windsurf", canonical: true }),
+      agent({
+        name: "cursor",
+        display: "Cursor",
+        internalSkills: ["pdf", "docx"],
+        internalOthers: ["README.md"],
+      }),
+      agent({ name: "gemini", display: "Gemini CLI" }),
+    ]);
+    linkAllAgentsMock.mockResolvedValue([
+      result("migrated", {
+        agent: "cursor",
+        display: "Cursor",
+        moved: ["pdf", "docx"],
+        parkedOthers: ["README.md"],
+      }),
+      result("linked", { agent: "gemini", display: "Gemini CLI" }),
+    ]);
+    renderWithRouter(<AgentAvatarMenu />);
+
+    await openMenu(user);
+    await user.click(screen.getByRole("button", { name: "一键链接" }));
+
+    // One call carries every actionable agent: linked and canonical ones stay
+    // out of it.
+    expect(linkAllAgentsMock).toHaveBeenCalledWith(["cursor", "gemini"]);
+    expect(
+      await screen.findByText(
+        "一键链接完成（链接 2 个 agent，导入 2 个 skills，备份 1 个文件）",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("reports a partially failed bulk link as an error toast", async () => {
+    const user = userEvent.setup();
+    fetchAgentStatusMock.mockResolvedValue([
+      agent({ name: "cursor", display: "Cursor" }),
+      agent({ name: "gemini", display: "Gemini CLI" }),
+    ]);
+    linkAllAgentsMock.mockResolvedValue([
+      result("linked", { agent: "cursor", display: "Cursor" }),
+      result("failed", {
+        agent: "gemini",
+        display: "Gemini CLI",
+        message: "permission denied",
+      }),
+    ]);
+    renderWithRouter(<AgentAvatarMenu />);
+
+    await openMenu(user);
+    await user.click(screen.getByRole("button", { name: "一键链接" }));
+
+    expect(
+      await screen.findByText("一键链接完成（链接 1 个 agent，1 个失败）"),
+    ).toBeInTheDocument();
   });
 });
 
