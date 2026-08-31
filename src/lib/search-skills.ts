@@ -73,7 +73,7 @@ function invertMatch(
 }
 
 // Building the inverted index is expensive (hundreds of ms for the full
-// ~24k-skill registry), and `useMemo` does not survive route changes — the
+// ~24k-skill registry) and `useMemo` does not survive route changes — the
 // explore page remounts on every visit. Cache the built search per data
 // reference: the same array reuses its index across mounts, and only a new
 // array (a fresh fetch) triggers a rebuild.
@@ -89,11 +89,21 @@ export function createSkillSearch(skills: Skill[]): SkillSearch {
 }
 
 /**
- * Plain case-insensitive substring search over the same fields, used while
- * the registry is still streaming in: building the MiniSearch index for
- * every progress snapshot would cost more than the whole streaming window.
- * No ranking and no highlighting (matched stays empty) — results settle into
- * the full fuzzy search once the index finishes loading.
+ * The search already built for this exact registry array, or null if there is
+ * none. Lets callers adopt a background-built index without risking the
+ * blocking build that `createSkillSearch` would do on a cache miss.
+ */
+export function peekSkillSearch(skills: Skill[]): SkillSearch | null {
+  return searchCache.get(skills) ?? null;
+}
+
+/**
+ * Plain case-insensitive substring search over the same fields, used whenever
+ * the fuzzy index is not ready: while the registry is still streaming in
+ * (building MiniSearch for every progress snapshot would cost more than the
+ * whole streaming window) and while the completed registry's index is being
+ * built in the background. No ranking and no highlighting (matched stays
+ * empty) — results settle into the full fuzzy search once the index lands.
  */
 export function containsSearch(
   skills: Skill[],

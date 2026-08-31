@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import {
   act,
   render,
@@ -115,6 +115,11 @@ beforeEach(() => {
   // fetchFullIndex resolves, matching the pre-streaming behavior.
   mockSubscribeIndexProgress.mockReset();
   mockSubscribeIndexProgress.mockImplementation(() => () => {});
+});
+
+// Tests that withhold the idle slices stub the idle-callback globals.
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("ExplorePage", () => {
@@ -810,5 +815,40 @@ describe("ExplorePage streaming", () => {
       await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/加载中/)).not.toBeInTheDocument();
+  });
+
+  it("builds the fuzzy index in the background and adopts it with no retry", async () => {
+    mockGadgetRegistry();
+
+    // Withhold the idle callback, so the test can observe the page at a point
+    // where the index is known to be missing.
+    const idleQueue: Array<() => void> = [];
+    vi.stubGlobal("requestIdleCallback", (task: () => void) => {
+      idleQueue.push(task);
+      return idleQueue.length;
+    });
+    vi.stubGlobal("cancelIdleCallback", () => {});
+
+    renderExplorePage();
+    await screen.findByRole("button", { name: "查看 gadget-master 详情" });
+
+    const user = userEvent.setup();
+    const input = screen.getByRole("textbox", { name: "搜索 Skill" });
+    await user.type(input, "gadgt");
+
+    // Nothing has been indexed yet, so a typo cannot match — and the count
+    // says the index is still building instead of implying "no such skill".
+    expect(await screen.findByText("共 0 个 · 索引中")).toBeInTheDocument();
+
+    // Granting the idle moment builds the index; the same query then
+    // resolves through fuzzy matching with no further input from the user.
+    await act(async () => {
+      while (idleQueue.length > 0) idleQueue.shift()?.();
+    });
+
+    expect(
+      await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/索引中/)).not.toBeInTheDocument();
   });
 });

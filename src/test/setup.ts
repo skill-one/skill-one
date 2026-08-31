@@ -57,6 +57,20 @@ class IntersectionObserverMock {
 globalThis.IntersectionObserver =
   IntersectionObserverMock as unknown as typeof IntersectionObserver;
 
+// jsdom does not implement the idle-callback pair, which the background
+// search-index build schedules its slices through. Provide a timer-based
+// version so tests exercise the same path a browser does (the module's own
+// fallback covers WebViews missing the API entirely).
+if (typeof globalThis.requestIdleCallback !== "function") {
+  globalThis.requestIdleCallback = ((callback: IdleRequestCallback) =>
+    setTimeout(
+      () => callback({ didTimeout: false, timeRemaining: () => 0 }),
+      0,
+    ) as unknown as number) as typeof globalThis.requestIdleCallback;
+  globalThis.cancelIdleCallback = ((handle: number) =>
+    clearTimeout(handle)) as typeof globalThis.cancelIdleCallback;
+}
+
 // jsdom lacks scrollIntoView and pointer-capture APIs used by Radix.
 if (typeof Element !== "undefined") {
   Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => {});

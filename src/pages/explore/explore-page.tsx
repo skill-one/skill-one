@@ -8,12 +8,9 @@ import {
   SearchX,
 } from "lucide-react";
 
+import { useSkillSearch } from "../../hooks/use-skill-search";
 import { useSkillsIndex } from "../../hooks/use-skills-index";
-import {
-  containsSearch,
-  createSkillSearch,
-  type SkillSearchHit,
-} from "../../lib/search-skills";
+import { containsSearch, type SkillSearchHit } from "../../lib/search-skills";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/ui/button";
 import {
@@ -125,17 +122,16 @@ export function ExplorePage() {
   const registry = useMemo(() => index?.skills ?? [], [index]);
   const complete = index?.complete ?? false;
 
-  // Reusable fuzzy-search index over the registry (weighted name > repo >
+  // Fuzzy-search index over the registry (weighted name > repo >
   // description, with a popularity boost from star counts). Building it is
-  // expensive (hundreds of ms for ~24k entries), so it is only built once the
-  // stream completes — never per progress snapshot. Until then search falls
-  // back to plain substring matching below. The built search is cached per
-  // data reference inside search-skills, so remounting this page never
-  // rebuilds the index — only a fresh fetch does.
-  const skillSearch = useMemo(
-    () => (complete ? createSkillSearch(registry) : null),
-    [complete, registry],
-  );
+  // expensive (hundreds of ms for ~24k entries), so it is never done during a
+  // render: once the stream completes, the build waits for the first idle
+  // moment — the finished list is on screen first, and the index lands a
+  // moment later. Search stays usable throughout, falling back to plain
+  // substring matching below until the index is ready. The built search is
+  // cached per data reference, so revisiting this page adopts it instead of
+  // rebuilding — only a fresh fetch pays the cost again.
+  const skillSearch = useSkillSearch(registry, complete);
 
   // Search filter: fuzzy match over name, repo and description, applied on
   // every keystroke — the index is ~24k entries. Keeping the search text out
@@ -145,8 +141,9 @@ export function ExplorePage() {
   const filtered = useMemo((): SkillSearchHit[] => {
     const q = search.trim();
     if (!q) return registry.map((skill) => ({ skill, matched: {} }));
-    // While streaming: substring match over what has loaded so far. The
-    // results (and the reported total) settle once the full index lands.
+    // Until the background build finishes: substring match, over what has
+    // loaded so far while streaming. The results (and the reported total)
+    // settle once the fuzzy index takes over.
     return skillSearch ? skillSearch(q) : containsSearch(registry, q);
   }, [skillSearch, registry, search]);
 
@@ -228,6 +225,11 @@ export function ExplorePage() {
   };
 
   const range = pageRange(page, totalPages);
+
+  // A search answered by the substring fallback while the fuzzy index is
+  // still building in the background: say so next to the count, so a thin
+  // result list reads as "not indexed yet" rather than "nothing matches".
+  const indexing = complete && !skillSearch && search.trim().length > 0;
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
@@ -457,6 +459,7 @@ export function ExplorePage() {
                   is streaming in the count climbs, so say so. */}
               <span className="absolute right-0 whitespace-nowrap text-sm text-muted-foreground tabular-nums">
                 共 {filteredTotal} 个{complete ? "" : " · 加载中"}
+                {indexing ? " · 索引中" : ""}
               </span>
             </div>
           )}
