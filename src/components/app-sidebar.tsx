@@ -52,14 +52,19 @@ export const footerItems: NavItem[] = [
  * installed skill count. Only these two entries have a real data source;
  * unimplemented pages (featured / official / project) show no badge. The
  * badge is not rendered while its data is loading, avoiding a flash of 0.
+ *
+ * The registry count is progressive: it reads the same streaming index query
+ * as the explore page, so it reports the skills parsed so far and climbs as
+ * the ~12MB download proceeds, settling on the registry size once the stream
+ * completes. It renders as a plain number — no progress decoration.
  */
 function useNavCounts(): Partial<Record<string, number>> {
-  // Both counts read the shared streaming index query: the badge stays
-  // hidden until the download completes, then shows the full registry size.
-  const { data: index } = useSkillsIndex();
+  const { data: index, isError } = useSkillsIndex();
   const { data: installedSkills } = useInstalledSkills();
   return {
-    "/explore": index?.complete ? index.skills.length : undefined,
+    // Hidden on a failed download: React Query keeps the last snapshot in
+    // `data`, which would otherwise freeze a partial count with no error cue.
+    "/explore": index && !isError ? index.skills.length : undefined,
     "/my-skills": installedSkills?.length,
   };
 }
