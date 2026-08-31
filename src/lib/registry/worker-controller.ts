@@ -214,9 +214,32 @@ export function createRegistryController(
     return ids;
   };
 
-  const getPage = ({ query, sort, page, pageSize }: PageRequest): PageData => {
-    const q = query.trim();
+  const getPage = ({
+    query,
+    repo,
+    sort,
+    page,
+    pageSize,
+  }: PageRequest): PageData => {
     const start = page * pageSize;
+    if (repo !== undefined) {
+      // Repo detail page: an exact identity filter, not a search — every
+      // skill of the repo, in registry order (or the chosen sort). Recomputed
+      // per request so pages settle as the download streams in.
+      const hits: SearchHit[] = [];
+      for (const skill of store) {
+        if (skill.repo === repo) hits.push({ skill, matched: {} });
+      }
+      if (sort !== "default") {
+        if (sort === "downloads") {
+          hits.sort((a, b) => b.skill.downloads - a.skill.downloads);
+        } else {
+          hits.sort((a, b) => a.skill.name.localeCompare(b.skill.name));
+        }
+      }
+      return { hits: hits.slice(start, start + pageSize), total: hits.length };
+    }
+    const q = query.trim();
     if (q) {
       // Fuzzy once the index is up; substring over what has loaded so far
       // while the download is still streaming. The results settle once the
@@ -280,16 +303,16 @@ export function createRegistryController(
     const q = query.trim().toLowerCase();
     let repos = reposFor();
     if (q) repos = repos.filter((repo) => repo.repo.toLowerCase().includes(q));
-    if (sort !== "default") {
-      const byName = (a: RepoInfo, b: RepoInfo) => a.repo.localeCompare(b.repo);
-      repos = [...repos].sort((a, b) =>
-        sort === "skills"
-          ? b.skills - a.skills || byName(a, b)
-          : sort === "downloads"
-            ? b.downloads - a.downloads || byName(a, b)
-            : byName(a, b),
-      );
-    }
+    const byName = (a: RepoInfo, b: RepoInfo) => a.repo.localeCompare(b.repo);
+    repos = [...repos].sort((a, b) =>
+      sort === "skills"
+        ? b.skills - a.skills || byName(a, b)
+        : sort === "downloads"
+          ? b.downloads - a.downloads || byName(a, b)
+          : sort === "name"
+            ? byName(a, b)
+            : b.stars - a.stars || byName(a, b),
+    );
     const start = page * pageSize;
     return { repos: repos.slice(start, start + pageSize), total: repos.length };
   };

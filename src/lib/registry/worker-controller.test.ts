@@ -277,6 +277,39 @@ describe("createRegistryController — getPage", () => {
     ]);
   });
 
+  it("filters exactly by repo for the repo detail page", async () => {
+    const t = setup({
+      skills: [
+        skill(0), // owner-0/repo-0
+        skill(1), // owner-1/repo-1
+        skill(3), // owner-0/repo-1
+        skill(6), // owner-0/repo-0
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    t.complete();
+    await t.flush();
+
+    t.controller.handle({
+      type: "getPage",
+      id: 1,
+      payload: {
+        query: "no-match-on-purpose",
+        repo: "owner-0/repo-0",
+        sort: "default",
+        page: 0,
+        pageSize: 10,
+      },
+    });
+    const data = resultData<{ hits: Array<{ skill: Skill }>; total: number }>(
+      t.recorded.results[0],
+    );
+    // An exact identity filter, not a search: only that repo's skills, the
+    // query text ignored.
+    expect(data.total).toBe(2);
+    expect(data.hits.map((h) => h.skill.name)).toEqual(["skill-0", "skill-6"]);
+  });
+
   it("searches by substring while streaming and fuzzy once indexed", async () => {
     const t = setup();
     t.controller.init({ cdnBase: "test" });
@@ -392,7 +425,6 @@ describe("createRegistryController — getRanking", () => {
     return t;
   }
 
-
   it("returns the leaderboard ranked, truncated and counted", async () => {
     const t = await boot(150);
 
@@ -487,11 +519,7 @@ describe("createRegistryController — getRepos", () => {
     return t;
   }
 
-
-  function requestRepos(
-    t: ReturnType<typeof setup>,
-    payload: ReposRequest,
-  ) {
+  function requestRepos(t: ReturnType<typeof setup>, payload: ReposRequest) {
     const before = t.recorded.results.length;
     t.controller.handle({ type: "getRepos", id: before + 1, payload });
     return resultData<{ repos: Array<{ repo: string }>; total: number }>(
@@ -503,12 +531,12 @@ describe("createRegistryController — getRepos", () => {
     const t = await reposSetup(reposSkills);
     const data = requestRepos(t, {
       query: "",
-      sort: "default",
+      sort: "stars",
       page: 0,
       pageSize: 10,
     });
     expect(data.total).toBe(3);
-    // Default order: most skills first, repo name as the tie-break.
+    // Star order: most stars first, repo name as the tie-break.
     expect(data.repos).toEqual([
       { repo: "acme/alpha", skills: 2, downloads: 80, stars: 10 },
       { repo: "acme/beta", skills: 1, downloads: 100, stars: 5 },
@@ -521,7 +549,7 @@ describe("createRegistryController — getRepos", () => {
     expect(
       requestRepos(t, {
         query: "ACME",
-        sort: "default",
+        sort: "stars",
         page: 0,
         pageSize: 10,
       }).total,
@@ -529,19 +557,20 @@ describe("createRegistryController — getRepos", () => {
     expect(
       requestRepos(t, {
         query: "beta",
-        sort: "default",
+        sort: "stars",
         page: 0,
         pageSize: 10,
       }).repos[0]?.repo,
     ).toBe("acme/beta");
   });
 
-  it("sorts by skills, downloads and name", async () => {
+  it("sorts by stars, skills, downloads and name", async () => {
     const t = await reposSetup(reposSkills);
     const names = (sort: RepoSortOrder) =>
       requestRepos(t, { query: "", sort, page: 0, pageSize: 10 }).repos.map(
         (r) => r.repo,
       );
+    expect(names("stars")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
     expect(names("skills")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
     expect(names("downloads")).toEqual(["acme/beta", "acme/alpha", "git/x"]);
     expect(names("name")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
@@ -551,13 +580,13 @@ describe("createRegistryController — getRepos", () => {
     const t = await reposSetup(reposSkills);
     const page0 = requestRepos(t, {
       query: "",
-      sort: "default",
+      sort: "stars",
       page: 0,
       pageSize: 2,
     });
     const page1 = requestRepos(t, {
       query: "",
-      sort: "default",
+      sort: "stars",
       page: 1,
       pageSize: 2,
     });
@@ -575,12 +604,12 @@ describe("createRegistryController — getRepos", () => {
     // caching over partial data).
     t.push(reposSkills[0]);
     expect(
-      requestRepos(t, { query: "", sort: "default", page: 0, pageSize: 10 })
+      requestRepos(t, { query: "", sort: "stars", page: 0, pageSize: 10 })
         .total,
     ).toBe(1);
     t.push(reposSkills[2]);
     expect(
-      requestRepos(t, { query: "", sort: "default", page: 0, pageSize: 10 })
+      requestRepos(t, { query: "", sort: "stars", page: 0, pageSize: 10 })
         .total,
     ).toBe(2);
 
@@ -589,7 +618,7 @@ describe("createRegistryController — getRepos", () => {
 
     // Landed: the settled aggregation answers from the per-version cache.
     expect(
-      requestRepos(t, { query: "", sort: "default", page: 0, pageSize: 10 }),
+      requestRepos(t, { query: "", sort: "stars", page: 0, pageSize: 10 }),
     ).toMatchObject({
       total: 2,
       repos: [

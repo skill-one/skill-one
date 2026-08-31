@@ -34,6 +34,12 @@ export interface PageRequest {
   /** 0-based page index. */
   page: number;
   pageSize: number;
+  /**
+   * Exact repo filter ("owner/repo") for the repo detail page. When set the
+   * query is ignored: skills are filtered by repo identity instead of being
+   * run through the fuzzy search.
+   */
+  repo?: string;
 }
 
 /** One page of explore results. `total` covers the whole (filtered) list. */
@@ -73,7 +79,7 @@ export interface RankingData {
 }
 
 /** Repos-page sort orders (mirrored by the worker's cached aggregation). */
-export type RepoSortOrder = "default" | "skills" | "downloads" | "name";
+export type RepoSortOrder = "stars" | "skills" | "downloads" | "name";
 
 /** One aggregated source repository, for the repos page. */
 export interface RepoInfo {

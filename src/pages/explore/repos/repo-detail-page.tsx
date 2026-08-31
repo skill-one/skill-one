@@ -1,0 +1,197 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router";
+import { ArrowLeft, Star } from "lucide-react";
+
+import { OwnerAvatar } from "../../../components/owner-avatar";
+import { Button } from "../../../components/ui/button";
+import { Skeleton } from "../../../components/ui/skeleton";
+import { useRegistryPage } from "../../../hooks/use-registry-page";
+import { useRegistryStats } from "../../../hooks/use-registry-stats";
+import { formatCount } from "../../../lib/utils";
+import type { Skill } from "../../../types/skill";
+import { Placeholder } from "../explore-page";
+import { RegistryPager } from "../registry-pager";
+import { SkillCard } from "../skill-card";
+import { SkillDetailDrawer } from "../skill-detail-drawer";
+
+/** Number of skills shown per page on the repo detail page. */
+const PAGE_SIZE = 24;
+
+/** Where the back button points; the repos list lives one level up. */
+const REPOS_PATH = "/explore/repos";
+
+/**
+ * Loading placeholder mirroring the skill grid, so opening a repo paints its
+ * final layout instantly and real cards replace the placeholders as the data
+ * arrives.
+ */
+function RepoDetailSkeleton() {
+  return (
+    <div
+      className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      aria-hidden
+    >
+      {Array.from({ length: 9 }, (_, i) => (
+        <Skeleton key={i} className="h-[136px] rounded-xl" />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The landing page behind a repos-page card: every registry skill that lives
+ * in one source repository, paged inside the registry worker (an exact repo
+ * filter, not a search). The repo id lives in the URL, so the page is
+ * deep-linkable and the back button returns to the repos list.
+ */
+export function RepoDetailPage() {
+  const { owner = "", repo = "" } = useParams<{
+    owner: string;
+    repo: string;
+  }>();
+  const repoId = `${owner}/${repo}`;
+
+  // 1-based current page and the card index shown in the detail drawer.
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<number | null>(null);
+
+  // Worker progress: the climbing count and the retry action for a failed
+  // download.
+  const stats = useRegistryStats();
+
+  const {
+    data: pageData,
+    isLoading,
+    isError,
+    error,
+    refetch: refetchPage,
+  } = useRegistryPage("", "default", page - 1, PAGE_SIZE, repoId);
+
+  const hits = pageData?.hits ?? [];
+  const pageSkills: Skill[] = useMemo(
+    () => hits.map((hit) => hit.skill),
+    [hits],
+  );
+
+  // Repo-level header facts from the first skill (same repo ⇒ same stars).
+  const stars = hits[0]?.skill.stars ?? 0;
+
+  // A download failure only owns the screen while there is nothing to show;
+  // with data on screen the error surfaces in the footer count instead.
+  const failure =
+    stats.count === 0 && !stats.complete
+      ? (stats.error ??
+        (isError && error instanceof Error ? error.message : null))
+      : null;
+
+  // The skeleton stays up until the first skill arrives.
+  const loading =
+    isLoading || (hits.length === 0 && stats.count === 0 && !failure);
+
+  const total = pageData?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // A background refetch can shrink the list below the current page.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  // Switching repos replaces the whole list, so any open drawer would point
+  // at a skill that is no longer on screen (e.g. the popover navigating).
+  useEffect(() => {
+    setSelected(null);
+  }, [repoId]);
+
+  const handlePage = (p: number) => {
+    setSelected(null);
+    setPage(p);
+  };
+
+  return (
+    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
+      {/* One header row: back to the repos list, the repo's avatar, its name
+          and its star count. */}
+      <header className="mb-5 flex items-center gap-2.5">
+        <Link
+          to={REPOS_PATH}
+          aria-label="返回仓库列表"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+
+        <OwnerAvatar owner={owner} className="h-9 w-9 text-[15px]" />
+
+        <div className="min-w-0">
+          <h1 className="truncate text-[20px] font-semibold leading-tight tracking-tight text-foreground">
+            {repoId}
+          </h1>
+          <p className="mt-0.5 flex items-center gap-3 text-[12px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <span className="font-medium tabular-nums">
+                {formatCount(stars)}
+              </span>
+            </span>
+            <span>共 {total} 个 Skill</span>
+          </p>
+        </div>
+      </header>
+
+      {/* Skill grid; the modal detail drawer overlays it without reflowing
+          it or moving its scroll position. */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex h-full min-w-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 -ml-1 -mt-1 overflow-y-auto pb-6 pl-1 pr-1 pt-1">
+            {failure ? (
+              <Placeholder message={`加载失败：${failure}`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    stats.refetch();
+                    void refetchPage();
+                  }}
+                >
+                  重试
+                </Button>
+              </Placeholder>
+            ) : loading ? (
+              <RepoDetailSkeleton />
+            ) : hits.length === 0 ? (
+              <Placeholder message={`仓库 ${repoId} 下暂无 Skill`} />
+            ) : (
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {hits.map((hit, i) => (
+                  <SkillCard
+                    key={`${hit.skill.repo}/${hit.skill.name}`}
+                    skill={hit.skill}
+                    selected={i === selected}
+                    onSelect={() => setSelected(i)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {total > 0 && (
+            <RegistryPager
+              page={page}
+              totalPages={totalPages}
+              onPage={handlePage}
+              count={`共 ${total} 个${stats.complete ? "" : " · 加载中"}`}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Modal detail drawer shared with the explore and featured pages. */}
+      <SkillDetailDrawer
+        skills={pageSkills}
+        selected={selected}
+        onSelect={setSelected}
+      />
+    </div>
+  );
+}

@@ -8,22 +8,21 @@ import { OwnerAvatar } from "../../../components/owner-avatar";
 /**
  * A single source-repository card on the repos page: the repository avatar
  * and name, how many registry skills it contains, and its aggregate
- * installs/stars. Clicking through opens the explore page pre-filtered to
- * the repository's skills (via the `?repo=` search query).
+ * installs/stars. Clicking through opens the repo detail page listing every
+ * registry skill of the repository.
  */
 export function RepoCard({ repo }: { repo: RepoInfo }) {
   const navigate = useNavigate();
-  const owner = repo.repo.split("/")[0];
+  const [owner, name = ""] = repo.repo.split("/");
+  const target = `/explore/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 
   return (
     <article
-      onClick={() =>
-        navigate(`/explore?repo=${encodeURIComponent(repo.repo)}`)
-      }
+      onClick={() => navigate(target)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          navigate(`/explore?repo=${encodeURIComponent(repo.repo)}`);
+          navigate(target);
         }
       }}
       role="button"
@@ -48,6 +47,15 @@ export function RepoCard({ repo }: { repo: RepoInfo }) {
             个 Skill
           </p>
         </div>
+        <span
+          className="ml-auto flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground"
+          aria-label={`Star 数 ${repo.stars}`}
+        >
+          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+          <span className="font-medium tabular-nums">
+            {formatCount(repo.stars)}
+          </span>
+        </span>
       </div>
 
       <div className="mt-3 flex items-center gap-4 text-[12px] text-muted-foreground">
@@ -55,12 +63,6 @@ export function RepoCard({ repo }: { repo: RepoInfo }) {
           <Download className="h-3.5 w-3.5" />
           <span className="font-medium tabular-nums">
             {formatCount(repo.downloads)}
-          </span>
-        </span>
-        <span className="flex items-center gap-1">
-          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-          <span className="font-medium tabular-nums">
-            {formatCount(repo.stars)}
           </span>
         </span>
       </div>

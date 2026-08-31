@@ -12,9 +12,9 @@ import type { SortOrder } from "../lib/registry/protocol";
 export const REGISTRY_PAGE_QUERY_PREFIX = "registry-page";
 
 /**
- * One paged slice of the registry (browse or search results), fetched from
- * the worker. Pages are small (one viewport of cards), so the main thread
- * never holds — or re-renders over — the full registry.
+ * One paged slice of the registry (browse, search, or a single repo's
+ * skills), fetched from the worker. Pages are small (one viewport of cards),
+ * so the main thread never holds — or re-renders over — the full registry.
  *
  * While the download streams in, the first query answer is computed over the
  * loaded prefix; when the worker's search index lands (a new `epoch`), every
@@ -26,6 +26,7 @@ export function useRegistryPage(
   sort: SortOrder,
   page: number,
   pageSize: number,
+  repo?: string,
 ) {
   const queryClient = useQueryClient();
   const seenEpoch = useRef(getRegistrySnapshot().epoch);
@@ -52,7 +53,14 @@ export function useRegistryPage(
   }, [queryClient]);
 
   return useQuery({
-    queryKey: [REGISTRY_PAGE_QUERY_PREFIX, query, sort, page, pageSize],
-    queryFn: () => getPage({ query, sort, page, pageSize }),
+    queryKey: [
+      REGISTRY_PAGE_QUERY_PREFIX,
+      repo ?? null,
+      query,
+      sort,
+      page,
+      pageSize,
+    ],
+    queryFn: () => getPage({ query, sort, page, pageSize, repo }),
   });
 }

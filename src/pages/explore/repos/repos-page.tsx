@@ -26,11 +26,12 @@ const PAGE_SIZE = 24;
 const SEARCH_DEBOUNCE_MS = 150;
 
 /**
- * The sort orders offered by the toolbar dropdown. "default" is the worker's
- * aggregation order (most skills first, repo name as the tie-break).
+ * The sort orders offered by the toolbar dropdown. "stars" (the default)
+ * puts the most-starred repositories first, repo name as the tie-break.
  */
 const SORT_OPTIONS: Array<{ value: RepoSortOrder; label: string }> = [
-  { value: "default", label: "按 Skill 数" },
+  { value: "stars", label: "按 Star 数" },
+  { value: "skills", label: "按 Skill 数" },
   { value: "downloads", label: "按下载量" },
   { value: "name", label: "按名称" },
 ];
@@ -65,7 +66,7 @@ export function ReposPage() {
   // Search text and sort order; any change resets the page, because the
   // result list (and the meaning of a card index) changes.
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<RepoSortOrder>("default");
+  const [sort, setSort] = useState<RepoSortOrder>("stars");
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
 
   // Download progress: the failure message and retry live here, since the

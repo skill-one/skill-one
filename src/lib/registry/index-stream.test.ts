@@ -1,9 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+import { DEFAULT_CDN_BASE, SourceFetchError } from "../cdn-config";
 import { readIndex, readLines } from "./index-stream";
-
-/** The mocked candidate fetcher from `../cdn-config` (see readIndex test). */
-const fetchFirstStream = vi.hoisted(() => vi.fn());
 
 /** Chunk a string into UTF-8 byte segments of the given size. */
 function chunksOf(text: string, size: number): Uint8Array[] {
@@ -73,20 +71,81 @@ describe("readLines", () => {
 });
 
 describe("readIndex", () => {
+  // Candidate URLs as produced by `fileCandidates(INDEX_SPEC, "")`:
+  // the direct GitHub origin first, the default CDN mirror second.
+  const ORIGIN_INDEX =
+    "https://raw.githubusercontent.com/skill-one/skills-index/dist/index.jsonl";
+  const ORIGIN_META = ORIGIN_INDEX.replace("index.jsonl", "index-meta.json");
+  const CDN_INDEX = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-index@dist/index.jsonl`;
+  const CDN_META = CDN_INDEX.replace("index.jsonl", "index-meta.json");
+
+  const fetchMock = vi.fn();
+
+  /** A minimal parseable index line (no stars / installs data). */
+  const MINIMAL_LINE = JSON.stringify({ source: "acme/tools", skillId: "x" });
+
+  /** A 200 meta response carrying the given freshness stamp. */
+  function metaResponse(generatedAt?: string): Response {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => (generatedAt === undefined ? {} : { generatedAt }),
+    } as unknown as Response;
+  }
+
+  /** A non-OK meta response (probe failure). */
+  function metaBad(): Response {
+    return { ok: false, status: 404 } as unknown as Response;
+  }
+
+  /**
+   * A 200 index response streaming out `text`; with `failAfterChunks` the
+   * body errors once that many chunks were delivered (mid-download drop).
+   */
+  function bodyResponse(text: string, failAfterChunks?: number): Response {
+    const chunks = chunksOf(text, 8);
+    let sent = 0;
+    return {
+      ok: true,
+      status: 200,
+      body: new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (failAfterChunks !== undefined && sent >= failAfterChunks) {
+            controller.error(new Error("connection dropped"));
+            return;
+          }
+          if (sent >= chunks.length) {
+            controller.close();
+            return;
+          }
+          controller.enqueue(chunks[sent++]);
+        },
+      }),
+    } as unknown as Response;
+  }
+
+  /** Track which index (not meta) URLs were actually downloaded. */
+  let indexFetches: string[];
+
   beforeEach(() => {
-    vi.resetModules();
-    fetchFirstStream.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+    indexFetches = [];
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(ORIGIN_INDEX) || url.startsWith(CDN_INDEX)) {
+        indexFetches.push(url);
+      }
+      return metaBad();
+    });
   });
 
-  it("streams candidate bodies as parsed skills, skipping unparseable lines", async () => {
-    // Register the mock before the module under test is imported, so
-    // readIndex binds the stubbed cdn-config instead of the real fetcher.
-    vi.doMock("../cdn-config", () => ({
-      fileCandidates: vi.fn((spec: unknown, base: string) => [{ spec, base }]),
-      fetchFirstStream,
-    }));
-    const indexStream = await import("./index-stream");
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
+  it("downloads from the freshest source through a versioned URL", async () => {
+    // The mirror answers but is a publish cycle behind the origin: the
+    // stale mirror must lose despite its usual speed advantage.
     const body = [
       JSON.stringify({
         source: "acme/tools",
@@ -101,20 +160,20 @@ describe("readIndex", () => {
       JSON.stringify({ source: "open.feishu.cn", skillId: "x", installs: 1 }), // non-GitHub → skipped
       "",
     ].join("\n");
-
-    fetchFirstStream.mockImplementation(
-      async (
-        _candidates: unknown,
-        consume: (body: ReadableStream<Uint8Array>) => Promise<void>,
-      ) => {
-        await consume(streamOf(chunksOf(body, 5)));
-      },
-    );
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(ORIGIN_INDEX) || url.startsWith(CDN_INDEX)) {
+        indexFetches.push(url);
+      }
+      if (url === ORIGIN_META) return metaResponse("2026-08-31T04:34:54Z");
+      if (url === CDN_META) return metaResponse("2026-08-30T04:34:54Z");
+      if (url.startsWith(ORIGIN_INDEX)) return bodyResponse(body);
+      return bodyResponse(MINIMAL_LINE);
+    });
 
     const skills: unknown[] = [];
     let restarts = 0;
-    await indexStream.readIndex(
-      "https://cdn.test",
+    await readIndex(
+      "",
       (skill) => skills.push(skill),
       () => restarts++,
     );
@@ -131,5 +190,120 @@ describe("readIndex", () => {
         path: "skills/hammer",
       },
     ]);
+    // Only the fresh origin's multi-megabyte body is downloaded, pinned to
+    // the publish stamp; the stale mirror is probed but never used.
+    expect(indexFetches).toEqual([
+      `${ORIGIN_INDEX}?v=${encodeURIComponent("2026-08-31T04:34:54Z")}`,
+    ]);
+  });
+
+  it("serves the faster mirror on a freshness tie through a versioned URL", async () => {
+    // Equal stamps: whichever meta arrives first (a free latency probe)
+    // wins the download, even against the origin's default first slot. The
+    // versioned URL is what makes the tie safe: a mirror whose body cache
+    // lags behind its (identical) meta cannot serve yesterday's bytes for
+    // the current version.
+    let resolveOriginMeta!: (resp: Response) => void;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(ORIGIN_INDEX) || url.startsWith(CDN_INDEX)) {
+        indexFetches.push(url);
+      }
+      if (url === ORIGIN_META) {
+        return new Promise((resolve) => {
+          resolveOriginMeta = resolve;
+        });
+      }
+      if (url === CDN_META) return metaResponse("2026-08-31T04:34:54Z");
+      return bodyResponse(MINIMAL_LINE);
+    });
+
+    const pending = readIndex(
+      "",
+      () => {},
+      () => {},
+    );
+    // The origin meta is slow to arrive; resolve it after the mirror's.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    resolveOriginMeta(metaResponse("2026-08-31T04:34:54Z"));
+    await pending;
+
+    expect(indexFetches).toEqual([
+      `${CDN_INDEX}?v=${encodeURIComponent("2026-08-31T04:34:54Z")}`,
+    ]);
+  });
+
+  it("keeps the candidate order when no meta is reachable", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === ORIGIN_INDEX || url === CDN_INDEX) indexFetches.push(url);
+      if (url === ORIGIN_META || url === CDN_META) return metaBad();
+      if (url === ORIGIN_INDEX) return bodyResponse(MINIMAL_LINE);
+      throw new TypeError("network down");
+    });
+
+    await readIndex(
+      "",
+      () => {},
+      () => {},
+    );
+
+    // No freshness signal: fall back to the default origin-first order,
+    // with the unversioned URLs.
+    expect(indexFetches).toEqual([ORIGIN_INDEX]);
+  });
+
+  it("falls back to the next source when the chosen body fails mid-download", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(ORIGIN_INDEX) || url.startsWith(CDN_INDEX)) {
+        indexFetches.push(url);
+      }
+      if (url === ORIGIN_META) return metaResponse("2026-08-30T04:34:54Z");
+      if (url === CDN_META) return metaResponse("2026-08-31T04:34:54Z");
+      if (url.startsWith(CDN_INDEX)) return bodyResponse("partial", 1);
+      return bodyResponse(MINIMAL_LINE);
+    });
+
+    const skills: unknown[] = [];
+    let restarts = 0;
+    await readIndex(
+      "",
+      (skill) => skills.push(skill),
+      () => restarts++,
+    );
+
+    // The freshest mirror dropped mid-download; the origin restarts the
+    // parse from scratch and completes it, through its own versioned URL.
+    expect(indexFetches).toEqual([
+      `${CDN_INDEX}?v=${encodeURIComponent("2026-08-31T04:34:54Z")}`,
+      `${ORIGIN_INDEX}?v=${encodeURIComponent("2026-08-30T04:34:54Z")}`,
+    ]);
+    expect(restarts).toBe(2);
+    expect(skills).toEqual([
+      {
+        name: "x",
+        repo: "acme/tools",
+        description: "",
+        stars: 0,
+        downloads: 0,
+        weeklyInstalls: undefined,
+        path: undefined,
+      },
+    ]);
+  });
+
+  it("surfaces a typed error when every source fails", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === ORIGIN_META || url === CDN_META)
+        return metaResponse("2026-08-31T04:34:54Z");
+      return { ok: false, status: 404 } as unknown as Response;
+    });
+
+    const err = await readIndex(
+      "",
+      () => {},
+      () => {},
+    ).catch((e) => e);
+    expect(err).toBeInstanceOf(SourceFetchError);
+    expect(err.kind).toBe("http");
+    expect(err.status).toBe(404);
   });
 });

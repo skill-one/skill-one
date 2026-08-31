@@ -4,7 +4,7 @@ import {
   DEFAULT_CDN_BASE,
   SourceFetchError,
   fileCandidates,
-  fetchFirstStream,
+  fetchFirstStreamInOrder,
   fetchFirstText,
   getCdnBase,
   setCdnBase,
@@ -123,7 +123,7 @@ describe("fetchFirstText", () => {
   });
 });
 
-describe("fetchFirstStream", () => {
+describe("fetchFirstStreamInOrder", () => {
   const encoder = new TextEncoder();
 
   /** A 200 response whose body streams out the given text chunks. */
@@ -171,39 +171,30 @@ describe("fetchFirstStream", () => {
     return text;
   }
 
-  it("streams the usable candidate's body to the consumer", async () => {
+  it("streams the first usable candidate's body to the consumer", async () => {
     fetchMock.mockImplementation(async (url: string) =>
       url === ORIGIN ? streamOk(["hello ", "world"]) : bad(),
     );
     const consumed: string[] = [];
-    await fetchFirstStream([ORIGIN, DEFAULT_CDN], async (body) => {
+    await fetchFirstStreamInOrder([ORIGIN, DEFAULT_CDN], async (body) => {
       consumed.push(await drain(body));
     });
     expect(consumed).toEqual(["hello world"]);
-    // Both candidates are fetched: the race starts them in parallel even
-    // though only the winner's body is consumed.
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Requests are strictly sequential: the working first candidate means
+    // the second is never requested.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("lands on whichever candidate answers first and aborts the slower one", async () => {
-    const signals = new Map<string, AbortSignal | null | undefined>();
-    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-      signals.set(url, init?.signal);
-      if (url === ORIGIN) {
-        // Headers never arrive on the origin: the mirror must win the race.
-        return new Promise<Response>(() => {});
-      }
-      return streamOk(["whole"]);
-    });
+  it("falls back to the next candidate when headers answer non-OK", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === ORIGIN ? bad() : streamOk(["whole"]),
+    );
     const consumed: string[] = [];
-    await fetchFirstStream([ORIGIN, DEFAULT_CDN], async (body) => {
+    await fetchFirstStreamInOrder([ORIGIN, DEFAULT_CDN], async (body) => {
       consumed.push(await drain(body));
     });
     expect(consumed).toEqual(["whole"]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    // Losing the race aborts the stalled request instead of letting it hang
-    // for its whole timeout.
-    expect(signals.get(ORIGIN)?.aborted).toBe(true);
   });
 
   it("falls back to the next candidate when the stream fails mid-download", async () => {
@@ -211,20 +202,38 @@ describe("fetchFirstStream", () => {
       url === ORIGIN ? streamErrorAfter(["partial"], 1) : streamOk(["whole"]),
     );
     const consumed: string[] = [];
-    await fetchFirstStream([ORIGIN, DEFAULT_CDN], async (body) => {
+    await fetchFirstStreamInOrder([ORIGIN, DEFAULT_CDN], async (body) => {
       consumed.push(await drain(body));
     });
-    // The consumer restarts from scratch on the fallback candidate: one race
-    // over both candidates, then one over the survivor.
+    // The consumer restarts from scratch on the fallback candidate.
     expect(consumed).toEqual(["whole"]);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back when the consumer itself throws", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === ORIGIN ? streamOk(["partial"]) : streamOk(["whole"]),
+    );
+    const consumed: string[] = [];
+    let attempts = 0;
+    await fetchFirstStreamInOrder([ORIGIN, DEFAULT_CDN], async (body) => {
+      attempts += 1;
+      const text = await drain(body);
+      if (attempts === 1) throw new Error("parse failed");
+      consumed.push(text);
+    });
+    expect(attempts).toBe(2);
+    expect(consumed).toEqual(["whole"]);
   });
 
   it("throws a typed http error when every candidate answers non-OK", async () => {
     fetchMock.mockResolvedValue(bad());
-    const err = await fetchFirstStream([ORIGIN, DEFAULT_CDN], async () => {
-      throw new Error("should not be called");
-    }).catch((e) => e);
+    const err = await fetchFirstStreamInOrder(
+      [ORIGIN, DEFAULT_CDN],
+      async () => {
+        throw new Error("should not be called");
+      },
+    ).catch((e) => e);
     expect(err).toBeInstanceOf(SourceFetchError);
     expect(err.kind).toBe("http");
     expect(err.status).toBe(404);
@@ -232,9 +241,12 @@ describe("fetchFirstStream", () => {
 
   it("throws a typed network error when a candidate never responds", async () => {
     fetchMock.mockRejectedValue(new TypeError("network down"));
-    const err = await fetchFirstStream([ORIGIN, DEFAULT_CDN], async () => {
-      throw new Error("should not be called");
-    }).catch((e) => e);
+    const err = await fetchFirstStreamInOrder(
+      [ORIGIN, DEFAULT_CDN],
+      async () => {
+        throw new Error("should not be called");
+      },
+    ).catch((e) => e);
     expect(err).toBeInstanceOf(SourceFetchError);
     expect(err.kind).toBe("network");
     expect(err.status).toBeUndefined();
@@ -242,7 +254,7 @@ describe("fetchFirstStream", () => {
 
   it("passes an abort timeout signal to each request", async () => {
     fetchMock.mockResolvedValue(streamOk(["body"]));
-    await fetchFirstStream([ORIGIN], async () => {});
+    await fetchFirstStreamInOrder([ORIGIN], async () => {});
     expect(fetchMock).toHaveBeenCalledWith(ORIGIN, {
       signal: expect.anything(),
     });

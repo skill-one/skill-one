@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, Search, SearchX } from "lucide-react";
-import { useSearchParams } from "react-router";
 
 import { useRegistryPage } from "../../hooks/use-registry-page";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
@@ -83,10 +82,7 @@ export function ExplorePage() {
 
   // Search text and sort order; any change invalidates the page/selection
   // because the result list (and the meaning of a card index) changes.
-  // A `?repo=<owner/repo>` query (a repos-page card click) seeds the search
-  // once on mount; the user is then free to edit or clear it.
-  const [searchParams] = useSearchParams();
-  const [search, setSearch] = useState(searchParams.get("repo") ?? "");
+  const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOrder>("default");
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
 
@@ -186,14 +182,10 @@ export function ExplorePage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuRadioGroup value="all">
-                <DropdownMenuRadioItem value="all">
-                  全部
-                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="all">全部</DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem disabled>
-                更多分类 · 即将上线
-              </DropdownMenuItem>
+              <DropdownMenuItem disabled>更多分类 · 即将上线</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -251,11 +243,7 @@ export function ExplorePage() {
               <ExploreSkeleton />
             ) : hits.length === 0 ? (
               <Placeholder
-                message={
-                  query
-                    ? `未找到匹配“${query}”的 Skill`
-                    : "暂无技能"
-                }
+                message={query ? `未找到匹配“${query}”的 Skill` : "暂无技能"}
               />
             ) : (
               <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">

@@ -9,15 +9,15 @@ import { createRegistryClientMock } from "../../../test/registry-harness";
 import type { RegistryHarness } from "../../../test/registry-harness";
 import { ExplorePage } from "../explore-page";
 import { ReposPage } from "./repos-page";
+import { RepoDetailPage } from "./repo-detail-page";
 
 /**
  * The registry client is replaced by a real-controller-driven harness, so
  * the page tests exercise the exact RPC/event contract the worker speaks.
  */
 vi.mock("../../../lib/registry/client", async () => {
-  const { createRegistryHarness, createRegistryClientMock } = await import(
-    "../../../test/registry-harness"
-  );
+  const { createRegistryHarness, createRegistryClientMock } =
+    await import("../../../test/registry-harness");
   return createRegistryClientMock(createRegistryHarness());
 });
 
@@ -27,7 +27,9 @@ const harness = (
   }
 ).__harness;
 
-/** Skills spread over repos: alpha has 2, beta 1, git/x 1. */
+/** Skills spread over repos: alpha has 2 skills (10 stars), beta 1 skill
+ * but the most stars (50), git/x 1 skill (1 star) — so the default star
+ * order differs from the skills order. */
 const repoSkills: Skill[] = [
   {
     name: "a1",
@@ -47,7 +49,7 @@ const repoSkills: Skill[] = [
     name: "b1",
     repo: "acme/beta",
     description: "",
-    stars: 5,
+    stars: 50,
     downloads: 100,
   },
   {
@@ -86,6 +88,10 @@ function renderReposPage() {
       <HashRouter>
         <Routes>
           <Route path="/explore/repos" element={<ReposPage />} />
+          <Route
+            path="/explore/repos/:owner/:repo"
+            element={<RepoDetailPage />}
+          />
           <Route path="/explore" element={<ExplorePage />} />
         </Routes>
       </HashRouter>
@@ -103,13 +109,17 @@ beforeEach(() => {
 });
 
 describe("ReposPage", () => {
-  it("renders one card per repo with its skill count and the total", async () => {
+  it("renders one card per repo with its star count, skill count and the total", async () => {
     bootRegistry(repoSkills);
     renderReposPage();
 
     expect(await screen.findByText("acme/alpha")).toBeInTheDocument();
     expect(screen.getByText("acme/beta")).toBeInTheDocument();
     expect(screen.getByText("git/x")).toBeInTheDocument();
+    // The star count sits in the card header, next to the repo name.
+    expect(screen.getByLabelText("Star 数 50")).toBeInTheDocument();
+    expect(screen.getByLabelText("Star 数 10")).toBeInTheDocument();
+    expect(screen.getByLabelText("Star 数 1")).toBeInTheDocument();
     // Every card carries the "N 个 Skill" count line.
     expect(screen.getAllByText("个 Skill")).toHaveLength(3);
     expect(screen.getByText("共 3 个仓库")).toBeInTheDocument();
@@ -162,23 +172,22 @@ describe("ReposPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("sorts repos by skills by default and by downloads from the toolbar", async () => {
+  it("sorts repos by stars by default and by skills from the toolbar", async () => {
     const user = userEvent.setup();
     bootRegistry(repoSkills);
     renderReposPage();
     await screen.findByText("acme/alpha");
 
-    // Default order: most skills first (alpha has 2, the others 1, with the
-    // repo name as tie-break).
+    // Default order: most stars first (beta has 50, alpha 10, git/x 1).
     const order = () =>
-      screen
-        .getAllByRole("heading", { level: 3 })
-        .map((el) => el.textContent);
-    expect(order()).toEqual(["acme/alpha", "acme/beta", "git/x"]);
-
-    await user.click(screen.getByRole("button", { name: "按 Skill 数" }));
-    await user.click(screen.getByRole("menuitemradio", { name: "按下载量" }));
+      screen.getAllByRole("heading", { level: 3 }).map((el) => el.textContent);
     expect(order()).toEqual(["acme/beta", "acme/alpha", "git/x"]);
+
+    await user.click(screen.getByRole("button", { name: "按 Star 数" }));
+    await user.click(
+      screen.getByRole("menuitemradio", { name: "按 Skill 数" }),
+    );
+    expect(order()).toEqual(["acme/alpha", "acme/beta", "git/x"]);
   });
 
   it("pages the repo list without re-downloading the registry", async () => {
@@ -213,24 +222,24 @@ describe("ReposPage", () => {
     expect(harness.downloads).toBe(2);
   });
 
-  it("navigates to the explore page pre-filtered to the repo's skills", async () => {
+  it("navigates to the repo detail page on card click", async () => {
     const user = userEvent.setup();
     bootRegistry(repoSkills);
     window.history.replaceState(null, "", "#/explore/repos");
     renderReposPage();
     await screen.findByText("acme/alpha");
 
-    await user.click(screen.getByRole("button", { name: "查看 acme/alpha 中的 Skill" }));
+    await user.click(
+      screen.getByRole("button", { name: "查看 acme/alpha 中的 Skill" }),
+    );
 
-    // The explore page mounted with the repo pre-seeded in its search box;
-    // the debounced search then filters the registry down to that repo's
-    // two skills.
-    const input = await screen.findByRole("textbox", { name: "搜索 Skill" });
-    expect(input).toHaveValue("acme/alpha");
-    // The seeded search is the explore page's generic fuzzy search, so other
-    // partial matches may rank in too — the repo's own skills must show.
+    // The repo detail page lists exactly that repo's skills.
     expect(
-      await screen.findByRole("button", { name: "查看 a1 详情" }),
+      await screen.findByRole("heading", { name: "acme/alpha" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("共 2 个 Skill")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "查看 a1 详情" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "查看 a2 详情" }),

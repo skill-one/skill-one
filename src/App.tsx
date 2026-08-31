@@ -14,6 +14,7 @@ import { ExplorePage } from "./pages/explore/explore-page";
 import { FeaturedPage } from "./pages/explore/featured/featured-page";
 import { RankingPage } from "./pages/explore/featured/ranking-page";
 import { ReposPage } from "./pages/explore/repos/repos-page";
+import { RepoDetailPage } from "./pages/explore/repos/repo-detail-page";
 import { MySkillsPage } from "./pages/my-skills/my-skills-page";
 import { SettingsPage } from "./pages/settings/settings-page";
 import { POPOVER_NAVIGATE_EVENT } from "./popover/popover-events";
@@ -75,6 +76,10 @@ export default function App() {
                   element={<RankingPage />}
                 />
                 <Route path="/explore/repos" element={<ReposPage />} />
+                <Route
+                  path="/explore/repos/:owner/:repo"
+                  element={<RepoDetailPage />}
+                />
                 <Route
                   path="/my-skills/project"
                   element={<PlaceholderPage icon={Folder} title="项目" />}

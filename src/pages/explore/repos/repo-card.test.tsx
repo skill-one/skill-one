@@ -33,27 +33,29 @@ function renderCard() {
 }
 
 describe("RepoCard", () => {
-  it("renders the repo name, skill count, downloads and stars", () => {
+  it("renders the repo name, header star count, skill count and downloads", () => {
     renderCard();
 
     expect(
       screen.getByRole("heading", { name: "acme/alpha" }),
     ).toBeInTheDocument();
+    // The star count sits in the card header, next to the repo name.
+    expect(screen.getByLabelText("Star 数 10")).toBeInTheDocument();
     expect(screen.getByText("个 Skill")).toBeInTheDocument();
     // The counts render as their own tabular spans next to the labels.
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("80")).toBeInTheDocument();
-    expect(screen.getByText("10")).toBeInTheDocument();
   });
 
-  it("navigates to the explore page pre-filtered by repo on click", async () => {
+  it("navigates to the repo detail page on click", async () => {
     const user = userEvent.setup();
     renderCard();
 
-    await user.click(screen.getByRole("button", { name: "查看 acme/alpha 中的 Skill" }));
+    await user.click(
+      screen.getByRole("button", { name: "查看 acme/alpha 中的 Skill" }),
+    );
 
-    expect(location?.pathname).toBe("/explore");
-    expect(location?.search).toBe(`?repo=${encodeURIComponent("acme/alpha")}`);
+    expect(location?.pathname).toBe("/explore/repos/acme/alpha");
   });
 
   it("navigates via Enter on the keyboard", async () => {
@@ -63,6 +65,6 @@ describe("RepoCard", () => {
     await user.tab(); // focus the card (it is the only tabbable element)
     await user.keyboard("{Enter}");
 
-    expect(location?.pathname).toBe("/explore");
+    expect(location?.pathname).toBe("/explore/repos/acme/alpha");
   });
 });
