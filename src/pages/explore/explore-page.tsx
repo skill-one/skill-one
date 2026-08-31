@@ -3,7 +3,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Loader2,
   Search,
   SearchX,
 } from "lucide-react";
@@ -23,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
+import { Skeleton } from "../../components/ui/skeleton";
 import {
   Pagination,
   PaginationContent,
@@ -95,6 +95,25 @@ export function Placeholder({
       <SearchX className="h-8 w-8 opacity-40" />
       <p className="text-[13px]">{message}</p>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Loading placeholder mirroring the skill grid: a viewport's worth of
+ * card-shaped skeletons, so switching to this page paints its final layout
+ * instantly and real cards replace the placeholders as the index streams in
+ * (instead of an empty spin that reads as "the page never switched").
+ */
+function ExploreSkeleton() {
+  return (
+    <div
+      className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      aria-hidden
+    >
+      {Array.from({ length: 12 }, (_, i) => (
+        <Skeleton key={i} className="h-[136px] rounded-xl" />
+      ))}
     </div>
   );
 }
@@ -321,9 +340,7 @@ export function ExplorePage() {
                 </Button>
               </Placeholder>
             ) : isLoading ? (
-              <div className="flex h-full min-h-[320px] items-center justify-center text-muted-foreground">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
+              <ExploreSkeleton />
             ) : skills.length === 0 ? (
               <Placeholder
                 message={

@@ -171,7 +171,7 @@ describe("fetchFirstStream", () => {
     return text;
   }
 
-  it("streams the first reachable candidate's body to the consumer", async () => {
+  it("streams the usable candidate's body to the consumer", async () => {
     fetchMock.mockImplementation(async (url: string) =>
       url === ORIGIN ? streamOk(["hello ", "world"]) : bad(),
     );
@@ -180,7 +180,30 @@ describe("fetchFirstStream", () => {
       consumed.push(await drain(body));
     });
     expect(consumed).toEqual(["hello world"]);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Both candidates are fetched: the race starts them in parallel even
+    // though only the winner's body is consumed.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("lands on whichever candidate answers first and aborts the slower one", async () => {
+    const signals = new Map<string, AbortSignal | null | undefined>();
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      signals.set(url, init?.signal);
+      if (url === ORIGIN) {
+        // Headers never arrive on the origin: the mirror must win the race.
+        return new Promise<Response>(() => {});
+      }
+      return streamOk(["whole"]);
+    });
+    const consumed: string[] = [];
+    await fetchFirstStream([ORIGIN, DEFAULT_CDN], async (body) => {
+      consumed.push(await drain(body));
+    });
+    expect(consumed).toEqual(["whole"]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Losing the race aborts the stalled request instead of letting it hang
+    // for its whole timeout.
+    expect(signals.get(ORIGIN)?.aborted).toBe(true);
   });
 
   it("falls back to the next candidate when the stream fails mid-download", async () => {
@@ -191,9 +214,10 @@ describe("fetchFirstStream", () => {
     await fetchFirstStream([ORIGIN, DEFAULT_CDN], async (body) => {
       consumed.push(await drain(body));
     });
-    // The consumer restarts from scratch on the fallback candidate.
+    // The consumer restarts from scratch on the fallback candidate: one race
+    // over both candidates, then one over the survivor.
     expect(consumed).toEqual(["whole"]);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("throws a typed http error when every candidate answers non-OK", async () => {
