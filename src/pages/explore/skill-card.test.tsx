@@ -41,7 +41,7 @@ describe("SkillCard", () => {
     vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
   });
 
-  it("renders name, repo, description, downloads and stars", () => {
+  it("renders name, repo, description and downloads, but no stars", () => {
     renderWithRouter(<SkillCard skill={skill} />);
 
     expect(screen.getByText("pdf")).toBeInTheDocument();
@@ -49,18 +49,18 @@ describe("SkillCard", () => {
     expect(
       screen.getByText("Read and merge PDF documents."),
     ).toBeInTheDocument();
-    // Both popularity metrics render side by side.
+    // Downloads render; the star count is intentionally not shown on cards.
     expect(screen.getByText("3M")).toBeInTheDocument();
-    expect(screen.getByText("169.6K")).toBeInTheDocument();
+    expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
   });
 
-  it("renders downloads and stars of 0 when the metrics are missing", () => {
-    renderWithRouter(
-      <SkillCard skill={{ ...skill, downloads: 0, stars: 0 }} />,
-    );
+  it("renders downloads of 0 when the metric is missing", () => {
+    renderWithRouter(<SkillCard skill={{ ...skill, downloads: 0 }} />);
 
-    // Both stats render as "0" instead of being hidden.
-    expect(screen.getAllByText("0")).toHaveLength(2);
+    // The downloads stat renders as "0" instead of being hidden.
+    expect(screen.getByText("0")).toBeInTheDocument();
+    // Stars never render, not even when the underlying data is present.
+    expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
   });
 
   it("renders with an empty description placeholder", () => {
@@ -68,7 +68,7 @@ describe("SkillCard", () => {
 
     expect(screen.getByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
-    expect(screen.getByText("169.6K")).toBeInTheDocument();
+    expect(screen.getByText("3M")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "安装" })).toBeEnabled();
   });
 

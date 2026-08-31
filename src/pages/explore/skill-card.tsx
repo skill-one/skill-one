@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Star, Download } from "lucide-react";
+import { Download } from "lucide-react";
 
 import type { SearchField } from "../../lib/registry/protocol";
 import { cn, formatCount } from "../../lib/utils";
@@ -123,12 +123,6 @@ export function SkillCard({
           <Download className="h-3.5 w-3.5" />
           <span className="font-medium tabular-nums">
             {formatCount(skill.downloads)}
-          </span>
-        </span>
-        <span className="flex items-center gap-1">
-          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-          <span className="font-medium tabular-nums">
-            {formatCount(skill.stars)}
           </span>
         </span>
       </div>

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router";
-import { Download, Package, Star } from "lucide-react";
+import { Package, Star } from "lucide-react";
 
 import type { RepoInfo } from "../../../lib/registry/protocol";
 import { cn, formatCount } from "../../../lib/utils";
@@ -54,15 +54,6 @@ export function RepoCard({ repo }: { repo: RepoInfo }) {
           <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
           <span className="font-medium tabular-nums">
             {formatCount(repo.stars)}
-          </span>
-        </span>
-      </div>
-
-      <div className="mt-3 flex items-center gap-4 text-[12px] text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <Download className="h-3.5 w-3.5" />
-          <span className="font-medium tabular-nums">
-            {formatCount(repo.downloads)}
           </span>
         </span>
       </div>

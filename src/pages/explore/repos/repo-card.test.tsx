@@ -33,7 +33,7 @@ function renderCard() {
 }
 
 describe("RepoCard", () => {
-  it("renders the repo name, header star count, skill count and downloads", () => {
+  it("renders the repo name, header star count and skill count, but no downloads", () => {
     renderCard();
 
     expect(
@@ -42,9 +42,10 @@ describe("RepoCard", () => {
     // The star count sits in the card header, next to the repo name.
     expect(screen.getByLabelText("Star 数 10")).toBeInTheDocument();
     expect(screen.getByText("个 Skill")).toBeInTheDocument();
-    // The counts render as their own tabular spans next to the labels.
+    // The skill count renders as its own tabular span next to the label.
     expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("80")).toBeInTheDocument();
+    // The download count is intentionally not shown on repo cards.
+    expect(screen.queryByText("80")).not.toBeInTheDocument();
   });
 
   it("navigates to the repo detail page on click", async () => {
