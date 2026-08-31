@@ -30,10 +30,22 @@ export interface NavItem {
   path: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  /**
+   * "prefix" keeps the item active for its sub-routes too (e.g. 精选 stays
+   * highlighted on a leaderboard page). Only opt in where the item owns a
+   * page family — a plain startsWith would light up 全部 for every /explore/*
+   * path, since /explore is a prefix of them.
+   */
+  match?: "exact" | "prefix";
 }
 
 export const shopItems: NavItem[] = [
-  { path: "/explore/featured", label: "精选", icon: Sparkles },
+  {
+    path: "/explore/featured",
+    label: "精选",
+    icon: Sparkles,
+    match: "prefix",
+  },
   { path: "/explore/repos", label: "仓库", icon: GitFork },
   { path: "/explore", label: "全部", icon: LayoutGrid },
 ];
@@ -72,7 +84,10 @@ function useNavCounts(): Partial<Record<string, number>> {
 
 function NavMenuItem({ item, count }: { item: NavItem; count?: number }) {
   const location = useLocation();
-  const isActive = location.pathname === item.path;
+  const isActive =
+    location.pathname === item.path ||
+    (item.match === "prefix" &&
+      location.pathname.startsWith(`${item.path}/`));
   const Icon = item.icon;
 
   return (

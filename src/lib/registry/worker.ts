@@ -24,6 +24,7 @@ self.onmessage = (event: MessageEvent<RegistryWorkerMessage>) => {
   } else if (
     message.type === "getPage" ||
     message.type === "getFeatured" ||
+    message.type === "getRanking" ||
     message.type === "lookupSkills"
   ) {
     controller.handle(message);

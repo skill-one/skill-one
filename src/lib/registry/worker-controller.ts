@@ -8,6 +8,8 @@ import {
 import type {
   PageData,
   PageRequest,
+  RankingData,
+  RankingRequest,
   RegistryEvent,
   RegistryRequest,
   RegistryWorkerMessage,
@@ -15,7 +17,12 @@ import type {
   SortOrder,
 } from "./protocol";
 import type { RegistryCache } from "./cache";
-import { buildHeroSlides } from "./featured-rankings";
+import {
+  buildHeroSlides,
+  RANKING_SIZE,
+  rankSkills,
+  rankingById,
+} from "./featured-rankings";
 
 /**
  * The registry worker's brain, isolated from the Worker plumbing so the
@@ -250,6 +257,24 @@ export function createRegistryController(
   };
 
   /**
+   * One leaderboard, ranked here and truncated to `RANKING_SIZE` so the main
+   * thread only ever receives what the page can show. An unknown id throws,
+   * which `handle` turns into an `ok: false` reply.
+   */
+  const getRanking = ({ rankingId }: RankingRequest): RankingData => {
+    const def = rankingById(rankingId);
+    if (!def) throw new Error(`未知榜单：${rankingId}`);
+    const { entries, total } = rankSkills(store, def, RANKING_SIZE);
+    return {
+      id: def.id,
+      title: def.title,
+      gradient: def.gradient,
+      entries,
+      total,
+    };
+  };
+
+  /**
    * Registry metadata for installed skills, in ref order (null on miss).
    * A ref matches by skillId or by the registry path's basename, since a
    * locally installed skill's SKILL.md name may differ from the skillId.
@@ -316,6 +341,9 @@ export function createRegistryController(
             break;
           case "getFeatured":
             data = getFeatured();
+            break;
+          case "getRanking":
+            data = getRanking(message.payload);
             break;
           case "lookupSkills":
             data = lookupSkills(message.payload.refs);

@@ -43,7 +43,7 @@ export interface RankingDef {
   id: string;
   /** Leaderboard heading. */
   title: string;
-  /** One-line explanation shown under the heading. */
+  /** Hero-slide line, ending in the call to action. */
   subtitle: string;
   /** Tailwind gradient classes painting the hero slide background. */
   gradient: string;

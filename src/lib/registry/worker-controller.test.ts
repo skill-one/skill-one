@@ -375,6 +375,96 @@ describe("createRegistryController — featured + lookup", () => {
   });
 });
 
+describe("createRegistryController — getRanking", () => {
+  /** Boot a complete registry of `n` ranked skills (skill-0 leads). */
+  async function boot(n: number) {
+    const t = setup({
+      skills: Array.from({ length: n }, (_, i) =>
+        skill(i, { downloads: (n - i) * 1_000, weeklyInstalls: n - i }),
+      ),
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+    return t;
+  }
+
+  it("returns the leaderboard ranked, truncated and counted", async () => {
+    const t = await boot(150);
+
+    t.controller.handle({
+      type: "getRanking",
+      id: 1,
+      payload: { rankingId: "weekly" },
+    });
+    const data = resultData<{
+      id: string;
+      entries: Array<{ rank: number; skill: Skill; label: string }>;
+      total: number;
+    }>(t.recorded.results[0]);
+
+    expect(data.id).toBe("weekly");
+    // Truncated to the page size, but counted in full.
+    expect(data.entries).toHaveLength(100);
+    expect(data.total).toBe(150);
+    expect(data.entries[0]).toMatchObject({ rank: 1, label: "150/周" });
+    expect(data.entries[0].skill.name).toBe("skill-0");
+    expect(data.entries[99]).toMatchObject({ rank: 100 });
+  });
+
+  it("carries the leaderboard's own presentation", async () => {
+    const t = await boot(5);
+
+    t.controller.handle({
+      type: "getRanking",
+      id: 1,
+      payload: { rankingId: "popular" },
+    });
+    const data = resultData<{ title: string; gradient: string }>(
+      t.recorded.results[0],
+    );
+
+    expect(data.title).toBe("人气总榜");
+    expect(data.gradient).toContain("gradient");
+  });
+
+  it("answers with an empty leaderboard instead of failing", async () => {
+    // Nothing clears the lifetime floor, so the rising board has no entries.
+    const t = setup({
+      skills: [skill(0, { downloads: 0, weeklyInstalls: 0 })],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "getRanking",
+      id: 1,
+      payload: { rankingId: "rising" },
+    });
+    const data = resultData<{ entries: unknown[]; total: number }>(
+      t.recorded.results[0],
+    );
+
+    expect(data.entries).toEqual([]);
+    expect(data.total).toBe(0);
+  });
+
+  it("rejects an unknown leaderboard id", async () => {
+    const t = await boot(5);
+
+    t.controller.handle({
+      type: "getRanking",
+      id: 1,
+      payload: { rankingId: "nope" },
+    });
+
+    expect(t.recorded.results[0]).toMatchObject({
+      ok: false,
+      id: 1,
+      error: "未知榜单：nope",
+    });
+  });
+});
+
 describe("createRegistryController — failures", () => {
   it("resets to an empty registry and surfaces the error without prior data", async () => {
     const t = setup();

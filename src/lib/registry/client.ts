@@ -3,6 +3,8 @@ import type {
   FeaturedData,
   PageData,
   PageRequest,
+  RankingData,
+  RankingRequest,
   RegistryWorkerMessage,
 } from "./protocol";
 import type { SkillRef } from "../../data/featured-content";
@@ -104,7 +106,7 @@ function ensureInit() {
 }
 
 function request(
-  type: "getPage" | "getFeatured" | "lookupSkills",
+  type: "getPage" | "getFeatured" | "getRanking" | "lookupSkills",
   payload?: unknown,
 ): Promise<unknown> {
   ensureInit();
@@ -140,6 +142,11 @@ export function getPage(request_: PageRequest): Promise<PageData> {
 /** Featured payload; call only once `ready` (see useRegistryStats). */
 export function getFeatured(): Promise<FeaturedData> {
   return request("getFeatured") as Promise<FeaturedData>;
+}
+
+/** One leaderboard; call only once `ready` (see useRegistryStats). */
+export function getRanking(request_: RankingRequest): Promise<RankingData> {
+  return request("getRanking", request_) as Promise<RankingData>;
 }
 
 /** Registry metadata per ref, in ref order (null on miss). */

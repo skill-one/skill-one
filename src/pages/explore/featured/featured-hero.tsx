@@ -7,8 +7,8 @@ import { useNavigate } from "react-router";
 import { cn } from "../../../lib/utils";
 import type { HeroSlide } from "../../../lib/registry/featured-rankings";
 
-/** Where a hero slide click lands: the full, sortable registry list. */
-const EXPLORE_PATH = "/explore";
+/** Where a hero slide click lands: the leaderboard page behind that slide. */
+const RANKING_PATH = "/explore/featured/ranking";
 
 /** Delay between automatic slide advances. */
 const AUTOPLAY_DELAY_MS = 5000;
@@ -60,7 +60,7 @@ export function FeaturedHero({ slides }: { slides: HeroSlide[] }) {
             >
               <button
                 type="button"
-                onClick={() => navigate(EXPLORE_PATH)}
+                onClick={() => navigate(`${RANKING_PATH}/${slide.id}`)}
                 aria-label={`${slide.title}，查看完整榜单`}
                 className={cn(
                   "relative block h-56 w-full cursor-pointer text-left",

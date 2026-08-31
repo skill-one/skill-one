@@ -12,6 +12,7 @@ import { createQueryClient } from "./lib/query-client";
 import { isTauri } from "./lib/tauri";
 import { ExplorePage } from "./pages/explore/explore-page";
 import { FeaturedPage } from "./pages/explore/featured/featured-page";
+import { RankingPage } from "./pages/explore/featured/ranking-page";
 import { MySkillsPage } from "./pages/my-skills/my-skills-page";
 import { SettingsPage } from "./pages/settings/settings-page";
 import { POPOVER_NAVIGATE_EVENT } from "./popover/popover-events";
@@ -68,6 +69,10 @@ export default function App() {
                 <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/my-skills" element={<MySkillsPage />} />
                 <Route path="/explore/featured" element={<FeaturedPage />} />
+                <Route
+                  path="/explore/featured/ranking/:rankingId"
+                  element={<RankingPage />}
+                />
                 <Route
                   path="/explore/repos"
                   element={

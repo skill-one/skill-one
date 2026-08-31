@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
-import { getFeatured, getRegistrySnapshot, subscribeRegistry } from "../lib/registry/client";
+import { getFeatured } from "../lib/registry/client";
+import { useInvalidateOnRegistryEpoch } from "./use-invalidate-on-registry-epoch";
 import { useRegistryStats } from "./use-registry-stats";
 
 /** Query key of the featured payload. */
@@ -15,23 +15,11 @@ export const FEATURED_DATA_QUERY_KEY = "featured-data";
  */
 export function useFeaturedData() {
   const { ready } = useRegistryStats();
-  const queryClient = useQueryClient();
-  const seenEpoch = useRef(getRegistrySnapshot().epoch);
-
-  useEffect(() => {
-    return subscribeRegistry(() => {
-      const { epoch } = getRegistrySnapshot();
-      if (epoch !== seenEpoch.current) {
-        seenEpoch.current = epoch;
-        void queryClient.invalidateQueries({
-          queryKey: [FEATURED_DATA_QUERY_KEY],
-        });
-      }
-    });
-  }, [queryClient]);
+  const queryKey = [FEATURED_DATA_QUERY_KEY];
+  useInvalidateOnRegistryEpoch(queryKey);
 
   return useQuery({
-    queryKey: [FEATURED_DATA_QUERY_KEY],
+    queryKey,
     queryFn: getFeatured,
     enabled: ready,
   });

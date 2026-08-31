@@ -1,6 +1,6 @@
 import type { Skill } from "../../types/skill";
 import type { SkillRef } from "../../data/featured-content";
-import type { HeroSlide } from "./featured-rankings";
+import type { HeroSlide, RankEntry } from "./featured-rankings";
 
 export type { SkillRef };
 
@@ -55,12 +55,30 @@ export interface FeaturedData {
   sections: FeaturedSectionData[];
 }
 
+/** Parameters of a leaderboard request. */
+export interface RankingRequest {
+  /** A `RANKINGS` id, e.g. "weekly". */
+  rankingId: string;
+}
+
+/** One leaderboard, ranked and truncated inside the worker. */
+export interface RankingData {
+  id: string;
+  title: string;
+  gradient: string;
+  /** Top entries of the leaderboard, at most `RANKING_SIZE`. */
+  entries: RankEntry[];
+  /** Skills that cleared the ranking floor, ignoring the truncation. */
+  total: number;
+}
+
 /** Main-thread → worker messages. */
 export type RegistryRequest =
   | { type: "init"; payload: { cdnBase: string } }
   | { type: "reload"; payload: { cdnBase: string } }
   | { type: "getPage"; id: number; payload: PageRequest }
   | { type: "getFeatured"; id: number }
+  | { type: "getRanking"; id: number; payload: RankingRequest }
   | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } };
 
 /** Per-request reply; `data` matches the request that carried the id. */

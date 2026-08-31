@@ -3,6 +3,8 @@ import type {
   FeaturedData,
   PageData,
   PageRequest,
+  RankingData,
+  RankingRequest,
   RegistryWorkerMessage,
   SkillRef,
 } from "../lib/registry/protocol";
@@ -35,6 +37,7 @@ export interface RegistryHarness {
   setRpcError(err: Error | null): void;
   getPage(req: PageRequest): Promise<PageData>;
   getFeatured(): Promise<FeaturedData>;
+  getRanking(req: RankingRequest): Promise<RankingData>;
   lookupSkills(refs: SkillRef[]): Promise<{ entries: Array<Skill | null> }>;
   getSnapshot(): RegistrySnapshot;
   subscribe(listener: () => void): () => void;
@@ -143,7 +146,7 @@ export function createRegistryHarness(): RegistryHarness {
   }
 
   async function request<T>(
-    type: "getPage" | "getFeatured" | "lookupSkills",
+    type: "getPage" | "getFeatured" | "getRanking" | "lookupSkills",
     payload?: unknown,
   ): Promise<T> {
     if (rpcError) throw rpcError;
@@ -199,6 +202,9 @@ export function createRegistryHarness(): RegistryHarness {
     getFeatured() {
       return request<FeaturedData>("getFeatured");
     },
+    getRanking(req) {
+      return request<RankingData>("getRanking", req);
+    },
     lookupSkills(refs) {
       return request<{ entries: Array<Skill | null> }>("lookupSkills", {
         refs,
@@ -233,6 +239,7 @@ export function createRegistryClientMock(harness: RegistryHarness) {
     reloadRegistry: () => harness.reload(),
     getPage: (req: PageRequest) => harness.getPage(req),
     getFeatured: () => harness.getFeatured(),
+    getRanking: (req: RankingRequest) => harness.getRanking(req),
     lookupSkills: (refs: SkillRef[]) => harness.lookupSkills(refs),
     getRegistrySnapshot: () => harness.getSnapshot(),
     subscribeRegistry: (listener: () => void) => harness.subscribe(listener),

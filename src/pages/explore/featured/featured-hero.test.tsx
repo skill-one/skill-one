@@ -114,7 +114,7 @@ describe("FeaturedHero", () => {
     expect(emblaApi.scrollNext).toHaveBeenCalledTimes(1);
   });
 
-  it("opens the explore page when a slide is clicked", async () => {
+  it("opens the slide's leaderboard page when clicked", async () => {
     const user = userEvent.setup();
     renderWithRouter(
       <Routes>
@@ -122,7 +122,10 @@ describe("FeaturedHero", () => {
           path="/explore/featured"
           element={<FeaturedHero slides={slides} />}
         />
-        <Route path="/explore" element={<div>full registry list</div>} />
+        <Route
+          path="/explore/featured/ranking/:rankingId"
+          element={<div>weekly leaderboard</div>}
+        />
       </Routes>,
       { route: "/explore/featured" },
     );
@@ -132,7 +135,32 @@ describe("FeaturedHero", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("full registry list")).toBeInTheDocument(),
+      expect(screen.getByText("weekly leaderboard")).toBeInTheDocument(),
+    );
+  });
+
+  it("lands each slide on its own leaderboard", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(
+      <Routes>
+        <Route
+          path="/explore/featured"
+          element={<FeaturedHero slides={slides} />}
+        />
+        <Route
+          path="/explore/featured/ranking/:rankingId"
+          element={<div>leaderboard page</div>}
+        />
+      </Routes>,
+      { route: "/explore/featured" },
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "人气总榜，查看完整榜单" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("leaderboard page")).toBeInTheDocument(),
     );
   });
 
