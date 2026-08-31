@@ -42,3 +42,27 @@ export const AGENT_ICON_BY_NAME: Record<string, string> = {
 export function getAgentIconUrl(name: string): string | undefined {
   return AGENT_ICON_BY_NAME[name];
 }
+
+// Icons drawn as a monochrome `currentColor` glyph. As `<img>` sources they
+// lose the page's CSS context, so `currentColor` resolves to black — invisible
+// against the dark background. Track them so AgentIcon can invert the image
+// in dark mode (black → white); colored `-color` icons must NOT be inverted.
+export const MONOCHROME_ICON_FILES: ReadonlySet<string> = new Set([
+  "/agent-icons/cline.svg",
+  "/agent-icons/cursor.svg",
+  "/agent-icons/githubcopilot.svg",
+  "/agent-icons/goose.svg",
+  "/agent-icons/grok.svg",
+  "/agent-icons/hermesagent.svg",
+  "/agent-icons/kilocode.svg",
+  "/agent-icons/opencode.svg",
+  "/agent-icons/pi.svg",
+  "/agent-icons/roocode.svg",
+  "/agent-icons/windsurf.svg",
+]);
+
+/** Whether the agent's brand icon is a monochrome glyph that needs a dark-mode inversion. */
+export function isMonochromeAgentIcon(name: string): boolean {
+  const url = AGENT_ICON_BY_NAME[name];
+  return url !== undefined && MONOCHROME_ICON_FILES.has(url);
+}

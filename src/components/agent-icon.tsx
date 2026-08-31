@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Bot } from "lucide-react";
 
-import { getAgentIconUrl } from "../lib/agent-icons";
+import { getAgentIconUrl, isMonochromeAgentIcon } from "../lib/agent-icons";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 /** Everything shadcn's `Avatar` accepts, plus the agent whose icon to show. */
@@ -25,10 +25,15 @@ export function AgentIcon({
   ...props
 }: AgentIconProps) {
   const iconUrl = getAgentIconUrl(agentName);
+  // Monochrome `currentColor` SVGs render black as <img>; flip them to white
+  // so they stay legible on the dark background. Colored icons keep their hues.
+  const darkFixClass = isMonochromeAgentIcon(agentName) ? "dark:invert" : undefined;
 
   return (
     <Avatar size={size} className={className} {...props}>
-      {iconUrl && <AvatarImage src={iconUrl} alt="" />}
+      {iconUrl && (
+        <AvatarImage src={iconUrl} alt="" className={darkFixClass} />
+      )}
       <AvatarFallback>
         <Bot aria-hidden="true" />
       </AvatarFallback>
