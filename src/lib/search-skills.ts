@@ -1,31 +1,18 @@
 import MiniSearch from "minisearch";
 
 import type { Skill } from "../types/skill";
+import type { SearchField, SearchHit } from "./registry/protocol";
 
 /**
  * Client-side fuzzy search over the skill registry, powered by MiniSearch
- * (inverted index + BM25+ ranking). Relevance is computed per field with
- * field boosts keeping the priority name > repo > description, and a
- * log-scale popularity boost nudges heavily installed skills upward —
- * relevance stays the primary signal.
+ * (inverted index + BM25+ ranking). Runs inside the registry worker.
+ * Relevance is computed per field with field boosts keeping the priority
+ * name > repo > description, and a log-scale popularity boost nudges heavily
+ * installed skills upward — relevance stays the primary signal.
  */
 
-/** Registry fields that are indexed and searched. */
-export type SkillSearchField = "name" | "repo" | "description";
-
-/** One search result: the skill plus what matched, for highlighting. */
-export interface SkillSearchHit {
-  skill: Skill;
-  /**
-   * Matched indexed terms per field. The terms are the expanded ones
-   * MiniSearch actually matched (a prefix query "redi" reports "redis"), and
-   * tokens follow MiniSearch's default tokenizer. Empty outside a search.
-   */
-  matched: Partial<Record<SkillSearchField, readonly string[]>>;
-}
-
 /** Search query → hits in relevance order. */
-export type SkillSearch = (query: string) => SkillSearchHit[];
+export type SkillSearch = (query: string) => SearchHit[];
 
 // Indexed documents need a unique id; Skill carries none (a repo can host
 // several skills), so documents are decorated with their registry position
@@ -61,65 +48,23 @@ function popularityBoost(downloads: number): number {
  */
 function invertMatch(
   match: Record<string, string[]>,
-): Partial<Record<SkillSearchField, readonly string[]>> {
-  const matched: Partial<Record<SkillSearchField, string[]>> = {};
+): Partial<Record<SearchField, readonly string[]>> {
+  const matched: Partial<Record<SearchField, string[]>> = {};
   for (const [term, fields] of Object.entries(match)) {
     for (const field of fields) {
       // The keys of `match` are exactly the configured search fields.
-      (matched[field as SkillSearchField] ??= []).push(term);
+      (matched[field as SearchField] ??= []).push(term);
     }
   }
   return matched;
 }
 
-// Building the inverted index is expensive (hundreds of ms for the full
-// ~24k-skill registry) and `useMemo` does not survive route changes — the
-// explore page remounts on every visit. Cache the built search per data
-// reference: the same array reuses its index across mounts, and only a new
-// array (a fresh fetch) triggers a rebuild.
-const searchCache = new WeakMap<Skill[], SkillSearch>();
-
-export function createSkillSearch(skills: Skill[]): SkillSearch {
-  let search = searchCache.get(skills);
-  if (!search) {
-    search = buildSkillSearch(skills);
-    searchCache.set(skills, search);
-  }
-  return search;
-}
-
 /**
- * The search already built for this exact registry array, or null if there is
- * none. Lets callers adopt a background-built index without risking the
- * blocking build that `createSkillSearch` would do on a cache miss.
+ * Build the fuzzy search over the whole registry. This costs hundreds of
+ * milliseconds for ~24k entries, so it must only run inside the worker —
+ * the main thread never calls it.
  */
-export function peekSkillSearch(skills: Skill[]): SkillSearch | null {
-  return searchCache.get(skills) ?? null;
-}
-
-/**
- * Plain case-insensitive substring search over the same fields, used whenever
- * the fuzzy index is not ready: while the registry is still streaming in
- * (building MiniSearch for every progress snapshot would cost more than the
- * whole streaming window) and while the completed registry's index is being
- * built in the background. No ranking and no highlighting (matched stays
- * empty) — results settle into the full fuzzy search once the index lands.
- */
-export function containsSearch(
-  skills: Skill[],
-  query: string,
-): SkillSearchHit[] {
-  const q = query.toLowerCase();
-  return skills
-    .filter((skill) =>
-      [skill.name, skill.repo, skill.description].some((field) =>
-        field.toLowerCase().includes(q),
-      ),
-    )
-    .map((skill) => ({ skill, matched: {} }));
-}
-
-function buildSkillSearch(skills: Skill[]): SkillSearch {
+export function buildSkillSearch(skills: Skill[]): SkillSearch {
   const miniSearch = new MiniSearch<IndexedSkill>({
     fields: ["name", "repo", "description"],
     searchOptions: {
@@ -141,4 +86,25 @@ function buildSkillSearch(skills: Skill[]): SkillSearch {
       skill: skills[id],
       matched: invertMatch(match),
     }));
+}
+
+/**
+ * Plain case-insensitive substring search over the same fields, used whenever
+ * the fuzzy index is not ready: while the registry is still streaming in
+ * (building MiniSearch for every progress snapshot would cost more than the
+ * whole streaming window). No ranking and no highlighting (matched stays
+ * empty) — results settle into the full fuzzy search once the index lands.
+ */
+export function containsSearch(
+  skills: Skill[],
+  query: string,
+): SearchHit[] {
+  const q = query.toLowerCase();
+  return skills
+    .filter((skill) =>
+      [skill.name, skill.repo, skill.description].some((field) =>
+        field.toLowerCase().includes(q),
+      ),
+    )
+    .map((skill) => ({ skill, matched: {} }));
 }

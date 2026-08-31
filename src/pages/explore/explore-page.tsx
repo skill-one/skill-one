@@ -7,9 +7,9 @@ import {
   SearchX,
 } from "lucide-react";
 
-import { useSkillSearch } from "../../hooks/use-skill-search";
-import { useSkillsIndex } from "../../hooks/use-skills-index";
-import { containsSearch, type SkillSearchHit } from "../../lib/search-skills";
+import { useRegistryPage } from "../../hooks/use-registry-page";
+import { useRegistryStats } from "../../hooks/use-registry-stats";
+import type { SearchHit, SortOrder } from "../../lib/registry/protocol";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/ui/button";
 import {
@@ -36,12 +36,13 @@ import { SkillDetailDrawer } from "./skill-detail-drawer";
 /** Number of skills shown per page in the paginated registry view. */
 const PAGE_SIZE = 24;
 
-/**
- * Sort orders offered by the toolbar dropdown. "default" keeps the registry
- * index order; the other orders sort the filtered list client-side.
- */
-type SortOrder = "default" | "downloads" | "name";
+/** Keystrokes settle this long before a search query reaches the worker. */
+const SEARCH_DEBOUNCE_MS = 150;
 
+/**
+ * The sort orders offered by the toolbar dropdown. "default" keeps the
+ * registry index order; the other orders are applied inside the worker.
+ */
 const SORT_OPTIONS: Array<{ value: SortOrder; label: string }> = [
   { value: "default", label: "默认排序" },
   { value: "downloads", label: "按下载量" },
@@ -100,6 +101,19 @@ export function Placeholder({
 }
 
 /**
+ * Keep a value one `delayMs` behind the input: keystrokes stay instant while
+ * the (debounced) search query only reaches the worker once typing settles.
+ */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+/**
  * Loading placeholder mirroring the skill grid: a viewport's worth of
  * card-shaped skeletons, so switching to this page paints its final layout
  * instantly and real cards replace the placeholders as the index streams in
@@ -126,66 +140,42 @@ export function ExplorePage() {
   // because the result list (and the meaning of a card index) changes.
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOrder>("default");
+  const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
 
+  // Worker progress: the climbing count, the streaming/indexing flags and
+  // the retry action for a failed download.
+  const stats = useRegistryStats();
+
+  // One page-sized answer from the registry worker; all filtering, sorting
+  // and slicing happen there — the main thread never touches the registry.
   const {
-    data: index,
+    data: pageData,
     isLoading,
     isError,
     error,
-    refetch,
-  } = useSkillsIndex();
+    refetch: refetchPage,
+  } = useRegistryPage(query, sort, page - 1, PAGE_SIZE);
 
-  // The registry browses progressively: while the index download streams in,
-  // `registry` holds the skills parsed so far (always a prefix of the final
-  // list, so pagination and the default order stay stable as it grows).
-  const registry = useMemo(() => index?.skills ?? [], [index]);
-  const complete = index?.complete ?? false;
+  const hits: SearchHit[] = pageData?.hits ?? [];
 
-  // Fuzzy-search index over the registry (weighted name > repo >
-  // description, with a popularity boost from star counts). Building it is
-  // expensive (hundreds of ms for ~24k entries), so it is never done during a
-  // render: once the stream completes, the build waits for the first idle
-  // moment — the finished list is on screen first, and the index lands a
-  // moment later. Search stays usable throughout, falling back to plain
-  // substring matching below until the index is ready. The built search is
-  // cached per data reference, so revisiting this page adopts it instead of
-  // rebuilding — only a fresh fetch pays the cost again.
-  const skillSearch = useSkillSearch(registry, complete);
+  // A download failure only owns the screen while there is nothing to show;
+  // with data on screen (cache / previous source) the error surfaces in the
+  // footer count instead of blanking the page.
+  const failure =
+    stats.count === 0 && !stats.complete
+      ? (stats.error ??
+        (isError && error instanceof Error ? error.message : null))
+      : null;
 
-  // Search filter: fuzzy match over name, repo and description, applied on
-  // every keystroke — the index is ~24k entries. Keeping the search text out
-  // of the query key also avoids persisting a localStorage cache entry per
-  // search term. An empty query bypasses the search and keeps the full
-  // registry in its original order, with nothing highlighted.
-  const filtered = useMemo((): SkillSearchHit[] => {
-    const q = search.trim();
-    if (!q) return registry.map((skill) => ({ skill, matched: {} }));
-    // Until the background build finishes: substring match, over what has
-    // loaded so far while streaming. The results (and the reported total)
-    // settle once the fuzzy index takes over.
-    return skillSearch ? skillSearch(q) : containsSearch(registry, q);
-  }, [skillSearch, registry, search]);
+  // The skeleton stays up until the very first skill arrives; after that the
+  // grid paints from partial data and grows with the stream.
+  const loading =
+    isLoading || (hits.length === 0 && stats.count === 0 && !failure);
 
-  // "default" keeps the (filtered) relevance order; the others sort a copy.
-  const sorted = useMemo(() => {
-    if (sort === "default") return filtered;
-    const out = [...filtered];
-    if (sort === "downloads") {
-      out.sort((a, b) => b.skill.downloads - a.skill.downloads);
-    } else {
-      out.sort((a, b) => a.skill.name.localeCompare(b.skill.name));
-    }
-    return out;
-  }, [filtered, sort]);
-
-  // Client-side pagination over the filtered+sorted list; the count shown on
-  // the pagination row reports the filtered total.
-  const filteredTotal = sorted.length;
-  const totalPages = Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE));
-  const skills = useMemo(
-    () => sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [sorted, page],
-  );
+  // Total of the (filtered) list, reported by the worker; before the first
+  // answer lands the progressive count stands in.
+  const total = pageData?.total ?? stats.count;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // A background refetch can shrink the index below the current page; while
   // the index is still streaming in, pages beyond the loaded prefix are also
@@ -194,13 +184,13 @@ export function ExplorePage() {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  // Index into `skills` of the skill shown in the detail panel; null keeps
-  // the panel closed (full-width grid). Clicking a card while the panel is
-  // open simply swaps the selection, so switching skills never replays the
+  // Index into `hits` of the skill shown in the detail panel; null keeps the
+  // panel closed (full-width grid). Clicking a card while the panel is open
+  // simply swaps the selection, so switching skills never replays the
   // slide-in animation.
   const [selected, setSelected] = useState<number | null>(null);
   // The sheet indexes a plain Skill list (the paged search hits, unwrapped).
-  const pageSkills = useMemo(() => skills.map((hit) => hit.skill), [skills]);
+  const pageSkills = useMemo(() => hits.map((hit) => hit.skill), [hits]);
 
   const handleSearch = (q: string) => {
     setSelected(null);
@@ -244,11 +234,6 @@ export function ExplorePage() {
   };
 
   const range = pageRange(page, totalPages);
-
-  // A search answered by the substring fallback while the fuzzy index is
-  // still building in the background: say so next to the count, so a thin
-  // result list reads as "not indexed yet" rather than "nothing matches".
-  const indexing = complete && !skillSearch && search.trim().length > 0;
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
@@ -326,32 +311,33 @@ export function ExplorePage() {
               outline — from being clipped by the scroll container at the
               flush top/left edges. */}
           <div className="min-h-0 flex-1 -ml-1 -mt-1 overflow-y-auto pb-6 pl-1 pr-1 pt-1">
-            {isError ? (
-              <Placeholder
-                message={`加载失败：${error instanceof Error ? error.message : "未知错误"}`}
-              >
+            {failure ? (
+              <Placeholder message={`加载失败：${failure}`}>
                 <Button
                   variant="outline"
                   size="sm"
                   className="mt-2"
-                  onClick={() => void refetch()}
+                  onClick={() => {
+                    stats.refetch();
+                    void refetchPage();
+                  }}
                 >
                   重试
                 </Button>
               </Placeholder>
-            ) : isLoading ? (
+            ) : loading ? (
               <ExploreSkeleton />
-            ) : skills.length === 0 ? (
+            ) : hits.length === 0 ? (
               <Placeholder
                 message={
-                  search.trim()
-                    ? `未找到匹配“${search.trim()}”的 Skill`
+                  query
+                    ? `未找到匹配“${query}”的 Skill`
                     : "暂无技能"
                 }
               />
             ) : (
               <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {skills.map((hit, i) => (
+                {hits.map((hit, i) => (
                   <SkillCard
                     key={`${hit.skill.repo}/${hit.skill.name}`}
                     skill={hit.skill}
@@ -366,10 +352,10 @@ export function ExplorePage() {
 
           {/* Pagination row: previous / numbered pages (with ellipsis) / next
               — the current page number doubles as an editable jump box — with
-              the filtered skill count pinned to the right. Shown once the
-              index has loaded; the controls appear only when there is more
-              than one page, so the count survives single-page searches. */}
-          {index && (
+              the skill count pinned to the right. The controls appear only
+              when there is more than one page, so the count survives
+              single-page searches. */}
+          {(stats.count > 0 || stats.complete) && (
             <div className="relative flex items-center justify-center border-t border-border py-2">
               {totalPages > 1 && (
                 <Pagination className="w-auto">
@@ -475,8 +461,8 @@ export function ExplorePage() {
                   how wide the count or the page window gets. While the index
                   is streaming in the count climbs, so say so. */}
               <span className="absolute right-0 whitespace-nowrap text-sm text-muted-foreground tabular-nums">
-                共 {filteredTotal} 个{complete ? "" : " · 加载中"}
-                {indexing ? " · 索引中" : ""}
+                共 {total} 个{stats.complete ? "" : " · 加载中"}
+                {stats.indexing ? " · 索引中" : ""}
               </span>
             </div>
           )}

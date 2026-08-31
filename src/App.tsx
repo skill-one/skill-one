@@ -3,17 +3,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { listen } from "@tauri-apps/api/event";
 import { Building2, Folder } from "lucide-react";
-import {
-  HashRouter,
-  Routes,
-  Route,
-  Navigate,
-  useNavigate,
-} from "react-router";
-import {
-  defaultShouldDehydrateQuery,
-  type Query,
-} from "@tanstack/react-query";
+import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppSidebar } from "./components/app-sidebar";
 import { PlaceholderPage } from "./components/placeholder-page";
@@ -34,11 +24,9 @@ const queryClient = createQueryClient();
  * `gcTime` above: persisted entries are never discarded for being old, they
  * are always restored and then revalidated when stale (see `staleTime`).
  *
- * The full registry index is excluded — the explore page's `skills` entry
- * stores the whole parsed ~12MB JSONL: it would exceed the WebView's
- * localStorage quota on every write, and it is refetched once per session
- * anyway. Only the bounded queries — installed skills, agent status — are
- * persisted.
+ * The registry lives in the worker (and its own IndexedDB cache), so it
+ * never enters this persister — only the bounded queries — installed
+ * skills, agent status — are persisted.
  *
  * The storage adapter accesses `window.localStorage` lazily (inside the
  * methods) so merely wiring up persistence never touches the getter — Node's
@@ -55,12 +43,6 @@ const persister = createSyncStoragePersister({
 const persistOptions = {
   persister,
   maxAge: Infinity,
-  dehydrateOptions: {
-    // Large blobs only; see the persister comment above.
-    shouldDehydrateQuery: (query: Query) =>
-      defaultShouldDehydrateQuery(query) &&
-      query.queryKey[0] !== "skills",
-  },
 };
 
 export default function App() {
@@ -85,10 +67,7 @@ export default function App() {
                 />
                 <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/my-skills" element={<MySkillsPage />} />
-                <Route
-                  path="/explore/featured"
-                  element={<FeaturedPage />}
-                />
+                <Route path="/explore/featured" element={<FeaturedPage />} />
                 <Route
                   path="/explore/official"
                   element={<PlaceholderPage icon={Building2} title="官方" />}
@@ -120,9 +99,8 @@ function PopoverNavigation() {
   const navigate = useNavigate();
   useEffect(() => {
     if (!isTauri()) return;
-    const unlisten = listen<{ path: string }>(
-      POPOVER_NAVIGATE_EVENT,
-      (event) => navigate(event.payload.path),
+    const unlisten = listen<{ path: string }>(POPOVER_NAVIGATE_EVENT, (event) =>
+      navigate(event.payload.path),
     );
     return () => {
       void unlisten.then((dispose) => dispose());

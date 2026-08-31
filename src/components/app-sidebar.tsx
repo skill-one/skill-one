@@ -24,7 +24,7 @@ import {
 } from "./ui/sidebar";
 import { isTauri } from "../lib/tauri";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
-import { useSkillsIndex } from "../hooks/use-skills-index";
+import { useRegistryStats } from "../hooks/use-registry-stats";
 
 export interface NavItem {
   path: string;
@@ -53,18 +53,19 @@ export const footerItems: NavItem[] = [
  * unimplemented pages (featured / official / project) show no badge. The
  * badge is not rendered while its data is loading, avoiding a flash of 0.
  *
- * The registry count is progressive: it reads the same streaming index query
- * as the explore page, so it reports the skills parsed so far and climbs as
- * the ~12MB download proceeds, settling on the registry size once the stream
+ * The registry count is progressive: it mirrors the registry worker's
+ * progress count, so it reports the skills parsed so far and climbs as the
+ * ~12MB download proceeds, settling on the registry size once the stream
  * completes. It renders as a plain number — no progress decoration.
  */
 function useNavCounts(): Partial<Record<string, number>> {
-  const { data: index, isError } = useSkillsIndex();
+  const stats = useRegistryStats();
   const { data: installedSkills } = useInstalledSkills();
   return {
-    // Hidden on a failed download: React Query keeps the last snapshot in
-    // `data`, which would otherwise freeze a partial count with no error cue.
-    "/explore": index && !isError ? index.skills.length : undefined,
+    // Hidden while nothing has loaded yet and on a failed download: an empty
+    // registry is not a meaningful count to advertise.
+    "/explore":
+      stats.error == null && stats.count > 0 ? stats.count : undefined,
     "/my-skills": installedSkills?.length,
   };
 }

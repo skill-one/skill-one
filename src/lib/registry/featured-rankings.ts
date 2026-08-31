@@ -1,5 +1,5 @@
-import { formatCount } from "../../../lib/utils";
-import type { Skill } from "../../../types/skill";
+import { formatCount } from "../utils";
+import type { Skill } from "../../types/skill";
 
 /** Skills listed on each hero slide. */
 export const HERO_RANK_SIZE = 3;

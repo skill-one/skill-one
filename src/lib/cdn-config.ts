@@ -74,11 +74,15 @@ function cdnUrl(base: string, { repo, path, ref }: FileSpec): string {
  * Candidate URLs in priority order. With no configured CDN: origin first, then
  * the default CDN. With a configured CDN base: that CDN first, then origin and
  * the default CDN. `min` removes duplicates.
+ *
+ * `baseOverride` replaces the persisted configuration — the registry worker
+ * has no `localStorage` access, so the main thread passes the configured
+ * base through every download. When omitted the stored value is read live.
  */
-export function fileCandidates(spec: FileSpec): string[] {
+export function fileCandidates(spec: FileSpec, baseOverride?: string): string[] {
   const origin = originUrl(spec);
   const defaultCdn = cdnUrl(DEFAULT_CDN_BASE, spec);
-  const base = getCdnBase();
+  const base = baseOverride ?? getCdnBase();
   const custom = base ? cdnUrl(base, spec) : null;
   const ordered = custom ? [custom, origin, defaultCdn] : [origin, defaultCdn];
   return [...new Set(ordered)];

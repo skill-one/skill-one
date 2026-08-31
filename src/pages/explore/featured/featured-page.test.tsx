@@ -5,10 +5,8 @@ import { act, within } from "@testing-library/react";
 import { FEATURED_CATEGORIES } from "../../../data/featured-content";
 import { renderWithRouter, screen, waitFor } from "../../../test/test-utils";
 import { fetchSkillDetail } from "../../../lib/skill-detail-api";
-import {
-  fetchFullIndex,
-  subscribeIndexProgress,
-} from "../../../lib/skills-api";
+import { createRegistryClientMock } from "../../../test/registry-harness";
+import type { RegistryHarness } from "../../../test/registry-harness";
 import type { Skill } from "../../../types/skill";
 import { FeaturedPage } from "./featured-page";
 
@@ -30,18 +28,28 @@ vi.mock("embla-carousel-react", () => ({
   default: vi.fn(() => [vi.fn(), emblaApi]),
 }));
 
-vi.mock("../../../lib/skills-api", () => ({
-  // The hook passes this straight into its query key; keep it a stable array.
-  SKILLS_QUERY_KEY: ["skills", 6],
-  fetchFullIndex: vi.fn(),
-  subscribeIndexProgress: vi.fn(),
-}));
+/**
+ * The registry client is replaced by a real-controller-driven harness, so
+ * the featured tests exercise the exact RPC/event contract the worker
+ * speaks (the query stays disabled until the worker reports `ready`).
+ */
+vi.mock("../../../lib/registry/client", async () => {
+  const { createRegistryHarness, createRegistryClientMock } = await import(
+    "../../../test/registry-harness"
+  );
+  return createRegistryClientMock(createRegistryHarness());
+});
+
+const harness = (
+  (await import("../../../lib/registry/client")) as unknown as {
+    __harness: RegistryHarness;
+  }
+).__harness;
+
 vi.mock("../../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
 }));
 
-const mockFetchFullIndex = vi.mocked(fetchFullIndex);
-const mockSubscribeIndexProgress = vi.mocked(subscribeIndexProgress);
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 
 const [efficiency, design, development, writing] = FEATURED_CATEGORIES;
@@ -70,8 +78,16 @@ function curatedIndexWithout(omit: Array<{ repo: string; name: string }>) {
   return curatedIndex().filter((s) => !dropped.has(`${s.repo}/${s.name}`));
 }
 
+/** Load the harness with a complete registry before the page mounts. */
+function bootRegistry(skills: Skill[]) {
+  harness.reset();
+  harness.init();
+  harness.pushAll(skills);
+  harness.complete();
+}
+
 beforeEach(() => {
-  mockFetchFullIndex.mockReset();
+  harness.reset();
   mockFetchSkillDetail.mockReset();
   mockFetchSkillDetail.mockImplementation(
     async (_repo: string, name: string) => ({
@@ -81,16 +97,13 @@ beforeEach(() => {
       path: `skills/${name}/SKILL.md`,
     }),
   );
-  // By default no progress is reported: data arrives complete when
-  // fetchFullIndex resolves, matching the pre-streaming behavior.
-  mockSubscribeIndexProgress.mockReset();
-  mockSubscribeIndexProgress.mockImplementation(() => () => {});
 });
 
 describe("FeaturedPage", () => {
-  it("shows layout skeletons while the registry loads", () => {
-    mockFetchFullIndex.mockReturnValue(new Promise<Skill[]>(() => {}));
+  it("shows layout skeletons while the registry loads", async () => {
+    harness.init(); // stream never completes → never ready
     const { container } = renderWithRouter(<FeaturedPage />);
+    await act(async () => {});
 
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(
       0,
@@ -99,28 +112,14 @@ describe("FeaturedPage", () => {
   });
 
   it("keeps the skeleton while the registry is still streaming in", async () => {
-    let resolveIndex: (skills: Skill[]) => void = () => {};
-    mockFetchFullIndex.mockImplementation(
-      () =>
-        new Promise<Skill[]>((resolve) => {
-          resolveIndex = resolve;
-        }),
-    );
-    let progress: ((skills: Skill[]) => void) | null = null;
-    mockSubscribeIndexProgress.mockImplementation((listener) => {
-      progress = listener;
-      return () => {
-        progress = null;
-      };
-    });
+    harness.init();
     const { container } = renderWithRouter(<FeaturedPage />);
     await act(async () => {});
 
     // Partial data arrives — rankings over an incomplete registry would be
     // wrong, so the page must not render any of it yet.
-    await act(async () => {
-      progress?.(curatedIndex().slice(0, 4));
-    });
+    harness.pushAll(curatedIndex().slice(0, 4));
+    await act(async () => {});
     expect(
       container.querySelectorAll(".animate-pulse").length,
     ).toBeGreaterThan(0);
@@ -128,10 +127,9 @@ describe("FeaturedPage", () => {
       screen.queryByRole("region", { name: "精选推荐" }),
     ).not.toBeInTheDocument();
 
-    // Completion unlocks the real content.
-    await act(async () => {
-      resolveIndex(curatedIndex());
-    });
+    // Completion (ready) unlocks the real content.
+    harness.pushAll(curatedIndex().slice(4));
+    harness.complete();
     expect(
       await screen.findByRole("region", { name: "精选推荐" }),
     ).toBeInTheDocument();
@@ -139,20 +137,21 @@ describe("FeaturedPage", () => {
 
   it("shows an error state and recovers via retry", async () => {
     const user = userEvent.setup();
-    mockFetchFullIndex.mockRejectedValueOnce(new Error("network error"));
-    mockFetchFullIndex.mockResolvedValue(curatedIndex());
+    bootRegistry(curatedIndex());
+    harness.setRpcError(new Error("network error"));
     renderWithRouter(<FeaturedPage />);
 
     expect(
       await screen.findByText("加载失败：network error"),
     ).toBeInTheDocument();
 
+    harness.setRpcError(null);
     await user.click(screen.getByRole("button", { name: "重试" }));
     expect(await screen.findByText(efficiency.title)).toBeInTheDocument();
   });
 
   it("renders the computed hero leaderboards and curated sections", async () => {
-    mockFetchFullIndex.mockResolvedValue(curatedIndex());
+    bootRegistry(curatedIndex());
     renderWithRouter(<FeaturedPage />);
 
     // Hero: computed slides ranked from the registry fixture.
@@ -178,7 +177,7 @@ describe("FeaturedPage", () => {
   it("skips curated references missing from the registry", async () => {
     const gone = development.skills.at(-1)!;
     const kept = development.skills[0];
-    mockFetchFullIndex.mockResolvedValue(curatedIndexWithout([gone]));
+    bootRegistry(curatedIndexWithout([gone]));
     renderWithRouter(<FeaturedPage />);
 
     await screen.findByText(development.title);
@@ -191,9 +190,7 @@ describe("FeaturedPage", () => {
   });
 
   it("hides a section when none of its references resolve", async () => {
-    mockFetchFullIndex.mockResolvedValue(
-      curatedIndexWithout(writing.skills),
-    );
+    bootRegistry(curatedIndexWithout(writing.skills));
     renderWithRouter(<FeaturedPage />);
 
     expect(await screen.findByText(efficiency.title)).toBeInTheDocument();
@@ -202,7 +199,7 @@ describe("FeaturedPage", () => {
 
   it("opens the detail panel when a card is clicked", async () => {
     const user = userEvent.setup();
-    mockFetchFullIndex.mockResolvedValue(curatedIndex());
+    bootRegistry(curatedIndex());
     renderWithRouter(<FeaturedPage />);
 
     const first = efficiency.skills[0].name;
@@ -220,7 +217,7 @@ describe("FeaturedPage", () => {
   it("walks the whole curated list inside the panel with arrow keys", async () => {
     const user = userEvent.setup();
     const { fireEvent } = await import("@testing-library/react");
-    mockFetchFullIndex.mockResolvedValue(curatedIndex());
+    bootRegistry(curatedIndex());
     renderWithRouter(<FeaturedPage />);
 
     const first = efficiency.skills[0].name;

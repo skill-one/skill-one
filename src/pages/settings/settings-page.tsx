@@ -6,6 +6,7 @@ import {
   getCdnBase,
   setCdnBase,
 } from "../../lib/cdn-config";
+import { reloadRegistry } from "../../lib/registry/client";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { ThemeModeToggle } from "../../components/theme-mode-toggle";
@@ -15,17 +16,22 @@ import { ThemeModeToggle } from "../../components/theme-mode-toggle";
  * download source.
  *
  * The CDN base is persisted to localStorage; `""` means "direct GitHub first"
- * (with the default CDN as a fallback). Changes take effect immediately on the
- * next fetch because index / SKILL.md / install all read the value live.
+ * (with the default CDN as a fallback). SKILL.md / install fetches read the
+ * value live; the registry worker is told to reload its index from the new
+ * source immediately (it has no `localStorage` access, so the base is
+ * passed in).
  */
 export function SettingsPage() {
   const [value, setValue] = useState(getCdnBase());
   const [saved, setSaved] = useState(false);
 
   const apply = (next: string) => {
+    const previous = getCdnBase();
     setCdnBase(next);
     setValue(getCdnBase());
     setSaved(true);
+    // A source switch invalidates the downloaded registry: re-fetch it.
+    if (previous !== next) reloadRegistry();
   };
 
   return (

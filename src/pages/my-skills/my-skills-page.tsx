@@ -2,38 +2,19 @@ import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Puzzle, RefreshCw, Trash2, Users } from "lucide-react";
 
-import {
-  removeInstalledSkill,
-  setSkillEnabled,
-} from "../../lib/local-skills";
+import { removeInstalledSkill, setSkillEnabled } from "../../lib/local-skills";
 import type { InstalledSkill } from "../../lib/skills-manager";
-import type { Skill } from "../../types/skill";
+import type { SkillRef } from "../../lib/registry/protocol";
 import { cn } from "../../lib/utils";
 import {
   INSTALLED_SKILLS_QUERY_KEY,
   useInstalledSkills,
 } from "../../hooks/use-installed-skills";
-import { useSkillsIndex } from "../../hooks/use-skills-index";
+import { useRegistrySkillMeta } from "../../hooks/use-registry-skill-meta";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { Button } from "../../components/ui/button";
 import { Switch } from "../../components/ui/switch";
-
-/**
- * Join installed skills with their registry entry. Each registry skill is
- * indexed under both its skillId and skill-dir basename (prefixed with the
- * repo), so a locally-installed skill whose SKILL.md name differs from the
- * registry skillId still matches for description fallback.
- */
-function buildIndexMap(index: Skill[]): Map<string, Skill> {
-  const map = new Map<string, Skill>();
-  for (const entry of index) {
-    map.set(`${entry.repo}/${entry.name}`, entry);
-    const base = entry.path?.split("/").pop();
-    if (base) map.set(`${entry.repo}/${base}`, entry);
-  }
-  return map;
-}
 
 function sourceLabelFor(skill: InstalledSkill): string {
   // No source record (e.g. placed manually into the global directory) or an
@@ -136,21 +117,20 @@ function SkillCardItem({
 export function MySkillsPage() {
   const queryClient = useQueryClient();
 
-  const {
-    data: skills,
-    isLoading,
-    isError,
-    error,
-  } = useInstalledSkills();
+  const { data: skills, isLoading, isError, error } = useInstalledSkills();
 
-  // Registry metadata (downloads / descriptions) for store-sourced skills.
-  // Best-effort: the index fetch needs the network, so a failure degrades to
-  // an empty join (downloads hidden, disk-extracted descriptions still shown).
-  // The join only starts once the streamed index is complete, matching the
-  // all-or-nothing descriptions the full download used to provide.
-  const { data: indexData } = useSkillsIndex();
-  const index = indexData?.complete ? indexData.skills : [];
-  const indexMap = useMemo(() => buildIndexMap(index), [index]);
+  const list = skills ?? [];
+
+  // Registry metadata (downloads / descriptions) for store-sourced skills,
+  // resolved inside the registry worker. Best-effort: until the worker is
+  // ready (or on failure) the map stays empty and the page degrades to
+  // hiding downloads and disk-extracted descriptions only — the same
+  // all-or-nothing contract the full download used to provide.
+  const refs = useMemo<SkillRef[]>(
+    () => list.map((skill) => ({ repo: skill.source ?? "", name: skill.name })),
+    [list],
+  );
+  const meta = useRegistrySkillMeta(refs);
 
   // Enablement is a real backend state (the agents-skills library moves the
   // skill between the canonical and disabled dirs), reported by `skill.enabled`.
@@ -184,8 +164,6 @@ export function MySkillsPage() {
       invalidate();
     },
   });
-
-  const list = skills ?? [];
 
   return (
     <div className="flex h-full flex-col">
@@ -221,9 +199,7 @@ export function MySkillsPage() {
           ) : (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               {list.map((skill) => {
-                const indexEntry = indexMap.get(
-                  `${skill.source}/${skill.name}`,
-                );
+                const indexEntry = meta.get(`${skill.source}/${skill.name}`);
                 return (
                   <SkillCardItem
                     key={skill.name}

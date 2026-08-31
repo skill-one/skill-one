@@ -5,7 +5,7 @@ import { Route, Routes } from "react-router";
 import { renderWithRouter, screen, waitFor } from "../../../test/test-utils";
 import type { Skill } from "../../../types/skill";
 import { FeaturedHero } from "./featured-hero";
-import type { HeroSlide } from "./featured-rankings";
+import type { HeroSlide } from "../../../lib/registry/featured-rankings";
 
 /**
  * Embla needs real layout to compute snap points, which jsdom never has, so

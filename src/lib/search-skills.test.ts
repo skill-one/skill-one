@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { createSkillSearch } from "./search-skills";
+import { buildSkillSearch } from "./search-skills";
 import type { Skill } from "../types/skill";
 
 // "redis" appears verbatim in exactly one field of each skill — name, repo
@@ -30,9 +30,9 @@ const skills: Skill[] = [
   },
 ];
 
-describe("createSkillSearch", () => {
+describe("buildSkillSearch", () => {
   it("ranks matches by field priority: name above repo above description", () => {
-    const results = createSkillSearch(skills)("redis");
+    const results = buildSkillSearch(skills)("redis");
 
     expect(results.map(({ skill }) => skill.name)).toEqual([
       "redis-cache-helper",
@@ -44,7 +44,7 @@ describe("createSkillSearch", () => {
   it("ranks equally relevant matches by install count", () => {
     // Both skills match "redis" in their name with the same token shape, so
     // the relevance scores are identical and popularity decides the order.
-    const results = createSkillSearch([
+    const results = buildSkillSearch([
       {
         name: "alpha-redis-tool",
         repo: "acme/alpha",
@@ -71,7 +71,7 @@ describe("createSkillSearch", () => {
     // Popularity may cross one priority tier (repo match over name match)
     // but never two: even a maximal-install description match loses to a
     // zero-install name match.
-    const results = createSkillSearch([
+    const results = buildSkillSearch([
       {
         name: "redis-cache-helper",
         repo: "acme/other-tools",
@@ -92,7 +92,7 @@ describe("createSkillSearch", () => {
   });
 
   it("reports the expanded matched terms per field for highlighting", () => {
-    const [hit] = createSkillSearch(skills)("redi");
+    const [hit] = buildSkillSearch(skills)("redi");
 
     // The prefix query "redi" reports the full indexed term "redis".
     expect(hit.skill.name).toBe("redis-cache-helper");
@@ -102,7 +102,7 @@ describe("createSkillSearch", () => {
   });
 
   it("reports matches from every field the term appears in", () => {
-    const hit = createSkillSearch(skills)("cache").find(
+    const hit = buildSkillSearch(skills)("cache").find(
       ({ skill }) => skill.name === "redis-cache-helper",
     );
 
@@ -113,7 +113,7 @@ describe("createSkillSearch", () => {
   });
 
   it("still finds a skill when the query has a typo or is a prefix", () => {
-    const search = createSkillSearch(skills);
+    const search = buildSkillSearch(skills);
 
     expect(search("redix").map(({ skill }) => skill.name)).toContain(
       "redis-cache-helper",
@@ -124,14 +124,6 @@ describe("createSkillSearch", () => {
   });
 
   it("returns nothing for text unrelated to the registry", () => {
-    expect(createSkillSearch(skills)("kubernetes")).toEqual([]);
-  });
-
-  it("reuses the built index for the same data and rebuilds for new data", () => {
-    // Route switches remount the page; the same array must yield the same
-    // cached search, while a fresh fetch (new array) rebuilds.
-    const first = createSkillSearch(skills);
-    expect(createSkillSearch(skills)).toBe(first);
-    expect(createSkillSearch([...skills])).not.toBe(first);
+    expect(buildSkillSearch(skills)("kubernetes")).toEqual([]);
   });
 });

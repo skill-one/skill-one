@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   act,
   render,
@@ -11,23 +11,34 @@ import {
 import userEvent from "@testing-library/user-event";
 import { HashRouter, Route, Routes } from "react-router";
 
-import { fetchFullIndex, subscribeIndexProgress } from "../../lib/skills-api";
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import type { Skill } from "../../types/skill";
+import { createRegistryClientMock } from "../../test/registry-harness";
+import type { RegistryHarness } from "../../test/registry-harness";
 import { ExplorePage } from "./explore-page";
 
-vi.mock("../../lib/skills-api", () => ({
-  // The hook passes this straight into its query key; keep it a stable array.
-  SKILLS_QUERY_KEY: ["skills", 6],
-  fetchFullIndex: vi.fn(),
-  subscribeIndexProgress: vi.fn(),
-}));
+/**
+ * The registry client is replaced by a real-controller-driven harness, so
+ * the page tests exercise the exact RPC/event contract the worker speaks —
+ * including streaming progress, substring→fuzzy search handover and the
+ * ready-epoch invalidation.
+ */
+vi.mock("../../lib/registry/client", async () => {
+  const { createRegistryHarness, createRegistryClientMock } =
+    await import("../../test/registry-harness");
+  return createRegistryClientMock(createRegistryHarness());
+});
+
+const harness = (
+  (await import("../../lib/registry/client")) as unknown as {
+    __harness: RegistryHarness;
+  }
+).__harness;
+
 vi.mock("../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
 }));
 
-const mockFetchFullIndex = vi.mocked(fetchFullIndex);
-const mockSubscribeIndexProgress = vi.mocked(subscribeIndexProgress);
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 
 /** Build a slice of `count` skills starting at global index `offset`. */
@@ -42,11 +53,14 @@ function makeSkills(count: number, offset: number) {
 }
 
 /**
- * Mock fetchFullIndex to serve a registry of `total` skills. The page owns
- * filtering, sorting and slicing, so the mock always returns the full list.
+ * Load the harness with a complete registry of `total` skills before the
+ * page mounts — the cold-start-cache path, where the page paints instantly.
  */
-function mockRegistry(total: number) {
-  mockFetchFullIndex.mockResolvedValue(makeSkills(total, 0));
+function bootRegistry(total: number) {
+  harness.reset();
+  harness.init();
+  harness.pushAll(makeSkills(total, 0));
+  harness.complete();
 }
 
 /**
@@ -73,8 +87,11 @@ function gadgetRegistry(): Skill[] {
   ];
 }
 
-function mockGadgetRegistry() {
-  mockFetchFullIndex.mockResolvedValue(gadgetRegistry());
+function bootGadgetRegistry() {
+  harness.reset();
+  harness.init();
+  harness.pushAll(gadgetRegistry());
+  harness.complete();
 }
 
 let queryClient: QueryClient;
@@ -101,7 +118,7 @@ beforeEach(() => {
   queryClient = new QueryClient({
     defaultOptions: { queries: { staleTime: 10 * 60 * 1000, retry: false } },
   });
-  mockFetchFullIndex.mockReset();
+  harness.reset();
   mockFetchSkillDetail.mockReset();
   mockFetchSkillDetail.mockImplementation(
     async (_repo: string, id: string) => ({
@@ -111,33 +128,24 @@ beforeEach(() => {
       path: `skills/${id}/SKILL.md`,
     }),
   );
-  // By default no progress is reported: data arrives complete when
-  // fetchFullIndex resolves, matching the pre-streaming behavior.
-  mockSubscribeIndexProgress.mockReset();
-  mockSubscribeIndexProgress.mockImplementation(() => () => {});
-});
-
-// Tests that withhold the idle slices stub the idle-callback globals.
-afterEach(() => {
-  vi.unstubAllGlobals();
 });
 
 describe("ExplorePage", () => {
   it("renders the first 24 skills with the total count", async () => {
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
 
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
     expect(screen.getByText("skill-23")).toBeInTheDocument();
     // Page 1 holds exactly 24 skills; skill-24 belongs to page 2.
     expect(screen.queryByText("skill-24")).not.toBeInTheDocument();
-    // The whole index is fetched once; paging is client-side from here on.
-    expect(mockFetchFullIndex).toHaveBeenCalledTimes(1);
+    // The page answered one RPC; paging never re-downloads the registry.
+    expect(harness.downloads).toBe(1);
     expect(screen.getByText("共 50 个")).toBeInTheDocument();
   });
 
   it("disables previous on the first page and enables next", async () => {
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -153,7 +161,7 @@ describe("ExplorePage", () => {
 
   it("renders the next page via the next control without refetching", async () => {
     const user = userEvent.setup();
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -162,12 +170,13 @@ describe("ExplorePage", () => {
     expect(await screen.findByText("skill-24")).toBeInTheDocument();
     expect(screen.getByText("skill-47")).toBeInTheDocument();
     expect(screen.queryByText("skill-48")).not.toBeInTheDocument();
-    expect(mockFetchFullIndex).toHaveBeenCalledTimes(1);
+    // The worker keeps the registry; page turns are pure RPCs.
+    expect(harness.downloads).toBe(1);
   });
 
   it("jumps to a page by clicking its numbered button", async () => {
     const user = userEvent.setup();
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -175,12 +184,12 @@ describe("ExplorePage", () => {
 
     expect(await screen.findByText("skill-48")).toBeInTheDocument();
     expect(screen.getByText("skill-49")).toBeInTheDocument();
-    expect(mockFetchFullIndex).toHaveBeenCalledTimes(1);
+    expect(harness.downloads).toBe(1);
   });
 
   it("disables next on the last page", async () => {
     const user = userEvent.setup();
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -198,7 +207,7 @@ describe("ExplorePage", () => {
   });
 
   it("shows every page number directly when there are few pages", async () => {
-    mockRegistry(216); // 9 pages — exactly the "show all" threshold
+    bootRegistry(216); // 9 pages — exactly the "show all" threshold
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -214,7 +223,7 @@ describe("ExplorePage", () => {
 
   it("collapses distant page numbers into an ellipsis window", async () => {
     const user = userEvent.setup();
-    mockRegistry(240); // 10 pages
+    bootRegistry(240); // 10 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -242,7 +251,7 @@ describe("ExplorePage", () => {
   });
 
   it("replaces the standalone jump form with the editable current page box", async () => {
-    mockRegistry(50); // 3 pages
+    bootRegistry(50); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -256,7 +265,7 @@ describe("ExplorePage", () => {
   });
 
   it("shows the skill count on the pagination row instead of the toolbar", async () => {
-    mockRegistry(50); // 3 pages
+    bootRegistry(50); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -269,7 +278,7 @@ describe("ExplorePage", () => {
 
   it("jumps directly to a typed page number", async () => {
     const user = userEvent.setup();
-    mockRegistry(50); // 3 pages
+    bootRegistry(50); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -286,7 +295,7 @@ describe("ExplorePage", () => {
 
   it("clamps an out-of-range jump to the last page", async () => {
     const user = userEvent.setup();
-    mockRegistry(50); // 3 pages
+    bootRegistry(50); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -300,7 +309,7 @@ describe("ExplorePage", () => {
 
   it("commits a typed jump on blur", async () => {
     const user = userEvent.setup();
-    mockRegistry(50); // 3 pages
+    bootRegistry(50); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -314,7 +323,7 @@ describe("ExplorePage", () => {
 
   it("keeps the current page while a number is typed but not committed", async () => {
     const user = userEvent.setup();
-    mockRegistry(50); // 3 pages
+    bootRegistry(50); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -330,7 +339,7 @@ describe("ExplorePage", () => {
 
   it("reverts to the current page on Escape", async () => {
     const user = userEvent.setup();
-    mockRegistry(50); // 3 pages
+    bootRegistry(50); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -350,7 +359,7 @@ describe("ExplorePage", () => {
 
   it("reverts an empty commit to the current page", async () => {
     const user = userEvent.setup();
-    mockRegistry(50); // 3 pages
+    bootRegistry(50); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -367,8 +376,8 @@ describe("ExplorePage", () => {
 
   it("shows an error state and recovers via retry", async () => {
     const user = userEvent.setup();
-    mockFetchFullIndex.mockRejectedValueOnce(new Error("network error"));
-    mockRegistry(50);
+    harness.init();
+    harness.fail(new Error("network error"));
     renderExplorePage();
 
     expect(
@@ -376,7 +385,12 @@ describe("ExplorePage", () => {
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "重试" }));
+    // The retry re-downloads (download #2), the fresh stream lands and the
+    // ready epoch refetches the page out of the failure state.
+    harness.pushAll(makeSkills(50, 0));
+    harness.complete();
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
+    expect(harness.downloads).toBe(2);
   });
 
   it("does not navigate away under HashRouter when clicking a page link", async () => {
@@ -384,7 +398,7 @@ describe("ExplorePage", () => {
     // default href="#" navigation would push a new hash route and remount the
     // page. onClick must preventDefault to keep the hash (and the route) fixed.
     const user = userEvent.setup();
-    mockRegistry(50);
+    bootRegistry(50);
     window.history.replaceState(null, "", "#/explore");
     render(
       <QueryClientProvider client={queryClient}>
@@ -412,7 +426,7 @@ describe("ExplorePage", () => {
 
   it("filters skills by search text and resets to the first page", async () => {
     const user = userEvent.setup();
-    mockGadgetRegistry();
+    bootGadgetRegistry();
     renderExplorePage();
     await screen.findByText("gadget-master");
 
@@ -432,7 +446,8 @@ describe("ExplorePage", () => {
         name: "查看 gadget-master 详情",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText("共 1 个")).toBeInTheDocument();
+    // The search is debounced, so wait for the worker's answer to land.
+    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
     // The grid went back to its first page and shows only the match.
     expect(screen.queryByText("tool-24")).not.toBeInTheDocument();
     // A single result fits on one page, so the pagination bar disappears.
@@ -443,7 +458,7 @@ describe("ExplorePage", () => {
 
   it("restores the full registry when the search is cleared", async () => {
     const user = userEvent.setup();
-    mockGadgetRegistry();
+    bootGadgetRegistry();
     renderExplorePage();
     await screen.findByText("gadget-master");
 
@@ -459,7 +474,7 @@ describe("ExplorePage", () => {
 
   it("shows a no-match empty state for a search with no results", async () => {
     const user = userEvent.setup();
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -478,7 +493,8 @@ describe("ExplorePage", () => {
     // "widget" appears verbatim in exactly one field of each skill — name,
     // repo and description respectively — so the ranking is decided by the
     // field weights alone.
-    mockFetchFullIndex.mockResolvedValue([
+    harness.init();
+    harness.pushAll([
       {
         name: "widget-pack",
         repo: "acme/unrelated",
@@ -501,6 +517,7 @@ describe("ExplorePage", () => {
         downloads: 1,
       },
     ]);
+    harness.complete();
     renderExplorePage();
     await screen.findByText("widget-pack");
 
@@ -515,7 +532,9 @@ describe("ExplorePage", () => {
     const cardOrder = () =>
       screen
         .getAllByRole("button", { name: /查看 .+ 详情/ })
-        .map((el) => el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""));
+        .map((el) =>
+          el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""),
+        );
     expect(cardOrder()).toEqual(["widget-pack", "misc-tools", "docgen"]);
   });
 
@@ -524,7 +543,8 @@ describe("ExplorePage", () => {
     // Registry order deliberately opposes the popularity order: without a
     // search the cards render as beta → alpha, so only the search's install
     // boost can flip them to alpha → beta.
-    mockFetchFullIndex.mockResolvedValue([
+    harness.init();
+    harness.pushAll([
       {
         name: "beta-redis-clip",
         repo: "acme/beta",
@@ -540,6 +560,7 @@ describe("ExplorePage", () => {
         downloads: 5_000_000,
       },
     ]);
+    harness.complete();
     renderExplorePage();
     await screen.findByText("beta-redis-clip");
 
@@ -548,7 +569,9 @@ describe("ExplorePage", () => {
     const cardOrder = () =>
       screen
         .getAllByRole("button", { name: /查看 .+ 详情/ })
-        .map((el) => el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""));
+        .map((el) =>
+          el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""),
+        );
     expect(cardOrder()).toEqual(["beta-redis-clip", "alpha-redis-tool"]);
 
     await user.type(
@@ -556,17 +579,16 @@ describe("ExplorePage", () => {
       "redis",
     );
 
-    expect(
-      await screen.findByRole("button", {
-        name: "查看 alpha-redis-tool 详情",
-      }),
-    ).toBeInTheDocument();
-    expect(cardOrder()).toEqual(["alpha-redis-tool", "beta-redis-clip"]);
+    // The search is debounced and both cards are already on the unfiltered
+    // page one, so the reorder itself is what signals the fuzzy answer.
+    await waitFor(() =>
+      expect(cardOrder()).toEqual(["alpha-redis-tool", "beta-redis-clip"]),
+    );
   });
 
   it("highlights matched terms on search results only", async () => {
     const user = userEvent.setup();
-    mockGadgetRegistry();
+    bootGadgetRegistry();
     const { container } = renderExplorePage();
     await screen.findByText("gadget-master");
 
@@ -591,20 +613,38 @@ describe("ExplorePage", () => {
 
   it("sorts skills by downloads and by name from the toolbar", async () => {
     const user = userEvent.setup();
-    mockFetchFullIndex.mockResolvedValue([
-      { name: "alpha", repo: "o/alpha", description: "", stars: 0, downloads: 5 },
-      { name: "beta", repo: "o/beta", description: "", stars: 0, downloads: 300 },
-      { name: "gamma", repo: "o/gamma", description: "", stars: 0, downloads: 50 },
+    harness.init();
+    harness.pushAll([
+      {
+        name: "alpha",
+        repo: "o/alpha",
+        description: "",
+        stars: 0,
+        downloads: 5,
+      },
+      {
+        name: "beta",
+        repo: "o/beta",
+        description: "",
+        stars: 0,
+        downloads: 300,
+      },
+      {
+        name: "gamma",
+        repo: "o/gamma",
+        description: "",
+        stars: 0,
+        downloads: 50,
+      },
     ]);
+    harness.complete();
     renderExplorePage();
     await screen.findByText("alpha");
 
     // Cards appear in DOM order; exact-match the names so the repo subtitles
     // ("o/alpha") don't interfere.
     const cardOrder = () =>
-      screen
-        .getAllByText(/^(alpha|beta|gamma)$/)
-        .map((el) => el.textContent);
+      screen.getAllByText(/^(alpha|beta|gamma)$/).map((el) => el.textContent);
 
     expect(cardOrder()).toEqual(["alpha", "beta", "gamma"]);
 
@@ -621,7 +661,7 @@ describe("ExplorePage", () => {
 
   it("offers the category placeholder menu with 全部 preselected", async () => {
     const user = userEvent.setup();
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -640,7 +680,7 @@ describe("ExplorePage", () => {
 
   it("opens the detail panel when a card is clicked", async () => {
     const user = userEvent.setup();
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -656,7 +696,7 @@ describe("ExplorePage", () => {
   });
 
   it("switches skills inside the panel via the arrow keys", async () => {
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -678,7 +718,7 @@ describe("ExplorePage", () => {
 
   it("closes the panel via the overlay and Escape", async () => {
     const user = userEvent.setup();
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -701,7 +741,7 @@ describe("ExplorePage", () => {
 
   it("opens the drawer without reflowing the grid", async () => {
     const user = userEvent.setup();
-    mockRegistry(50);
+    bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -730,31 +770,8 @@ describe("ExplorePage", () => {
 });
 
 describe("ExplorePage streaming", () => {
-  /** The progress listener the page's hook registered, or null. */
-  let progress: ((skills: Skill[]) => void) | null;
-
-  /** Emit a progress snapshot from the (mocked) streaming index. */
-  async function emitProgress(skills: Skill[]) {
-    await act(async () => {
-      progress?.(skills);
-    });
-  }
-
-  beforeEach(() => {
-    progress = null;
-    mockSubscribeIndexProgress.mockImplementation((listener) => {
-      progress = listener;
-      return () => {
-        progress = null;
-      };
-    });
-  });
-
   it("paints a skeleton grid while the first snapshot is still in flight", async () => {
-    // Neither the promise nor any progress snapshot has landed yet.
-    mockFetchFullIndex.mockImplementation(
-      () => new Promise<Skill[]>(() => {}),
-    );
+    harness.init();
     const { container } = renderExplorePage();
     await act(async () => {});
 
@@ -765,21 +782,18 @@ describe("ExplorePage streaming", () => {
     );
     expect(screen.queryByText("skill-0")).not.toBeInTheDocument();
 
-    // The first snapshot replaces the skeleton with real cards.
-    await emitProgress(makeSkills(3, 0));
+    // The first streamed batch replaces the skeleton with real cards.
+    harness.pushAll(makeSkills(3, 0));
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
     expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
   });
 
   it("renders page one from progress snapshots while the index is still streaming", async () => {
-    // The download never finishes within the test — only snapshots arrive.
-    mockFetchFullIndex.mockImplementation(
-      () => new Promise<Skill[]>(() => {}),
-    );
+    harness.init();
     renderExplorePage();
     await act(async () => {});
 
-    await emitProgress(makeSkills(30, 0));
+    harness.pushAll(makeSkills(30, 0));
 
     // Page one paints from the partial data; the count reports what has
     // loaded so far and says it is still loading.
@@ -790,24 +804,18 @@ describe("ExplorePage streaming", () => {
     expect(screen.getByText(/加载中/)).toBeInTheDocument();
 
     // A later snapshot grows the registry (and the count) in place.
-    await emitProgress(makeSkills(60, 0));
+    harness.pushAll(makeSkills(60, 0).slice(30));
     expect(await screen.findByText(/共 60 个/)).toBeInTheDocument();
     expect(screen.getByText("共 60 个 · 加载中")).toBeInTheDocument();
   });
 
   it("falls back to substring search while streaming and fuzzy search once complete", async () => {
-    let resolveIndex: ((skills: Skill[]) => void) | undefined;
-    mockFetchFullIndex.mockImplementation(
-      () =>
-        new Promise<Skill[]>((resolve) => {
-          resolveIndex = resolve;
-        }),
-    );
+    harness.init();
     renderExplorePage();
     await act(async () => {});
 
     // Only the first 10 skills have streamed in, including the gadget.
-    await emitProgress(gadgetRegistry().slice(0, 10));
+    harness.pushAll(gadgetRegistry().slice(0, 10));
     await screen.findByText("gadget-master");
 
     const user = userEvent.setup();
@@ -815,10 +823,12 @@ describe("ExplorePage streaming", () => {
 
     // Exact substring still matches during streaming...
     await user.type(input, "gadget");
+    // The card is also on the unfiltered streaming page one, and the search
+    // itself is debounced — the count is what proves the filter applied.
+    expect(await screen.findByText(/共 1 个/)).toBeInTheDocument();
     expect(
       await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/共 1 个/)).toBeInTheDocument();
 
     // ...but a typo cannot, since the fallback has no fuzzy matching.
     await user.clear(input);
@@ -828,48 +838,12 @@ describe("ExplorePage streaming", () => {
     ).toBeInTheDocument();
 
     // The stream completes; the MiniSearch index builds over the full
-    // registry and the same typo now fuzzy-matches.
-    await act(async () => {
-      resolveIndex?.(gadgetRegistry());
-    });
+    // registry and the same typo now fuzzy-matches with no user retry.
+    harness.pushAll(gadgetRegistry().slice(10));
+    harness.complete();
     expect(
       await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/加载中/)).not.toBeInTheDocument();
-  });
-
-  it("builds the fuzzy index in the background and adopts it with no retry", async () => {
-    mockGadgetRegistry();
-
-    // Withhold the idle callback, so the test can observe the page at a point
-    // where the index is known to be missing.
-    const idleQueue: Array<() => void> = [];
-    vi.stubGlobal("requestIdleCallback", (task: () => void) => {
-      idleQueue.push(task);
-      return idleQueue.length;
-    });
-    vi.stubGlobal("cancelIdleCallback", () => {});
-
-    renderExplorePage();
-    await screen.findByRole("button", { name: "查看 gadget-master 详情" });
-
-    const user = userEvent.setup();
-    const input = screen.getByRole("textbox", { name: "搜索 Skill" });
-    await user.type(input, "gadgt");
-
-    // Nothing has been indexed yet, so a typo cannot match — and the count
-    // says the index is still building instead of implying "no such skill".
-    expect(await screen.findByText("共 0 个 · 索引中")).toBeInTheDocument();
-
-    // Granting the idle moment builds the index; the same query then
-    // resolves through fuzzy matching with no further input from the user.
-    await act(async () => {
-      while (idleQueue.length > 0) idleQueue.shift()?.();
-    });
-
-    expect(
-      await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/索引中/)).not.toBeInTheDocument();
   });
 });

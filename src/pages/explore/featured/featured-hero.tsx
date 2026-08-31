@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "../../../lib/utils";
-import type { HeroSlide } from "./featured-rankings";
+import type { HeroSlide } from "../../../lib/registry/featured-rankings";
 
 /** Where a hero slide click lands: the full, sortable registry list. */
 const EXPLORE_PATH = "/explore";

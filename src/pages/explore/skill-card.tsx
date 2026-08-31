@@ -7,7 +7,7 @@ import {
   INSTALLED_SKILLS_QUERY_KEY,
   useInstalledSkills,
 } from "../../hooks/use-installed-skills";
-import type { SkillSearchField } from "../../lib/search-skills";
+import type { SearchField } from "../../lib/registry/protocol";
 import { cn, formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { Button } from "../../components/ui/button";
@@ -42,9 +42,7 @@ const INSTALL_BUTTON: Record<
 };
 
 /** Matched indexed terms per field, from the search that produced this hit. */
-export type SkillCardMatched = Partial<
-  Record<SkillSearchField, readonly string[]>
->;
+export type SkillCardMatched = Partial<Record<SearchField, readonly string[]>>;
 
 /**
  * Splits text on the same separator class MiniSearch's default tokenizer

@@ -40,6 +40,11 @@ export default defineConfig({
   },
   // Env variables starting with TAURI_ are exposed to the client.
   envPrefix: ["VITE_", "TAURI_"],
+  // The registry worker is bundled as an ES module (it imports shared
+  // modules); WKWebView supports module workers on macOS 12+.
+  worker: {
+    format: "es",
+  },
   build: {
     // Multi-page build: the menu bar popover window gets its own entry
     // (see popover.html / src/popover/).

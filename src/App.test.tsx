@@ -4,14 +4,30 @@ import userEvent from "@testing-library/user-event";
 
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
-import { fetchFullIndex } from "./lib/skills-api";
 import App from "./App";
 
-vi.mock("./lib/skills-api", () => ({
-  // The hook passes this straight into its query key; keep it a stable array.
-  SKILLS_QUERY_KEY: ["skills", 6],
-  fetchFullIndex: vi.fn(),
-  subscribeIndexProgress: vi.fn(() => () => {}),
+// The routing tests never need registry data: hold the worker client at its
+// initial (empty, not-ready) snapshot so no async data reaches the UI.
+// The snapshot must be a stable reference — useSyncExternalStore re-renders
+// whenever getSnapshot returns a new object.
+const INITIAL_SNAPSHOT = vi.hoisted(() => ({
+  count: 0,
+  complete: false,
+  indexing: false,
+  ready: false,
+  epoch: 0,
+  error: null,
+}));
+
+vi.mock("./lib/registry/client", () => ({
+  initRegistry: vi.fn(),
+  reloadRegistry: vi.fn(),
+  getPage: vi.fn(() => new Promise(() => {})),
+  getFeatured: vi.fn(() => new Promise(() => {})),
+  lookupSkills: vi.fn(() => new Promise(() => {})),
+  getRegistrySnapshot: () => INITIAL_SNAPSHOT,
+  subscribeRegistry: vi.fn(() => () => {}),
+  resetRegistryClient: vi.fn(),
 }));
 
 // The real persister would read/write localStorage during provider restoration;
@@ -26,18 +42,11 @@ vi.mock("@tanstack/query-sync-storage-persister", () => ({
 }));
 
 const mockCreateSyncStoragePersister = vi.mocked(createSyncStoragePersister);
-const mockFetchFullIndex = vi.mocked(fetchFullIndex);
-
-// Keep the registry-index query (sidebar badge + explore) pending so its async
-// state updates never fire outside act() in these routing-only tests.
-mockFetchFullIndex.mockImplementation(() => new Promise(() => {}));
 
 describe("App routing", () => {
   afterEach(() => {
     // Reset the hash so each test starts from a clean route.
     window.location.hash = "";
-    mockFetchFullIndex.mockReset();
-    mockFetchFullIndex.mockImplementation(() => new Promise(() => {}));
   });
 
   it("persists the query cache to localStorage", async () => {
