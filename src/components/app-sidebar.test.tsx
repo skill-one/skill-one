@@ -51,7 +51,7 @@ describe("AppSidebar", () => {
   it("renders brand and nav items", () => {
     renderSidebar();
 
-    expect(screen.getByText("skillone")).toBeInTheDocument();
+    expect(screen.getByText("Skill One")).toBeInTheDocument();
     expect(screen.getByText("精选")).toBeInTheDocument();
     expect(screen.getByText("官方")).toBeInTheDocument();
     expect(screen.getByText("全部")).toBeInTheDocument();
