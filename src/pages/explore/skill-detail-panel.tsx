@@ -9,11 +9,11 @@ import type { Skill } from "../../types/skill";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import {
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "../../components/ui/sheet";
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "../../components/ui/drawer";
 import { Markdown } from "../../components/markdown";
 import { OwnerAvatar } from "../../components/owner-avatar";
 
@@ -25,13 +25,13 @@ interface SkillDetailPanelProps {
 }
 
 /**
- * Detail drawer for one skill, shown as a standard shadcn Sheet over the
- * right edge of the skill grid. The grid itself never reflows — opening or
- * closing the drawer leaves its layout and scroll position untouched. The
- * drawer is modal (dimmed overlay, focus trap, scroll lock); Escape, the
- * X button, or clicking the overlay closes it, and ←/→ switch skills.
- * Each skill's SKILL.md is fetched through TanStack Query and cached
- * independently, so revisits are instant.
+ * Detail drawer for one skill, shown as a standard shadcn Drawer sliding
+ * in from the right edge of the window. The grid itself never reflows —
+ * opening or closing the drawer leaves its layout and scroll position
+ * untouched. The drawer is modal (dimmed overlay, focus trap, scroll
+ * lock); Escape, clicking the overlay, or dragging the drawer sideways
+ * closes it, and ←/→ switch skills. Each skill's SKILL.md is fetched
+ * through TanStack Query and cached independently, so revisits are instant.
  */
 export function SkillDetailPanel({
   skill,
@@ -70,8 +70,8 @@ export function SkillDetailPanel({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [skill, onPrev, onNext]);
 
-  // Always render the SheetContent — Radix mounts and unmounts it with the
-  // Sheet's open state, keeping the drawer alive through the close
+  // Always render the DrawerContent — Radix mounts and unmounts it with the
+  // Drawer's open state, keeping the drawer alive through the close
   // animation. With no skill (and no latch yet) the drawer is empty, which
   // only happens before the first selection.
   const owner = shown?.repo.split("/")[0] ?? "";
@@ -88,11 +88,11 @@ export function SkillDetailPanel({
   const filePath = detail?.path.replace(/^\/+|\/+$/g, "") ?? "";
 
   return (
-    <SheetContent side="right" className="flex flex-col">
-      <SheetHeader>
+    <DrawerContent>
+      <DrawerHeader>
         <OwnerAvatar owner={owner} className="h-11 w-11 text-[18px]" />
-        <SheetTitle className="truncate">{shown?.name}</SheetTitle>
-        <SheetDescription asChild>
+        <DrawerTitle className="truncate">{shown?.name}</DrawerTitle>
+        <DrawerDescription asChild>
           <a
             href={sourceHref}
             onClick={(e) => {
@@ -105,7 +105,7 @@ export function SkillDetailPanel({
             <span className="truncate">{shown?.repo}</span>
             <ExternalLink className="h-3 w-3 shrink-0" />
           </a>
-        </SheetDescription>
+        </DrawerDescription>
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           {detail?.version && (
             <Badge variant="secondary">v{detail.version}</Badge>
@@ -127,7 +127,7 @@ export function SkillDetailPanel({
             </span>
           </span>
         </div>
-      </SheetHeader>
+      </DrawerHeader>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isPending ? (
@@ -186,6 +186,6 @@ export function SkillDetailPanel({
           </div>
         ) : null}
       </div>
-    </SheetContent>
+    </DrawerContent>
   );
 }

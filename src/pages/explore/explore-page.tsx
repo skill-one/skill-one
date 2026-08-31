@@ -31,7 +31,7 @@ import {
   PaginationLink,
 } from "../../components/ui/pagination";
 import { SkillCard } from "./skill-card";
-import { SkillDetailSheet } from "./skill-detail-sheet";
+import { SkillDetailDrawer } from "./skill-detail-drawer";
 
 /** Number of skills shown per page in the paginated registry view. */
 const PAGE_SIZE = 24;
@@ -468,7 +468,7 @@ export function ExplorePage() {
 
       {/* Modal detail drawer; the wiring (open/close, prev/next bounds) is
           shared with the featured page. */}
-      <SkillDetailSheet
+      <SkillDetailDrawer
         skills={pageSkills}
         selected={selected}
         onSelect={setSelected}

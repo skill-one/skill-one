@@ -7,7 +7,7 @@ import { Button } from "../../../components/ui/button";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../explore-page";
 import { SkillCard } from "../skill-card";
-import { SkillDetailSheet } from "../skill-detail-sheet";
+import { SkillDetailDrawer } from "../skill-detail-drawer";
 import { FeaturedHero } from "./featured-hero";
 import { buildHeroSlides } from "./featured-rankings";
 
@@ -144,7 +144,7 @@ export function FeaturedPage() {
         </div>
 
       {/* Modal detail drawer shared with the explore page. */}
-      <SkillDetailSheet
+      <SkillDetailDrawer
         skills={flatSkills}
         selected={selected}
         onSelect={setSelected}

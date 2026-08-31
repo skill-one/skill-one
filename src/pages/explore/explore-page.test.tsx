@@ -676,16 +676,16 @@ describe("ExplorePage", () => {
     ).toBeInTheDocument();
   });
 
-  it("closes the panel via the X button and Escape", async () => {
+  it("closes the panel via the overlay and Escape", async () => {
     const user = userEvent.setup();
     mockRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
-    // X button closes the drawer.
+    // Clicking the overlay closes the drawer.
     await user.click(screen.getByText("skill-0"));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(document.querySelector('[data-slot="drawer-overlay"]')!);
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
@@ -719,7 +719,7 @@ describe("ExplorePage", () => {
       "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
     );
 
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
