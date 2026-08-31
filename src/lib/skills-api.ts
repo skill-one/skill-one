@@ -184,10 +184,19 @@ const PROGRESS_INTERVAL_MS = 400;
  * accumulates the lines parsed so far; `listeners` receive throttled
  * cumulative snapshots while the stream runs (and one immediate snapshot —
  * everything parsed so far — when joining a download that already finished).
+ *
+ * `announced` is the last snapshot handed out. It is what makes the
+ * cumulative count monotonically increasing: a candidate that fails
+ * mid-stream restarts the parse from scratch on the next one, and those
+ * early snapshots are smaller than what listeners already saw. Keeping the
+ * announced copy on the state (rather than `skills`) also means a late
+ * subscriber joins from it, so it can never observe a backwards step either.
  */
 interface IndexLoad {
   promise: Promise<Skill[]>;
   skills: Skill[];
+  /** Last announced snapshot; empty until the first notify. */
+  announced: Skill[];
   listeners: Set<(skills: Skill[]) => void>;
 }
 
@@ -197,19 +206,20 @@ function startLoad(): IndexLoad {
   const state: IndexLoad = {
     promise: null as unknown as Promise<Skill[]>,
     skills: [],
+    announced: [],
     listeners: new Set(),
   };
   state.promise = (async () => {
     let lastNotify = 0;
     const notify = () => {
-      if (state.skills.length === 0) return;
+      if (state.skills.length <= state.announced.length) return;
       // Leading edge: the very first skills notify immediately so the UI can
       // paint page one while the rest of the file is still in flight.
       const now = Date.now();
       if (now - lastNotify < PROGRESS_INTERVAL_MS) return;
       lastNotify = now;
-      const snapshot = [...state.skills];
-      for (const listener of state.listeners) listener(snapshot);
+      state.announced = [...state.skills];
+      for (const listener of state.listeners) listener(state.announced);
     };
     try {
       await fetchFirstStream(fileCandidates({ ...INDEX_SPEC }), async (body) => {
@@ -248,7 +258,9 @@ export function subscribeIndexProgress(
 ): () => void {
   load ??= startLoad();
   load.listeners.add(listener);
-  if (load.skills.length > 0) listener([...load.skills]);
+  // Start from the last announced snapshot, not the live buffer: the live one
+  // is rewound to empty on every candidate restart.
+  if (load.announced.length > 0) listener(load.announced);
   const state = load;
   return () => {
     state.listeners.delete(listener);

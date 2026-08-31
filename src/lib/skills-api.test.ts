@@ -77,6 +77,32 @@ function timedStream(chunks: string[], intervalMs: number): Response {
   return new Response(body);
 }
 
+/**
+ * Like `timedStream`, but the body errors once `errorAfter` chunks were read —
+ * a candidate that dies part-way through, with the timing needed to observe
+ * the progress notifications it already emitted.
+ */
+function timedStreamError(
+  chunks: string[],
+  intervalMs: number,
+  errorAfter: number,
+): Response {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const push = (i: number) => {
+        if (i >= errorAfter) {
+          controller.error(new Error("connection dropped"));
+          return;
+        }
+        controller.enqueue(encoder.encode(chunks[i]));
+        setTimeout(() => push(i + 1), intervalMs);
+      };
+      push(0);
+    },
+  });
+  return new Response(body);
+}
+
 /** A single-chunk text response, as most tests need. */
 function ok(body: string): Response {
   return streamOk([body]);
@@ -444,6 +470,56 @@ describe("index streaming", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(skills.map((s) => s.name)).toEqual(["b", "c"]);
+  });
+
+  it("never rewinds the cumulative progress when a candidate restarts", async () => {
+    vi.useFakeTimers();
+    const { fetchFullIndex, subscribeIndexProgress } = await freshModule();
+    const line = (name: string) =>
+      JSON.stringify({
+        source: "owner/repo",
+        skillId: name,
+        installs: 1,
+        weeklyInstalls: [],
+      });
+    // The origin serves a, b, c (one notification each at 450ms) and dies.
+    fetchMock
+      .mockResolvedValueOnce(
+        timedStreamError(
+          [`${line("a")}\n`, `${line("b")}\n`, `${line("c")}\n`],
+          450,
+          3,
+        ),
+      )
+      // The CDN then re-serves the file from scratch, so its early snapshots
+      // are shorter than the three entries listeners have already seen.
+      .mockResolvedValueOnce(
+        timedStream(
+          [
+            `${line("b")}\n`,
+            `${line("c")}\n`,
+            `${line("d")}\n`,
+            `${line("e")}\n`,
+          ],
+          450,
+        ),
+      );
+
+    const seen: number[] = [];
+    const unsubscribe = subscribeIndexProgress((skills) => {
+      seen.push(skills.length);
+    });
+    const done = fetchFullIndex();
+
+    // Run both candidates to completion.
+    for (let i = 0; i < 12; i++) await vi.advanceTimersByTimeAsync(450);
+    await done;
+
+    // The restart's shorter snapshots are dropped, so the count the UI shows
+    // only ever climbs: 1, 2, 3, then 4 once the retry passes the point the
+    // first candidate had reached. It never jumps back down to 1.
+    expect(seen).toEqual([1, 2, 3, 4]);
+    unsubscribe();
   });
 
   it("starts the download from a progress subscription alone", async () => {
