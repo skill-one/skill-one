@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { openExternal } from "../../lib/open-external";
 import type { Skill } from "../../types/skill";
-import { Sheet } from "../../components/ui/sheet";
+import { Drawer } from "../../components/ui/drawer";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
 vi.mock("../../lib/skill-detail-api", () => ({
@@ -42,12 +42,12 @@ const detail = {
 let queryClient: QueryClient;
 
 /**
- * The panel renders the content side of a modal Sheet, so the tests mount
- * it inside a stateful open Sheet exactly like the explore page does. The
- * sheet starts open only when a skill is present, mirroring the page's
+ * The panel renders the content side of a modal Drawer, so the tests mount
+ * it inside a stateful open Drawer exactly like the explore page does. The
+ * drawer starts open only when a skill is present, mirroring the page's
  * `open = skill != null` wiring.
  */
-function Drawer({
+function DetailDrawer({
   skill,
   onPrev,
   onNext,
@@ -59,21 +59,21 @@ function Drawer({
   const [open, setOpen] = useState(skill != null);
   return (
     <QueryClientProvider client={queryClient}>
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Drawer direction="right" open={open} onOpenChange={setOpen}>
         <SkillDetailPanel
           skill={skill}
           onPrev={onPrev ?? (() => {})}
           onNext={onNext ?? (() => {})}
         />
-      </Sheet>
+      </Drawer>
     </QueryClientProvider>
   );
 }
 
 function renderDrawer(
-  props: Partial<Parameters<typeof Drawer>[0]> & { skill?: Skill | null },
+  props: Partial<Parameters<typeof DetailDrawer>[0]> & { skill?: Skill | null },
 ) {
-  return render(<Drawer skill={skill} {...props} />);
+  return render(<DetailDrawer skill={skill} {...props} />);
 }
 
 beforeEach(() => {
@@ -189,13 +189,15 @@ describe("SkillDetailPanel", () => {
     expect(onPrev).toHaveBeenCalledTimes(1);
   });
 
-  it("closes via the X button", async () => {
+  it("closes via clicking the overlay", async () => {
     const user = userEvent.setup();
     mockFetchSkillDetail.mockResolvedValue(detail);
     renderDrawer({});
 
     await screen.findByText("Use this skill for PDFs.");
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    const overlay = document.querySelector('[data-slot="drawer-overlay"]');
+    expect(overlay).not.toBeNull();
+    await user.click(overlay!);
     await vi.waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
