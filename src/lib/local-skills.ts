@@ -146,6 +146,25 @@ export async function linkAgent(
   return mockLinkResult(name, "linked");
 }
 
+/**
+ * Link several agents in one go (一键链接). Reuses the backend's batch link
+ * with `migrate`, mirroring the single-agent confirm flow: each agent's skills
+ * move into the canonical dir, other files park into its backup slot. Reruns
+ * are safe — already linked agents come back as `alreadyLinked` and are left
+ * untouched.
+ */
+export async function linkAllAgents(
+  names: string[],
+): Promise<AgentLinkResult[]> {
+  if (names.length === 0) return [];
+  if (isTauri()) {
+    const result = await linkAgents(names, { global: true, migrate: true });
+    return result.results;
+  }
+  names.forEach((name) => setMockAgentLinked(name, true));
+  return names.flatMap((name) => mockLinkResult(name, "linked"));
+}
+
 /** Unlink one agent's skills dir (backend in Tauri, mock store in the browser). */
 export async function unlinkAgent(name: string): Promise<AgentLinkResult[]> {
   if (isTauri()) {

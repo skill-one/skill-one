@@ -23,9 +23,13 @@ async function openAgentMenu(user: ReturnType<typeof userEvent.setup>) {
   );
 }
 
-/** Menu items read as "<display> <state>" — the status dot holds no text. */
+/**
+ * Menu items read as "<display> [pending counts] <state>" — the status dot
+ * holds no text, and agents with content in their dir carry badge text between
+ * the display name and the state.
+ */
 const menuItem = (display: string, state: string) =>
-  screen.findByRole("menuitem", { name: new RegExp(`${display}\\s+${state}`) });
+  screen.findByRole("menuitem", { name: new RegExp(`${display}.*${state}`) });
 
 describe("MySkillsPage", () => {
   afterEach(() => {

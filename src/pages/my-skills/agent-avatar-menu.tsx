@@ -11,6 +11,7 @@ import {
 import {
   fetchAgentStatus,
   linkAgent,
+  linkAllAgents,
   unlinkAgent,
 } from "../../lib/local-skills";
 import type { AgentStatus } from "../../lib/skills-manager";
@@ -28,7 +29,7 @@ import {
 } from "../../components/ui/dropdown-menu";
 import { AgentAvatarGroup } from "./agent-avatar-group";
 import { agentLinkState, agentStateDotClass, agentStateLabel } from "./agent-link-state";
-import { formatLinkMessage, type Notice } from "./link-notice";
+import { formatBulkLinkMessage, formatLinkMessage, type Notice } from "./link-notice";
 import {
   LinkConfirmDialog,
   type LinkConfirmTarget,
@@ -127,6 +128,19 @@ export function AgentAvatarMenu() {
       }),
   });
 
+  const linkAllMutation = useMutation({
+    mutationFn: (names: string[]) => linkAllAgents(names),
+    onSuccess: (results) => {
+      invalidate();
+      setNotice(formatBulkLinkMessage(results));
+    },
+    onError: (err) =>
+      setNotice({
+        text: `一键链接失败：${err instanceof Error ? err.message : String(err)}`,
+        kind: "error",
+      }),
+  });
+
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(null), 5000);
@@ -160,7 +174,10 @@ export function AgentAvatarMenu() {
   };
 
   const list = agents ?? [];
+  // Agents 一键链接 can act on: unlinked and not using their own native dir.
+  const linkable = list.filter((agent) => !agent.linked && !agent.canonical);
   const busyFor = (name: string) =>
+    linkAllMutation.isPending ||
     (linkMutation.isPending && linkMutation.variables === name) ||
     (confirmMutation.isPending && confirmMutation.variables === name) ||
     (unlinkMutation.isPending && unlinkMutation.variables === name);
@@ -231,37 +248,72 @@ export function AgentAvatarMenu() {
 
           {/* The menu lists every agent, including the ones the strip folds
               into its +N count, so all of them are handled the same way. */}
-          <DropdownMenuContent align="start" className="min-w-56">
-            <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
-              Agents
+          <DropdownMenuContent align="start" className="min-w-64">
+            <DropdownMenuLabel className="flex items-center justify-between gap-3">
+              <span className="text-[11px] font-normal text-muted-foreground">
+                Agents · 共 {list.length} 个
+              </span>
+              {/* A plain button (not a menu item) so the bulk link keeps the
+                  menu open: statuses refresh in place via the query refetch. */}
+              <button
+                type="button"
+                disabled={
+                  linkable.length === 0 || linkAllMutation.isPending
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  linkAllMutation.mutate(linkable.map((agent) => agent.name));
+                }}
+                className="flex shrink-0 items-center gap-1 rounded text-[11px] font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+              >
+                {linkAllMutation.isPending && (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                )}
+                一键链接
+              </button>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              {list.map((agent) => (
-                <DropdownMenuItem
-                  key={agent.name}
-                  disabled={busyFor(agent.name)}
-                  onSelect={() => handleSelect(agent)}
-                  className="gap-2.5"
-                >
-                  <AgentIcon agentName={agent.name} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-[13px]">
-                    {agent.display}
-                  </span>{" "}
-                  {/* Whitespace-only node: keeps the item's accessible name
-                      readable ("Cursor 已链接") instead of running the two
-                      labels together. Ignored by the flex layout. */}
-                  <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <span
-                      className={cn(
-                        "h-1.5 w-1.5 rounded-full",
-                        agentStateDotClass[agentLinkState(agent)],
+              {list.map((agent) => {
+                const skillsCount = agent.internalSkills?.length ?? 0;
+                const othersCount = agent.internalOthers?.length ?? 0;
+                return (
+                  <DropdownMenuItem
+                    key={agent.name}
+                    disabled={busyFor(agent.name)}
+                    onSelect={() => handleSelect(agent)}
+                    className="gap-2.5"
+                  >
+                    <AgentIcon agentName={agent.name} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px]">
+                        {agent.display}
+                      </div>
+                      {/* Pending-action counts, shown only when there is
+                          something a link would do to this agent's dir. */}
+                      {(skillsCount > 0 || othersCount > 0) && (
+                        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                          {skillsCount > 0 && (
+                            <span>{skillsCount} 个 skill 待导入</span>
+                          )}
+                          {othersCount > 0 && (
+                            <span>{othersCount} 个文件待备份</span>
+                          )}
+                        </div>
                       )}
-                    />
-                    {agentStateLabel(agent)}
-                  </span>
-                </DropdownMenuItem>
-              ))}
+                    </div>
+                    <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          agentStateDotClass[agentLinkState(agent)],
+                        )}
+                      />
+                      {agentStateLabel(agent)}
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })}
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
