@@ -750,6 +750,27 @@ describe("ExplorePage streaming", () => {
     });
   });
 
+  it("paints a skeleton grid while the first snapshot is still in flight", async () => {
+    // Neither the promise nor any progress snapshot has landed yet.
+    mockFetchFullIndex.mockImplementation(
+      () => new Promise<Skill[]>(() => {}),
+    );
+    const { container } = renderExplorePage();
+    await act(async () => {});
+
+    // The switch is instant: card-shaped skeletons fill the grid instead of
+    // a spinner, and no card is rendered from nothing.
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(
+      12,
+    );
+    expect(screen.queryByText("skill-0")).not.toBeInTheDocument();
+
+    // The first snapshot replaces the skeleton with real cards.
+    await emitProgress(makeSkills(3, 0));
+    expect(await screen.findByText("skill-0")).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
+  });
+
   it("renders page one from progress snapshots while the index is still streaming", async () => {
     // The download never finishes within the test — only snapshots arrive.
     mockFetchFullIndex.mockImplementation(
