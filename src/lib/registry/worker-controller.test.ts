@@ -22,7 +22,11 @@ vi.mock("../../data/featured-content", () => ({
 
 import { createRegistryController } from "./worker-controller";
 import type { RegistryCache } from "./cache";
-import type { RegistryWorkerMessage } from "./protocol";
+import type {
+  RegistryWorkerMessage,
+  RepoSortOrder,
+  ReposRequest,
+} from "./protocol";
 import type { Skill } from "../../types/skill";
 
 /** Deterministic skill factory; `i` varies name, repo and metrics. */
@@ -372,6 +376,135 @@ describe("createRegistryController — featured + lookup", () => {
     expect(entries[0]?.name).toBe("alpha");
     expect(entries[1]?.name).toBe("beta");
     expect(entries[2]).toBeNull();
+  });
+});
+
+describe("createRegistryController — getRepos", () => {
+  // Four skills across three repos: alpha has 2 skills (80 downloads,
+  // 10 stars), beta 1 skill (100 downloads, 5 stars), git/x 1 skill.
+  const reposSkills: Skill[] = [
+    { ...skill(0), name: "a1", repo: "acme/alpha", downloads: 50, stars: 10 },
+    { ...skill(1), name: "a2", repo: "acme/alpha", downloads: 30, stars: 10 },
+    { ...skill(2), name: "b1", repo: "acme/beta", downloads: 100, stars: 5 },
+    { ...skill(3), name: "g1", repo: "git/x", downloads: 1, stars: 1 },
+  ];
+
+  async function reposSetup(skills: Skill[]) {
+    const t = setup({ skills });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+    return t;
+  }
+
+  function requestRepos(
+    t: ReturnType<typeof setup>,
+    payload: ReposRequest,
+  ) {
+    const before = t.recorded.results.length;
+    t.controller.handle({ type: "getRepos", id: before + 1, payload });
+    return resultData<{ repos: Array<{ repo: string }>; total: number }>(
+      t.recorded.results[before],
+    );
+  }
+
+  it("aggregates per-repo skill counts, downloads and stars", async () => {
+    const t = await reposSetup(reposSkills);
+    const data = requestRepos(t, {
+      query: "",
+      sort: "default",
+      page: 0,
+      pageSize: 10,
+    });
+    expect(data.total).toBe(3);
+    // Default order: most skills first, repo name as the tie-break.
+    expect(data.repos).toEqual([
+      { repo: "acme/alpha", skills: 2, downloads: 80, stars: 10 },
+      { repo: "acme/beta", skills: 1, downloads: 100, stars: 5 },
+      { repo: "git/x", skills: 1, downloads: 1, stars: 1 },
+    ]);
+  });
+
+  it("filters by case-insensitive repo substring", async () => {
+    const t = await reposSetup(reposSkills);
+    expect(
+      requestRepos(t, {
+        query: "ACME",
+        sort: "default",
+        page: 0,
+        pageSize: 10,
+      }).total,
+    ).toBe(2);
+    expect(
+      requestRepos(t, {
+        query: "beta",
+        sort: "default",
+        page: 0,
+        pageSize: 10,
+      }).repos[0]?.repo,
+    ).toBe("acme/beta");
+  });
+
+  it("sorts by skills, downloads and name", async () => {
+    const t = await reposSetup(reposSkills);
+    const names = (sort: RepoSortOrder) =>
+      requestRepos(t, { query: "", sort, page: 0, pageSize: 10 }).repos.map(
+        (r) => r.repo,
+      );
+    expect(names("skills")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
+    expect(names("downloads")).toEqual(["acme/beta", "acme/alpha", "git/x"]);
+    expect(names("name")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
+  });
+
+  it("pages the repo list", async () => {
+    const t = await reposSetup(reposSkills);
+    const page0 = requestRepos(t, {
+      query: "",
+      sort: "default",
+      page: 0,
+      pageSize: 2,
+    });
+    const page1 = requestRepos(t, {
+      query: "",
+      sort: "default",
+      page: 1,
+      pageSize: 2,
+    });
+    expect(page0.repos.map((r) => r.repo)).toEqual(["acme/alpha", "acme/beta"]);
+    expect(page1.repos.map((r) => r.repo)).toEqual(["git/x"]);
+    expect(page1.total).toBe(3);
+  });
+
+  it("tracks the loaded prefix while streaming and caches once complete", async () => {
+    const t = setup();
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    // Mid-stream: answers reflect the loaded prefix and keep growing (no
+    // caching over partial data).
+    t.push(reposSkills[0]);
+    expect(
+      requestRepos(t, { query: "", sort: "default", page: 0, pageSize: 10 })
+        .total,
+    ).toBe(1);
+    t.push(reposSkills[2]);
+    expect(
+      requestRepos(t, { query: "", sort: "default", page: 0, pageSize: 10 })
+        .total,
+    ).toBe(2);
+
+    t.complete();
+    await t.flush();
+
+    // Landed: the settled aggregation answers from the per-version cache.
+    expect(
+      requestRepos(t, { query: "", sort: "default", page: 0, pageSize: 10 }),
+    ).toMatchObject({
+      total: 2,
+      repos: [
+        { repo: "acme/alpha", skills: 1 },
+        { repo: "acme/beta", skills: 1 },
+      ],
+    });
   });
 });
 

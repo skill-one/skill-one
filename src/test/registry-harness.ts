@@ -3,6 +3,8 @@ import type {
   FeaturedData,
   PageData,
   PageRequest,
+  RepoPageData,
+  ReposRequest,
   RegistryWorkerMessage,
   SkillRef,
 } from "../lib/registry/protocol";
@@ -34,6 +36,7 @@ export interface RegistryHarness {
   /** Make every RPC reject (worker crash stand-in) until cleared. */
   setRpcError(err: Error | null): void;
   getPage(req: PageRequest): Promise<PageData>;
+  getRepos(req: ReposRequest): Promise<RepoPageData>;
   getFeatured(): Promise<FeaturedData>;
   lookupSkills(refs: SkillRef[]): Promise<{ entries: Array<Skill | null> }>;
   getSnapshot(): RegistrySnapshot;
@@ -143,7 +146,7 @@ export function createRegistryHarness(): RegistryHarness {
   }
 
   async function request<T>(
-    type: "getPage" | "getFeatured" | "lookupSkills",
+    type: "getPage" | "getRepos" | "getFeatured" | "lookupSkills",
     payload?: unknown,
   ): Promise<T> {
     if (rpcError) throw rpcError;
@@ -196,6 +199,9 @@ export function createRegistryHarness(): RegistryHarness {
     getPage(req) {
       return request<PageData>("getPage", req);
     },
+    getRepos(req) {
+      return request<RepoPageData>("getRepos", req);
+    },
     getFeatured() {
       return request<FeaturedData>("getFeatured");
     },
@@ -232,6 +238,7 @@ export function createRegistryClientMock(harness: RegistryHarness) {
     initRegistry: () => harness.init(),
     reloadRegistry: () => harness.reload(),
     getPage: (req: PageRequest) => harness.getPage(req),
+    getRepos: (req: ReposRequest) => harness.getRepos(req),
     getFeatured: () => harness.getFeatured(),
     lookupSkills: (refs: SkillRef[]) => harness.lookupSkills(refs),
     getRegistrySnapshot: () => harness.getSnapshot(),

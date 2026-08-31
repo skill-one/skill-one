@@ -3,6 +3,8 @@ import type {
   FeaturedData,
   PageData,
   PageRequest,
+  RepoPageData,
+  ReposRequest,
   RegistryWorkerMessage,
 } from "./protocol";
 import type { SkillRef } from "../../data/featured-content";
@@ -104,7 +106,7 @@ function ensureInit() {
 }
 
 function request(
-  type: "getPage" | "getFeatured" | "lookupSkills",
+  type: "getPage" | "getRepos" | "getFeatured" | "lookupSkills",
   payload?: unknown,
 ): Promise<unknown> {
   ensureInit();
@@ -135,6 +137,11 @@ export function resetRegistryClient() {
 /** One paged explore result (browse or search). */
 export function getPage(request_: PageRequest): Promise<PageData> {
   return request("getPage", request_) as Promise<PageData>;
+}
+
+/** One paged repos result (browse or search). */
+export function getRepos(request_: ReposRequest): Promise<RepoPageData> {
+  return request("getRepos", request_) as Promise<RepoPageData>;
 }
 
 /** Featured payload; call only once `ready` (see useRegistryStats). */

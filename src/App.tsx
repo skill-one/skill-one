@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { listen } from "@tauri-apps/api/event";
-import { Folder, GitFork } from "lucide-react";
+import { Folder } from "lucide-react";
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppSidebar } from "./components/app-sidebar";
@@ -12,6 +12,7 @@ import { createQueryClient } from "./lib/query-client";
 import { isTauri } from "./lib/tauri";
 import { ExplorePage } from "./pages/explore/explore-page";
 import { FeaturedPage } from "./pages/explore/featured/featured-page";
+import { ReposPage } from "./pages/explore/repos/repos-page";
 import { MySkillsPage } from "./pages/my-skills/my-skills-page";
 import { SettingsPage } from "./pages/settings/settings-page";
 import { POPOVER_NAVIGATE_EVENT } from "./popover/popover-events";
@@ -68,16 +69,7 @@ export default function App() {
                 <Route path="/explore" element={<ExplorePage />} />
                 <Route path="/my-skills" element={<MySkillsPage />} />
                 <Route path="/explore/featured" element={<FeaturedPage />} />
-                <Route
-                  path="/explore/repos"
-                  element={
-                    <PlaceholderPage
-                      icon={GitFork}
-                      title="仓库"
-                      description="按仓库浏览 Skill，每个仓库显示其中的 Skill 数量 · 即将上线"
-                    />
-                  }
-                />
+                <Route path="/explore/repos" element={<ReposPage />} />
                 <Route
                   path="/my-skills/project"
                   element={<PlaceholderPage icon={Folder} title="项目" />}

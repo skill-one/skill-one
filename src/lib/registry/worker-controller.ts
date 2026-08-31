@@ -8,6 +8,9 @@ import {
 import type {
   PageData,
   PageRequest,
+  RepoInfo,
+  RepoPageData,
+  ReposRequest,
   RegistryEvent,
   RegistryRequest,
   RegistryWorkerMessage,
@@ -84,6 +87,10 @@ export function createRegistryController(
   let dataVersion = 0;
   let orderCache: { version: number; sort: SortOrder; ids: number[] } | null =
     null;
+  // Aggregated per-repo summaries, cached per data version like the sort
+  // order: grouping the registry is an O(n) pass, page requests only filter,
+  // sort and slice the (much smaller) repo list.
+  let repoCache: { version: number; repos: RepoInfo[] } | null = null;
 
   const emitProgress = () => {
     post({
@@ -131,6 +138,7 @@ export function createRegistryController(
       lastNotify = 0;
       dataVersion++;
       orderCache = null;
+      repoCache = null;
     }
     try {
       await deps.readIndex(
@@ -171,6 +179,7 @@ export function createRegistryController(
     announcedCount = buffer.length;
     dataVersion++;
     orderCache = null;
+    repoCache = null;
     // No separate "landed" event: buildIndex immediately emits the settled
     // count and posts ready — the index build is synchronous from here.
     void deps.cache.save(store);
@@ -222,6 +231,60 @@ export function createRegistryController(
         .map((id) => ({ skill: store[id], matched: {} })),
       total: ids.length,
     };
+  };
+
+  /**
+   * Aggregated per-repo summaries. While the download streams in the list
+   * keeps growing, so the aggregation is recomputed per request; once the
+   * dataset has landed it is cached per data version (see `repoCache`).
+   */
+  const reposFor = (): RepoInfo[] => {
+    if (complete && repoCache?.version === dataVersion) return repoCache.repos;
+    const byRepo = new Map<string, RepoInfo>();
+    for (const skill of store) {
+      const entry = byRepo.get(skill.repo);
+      if (entry) {
+        entry.skills++;
+        entry.downloads += skill.downloads;
+        // Same repo, same star count; max() simply tolerates bad data.
+        entry.stars = Math.max(entry.stars, skill.stars);
+      } else {
+        byRepo.set(skill.repo, {
+          repo: skill.repo,
+          skills: 1,
+          downloads: skill.downloads,
+          stars: skill.stars,
+        });
+      }
+    }
+    const repos = [...byRepo.values()].sort(
+      (a, b) => b.skills - a.skills || a.repo.localeCompare(b.repo),
+    );
+    if (complete) repoCache = { version: dataVersion, repos };
+    return repos;
+  };
+
+  const getRepos = ({
+    query,
+    sort,
+    page,
+    pageSize,
+  }: ReposRequest): RepoPageData => {
+    const q = query.trim().toLowerCase();
+    let repos = reposFor();
+    if (q) repos = repos.filter((repo) => repo.repo.toLowerCase().includes(q));
+    if (sort !== "default") {
+      const byName = (a: RepoInfo, b: RepoInfo) => a.repo.localeCompare(b.repo);
+      repos = [...repos].sort((a, b) =>
+        sort === "skills"
+          ? b.skills - a.skills || byName(a, b)
+          : sort === "downloads"
+            ? b.downloads - a.downloads || byName(a, b)
+            : byName(a, b),
+      );
+    }
+    const start = page * pageSize;
+    return { repos: repos.slice(start, start + pageSize), total: repos.length };
   };
 
   /** Featured payload: hero slides plus resolved curated sections. */
@@ -313,6 +376,9 @@ export function createRegistryController(
         switch (message.type) {
           case "getPage":
             data = getPage(message.payload);
+            break;
+          case "getRepos":
+            data = getRepos(message.payload);
             break;
           case "getFeatured":
             data = getFeatured();
