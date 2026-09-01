@@ -3,8 +3,8 @@
 [English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
 Through the Tauri backend (`src-tauri/src/skills.rs`), this project calls the
-[`Manager`](https://docs.rs/agents-skills/latest/agents_skills/struct.Manager.html)
-facade of `agents-skills` v0.9 to expose skill installation and agent-linking
+[`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
+facade of `agents-skills` v0.10 to expose skill installation and agent-linking
 capabilities to the frontend. The frontend reaches these Tauri commands via the
 `invoke` wrapper in `src/lib/skills-manager.ts`.
 
@@ -14,7 +14,7 @@ capabilities to the frontend. The frontend reaches these Tauri commands via the
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.9"
+agents-skills = "0.10"
 ```
 
 Since 0.8 the library's `core` module is private: everything the app needs is

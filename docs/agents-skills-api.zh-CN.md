@@ -2,8 +2,8 @@
 
 [English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
-本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.9 的
-[`Manager`](https://docs.rs/agents-skills/latest/agents_skills/struct.Manager.html)
+本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.10 的
+[`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
 门面，将技能安装与 agent 链接能力暴露给前端。前端经 `src/lib/skills-manager.ts`
 的 `invoke` 封装访问这些 Tauri 命令。
 
@@ -13,7 +13,7 @@
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.9"
+agents-skills = "0.10"
 ```
 
 自 0.8 起，库的 `core` 模块不再公开：应用所需的一切都从 crate 根导出

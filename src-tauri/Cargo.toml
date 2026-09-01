@@ -27,7 +27,7 @@ tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-ap
 # Opens external links (skill sources) in the system browser.
 tauri-plugin-opener = "2"
 # Skills install / agent management backed by the agents-skills library.
-agents-skills = "0.9"
+agents-skills = "0.10"
 serde = { version = "1", features = ["derive"] }
 # Frontmatter parsing for description extraction (same parser agents-skills uses;
 # the library's own parser is private since 0.8).
