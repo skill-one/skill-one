@@ -15,7 +15,7 @@ import type { InstalledSkill } from "../../lib/skills-manager";
 import type { SkillRef } from "../../lib/registry/protocol";
 import { cn } from "../../lib/utils";
 import {
-  INSTALLED_SKILLS_QUERY_KEY,
+  markSkillsChanged,
   useInstalledSkills,
 } from "../../hooks/use-installed-skills";
 import { useRegistrySkillMeta } from "../../hooks/use-registry-skill-meta";
@@ -173,8 +173,7 @@ export function MySkillsPage() {
     {},
   );
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: INSTALLED_SKILLS_QUERY_KEY });
+  const invalidate = () => markSkillsChanged(queryClient);
 
   const removeMutation = useMutation({
     mutationFn: (name: string) => removeInstalledSkill(name),
@@ -187,9 +186,7 @@ export function MySkillsPage() {
     onMutate: ({ name, enabled }) =>
       setPendingEnabled((prev) => ({ ...prev, [name]: enabled })),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: INSTALLED_SKILLS_QUERY_KEY,
-      });
+      await markSkillsChanged(queryClient);
       setPendingEnabled({});
     },
     onError: () => {

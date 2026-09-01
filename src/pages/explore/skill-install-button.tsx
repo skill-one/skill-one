@@ -4,7 +4,7 @@ import { Check, Download, Loader2, RefreshCw } from "lucide-react";
 
 import { installSkillFromSource } from "../../lib/local-skills";
 import {
-  INSTALLED_SKILLS_QUERY_KEY,
+  markSkillsChanged,
   useInstalledSkills,
 } from "../../hooks/use-installed-skills";
 import { cn } from "../../lib/utils";
@@ -103,12 +103,11 @@ export function SkillInstallButton({
     onError?.(null);
     try {
       await installSkillFromSource(skill.repo, skill.name);
-      // The "my skills" page caches its list for 10 minutes (staleTime) and
-      // never GCs it, so invalidate here to make the newly installed skill
-      // show up there on the next visit.
-      await queryClient.invalidateQueries({
-        queryKey: INSTALLED_SKILLS_QUERY_KEY,
-      });
+      // The "my skills" list is cached for 10 minutes (staleTime) and never
+      // GCs, so refresh this window and broadcast the change: invalidate here
+      // makes the new skill show up on the next visit, and the broadcast lets
+      // the menu bar popover (its own webview + cache) update live.
+      await markSkillsChanged(queryClient);
       setInstallState("installed");
     } catch (err) {
       setInstallState("error");

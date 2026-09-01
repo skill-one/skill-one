@@ -1,17 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithRouter } from "../test/test-utils";
 import { fetchInstalledSkills } from "../lib/local-skills";
 import type { InstalledSkill } from "../lib/skills-manager";
-import { POPOVER_NAVIGATE_EVENT, skillPath } from "./popover-events";
+import {
+  POPOVER_NAVIGATE_EVENT,
+  SKILLS_CHANGED_EVENT,
+  skillPath,
+} from "./popover-events";
 import { PopoverPage } from "./popover-page";
 
-const { emitMock, hideMock } = vi.hoisted(() => ({
-  emitMock: vi.fn(),
-  hideMock: vi.fn(),
-}));
+type EventHandler = (event: { payload: unknown }) => void;
+
+const { emitMock, hideMock, listenMock, focusChangedMock, eventHandlers, focusHandlers } =
+  vi.hoisted(() => {
+    const eventHandlers = new Map<string, EventHandler>();
+    const focusHandlers = new Set<EventHandler>();
+    const unlisten = () => {};
+    return {
+      emitMock: vi.fn(),
+      hideMock: vi.fn(),
+      eventHandlers,
+      focusHandlers,
+      listenMock: vi.fn((event: string, handler: EventHandler) => {
+        eventHandlers.set(event, handler);
+        return Promise.resolve(unlisten);
+      }),
+      focusChangedMock: vi.fn((handler: EventHandler) => {
+        focusHandlers.add(handler);
+        return Promise.resolve(unlisten);
+      }),
+    };
+  });
 
 vi.mock("../lib/local-skills", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/local-skills")>();
@@ -21,12 +43,12 @@ vi.mock("../lib/local-skills", async (importOriginal) => {
   };
 });
 
-// The popover's Tauri-only behaviors (navigate emit, Escape hide) are
-// asserted with the Tauri environment on.
+// The popover's Tauri-only behaviors (navigate emit, Escape hide, live-sync
+// listeners) are asserted with the Tauri environment on.
 vi.mock("../lib/tauri", () => ({ isTauri: () => true }));
-vi.mock("@tauri-apps/api/event", () => ({ emit: emitMock }));
+vi.mock("@tauri-apps/api/event", () => ({ emit: emitMock, listen: listenMock }));
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ hide: hideMock }),
+  getCurrentWindow: () => ({ hide: hideMock, onFocusChanged: focusChangedMock }),
 }));
 
 const fetchInstalledSkillsMock = vi.mocked(fetchInstalledSkills);
@@ -48,6 +70,8 @@ function skill(overrides: Partial<InstalledSkill>): InstalledSkill {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  eventHandlers.clear();
+  focusHandlers.clear();
   fetchInstalledSkillsMock.mockResolvedValue([
     skill({}),
     skill({ name: "docx", description: "Word 工具" }),
@@ -129,5 +153,56 @@ describe("PopoverPage", () => {
     await user.keyboard("{Escape}");
 
     expect(hideMock).toHaveBeenCalled();
+  });
+
+  it("registers a skills-changed listener on the Tauri bus", async () => {
+    renderWithRouter(<PopoverPage />);
+    await screen.findByText("pdf");
+
+    expect(eventHandlers.has(SKILLS_CHANGED_EVENT)).toBe(true);
+  });
+
+  it("refreshes live when another window reports the skills list changed", async () => {
+    renderWithRouter(<PopoverPage />);
+    await screen.findByText("pdf");
+
+    // The main window just enabled a new skill: it broadcasts the change.
+    fetchInstalledSkillsMock.mockResolvedValue([
+      skill({ name: "freshly-enabled", description: "刚开启" }),
+    ]);
+    await act(async () => {
+      eventHandlers.get(SKILLS_CHANGED_EVENT)?.({ payload: undefined });
+    });
+
+    expect(await screen.findByText("freshly-enabled")).toBeInTheDocument();
+    expect(screen.queryByText("pdf")).not.toBeInTheDocument();
+  });
+
+  it("refreshes when the popover window gains focus", async () => {
+    renderWithRouter(<PopoverPage />);
+    await screen.findByText("pdf");
+
+    // Re-opening the popover (menu bar click) focuses its window.
+    fetchInstalledSkillsMock.mockResolvedValue([skill({ name: "on-open" })]);
+    const onFocus = [...focusHandlers][0];
+    expect(onFocus).toBeTypeOf("function");
+    await act(async () => {
+      onFocus({ payload: true });
+    });
+
+    expect(await screen.findByText("on-open")).toBeInTheDocument();
+  });
+
+  it("ignores focus-lost events (does not refetch on blur)", async () => {
+    renderWithRouter(<PopoverPage />);
+    await screen.findByText("pdf");
+    fetchInstalledSkillsMock.mockClear();
+
+    const onFocus = [...focusHandlers][0];
+    await act(async () => {
+      onFocus({ payload: false });
+    });
+
+    expect(fetchInstalledSkillsMock).not.toHaveBeenCalled();
   });
 });

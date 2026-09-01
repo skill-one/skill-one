@@ -12,6 +12,7 @@ import {
   POPOVER_NAVIGATE_EVENT,
   skillPath,
 } from "./popover-events";
+import { useSkillsLiveSync } from "./use-skills-live-sync";
 
 /**
  * Menu bar popover: a titled header (enabled count), the installed and
@@ -29,6 +30,8 @@ import {
  * keyboard equivalent (hidden via the core window API).
  */
 export function PopoverPage() {
+  useSkillsLiveSync();
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && isTauri()) void getCurrentWindow().hide();
