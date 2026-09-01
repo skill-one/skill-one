@@ -2,11 +2,9 @@ import { useEffect } from "react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { listen } from "@tauri-apps/api/event";
-import { Folder } from "lucide-react";
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppSidebar } from "./components/app-sidebar";
-import { PlaceholderPage } from "./components/placeholder-page";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 import { createQueryClient } from "./lib/query-client";
 import { isTauri } from "./lib/tauri";
@@ -79,10 +77,6 @@ export default function App() {
                 <Route
                   path="/explore/repos/:owner/:repo"
                   element={<RepoDetailPage />}
-                />
-                <Route
-                  path="/my-skills/project"
-                  element={<PlaceholderPage icon={Folder} title="项目" />}
                 />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route

@@ -37,6 +37,7 @@ describe("installSkillFromSource", () => {
 
     expect(installSkill).toHaveBeenCalledWith("anthropics/skills", {
       global: true,
+      cwd: undefined,
       skills: ["pdf"],
     });
   });
@@ -77,8 +78,31 @@ describe("installSkillFromSource", () => {
     await vi.advanceTimersByTimeAsync(MOCK_INSTALL_DELAY_MS);
     await pending;
 
-    expect(installMockSkill).toHaveBeenCalledWith("anthropics/skills", "pdf");
+    expect(installMockSkill).toHaveBeenCalledWith("anthropics/skills", "pdf", {
+      kind: "global",
+    });
     expect(installSkill).not.toHaveBeenCalled();
+  });
+
+  it("installs into a project scope by passing cwd (Tauri)", async () => {
+    isTauri.mockReturnValue(true);
+    installSkill.mockResolvedValue({
+      listOnly: false,
+      installed: [{ name: "pdf", canonicalPath: "/p/.agents/skills/pdf" }],
+      failed: [],
+      discovered: ["pdf"],
+    });
+
+    await installSkillFromSource("anthropics/skills", "pdf", {
+      kind: "project",
+      path: "/p",
+    });
+
+    expect(installSkill).toHaveBeenCalledWith("anthropics/skills", {
+      global: false,
+      cwd: "/p",
+      skills: ["pdf"],
+    });
   });
 
   it("delays the mock install so the installing state stays observable", async () => {

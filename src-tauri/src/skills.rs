@@ -35,6 +35,36 @@ where
         .map_err(|e| format!("{task} task failed: {e}"))?
 }
 
+// ============================ Filesystem helpers ============================
+
+/// The canonical skills dir for a scope base: `<base>/.agents/skills`. Mirrors
+/// `agents-skills`' `UNIVERSAL_SKILLS_DIR` layout (the library's own resolver is
+/// private), so a skill moved here is where `list` looks for it.
+fn canonical_skills_dir(base: &std::path::Path) -> std::path::PathBuf {
+    base.join(".agents/skills")
+}
+
+/// Recursively copy `src` into `dst` (created if missing). Symlinks inside a
+/// skill dir are rare (skills are plain directories of files); file contents are
+/// copied and directories are recreated, so a real copy is produced.
+fn copy_dir_recursive(
+    src: &std::path::Path,
+    dst: &std::path::Path,
+) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_recursive(&from, &to)?;
+        } else {
+            std::fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
+}
+
 // ============================ DTOs (serialized to the frontend) ============================
 
 #[derive(Debug, Clone, Serialize)]
@@ -366,6 +396,33 @@ mod tests {
         assert_eq!(dto.restored, vec!["pdf"]);
         assert_eq!(dto.restored_from.as_deref(), Some("/backup/cursor/skills"));
     }
+
+    #[test]
+    fn canonical_skills_dir_uses_agents_layout() {
+        let base = std::path::Path::new("/home/me");
+        assert_eq!(
+            canonical_skills_dir(base),
+            std::path::PathBuf::from("/home/me/.agents/skills")
+        );
+    }
+
+    #[test]
+    fn copy_dir_recursive_copies_nested_tree() {
+        let src = tempdir().expect("src tempdir");
+        fs::create_dir(src.path().join("assets")).expect("create assets");
+        fs::write(src.path().join("SKILL.md"), "body").expect("write skill");
+        fs::write(src.path().join("assets/ref.txt"), "ref").expect("write ref");
+
+        let dst = tempdir().expect("dst tempdir");
+        let target = dst.path().join("moved");
+        copy_dir_recursive(src.path(), &target).expect("copy");
+
+        assert_eq!(fs::read_to_string(target.join("SKILL.md")).unwrap(), "body");
+        assert_eq!(
+            fs::read_to_string(target.join("assets/ref.txt")).unwrap(),
+            "ref"
+        );
+    }
 }
 
 // ============================ Tauri commands ============================
@@ -575,6 +632,55 @@ pub async fn link_status(
                 }),
             })
             .collect())
+    })
+    .await
+}
+
+/// Relocate an installed skill between scopes by moving its directory on disk.
+///
+/// Used when a reinstall is impossible — a skill with no install source (placed
+/// manually into a skills dir). `from_path` is the skill's current directory as
+/// reported by `list`; the leaf directory name is preserved. The destination
+/// canonical dir is derived from the target scope (`to_global` / `to_cwd`) the
+/// same way `agents-skills` resolves it, so `list` finds the skill in the new
+/// scope. The copy is staged first and the origin is deleted only once the copy
+/// lands, so a failed move never leaves the skill missing from both scopes.
+/// Returns the new absolute path.
+#[tauri::command]
+pub async fn move_skill(
+    from_path: String,
+    to_global: Option<bool>,
+    to_cwd: Option<String>,
+) -> Result<String, String> {
+    let to_global = to_global.unwrap_or(false);
+    run_blocking(to_cwd, "move", move |manager| {
+        let env = manager.env();
+        let base = if to_global { &env.home } else { &env.cwd };
+        let canonical = canonical_skills_dir(base);
+        let src = std::path::PathBuf::from(&from_path);
+        if !src.is_dir() {
+            return Err(format!("源技能目录不存在：{from_path}"));
+        }
+        let leaf = src
+            .file_name()
+            .ok_or_else(|| format!("无效的源路径：{from_path}"))?;
+        let dest = canonical.join(leaf);
+        if dest == src {
+            return Err("目标与源相同，无需移动".to_string());
+        }
+        if dest.exists() {
+            return Err(format!("目标已存在同名技能：{}", dest.display()));
+        }
+        let stage = canonical.join(format!(".{}.moving", leaf.to_string_lossy()));
+        let _ = std::fs::remove_dir_all(&stage);
+        std::fs::create_dir_all(&canonical).map_err(|e| format!("创建目标目录失败：{e}"))?;
+        copy_dir_recursive(&src, &stage).map_err(|e| format!("复制技能目录失败：{e}"))?;
+        if let Err(e) = std::fs::remove_dir_all(&src) {
+            let _ = std::fs::remove_dir_all(&stage);
+            return Err(format!("删除原技能目录失败：{e}"));
+        }
+        std::fs::rename(&stage, &dest).map_err(|e| format!("落位技能目录失败：{e}"))?;
+        Ok(dest.display().to_string())
     })
     .await
 }
