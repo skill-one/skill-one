@@ -5,12 +5,12 @@ import userEvent from "@testing-library/user-event";
 import { renderWithRouter } from "../test/test-utils";
 import { fetchInstalledSkills } from "../lib/local-skills";
 import type { InstalledSkill } from "../lib/skills-manager";
+import { POPOVER_NAVIGATE_EVENT, skillPath } from "./popover-events";
 import { PopoverPage } from "./popover-page";
 
-const { emitMock, hideMock, setSizeMock } = vi.hoisted(() => ({
+const { emitMock, hideMock } = vi.hoisted(() => ({
   emitMock: vi.fn(),
   hideMock: vi.fn(),
-  setSizeMock: vi.fn(),
 }));
 
 vi.mock("../lib/local-skills", async (importOriginal) => {
@@ -21,12 +21,12 @@ vi.mock("../lib/local-skills", async (importOriginal) => {
   };
 });
 
-// The popover's Tauri-only behaviors (store emit, Escape hide, content-driven
-// resize) are asserted with the Tauri environment on.
+// The popover's Tauri-only behaviors (navigate emit, Escape hide) are
+// asserted with the Tauri environment on.
 vi.mock("../lib/tauri", () => ({ isTauri: () => true }));
 vi.mock("@tauri-apps/api/event", () => ({ emit: emitMock }));
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ hide: hideMock, setSize: setSizeMock }),
+  getCurrentWindow: () => ({ hide: hideMock }),
 }));
 
 const fetchInstalledSkillsMock = vi.mocked(fetchInstalledSkills);
@@ -41,75 +41,93 @@ function skill(overrides: Partial<InstalledSkill>): InstalledSkill {
     sourceUrl: null,
     sourceType: null,
     enabled: true,
+    description: "PDF 工具",
     ...overrides,
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  fetchInstalledSkillsMock.mockResolvedValue([skill({})]);
+  fetchInstalledSkillsMock.mockResolvedValue([
+    skill({}),
+    skill({ name: "docx", description: "Word 工具" }),
+    skill({ name: "parked", description: "已停用", enabled: false }),
+  ]);
 });
 
 describe("PopoverPage", () => {
-  it("resizes the window to the clamped content height after loading", async () => {
-    // jsdom reports zero element sizes, so the natural height falls through
-    // to the MIN clamp — asserting the whole clamp + resize pipeline.
+  it("lists only installed and enabled skills", async () => {
     renderWithRouter(<PopoverPage />);
 
-    expect(await screen.findByText("1 个技能")).toBeInTheDocument();
-    await vi.waitFor(() => expect(setSizeMock).toHaveBeenCalled());
-    const size = setSizeMock.mock.calls[0][0];
-    expect(size.width).toBe(320);
-    expect(size.height).toBe(200);
+    expect(await screen.findByText("pdf")).toBeInTheDocument();
+    expect(screen.getByText("docx")).toBeInTheDocument();
+    // Disabled skills are parked in the backend's disabled dir and belong
+    // to the main window's management page, not the glanceable popover.
+    expect(screen.queryByText("parked")).not.toBeInTheDocument();
   });
 
-  it("lists installed skills with enabled/disabled badges and a header count", async () => {
+  it("shows the header title and enabled count", async () => {
+    renderWithRouter(<PopoverPage />);
+
+    expect(await screen.findByText("SkillOne")).toBeInTheDocument();
+    // Count matches the visible (enabled-only) list, not the raw total.
+    expect(await screen.findByText("2 个技能")).toBeInTheDocument();
+  });
+
+  it("renders the name and description per entry", async () => {
+    renderWithRouter(<PopoverPage />);
+
+    expect(await screen.findByText("PDF 工具")).toBeInTheDocument();
+    expect(screen.getByText("Word 工具")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when no skill is enabled", async () => {
     fetchInstalledSkillsMock.mockResolvedValue([
-      skill({ name: "pdf", description: "Read and process PDF files", enabled: true }),
-      skill({ name: "old-skill", enabled: false }),
+      skill({ name: "parked", enabled: false }),
     ]);
     renderWithRouter(<PopoverPage />);
 
-    expect(await screen.findByText("2 个技能")).toBeInTheDocument();
-    expect(screen.getByText("pdf")).toBeInTheDocument();
-    expect(screen.getByText("Read and process PDF files")).toBeInTheDocument();
-    expect(screen.getByText("old-skill")).toBeInTheDocument();
-    expect(screen.getAllByText("启用")).toHaveLength(1);
-    expect(screen.getByText("停用")).toBeInTheDocument();
+    expect(await screen.findByText("没有已启用的技能")).toBeInTheDocument();
   });
 
-  it("shows the empty state when nothing is installed", async () => {
-    fetchInstalledSkillsMock.mockResolvedValue([]);
+  it("shows an error state when the list fails to load", async () => {
+    fetchInstalledSkillsMock.mockRejectedValue(new Error("backend down"));
     renderWithRouter(<PopoverPage />);
 
-    expect(await screen.findByText("还没有安装任何 skill")).toBeInTheDocument();
-    expect(screen.getByText("去商店逛逛，挑一个装上吧")).toBeInTheDocument();
-    expect(screen.getByText("0 个技能")).toBeInTheDocument();
+    expect(await screen.findByText("技能列表加载失败")).toBeInTheDocument();
+    expect(screen.getByText("backend down")).toBeInTheDocument();
   });
 
-  it("emits the navigate event with the store path on 打开商店", async () => {
+  it("emits a deep link to the clicked skill", async () => {
     const user = userEvent.setup();
     renderWithRouter(<PopoverPage />);
 
-    await user.click(await screen.findByRole("button", { name: /打开商店/ }));
+    await user.click(await screen.findByRole("button", { name: /pdf/ }));
 
-    expect(emitMock).toHaveBeenCalledWith("popover-navigate", {
-      path: "/explore",
+    expect(emitMock).toHaveBeenCalledWith(POPOVER_NAVIGATE_EVENT, {
+      path: skillPath("pdf"),
     });
   });
 
-  it("hides the popover window on Escape", async () => {
+  it("emits the my-skills path from the footer button", async () => {
+    const user = userEvent.setup();
     renderWithRouter(<PopoverPage />);
 
-    expect(
-      await screen.findByRole("button", { name: /打开商店/ }),
-    ).toBeInTheDocument();
-    expect(hideMock).not.toHaveBeenCalled();
-
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    await user.click(
+      await screen.findByRole("button", { name: "打开 Skill One" }),
     );
 
-    expect(hideMock).toHaveBeenCalledTimes(1);
+    expect(emitMock).toHaveBeenCalledWith(POPOVER_NAVIGATE_EVENT, {
+      path: "/my-skills",
+    });
+  });
+
+  it("hides the window on Escape", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<PopoverPage />);
+
+    await user.keyboard("{Escape}");
+
+    expect(hideMock).toHaveBeenCalled();
   });
 });
