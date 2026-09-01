@@ -155,7 +155,12 @@ export function ReposPage() {
       {/* Repo grid. */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex h-full min-w-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 -ml-1 -mt-1 overflow-y-auto pb-6 pl-1 pr-1 pt-1">
+          {/* Symmetric 12px horizontal padding (offset by matching
+              negative margins, so content position and card widths are
+              unchanged) reserves room beside the cards for the overlay
+              scrollbar instead of letting it overlap them, and keeps the
+              outside-painted ink unclipped. */}
+          <div className="min-h-0 flex-1 -mx-3 -mt-1 overflow-y-auto px-3 pb-6 pt-1">
             {failure ? (
               <Placeholder message={`加载失败：${failure}`}>
                 <Button
