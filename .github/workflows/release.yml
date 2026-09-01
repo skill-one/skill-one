@@ -31,7 +31,8 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - uses: swatinem/rust-cache@v4
+      # Latest major: the repo publishes no v3/v4 tags (latest release v2.9.2).
+      - uses: swatinem/rust-cache@v2
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
