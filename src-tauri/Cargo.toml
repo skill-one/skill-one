@@ -26,8 +26,6 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 # Opens external links (skill sources) in the system browser.
 tauri-plugin-opener = "2"
-# Native folder picker, used to choose a project directory for project-scoped installs.
-tauri-plugin-dialog = "2"
 # Skills install / agent management backed by the agents-skills library.
 agents-skills = "0.10"
 serde = { version = "1", features = ["derive"] }

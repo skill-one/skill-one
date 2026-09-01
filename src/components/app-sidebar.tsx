@@ -61,7 +61,7 @@ export const footerItems: NavItem[] = [
 /**
  * Real badge counts: Shop "全部" = registry total, "仓库" = aggregated repo
  * total, "My Skills → 全局" = installed skill count. Pages without a count
- * source (精选 / 项目) show no badge. The badge is not rendered while its
+ * source (精选) show no badge. The badge is not rendered while its
  * data is loading, avoiding a flash of 0.
  *
  * The registry count is progressive: it mirrors the registry worker's

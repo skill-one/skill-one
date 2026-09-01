@@ -6,16 +6,17 @@ import { isTauri } from "./tauri";
  * Thin typed client for the skills install / agent management commands, backed
  * by the `agents-skills` Rust library in the Tauri shell.
  *
- * All commands accept an optional `cwd`: the project directory to operate on
- * (empty = the app's current working directory). Skills install into
- * `.agents/skills` under that directory, and its lockfile drives list/update.
+ * All commands operate on the user-level **global** skills directory
+ * (`~/.agents/skills`); project-level support has been removed. Its lockfile
+ * drives list/update.
  */
 
 /** A listed skill, enriched with lock metadata (mirrors `list --json`). */
 export interface InstalledSkill {
   name: string;
   path: string;
-  scope: "project" | "global";
+  /** Always `"global"` — skills live only in the global directory. */
+  scope: "global";
   agents: string[];
   source: string | null;
   sourceUrl: string | null;
@@ -143,11 +144,6 @@ export interface AgentStatus {
   pendingBackup?: PendingBackup | null;
 }
 
-interface ManagerOptions {
-  /** Project directory to operate on; empty = the app's cwd. */
-  cwd?: string;
-}
-
 function requireTauri(): void {
   if (!isTauri()) {
     throw new Error(
@@ -163,88 +159,62 @@ function requireTauri(): void {
  */
 export async function installSkill(
   source: string,
-  options: {
-    global?: boolean;
-    skills?: string[];
-    listOnly?: boolean;
-  } & ManagerOptions = {},
+  options: { skills?: string[]; listOnly?: boolean } = {},
 ): Promise<InstallResult> {
   requireTauri();
   return invoke<InstallResult>("install_skill", {
     source,
-    global: options.global,
     skills: options.skills,
     listOnly: options.listOnly,
-    cwd: options.cwd,
   });
 }
 
-/** List installed skills (project scope by default). */
+/** List installed skills in the global skills directory. */
 export async function listInstalledSkills(
-  options: {
-    global?: boolean;
-    agents?: string[];
-  } & ManagerOptions = {},
+  options: { agents?: string[] } = {},
 ): Promise<InstalledSkill[]> {
   requireTauri();
   return invoke<InstalledSkill[]>("list_installed_skills", {
-    global: options.global,
     agents: options.agents,
-    cwd: options.cwd,
   });
 }
 
 /**
- * Remove installed skills. `all` removes everything in the scope; otherwise the
- * listed `skills` are removed.
+ * Remove installed skills. `all` removes everything; otherwise the listed
+ * `skills` are removed.
  */
 export async function removeSkills(
   skills: string[],
-  options: {
-    global?: boolean;
-    all?: boolean;
-  } & ManagerOptions = {},
+  options: { all?: boolean } = {},
 ): Promise<RemoveResult> {
   requireTauri();
   return invoke<RemoveResult>("remove_skills", {
     skills,
-    global: options.global,
     all: options.all,
-    cwd: options.cwd,
   });
 }
 
 /** Disable installed skills (moves them out of the canonical dir). */
 export async function disableSkills(
   skills: string[] = [],
-  options: {
-    global?: boolean;
-    all?: boolean;
-  } & ManagerOptions = {},
+  options: { all?: boolean } = {},
 ): Promise<DisableResult> {
   requireTauri();
   return invoke<DisableResult>("disable_skills", {
     skills,
-    global: options.global,
     all: options.all,
-    cwd: options.cwd,
   });
 }
 
 /** Enable disabled skills (moves them back into the canonical dir). */
 export async function enableSkills(
   skills: string[] = [],
-  options: {
-    global?: boolean;
-    all?: boolean;
-  } & ManagerOptions = {},
+  options: { all?: boolean } = {},
 ): Promise<EnableResult> {
   requireTauri();
   return invoke<EnableResult>("enable_skills", {
     skills,
-    global: options.global,
     all: options.all,
-    cwd: options.cwd,
   });
 }
 
@@ -255,65 +225,26 @@ export async function enableSkills(
  */
 export async function linkAgents(
   agents: string[] = [],
-  options: {
-    global?: boolean;
-    unlink?: boolean;
-    migrate?: boolean;
-  } & ManagerOptions = {},
+  options: { unlink?: boolean; migrate?: boolean } = {},
 ): Promise<LinkResult> {
   requireTauri();
   return invoke<LinkResult>("link_agents", {
     agents,
-    global: options.global,
     unlink: options.unlink,
     migrate: options.migrate,
-    cwd: options.cwd,
   });
 }
 
 /** Unlink agents from the canonical skills dir. */
 export function unlinkAgents(
   agents: string[] = [],
-  options: {
-    global?: boolean;
-  } & ManagerOptions = {},
+  options: Record<string, never> = {},
 ): Promise<LinkResult> {
   return linkAgents(agents, { ...options, unlink: true });
 }
 
 /** Report per-agent link status. */
-export async function getLinkStatus(
-  options: {
-    global?: boolean;
-  } & ManagerOptions = {},
-): Promise<AgentStatus[]> {
+export async function getLinkStatus(): Promise<AgentStatus[]> {
   requireTauri();
-  return invoke<AgentStatus[]>("link_status", {
-    global: options.global,
-    cwd: options.cwd,
-  });
-}
-
-/**
- * Relocate an installed skill between scopes by moving its directory on disk.
- *
- * This is the fallback for a skill that has **no install source** (placed
- * manually into a skills dir) — there is nothing to reinstall from, so the
- * directory itself is moved. `fromPath` is the skill's current absolute path (as
- * reported by `list`); the destination scope is expressed with `toGlobal` /
- * `toCwd` exactly like the other commands. Resolves to the new absolute path.
- */
-export async function moveSkillDir(
-  fromPath: string,
-  options: {
-    toGlobal?: boolean;
-    toCwd?: string;
-  } = {},
-): Promise<string> {
-  requireTauri();
-  return invoke<string>("move_skill", {
-    fromPath,
-    toGlobal: options.toGlobal,
-    toCwd: options.toCwd,
-  });
+  return invoke<AgentStatus[]>("link_status");
 }

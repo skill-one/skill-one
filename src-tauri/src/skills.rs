@@ -10,59 +10,25 @@ use agents_skills::{
     RemoveRequest,
 };
 
-/// Build a `Manager` targeting `cwd` (empty/`None` = the process's own cwd).
-///
-/// `cwd` selects the project scope root: skills install into `.agents/skills`
-/// under that directory, and its lockfile is used.
-fn manager(cwd: Option<&str>) -> Manager {
-    match cwd.filter(|s| !s.trim().is_empty()) {
-        Some(p) => Manager::builder().cwd(p).build(),
-        None => Manager::new(),
-    }
+/// Build a `Manager` targeting the user-level **global** skills directory
+/// (`~/.agents/skills`). Skills only live there; project-level support has
+/// been removed.
+fn manager() -> Manager {
+    Manager::new()
 }
 
 /// Run a blocking manager operation off the async runtime (git clone, install,
 /// link, ...), mapping a failed join to the command error string. `task` names
 /// the operation for that message ("install", "list", ...). Every command's
 /// backend work goes through here.
-async fn run_blocking<T, F>(cwd: Option<String>, task: &str, f: F) -> Result<T, String>
+async fn run_blocking<T, F>(task: &str, f: F) -> Result<T, String>
 where
     F: FnOnce(&Manager) -> Result<T, String> + Send + 'static,
     T: Send + 'static,
 {
-    tauri::async_runtime::spawn_blocking(move || f(&manager(cwd.as_deref())))
+    tauri::async_runtime::spawn_blocking(move || f(&manager()))
         .await
         .map_err(|e| format!("{task} task failed: {e}"))?
-}
-
-// ============================ Filesystem helpers ============================
-
-/// The canonical skills dir for a scope base: `<base>/.agents/skills`. Mirrors
-/// `agents-skills`' `UNIVERSAL_SKILLS_DIR` layout (the library's own resolver is
-/// private), so a skill moved here is where `list` looks for it.
-fn canonical_skills_dir(base: &std::path::Path) -> std::path::PathBuf {
-    base.join(".agents/skills")
-}
-
-/// Recursively copy `src` into `dst` (created if missing). Symlinks inside a
-/// skill dir are rare (skills are plain directories of files); file contents are
-/// copied and directories are recreated, so a real copy is produced.
-fn copy_dir_recursive(
-    src: &std::path::Path,
-    dst: &std::path::Path,
-) -> std::io::Result<()> {
-    std::fs::create_dir_all(dst)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let from = entry.path();
-        let to = dst.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_dir_recursive(&from, &to)?;
-        } else {
-            std::fs::copy(&from, &to)?;
-        }
-    }
-    Ok(())
 }
 
 // ============================ DTOs (serialized to the frontend) ============================
@@ -396,33 +362,6 @@ mod tests {
         assert_eq!(dto.restored, vec!["pdf"]);
         assert_eq!(dto.restored_from.as_deref(), Some("/backup/cursor/skills"));
     }
-
-    #[test]
-    fn canonical_skills_dir_uses_agents_layout() {
-        let base = std::path::Path::new("/home/me");
-        assert_eq!(
-            canonical_skills_dir(base),
-            std::path::PathBuf::from("/home/me/.agents/skills")
-        );
-    }
-
-    #[test]
-    fn copy_dir_recursive_copies_nested_tree() {
-        let src = tempdir().expect("src tempdir");
-        fs::create_dir(src.path().join("assets")).expect("create assets");
-        fs::write(src.path().join("SKILL.md"), "body").expect("write skill");
-        fs::write(src.path().join("assets/ref.txt"), "ref").expect("write ref");
-
-        let dst = tempdir().expect("dst tempdir");
-        let target = dst.path().join("moved");
-        copy_dir_recursive(src.path(), &target).expect("copy");
-
-        assert_eq!(fs::read_to_string(target.join("SKILL.md")).unwrap(), "body");
-        assert_eq!(
-            fs::read_to_string(target.join("assets/ref.txt")).unwrap(),
-            "ref"
-        );
-    }
 }
 
 // ============================ Tauri commands ============================
@@ -432,15 +371,13 @@ mod tests {
 #[tauri::command]
 pub async fn install_skill(
     source: String,
-    global: Option<bool>,
     skills: Option<Vec<String>>,
     list_only: Option<bool>,
-    cwd: Option<String>,
 ) -> Result<InstallResult, String> {
-    run_blocking(cwd, "install", move |manager| {
+    run_blocking("install", move |manager| {
         let req = AddRequest {
             source,
-            global: global.unwrap_or(false),
+            global: true,
             skills: skills.unwrap_or_default(),
             list_only: list_only.unwrap_or(false),
         };
@@ -469,18 +406,16 @@ pub async fn install_skill(
     .await
 }
 
-/// List installed skills (project scope by default, pass `global` for the
-/// user-level install). Returns the same camelCase shape as `list --json`,
-/// plus a `description` extracted from each skill's on-disk SKILL.md.
+/// List installed skills in the global skills directory. Returns the same
+/// camelCase shape as `list --json`, plus a `description` extracted from each
+/// skill's on-disk SKILL.md.
 #[tauri::command]
 pub async fn list_installed_skills(
-    global: Option<bool>,
     agents: Option<Vec<String>>,
-    cwd: Option<String>,
 ) -> Result<Vec<ListedSkillDto>, String> {
-    run_blocking(cwd, "list", move |manager| {
+    run_blocking("list", move |manager| {
         let req = ListRequest {
-            global: global.unwrap_or(false),
+            global: true,
             agents: agents.unwrap_or_default(),
         };
         let listed = manager.list(&req).map_err(|e| e.to_string())?;
@@ -507,14 +442,12 @@ pub async fn list_installed_skills(
 #[tauri::command]
 pub async fn remove_skills(
     skills: Option<Vec<String>>,
-    global: Option<bool>,
     all: Option<bool>,
-    cwd: Option<String>,
 ) -> Result<RemoveResult, String> {
-    run_blocking(cwd, "remove", move |manager| {
+    run_blocking("remove", move |manager| {
         let req = RemoveRequest {
             skills: skills.unwrap_or_default(),
-            global: global.unwrap_or(false),
+            global: true,
             all: all.unwrap_or(false),
         };
         let outcome = manager.remove(&req).map_err(|e| e.to_string())?;
@@ -532,14 +465,12 @@ pub async fn remove_skills(
 #[tauri::command]
 pub async fn disable_skills(
     skills: Option<Vec<String>>,
-    global: Option<bool>,
     all: Option<bool>,
-    cwd: Option<String>,
 ) -> Result<DisableResult, String> {
-    run_blocking(cwd, "disable", move |manager| {
+    run_blocking("disable", move |manager| {
         let req = DisableRequest {
             skills: skills.unwrap_or_default(),
-            global: global.unwrap_or(false),
+            global: true,
             all: all.unwrap_or(false),
         };
         let outcome = manager.disable(&req).map_err(|e| e.to_string())?;
@@ -559,14 +490,12 @@ pub async fn disable_skills(
 #[tauri::command]
 pub async fn enable_skills(
     skills: Option<Vec<String>>,
-    global: Option<bool>,
     all: Option<bool>,
-    cwd: Option<String>,
 ) -> Result<EnableResult, String> {
-    run_blocking(cwd, "enable", move |manager| {
+    run_blocking("enable", move |manager| {
         let req = EnableRequest {
             skills: skills.unwrap_or_default(),
-            global: global.unwrap_or(false),
+            global: true,
             all: all.unwrap_or(false),
         };
         let outcome = manager.enable(&req).map_err(|e| e.to_string())?;
@@ -587,15 +516,13 @@ pub async fn enable_skills(
 #[tauri::command]
 pub async fn link_agents(
     agents: Option<Vec<String>>,
-    global: Option<bool>,
     unlink: Option<bool>,
     migrate: Option<bool>,
-    cwd: Option<String>,
 ) -> Result<LinkResult, String> {
-    run_blocking(cwd, "link", move |manager| {
+    run_blocking("link", move |manager| {
         let req = AgentRequest {
             agents: agents.unwrap_or_default(),
-            global: global.unwrap_or(false),
+            global: true,
             unlink: unlink.unwrap_or(false),
             migrate: migrate.unwrap_or(false),
         };
@@ -611,13 +538,10 @@ pub async fn link_agents(
 /// Report per-agent link status (linked / canonical / not linked), including
 /// each unlinked agent's private content and any backup waiting to be restored.
 #[tauri::command]
-pub async fn link_status(
-    global: Option<bool>,
-    cwd: Option<String>,
-) -> Result<Vec<AgentStatusDto>, String> {
-    run_blocking(cwd, "link status", move |manager| {
+pub async fn link_status() -> Result<Vec<AgentStatusDto>, String> {
+    run_blocking("link status", move |manager| {
         Ok(manager
-            .agent_status(global.unwrap_or(false))
+            .agent_status(true)
             .into_iter()
             .map(|s| AgentStatusDto {
                 name: s.name,
@@ -632,55 +556,6 @@ pub async fn link_status(
                 }),
             })
             .collect())
-    })
-    .await
-}
-
-/// Relocate an installed skill between scopes by moving its directory on disk.
-///
-/// Used when a reinstall is impossible — a skill with no install source (placed
-/// manually into a skills dir). `from_path` is the skill's current directory as
-/// reported by `list`; the leaf directory name is preserved. The destination
-/// canonical dir is derived from the target scope (`to_global` / `to_cwd`) the
-/// same way `agents-skills` resolves it, so `list` finds the skill in the new
-/// scope. The copy is staged first and the origin is deleted only once the copy
-/// lands, so a failed move never leaves the skill missing from both scopes.
-/// Returns the new absolute path.
-#[tauri::command]
-pub async fn move_skill(
-    from_path: String,
-    to_global: Option<bool>,
-    to_cwd: Option<String>,
-) -> Result<String, String> {
-    let to_global = to_global.unwrap_or(false);
-    run_blocking(to_cwd, "move", move |manager| {
-        let env = manager.env();
-        let base = if to_global { &env.home } else { &env.cwd };
-        let canonical = canonical_skills_dir(base);
-        let src = std::path::PathBuf::from(&from_path);
-        if !src.is_dir() {
-            return Err(format!("源技能目录不存在：{from_path}"));
-        }
-        let leaf = src
-            .file_name()
-            .ok_or_else(|| format!("无效的源路径：{from_path}"))?;
-        let dest = canonical.join(leaf);
-        if dest == src {
-            return Err("目标与源相同，无需移动".to_string());
-        }
-        if dest.exists() {
-            return Err(format!("目标已存在同名技能：{}", dest.display()));
-        }
-        let stage = canonical.join(format!(".{}.moving", leaf.to_string_lossy()));
-        let _ = std::fs::remove_dir_all(&stage);
-        std::fs::create_dir_all(&canonical).map_err(|e| format!("创建目标目录失败：{e}"))?;
-        copy_dir_recursive(&src, &stage).map_err(|e| format!("复制技能目录失败：{e}"))?;
-        if let Err(e) = std::fs::remove_dir_all(&src) {
-            let _ = std::fs::remove_dir_all(&stage);
-            return Err(format!("删除原技能目录失败：{e}"));
-        }
-        std::fs::rename(&stage, &dest).map_err(|e| format!("落位技能目录失败：{e}"))?;
-        Ok(dest.display().to_string())
     })
     .await
 }

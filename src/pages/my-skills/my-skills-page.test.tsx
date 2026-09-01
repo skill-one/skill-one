@@ -7,13 +7,10 @@ import { renderWithRouter } from "../../test/test-utils";
 import {
   addMockLocalSkill,
   installMockSkill,
-  MOCK_PROJECT_PATH,
   resetMockAgentStatus,
   resetMockInstalledSkills,
   setMockSkillEnabled,
 } from "../../lib/mock-local";
-import { GLOBAL_SCOPE, projectScope } from "../../lib/skill-scope";
-import { addProject, resetProjects } from "../../lib/projects";
 
 // The page reads installed skills through local-skills, which falls back to
 // the mutable mock store in the browser (this test env), so mutations below
@@ -38,7 +35,6 @@ describe("MySkillsPage", () => {
   afterEach(() => {
     resetMockInstalledSkills();
     resetMockAgentStatus();
-    resetProjects();
   });
 
   it("shows the installed count in the bottom pager row", async () => {
@@ -126,7 +122,7 @@ describe("MySkillsPage", () => {
   it("shows a backend-disabled skill as switched off", async () => {
     // A skill parked in the backend's disabled dir is reported with
     // enabled=false; the switch must reflect that instead of assuming on.
-    setMockSkillEnabled("pdf", GLOBAL_SCOPE, false);
+    setMockSkillEnabled("pdf", false);
     renderWithRouter(<MySkillsPage />);
 
     const pdf = await screen.findByRole("switch", { name: "开启 pdf" });
@@ -216,7 +212,7 @@ describe("MySkillsPage", () => {
 
   it("filters by enablement state from the toolbar dropdown", async () => {
     const user = userEvent.setup();
-    setMockSkillEnabled("pdf", GLOBAL_SCOPE, false);
+    setMockSkillEnabled("pdf", false);
     renderWithRouter(<MySkillsPage />);
     await screen.findByText("共 6 个");
 
@@ -336,73 +332,4 @@ describe("MySkillsPage", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("keeps project skills hidden until their project is registered", async () => {
-    // The mock seeds two skills in the demo project, but with no registered
-    // project the merged list only holds the six global skills.
-    renderWithRouter(<MySkillsPage />);
-
-    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
-    expect(screen.queryByText("deploy-preview")).not.toBeInTheDocument();
-    expect(screen.queryByText("local-migration")).not.toBeInTheDocument();
-  });
-
-  it("merges a registered project's skills into the same list", async () => {
-    addProject(MOCK_PROJECT_PATH);
-    renderWithRouter(<MySkillsPage />);
-
-    // 6 global + 2 project on one page, each labelled with its scope.
-    expect(await screen.findByText("共 8 个")).toBeInTheDocument();
-    expect(screen.getByText("deploy-preview")).toBeInTheDocument();
-    expect(screen.getByText("pdf")).toBeInTheDocument();
-
-    // The project rows' scope selectors already read the project's name.
-    const deployCard = document.querySelector('[data-skill="deploy-preview"]')!;
-    expect(
-      within(deployCard as HTMLElement).getByRole("button", {
-        name: "demo-app",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("filters the merged list by scope", async () => {
-    const user = userEvent.setup();
-    addProject(MOCK_PROJECT_PATH);
-    renderWithRouter(<MySkillsPage />);
-    await screen.findByText("共 8 个");
-
-    const scopeTrigger = screen.getByRole("button", { name: "范围" });
-    await user.click(scopeTrigger);
-    await user.click(await screen.findByRole("menuitemradio", { name: "全局" }));
-
-    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
-    expect(screen.queryByText("deploy-preview")).not.toBeInTheDocument();
-
-    await user.click(scopeTrigger);
-    await user.click(await screen.findByRole("menuitemradio", { name: "项目" }));
-
-    expect(await screen.findByText("共 2 个")).toBeInTheDocument();
-    expect(screen.getByText("deploy-preview")).toBeInTheDocument();
-    expect(screen.queryByText("pdf")).not.toBeInTheDocument();
-  });
-
-  it("moves a global skill into a project from the card's scope menu", async () => {
-    const user = userEvent.setup();
-    addProject(MOCK_PROJECT_PATH);
-    renderWithRouter(<MySkillsPage />);
-    await screen.findByText("共 8 个");
-
-    const pdfCard = () =>
-      document.querySelector('[data-skill="pdf"]') as HTMLElement;
-    await user.click(within(pdfCard()).getByRole("button", { name: "全局" }));
-    await user.click(await screen.findByRole("menuitem", { name: "demo-app" }));
-
-    // Still 8 total; pdf has simply relocated into the project, so its card now
-    // reports the project as its scope.
-    expect(await screen.findByText("共 8 个")).toBeInTheDocument();
-    await waitFor(() => {
-      expect(
-        within(pdfCard()).getByRole("button", { name: "demo-app" }),
-      ).toBeInTheDocument();
-    });
-  });
 });
