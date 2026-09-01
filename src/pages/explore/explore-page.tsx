@@ -19,7 +19,7 @@ import { Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { SkillCard } from "./skill-card";
 import { SkillDetailDrawer } from "./skill-detail-drawer";
-import { RegistryPager } from "./registry-pager";
+import { ListPager } from "../../components/list-pager";
 
 /** Number of skills shown per page in the paginated registry view. */
 const PAGE_SIZE = 24;
@@ -269,7 +269,7 @@ export function ExplorePage() {
               page). While the index is streaming in the count climbs, so say
               so. */}
           {(stats.count > 0 || stats.complete) && (
-            <RegistryPager
+            <ListPager
               page={page}
               totalPages={totalPages}
               onPage={handlePage}

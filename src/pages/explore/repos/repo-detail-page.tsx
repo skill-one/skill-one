@@ -10,7 +10,7 @@ import { useRegistryStats } from "../../../hooks/use-registry-stats";
 import { formatCount } from "../../../lib/utils";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../explore-page";
-import { RegistryPager } from "../registry-pager";
+import { ListPager } from "../../../components/list-pager";
 import { SkillCard } from "../skill-card";
 import { SkillDetailDrawer } from "../skill-detail-drawer";
 
@@ -181,7 +181,7 @@ export function RepoDetailPage() {
           </div>
 
           {total > 0 && (
-            <RegistryPager
+            <ListPager
               page={page}
               totalPages={totalPages}
               onPage={handlePage}
