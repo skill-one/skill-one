@@ -18,6 +18,7 @@ import type { AgentStatus } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
 import { INSTALLED_SKILLS_QUERY_KEY } from "../../hooks/use-installed-skills";
 import { AgentIcon } from "../../components/agent-icon";
+import { Button } from "../../components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -253,10 +254,10 @@ export function AgentAvatarMenu() {
               <span className="text-[11px] font-normal text-muted-foreground">
                 Agents · 共 {list.length} 个
               </span>
-              {/* A plain button (not a menu item) so the bulk link keeps the
+              {/* A real button (not a menu item) so the bulk link keeps the
                   menu open: statuses refresh in place via the query refetch. */}
-              <button
-                type="button"
+              <Button
+                size="xs"
                 disabled={
                   linkable.length === 0 || linkAllMutation.isPending
                 }
@@ -264,13 +265,12 @@ export function AgentAvatarMenu() {
                   e.stopPropagation();
                   linkAllMutation.mutate(linkable.map((agent) => agent.name));
                 }}
-                className="flex shrink-0 items-center gap-1 rounded text-[11px] font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
               >
                 {linkAllMutation.isPending && (
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Loader2 className="animate-spin" />
                 )}
                 一键链接
-              </button>
+              </Button>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>

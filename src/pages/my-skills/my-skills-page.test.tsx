@@ -37,12 +37,18 @@ describe("MySkillsPage", () => {
     resetMockAgentStatus();
   });
 
-  it("renders the stats card with the installed count", async () => {
+  it("shows the installed count in the bottom pager row", async () => {
     renderWithRouter(<MySkillsPage />);
 
     // Wait for the (mock) query to land: 6 skills installed globally.
-    expect(await screen.findByText("6")).toBeInTheDocument();
-    expect(screen.getByText("已安装")).toBeInTheDocument();
+    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
+    // A single-page list still shows the pager controls, both ends clamped.
+    expect(
+      screen.getByRole("link", { name: "上一页" }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(
+      screen.getByRole("link", { name: "下一页" }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 
   it("renders each installed skill", async () => {
@@ -68,10 +74,8 @@ describe("MySkillsPage", () => {
     await waitFor(() => {
       expect(screen.queryByText("pdf")).not.toBeInTheDocument();
     });
-    // Stats count lives in the installed-skills section.
-    const statsSection = screen.getByText("已安装").closest("div")
-      ?.parentElement as HTMLElement;
-    expect(within(statsSection).getByText("5")).toBeInTheDocument();
+    // The bottom pager count follows the (filtered) list size.
+    expect(await screen.findByText("共 5 个")).toBeInTheDocument();
   });
 
   it("shows the empty state after removing every skill", async () => {
@@ -165,6 +169,82 @@ describe("MySkillsPage", () => {
 
     await screen.findByText("local-skill");
     expect(screen.getByText("本地")).toBeInTheDocument();
+  });
+
+  it("filters skills by search text and updates the count", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await screen.findByText("共 6 个");
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
+    expect(screen.getAllByTitle("移除")).toHaveLength(1);
+    expect(screen.queryByText("docx")).not.toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText("搜索 Skill"));
+    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
+    expect(screen.getAllByTitle("移除")).toHaveLength(6);
+  });
+
+  it("shows a no-match empty state for a search with no results", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await screen.findByText("共 6 个");
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "zzz");
+
+    expect(await screen.findByText(/未找到匹配/)).toBeInTheDocument();
+    expect(screen.getByText("共 0 个")).toBeInTheDocument();
+  });
+
+  it("filters by enablement state from the toolbar dropdown", async () => {
+    const user = userEvent.setup();
+    setMockSkillEnabled("pdf", false);
+    renderWithRouter(<MySkillsPage />);
+    await screen.findByText("共 6 个");
+
+    await user.click(screen.getByRole("button", { name: "筛选" }));
+    await user.click(
+      await screen.findByRole("menuitemradio", { name: "已禁用" }),
+    );
+
+    // Only the disabled skill survives; the trigger now shows the selection.
+    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "开启 pdf" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("docx")).not.toBeInTheDocument();
+    // The trigger now spells out the active filter.
+    expect(
+      await screen.findByRole("button", { name: /已禁用/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("pages through the grid and clamps back when the last page empties", async () => {
+    const user = userEvent.setup();
+    // installMockSkill prepends, so page 1 holds extra-18..extra-0 plus the
+    // first five base skills and the tail base skill lands on page 2.
+    for (let i = 0; i < 19; i++) installMockSkill("test/repo", `extra-${i}`);
+    renderWithRouter(<MySkillsPage />);
+
+    expect(await screen.findByText("共 25 个")).toBeInTheDocument();
+    expect(screen.getByText("extra-18")).toBeInTheDocument();
+    expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("下一页"));
+
+    expect(await screen.findByText("frontend-design")).toBeInTheDocument();
+    expect(screen.queryByText("extra-18")).not.toBeInTheDocument();
+
+    // Removing the only skill on the last page clamps back to page 1.
+    const [onlyRemove] = await screen.findAllByTitle("移除");
+    await user.click(onlyRemove);
+    await waitFor(() => {
+      expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
+    });
+    expect(await screen.findByText("共 24 个")).toBeInTheDocument();
+    expect(screen.getByText("extra-18")).toBeInTheDocument();
   });
 
   it("lists every detected agent in the strip's dropdown menu", async () => {

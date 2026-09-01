@@ -64,7 +64,7 @@ describe("AgentAvatarGroup", () => {
     ).toEqual(["avatar", "avatar"]);
   });
 
-  it("marks each avatar's link state with a status badge", () => {
+  it("keeps the avatars plain — link state lives in the menu, not on dots", () => {
     const { container } = render(
       <AgentAvatarGroup
         agents={[
@@ -76,13 +76,6 @@ describe("AgentAvatarGroup", () => {
       />,
     );
 
-    // Badges follow avatar order: linked, content waiting (amber), canonical
-    // (counts as linked), plain unlinked (muted).
-    expect(slots(container, "avatar-badge").map((badge) => badge.className)).toEqual([
-      expect.stringContaining("bg-emerald-500"),
-      expect.stringContaining("bg-amber-500"),
-      expect.stringContaining("bg-emerald-500"),
-      expect.stringContaining("bg-muted-foreground"),
-    ]);
+    expect(slots(container, "avatar-badge")).toHaveLength(0);
   });
 });
