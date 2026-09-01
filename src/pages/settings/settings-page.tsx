@@ -9,6 +9,7 @@ import {
 import { reloadRegistry } from "../../lib/registry/client";
 import { removeProject } from "../../lib/projects";
 import { useProjects } from "../../hooks/use-projects";
+import { useAppUpdate } from "../../hooks/use-app-update";
 import { useProjectAdd } from "../../hooks/use-project-add";
 import { AddProjectDialog } from "../../components/add-project-dialog";
 import { Button } from "../../components/ui/button";
@@ -30,6 +31,7 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const projects = useProjects();
   const projectAdd = useProjectAdd();
+  const update = useAppUpdate();
 
   const apply = (next: string) => {
     const previous = getCdnBase();
@@ -61,6 +63,44 @@ export function SettingsPage() {
           <div className="mt-3">
             <ThemeModeToggle />
           </div>
+        </div>
+
+        <div className="rounded-xl border border-border/70 bg-card p-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <div>
+              <h3 className="text-[13px] font-medium text-foreground">
+                软件更新
+              </h3>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                启动时自动检查新版本（GitHub Releases，签名校验后安装），也可手动检查。
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              disabled={update.phase === "checking"}
+              onClick={() => void update.check()}
+            >
+              {update.phase === "checking" ? "正在检查…" : "检查更新"}
+            </Button>
+          </div>
+          {update.phase === "upToDate" && (
+            <p className="mt-2 flex items-center gap-1 text-[12px] text-primary">
+              <Check className="h-3.5 w-3.5" />
+              已是最新版本。
+            </p>
+          )}
+          {update.phase === "available" && (
+            <p className="mt-2 text-[12px] text-primary">
+              发现新版本 v{update.version}，可在更新弹窗中安装。
+            </p>
+          )}
+          {update.phase === "error" && (
+            <p role="alert" className="mt-2 text-[12px] text-destructive">
+              {update.error}
+            </p>
+          )}
         </div>
 
         <div className="rounded-xl border border-border/70 bg-card p-4">

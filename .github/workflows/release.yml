@@ -37,7 +37,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # TAURI_SIGNING_PRIVATE_KEY makes `tauri build` also emit the updater
+      # artifacts: bundle/macos/skillone.app.tar.gz + .sig (minisign-signed;
+      # independent from any Apple developer identity).
       - name: Build app bundle
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm run tauri build
 
       - name: Get version
@@ -53,6 +59,39 @@ jobs:
           echo "path=${DMG}" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "${DMG}")" >> "$GITHUB_OUTPUT"
 
+      - name: Locate updater artifact
+        id: app
+        shell: bash
+        run: |
+          TAR=$(ls src-tauri/target/release/bundle/macos/*.app.tar.gz | head -n1)
+          echo "path=${TAR}" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "${TAR}")" >> "$GITHUB_OUTPUT"
+
+      # What the in-app updater reads from
+      # .../releases/latest/download/latest.json. Only darwin-aarch64 ships
+      # today (macos-14 runner); add platforms keys when new targets appear.
+      - name: Build updater manifest
+        shell: bash
+        env:
+          SIG_PATH: ${{ steps.app.outputs.path }}.sig
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const [version, tarName, sigPath] = process.argv.slice(1);
+            fs.writeFileSync("latest.json", JSON.stringify({
+              version,
+              notes: `skillone ${version}`,
+              pub_date: new Date().toISOString(),
+              platforms: {
+                "darwin-aarch64": {
+                  url: `https://github.com/${process.env.GITHUB_REPOSITORY}` +
+                    `/releases/download/v${version}/${tarName}`,
+                  signature: fs.readFileSync(sigPath, "utf8").trim(),
+                },
+              },
+            }, null, 2) + "\n");
+          ' "${{ steps.ver.outputs.version }}" "${{ steps.app.outputs.name }}" "$SIG_PATH"
+
       - name: Create GitHub Release
         shell: bash
         env:
@@ -63,7 +102,11 @@ jobs:
           if ! gh release view "${TAG}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "${TAG}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --generate-notes
           fi
-          gh release upload "${TAG}" "${{ steps.dmg.outputs.path }}" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "${TAG}" \
+            "${{ steps.dmg.outputs.path }}" \
+            "${{ steps.app.outputs.path }}" \
+            latest.json \
+            --repo "$GITHUB_REPOSITORY" --clobber
 
       - name: Publish Homebrew Cask
         shell: bash

@@ -5,8 +5,10 @@ import { listen } from "@tauri-apps/api/event";
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppSidebar } from "./components/app-sidebar";
+import { UpdateDialog } from "./components/update-dialog";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 import { createQueryClient } from "./lib/query-client";
+import { checkForUpdate } from "./lib/update-store";
 import { isTauri } from "./lib/tauri";
 import { ExplorePage } from "./pages/explore/explore-page";
 import { FeaturedPage } from "./pages/explore/featured/featured-page";
@@ -54,6 +56,8 @@ export default function App() {
     >
       <HashRouter>
         <PopoverNavigation />
+        <StartupUpdateCheck />
+        <UpdateDialog />
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
           <SidebarProvider
             style={{ minHeight: 0 }}
@@ -108,5 +112,17 @@ function PopoverNavigation() {
       void unlisten.then((dispose) => dispose());
     };
   }, [navigate]);
+  return null;
+}
+
+/**
+ * Silent startup update check. Only inside Tauri; network/signature failures
+ * stay quiet here (the settings page surfaces them on a manual check).
+ */
+function StartupUpdateCheck() {
+  useEffect(() => {
+    if (!isTauri()) return;
+    void checkForUpdate();
+  }, []);
   return null;
 }

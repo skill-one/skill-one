@@ -12,6 +12,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        // Self-update: `updater` fetches/verifies/installs signed artifacts from
+        // GitHub Releases; `process` lets the frontend relaunch after install.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(tray::PopoverState::default())
         .invoke_handler(tauri::generate_handler![
             skills::install_skill,

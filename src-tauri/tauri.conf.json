@@ -46,6 +46,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -53,5 +54,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERFOTBGRUJFMUUzQzg3MgpSV1J5eU9QaDZ3L3BEVUF4ZmhYazA3M1RTcW5TMEFQNmRZV0E0Q0k0eVplbjd1Y3VqSkVsV0pmdwo=",
+      "endpoints": [
+        "https://github.com/skill-one/skillone/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
