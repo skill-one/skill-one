@@ -32,6 +32,26 @@ describe("SettingsPage", () => {
     expect(screen.getByText("跟随系统")).toBeInTheDocument();
   });
 
+  it("shows the 软件更新 card with a manual check control", () => {
+    renderSettings();
+
+    expect(screen.getByText("软件更新")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "检查更新" }),
+    ).toBeInTheDocument();
+  });
+
+  it("reports browser mode when checking updates outside Tauri", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+
+    await user.click(screen.getByRole("button", { name: "检查更新" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "自动更新仅在桌面应用内可用。",
+    );
+  });
+
   it("switches the document to dark from the settings page", async () => {
     const user = userEvent.setup();
     renderSettings();

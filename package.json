@@ -21,6 +21,8 @@
     "@tanstack/react-query-persist-client": "^5.102.8",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-opener": "^2.5.4",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "embla-carousel-autoplay": "^8.6.0",
