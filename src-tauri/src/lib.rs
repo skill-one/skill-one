@@ -11,7 +11,6 @@ mod tray;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init())
         .manage(tray::PopoverState::default())
         .invoke_handler(tauri::generate_handler![
             skills::install_skill,
@@ -21,7 +20,6 @@ pub fn run() {
             skills::enable_skills,
             skills::link_agents,
             skills::link_status,
-            skills::move_skill,
         ])
         .setup(|app| {
             tray::create_tray(app.handle())?;

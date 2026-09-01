@@ -35,7 +35,7 @@ describe("fetchAgentStatus (Tauri)", () => {
 
     const statuses = await fetchAgentStatus();
 
-    expect(getLinkStatus).toHaveBeenCalledWith({ global: true });
+    expect(getLinkStatus).toHaveBeenCalledWith();
     expect(statuses[0]).toMatchObject({
       name: "cursor",
       linked: false,

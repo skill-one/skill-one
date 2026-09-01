@@ -22,6 +22,10 @@ agents-skills = "0.10"
 
 ## Manager 构造
 
+Skill One 只使用用户级全局技能目录（`~/.agents/skills`），因此实际代码统一用
+`Manager::new()`；`cwd` 构造仅作为库本身的用法列出，应用已不再使用
+（项目级技能支持已移除）。
+
 ```rust
 let manager = Manager::builder().cwd(p).build(); // 指定项目根目录（技能装到 ./agents/skills）
 let manager = Manager::new();                    // 使用进程当前工作目录

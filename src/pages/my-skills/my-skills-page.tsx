@@ -11,26 +11,16 @@ import {
   Users,
 } from "lucide-react";
 
-import {
-  moveSkill,
-  removeInstalledSkill,
-  setSkillEnabled,
-} from "../../lib/local-skills";
-import { type Project } from "../../lib/projects";
-import { type SkillScope } from "../../lib/skill-scope";
+import { removeInstalledSkill, setSkillEnabled } from "../../lib/local-skills";
 import {
   markSkillsChanged,
   useInstalledSkills,
-  type ScopedInstalledSkill,
 } from "../../hooks/use-installed-skills";
-import { useProjects } from "../../hooks/use-projects";
-import { useProjectAdd } from "../../hooks/use-project-add";
 import { useRegistrySkillMeta } from "../../hooks/use-registry-skill-meta";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import type { SkillRef } from "../../lib/registry/protocol";
+import type { InstalledSkill } from "../../lib/skills-manager";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
-import { ScopeSelect } from "./scope-select";
-import { AddProjectDialog } from "../../components/add-project-dialog";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { Button } from "../../components/ui/button";
 import {
@@ -54,31 +44,18 @@ const SEARCH_DEBOUNCE_MS = 150;
 /** Enablement filter offered by the toolbar dropdown. */
 type EnabledFilter = "all" | "enabled" | "disabled";
 
-/** Scope filter: every skill, or only the global / project ones. */
-type ScopeFilter = "all" | "global" | "project";
-
 const ENABLE_OPTIONS: Array<{ value: EnabledFilter; label: string }> = [
   { value: "all", label: "全部" },
   { value: "enabled", label: "已启用" },
   { value: "disabled", label: "已禁用" },
 ];
 
-const SCOPE_OPTIONS: Array<{ value: ScopeFilter; label: string }> = [
-  { value: "all", label: "全部范围" },
-  { value: "global", label: "全局" },
-  { value: "project", label: "项目" },
-];
-
-/** Stable identity for a row: a skill's name is only unique within its scope. */
-function rowId(skill: Pick<ScopedInstalledSkill, "name" | "scopeKey">): string {
-  const { kind, path } =
-    skill.scopeKey.kind === "project"
-      ? { kind: "project" as const, path: skill.scopeKey.path }
-      : { kind: "global" as const, path: "" };
-  return `${kind}|${path}|${skill.name}`;
+/** Stable identity for a row: a skill's name is unique in the global directory. */
+function rowId(skill: InstalledSkill): string {
+  return skill.name;
 }
 
-function sourceLabelFor(skill: ScopedInstalledSkill): string {
+function sourceLabelFor(skill: InstalledSkill): string {
   // No source record (e.g. placed manually into the global directory) or an
   // explicit local source both mean this is a local skill.
   if (!skill.sourceType || skill.sourceType === "local") return "本地";
@@ -87,26 +64,18 @@ function sourceLabelFor(skill: ScopedInstalledSkill): string {
 
 function SkillCardItem({
   skill,
-  projects,
   enabled,
   removing,
-  moving,
   description,
   onToggle,
   onRemove,
-  onMove,
-  onAddProject,
 }: {
-  skill: ScopedInstalledSkill;
-  projects: Project[];
+  skill: InstalledSkill;
   enabled: boolean;
   removing: boolean;
-  moving: boolean;
   description: string;
   onToggle: (enabled: boolean) => void;
   onRemove: () => void;
-  onMove: (target: SkillScope) => void;
-  onAddProject: () => void;
 }) {
   return (
     <div
@@ -166,15 +135,8 @@ function SkillCardItem({
         {description || "暂无描述"}
       </p>
 
-      {/* Bottom: scope selector (left) and remove action (right). */}
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <ScopeSelect
-          scope={skill.scopeKey}
-          projects={projects}
-          busy={moving}
-          onPick={onMove}
-          onAddProject={onAddProject}
-        />
+      {/* Bottom: remove action, right-aligned. */}
+      <div className="mt-3 flex items-center justify-end">
         <Button
           variant="ghost"
           size="icon"
@@ -194,7 +156,6 @@ export function MySkillsPage() {
   const queryClient = useQueryClient();
 
   const { data: skills, isLoading, isError, error } = useInstalledSkills();
-  const projects = useProjects();
 
   const list = useMemo(() => skills ?? [], [skills]);
 
@@ -215,15 +176,14 @@ export function MySkillsPage() {
   const [pendingEnabled, setPendingEnabled] = useState<Record<string, boolean>>(
     {},
   );
-  // A single, dismissible banner for a failed move / remove / toggle, since the
-  // three row actions share one surface and there is no toast layer yet.
+  // A single, dismissible banner for a failed remove / toggle, since the two
+  // row actions share one surface and there is no toast layer yet.
   const [actionError, setActionError] = useState<string | null>(null);
 
   const invalidate = () => markSkillsChanged(queryClient);
 
   const removeMutation = useMutation({
-    mutationFn: (skill: ScopedInstalledSkill) =>
-      removeInstalledSkill(skill.name, skill.scopeKey),
+    mutationFn: (skill: InstalledSkill) => removeInstalledSkill(skill.name),
     onSuccess: () => {
       setActionError(null);
       invalidate();
@@ -236,9 +196,9 @@ export function MySkillsPage() {
       skill,
       enabled,
     }: {
-      skill: ScopedInstalledSkill;
+      skill: InstalledSkill;
       enabled: boolean;
-    }) => setSkillEnabled(skill.name, enabled, skill.scopeKey),
+    }) => setSkillEnabled(skill.name, enabled),
     onMutate: ({ skill, enabled }) =>
       setPendingEnabled((prev) => ({ ...prev, [rowId(skill)]: enabled })),
     onSuccess: async () => {
@@ -253,28 +213,12 @@ export function MySkillsPage() {
     },
   });
 
-  const moveMutation = useMutation({
-    mutationFn: ({
-      skill,
-      to,
-    }: {
-      skill: ScopedInstalledSkill;
-      to: SkillScope;
-    }) => moveSkill(skill, to),
-    onSuccess: () => {
-      setActionError(null);
-      invalidate();
-    },
-    onError: (e) => setActionError(errMessage(e, "迁移失败")),
-  });
-
-  // 1-based current page; the toolbar (search + scope filter + enablement
-  // filter) is local state — the full installed list is already in memory, so
-  // everything below filters and slices on the main thread.
+  // 1-based current page; the toolbar (search + enablement filter) is local
+  // state — the full installed list is already in memory, so everything below
+  // filters and slices on the main thread.
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<EnabledFilter>("all");
-  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all");
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS)
     .trim()
     .toLowerCase();
@@ -287,10 +231,6 @@ export function MySkillsPage() {
   const handleFilter = (next: EnabledFilter) => {
     setPage(1);
     setFilter(next);
-  };
-  const handleScopeFilter = (next: ScopeFilter) => {
-    setPage(1);
-    setScopeFilter(next);
   };
 
   // Deep link from the menu bar popover: `/my-skills?skill=<name>` pre-fills
@@ -308,8 +248,6 @@ export function MySkillsPage() {
   const filtered = useMemo(
     () =>
       list.filter((skill) => {
-        if (scopeFilter !== "all" && skill.scopeKey.kind !== scopeFilter)
-          return false;
         if (
           query &&
           !`${skill.name} ${skill.description ?? ""} ${skill.source ?? ""}`
@@ -322,7 +260,7 @@ export function MySkillsPage() {
         if (filter === "disabled") return !enabled;
         return true;
       }),
-    [list, query, filter, scopeFilter, pendingEnabled],
+    [list, query, filter, pendingEnabled],
   );
 
   const total = filtered.length;
@@ -333,10 +271,6 @@ export function MySkillsPage() {
   }, [page, totalPages]);
 
   const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  // Project adding is shared with Settings: the native picker in the desktop
-  // shell, a manual path dialog in the browser. The card's scope menu triggers it.
-  const projectAdd = useProjectAdd();
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
@@ -357,12 +291,6 @@ export function MySkillsPage() {
         <div className="ml-auto flex items-center gap-2">
           <AgentAvatarMenu />
 
-          <FilterDropdown
-            label="范围"
-            value={scopeFilter}
-            options={SCOPE_OPTIONS}
-            onChange={handleScopeFilter}
-          />
           <FilterDropdown
             label="筛选"
             value={filter}
@@ -410,9 +338,7 @@ export function MySkillsPage() {
               <p className="text-[13px]">
                 {query
                   ? `未找到匹配“${query}”的 Skill`
-                  : scopeFilter !== "all"
-                    ? "当前范围内没有技能"
-                    : "没有符合条件的 Skill"}
+                  : "没有符合条件的 Skill"}
               </p>
             </div>
           ) : (
@@ -424,7 +350,6 @@ export function MySkillsPage() {
                   <SkillCardItem
                     key={id}
                     skill={skill}
-                    projects={projects}
                     enabled={pendingEnabled[id] ?? skill.enabled}
                     description={
                       skill.description ?? indexEntry?.description ?? ""
@@ -434,16 +359,10 @@ export function MySkillsPage() {
                       removeMutation.variables != null &&
                       rowId(removeMutation.variables) === id
                     }
-                    moving={
-                      moveMutation.isPending &&
-                      rowId(moveMutation.variables?.skill) === id
-                    }
                     onToggle={(enabled) =>
                       toggleMutation.mutate({ skill, enabled })
                     }
                     onRemove={() => removeMutation.mutate(skill)}
-                    onMove={(to) => moveMutation.mutate({ skill, to })}
-                    onAddProject={projectAdd.start}
                   />
                 );
               })}
@@ -460,19 +379,13 @@ export function MySkillsPage() {
           />
         )}
       </div>
-
-      {/* Browser-only manual path entry, the fallback for the native picker. */}
-      <AddProjectDialog
-        open={projectAdd.manualOpen}
-        onOpenChange={projectAdd.setManualOpen}
-      />
     </div>
   );
 }
 
-/** A single-select toolbar filter rendered as a pill dropdown, shared by the
- *  enablement and scope filters. The trigger shows the active option (or the
- *  neutral `label` when it is the "all" default). */
+/** A single-select toolbar filter rendered as a pill dropdown for the
+ *  enablement filter. The trigger shows the active option (or the neutral
+ *  `label` when it is the "all" default). */
 function FilterDropdown<T extends string>({
   label,
   value,

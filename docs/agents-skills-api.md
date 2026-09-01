@@ -24,6 +24,11 @@ reaches into internals.
 
 ## Constructing the Manager
 
+Skill One only uses the user-level global skills directory
+(`~/.agents/skills`), so the actual code always builds `Manager::new()`. The
+`cwd` constructor is listed for completeness of the library's own API; the app
+no longer uses it (project-level skill support has been removed).
+
 ```rust
 let manager = Manager::builder().cwd(p).build(); // project root (skills install to ./agents/skills)
 let manager = Manager::new();                    // process current working directory

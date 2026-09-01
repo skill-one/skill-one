@@ -6,25 +6,12 @@
  */
 
 import type { AgentStatus, InstalledSkill } from "./skills-manager";
-import {
-  isSameScope,
-  scopeFromSkill,
-  type SkillScope,
-} from "./skill-scope";
 
 // ---------------------------------------------------------------- skills
 
-/**
- * The one mock project the browser demo uses. Exported so the projects store can
- * register it and the demo project's skills become visible in the merged list.
- */
-export const MOCK_PROJECT_PATH = "/Users/me/work/demo-app";
-
-/** A skill's on-disk path for a scope (global keeps a `~` prefix for readability). */
-function mockPathFor(name: string, scope: SkillScope): string {
-  return scope.kind === "global"
-    ? `~/.agents/skills/${name}`
-    : `${scope.path}/.agents/skills/${name}`;
+/** A skill's on-disk path (global dir keeps a `~` prefix for readability). */
+function mockPathFor(name: string): string {
+  return `~/.agents/skills/${name}`;
 }
 
 const mockGlobalRows = [
@@ -66,29 +53,10 @@ const mockGlobalRows = [
   },
 ];
 
-// Two skills that live in the demo project rather than globally, so the merged
-// list shows both scopes side by side and the project scope is explorable.
-const mockProjectRows = [
-  {
-    name: "deploy-preview",
-    source: "vercel/skills",
-    sourceType: "github",
-    description: "为当前分支拉起一个预览部署。",
-  },
-  {
-    name: "local-migration",
-    source: null,
-    sourceType: null,
-    description: "本地迁移脚本技能（无安装来源）。",
-  },
-];
-
 function buildMockSkills(): InstalledSkill[] {
-  const globalScope: SkillScope = { kind: "global" };
-  const projectScope: SkillScope = { kind: "project", path: MOCK_PROJECT_PATH };
-  const globals: InstalledSkill[] = mockGlobalRows.map((row, i) => ({
+  return mockGlobalRows.map((row, i) => ({
     name: row.name,
-    path: mockPathFor(row.name, globalScope),
+    path: mockPathFor(row.name),
     scope: "global",
     agents: i === 0 ? ["claude-code"] : [],
     source: row.source,
@@ -97,60 +65,32 @@ function buildMockSkills(): InstalledSkill[] {
     description: row.description,
     enabled: true,
   }));
-  const projects: InstalledSkill[] = mockProjectRows.map((row) => ({
-    name: row.name,
-    path: mockPathFor(row.name, projectScope),
-    scope: "project",
-    agents: [],
-    source: row.source,
-    sourceUrl: null,
-    sourceType: row.sourceType,
-    description: row.description,
-    enabled: true,
-  }));
-  return [...globals, ...projects];
 }
 
 let mockSkills = buildMockSkills();
 
-/** Skills installed in a given scope (global, or one project directory). */
-export function getMockSkillsInScope(scope: SkillScope): InstalledSkill[] {
-  return mockSkills.filter((s) => isSameScope(scopeFromSkill(s), scope));
-}
-
-/** All mock skills across every scope (kept for the popover / legacy consumers). */
+/** All mock skills in the global skills directory. */
 export function getMockInstalledSkills(): InstalledSkill[] {
   return mockSkills;
 }
 
-/** Whether a scope already holds a skill with this name. */
-function hasMockSkillInScope(name: string, scope: SkillScope): boolean {
-  return getMockSkillsInScope(scope).some((s) => s.name === name);
-}
-
-/** Remove a skill from a scope (name + scope, since the same name can exist in two scopes). */
-export function removeMockSkill(name: string, scope: SkillScope): void {
-  mockSkills = mockSkills.filter(
-    (s) => !(s.name === name && isSameScope(scopeFromSkill(s), scope)),
-  );
+/** Remove a skill by name. */
+export function removeMockSkill(name: string): void {
+  mockSkills = mockSkills.filter((s) => s.name !== name);
 }
 
 /**
- * Record a mock install of a single skill from a GitHub source (`owner/repo`)
- * into a scope. Mirrors a successful install in the browser without cloning a
- * repo; a skill of that name already in the same scope is left untouched.
+ * Record a mock install of a single skill from a GitHub source (`owner/repo`).
+ * Mirrors a successful install in the browser without cloning a repo; a skill
+ * of the same name is left untouched.
  */
-export function installMockSkill(
-  repo: string,
-  name: string,
-  scope: SkillScope = { kind: "global" },
-): void {
-  if (hasMockSkillInScope(name, scope)) return;
+export function installMockSkill(repo: string, name: string): void {
+  if (mockSkills.some((s) => s.name === name)) return;
   mockSkills = [
     {
       name,
-      path: mockPathFor(name, scope),
-      scope: scope.kind === "global" ? "global" : "project",
+      path: mockPathFor(name),
+      scope: "global",
       agents: [],
       source: repo,
       sourceUrl: null,
@@ -163,19 +103,16 @@ export function installMockSkill(
 
 /**
  * Record a mock install of a skill with no source record, mirroring a skill
- * placed manually into a skills directory (no lock entry → `sourceType` is
- * `null`). Used to exercise the "no reinstall source" migration path.
+ * placed manually into the skills directory (no lock entry → `sourceType` is
+ * `null`).
  */
-export function addMockLocalSkill(
-  name: string,
-  scope: SkillScope = { kind: "global" },
-): void {
-  if (hasMockSkillInScope(name, scope)) return;
+export function addMockLocalSkill(name: string): void {
+  if (mockSkills.some((s) => s.name === name)) return;
   mockSkills = [
     {
       name,
-      path: mockPathFor(name, scope),
-      scope: scope.kind === "global" ? "global" : "project",
+      path: mockPathFor(name),
+      scope: "global",
       agents: [],
       source: null,
       sourceUrl: null,
@@ -188,44 +125,8 @@ export function addMockLocalSkill(
 }
 
 /** Flip a mock skill's enabled state, mirroring the backend's disable/enable. */
-export function setMockSkillEnabled(
-  name: string,
-  scope: SkillScope,
-  enabled: boolean,
-): void {
-  mockSkills = mockSkills.map((s) =>
-    s.name === name && isSameScope(scopeFromSkill(s), scope)
-      ? { ...s, enabled }
-      : s,
-  );
-}
-
-/**
- * Move a mock skill from one scope to another by rewriting its scope/path, the
- * browser mirror of a reinstall (source skills) or a directory move (sourceless
- * skills). A name clash in the target scope drops the origin copy (target wins),
- * matching what the real move surfaces as a collision.
- */
-export function moveMockSkill(
-  name: string,
-  from: SkillScope,
-  to: SkillScope,
-): void {
-  const origin = mockSkills.find(
-    (s) => s.name === name && isSameScope(scopeFromSkill(s), from),
-  );
-  if (!origin) return;
-  const rest = mockSkills.filter(
-    (s) =>
-      !(s.name === name && isSameScope(scopeFromSkill(s), from)) &&
-      !(s.name === name && isSameScope(scopeFromSkill(s), to)),
-  );
-  const relocated: InstalledSkill = {
-    ...origin,
-    scope: to.kind === "global" ? "global" : "project",
-    path: mockPathFor(name, to),
-  };
-  mockSkills = [relocated, ...rest];
+export function setMockSkillEnabled(name: string, enabled: boolean): void {
+  mockSkills = mockSkills.map((s) => (s.name === name ? { ...s, enabled } : s));
 }
 
 export function resetMockInstalledSkills(): void {
