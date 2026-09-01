@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { MySkillsPage } from "./my-skills-page";
@@ -135,6 +135,70 @@ describe("MySkillsPage", () => {
     expect(
       await screen.findByText("PDF 文档读取、生成、合并、拆分与标注。"),
     ).toBeInTheDocument();
+  });
+
+  it("opens the shared detail drawer when a card is clicked", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "查看 pdf 详情" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    // The mock registry is not running, so the installed record has no index
+    // entry: the panel reads the SKILL.md from the (mock) skills directory.
+    expect(within(dialog).getByText("pdf")).toBeInTheDocument();
+    expect(within(dialog).getByText("anthropics/skills")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("PDF 文档读取、生成、合并、拆分与标注。"),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("（浏览器演示数据：模拟的本地 SKILL.md）"),
+    ).toBeInTheDocument();
+  });
+
+  it("walks the installed list with the arrow keys inside the drawer", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "查看 pdf 详情" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    // The drawer now shows the next installed skill (mock order: pdf → docx).
+    expect(
+      await within(dialog).findByText("以编程方式创建和编辑 Word 文档。"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("docx")).toBeInTheDocument();
+  });
+
+  it("labels a no-source skill's drawer as 本地安装 without repo links", async () => {
+    const user = userEvent.setup();
+    addMockLocalSkill("my-local");
+    renderWithRouter(<MySkillsPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "查看 my-local 详情" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("本地安装")).toBeInTheDocument();
+    expect(within(dialog).queryByText("anthropics/skills")).not.toBeInTheDocument();
+  });
+
+  it("does not open the drawer from the row controls", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await screen.findByText("共 6 个");
+
+    await user.click(await screen.findByRole("switch", { name: "关闭 pdf" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await user.click((await screen.findAllByTitle("移除"))[0]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("uses '暂无描述' as a placeholder when a skill has no description", async () => {

@@ -12,6 +12,8 @@
  */
 
 import { isTauri } from "./tauri";
+import { toDetail } from "./skill-detail-api";
+import type { SkillDetail } from "../types/skill";
 import {
   disableSkills,
   enableSkills,
@@ -19,6 +21,7 @@ import {
   installSkill,
   linkAgents,
   listInstalledSkills,
+  readSkillMd,
   removeSkills,
   unlinkAgents,
   type AgentLinkResult,
@@ -43,6 +46,35 @@ export async function fetchInstalledSkills(): Promise<InstalledSkill[]> {
     return listInstalledSkills();
   }
   return getMockInstalledSkills();
+}
+
+/**
+ * SKILL.md of an installed skill, read from the local skills directory.
+ *
+ * Used by the detail view whenever the registry cannot point at the skill's
+ * repo path (local skills, or store-sourced ones whose index entry is not
+ * available) — disk works offline, covers disabled skills and shows the
+ * version actually installed. In Tauri the backend resolves the name through
+ * its `list` and returns the raw text, parsed here with the same frontmatter
+ * parser the store detail view uses. In the browser the mock store provides
+ * an equivalent record.
+ */
+export async function fetchLocalSkillDetail(name: string): Promise<SkillDetail> {
+  if (isTauri()) {
+    const { path, content } = await readSkillMd(name);
+    return toDetail(content, name, path);
+  }
+  const skill = getMockInstalledSkills().find((s) => s.name === name);
+  if (!skill) {
+    throw new Error(`本地未安装技能 ${name}`);
+  }
+  const description = skill.description ?? "";
+  return {
+    name: skill.name,
+    description,
+    instructions: `演示数据：${skill.name} 的本地 SKILL.md 正文。\n\n（浏览器演示数据：模拟的本地 SKILL.md）`,
+    path: `${skill.path}/SKILL.md`,
+  };
 }
 
 /**

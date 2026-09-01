@@ -35,6 +35,14 @@ export interface InstalledSkillDto {
   canonicalPath: string;
 }
 
+/** A skill's SKILL.md read from the local skills directory. */
+export interface SkillMd {
+  /** Absolute path of the file on disk. */
+  path: string;
+  /** Raw content, frontmatter included; parsed on the frontend. */
+  content: string;
+}
+
 export interface InstallFailureDto {
   skill: string;
   error: string;
@@ -177,6 +185,16 @@ export async function listInstalledSkills(
   return invoke<InstalledSkill[]>("list_installed_skills", {
     agents: options.agents,
   });
+}
+
+/**
+ * Read the raw SKILL.md of an installed skill from the local skills
+ * directory. The backend resolves the name through its `list`, so disabled
+ * (parked) skills stay readable and no path is ever interpolated.
+ */
+export async function readSkillMd(name: string): Promise<SkillMd> {
+  requireTauri();
+  return invoke<SkillMd>("read_skill_md", { name });
 }
 
 /**

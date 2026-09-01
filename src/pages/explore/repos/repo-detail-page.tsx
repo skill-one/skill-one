@@ -12,7 +12,7 @@ import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../explore-page";
 import { ListPager } from "../../../components/list-pager";
 import { SkillCard } from "../skill-card";
-import { SkillDetailDrawer } from "../skill-detail-drawer";
+import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 
 /** Number of skills shown per page on the repo detail page. */
 const PAGE_SIZE = 24;

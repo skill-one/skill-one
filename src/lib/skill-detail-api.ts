@@ -102,7 +102,8 @@ export function parseFrontmatter(raw: string): {
   };
 }
 
-function toDetail(raw: string, skillId: string, path: string): SkillDetail {
+/** Split a raw SKILL.md into the shape the detail view consumes. */
+export function toDetail(raw: string, skillId: string, path: string): SkillDetail {
   const { frontmatter, body } = parseFrontmatter(raw);
   return {
     name: frontmatter.name ?? skillId,

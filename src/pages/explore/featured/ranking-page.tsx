@@ -10,7 +10,7 @@ import { RANKINGS, rankingById, type RankEntry } from "../../../lib/registry/fea
 import { cn } from "../../../lib/utils";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../explore-page";
-import { SkillDetailDrawer } from "../skill-detail-drawer";
+import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 import { SkillInstallButton } from "../skill-install-button";
 
 /** Where the back button points; the tabs live under the same route. */

@@ -5,13 +5,18 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { fetchLocalSkillDetail } from "../../lib/local-skills";
 import { openExternal } from "../../lib/open-external";
 import type { Skill } from "../../types/skill";
-import { Drawer } from "../../components/ui/drawer";
+import { Drawer } from "../ui/drawer";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
 vi.mock("../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
+}));
+
+vi.mock("../../lib/local-skills", () => ({
+  fetchLocalSkillDetail: vi.fn(),
 }));
 
 vi.mock("../../lib/open-external", () => ({
@@ -19,6 +24,7 @@ vi.mock("../../lib/open-external", () => ({
 }));
 
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
+const mockFetchLocalSkillDetail = vi.mocked(fetchLocalSkillDetail);
 const mockOpenExternal = vi.mocked(openExternal);
 
 const skill: Skill = {
@@ -27,6 +33,16 @@ const skill: Skill = {
   description: "Read and merge PDF documents.",
   stars: 169600,
   downloads: 2991984,
+  path: "skills/pdf",
+};
+
+/** A skill placed manually into the global directory: no repo, disk read. */
+const localSkill: Skill = {
+  name: "my-tool",
+  repo: "",
+  description: "",
+  stars: 0,
+  downloads: 0,
 };
 
 const detail = {
@@ -37,6 +53,13 @@ const detail = {
   author: "Anthropic",
   instructions: "Use this skill for PDFs.",
   path: "skills/pdf/SKILL.md",
+};
+
+const localDetail = {
+  name: "my-tool",
+  description: "",
+  instructions: "Local skill body.",
+  path: "/Users/me/.agents/skills/my-tool/SKILL.md",
 };
 
 let queryClient: QueryClient;
@@ -81,6 +104,7 @@ beforeEach(() => {
     defaultOptions: { queries: { retry: false } },
   });
   mockFetchSkillDetail.mockReset();
+  mockFetchLocalSkillDetail.mockReset();
   mockOpenExternal.mockReset();
 });
 
@@ -112,7 +136,7 @@ describe("SkillDetailPanel", () => {
     expect(mockFetchSkillDetail).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
-      undefined,
+      "skills/pdf",
     );
   });
 
@@ -136,14 +160,32 @@ describe("SkillDetailPanel", () => {
     );
   });
 
-  it("links the source repo to the GitHub repo root when the path is unknown", async () => {
-    mockFetchSkillDetail.mockResolvedValue(detail);
-    renderDrawer({});
+  it("reads the installed copy from disk but keeps the GitHub links when the registry path is gone", async () => {
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({ skill: { ...skill, path: undefined } });
 
     await screen.findByText("Use this skill for PDFs.");
+    expect(mockFetchLocalSkillDetail).toHaveBeenCalledWith("pdf");
+    expect(mockFetchSkillDetail).not.toHaveBeenCalled();
     expect(
       screen.getByRole("link", { name: /anthropics\/skills/ }),
     ).toHaveAttribute("href", "https://github.com/anthropics/skills");
+  });
+
+  it("reads pure local skills from disk without store-only header parts", async () => {
+    mockFetchLocalSkillDetail.mockResolvedValue(localDetail);
+    renderDrawer({ skill: localSkill });
+
+    expect(await screen.findByText("Local skill body.")).toBeInTheDocument();
+    expect(mockFetchLocalSkillDetail).toHaveBeenCalledWith("my-tool");
+    expect(mockFetchSkillDetail).not.toHaveBeenCalled();
+    // No repo → no GitHub links at all, a 本地安装 caption and the Puzzle
+    // placeholder avatar, the disk path as plain text, and no stats row.
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText("本地安装")).toBeInTheDocument();
+    expect(screen.getByLabelText("skill 头像")).toBeInTheDocument();
+    expect(screen.getByText(localDetail.path)).toBeInTheDocument();
+    expect(screen.queryByText("3M")).not.toBeInTheDocument();
   });
 
   it("opens the source link through the system browser on click", async () => {

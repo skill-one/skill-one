@@ -6,7 +6,7 @@ import { Button } from "../../../components/ui/button";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../explore-page";
 import { SkillCard } from "../skill-card";
-import { SkillDetailDrawer } from "../skill-detail-drawer";
+import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 import { FeaturedHero } from "./featured-hero";
 
 /** Loading placeholder mirroring the page layout: hero plus two sections. */

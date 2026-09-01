@@ -49,6 +49,7 @@ function makeSkills(count: number, offset: number) {
     description: "",
     stars: 1000,
     downloads: 1000,
+    path: `skills/skill-${offset + i}`,
   }));
 }
 
@@ -76,6 +77,7 @@ function gadgetRegistry(): Skill[] {
       description: "Builds tiny gadgets.",
       stars: 99,
       downloads: 99,
+      path: "skills/gadget-master",
     },
     ...Array.from({ length: 49 }, (_, i) => ({
       name: `tool-${i}`,
@@ -83,6 +85,7 @@ function gadgetRegistry(): Skill[] {
       description: "A general purpose utility.",
       stars: 10,
       downloads: 10,
+      path: `skills/tool-${i}`,
     })),
   ];
 }
