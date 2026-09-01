@@ -339,7 +339,7 @@ export function MySkillsPage() {
   const projectAdd = useProjectAdd();
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
+    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
       {/* Toolbar, styled like the store's full list: search first, controls
           clustered on the right. */}
       <div className="mb-4 flex items-center gap-3">
@@ -389,7 +389,7 @@ export function MySkillsPage() {
       {/* Card grid with the pager row pinned to the bottom, mirroring the store
           page. */}
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-4">
+        <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-0">
           {isError ? (
             <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
               <Users className="h-7 w-7 opacity-40" />
