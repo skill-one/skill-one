@@ -23,36 +23,26 @@
 1. 打开 `.dmg`，把 **skillone** 拖入「应用程序」文件夹。
 2. 启动应用——首次启动只需按 [macOS 首次安装须知](#macos-首次安装须知) 放行一次 Gatekeeper。
 
-自 v0.2.0 起不必再手动下载：新版本会通过内置更新器自动送达。（更早版本的安装包里没有更新器，因此需要这一次手动重装。）
-
 ### Homebrew（一条命令）
 
 ```bash
 brew install --cask skill-one/tap/skillone
 ```
 
-brew 用户可以一直用 `brew upgrade --cask skillone` 升级；brew 下载不带 quarantine 属性，完全不会触发 Gatekeeper 提示。
-
 ## 保持最新
 
-skillone 通过 GitHub Releases + **应用内更新器** 发布更新：
+启动时自动检查更新，发现新版会弹窗提示，点「立即更新」即下载安装并自动重启；也可手动检查：**设置 → 软件更新 → 检查更新**。更新包安装前会做签名校验，签名不符不会安装。
 
-- 启动时静默检查最新版本；发现新版会弹出更新窗，点「立即更新」即带进度下载安装，完成后自动重启进入新版本。
-- 也可以随时手动检查：**设置 → 软件更新 → 检查更新**。
-- 每个更新包在安装前都会做密码学**签名校验**，签名不符的包永远不会被安装。（发布只需打一个 `v*` tag——CI 会自动构建、签名并发布更新清单。）
+Homebrew 用户请继续用 `brew upgrade --cask skillone` 升级。
 
-应用内完成的更新不会被 Gatekeeper 拦截（替换由应用自身执行）。通过 Homebrew 安装的用户，建议继续用 `brew upgrade --cask skillone` 升级，以保持 brew 的记录同步。
+## macOS 首次安装须知
 
-### macOS 首次安装须知
+应用为 ad-hoc 签名，手动下载的 `.dmg` 首次启动可能被 Gatekeeper 拦截。任选一种方式放行一次：
 
-本应用以 ad-hoc 签名分发（未购买 Apple 开发者 ID），因此**手动下载首次安装**时，macOS 可能提示「无法打开 skillone，因为无法验证开发者」（macOS 15 起，右键打开也可能提示「无法打开」）。任选一种方式一次性放行：
+- **系统设置 → 隐私与安全性** → 点被拦截提示处的**仍要打开**；
+- 终端执行 `xattr -d com.apple.quarantine /Applications/skillone.app`。
 
-- **右键（或按住 Control 点击）应用 → 打开 →** 弹窗中再点**打开**；或
-- **系统设置 → 隐私与安全性** → 拉到底部被拦截提示处 → 点**仍要打开**。
-
-也可用命令行的方式去掉隔离属性：`xattr -d com.apple.quarantine /Applications/skillone.app`。
-
-放行这一次之后，应用永久正常打开——后续由应用内更新器送达的更新也**不会再要求放行**。（Homebrew 安装则完全没有这一步。）
+放行后永久正常打开，后续应用内更新不会再提示；Homebrew 安装无此步骤。
 
 ## 使用
 
