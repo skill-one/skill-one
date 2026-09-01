@@ -107,6 +107,35 @@ export interface RepoPageData {
   total: number;
 }
 
+/**
+ * How the dataset currently served by the worker got here during this run.
+ * Surfaced in Settings so a user can tell a real refresh from a cache reuse.
+ */
+export type IndexOrigin =
+  /** A newer commit was downloaded (or this was the first cold-start fetch). */
+  | "updated"
+  /** The published commit matches the cached one: the download was skipped. */
+  | "unchanged"
+  /** Serving the cold-start cache while the revalidation is still in flight. */
+  | "cache";
+
+/** Published metadata describing the dataset currently served by the worker. */
+export interface IndexInfo {
+  /**
+   * The `distCommit` the served index was fetched at; absent for records
+   * written before commit addressing existed.
+   */
+  commit?: string;
+  /** Upstream `generatedAt` (second-precision UTC). */
+  generatedAt?: string;
+  /** Upstream `counts.total`: published entries, before the GitHub filter. */
+  total?: number;
+  /** Upstream `formatVersion` of the served index. */
+  formatVersion?: number;
+  /** Origin of the served dataset for this run. */
+  origin: IndexOrigin;
+}
+
 /** Main-thread → worker messages. */
 export type RegistryRequest =
   | { type: "init"; payload: { cdnBase: string } }
@@ -131,6 +160,7 @@ export type RegistryEvent =
       indexing: boolean;
     }
   | { type: "ready" }
+  | { type: "index"; info: IndexInfo | null }
   | { type: "error"; message: string };
 
 export type RegistryWorkerMessage =

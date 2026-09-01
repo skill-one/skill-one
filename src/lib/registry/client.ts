@@ -1,6 +1,7 @@
 import { getCdnBase } from "../cdn-config";
 import type {
   FeaturedData,
+  IndexInfo,
   PageData,
   PageRequest,
   RankingData,
@@ -35,6 +36,8 @@ export interface RegistrySnapshot {
   epoch: number;
   /** Last download failure message; null while healthy. */
   error: string | null;
+  /** Identity of the published snapshot being served; null until one is. */
+  index: IndexInfo | null;
 }
 
 const INITIAL_SNAPSHOT: RegistrySnapshot = {
@@ -44,6 +47,7 @@ const INITIAL_SNAPSHOT: RegistrySnapshot = {
   ready: false,
   epoch: 0,
   error: null,
+  index: null,
 };
 
 let worker: Worker | null = null;
@@ -84,6 +88,9 @@ function onMessage(message: RegistryWorkerMessage) {
       indexing: false,
       epoch: snapshot.epoch + 1,
     };
+    emit();
+  } else if (message.type === "index") {
+    snapshot = { ...snapshot, index: message.info };
     emit();
   } else if (message.type === "error") {
     snapshot = { ...snapshot, error: message.message };

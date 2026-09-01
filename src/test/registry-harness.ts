@@ -1,6 +1,7 @@
 import { createRegistryController } from "../lib/registry/worker-controller";
 import type {
   FeaturedData,
+  IndexInfo,
   PageData,
   PageRequest,
   RankingData,
@@ -11,6 +12,7 @@ import type {
   SkillRef,
 } from "../lib/registry/protocol";
 import type { RegistrySnapshot } from "../lib/registry/client";
+import type { PublishedIndex } from "../lib/registry/index-stream";
 import type { Skill } from "../types/skill";
 
 /**
@@ -35,6 +37,14 @@ export interface RegistryHarness {
   fail(err: unknown): void;
   /** How many downloads (init + reloads) have started. */
   readonly downloads: number;
+  /**
+   * Advertise the published snapshot the fake sources serve: its commit is
+   * what the controller compares against its cache to decide whether the body
+   * needs downloading, and what downloads get pinned to.
+   */
+  publishMeta(meta: PublishedIndex | null): void;
+  /** Commit the most recent download was pinned to (undefined = branch). */
+  readonly pinnedCommit: string | undefined;
   /** Make every RPC reject (worker crash stand-in) until cleared. */
   setRpcError(err: Error | null): void;
   getPage(req: PageRequest): Promise<PageData>;
@@ -55,6 +65,7 @@ const INITIAL_SNAPSHOT: RegistrySnapshot = {
   ready: false,
   epoch: 0,
   error: null,
+  index: null,
 };
 
 export function createRegistryHarness(): RegistryHarness {
@@ -80,6 +91,12 @@ export function createRegistryHarness(): RegistryHarness {
   let earlyBuffer: Skill[] = [];
   let earlyOutcome: "none" | "complete" | "fail" = "none";
   let earlyError: unknown;
+  // The published snapshot the fake sources advertise. Null (the default) means
+  // "no meta reachable": no commit to pin or compare, so every boot downloads
+  // — exactly the behavior from before commit addressing existed.
+  let published: PublishedIndex | null = null;
+  /** Commit the newest download was pinned to (undefined = branch fallback). */
+  let pinnedCommit: string | undefined;
 
   const replies = new Map<
     number,
@@ -92,8 +109,9 @@ export function createRegistryHarness(): RegistryHarness {
   function spawnController() {
     return createRegistryController(
       {
-        readIndex: async (_cdnBase, line) => {
+        readIndex: async (_cdnBase, commit, line) => {
           downloads++;
+          pinnedCommit = commit;
           onLine = line;
           for (const skill of earlyBuffer) line(skill);
           earlyBuffer = [];
@@ -107,6 +125,7 @@ export function createRegistryHarness(): RegistryHarness {
             settle = { resolve, reject };
           });
         },
+        probeMeta: async () => published,
         cache: {
           load: async () => null,
           save: async () => {},
@@ -134,6 +153,9 @@ export function createRegistryHarness(): RegistryHarness {
         indexing: false,
         epoch: snapshot.epoch + 1,
       };
+      emit();
+    } else if (message.type === "index") {
+      snapshot = { ...snapshot, index: message.info };
       emit();
     } else if (message.type === "error") {
       snapshot = { ...snapshot, error: message.message };
@@ -196,6 +218,12 @@ export function createRegistryHarness(): RegistryHarness {
     get downloads() {
       return downloads;
     },
+    publishMeta(meta) {
+      published = meta;
+    },
+    get pinnedCommit() {
+      return pinnedCommit;
+    },
     setRpcError(err) {
       rpcError = err;
     },
@@ -232,6 +260,8 @@ export function createRegistryHarness(): RegistryHarness {
       earlyBuffer = [];
       earlyOutcome = "none";
       earlyError = undefined;
+      published = null;
+      pinnedCommit = undefined;
       controller = spawnController();
     },
   };

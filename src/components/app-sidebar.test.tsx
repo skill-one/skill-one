@@ -184,6 +184,7 @@ describe("AppSidebar streaming", () => {
       ready: false,
       epoch: 0,
       error: null,
+      index: null,
     });
   });
 });

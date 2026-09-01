@@ -21,7 +21,8 @@ vi.mock("../../data/featured-content", () => ({
 }));
 
 import { createRegistryController } from "./worker-controller";
-import type { RegistryCache } from "./cache";
+import type { CachedIndex, RegistryCache } from "./cache";
+import type { PublishedIndex } from "./index-stream";
 import type {
   RegistryWorkerMessage,
   RepoSortOrder,
@@ -43,6 +44,11 @@ function skill(i: number, over: Partial<Skill> = {}): Skill {
 
 type ResultMessage = Extract<RegistryWorkerMessage, { type: "result" }>;
 
+/** A stored record as the cache hands it back: skills plus their identity. */
+function record(skills: Skill[], commit?: string): CachedIndex {
+  return { skills, commit, fetchedAt: 1 };
+}
+
 /** Unwrap a posted result, asserting it succeeded. */
 function resultData<T>(message: ResultMessage): T {
   expect(message.ok).toBe(true);
@@ -53,6 +59,7 @@ interface Recorded {
   messages: RegistryWorkerMessage[];
   results: Array<Extract<RegistryWorkerMessage, { type: "result" }>>;
   progress: Array<Extract<RegistryWorkerMessage, { type: "progress" }>>;
+  indexes: Array<Extract<RegistryWorkerMessage, { type: "index" }>>;
   errors: Array<Extract<RegistryWorkerMessage, { type: "error" }>>;
   readyCount: number;
 }
@@ -62,12 +69,15 @@ function setup(options?: {
   skills?: Skill[];
   cache?: RegistryCache;
   now?: () => number;
+  /** What the sources advertise as published; null = probe found nothing. */
+  published?: PublishedIndex | null;
 }) {
   const messages: RegistryWorkerMessage[] = [];
   const recorded: Recorded = {
     messages,
     results: [],
     progress: [],
+    indexes: [],
     errors: [],
     readyCount: 0,
   };
@@ -75,6 +85,7 @@ function setup(options?: {
     messages.push(message);
     if (message.type === "result") recorded.results.push(message);
     else if (message.type === "progress") recorded.progress.push(message);
+    else if (message.type === "index") recorded.indexes.push(message);
     else if (message.type === "error") recorded.errors.push(message);
     else if (message.type === "ready") recorded.readyCount++;
   };
@@ -84,11 +95,15 @@ function setup(options?: {
     resolve(): void;
     reject(err: unknown): void;
   }> = [];
+  /** Commit each started download was pinned to (undefined = branch ref). */
+  const pins: Array<string | undefined> = [];
   const readIndex = async (
     _cdnBase: string,
+    commit: string | undefined,
     line: (skill: Skill) => void,
   ): Promise<void> => {
     onLine = line;
+    pins.push(commit);
     if (options?.skills) {
       for (const s of options.skills) line(s);
       return;
@@ -100,6 +115,7 @@ function setup(options?: {
 
   const controller = createRegistryController(
     {
+      probeMeta: async () => options?.published ?? null,
       readIndex,
       cache: options?.cache ?? {
         load: async () => null,
@@ -114,6 +130,7 @@ function setup(options?: {
   return {
     controller,
     recorded,
+    pins,
     /** Deliver one skill on the newest open stream. */
     push(s: Skill) {
       onLine?.(s);
@@ -126,11 +143,9 @@ function setup(options?: {
     fail(err: unknown, which = -1) {
       streams.at(which)?.reject(err);
     },
-    /** Flush the async boot chain (cache read → stream start). */
+    /** Flush the async boot chain (cache read → meta probe → stream start). */
     async flush() {
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
     },
   };
 }
@@ -156,7 +171,7 @@ describe("createRegistryController — boot", () => {
       indexing: false,
     });
     expect(t.recorded.readyCount).toBe(1);
-    expect(t.controller.stats()).toEqual({
+    expect(t.controller.stats()).toMatchObject({
       count: 3,
       complete: true,
       indexing: false,
@@ -165,7 +180,7 @@ describe("createRegistryController — boot", () => {
   });
 
   it("serves instantly from the cold-start cache, then revalidates", async () => {
-    const cached = [skill(0), skill(1)];
+    const cached = record([skill(0), skill(1)], "a".repeat(8));
     const saved: Skill[][] = [];
     const t = setup({
       cache: {
@@ -180,11 +195,17 @@ describe("createRegistryController — boot", () => {
     await t.flush();
 
     // The cache answers first: ready without any network wait.
-    expect(t.controller.stats()).toEqual({
+    expect(t.controller.stats()).toMatchObject({
       count: 2,
       complete: true,
       indexing: false,
       ready: true,
+    });
+
+    // What is on screen is announced as such, including the commit it came from.
+    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
+      commit: "a".repeat(8),
+      origin: "cache",
     });
 
     // The background revalidation lands over a manual stream and supersedes
@@ -196,6 +217,101 @@ describe("createRegistryController — boot", () => {
     await t.flush();
     expect(t.controller.stats()).toMatchObject({ count: 3, ready: true });
     expect(saved).toEqual([[skill(0), skill(1), skill(2)]]);
+    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({ origin: "updated" });
+  });
+
+  it("skips the body download when the published commit is unchanged", async () => {
+    const commit = "a".repeat(8);
+    const saved: Array<[Skill[], unknown]> = [];
+    const t = setup({
+      cache: {
+        load: async () => record([skill(0), skill(1)], commit),
+        save: async (skills, identity) => {
+          saved.push([skills, identity]);
+        },
+        clear: async () => {},
+      },
+      published: { commit, generatedAt: "2026-09-01T14:25:32Z", total: 2 },
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    // No stream was ever opened: the cached bytes belong to this commit.
+    expect(t.pins).toEqual([]);
+    expect(saved).toEqual([]);
+    expect(t.controller.stats()).toMatchObject({ count: 2, ready: true });
+    // The read-out still carries what the probe learned (fresh stamp, count).
+    expect(t.recorded.indexes.at(-1)?.info).toEqual({
+      commit,
+      generatedAt: "2026-09-01T14:25:32Z",
+      total: 2,
+      formatVersion: undefined,
+      origin: "unchanged",
+    });
+  });
+
+  it("downloads a newer commit pinned to that snapshot and records it", async () => {
+    const publishedCommit = "b".repeat(8);
+    const saved: Array<[Skill[], unknown]> = [];
+    const t = setup({
+      cache: {
+        load: async () => record([skill(0)], "a".repeat(8)),
+        save: async (skills, identity) => {
+          saved.push([skills, identity]);
+        },
+        clear: async () => {},
+      },
+      published: { commit: publishedCommit, formatVersion: 4, total: 23734 },
+      skills: [skill(0), skill(1)],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    // The download is addressed at the published commit, not the branch.
+    expect(t.pins).toEqual([publishedCommit]);
+    expect(saved).toEqual([
+      [[skill(0), skill(1)], { commit: publishedCommit, formatVersion: 4 }],
+    ]);
+    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
+      commit: publishedCommit,
+      total: 23734,
+      formatVersion: 4,
+      origin: "updated",
+    });
+  });
+
+  it("re-downloads an unchanged commit when the user forces a reload", async () => {
+    const commit = "a".repeat(8);
+    const t = setup({
+      published: { commit },
+      skills: [skill(0)],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+    expect(t.pins).toEqual([commit]);
+
+    // Second boot-equivalent: the commit never moved, but a manual retry (or a
+    // source switch) must still fetch rather than report "nothing to do".
+    t.controller.reload({ cdnBase: "other" });
+    await t.flush();
+    expect(t.pins).toEqual([commit, commit]);
+  });
+
+  it("falls back to the branch ref when no meta can be reached", async () => {
+    const t = setup({
+      cache: {
+        load: async () => record([skill(0)], "a".repeat(8)),
+        save: async () => {},
+        clear: async () => {},
+      },
+      published: null,
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    // Nothing to compare against: download unpinned instead of trusting a
+    // commit that may no longer be current.
+    expect(t.pins).toEqual([undefined]);
   });
 
   it("throttles progress notifications by wall clock", async () => {
@@ -639,12 +755,13 @@ describe("createRegistryController — failures", () => {
     await t.flush();
 
     expect(t.recorded.errors.map((e) => e.message)).toEqual(["network error"]);
-    expect(t.controller.stats()).toEqual({
+    expect(t.controller.stats()).toMatchObject({
       count: 0,
       complete: false,
-      indexing: false,
       ready: false,
     });
+    // Nothing is served, so no snapshot identity is claimed.
+    expect(t.controller.stats().index).toBeNull();
   });
 
   it("keeps serving prior data when a revalidation fails", async () => {

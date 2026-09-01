@@ -92,6 +92,22 @@ export function fileCandidates(
 }
 
 /**
+ * Append a unique `t` parameter so the request bypasses every cached copy on
+ * the way (WebView HTTP cache, CDN edge).
+ *
+ * Only for tiny *mutable* pointers whose job is to report freshness — the
+ * registry's `index-meta.json`, at ~300 B. Verified against the default CDN,
+ * which serves branch files with `stale-while-revalidate` and would otherwise
+ * answer with a day-old body straight from the edge. Never apply it to a
+ * commit-pinned URL (content-addressed, so already cache-safe) or to any
+ * multi-megabyte body, where busting means a full origin download every call.
+ */
+export function cacheBusted(url: string): string {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}t=${Date.now()}`;
+}
+
+/**
  * Per-request timeout for each candidate. Without it a hanging
  * `raw.githubusercontent.com` connection would stall the whole data layer
  * indefinitely (there is no user-facing cancel), and the CDN fallback would

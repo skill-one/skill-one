@@ -1,15 +1,27 @@
 import {
+  cacheBusted,
   fetchFirstStreamInOrder,
-  fileCandidates,
   fetchSignal,
+  fileCandidates,
 } from "../cdn-config";
 import type { Skill } from "../../types/skill";
 import { parseSkillLine } from "./parse";
 
 /**
- * Streaming reader for the registry index: picks the freshest download
- * candidate, splits the response body into JSONL lines and hands every
- * parsed skill to the caller. Runs inside the registry worker.
+ * Streaming reader for the registry index: resolves which published version to
+ * use, then splits the response body into JSONL lines and hands every parsed
+ * skill to the caller. Runs inside the registry worker.
+ *
+ * Two files, two cache policies:
+ *
+ * - `index-meta.json` sits on the mutable `dist` branch and is tiny, so it is
+ *   always requested cache-busted — it is the freshness oracle and a stale
+ *   answer defeats its own purpose.
+ * - `index.jsonl` is fetched through the `distCommit` that meta advertises, so
+ *   its URL is content-addressed and immutable: a cached copy is by definition
+ *   the right bytes, and a CDN that lags behind can only serve the *same*
+ *   version. Callers compare that commit against their own cache to decide
+ *   whether the multi-megabyte body needs downloading at all.
  */
 
 /** The skills-index repo publishes the full index (JSONL) to its `dist` branch. */
@@ -19,12 +31,45 @@ const INDEX_SPEC = {
   ref: "dist",
 } as const;
 
+/** Sidecar metadata published next to the index. */
+const META_SPEC = { ...INDEX_SPEC, path: "index-meta.json" } as const;
+
 /**
  * Silence allowed between body chunks before the read is treated as stalled.
  * The per-request timeout only guards the response headers, so this is what
  * keeps a dead connection from hanging the load forever.
  */
 const CHUNK_TIMEOUT_MS = 15_000;
+
+/**
+ * A commit sha, in the short or full form GitHub emits. Anything else is
+ * dropped rather than interpolated into a download URL.
+ */
+const COMMIT = /^[0-9a-f]{7,40}$/i;
+
+/** Freshness and shape of the published index, as advertised by its meta file. */
+interface RawIndexMeta {
+  formatVersion?: unknown;
+  generatedAt?: unknown;
+  distCommit?: unknown;
+  counts?: { total?: unknown };
+}
+
+/**
+ * Normalized facts about the currently published snapshot. Fields are optional
+ * because older meta files and mirrors lagging behind a format change simply
+ * omit them; the caller treats a missing `commit` as "cannot pin, cannot skip".
+ */
+export interface PublishedIndex {
+  /** Immutable commit the index body can be fetched at. */
+  commit?: string;
+  /** Second-precision UTC generation stamp. */
+  generatedAt?: string;
+  /** Published entry count, before any consumer-side filtering. */
+  total?: number;
+  /** Record format of the published index. */
+  formatVersion?: number;
+}
 
 /**
  * Read a response body as decoded text lines, delivering each complete line
@@ -78,100 +123,82 @@ export async function readLines(
   }
 }
 
-/** Freshness stamp published alongside the index (`index-meta.json`). */
-interface IndexMeta {
-  generatedAt?: string;
+/**
+ * Probe the published index metadata, trying each download source in priority
+ * order and returning the first that answers with a usable body.
+ *
+ * The walk is sequential by design: the pointer costs ~300 B, so racing three
+ * sources would buy nothing, while an ordered walk keeps the user's configured
+ * CDN first in line. Every attempt is cache-busted, so a source that answers at
+ * all answers for the current publish rather than for a cached one — the
+ * staleness that used to require ranking candidates by `generatedAt` cannot
+ * occur here, and with the body commit-addressed it cannot occur downstream
+ * either.
+ *
+ * Returns null when no source could be reached, which leaves the caller to
+ * fall back to the mutable branch ref.
+ */
+export async function probeIndexMeta(
+  cdnBase: string,
+): Promise<PublishedIndex | null> {
+  for (const url of fileCandidates(META_SPEC, cdnBase)) {
+    try {
+      const resp = await fetch(cacheBusted(url), { signal: fetchSignal() });
+      if (!resp.ok) continue;
+      const meta: unknown = await resp.json();
+      if (!meta || typeof meta !== "object") continue;
+      return normalize(meta as RawIndexMeta);
+    } catch {
+      // Unreachable, timed out, or not JSON: give the next source a turn.
+    }
+  }
+  return null;
 }
 
-/**
- * Resolve the index download candidates: probe each source's
- * `index-meta.json` (~300 B), then order the sources newest-first and turn
- * each index URL into a per-publish versioned one.
- *
- * jsDelivr-style CDNs cache branch-resolved files well beyond one daily
- * publish cycle, so a mirror can keep serving yesterday's index.jsonl while
- * the direct origin is already fresh — observed as every skill card showing
- * 0 stars. Ranking by the meta's `generatedAt` alone is not enough either:
- * a mirror can even serve a *stale body* while its *meta* is fresh (the two
- * files cache independently), so identical stamps would tie and the faster
- * mirror would win with yesterday's bytes. Making the stamp part of the URL
- * fixes that — the CDN's cache key changes with every publish, so a stale
- * body can never impersonate the current version, and the mirror keeps its
- * speed advantage for the common (unchanged) case.
- *
- * Candidates whose meta is missing or unreachable rank below all probed ones
- * in their original relative order and keep their unversioned URL; when
- * nothing could be probed the input order is returned unchanged.
- *
- * `indexUrls` and `metaUrls` are index-aligned `fileCandidates` lists for
- * `index.jsonl` and `index-meta.json` respectively.
- */
-async function resolveCandidates(
-  indexUrls: string[],
-  metaUrls: string[],
-): Promise<string[]> {
-  const arrival: string[] = [];
-  const metas = await Promise.all(
-    metaUrls.map(async (metaUrl): Promise<IndexMeta | null> => {
-      try {
-        const resp = await fetch(metaUrl, { signal: fetchSignal() });
-        if (!resp.ok) return null;
-        const meta = (await resp.json()) as IndexMeta;
-        if (!meta.generatedAt || Number.isNaN(Date.parse(meta.generatedAt))) {
-          return null;
-        }
-        arrival.push(metaUrl);
-        return meta;
-      } catch {
-        return null;
-      }
-    }),
-  );
-  if (arrival.length === 0) return indexUrls;
-  return indexUrls
-    .map((url, i) => {
-      const meta = metas[i];
-      const versioned = meta
-        ? `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(meta.generatedAt ?? "")}`
-        : url;
-      return {
-        url: versioned,
-        score: meta ? Date.parse(meta.generatedAt ?? "") : -1,
-        arrival: arrival.indexOf(metaUrls[i]),
-        orig: i,
-      };
-    })
-    .sort(
-      (a, b) => b.score - a.score || a.arrival - b.arrival || a.orig - b.orig,
-    )
-    .map((entry) => entry.url);
+/** Keep only the fields we can actually use; junk becomes `undefined`. */
+function normalize(raw: RawIndexMeta): PublishedIndex {
+  const text = (value: unknown): string | undefined =>
+    typeof value === "string" && value.length > 0 ? value : undefined;
+  const count = (value: unknown): number | undefined =>
+    typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  const commit = text(raw.distCommit);
+  return {
+    // Anything but a sha would build a bogus download URL, so it is dropped.
+    commit: commit && COMMIT.test(commit) ? commit : undefined,
+    generatedAt: text(raw.generatedAt),
+    total: count(raw.counts?.total),
+    formatVersion: count(raw.formatVersion),
+  };
 }
 
 /**
  * Stream the index from the freshest source, handing every parsed skill to
- * `onLine`. The CDN base is passed in by the main thread: workers have no
+ * `onLine`. `commit` pins the download to an immutable snapshot (see
+ * `probeIndexMeta`); without one the mutable `dist` branch is used, and only
+ * that fallback path is cache-busted — otherwise a stale edge copy could be
+ * mistaken for the current index, which is exactly the failure the commit pin
+ * exists to remove.
+ *
+ * The CDN base is passed in by the main thread: workers have no
  * `localStorage`, so the user's configured download source cannot be read
- * here. A candidate that fails mid-stream falls back to the next-freshest
- * one, restarting the parse from scratch via `onRestart`.
+ * here. A candidate that fails mid-stream falls back to the next one,
+ * restarting the parse from scratch via `onRestart`.
  */
 export async function readIndex(
   cdnBase: string,
+  commit: string | undefined,
   onLine: (skill: Skill) => void,
   onRestart: () => void,
 ): Promise<void> {
-  const indexUrls = fileCandidates(INDEX_SPEC, cdnBase);
-  const metaUrls = fileCandidates(
-    { ...INDEX_SPEC, path: "index-meta.json" },
-    cdnBase,
+  const spec = { ...INDEX_SPEC, ref: commit ?? INDEX_SPEC.ref };
+  const urls = fileCandidates(spec, cdnBase).map((url) =>
+    commit ? url : cacheBusted(url),
   );
-  await fetchFirstStreamInOrder(
-    await resolveCandidates(indexUrls, metaUrls),
-    async (body) => {
-      onRestart();
-      await readLines(body, (line) => {
-        const skill = parseSkillLine(line);
-        if (skill) onLine(skill);
-      });
-    },
-  );
+  await fetchFirstStreamInOrder(urls, async (body) => {
+    onRestart();
+    await readLines(body, (line) => {
+      const skill = parseSkillLine(line);
+      if (skill) onLine(skill);
+    });
+  });
 }
