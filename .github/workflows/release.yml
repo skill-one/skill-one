@@ -12,22 +12,26 @@ jobs:
       contents: write
     runs-on: macos-14 # Apple Silicon (arm64)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
 
-      # No `version` input: pnpm/action-setup reads `packageManager` from
+      # No `version` input: pnpm/setup reads `packageManager` from
       # package.json, and passing a conflicting pin errors the workflow.
+      # pnpm 11 ships a self-contained binary, so this needs no Node —
+      # the explicit install step below stays for the frozen lockfile.
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/setup@v1
+        with:
+          install: false
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@v4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
