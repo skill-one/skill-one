@@ -8,5 +8,13 @@
 /** Event the popover emits to open a page in the main window. */
 export const POPOVER_NAVIGATE_EVENT = "popover-navigate";
 
-/** The store page route the popover's footer button jumps to. */
-export const STORE_PATH = "/explore";
+/** The my-skills page the popover's footer button opens. */
+export const MY_SKILLS_PATH = "/my-skills";
+
+/**
+ * Deep link into the my-skills page with the search box pre-filled with
+ * `name`, so the clicked skill is the one item in the filtered list.
+ */
+export function skillPath(name: string): string {
+  return `${MY_SKILLS_PATH}?skill=${encodeURIComponent(name)}`;
+}

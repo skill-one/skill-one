@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown,
@@ -216,6 +217,18 @@ export function MySkillsPage() {
     setPage(1);
     setFilter(next);
   };
+
+  // Deep link from the menu bar popover: `/my-skills?skill=<name>` pre-fills
+  // the search box so the targeted skill is the only one in the list. The
+  // param is consumed (removed) once applied so a refresh stays on the page.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const target = searchParams.get("skill");
+    if (!target) return;
+    setPage(1);
+    setSearch(target);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const filtered = useMemo(
     () =>

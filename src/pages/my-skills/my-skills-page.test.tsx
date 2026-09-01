@@ -171,6 +171,18 @@ describe("MySkillsPage", () => {
     expect(screen.getByText("本地")).toBeInTheDocument();
   });
 
+  it("pre-fills the search box from the ?skill= deep link", async () => {
+    // The menu bar popover deep links to /my-skills?skill=<name>; the page
+    // must land with that skill pre-filtered and consume the param.
+    renderWithRouter(<MySkillsPage />, { route: "/my-skills?skill=pdf" });
+
+    expect(
+      await screen.findByLabelText("搜索 Skill"),
+    ).toHaveValue("pdf");
+    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
+    expect(screen.queryByText("docx")).not.toBeInTheDocument();
+  });
+
   it("filters skills by search text and updates the count", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
