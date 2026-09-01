@@ -72,25 +72,41 @@ describe("AppSidebar", () => {
     expect(screen.getByText("设置")).toBeInTheDocument();
   });
 
-  it("shows the registry total on 全部, installed count on 全局", async () => {
+  it("shows the registry total on 全部, repo total on 仓库, installed count on 全局", async () => {
     await boot(registryOf(400));
     harness.complete();
     await act(async () => {});
     renderSidebar();
 
-    // Mock skills are installed (see ../lib/mock-local): only 全部 shows the
-    // registry total (400); 精选/仓库/项目 have no count source and show none.
+    // Mock skills are installed (see ../lib/mock-local): 全部 shows the
+    // registry total (400) and 仓库 the aggregated repo total; 精选/项目
+    // have no count source and show none. The mock repos cycle
+    // owner-${i%7}/repo-${i%11}, which resolves to the full 7×11 grid of
+    // distinct repos over 400 skills (the pair repeats every 77 indexes).
     expect(await screen.findByText("400")).toBeInTheDocument();
+    expect(await screen.findByText("77")).toBeInTheDocument();
     expect(await screen.findByText("6")).toBeInTheDocument();
     expect(screen.queryByText("12")).not.toBeInTheDocument();
   });
 
-  it("omits badges for unimplemented pages and hides badges before data loads", async () => {
+  it("keeps the 仓库 badge hidden while the registry is still streaming", async () => {
+    await boot(registryOf(400));
+    renderSidebar();
+    await act(async () => {});
+
+    // 全部 already reports its progressive count, but a repo count over a
+    // partial index would be wrong, so 仓库 stays badge-less until ready.
+    expect(await screen.findByText("400")).toBeInTheDocument();
+    expect(screen.queryByText("77")).not.toBeInTheDocument();
+  });
+
+  it("omits badges for pages without a count source and hides badges before data loads", async () => {
     renderSidebar();
 
-    // No registry data yet → no 400 badge; installed skills render sync from
-    // the mock store, so 全局 still shows 6.
+    // No registry data yet → no 400 badge (and no repo total either); the
+    // installed skills render sync from the mock store, so 全局 still shows 6.
     expect(screen.queryByText("400")).not.toBeInTheDocument();
+    expect(screen.queryByText("77")).not.toBeInTheDocument();
     expect(await screen.findByText("6")).toBeInTheDocument();
   });
 

@@ -24,6 +24,7 @@ import {
 } from "./ui/sidebar";
 import { isTauri } from "../lib/tauri";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
+import { useRegistryRepos } from "../hooks/use-registry-repos";
 import { useRegistryStats } from "../hooks/use-registry-stats";
 
 export interface NavItem {
@@ -60,24 +61,32 @@ export const footerItems: NavItem[] = [
 ];
 
 /**
- * Real badge counts: Shop "全部" = registry total, "My Skills → 全局" =
- * installed skill count. Only these two entries have a real data source;
- * pages without a count source (精选 / 仓库 / 项目) show no badge. The
- * badge is not rendered while its data is loading, avoiding a flash of 0.
+ * Real badge counts: Shop "全部" = registry total, "仓库" = aggregated repo
+ * total, "My Skills → 全局" = installed skill count. Pages without a count
+ * source (精选 / 项目) show no badge. The badge is not rendered while its
+ * data is loading, avoiding a flash of 0.
  *
  * The registry count is progressive: it mirrors the registry worker's
  * progress count, so it reports the skills parsed so far and climbs as the
  * ~12MB download proceeds, settling on the registry size once the stream
  * completes. It renders as a plain number — no progress decoration.
+ *
+ * The repos count is the opposite: it reuses the repos page's aggregation,
+ * whose query only runs once the whole index has landed — a repo count
+ * computed over a partial download is simply wrong.
  */
 function useNavCounts(): Partial<Record<string, number>> {
   const stats = useRegistryStats();
   const { data: installedSkills } = useInstalledSkills();
+  // A single-row page fetch: only `total` is of interest here.
+  const { data: reposPage } = useRegistryRepos("", "stars", 0, 1);
+  const repoTotal = reposPage?.total ?? 0;
   return {
     // Hidden while nothing has loaded yet and on a failed download: an empty
     // registry is not a meaningful count to advertise.
     "/explore":
       stats.error == null && stats.count > 0 ? stats.count : undefined,
+    "/explore/repos": repoTotal > 0 ? repoTotal : undefined,
     "/my-skills": installedSkills?.length,
   };
 }
