@@ -413,17 +413,26 @@ describe("AgentAvatarMenu link actions", () => {
   it("acts on a folded agent the same way as an inline one", async () => {
     const user = userEvent.setup();
     const total = AVATAR_GROUP_MAX + 3;
+    // The last agent always sits beyond the inline window, whatever the cap.
+    const folded = total - 1;
     fetchAgentStatusMock.mockResolvedValue(manyAgents(total));
     linkAgentMock.mockResolvedValue([
-      result("linked", { agent: "agent-5", display: "Agent 5" }),
+      result("linked", {
+        agent: `agent-${folded}`,
+        display: `Agent ${folded}`,
+      }),
     ]);
     renderWithRouter(<AgentAvatarMenu />);
 
     await openMenu(user);
-    // Agent 5 never renders inline, but the menu still reaches it.
-    await user.click(await menuItem("Agent 5", "未链接"));
+    // The folded agent never renders inline, but the menu still reaches it.
+    await user.click(
+      await menuItem(`Agent ${folded}`, "未链接"),
+    );
 
-    expect(await screen.findByText("Agent 5 已链接")).toBeInTheDocument();
-    expect(linkAgentMock).toHaveBeenCalledWith("agent-5");
+    expect(
+      await screen.findByText(`Agent ${folded} 已链接`),
+    ).toBeInTheDocument();
+    expect(linkAgentMock).toHaveBeenCalledWith(`agent-${folded}`);
   });
 });
