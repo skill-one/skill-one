@@ -16,7 +16,9 @@ One JSON object per line:
   "installs": 3005209,
   "weeklyInstalls": [113781, 109199, 109085, 115475, 107969, 101120, 96861, 93130],
   "path": "skills/find-skills",
-  "description": "Discover and install agent skills"
+  "description": "Discover and install agent skills",
+  "rev": "t1-a4cf6ce14f6d65b3",
+  "firstSeenAt": "2026-08-12T04:34:54Z"
 }
 ```
 
@@ -29,8 +31,12 @@ One JSON object per line:
 | `path`            | `string`   | Skill's directory relative to the repo root (used to build the `SKILL.md` URL) |
 | `description`     | `string`   | Skill description (optional, empty when missing)             |
 | `stars`           | `number`   | GitHub stars of the source repo (optional; normalized to 0 when missing) |
+| `rev`             | `string`   | Content fingerprint of the skill directory (`t1-<16 hex>`; `t1` names the fingerprint scheme). Changes when any file inside the directory changes, including its mode — i.e. **which version of the skill the index describes**. |
+| `firstSeenAt`     | `string`   | When the registry first recorded this `rev` (ISO, UTC): how long the *current* content has been published, not when the skill first appeared |
 
-> `source` / `skillId` / `installs` / `weeklyInstalls` come from skills.sh; `path` / `description` are obtained by scanning the repositories.
+> `source` / `skillId` / `installs` / `weeklyInstalls` come from skills.sh; `path` / `description` / `rev` / `firstSeenAt` are obtained by scanning the repositories.
+>
+> `rev` and `firstSeenAt` are absent on the (~2.5%) entries whose repository content could not be scanned. Where present the skill detail drawer shows both — the fingerprint as 版本 (`#a4cf6ce1`, full value in the tooltip) and the stamp as 收录时间. An author-declared frontmatter `version` is deliberately not displayed next to it: it is a different kind of claim about a different thing.
 
 ## Consuming the index
 

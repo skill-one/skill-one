@@ -254,6 +254,8 @@ describe("readIndex", () => {
         description: "Hammers.",
         path: "skills/hammer",
         weeklyInstalls: [1, 2],
+        rev: "t1-a4cf6ce14f6d65b3",
+        firstSeenAt: "2026-08-12T04:34:54Z",
       }),
       "not json", // malformed → skipped
       JSON.stringify({ source: "open.feishu.cn", skillId: "x", installs: 1 }), // non-GitHub → skipped
@@ -283,6 +285,8 @@ describe("readIndex", () => {
         downloads: 10,
         weeklyInstalls: 2,
         path: "skills/hammer",
+        rev: "t1-a4cf6ce14f6d65b3",
+        firstSeenAt: "2026-08-12T04:34:54Z",
       },
     ]);
   });

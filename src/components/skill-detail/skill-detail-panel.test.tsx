@@ -45,6 +45,16 @@ const localSkill: Skill = {
   downloads: 0,
 };
 
+/** A registry entry that carries its version identity (the scanned majority). */
+const versionedSkill: Skill = {
+  ...skill,
+  rev: "t1-a4cf6ce14f6d65b3",
+  firstSeenAt: "2026-08-12T04:34:54Z",
+};
+
+/** How the panel renders `versionedSkill.firstSeenAt` in the host's locale. */
+const SEEN_AT_LOCALE = new Date("2026-08-12T04:34:54Z").toLocaleDateString();
+
 const detail = {
   name: "pdf",
   description: "Read and merge PDF documents.",
@@ -126,7 +136,12 @@ describe("SkillDetailPanel", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
-    expect(screen.getByText("v1.2.0")).toBeInTheDocument();
+    // The author-declared frontmatter version is not shown: the registry's own
+    // content fingerprint is the version on display.
+    expect(screen.queryByText("v1.2.0")).not.toBeInTheDocument();
+    // This entry carries no registry identity, so the meta row stays out.
+    expect(screen.queryByText(/^版本/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^收录时间/)).not.toBeInTheDocument();
     expect(screen.getByText("MIT")).toBeInTheDocument();
     expect(screen.getByText("Anthropic")).toBeInTheDocument();
     expect(screen.getByText("skills/pdf/SKILL.md")).toBeInTheDocument();
@@ -138,6 +153,18 @@ describe("SkillDetailPanel", () => {
       "pdf",
       "skills/pdf",
     );
+  });
+
+  it("shows the registry version fingerprint and when that version was recorded", async () => {
+    mockFetchSkillDetail.mockResolvedValue(detail);
+    renderDrawer({ skill: versionedSkill });
+
+    await screen.findByText("Use this skill for PDFs.");
+    // Compact form: the fingerprint scheme segment stays out of the row.
+    expect(screen.getByText(/^版本/)).toHaveTextContent("#a4cf6ce1");
+    expect(screen.getByText(/^收录时间/)).toHaveTextContent(SEEN_AT_LOCALE);
+    // The value it abbreviates, and what it means, live in the tooltips.
+    expect(screen.getByTitle(/t1-a4cf6ce14f6d65b3/)).toBeInTheDocument();
   });
 
   it("links the source repo to the skill's GitHub directory when known", async () => {

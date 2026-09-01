@@ -15,7 +15,9 @@
   "installs": 3005209,
   "weeklyInstalls": [113781, 109199, 109085, 115475, 107969, 101120, 96861, 93130],
   "path": "skills/find-skills",
-  "description": "Discover and install agent skills"
+  "description": "Discover and install agent skills",
+  "rev": "t1-a4cf6ce14f6d65b3",
+  "firstSeenAt": "2026-08-12T04:34:54Z"
 }
 ```
 
@@ -28,8 +30,12 @@
 | `path`            | `string`   | 技能在仓库内的相对目录（用于拼 `SKILL.md` 地址）            |
 | `description`     | `string`   | 技能说明（可选，缺失时为空）                                |
 | `stars`           | `number`   | 源仓库的 GitHub star 数（可选，缺失时归一为 0）             |
+| `rev`             | `string`   | 技能目录的内容指纹（`t1-<16 hex>`，`t1` 是指纹算法标识）。目录内任何文件变化——含文件权限变化——都会使其改变，即**索引所描述的那个版本** |
+| `firstSeenAt`     | `string`   | 注册表首次记录该 `rev` 的时间（ISO，UTC）：说的是*当前内容*发布了多久，不是技能最早何时进入索引 |
 
-> `source` / `skillId` / `installs` / `weeklyInstalls` 来自 skills.sh；`path` / `description` 由仓库扫描得到。
+> `source` / `skillId` / `installs` / `weeklyInstalls` 来自 skills.sh；`path` / `description` / `rev` / `firstSeenAt` 由仓库扫描得到。
+>
+> 约 2.5% 未能扫描到仓库内容的条目不带 `rev` 与 `firstSeenAt`。带有的情况下，技能详情抽屉会展示两者——指纹以「版本」呈现（`#a4cf6ce1`，完整值放 tooltip），时间以「收录时间」呈现。作者自己在 frontmatter 写的 `version` 刻意不再并列展示：它是对另一件事的声明。
 
 ## 消费方式
 

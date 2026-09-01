@@ -21,6 +21,10 @@ interface RawSkill {
   path?: string;
   /** GitHub stars of the source repo; absent on the old skills.sh snapshot. */
   stars?: number;
+  /** Content fingerprint of the skill directory (e.g. "t1-a4cf6ce14f6d65b3"). */
+  rev?: string;
+  /** When the registry first recorded that fingerprint (ISO, UTC). */
+  firstSeenAt?: string;
 }
 
 /**
@@ -63,6 +67,10 @@ function toSkill(raw: RawSkill): Skill {
         ? raw.weeklyInstalls[raw.weeklyInstalls.length - 1]
         : undefined,
     path: raw.path,
+    // Identity of the version the index describes, and how long the registry
+    // has carried it. Both are absent on unscanned entries (~2.5%).
+    rev: raw.rev,
+    firstSeenAt: raw.firstSeenAt,
   };
 }
 

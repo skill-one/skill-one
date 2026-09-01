@@ -5,7 +5,7 @@ import { Download, ExternalLink, Loader2, Puzzle, Star } from "lucide-react";
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { fetchLocalSkillDetail } from "../../lib/local-skills";
 import { openExternal } from "../../lib/open-external";
-import { formatCount } from "../../lib/utils";
+import { formatDate, formatCount, formatRev } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -37,6 +37,10 @@ interface SkillDetailPanelProps {
  * while an installed skill without one — local skills included — is read from
  * the local skills directory instead, so the view always shows the copy the
  * user actually installed.
+ *
+ * The header's version identity (content fingerprint + the date the registry
+ * first recorded it) comes from the index entry rather than the SKILL.md, so
+ * unscanned entries and local installs simply show no such row.
  */
 export function SkillDetailPanel({
   skill,
@@ -108,6 +112,12 @@ export function SkillDetailPanel({
   // Repo-relative SKILL.md path, reused for the GitHub file link and to
   // resolve relative URLs inside the markdown body.
   const filePath = detail?.path.replace(/^\/+|\/+$/g, "") ?? "";
+  // Version identity as the registry sees it: the directory fingerprint, and
+  // how long the index has carried that exact content. From the index entry,
+  // not the SKILL.md — so absent on unscanned entries and on local installs
+  // the registry never listed.
+  const rev = shown?.rev ? formatRev(shown.rev) : null;
+  const seenAt = formatDate(shown?.firstSeenAt);
 
   return (
     <DrawerContent>
@@ -142,9 +152,6 @@ export function SkillDetailPanel({
           </DrawerDescription>
         )}
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
-          {detail?.version && (
-            <Badge variant="secondary">v{detail.version}</Badge>
-          )}
           {detail?.license && (
             <Badge variant="secondary">{detail.license}</Badge>
           )}
@@ -166,6 +173,23 @@ export function SkillDetailPanel({
             </>
           )}
         </div>
+        {(rev || seenAt) && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground/70">
+            {rev && (
+              <span title={`技能目录的内容指纹（目录内任何文件或其权限变化都会改变）：${shown?.rev}`}>
+                版本 <span className="font-mono">{rev}</span>
+              </span>
+            )}
+            {rev && seenAt && (
+              <span aria-hidden="true">·</span>
+            )}
+            {seenAt && (
+              <span title="注册表首次收录当前版本内容的时间；内容一变即重新起算">
+                收录时间 {seenAt}
+              </span>
+            )}
+          </div>
+        )}
       </DrawerHeader>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
