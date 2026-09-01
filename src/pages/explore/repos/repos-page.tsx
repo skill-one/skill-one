@@ -16,7 +16,7 @@ import {
 import { Input } from "../../../components/ui/input";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { Placeholder } from "../explore-page";
-import { RegistryPager } from "../registry-pager";
+import { ListPager } from "../../../components/list-pager";
 import { RepoCard } from "./repo-card";
 
 /** Number of repos shown per page in the paginated view. */
@@ -192,7 +192,7 @@ export function ReposPage() {
 
           {/* Pagination row with the repo count pinned to the right. */}
           {stats.ready && (
-            <RegistryPager
+            <ListPager
               page={page}
               totalPages={totalPages}
               onPage={handlePage}

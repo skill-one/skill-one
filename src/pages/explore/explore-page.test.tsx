@@ -454,10 +454,14 @@ describe("ExplorePage", () => {
     expect(await screen.findByText("共 1 个")).toBeInTheDocument();
     // The grid went back to its first page and shows only the match.
     expect(screen.queryByText("tool-24")).not.toBeInTheDocument();
-    // A single result fits on one page, so the pagination bar disappears.
+    // A single result fits on one page: the pager controls stay visible but
+    // both ends are clamped (disabled).
     expect(
-      screen.queryByRole("link", { name: "下一页" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("link", { name: "下一页" }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(
+      screen.getByRole("link", { name: "上一页" }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 
   it("restores the full registry when the search is cleared", async () => {

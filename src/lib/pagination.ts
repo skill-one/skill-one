@@ -5,7 +5,7 @@
  * of buttons. When there are few pages (≤ SHOW_ALL_THRESHOLD) every page number
  * is shown directly.
  *
- * Shared by the explore and repos pages, which render the same pagination row.
+ * Used by the shared ListPager component.
  */
 
 /** Pages at or below this count render every page number directly. */
