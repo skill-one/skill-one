@@ -50,12 +50,37 @@ function openDbOf(db: object) {
 }
 
 describe("createRegistryCache", () => {
-  it("round-trips the parsed registry through save/load", async () => {
+  it("round-trips the parsed registry and its identity through save/load", async () => {
+    const { db } = fakeDb();
+    const cache = createRegistryCache(openDbOf(db));
+
+    await cache.save(skills, {
+      commit: "e52627fe",
+      formatVersion: 4,
+      generatedAt: "2026-09-01T14:25:32Z",
+    });
+    const loaded = await cache.load();
+    expect(loaded?.skills).toEqual(skills);
+    expect(loaded).toMatchObject({
+      commit: "e52627fe",
+      formatVersion: 4,
+      generatedAt: "2026-09-01T14:25:32Z",
+    });
+    // When the record was written is kept for display, never for comparison.
+    expect(loaded?.fetchedAt).toBeGreaterThan(0);
+  });
+
+  it("loads a record saved without an identity as an unknown commit", async () => {
     const { db } = fakeDb();
     const cache = createRegistryCache(openDbOf(db));
 
     await cache.save(skills);
-    await expect(cache.load()).resolves.toEqual(skills);
+    // A record from before commit addressing (or from a run that could not
+    // reach any meta): usable data, but nothing to compare a probe against.
+    await expect(cache.load()).resolves.toMatchObject({
+      skills,
+      commit: undefined,
+    });
   });
 
   it("returns null on an empty store", async () => {
@@ -67,7 +92,7 @@ describe("createRegistryCache", () => {
   it("drops records written by an older schema version", async () => {
     const { db, store } = fakeDb();
     const cache = createRegistryCache(openDbOf(db));
-    await cache.save(skills);
+    await cache.save(skills, { commit: "e52627fe" });
 
     // Age the stored record into a previous schema version.
     const record = [...store.values()][0] as { schemaVersion: number };
@@ -78,7 +103,7 @@ describe("createRegistryCache", () => {
   it("clear() removes the stored record", async () => {
     const { db } = fakeDb();
     const cache = createRegistryCache(openDbOf(db));
-    await cache.save(skills);
+    await cache.save(skills, { commit: "e52627fe" });
     await cache.clear();
     await expect(cache.load()).resolves.toBeNull();
   });
@@ -88,7 +113,7 @@ describe("createRegistryCache", () => {
       Promise.reject(new Error("blocked")),
     );
     await expect(cache.load()).resolves.toBeNull();
-    await expect(cache.save(skills)).resolves.toBeUndefined();
+    await expect(cache.save(skills, { commit: "e52627fe" })).resolves.toBeUndefined();
     await expect(cache.clear()).resolves.toBeUndefined();
   });
 

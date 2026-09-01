@@ -1,17 +1,22 @@
 import { createRegistryCache } from "./cache";
-import { readIndex } from "./index-stream";
+import { probeIndexMeta, readIndex } from "./index-stream";
 import { createRegistryController } from "./worker-controller";
 import type { RegistryWorkerMessage } from "./protocol";
 
 /**
- * Registry worker entry: the whole registry service (download, parse,
- * search index, pagination, featured computation) runs here so the main
- * thread never touches the ~12MB index or the CPU-heavy work over it.
- * All logic lives in the controller; this file only wires `self.onmessage`.
+ * Registry worker entry: the whole registry service (freshness probe,
+ * download, parse, search index, pagination, featured computation) runs here
+ * so the main thread never touches the ~12MB index or the CPU-heavy work over
+ * it. All logic lives in the controller; this file only wires `self.onmessage`.
  */
 
 const controller = createRegistryController(
-  { readIndex, cache: createRegistryCache(), now: () => Date.now() },
+  {
+    probeMeta: probeIndexMeta,
+    readIndex,
+    cache: createRegistryCache(),
+    now: () => Date.now(),
+  },
   (message) => self.postMessage(message),
 );
 

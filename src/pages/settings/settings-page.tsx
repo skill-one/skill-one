@@ -7,25 +7,40 @@ import {
   setCdnBase,
 } from "../../lib/cdn-config";
 import { reloadRegistry } from "../../lib/registry/client";
+import type { IndexOrigin } from "../../lib/registry/protocol";
 import { useAppUpdate } from "../../hooks/use-app-update";
+import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { ThemeModeToggle } from "../../components/theme-mode-toggle";
 
+/** How the served snapshot got here, phrased for the settings page. */
+const INDEX_ORIGIN_LABEL: Record<IndexOrigin, string> = {
+  updated: "本次启动已下载最新索引",
+  unchanged: "索引未更新，已复用本地缓存",
+  cache: "正在校验本地缓存…",
+};
+
 /**
- * Settings page. Hosts the appearance picker and the configurable CDN
- * download source.
+ * Settings page. Hosts the appearance picker, the configurable CDN download
+ * source, and the registry snapshot currently in use.
  *
  * The CDN base is persisted to localStorage; `""` means "direct GitHub first"
  * (with the default CDN as a fallback). SKILL.md / install fetches read the
  * value live; the registry worker is told to reload its index from the new
  * source immediately (it has no `localStorage` access, so the base is
  * passed in).
+ *
+ * The index card is the read-out for commit-based caching: it names the
+ * snapshot being served and whether this launch re-downloaded it or reused the
+ * local copy. Its button is the manual escape hatch — a reload always
+ * re-downloads, even when the published commit has not moved.
  */
 export function SettingsPage() {
   const [value, setValue] = useState(getCdnBase());
   const [saved, setSaved] = useState(false);
   const update = useAppUpdate();
+  const { index } = useRegistryStats();
 
   const apply = (next: string) => {
     const previous = getCdnBase();
@@ -35,6 +50,18 @@ export function SettingsPage() {
     // A source switch invalidates the downloaded registry: re-fetch it.
     if (previous !== next) reloadRegistry();
   };
+
+  // Facts about the snapshot the store is actually serving. A commit prefix
+  // is enough to recognize it and to diff against a release, and the full sha
+  // would only wrap.
+  const indexRows = [
+    {
+      term: "索引版本",
+      value: index?.commit ? index.commit.slice(0, 12) : "未知",
+    },
+    { term: "发布于", value: formatIndexTime(index?.generatedAt) },
+    { term: "条目数", value: formatTotal(index?.total) },
+  ];
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[680px] flex-col px-8 py-5">
@@ -151,7 +178,52 @@ export function SettingsPage() {
             保存
           </Button>
         </div>
+
+        <div className="rounded-xl border border-border/70 bg-card p-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <div>
+              <h3 className="text-[13px] font-medium text-foreground">
+                技能索引
+              </h3>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                商店数据来自 skill-one/skills-index 发布的快照。索引按 commit
+                定址：版本未变时启动直接复用本地缓存，不再下载全量数据。
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => reloadRegistry()}
+            >
+              立即重新下载
+            </Button>
+          </div>
+          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
+            {indexRows.map(({ term, value: detail }) => (
+              <div key={term} className="contents">
+                <dt className="text-muted-foreground">{term}</dt>
+                <dd className="min-w-0 break-all text-foreground">{detail}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            {index ? INDEX_ORIGIN_LABEL[index.origin] : "索引尚未就绪"}
+          </p>
+        </div>
       </div>
     </div>
   );
+}
+
+/** Upstream UTC stamp rendered in the user's locale and time zone. */
+function formatIndexTime(iso?: string): string {
+  if (!iso) return "未知";
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? "未知" : new Date(ms).toLocaleString();
+}
+
+/** Digits with thousands separators; a published count should not be fuzzy. */
+function formatTotal(total?: number): string {
+  return total === undefined ? "未知" : new Intl.NumberFormat("en").format(total);
 }

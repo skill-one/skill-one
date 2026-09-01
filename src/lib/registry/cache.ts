@@ -3,8 +3,9 @@ import type { Skill } from "../../types/skill";
 /**
  * Cold-start cache for the parsed registry, kept in IndexedDB and read
  * inside the worker. The cache only serves "show first, verify later": every
- * session still re-downloads the index in the background and overwrites the
- * record when the fresh stream completes.
+ * session still probes the published metadata and re-downloads the index when
+ * the advertised commit differs from the cached one — a matching commit lets
+ * the multi-megabyte download be skipped outright.
  */
 
 const DB_NAME = "skillone-registry";
@@ -15,11 +16,28 @@ const KEY = "skills";
 /** Bump when the stored Skill shape changes so stale records are dropped. */
 const SCHEMA_VERSION = 1;
 
+/** Identity of the published snapshot a record was built from. */
+export interface CacheIdentity {
+  /** `distCommit` the index was fetched at; absent for pre-pinning records. */
+  commit?: string;
+  /** Upstream `formatVersion` of those records. */
+  formatVersion?: number;
+  /** Upstream `generatedAt` of that snapshot (display only; never compared). */
+  generatedAt?: string;
+}
+
 /** A single cached record. */
-interface CacheRecord {
+interface CacheRecord extends CacheIdentity {
   schemaVersion: number;
   fetchedAt: number;
   skills: Skill[];
+}
+
+/** The cached dataset plus the identity it was downloaded from. */
+export interface CachedIndex extends CacheIdentity {
+  skills: Skill[];
+  /** When the record was written, in ms since the epoch. */
+  fetchedAt: number;
 }
 
 /** Minimal `IDBOpenDBRequest`-like factory, injectable for tests. */
@@ -73,20 +91,24 @@ export function createRegistryCache(openDb: OpenDb = defaultOpenDb) {
   }
 
   return {
-    /** Cached skills, or null on miss, version mismatch, or DB failure. */
-    async load(): Promise<Skill[] | null> {
+    /** Cached dataset, or null on miss, version mismatch, or DB failure. */
+    async load(): Promise<CachedIndex | null> {
       const record = await withStore("readonly", (store) =>
         requestToPromise(store.get(KEY) as IDBRequest<CacheRecord | undefined>),
       );
       if (!record || record.schemaVersion !== SCHEMA_VERSION) return null;
-      return record.skills;
+      const { skills, commit, formatVersion, generatedAt, fetchedAt } = record;
+      return { skills, commit, formatVersion, generatedAt, fetchedAt };
     },
 
-    /** Persist the parsed registry (overwrites the single record). */
-    async save(skills: Skill[]): Promise<void> {
+    /** Persist the parsed registry with its snapshot identity (overwrites). */
+    async save(skills: Skill[], identity: CacheIdentity = {}): Promise<void> {
       const record: CacheRecord = {
         schemaVersion: SCHEMA_VERSION,
         fetchedAt: Date.now(),
+        commit: identity.commit,
+        formatVersion: identity.formatVersion,
+        generatedAt: identity.generatedAt,
         skills,
       };
       await withStore("readwrite", (store) =>

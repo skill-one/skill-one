@@ -6,6 +6,7 @@ import {
   type SkillSearch,
 } from "../search-skills";
 import type {
+  IndexInfo,
   PageData,
   PageRequest,
   RankingData,
@@ -20,6 +21,7 @@ import type {
   SortOrder,
 } from "./protocol";
 import type { RegistryCache } from "./cache";
+import type { PublishedIndex } from "./index-stream";
 import {
   buildHeroSlides,
   RANKING_SIZE,
@@ -42,13 +44,20 @@ const PROGRESS_INTERVAL_MS = 400;
 
 export interface ControllerDeps {
   /**
-   * Stream the JSONL index, handing every parsed skill to `onLine`.
-   * `onRestart` is called at the start of each candidate attempt so the
-   * controller can drop its partial buffer (a failed mid-stream candidate
-   * restarts the parse from scratch).
+   * Read the published index metadata: the freshness oracle that decides
+   * whether the body needs downloading at all. Null when no source answered.
+   */
+  probeMeta(cdnBase: string): Promise<PublishedIndex | null>;
+  /**
+   * Stream the JSONL index, handing every parsed skill to `onLine`. `commit`
+   * pins the download to an immutable snapshot; undefined falls back to the
+   * mutable branch ref. `onRestart` is called at the start of each candidate
+   * attempt so the controller can drop its partial buffer (a failed mid-stream
+   * candidate restarts the parse from scratch).
    */
   readIndex(
     cdnBase: string,
+    commit: string | undefined,
     onLine: (skill: Skill) => void,
     onRestart: () => void,
   ): Promise<void>;
@@ -63,6 +72,8 @@ export interface RegistryStats {
   complete: boolean;
   indexing: boolean;
   ready: boolean;
+  /** Identity of the snapshot being served; null while nothing is loaded. */
+  index: IndexInfo | null;
 }
 
 export function createRegistryController(
@@ -74,6 +85,12 @@ export function createRegistryController(
   // Bumped on every init/reload; responses from a superseded download are
   // dropped instead of clobbering newer data.
   let generation = 0;
+  // The published commit the served `store` was built from. Undefined until a
+  // download records one (a cold-start cache written before commit addressing
+  // counts as unknown, so it always re-downloads once).
+  let servedCommit: string | undefined;
+  // Last announced snapshot identity, kept for `stats()` and for tests.
+  let indexInfo: IndexInfo | null = null;
 
   // The array every query reads. During a fresh (non-revalidating) download
   // it points at the growing buffer, so paged browse / substring search /
@@ -108,6 +125,12 @@ export function createRegistryController(
     });
   };
 
+  /** Announce the snapshot identity now being served. */
+  const emitIndex = (info: IndexInfo) => {
+    indexInfo = info;
+    post({ type: "index", info });
+  };
+
   const notifyThrottled = (count: number) => {
     if (count <= announcedCount) return;
     // Leading edge: the very first skills notify immediately so the UI can
@@ -129,11 +152,34 @@ export function createRegistryController(
   };
 
   /**
-   * Download the index into a fresh buffer, keeping any data already being
-   * served (cold-start cache, previous source) visible and queryable until
-   * the new stream completes — a revalidation never blanks the UI.
+   * Bring the served dataset up to date. The published snapshot is probed
+   * first (~300 B); only a differing commit downloads the body, which is then
+   * streamed into a fresh buffer while any data already being served (cold-start
+   * cache, previous source) stays visible and queryable — a revalidation never
+   * blanks the UI.
+   *
+   * `force` skips the "unchanged" short-circuit: a source switch or a user
+   * retry must re-download even when the published commit has not moved.
    */
-  const download = async (gen: number) => {
+  const download = async (gen: number, force = false) => {
+    // Null means no source answered: no commit to pin, nothing to compare.
+    const published = await deps.probeMeta(cdnBase);
+    if (gen !== generation) return;
+    const commit = published?.commit;
+    const identity = {
+      commit,
+      generatedAt: published?.generatedAt,
+      formatVersion: published?.formatVersion,
+    };
+    const total = published?.total;
+
+    if (!force && commit && commit === servedCommit) {
+      // The body is addressed by this commit, so equal commits mean equal
+      // bytes: keep serving the cache and skip the download entirely.
+      emitIndex({ ...identity, total, origin: "unchanged" });
+      return;
+    }
+
     const revalidating = complete && store.length > 0;
     const buffer: Skill[] = [];
     if (!revalidating) {
@@ -150,6 +196,7 @@ export function createRegistryController(
     try {
       await deps.readIndex(
         cdnBase,
+        commit,
         (skill) => {
           buffer.push(skill);
           if (!revalidating) notifyThrottled(buffer.length);
@@ -170,7 +217,15 @@ export function createRegistryController(
         search = null;
         dataVersion++;
         announcedCount = 0;
+        // Nothing is being served, so the stored record (possibly from an
+        // older commit) must not be reused by the next cold start either.
+        servedCommit = undefined;
+        indexInfo = null;
+        void deps.cache.clear();
         emitProgress();
+        post({ type: "index", info: null });
+      } else if (indexInfo) {
+        post({ type: "index", info: indexInfo });
       }
       post({
         type: "error",
@@ -189,7 +244,9 @@ export function createRegistryController(
     repoCache = null;
     // No separate "landed" event: buildIndex immediately emits the settled
     // count and posts ready — the index build is synchronous from here.
-    void deps.cache.save(store);
+    servedCommit = commit;
+    void deps.cache.save(store, identity);
+    emitIndex({ ...identity, total, origin: "updated" });
     buildIndex();
   };
 
@@ -382,10 +439,11 @@ export function createRegistryController(
         complete,
         indexing: complete && !ready,
         ready,
+        index: indexInfo,
       };
     },
 
-    /** Entry point: read the cold-start cache, then revalidate. */
+    /** Entry point: serve the cold-start cache, then revalidate it. */
     init({ cdnBase: base }: { cdnBase: string }) {
       if (bootStarted) return;
       bootStarted = true;
@@ -393,12 +451,21 @@ export function createRegistryController(
       const gen = ++generation;
       void (async () => {
         const cached = await deps.cache.load();
-        if (cached && cached.length > 0 && gen === generation) {
-          store = cached;
+        if (cached && cached.skills.length > 0 && gen === generation) {
+          store = cached.skills;
+          servedCommit = cached.commit;
           complete = true;
-          announcedCount = cached.length;
+          announcedCount = cached.skills.length;
           emitProgress();
           buildIndex();
+          // What is on screen until the probe below answers.
+          emitIndex({
+            commit: cached.commit,
+            generatedAt: cached.generatedAt,
+            formatVersion: cached.formatVersion,
+            total: cached.skills.length,
+            origin: "cache",
+          });
         }
         await download(gen);
       })();
@@ -409,7 +476,7 @@ export function createRegistryController(
       cdnBase = base;
       const gen = ++generation;
       void deps.cache.clear();
-      void download(gen);
+      void download(gen, true);
     },
 
     /** Handle one message from the main thread. */

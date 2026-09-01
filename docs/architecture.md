@@ -28,11 +28,11 @@ Skill One is a Tauri v2 desktop app. The frontend (React) handles rendering and 
 
 ### Frontend (reads)
 
-- **`src/lib/skills-api.ts`**: Fetches and parses the skills registry index (JSONL) as a stream, so skills become available progressively while the download is still running; consumers filter, sort, and paginate them client-side.
+- **`src/lib/registry/`**: The registry as a service — `client.ts` is the main-thread proxy of `worker.ts`, `index-stream.ts` probes the published snapshot and streams/parses `index.jsonl` (JSONL, line by line, so skills become available while the download runs), `worker-controller.ts` answers paged browse, search, featured and lookup requests, and `cache.ts` persists the parsed list. Consumers filter, sort, and paginate through it rather than holding the registry.
 - **`src/lib/skill-detail-api.ts`**: Fetches a single skill's `SKILL.md` on demand and parses its frontmatter and body.
 - **`src/lib/cdn-config.ts`**: Manages download sources. Defaults to direct `raw.githubusercontent.com` access, falls back to a CDN mirror (`cdn.jsdmirror.com`) on failure, and lets users configure a custom CDN in "Settings". Candidate URLs are tried in priority order — including mid-stream, when a body fails partway through — and the configuration is persisted to localStorage.
 
-Read data is cached and persisted uniformly through TanStack Query (`staleTime` 10 minutes, `gcTime` infinite), so after a restart the app can render from cache first and refresh in the background. Each candidate request has a 10-second timeout guarding the response headers; streamed bodies additionally enforce a stall timeout between chunks (a multi-megabyte download legitimately outlasts any fixed cap). Persistence excludes the full-index query (`skills`, the shared streaming entry that stores the parsed list with a completion flag) — the parsed index is too large for the WebView localStorage quota and is re-fetched every session; only small queries such as the installed list and agent status are written to disk.
+Read data is cached through TanStack Query (`staleTime` 10 minutes, `gcTime` infinite), so after a restart the app can render from cache first and refresh in the background. Each candidate request has a 10-second timeout guarding the response headers; streamed bodies additionally enforce a stall timeout between chunks (a multi-megabyte download legitimately outlasts any fixed cap). The registry index has its own two persistence layers, both inside the worker: the parsed list in IndexedDB and the commit it was addressed at (see *Browsing the skill list*), which together let a launch skip the download entirely when nothing was published since. Small queries such as the installed list and agent status are persisted through TanStack Query; the parsed index is far too large for the WebView localStorage quota and is deliberately kept out of it.
 
 ### Backend (writes)
 
@@ -73,14 +73,17 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 
 **Browsing the skill list**:
 
-1. `explore-page` subscribes to the index through the `useSkillsIndex` hook, which starts the download and mirrors every progress snapshot into the TanStack Query cache as `{ skills, complete: false }`.
-2. `skills-api.ts` streams the index (cached per session) and parses each line as it arrives; pages render from the partial list right away — partial lists are always prefixes of the final one, so pagination and the default order stay stable while the count climbs.
-3. While streaming, search falls back to plain substring matching; the MiniSearch fuzzy index is built once the stream completes (`complete: true`), because rebuilding it per snapshot would cost more than the download itself.
-4. `cdn-config.ts` tries direct GitHub access and CDN mirrors in order.
-5. TanStack Query caches the result in memory (not persisted — too large); paging and in-session navigation hit the cache first.
+1. The registry lives in a lazily spawned worker (`lib/registry/worker.ts` behind the `lib/registry/client.ts` proxy): the main thread only ever receives page-sized answers and pushed progress, never the ~12 MB index.
+2. On boot the worker reads the parsed index from IndexedDB (`lib/registry/cache.ts`) and serves it immediately — cold start paints from cache with no network wait.
+3. It then probes `index-meta.json` for the published `distCommit`, requesting it with a cache-busting stamp so no cached copy can make an old commit look current. Same commit as the cached one: the multi-megabyte body is not downloaded at all.
+4. Otherwise `registry/index-stream.ts` streams `index.jsonl` **addressed at that commit** (immutable, so a CDN copy is always the right bytes), parsing each line as it arrives; pages render from the partial list right away — partial lists are always prefixes of the final one, so pagination and the default order stay stable while the count climbs.
+5. While streaming, search falls back to plain substring matching; the MiniSearch fuzzy index is built once the stream completes, because rebuilding it per snapshot would cost more than the download itself.
+6. The landed dataset overwrites the IndexedDB record together with its identity (commit, `formatVersion`, generation stamp).
+7. `cdn-config.ts` tries the configured CDN, direct GitHub and the default CDN in order; a source that fails mid-stream hands over to the next and restarts the parse.
+8. The announced identity reaches the main thread through the client snapshot, where Settings shows which snapshot is in use and whether this launch reused the local cache. Only page results are kept in the TanStack Query memory cache; the registry itself is not duplicated there.
 
 **Curated featured page**:
 
-1. `featured-page` reads the same cached index as explore (shared query key), but keeps its skeleton until the stream completes — rankings over an incomplete registry would be wrong.
+1. `featured-page` asks the worker to compute its payload, and keeps its skeleton until the index reports complete — rankings over an incomplete registry would be wrong.
 2. The hero carousels are computed from the index (`featured-rankings.ts`): weekly installs, lifetime installs, and the weekly/lifetime share; the parser keeps each skill's most recent week as `weeklyInstalls`.
 3. Category sections join the hand-picked references in `featured-content.ts` against the index; unresolved references are skipped and empty sections hidden.

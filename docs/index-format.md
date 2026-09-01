@@ -32,16 +32,35 @@ One JSON object per line:
 
 > `source` / `skillId` / `installs` / `weeklyInstalls` come from skills.sh; `path` / `description` are obtained by scanning the repositories.
 
-## How it is used today
+## Consuming the index
 
-See [src/lib/skills-api.ts](../src/lib/skills-api.ts):
+Implemented in [src/lib/registry/](../src/lib/registry/) (worker + main-thread proxy), consumed by the store pages.
 
-- `INDEX_SPEC` specifies `repo` / `path: "index.jsonl"` / `ref: "dist"`.
-- The index is fetched through the configurable download source (direct GitHub raw or a CDN mirror); see [src/lib/cdn-config.ts](../src/lib/cdn-config.ts).
-- After parsing, non-GitHub repositories are filtered out (a `source` containing `.` is treated as a domain) and entries are mapped to the `Skill` model: `name = name ?? skillId`, `stars = stars ?? 0` (the index carries a separate `stars` field for entries that have one).
-- The download is streamed: the response body is decoded line by line and each line is parsed as soon as it arrives, so the UI never waits for the whole ~12MB file. Snapshots of everything parsed so far are pushed to subscribers at most once every 400ms (see `subscribeIndexProgress`), and the live buffer is rewound when a download source fails mid-stream and the next candidate restarts the file — announced snapshots are therefore monotonic and never shrink.
-- The full index is cached once per session and paginated locally (200 per page at the API level; the UI shows 24 cards per page); caching and refreshing are handled by TanStack Query. The cached entry is `{ skills, complete }`, where `complete` is false while the stream is still running.
-- The explore page renders progressively from those snapshots (the count reads "N · 加载中" until the stream finishes), and the sidebar's 全部 badge shows the number of skills parsed so far, climbing as the download proceeds. It is hidden again if the download fails, since React Query keeps the last snapshot in `data`.
-- Pages that need the whole registry — the featured page's leaderboards and curated joins, and My Skills' metadata join — gate on `complete` and keep their skeleton until the stream finishes, because partial data would rank the wrong skills.
+### The `index-meta.json` sidecar
+
+The metadata published beside the index is what makes caching possible:
+
+| Field | Role |
+| --- | --- |
+| `formatVersion` | Stored with the cached dataset, so a format change can be detected. |
+| `generatedAt` | Displayed in Settings as the snapshot's publication time. |
+| `counts.total` | Published entry count, shown in Settings next to the number actually loaded (which is lower: non-GitHub sources are filtered out). |
+| `distCommit` | The `dist`-branch commit carrying this snapshot's `index.jsonl`. The download is addressed at it, which is what turns "did the index change?" into a string comparison. |
+
+### Fetch strategy
+
+- The pointer is probed first, through the configurable download source (see [src/lib/cdn-config.ts](../src/lib/cdn-config.ts)) and **with a cache-busting stamp**: a mutable file that reports freshness must never be served from a cache, or an old commit looks current. At ~300 B, busting it costs nothing.
+- The body is then fetched at `distCommit` (`…/skills-index@<sha>/index.jsonl`, or `raw.githubusercontent.com/…/<sha>/…`). A commit-addressed URL is immutable, so no busting is applied and a CDN edge copy is necessarily the right bytes.
+- If no source advertises a usable commit, the download falls back to the mutable `dist` ref — busted, because without a pin a day-old edge copy would be indistinguishable from the current index.
+- The parsed list plus the commit it came from are persisted to IndexedDB. Next launch serves that cache immediately, then compares the probed commit with the stored one: equal means the multi-megabyte body is not downloaded at all.
+- `INDEX_SPEC` in [index-stream.ts](../src/lib/registry/index-stream.ts) pins `repo` / `path: "index.jsonl"` / `ref: "dist"` (the ref above is supplied per download).
+- After parsing, non-GitHub repositories are filtered out (a `source` containing `.` is treated as a domain) and entries are mapped to the `Skill` model: `name = name ?? skillId`, `stars = stars ?? 0`.
+- The download is streamed: the response body is decoded line by line and each line is parsed as soon as it arrives, so the UI never waits for the whole ~12MB file. Progress is pushed at most every 400ms, and the live buffer is rewound when a source fails mid-stream and the next candidate restarts the file — announced counts are therefore monotonic.
+
+### UI
+
+- The explore page renders progressively while the stream runs (the count reads "N · 加载中" until it finishes) and the sidebar's 全部 badge climbs with it.
+- Pages that need the whole registry — the featured page's leaderboards and curated joins, and My Skills' metadata join — gate on completion and keep their skeleton until the stream finishes, because partial data would rank the wrong skills.
+- Settings reports the served snapshot (commit, publication time, published entry count) and whether this launch downloaded it or reused the local copy; its button forces a re-download even when the commit has not moved.
 
 A skill's `SKILL.md` is fetched separately from `source + path`; see [src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts).
