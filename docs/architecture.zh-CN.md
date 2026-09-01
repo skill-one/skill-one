@@ -28,11 +28,11 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 ### 前端（读取）
 
-- **`src/lib/skills-api.ts`**：以流式方式拉取并解析 skills 注册表索引（JSONL），下载进行中即可逐步拿到已解析的 skill；由调用方在客户端完成过滤、排序与分页。
+- **`src/lib/registry/`**：把注册表当作一个服务来访问——`client.ts` 是 `worker.ts` 在主线程的代理，`index-stream.ts` 先探测已发布快照再流式拉取并解析 `index.jsonl`（逐行解析，下载进行中即可逐步拿到 skill），`worker-controller.ts` 应答分页浏览、搜索、精选与元数据查询，`cache.ts` 持久化解析结果。调用方经由它完成过滤、排序与分页，自身不持有全量注册表。
 - **`src/lib/skill-detail-api.ts`**：按需拉取单个 skill 的 `SKILL.md`，解析 frontmatter 与正文。
 - **`src/lib/cdn-config.ts`**：管理下载源。默认直连 `raw.githubusercontent.com`，失败后回退到 CDN 镜像（`cdn.jsdmirror.com`），并支持用户在「设置」中配置自定义 CDN。候选地址按优先级依次尝试——包括响应体中途失败时——配置持久化到 localStorage。
 
-读取数据通过 TanStack Query 统一缓存与持久化（`staleTime` 10 分钟、`gcTime` 无限），重启后可先从缓存渲染再后台刷新。每个候选请求带 10 秒超时，仅守护响应头；流式响应体另有分块间的停滞超时（数 MB 的下载本就可能超过任何固定上限）。持久化会排除全量索引查询（`skills`，即共享的流式查询，存解析列表及其完成标志）——解析后的索引体积超出 WebView localStorage 配额，且每次会话都会重新拉取；只有已安装列表、agent 状态等小体量查询会落盘。
+读取数据通过 TanStack Query 缓存（`staleTime` 10 分钟、`gcTime` 无限），重启后可先从缓存渲染再后台刷新。每个候选请求带 10 秒超时，仅守护响应头；流式响应体另有分块间的停滞超时（数 MB 的下载本就可能超过任何固定上限）。注册表索引还有两层专属持久化，都在 worker 内部：IndexedDB 里的解析结果，以及它所定址的 commit（见「浏览 skill 列表」）；两者合起来让一次启动在「上游没有新发布」时完全跳过下载。已安装列表、agent 状态等小体量查询由 TanStack Query 落盘；解析后的索引体积远超 WebView localStorage 配额，刻意排除在外。
 
 ### 后端（写入）
 
@@ -73,14 +73,17 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 **探索技能列表**：
 
-1. `explore-page` 通过 `useSkillsIndex` hook 订阅索引，hook 负责启动下载，并把每个进度快照以 `{ skills, complete: false }` 的形式镜像进 TanStack Query 缓存。
-2. `skills-api.ts` 流式拉取索引（按会话缓存），每收到一行就解析一行；页面直接用部分数据渲染——部分列表始终是完整列表的前缀，因此翻页与默认排序保持稳定，仅总数不断上涨。
-3. 流式期间搜索退化为普通子串匹配；MiniSearch 模糊索引在流结束后构建（`complete: true`）——每个快照都重建索引的代价高于下载本身。
-4. `cdn-config.ts` 依序尝试直连 GitHub 与 CDN 镜像。
-5. TanStack Query 在内存中缓存结果（体积过大，不落盘）；翻页与会话内导航优先命中缓存。
+1. 注册表跑在按需创建的 worker 里（`lib/registry/client.ts` 是 `lib/registry/worker.ts` 的主线程代理）：主线程只接收分页结果与进度事件，从不持有 ~12 MB 索引。
+2. 启动时 worker 先从 IndexedDB 读取解析结果（`lib/registry/cache.ts`）并立即用于渲染——冷启动不等网络。
+3. 随后探测 `index-meta.json` 拿到已发布的 `distCommit`，该请求带打散缓存的时间戳，避免任何缓存副本把旧 commit 冒充成当前版本。commit 与缓存一致时：**完全跳过多 MB 的正文下载**。
+4. 否则 `registry/index-stream.ts` 拉取**定址到该 commit** 的 `index.jsonl`（不可变，镜像里的副本必然是正确字节），每收到一行就解析一行；页面直接用部分数据渲染——部分列表始终是完整列表的前缀，因此翻页与默认排序保持稳定，仅总数不断上涨。
+5. 流式期间搜索退化为普通子串匹配；MiniSearch 模糊索引在流结束后构建——每个快照都重建索引的代价高于下载本身。
+6. 落地后的数据连同其身份（commit、`formatVersion`、生成时间）一起覆盖 IndexedDB 记录。
+7. `cdn-config.ts` 按优先级尝试自定义 CDN、直连 GitHub 与默认 CDN；某个源中途失败即交给下一个并重头解析。
+8. 广播出的身份信息经 client 快照到达主线程，「设置」页据此显示当前使用哪个快照、本次启动是复用本地缓存还是重新下载。TanStack Query 只缓存分页结果，注册表本身不在那里重复存一份。
 
 **精选页**：
 
-1. `featured-page` 与探索页共享同一份缓存索引（共用 query key），但流式期间保持骨架屏——基于不完整注册表的排名是错误的。
+1. `featured-page` 请 worker 计算其数据，并在索引报告完成前保持骨架屏——基于不完整注册表的排名是错误的。
 2. Hero 轮播由索引实时计算（`featured-rankings.ts`）：周安装量、历史总安装量、周增量占比；解析层将每个 skill 最近一周的安装量保留为 `weeklyInstalls`。
 3. 分类区块将 `featured-content.ts` 中的人工策划引用与索引联结；解析不到的引用自动跳过，空分类整体隐藏。
