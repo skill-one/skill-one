@@ -23,6 +23,20 @@ export interface Skill {
    * the SKILL.md directly without path probing.
    */
   path?: string;
+  /**
+   * Content fingerprint the registry computed for the skill directory (e.g.
+   * "t1-a4cf6ce14f6d65b3"; the `t1` segment is the fingerprint scheme). The
+   * authoritative identity of *which version of the skill* the index describes:
+   * it changes when any file in the directory changes, including its mode.
+   * Absent on entries whose repository content was never scanned.
+   */
+  rev?: string;
+  /**
+   * When the registry first recorded this `rev` (ISO, UTC) — i.e. how long the
+   * skill has been published in its current version, not when the skill first
+   * appeared. Absent together with `rev`.
+   */
+  firstSeenAt?: string;
 }
 
 /**
