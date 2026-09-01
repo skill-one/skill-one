@@ -1,4 +1,4 @@
-# skillone
+# Skill One
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -20,27 +20,29 @@
 
 到 [Releases](https://github.com/skill-one/skillone/releases) 页面下载最新的 `.dmg`（目前提供 macOS Apple Silicon 版），然后：
 
-1. 打开 `.dmg`，把 **skillone** 拖入「应用程序」文件夹。
+1. 打开 `.dmg`，把 **Skill One** 拖入「应用程序」文件夹。
 2. 启动应用——首次启动只需按 [macOS 首次安装须知](#macos-首次安装须知) 放行一次 Gatekeeper。
 
 ### Homebrew（一条命令）
 
 ```bash
-brew install --cask skill-one/tap/skillone
+brew install --cask skill-one/tap/skill-one
 ```
+
+Homebrew 用户可继续用 `brew upgrade --cask skill-one` 升级；brew 下载不带 quarantine 属性，因此不会触发 Gatekeeper 提示。
 
 ## 保持最新
 
 启动时自动检查更新，发现新版会弹窗提示，点「立即更新」即下载安装并自动重启；也可手动检查：**设置 → 软件更新 → 检查更新**。更新包安装前会做签名校验，签名不符不会安装。
 
-Homebrew 用户请继续用 `brew upgrade --cask skillone` 升级。
+Homebrew 用户请继续用 `brew upgrade --cask skill-one` 升级。
 
 ## macOS 首次安装须知
 
 应用为 ad-hoc 签名，手动下载的 `.dmg` 首次启动可能被 Gatekeeper 拦截。任选一种方式放行一次：
 
 - **系统设置 → 隐私与安全性** → 点被拦截提示处的**仍要打开**；
-- 终端执行 `xattr -d com.apple.quarantine /Applications/skillone.app`。
+- 终端执行 `xattr -d com.apple.quarantine "/Applications/Skill One.app"`。
 
 放行后永久正常打开，后续应用内更新不会再提示；Homebrew 安装无此步骤。
 

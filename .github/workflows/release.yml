@@ -38,7 +38,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # TAURI_SIGNING_PRIVATE_KEY makes `tauri build` also emit the updater
-      # artifacts: bundle/macos/skillone.app.tar.gz + .sig (minisign-signed;
+      # artifacts: bundle/macos/Skill One.app.tar.gz + .sig (minisign-signed;
       # independent from any Apple developer identity).
       - name: Build app bundle
         env:
@@ -55,7 +55,7 @@ jobs:
         id: dmg
         shell: bash
         run: |
-          DMG=$(ls src-tauri/target/release/bundle/dmg/skillone_*.dmg | head -n1)
+          DMG=$(ls src-tauri/target/release/bundle/dmg/*.dmg | head -n1)
           echo "path=${DMG}" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "${DMG}")" >> "$GITHUB_OUTPUT"
 
@@ -80,7 +80,7 @@ jobs:
             const [version, tarName, sigPath] = process.argv.slice(1);
             fs.writeFileSync("latest.json", JSON.stringify({
               version,
-              notes: `skillone ${version}`,
+              notes: `Skill One ${version}`,
               pub_date: new Date().toISOString(),
               platforms: {
                 "darwin-aarch64": {
@@ -125,21 +125,21 @@ jobs:
           cd "$TMP"
 
           mkdir -p Casks
-          cat > "Casks/skillone.rb" <<RUBY
-          cask "skillone" do
+          cat > "Casks/skill-one.rb" <<RUBY
+          cask "skill-one" do
             version "${VERSION}"
             sha256 "${SHA256}"
 
             url "${DMG_URL}"
-            name "skillone"
+            name "Skill One"
             desc "Find, install and manage agent skills (Tauri v2 desktop app)"
             homepage "https://github.com/skill-one/skillone"
-            app "skillone.app"
+            app "Skill One.app"
           end
           RUBY
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "Casks/skillone.rb"
-          git commit -m "skillone ${VERSION}" || echo "no changes"
+          git add "Casks/skill-one.rb"
+          git commit -m "skill-one ${VERSION}" || echo "no changes"
           git push origin main

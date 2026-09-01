@@ -115,6 +115,6 @@ shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 
 2. **提交并打 tag**：`chore(release): bump version to X.Y.Z`，随后 `git tag -a vX.Y.Z -m "vX.Y.Z"`。
 3. **推送**：先 `git push origin main`，再推 tag——推送 `v*` tag 正是触发构建的动作。
 
-[GitHub Actions](../.github/workflows/release.yml) 会在 `macos-14`（arm64）上构建，并上传 `.dmg`、经 minisign 签名的 `skillone.app.tar.gz` 与应用内更新器读取的 `latest.json` 清单，同时按 SHA256 更新 [skill-one/homebrew-tap](https://github.com/skill-one/homebrew-tap) 里的 `skillone.rb` cask。
+[GitHub Actions](../.github/workflows/release.yml) 会在 `macos-14`（arm64）上构建，并上传 `.dmg`、经 minisign 签名的 `Skill One.app.tar.gz` 与应用内更新器读取的 `latest.json` 清单，同时按 SHA256 更新 [skill-one/homebrew-tap](https://github.com/skill-one/homebrew-tap) 里的 `skill-one.rb` cask。
 
 > 应用为 ad-hoc 签名分发，手动下载的 macOS 版本首次启动需在「系统设置 → 隐私与安全性」中允许打开。自 v0.2.0 起，已安装的应用可在应用内自行完成更新。

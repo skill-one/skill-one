@@ -45,12 +45,12 @@ pub struct PopoverState {
 
 /// Build the menu bar tray icon with its native right-click menu.
 pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "打开 SkillOne", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "退出 SkillOne", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "打开 Skill One", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出 Skill One", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quit])?;
 
     TrayIconBuilder::with_id("main-tray")
-        .tooltip("SkillOne")
+        .tooltip("Skill One")
         // Monochrome template icon: macOS recolors it for light/dark menu bars.
         .icon(Image::from_bytes(include_bytes!("../icons/tray-icon.png"))?)
         .icon_as_template(true)

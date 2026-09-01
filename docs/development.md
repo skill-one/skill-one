@@ -115,6 +115,6 @@ Cutting a release is one annotated tag — see [auto-update.md](auto-update.md) 
 2. **Commit and tag**: `chore(release): bump version to X.Y.Z`, then `git tag -a vX.Y.Z -m "vX.Y.Z"`.
 3. **Push**: `git push origin main`, then push the tag — pushing a `v*` tag is what triggers the build.
 
-[GitHub Actions](../.github/workflows/release.yml) builds on `macos-14` (arm64) and publishes the `.dmg`, the minisign-signed `skillone.app.tar.gz` plus the `latest.json` manifest the in-app updater reads, and the SHA256-checked `skillone.rb` cask in [skill-one/homebrew-tap](https://github.com/skill-one/homebrew-tap).
+[GitHub Actions](../.github/workflows/release.yml) builds on `macos-14` (arm64) and publishes the `.dmg`, the minisign-signed `Skill One.app.tar.gz` plus the `latest.json` manifest the in-app updater reads, and the SHA256-checked `skill-one.rb` cask in [skill-one/homebrew-tap](https://github.com/skill-one/homebrew-tap).
 
 > The app is distributed ad-hoc signed; on first launch of a manually downloaded macOS build, allow it under "System Settings → Privacy & Security". From v0.2.0 onward, installs update themselves in-app.

@@ -93,7 +93,7 @@ describe("PopoverPage", () => {
   it("shows the header title and enabled count", async () => {
     renderWithRouter(<PopoverPage />);
 
-    expect(await screen.findByText("SkillOne")).toBeInTheDocument();
+    expect(await screen.findByText("Skill One")).toBeInTheDocument();
     // Count matches the visible (enabled-only) list, not the raw total.
     expect(await screen.findByText("2 个技能")).toBeInTheDocument();
   });
