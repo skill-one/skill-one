@@ -219,12 +219,15 @@ export function ExplorePage() {
           it or moving its scroll position. */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex h-full min-w-0 flex-1 flex-col">
-          {/* Grid. The 4px top/left padding (+ matching negative margins,
-              so content position and card widths are unchanged) keeps the
-              cards' outside-painted ink — the selected ring and the focus
-              outline — from being clipped by the scroll container at the
-              flush top/left edges. */}
-          <div className="min-h-0 flex-1 -ml-1 -mt-1 overflow-y-auto pb-6 pl-1 pr-1 pt-1">
+          {/* Grid. The horizontal padding is sized for the macOS-style
+              overlay scrollbar: a hovered (transformed) card is painted
+              over the thumb, so the cards need reserved space on the right
+              instead of sitting under it. Each padding is offset by a
+              matching negative margin, so content position and card widths
+              are unchanged while the outside-painted ink — the selected
+              ring and the focus outline — stays unclipped; the 4px top
+              pair does the same at the flush top edge. */}
+          <div className="min-h-0 flex-1 -mx-3 -mt-1 overflow-y-auto px-3 pb-6 pt-1">
             {failure ? (
               <Placeholder message={`加载失败：${failure}`}>
                 <Button

@@ -60,7 +60,11 @@ export function FeaturedPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
-      <div className="min-h-0 flex-1 overflow-y-auto pb-6 pr-1">
+      {/* Symmetric 12px horizontal padding (offset by matching negative
+          margins, so content position and card widths are unchanged)
+          reserves room beside the cards for the overlay scrollbar instead
+          of letting it overlap them. */}
+      <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-6">
         {isError ? (
           <Placeholder
             message={`加载失败：${error instanceof Error ? error.message : "未知错误"}`}
