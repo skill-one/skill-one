@@ -1,51 +1,58 @@
 # Auto-Update
 
-The app updates itself with the official Tauri v2 updater plugin. No Apple
-Developer account is involved anywhere in this pipeline: update packages are
-trusted via a **minisign key**, not via Apple codesigning/notarization.
+The app updates itself with the official Tauri v2 updater plugin. Trust comes from a
+**minisign key** — there is no Apple Developer account, no codesigning and no
+notarization anywhere in the pipeline.
+
+## Cutting a release
+
+Pushing one annotated tag publishes the update; CI does everything else.
+
+```bash
+# 1) bump all four version fields to X.Y.Z — they must match exactly
+#    package.json · src-tauri/tauri.conf.json · src-tauri/Cargo.toml · src-tauri/Cargo.lock
+git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+git commit -m "chore(release): bump version to X.Y.Z"
+git push origin main
+
+# 2) tag it — pushing a v* tag triggers .github/workflows/release.yml
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+The workflow (`macos-14`, about 5 minutes) builds once, uploads three files to the GitHub
+Release, then bumps the Homebrew cask:
+
+| File | Consumed by |
+| --- | --- |
+| `skillone_X.Y.Z_aarch64.dmg` | new users, Homebrew |
+| `skillone.app.tar.gz` | existing installs — the updater payload |
+| `latest.json` | the in-app updater (version + signature) |
+
+No per-release config: the app always follows the newest release.
 
 ## How it works
 
-```
-GitHub Release (skill-one/skillone)
-  latest.json  ── fetched by app at startup / manual check ─▶  version + signature
-  skillone.app.tar.gz + .sig  ── downloaded after "update available" ─▶ minisign
-                                                            verified ─▶ install ─▶ relaunch
-```
-
-- **Endpoint**: `https://github.com/skill-one/skillone/releases/latest/download/latest.json`
-  (the `latest` path means no config change per release).
-- **Verification**: the artifact's minisign signature is checked against the
-  public key embedded in `src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
-  A mismatched or unsigned package is never installed.
-- **Frontend**: `src/lib/update-store.ts` (state) → `UpdateDialog` (global,
-  auto-opens) + settings page "软件更新" card (manual check).
-- **macOS note**: because the updater downloads the package itself, the new
-  bundle has no quarantine attribute — auto-updated builds launch without any
-  Gatekeeper prompt. (Only fresh downloads of the DMG by new users may need
-  right-click → Open, which is unrelated to the updater.)
+- **Endpoint**: `https://github.com/skill-one/skillone/releases/latest/download/latest.json`, checked at startup.
+- **Verification**: the package signature is checked against `plugins.updater.pubkey` in
+  `src-tauri/tauri.conf.json`. Unsigned packages, or packages signed by another key, are
+  never installed.
+- **Flow**: `src/lib/update-store.ts` (state) → `UpdateDialog` (mounted globally,
+  auto-opens on startup) + the settings page "Software Update" card (manual check);
+  installing verifies the package, swaps the bundle and relaunches.
+- **macOS**: the updater downloads the package itself, so the new bundle has no
+  quarantine attribute and relaunches without a Gatekeeper prompt.
 
 ## Signing key
 
 | Item | Value |
 | --- | --- |
-| Private key (local copy) | `~/.tauri/skillone.updater.key` — **back it up**; losing it breaks all future updates |
-| Public key | `~/.tauri/skillone.updater.key.pub`, pasted into `tauri.conf.json` |
-| GitHub secrets | `TAURI_SIGNING_PRIVATE_KEY` (+ `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, empty) |
-| Generate command | `pnpm tauri signer generate --ci -p "" -w ~/.tauri/skillone.updater.key` |
+| Private key (local copy) | `~/.tauri/skillone.updater.key` — **back it up**; if it is lost, no existing install can ever accept an update again |
+| Public key | `~/.tauri/skillone.updater.key.pub`, embedded in `tauri.conf.json` |
+| GitHub secrets | `TAURI_SIGNING_PRIVATE_KEY` (+ `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, empty string) |
+| Generate a keypair | `pnpm tauri signer generate --ci -p "" -w ~/.tauri/skillone.updater.key` |
 
-## CI
-
-`.github/workflows/release.yml` on tag push:
-
-1. `tauri build` runs with the signing env vars; `bundle.createUpdaterArtifacts`
-   makes it also emit `bundle/macos/skillone.app.tar.gz` + `.sig`.
-2. A step generates `latest.json` (`darwin-aarch64` platform entry pointing at
-   that release's tarball, signature inlined).
-3. DMG + tar.gz + latest.json are uploaded to the GitHub Release (brew cask
-   step unchanged).
-
-Building locally without a release also needs the key:
+Building the signed bundle locally needs the same key:
 
 ```sh
 export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/skillone.updater.key)"
@@ -53,29 +60,36 @@ export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 pnpm tauri build --bundles app
 ```
 
-## Local end-to-end test (no GitHub needed)
+## Worth knowing
 
-Serve the update manifest from localhost and point a throwaway build at it:
+- **v0.2.0 is the first release that carries an updater.** Builds before it contain no
+  updater code, so those users must reinstall the DMG once before in-app updates start
+  working.
+- GitHub's `releases/latest` pointer is edge-cached — a fresh release can take a minute
+  or two to become visible to clients.
+- The check is issued by Rust (`reqwest`), not by the webview, so no HTTP cache is
+  involved; every check is a live request.
+- A packaged build must be started with `open`, not by exec'ing the binary inside it.
+
+## Testing an update without GitHub
+
+Serve a manifest from localhost and point a throwaway build at it
+(`dangerousInsecureTransportProtocol` is required because release endpoints must be HTTPS):
 
 ```sh
-# 1) build the "new" version and stash its artifact
-pnpm tauri build --bundles app --config '{"version":"0.1.9"}'
+pnpm tauri build --bundles app --config '{"version":"9.9.9"}'          # the "new" build
 mv src-tauri/target/release/bundle/macos/skillone.app.tar.gz* /tmp/upd/
+# hand-write /tmp/upd/latest.json → version "9.9.9",
+#   url "http://127.0.0.1:8099/skillone.app.tar.gz", signature = contents of the .sig file
+(cd /tmp/upd && python3 -m http.server 8099)
 
-# 2) write /tmp/upd/latest.json → version 0.1.9, url http://127.0.0.1:8099/skillone.app.tar.gz,
-#    signature = contents of the .sig file; serve it
-cd /tmp/upd && python3 -m http.server 8099
-
-# 3) build the "old" version whose endpoint points at localhost, run it
-pnpm tauri build --bundles app --config '{"plugins":{"updater":{"endpoints":["http://127.0.0.1:8099/latest.json"]}}}'
-open src-tauri/target/release/bundle/macos/skillone.app
+# the "old" build: same code, endpoint aimed at localhost
+pnpm tauri build --bundles app --config '{"version":"0.0.1","plugins":{"updater":{"endpoints":["http://127.0.0.1:8099/latest.json"],"dangerousInsecureTransportProtocol":true}}}'
+open src-tauri/target/release/bundle/macos/skillone.app               # startup offers the 9.9.9 update
 ```
-
-The startup check should pop the update dialog; installing verifies the
-signature, swaps the bundle and relaunches into 0.1.9.
 
 ## Key rotation
 
-Re-generate the keypair, update `plugins.updater.pubkey` + both GitHub
-secrets in one release. Old clients keep the old pubkey and will reject
-packages signed with the new key — rotate before shipping updates, not after.
+Generate a new keypair, then update `plugins.updater.pubkey` **and** both GitHub secrets in
+the same release. Old clients hold the old public key and will reject packages signed with
+the new one — rotate before you ship updates, not after.

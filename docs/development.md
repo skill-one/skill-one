@@ -109,21 +109,12 @@ Tests use Vitest + Testing Library and run in the `jsdom` environment. Component
 
 ## Release
 
-The release process is automated by [GitHub Actions](../.github/workflows/release.yml) with the following steps:
+Cutting a release is one annotated tag — see [auto-update.md](auto-update.md) for the full procedure and the published artifacts. In short:
 
-1. **Bump the version**: Update `version` in `package.json` and keep it in sync with `version` in `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` (all three must match; `Cargo.lock` updates automatically during the build).
-2. **Tag and push**: The tag looks like `v<version>` (e.g. `v0.1.1`).
-3. After a `v*` tag is pushed or the workflow is triggered manually, CI automatically:
-   - Runs `pnpm tauri build` on `macos-14` (arm64) to produce a `.dmg`.
-   - Creates a GitHub Release and uploads the `.dmg`.
-   - Computes SHA256, then updates the `skillone.rb` cask in the [skill-one/homebrew-tap](https://github.com/skill-one/homebrew-tap) repository and pushes it, so users can upgrade via Homebrew.
+1. **Bump the version**: keep `version` identical in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` **and** `src-tauri/Cargo.lock` — the release commit carries all four.
+2. **Commit and tag**: `chore(release): bump version to X.Y.Z`, then `git tag -a vX.Y.Z -m "vX.Y.Z"`.
+3. **Push**: `git push origin main`, then push the tag — pushing a `v*` tag is what triggers the build.
 
-```bash
-# After bumping the version locally
-git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
-git commit -m "chore: bump version to 0.1.1"
-git tag v0.1.1
-git push origin main --tags
-```
+[GitHub Actions](../.github/workflows/release.yml) builds on `macos-14` (arm64) and publishes the `.dmg`, the minisign-signed `skillone.app.tar.gz` plus the `latest.json` manifest the in-app updater reads, and the SHA256-checked `skillone.rb` cask in [skill-one/homebrew-tap](https://github.com/skill-one/homebrew-tap).
 
-> The app is unsigned; on first launch of the macOS build, allow it under "System Settings → Privacy & Security".
+> The app is distributed ad-hoc signed; on first launch of a manually downloaded macOS build, allow it under "System Settings → Privacy & Security". From v0.2.0 onward, installs update themselves in-app.

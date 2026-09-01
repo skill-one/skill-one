@@ -23,7 +23,7 @@ Grab the latest `.dmg` from the [Releases](https://github.com/skill-one/skillone
 1. Open the `.dmg` and drag **skillone** into your **Applications** folder.
 2. Launch it — see the [macOS first-launch note](#macos-first-launch) for the one-time Gatekeeper step.
 
-From then on you never need to download again: new versions arrive through the built-in updater.
+From v0.2.0 onwards you never need to download again: new versions arrive through the built-in updater. (Installs of earlier versions have no updater, so they need this one manual reinstall.)
 
 ### Homebrew (one command)
 

@@ -109,21 +109,12 @@ shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 
 
 ## 发布
 
-发布流程由 [GitHub Actions](../.github/workflows/release.yml) 自动完成，步骤如下：
+发版就是推一个附注 tag——完整流程与产物说明见 [auto-update.zh-CN.md](auto-update.zh-CN.md)。简要：
 
-1. **更新版本号**：修改 `package.json` 中的 `version`，并同步 `src-tauri/tauri.conf.json` 与 `src-tauri/Cargo.toml` 的 `version`（三处必须一致，`Cargo.lock` 会随构建自动更新）。
-2. **打 tag 并推送**：tag 形如 `v<version>`（例如 `v0.1.1`）。
-3. 推送 `v*` tag 或手动触发 workflow 后，CI 自动执行：
-   - 在 `macos-14`（arm64）上执行 `pnpm tauri build` 产出 `.dmg`。
-   - 创建 GitHub Release 并上传 `.dmg`。
-   - 计算 SHA256 后，更新 [skill-one/homebrew-tap](https://github.com/skill-one/homebrew-tap) 仓库中的 `skillone.rb` cask 并推送，用户即可通过 Homebrew 升级。
+1. **更新版本号**：`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` **和** `src-tauri/Cargo.lock` 四处的 `version` 必须完全一致，发布提交里四处一起带上。
+2. **提交并打 tag**：`chore(release): bump version to X.Y.Z`，随后 `git tag -a vX.Y.Z -m "vX.Y.Z"`。
+3. **推送**：先 `git push origin main`，再推 tag——推送 `v*` tag 正是触发构建的动作。
 
-```bash
-# 本地完成版本号修改后
-git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
-git commit -m "chore: bump version to 0.1.1"
-git tag v0.1.1
-git push origin main --tags
-```
+[GitHub Actions](../.github/workflows/release.yml) 会在 `macos-14`（arm64）上构建，并上传 `.dmg`、经 minisign 签名的 `skillone.app.tar.gz` 与应用内更新器读取的 `latest.json` 清单，同时按 SHA256 更新 [skill-one/homebrew-tap](https://github.com/skill-one/homebrew-tap) 里的 `skillone.rb` cask。
 
-> 应用未签名，macOS 首次启动需在「系统设置 → 隐私与安全性」中允许打开。
+> 应用为 ad-hoc 签名分发，手动下载的 macOS 版本首次启动需在「系统设置 → 隐私与安全性」中允许打开。自 v0.2.0 起，已安装的应用可在应用内自行完成更新。
