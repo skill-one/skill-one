@@ -229,7 +229,7 @@ export function RankingPage() {
       </header>
 
       {/* Symmetric 12px horizontal padding (offset by matching negative
-          margins, so content position and card widths are unchanged)
+          margins, so content position and row widths are unchanged)
           reserves room beside the rows for the overlay scrollbar instead
           of letting it overlap them. */}
       <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-6">

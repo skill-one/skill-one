@@ -135,7 +135,7 @@ export interface AgentStatus {
   /**
    * Skills already living inside the agent's own directory. Only populated for
    * unlinked, non-canonical agents: it surfaces what a migrate would move into
-   * the canonical dir, so the UI can preview them on the card.
+   * the canonical dir, so the UI can preview them on the row.
    */
   internalSkills?: string[];
   /**

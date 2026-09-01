@@ -23,7 +23,12 @@ export interface SearchHit {
   matched: Partial<Record<SearchField, readonly string[]>>;
 }
 
-/** Explore page sort orders (mirrored by the worker's cached sort). */
+/**
+ * Explore page sort orders (mirrored by the worker's cached sort). "default"
+ * keeps the registry index order — the explore toolbar no longer offers it, but
+ * the repo detail page still asks for it. A non-empty query ignores `sort`
+ * entirely and answers in relevance order.
+ */
 export type SortOrder = "default" | "downloads" | "name";
 
 /** Parameters of a paged explore request. */

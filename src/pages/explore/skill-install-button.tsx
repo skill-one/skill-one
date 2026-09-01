@@ -51,7 +51,7 @@ function toErrorMessage(err: unknown): string {
 }
 
 /**
- * The install action shared by every skill surface (store cards, leaderboard
+ * The install action shared by every skill surface (store rows, leaderboard
  * rows): a real install through the skills backend (Tauri) or the mock store
  * (browser), reflected as idle → installing → installed | error.
  *
@@ -76,8 +76,8 @@ export function SkillInstallButton({
   // The install button reflects the persisted install state, not just this
   // session: skills already present in the global skills directory render as
   // 已安装 (disabled) before any click. Sharing the "my skills" query keeps
-  // store cards in sync with installs/removals done elsewhere; React Query
-  // dedupes the shared key so a page of cards issues a single fetch.
+  // store rows in sync with installs/removals done elsewhere; React Query
+  // dedupes the shared key so a page of rows issues a single fetch.
   const { data: installedSkills } = useInstalledSkills();
 
   const installing = installState === "installing";

@@ -5,9 +5,12 @@ import { useFeaturedData } from "../../../hooks/use-featured-data";
 import { Button } from "../../../components/ui/button";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../explore-page";
-import { SkillCard } from "../skill-card";
+import { SkillListRow } from "../skill-list-row";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 import { FeaturedHero } from "./featured-hero";
+
+/** Rows per curated section in the loading placeholder. */
+const SKELETON_ROWS = 6;
 
 /** Loading placeholder mirroring the page layout: hero plus two sections. */
 function FeaturedSkeleton() {
@@ -17,9 +20,9 @@ function FeaturedSkeleton() {
       {[0, 1].map((section) => (
         <div key={section}>
           <Skeleton className="mb-4 h-7 w-24" />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }, (_, i) => (
-              <Skeleton key={i} className="h-[136px] rounded-xl" />
+          <div className="flex flex-col gap-2">
+            {Array.from({ length: SKELETON_ROWS }, (_, i) => (
+              <Skeleton key={i} className="h-16 rounded-xl" />
             ))}
           </div>
         </div>
@@ -30,9 +33,9 @@ function FeaturedSkeleton() {
 
 /**
  * The store's curated landing page: computed leaderboard banners on top,
- * hand-curated category sections of skill cards below.
+ * hand-curated category sections of skill rows below.
  *
- * Both the hero slides and the section grids arrive precomputed from the
+ * Both the hero slides and the section lists arrive precomputed from the
  * registry worker (rankings and curated joins only mean anything against
  * the whole registry, so the page keeps its skeleton until the worker is
  * ready). Curated references missing from the index are skipped inside the
@@ -61,8 +64,8 @@ export function FeaturedPage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
       {/* Symmetric 12px horizontal padding (offset by matching negative
-          margins, so content position and card widths are unchanged)
-          reserves room beside the cards for the overlay scrollbar instead
+          margins, so content position and row widths are unchanged)
+          reserves room beside the rows for the overlay scrollbar instead
           of letting it overlap them. */}
       <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-6">
         {isError ? (
@@ -90,18 +93,18 @@ export function FeaturedPage() {
                 <h2 className="mb-4 text-xl font-bold tracking-tight text-foreground">
                   {section.title}
                 </h2>
-                {/* The detail drawer overlays the grid; the layout never
+                {/* The detail drawer overlays the list; the layout never
                       changes when it opens or closes. */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <ul className="flex flex-col gap-2">
                   {section.skills.map(({ skill, index: i }) => (
-                    <SkillCard
+                    <SkillListRow
                       key={`${skill.repo}/${skill.name}`}
                       skill={skill}
                       selected={i === selected}
                       onSelect={() => setSelected(i)}
                     />
                   ))}
-                </div>
+                </ul>
               </section>
             ))}
           </div>

@@ -137,7 +137,7 @@ describe("MySkillsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("opens the shared detail drawer when a card is clicked", async () => {
+  it("opens the shared detail drawer when a row is clicked", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
 
@@ -297,7 +297,7 @@ describe("MySkillsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("pages through the grid and clamps back when the last page empties", async () => {
+  it("pages through the list and clamps back when the last page empties", async () => {
     const user = userEvent.setup();
     // installMockSkill prepends, so page 1 holds extra-18..extra-0 plus the
     // first five base skills and the tail base skill lands on page 2.

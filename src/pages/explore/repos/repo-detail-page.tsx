@@ -11,7 +11,7 @@ import { formatCount } from "../../../lib/utils";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../explore-page";
 import { ListPager } from "../../../components/list-pager";
-import { SkillCard } from "../skill-card";
+import { SkillListRow } from "../skill-list-row";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 
 /** Number of skills shown per page on the repo detail page. */
@@ -21,18 +21,15 @@ const PAGE_SIZE = 24;
 const REPOS_PATH = "/explore/repos";
 
 /**
- * Loading placeholder mirroring the skill grid, so opening a repo paints its
- * final layout instantly and real cards replace the placeholders as the data
+ * Loading placeholder mirroring the skill list, so opening a repo paints its
+ * final layout instantly and real rows replace the placeholders as the data
  * arrives.
  */
 function RepoDetailSkeleton() {
   return (
-    <div
-      className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-      aria-hidden
-    >
+    <div className="flex flex-col gap-2" aria-hidden>
       {Array.from({ length: 9 }, (_, i) => (
-        <Skeleton key={i} className="h-[136px] rounded-xl" />
+        <Skeleton key={i} className="h-16 rounded-xl" />
       ))}
     </div>
   );
@@ -51,7 +48,7 @@ export function RepoDetailPage() {
   }>();
   const repoId = `${owner}/${repo}`;
 
-  // 1-based current page and the card index shown in the detail drawer.
+  // 1-based current page and the row index shown in the detail drawer.
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -138,13 +135,13 @@ export function RepoDetailPage() {
         </div>
       </header>
 
-      {/* Skill grid; the modal detail drawer overlays it without reflowing
+      {/* The skill list; the modal detail drawer overlays it without reflowing
           it or moving its scroll position. */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex h-full min-w-0 flex-1 flex-col">
           {/* Symmetric 12px horizontal padding (offset by matching
-              negative margins, so content position and card widths are
-              unchanged) reserves room beside the cards for the overlay
+              negative margins, so content position and row widths are
+              unchanged) reserves room beside the rows for the overlay
               scrollbar instead of letting it overlap them, and keeps the
               outside-painted ink unclipped. */}
           <div className="min-h-0 flex-1 -mx-3 -mt-1 overflow-y-auto px-3 pb-0 pt-1">
@@ -167,16 +164,16 @@ export function RepoDetailPage() {
             ) : hits.length === 0 ? (
               <Placeholder message={`仓库 ${repoId} 下暂无 Skill`} />
             ) : (
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="flex flex-col gap-2">
                 {hits.map((hit, i) => (
-                  <SkillCard
+                  <SkillListRow
                     key={`${hit.skill.repo}/${hit.skill.name}`}
                     skill={hit.skill}
                     selected={i === selected}
                     onSelect={() => setSelected(i)}
                   />
                 ))}
-              </div>
+              </ul>
             )}
           </div>
 

@@ -446,15 +446,16 @@ describe("ExplorePage", () => {
       "gadget",
     );
 
-    // Highlighting splits the name into <mark> segments, so match the card
+    // Highlighting splits the name into <mark> segments, so match the row
     // via its aria-label, which stays intact.
     expect(
       await screen.findByRole("button", {
         name: "查看 gadget-master 详情",
       }),
     ).toBeInTheDocument();
-    // The search is debounced, so wait for the worker's answer to land.
-    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
+    // The search is debounced, so wait for the worker's answer to land. The
+    // count names the ranking as well: relevance, not the toolbar's sort.
+    expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
     // The grid went back to its first page and shows only the match.
     expect(screen.queryByText("tool-24")).not.toBeInTheDocument();
     // A single result fits on one page: the pager controls stay visible but
@@ -475,7 +476,7 @@ describe("ExplorePage", () => {
 
     const input = screen.getByRole("textbox", { name: "搜索 Skill" });
     await user.type(input, "gadget");
-    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
+    expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
 
     await user.clear(input);
 
@@ -538,7 +539,7 @@ describe("ExplorePage", () => {
     );
 
     expect(await screen.findByText("docgen")).toBeInTheDocument();
-    // Cards appear in DOM order; read each card's aria-label, which stays
+    // Rows appear in DOM order; read each row's aria-label, which stays
     // intact even when highlighted names are split across <mark> segments.
     const cardOrder = () =>
       screen
@@ -551,21 +552,20 @@ describe("ExplorePage", () => {
 
   it("ranks search results by install count among equally relevant matches", async () => {
     const user = userEvent.setup();
-    // Registry order deliberately opposes the popularity order: without a
-    // search the cards render as beta → alpha, so only the search's install
-    // boost can flip them to alpha → beta.
+    // Registry order: ["alpha-redis-clip", "beta-redis-tool"] — the same
+    // sequence the name sort produces, and the opposite of the popularity one.
     harness.init();
     harness.pushAll([
       {
-        name: "beta-redis-clip",
-        repo: "acme/beta",
+        name: "alpha-redis-clip",
+        repo: "acme/alpha",
         description: "Utilities.",
         stars: 10,
         downloads: 10,
       },
       {
-        name: "alpha-redis-tool",
-        repo: "acme/alpha",
+        name: "beta-redis-tool",
+        repo: "acme/beta",
         description: "Utilities.",
         stars: 10,
         downloads: 5_000_000,
@@ -573,9 +573,9 @@ describe("ExplorePage", () => {
     ]);
     harness.complete();
     renderExplorePage();
-    await screen.findByText("beta-redis-clip");
+    await screen.findByText("beta-redis-tool");
 
-    // Cards appear in DOM order; read each card's aria-label, which stays
+    // Rows appear in DOM order; read each row's aria-label, which stays
     // intact even when highlighted names are split across <mark> segments.
     const cardOrder = () =>
       screen
@@ -583,17 +583,23 @@ describe("ExplorePage", () => {
         .map((el) =>
           el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""),
         );
-    expect(cardOrder()).toEqual(["beta-redis-clip", "alpha-redis-tool"]);
+
+    // Start from the name order, so the page is knowingly un-popular first.
+    await user.click(screen.getByRole("button", { name: "按下载量" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
+    expect(cardOrder()).toEqual(["alpha-redis-clip", "beta-redis-tool"]);
 
     await user.type(
       screen.getByRole("textbox", { name: "搜索 Skill" }),
       "redis",
     );
 
-    // The search is debounced and both cards are already on the unfiltered
-    // page one, so the reorder itself is what signals the fuzzy answer.
+    // Both matches are equally relevant, so the search's install boost puts the
+    // popular one first — a reorder the name sort alone cannot explain, which is
+    // also the proof that a search answers in relevance order rather than in the
+    // sort chosen for the browsed list.
     await waitFor(() =>
-      expect(cardOrder()).toEqual(["alpha-redis-tool", "beta-redis-clip"]),
+      expect(cardOrder()).toEqual(["beta-redis-tool", "alpha-redis-clip"]),
     );
   });
 
@@ -622,7 +628,7 @@ describe("ExplorePage", () => {
     expect(heading?.textContent).toBe("gadget-master");
   });
 
-  it("sorts skills by downloads and by name from the toolbar", async () => {
+  it("opens in download order and re-sorts the browsed list", async () => {
     const user = userEvent.setup();
     harness.init();
     harness.pushAll([
@@ -652,22 +658,52 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("alpha");
 
-    // Cards appear in DOM order; exact-match the names so the repo subtitles
+    // Rows appear in DOM order; exact-match the names so the repo subtitles
     // ("o/alpha") don't interfere.
     const cardOrder = () =>
       screen.getAllByText(/^(alpha|beta|gamma)$/).map((el) => el.textContent);
 
-    expect(cardOrder()).toEqual(["alpha", "beta", "gamma"]);
-
-    // Sort by downloads: 300 → 50 → 5.
-    await user.click(screen.getByRole("button", { name: "默认排序" }));
-    await user.click(screen.getByRole("menuitemradio", { name: "按下载量" }));
+    // The page starts on the popularity order, not on the registry order.
     expect(cardOrder()).toEqual(["beta", "gamma", "alpha"]);
 
-    // Sort by name; the trigger label follows the active order.
+    // The dropdown offers the two browsed-list orders and nothing else.
     await user.click(screen.getByRole("button", { name: "按下载量" }));
+    expect(
+      screen.queryByRole("menuitemradio", { name: "默认排序" }),
+    ).toBeNull();
     await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
     expect(cardOrder()).toEqual(["alpha", "beta", "gamma"]);
+
+    // The trigger label follows the active order, so it can be opened again.
+    await user.click(screen.getByRole("button", { name: "按名称" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "按下载量" }));
+    expect(cardOrder()).toEqual(["beta", "gamma", "alpha"]);
+  });
+
+  it("replaces the sort control with a read-only 相关度 while searching", async () => {
+    const user = userEvent.setup();
+    bootGadgetRegistry();
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    // Choose a browsed-list order first, so the control's return is
+    // distinguishable from a reset.
+    await user.click(screen.getByRole("button", { name: "按下载量" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
+
+    const input = screen.getByRole("textbox", { name: "搜索 Skill" });
+    await user.type(input, "gadget");
+    expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
+
+    // The hits are not ordered by the user's choice, so the control stops
+    // pretending to be one: the dropdown is gone, the label states the ranking.
+    expect(screen.queryByRole("button", { name: "按名称" })).toBeNull();
+    expect(screen.getByRole("button", { name: "相关度" })).toBeDisabled();
+
+    // Clearing the search gives the choice back, still on 按名称.
+    await user.clear(input);
+    expect(await screen.findByText("共 50 个")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "按名称" })).toBeEnabled();
   });
 
   it("offers the category placeholder menu with 全部 preselected", async () => {
@@ -689,7 +725,7 @@ describe("ExplorePage", () => {
     ).toHaveAttribute("aria-disabled", "true");
   });
 
-  it("opens the detail panel when a card is clicked", async () => {
+  it("opens the detail panel when a row is clicked", async () => {
     const user = userEvent.setup();
     bootRegistry(50);
     renderExplorePage();
@@ -750,50 +786,46 @@ describe("ExplorePage", () => {
     );
   });
 
-  it("opens the drawer without reflowing the grid", async () => {
+  it("opens the drawer without reflowing the list", async () => {
     const user = userEvent.setup();
     bootRegistry(50);
-    renderExplorePage();
+    const { container } = renderExplorePage();
     await screen.findByText("skill-0");
 
-    const grid = screen.getByText("skill-0").closest(".grid")!;
-    expect(grid.className).toBe(
-      "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
-    );
+    const list = container.querySelector("ul.flex-col")!;
+    expect(list.className).toBe("flex flex-col gap-2");
+    expect(list.querySelectorAll("li")).toHaveLength(24);
 
-    // Opening the drawer overlays the grid: the grid's classes — and with
-    // them its layout and scroll position — stay exactly the same while
-    // the drawer is open and after it closes.
+    // Opening the drawer overlays the list: its classes — and with them its
+    // layout and scroll position — stay exactly the same while the drawer is
+    // open and after it closes.
     await user.click(screen.getByText("skill-0"));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(grid.className).toBe(
-      "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
-    );
+    expect(list.className).toBe("flex flex-col gap-2");
 
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    expect(grid.className).toBe(
-      "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
-    );
+    expect(list.className).toBe("flex flex-col gap-2");
+    expect(list.querySelectorAll("li")).toHaveLength(24);
   });
 });
 
 describe("ExplorePage streaming", () => {
-  it("paints a skeleton grid while the first snapshot is still in flight", async () => {
+  it("paints a skeleton list while the first snapshot is still in flight", async () => {
     harness.init();
     const { container } = renderExplorePage();
     await act(async () => {});
 
-    // The switch is instant: card-shaped skeletons fill the grid instead of
-    // a spinner, and no card is rendered from nothing.
-    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(
-      12,
-    );
+    // The switch is instant: row-shaped skeletons fill the list instead of a
+    // spinner, and no row is rendered from nothing.
+    const skeletons = container.querySelectorAll('[data-slot="skeleton"]');
+    expect(skeletons).toHaveLength(12);
+    expect(skeletons[0].className).toContain("h-16");
     expect(screen.queryByText("skill-0")).not.toBeInTheDocument();
 
-    // The first streamed batch replaces the skeleton with real cards.
+    // The first streamed batch replaces the skeleton with real rows.
     harness.pushAll(makeSkills(3, 0));
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
     expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
@@ -834,7 +866,7 @@ describe("ExplorePage streaming", () => {
 
     // Exact substring still matches during streaming...
     await user.type(input, "gadget");
-    // The card is also on the unfiltered streaming page one, and the search
+    // The row is also on the unfiltered streaming page one, and the search
     // itself is debounced — the count is what proves the filter applied.
     expect(await screen.findByText(/共 1 个/)).toBeInTheDocument();
     expect(
@@ -858,3 +890,4 @@ describe("ExplorePage streaming", () => {
     expect(screen.queryByText(/加载中/)).not.toBeInTheDocument();
   });
 });
+

@@ -17,7 +17,7 @@ import {
 } from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
-import { SkillCard } from "./skill-card";
+import { SkillListRow } from "./skill-list-row";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { ListPager } from "../../components/list-pager";
 
@@ -28,11 +28,16 @@ const PAGE_SIZE = 24;
 const SEARCH_DEBOUNCE_MS = 150;
 
 /**
- * The sort orders offered by the toolbar dropdown. "default" keeps the
- * registry index order; the other orders are applied inside the worker.
+ * The sort orders offered by the toolbar dropdown; both are applied inside the
+ * worker and order the *browsed* list. Downloads is the entry order — "most
+ * installed first" is the reading a store visitor wants, and the registry index
+ * order was never a choice worth exposing.
+ *
+ * A search is the exception: the worker answers it in relevance order, so the
+ * dropdown is replaced by a read-only 相关度 pill rather than claiming an order
+ * the results do not follow.
  */
 const SORT_OPTIONS: Array<{ value: SortOrder; label: string }> = [
-  { value: "default", label: "默认排序" },
   { value: "downloads", label: "按下载量" },
   { value: "name", label: "按名称" },
 ];
@@ -58,19 +63,22 @@ export function Placeholder({
 }
 
 /**
- * Loading placeholder mirroring the skill grid: a viewport's worth of
- * card-shaped skeletons, so switching to this page paints its final layout
- * instantly and real cards replace the placeholders as the index streams in
+ * Container of the skill list — one row per skill, leaderboard style.
+ * Extracted because both the results and the loading placeholder agree on it.
+ */
+const LIST_CLASS = "flex flex-col gap-2";
+
+/**
+ * Loading placeholder mirroring the skill list: a viewport's worth of
+ * row-shaped skeletons, so switching to this page paints its final layout
+ * instantly and real rows replace the placeholders as the index streams in
  * (instead of an empty spin that reads as "the page never switched").
  */
 function ExploreSkeleton() {
   return (
-    <div
-      className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-      aria-hidden
-    >
+    <div className={LIST_CLASS} aria-hidden>
       {Array.from({ length: 12 }, (_, i) => (
-        <Skeleton key={i} className="h-[136px] rounded-xl" />
+        <Skeleton key={i} className="h-16 rounded-xl" />
       ))}
     </div>
   );
@@ -81,9 +89,9 @@ export function ExplorePage() {
   const [page, setPage] = useState(1);
 
   // Search text and sort order; any change invalidates the page/selection
-  // because the result list (and the meaning of a card index) changes.
+  // because the result list (and the meaning of a row index) changes.
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortOrder>("default");
+  const [sort, setSort] = useState<SortOrder>("downloads");
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
 
   // Worker progress: the climbing count, the streaming/indexing flags and
@@ -112,7 +120,7 @@ export function ExplorePage() {
       : null;
 
   // The skeleton stays up until the very first skill arrives; after that the
-  // grid paints from partial data and grows with the stream.
+  // list paints from partial data and grows with the stream.
   const loading =
     isLoading || (hits.length === 0 && stats.count === 0 && !failure);
 
@@ -129,7 +137,7 @@ export function ExplorePage() {
   }, [page, totalPages]);
 
   // Index into `hits` of the skill shown in the detail panel; null keeps the
-  // panel closed (full-width grid). Clicking a card while the panel is open
+  // panel closed. Clicking a row while the panel is open
   // simply swaps the selection, so switching skills never replays the
   // slide-in animation.
   const [selected, setSelected] = useState<number | null>(null);
@@ -189,44 +197,55 @@ export function ExplorePage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="rounded-full px-4">
-                {SORT_OPTIONS.find((option) => option.value === sort)?.label}
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuRadioGroup
-                value={sort}
-                onValueChange={(value) => handleSort(value as SortOrder)}
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <DropdownMenuRadioItem
-                    key={option.value}
-                    value={option.value}
-                  >
-                    {option.label}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* A search is ordered by relevance — the ranking is what decided
+              these skills match — so the sort control is replaced by a static
+              label instead of claiming an order the results do not follow.
+              Clearing the search brings the choice back, still on whatever the
+              user last picked for the browsed list. */}
+          {query ? (
+            <Button variant="outline" className="rounded-full px-4" disabled>
+              相关度
+            </Button>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="rounded-full px-4">
+                  {SORT_OPTIONS.find((option) => option.value === sort)?.label}
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup
+                  value={sort}
+                  onValueChange={(value) => handleSort(value as SortOrder)}
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <DropdownMenuRadioItem
+                      key={option.value}
+                      value={option.value}
+                    >
+                      {option.label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
-      {/* Skill grid; the modal detail drawer overlays it without reflowing
+      {/* The skill list; the modal detail drawer overlays it without reflowing
           it or moving its scroll position. */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex h-full min-w-0 flex-1 flex-col">
-          {/* Grid. The horizontal padding is sized for the macOS-style
-              overlay scrollbar: a hovered (transformed) card is painted
-              over the thumb, so the cards need reserved space on the right
-              instead of sitting under it. Each padding is offset by a
-              matching negative margin, so content position and card widths
-              are unchanged while the outside-painted ink — the selected
-              ring and the focus outline — stays unclipped; the 4px top
-              pair does the same at the flush top edge. */}
+          {/* Results. The horizontal padding is sized for the macOS-style
+              overlay scrollbar: a hovered (transformed) row is painted over the
+              thumb, so the rows need reserved space on the right instead of
+              sitting under it. Each padding is offset by a matching negative
+              margin, so content position and row widths are unchanged while the
+              outside-painted ink — the selected ring and the focus outline —
+              stays unclipped; the 4px top pair does the same at the flush top
+              edge. */}
           <div className="min-h-0 flex-1 -mx-3 -mt-1 overflow-y-auto px-3 pb-0 pt-1">
             {failure ? (
               <Placeholder message={`加载失败：${failure}`}>
@@ -249,9 +268,9 @@ export function ExplorePage() {
                 message={query ? `未找到匹配“${query}”的 Skill` : "暂无技能"}
               />
             ) : (
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className={LIST_CLASS}>
                 {hits.map((hit, i) => (
-                  <SkillCard
+                  <SkillListRow
                     key={`${hit.skill.repo}/${hit.skill.name}`}
                     skill={hit.skill}
                     matched={hit.matched}
@@ -259,15 +278,15 @@ export function ExplorePage() {
                     onSelect={() => setSelected(i)}
                   />
                 ))}
-              </div>
+              </ul>
             )}
           </div>
 
           {/* Pagination row: previous / numbered pages (with ellipsis) / next
               — the current page number doubles as an editable jump box — with
-              the skill count pinned to the right (shared with the repos
-              page). While the index is streaming in the count climbs, so say
-              so. */}
+              the skill count pinned to the right (shared with the repos page).
+              While the index is streaming in the count climbs, so say so, and a
+              search says what ordered the list. */}
           {(stats.count > 0 || stats.complete) && (
             <ListPager
               page={page}
@@ -275,7 +294,7 @@ export function ExplorePage() {
               onPage={handlePage}
               count={`共 ${total} 个${stats.complete ? "" : " · 加载中"}${
                 stats.indexing ? " · 索引中" : ""
-              }`}
+              }${query ? " · 按相关度" : ""}`}
             />
           )}
         </div>

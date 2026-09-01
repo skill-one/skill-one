@@ -13,7 +13,7 @@ export const REGISTRY_PAGE_QUERY_PREFIX = "registry-page";
 
 /**
  * One paged slice of the registry (browse, search, or a single repo's
- * skills), fetched from the worker. Pages are small (one viewport of cards),
+ * skills), fetched from the worker. Pages are small (one viewport of rows),
  * so the main thread never holds — or re-renders over — the full registry.
  *
  * While the download streams in, the first query answer is computed over the

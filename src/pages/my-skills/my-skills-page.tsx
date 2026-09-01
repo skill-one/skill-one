@@ -87,7 +87,11 @@ function detailSkillFor(skill: InstalledSkill, meta: Map<string, Skill>): Skill 
   );
 }
 
-function SkillCardItem({
+/**
+ * One installed skill, in the same row shape the store list uses: avatar, name
+ * and source, description, then the row's own actions on the right.
+ */
+function InstalledSkillRow({
   skill,
   enabled,
   removing,
@@ -100,7 +104,7 @@ function SkillCardItem({
   skill: InstalledSkill;
   enabled: boolean;
   removing: boolean;
-  /** Whether this card is the one shown in the detail panel. */
+  /** Whether this row is the one shown in the detail panel. */
   selected: boolean;
   description: string;
   onToggle: (enabled: boolean) => void;
@@ -109,26 +113,27 @@ function SkillCardItem({
   onOpen: () => void;
 }) {
   return (
-    <div
-      data-skill={skill.name}
-      role="button"
-      tabIndex={0}
-      aria-label={`查看 ${skill.name} 详情`}
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
-      className={cn(
-        "relative cursor-pointer rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:border-border hover:shadow-[0_6px_20px_-12px_rgba(15,23,42,0.15)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        !enabled && "opacity-60",
-        selected && "border-primary ring-1 ring-primary",
-      )}
-    >
-      {/* Top: avatar + name + source; the right side stays empty for the toggle in the top-right corner. */}
-      <div className="flex items-start gap-3 pr-12">
+    <li>
+      <div
+        data-skill={skill.name}
+        role="button"
+        tabIndex={0}
+        aria-label={`查看 ${skill.name} 详情`}
+        onClick={onOpen}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpen();
+          }
+        }}
+        className={cn(
+          "flex cursor-pointer items-center gap-4 rounded-xl border border-border bg-card px-3.5 py-3 transition-all duration-150",
+          "hover:-translate-y-px hover:border-border hover:bg-accent/40 hover:shadow-[0_8px_24px_-16px_rgba(15,23,42,0.25)]",
+          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          !enabled && "opacity-60",
+          selected && "border-primary ring-1 ring-primary",
+        )}
+      >
         {skill.sourceType !== "local" && skill.source?.includes("/") ? (
           <OwnerAvatar
             owner={skill.source.split("/")[0]}
@@ -142,62 +147,58 @@ function SkillCardItem({
             <Puzzle className="h-5 w-5" />
           </div>
         )}
-        <div className="min-w-0 flex-1 pt-1.5">
-          <h3
-            className={cn(
-              "truncate text-[14px] font-semibold",
-              enabled ? "text-foreground" : "text-muted-foreground",
-            )}
-          >
-            {skill.name}
-          </h3>
-          <p
-            className={cn(
-              "mt-0.5 truncate text-[12px]",
-              enabled ? "text-muted-foreground" : "text-muted-foreground/70",
-            )}
-          >
-            {sourceLabelFor(skill)}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h3
+              className={cn(
+                "truncate text-[14px] font-semibold",
+                enabled ? "text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {skill.name}
+            </h3>
+            <p
+              className={cn(
+                "truncate text-[12px]",
+                enabled ? "text-muted-foreground" : "text-muted-foreground/70",
+              )}
+            >
+              {sourceLabelFor(skill)}
+            </p>
+          </div>
+          {/* Description: the disk-extracted SKILL.md description for local
+              skills; store-sourced ones fall back to the registry description.
+              One line, hidden on narrow windows, so the row keeps its height. */}
+          <p className="mt-0.5 hidden truncate text-[13px] leading-relaxed text-muted-foreground lg:block">
+            {description || "暂无描述"}
           </p>
         </div>
-      </div>
 
-      {/* Top-right corner: enable toggle. Clicks stay local — the card opens
-          the detail panel, this control must not. */}
-      <div
-        className="absolute right-4 top-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Switch
-          checked={enabled}
-          onCheckedChange={onToggle}
-          aria-label={`${enabled ? "关闭" : "开启"} ${skill.name}`}
-        />
-      </div>
-
-      {/* Description: the disk-extracted SKILL.md description for local skills;
-          store-sourced ones fall back to the registry description. */}
-      <p className="mt-3 line-clamp-2 min-h-[2.5em] text-[12px] leading-relaxed text-muted-foreground">
-        {description || "暂无描述"}
-      </p>
-
-      {/* Bottom: remove action, right-aligned; not a card-open click. */}
-      <div
-        className="mt-3 flex items-center justify-end"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-          title="移除"
-          disabled={removing}
-          onClick={onRemove}
+        {/* The row's own actions. Clicks stay here: the row body opens the
+            detail panel, these controls must not. */}
+        <div
+          className="flex shrink-0 items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
         >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+          <Switch
+            checked={enabled}
+            onCheckedChange={onToggle}
+            aria-label={`${enabled ? "关闭" : "开启"} ${skill.name}`}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            title="移除"
+            disabled={removing}
+            onClick={onRemove}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
-    </div>
+    </li>
   );
 }
 
@@ -379,8 +380,8 @@ export function MySkillsPage() {
         </div>
       )}
 
-      {/* Card grid with the pager row pinned to the bottom, mirroring the store
-          page. */}
+      {/* The skill list, in the store's row shape, with the pager row pinned to
+          the bottom. */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-0">
           {isError ? (
@@ -407,13 +408,13 @@ export function MySkillsPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+            <ul className="flex flex-col gap-2">
               {visible.map((skill, i) => {
                 const id = rowId(skill);
                 const index = pageOffset + i;
                 const indexEntry = meta.get(`${skill.source}/${skill.name}`);
                 return (
-                  <SkillCardItem
+                  <InstalledSkillRow
                     key={id}
                     skill={skill}
                     enabled={pendingEnabled[id] ?? skill.enabled}
@@ -434,7 +435,7 @@ export function MySkillsPage() {
                   />
                 );
               })}
-            </div>
+            </ul>
           )}
         </div>
 

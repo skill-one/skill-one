@@ -301,14 +301,12 @@ export function createRegistryController(
       // Fuzzy once the index is up; substring over what has loaded so far
       // while the download is still streaming. The results settle once the
       // index lands (the main thread refetches on `ready`).
+      //
+      // Always in relevance order: `sort` orders the browsed list, and
+      // re-ranking search hits by download count or name would throw away the
+      // ranking (name match > repo > description, install count as tie-break)
+      // that made them hits in the first place.
       const hits: SearchHit[] = search ? search(q) : containsSearch(store, q);
-      if (sort !== "default") {
-        if (sort === "downloads") {
-          hits.sort((a, b) => b.skill.downloads - a.skill.downloads);
-        } else {
-          hits.sort((a, b) => a.skill.name.localeCompare(b.skill.name));
-        }
-      }
       return { hits: hits.slice(start, start + pageSize), total: hits.length };
     }
     const ids = orderFor(sort);
