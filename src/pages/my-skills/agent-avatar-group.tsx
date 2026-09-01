@@ -3,7 +3,7 @@ import { AgentIcon } from "../../components/agent-icon";
 import { AvatarGroup, AvatarGroupCount } from "../../components/ui/avatar";
 
 /** Agents shown inline before the strip collapses the rest into a +N count. */
-export const AVATAR_GROUP_MAX = 4;
+export const AVATAR_GROUP_MAX = 2;
 
 /**
  * The agent link strip: overlapping shadcn avatars (brand icon, Bot fallback,
