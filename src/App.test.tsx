@@ -75,8 +75,8 @@ describe("App routing", () => {
 
     expect(await screen.findByText(/配置技能数据的下载源/)).toBeInTheDocument();
 
-    // Navigate back to My Skills (全局).
-    await user.click(screen.getByRole("link", { name: /全局/ }));
+    // Navigate back to the 我的 skills page.
+    await user.click(screen.getByRole("link", { name: /我的 skills/ }));
 
     expect(await screen.findByText("共 6 个")).toBeInTheDocument();
   });

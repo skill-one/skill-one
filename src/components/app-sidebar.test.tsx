@@ -67,8 +67,7 @@ describe("AppSidebar", () => {
     expect(screen.getByText("精选")).toBeInTheDocument();
     expect(screen.getByText("仓库")).toBeInTheDocument();
     expect(screen.getByText("全部")).toBeInTheDocument();
-    expect(screen.getByText("全局")).toBeInTheDocument();
-    expect(screen.getByText("项目")).toBeInTheDocument();
+    expect(screen.getByText("我的 skills")).toBeInTheDocument();
     expect(screen.getByText("设置")).toBeInTheDocument();
   });
 
@@ -113,7 +112,7 @@ describe("AppSidebar", () => {
   it("marks the active route link", () => {
     renderSidebar("/my-skills");
 
-    const link = screen.getByRole("link", { name: /全局/ });
+    const link = screen.getByRole("link", { name: /我的 skills/ });
     expect(link).toHaveAttribute("data-active", "true");
     expect(link).toHaveAttribute("aria-current", "page");
   });

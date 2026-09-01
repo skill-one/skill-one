@@ -4,8 +4,7 @@ import {
   Sparkles,
   GitFork,
   LayoutGrid,
-  Globe,
-  Folder,
+  Boxes,
 } from "lucide-react";
 
 import {
@@ -52,8 +51,7 @@ export const shopItems: NavItem[] = [
 ];
 
 export const mySkillsItems: NavItem[] = [
-  { path: "/my-skills", label: "全局", icon: Globe },
-  { path: "/my-skills/project", label: "项目", icon: Folder },
+  { path: "/my-skills", label: "我的 skills", icon: Boxes },
 ];
 
 export const footerItems: NavItem[] = [
@@ -153,7 +151,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>我的SKILLS</SidebarGroupLabel>
+          <SidebarGroupLabel>管理</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mySkillsItems.map((item) => (

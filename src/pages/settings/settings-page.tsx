@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Folder, Trash2 } from "lucide-react";
 
 import {
   DEFAULT_CDN_BASE,
@@ -7,6 +7,10 @@ import {
   setCdnBase,
 } from "../../lib/cdn-config";
 import { reloadRegistry } from "../../lib/registry/client";
+import { removeProject } from "../../lib/projects";
+import { useProjects } from "../../hooks/use-projects";
+import { useProjectAdd } from "../../hooks/use-project-add";
+import { AddProjectDialog } from "../../components/add-project-dialog";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { ThemeModeToggle } from "../../components/theme-mode-toggle";
@@ -24,6 +28,8 @@ import { ThemeModeToggle } from "../../components/theme-mode-toggle";
 export function SettingsPage() {
   const [value, setValue] = useState(getCdnBase());
   const [saved, setSaved] = useState(false);
+  const projects = useProjects();
+  const projectAdd = useProjectAdd();
 
   const apply = (next: string) => {
     const previous = getCdnBase();
@@ -55,6 +61,59 @@ export function SettingsPage() {
           <div className="mt-3">
             <ThemeModeToggle />
           </div>
+        </div>
+
+        <div className="rounded-xl border border-border/70 bg-card p-4">
+          <h3 className="text-[13px] font-medium text-foreground">项目</h3>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            管理项目级技能的安装目录。技能会安装到各项目的
+            <span className="mx-1 font-mono">.agents/skills</span>
+            下；在「我的 skills」里可把某个技能移到全局或某个项目。
+          </p>
+
+          <div className="mt-3 flex flex-col gap-2">
+            {projects.length === 0 ? (
+              <p className="text-[12px] text-muted-foreground">
+                还没有添加项目。
+              </p>
+            ) : (
+              projects.map((project) => (
+                <div
+                  key={project.path}
+                  className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2"
+                >
+                  <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium text-foreground">
+                      {project.name}
+                    </p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {project.path}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                    title={`移除 ${project.name}`}
+                    aria-label={`移除项目 ${project.name}`}
+                    onClick={() => removeProject(project.path)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={projectAdd.start}
+          >
+            添加项目…
+          </Button>
         </div>
 
         <div className="rounded-xl border border-border/70 bg-card p-4">
@@ -112,6 +171,11 @@ export function SettingsPage() {
           </Button>
         </div>
       </div>
+
+      <AddProjectDialog
+        open={projectAdd.manualOpen}
+        onOpenChange={projectAdd.setManualOpen}
+      />
     </div>
   );
 }

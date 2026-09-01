@@ -293,3 +293,27 @@ export async function getLinkStatus(
     cwd: options.cwd,
   });
 }
+
+/**
+ * Relocate an installed skill between scopes by moving its directory on disk.
+ *
+ * This is the fallback for a skill that has **no install source** (placed
+ * manually into a skills dir) — there is nothing to reinstall from, so the
+ * directory itself is moved. `fromPath` is the skill's current absolute path (as
+ * reported by `list`); the destination scope is expressed with `toGlobal` /
+ * `toCwd` exactly like the other commands. Resolves to the new absolute path.
+ */
+export async function moveSkillDir(
+  fromPath: string,
+  options: {
+    toGlobal?: boolean;
+    toCwd?: string;
+  } = {},
+): Promise<string> {
+  requireTauri();
+  return invoke<string>("move_skill", {
+    fromPath,
+    toGlobal: options.toGlobal,
+    toCwd: options.toCwd,
+  });
+}
