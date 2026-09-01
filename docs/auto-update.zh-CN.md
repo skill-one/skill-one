@@ -24,8 +24,8 @@ Homebrew cask：
 
 | 文件 | 谁在用 |
 | --- | --- |
-| `skillone_X.Y.Z_aarch64.dmg` | 新用户、Homebrew |
-| `skillone.app.tar.gz` | 已安装用户——更新包本体 |
+| `Skill One_X.Y.Z_aarch64.dmg` | 新用户、Homebrew |
+| `Skill One.app.tar.gz` | 已安装用户——更新包本体 |
 | `latest.json` | 应用内更新器（版本号 + 签名） |
 
 每次发版都不用改配置：应用永远跟随最新一次 Release。
@@ -72,14 +72,14 @@ pnpm tauri build --bundles app
 
 ```sh
 pnpm tauri build --bundles app --config '{"version":"9.9.9"}'          # 「新版本」
-mv src-tauri/target/release/bundle/macos/skillone.app.tar.gz* /tmp/upd/
+mv "src-tauri/target/release/bundle/macos/Skill One.app.tar.gz"* /tmp/upd/
 # 手写 /tmp/upd/latest.json → version "9.9.9"、
-#   url "http://127.0.0.1:8099/skillone.app.tar.gz"、signature = .sig 文件内容
+#   url "http://127.0.0.1:8099/Skill One.app.tar.gz"、signature = .sig 文件内容
 (cd /tmp/upd && python3 -m http.server 8099)
 
 # 「旧版本」：同一份代码，只把更新源改成 localhost
 pnpm tauri build --bundles app --config '{"version":"0.0.1","plugins":{"updater":{"endpoints":["http://127.0.0.1:8099/latest.json"],"dangerousInsecureTransportProtocol":true}}}'
-open src-tauri/target/release/bundle/macos/skillone.app               # 启动时应提示升级到 9.9.9
+open "src-tauri/target/release/bundle/macos/Skill One.app"             # 启动时应提示升级到 9.9.9
 ```
 
 ## 密钥轮换

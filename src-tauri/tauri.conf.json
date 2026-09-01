@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "skillone",
+  "productName": "Skill One",
   "version": "0.2.0",
   "identifier": "com.skillone.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "skillone",
+        "title": "Skill One",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "width": 1080,
@@ -25,7 +25,7 @@
       {
         "label": "popover",
         "url": "popover.html",
-        "title": "SkillOne",
+        "title": "Skill One",
         "width": 320,
         "height": 400,
         "visible": false,

@@ -1,4 +1,4 @@
-# skillone
+# Skill One
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -20,7 +20,7 @@ A desktop app for finding, installing, and managing agent skills. Built on Tauri
 
 Grab the latest `.dmg` from the [Releases](https://github.com/skill-one/skillone/releases) page (currently macOS on Apple Silicon), then:
 
-1. Open the `.dmg` and drag **skillone** into your **Applications** folder.
+1. Open the `.dmg` and drag **Skill One** into your **Applications** folder.
 2. Launch it — see the [macOS first-launch note](#macos-first-launch) for the one-time Gatekeeper step.
 
 From v0.2.0 onwards you never need to download again: new versions arrive through the built-in updater. (Installs of earlier versions have no updater, so they need this one manual reinstall.)
@@ -28,16 +28,16 @@ From v0.2.0 onwards you never need to download again: new versions arrive throug
 ### Homebrew (one command)
 
 ```bash
-brew install --cask skill-one/tap/skillone
+brew install --cask skill-one/tap/skill-one
 ```
 
-Brew users can keep updating with `brew upgrade --cask skillone`; brew downloads carry no quarantine attribute, so Gatekeeper never prompts.
+Brew users can keep updating with `brew upgrade --cask skill-one`; brew downloads carry no quarantine attribute, so Gatekeeper never prompts.
 
 ## Staying up to date
 
 The app checks for updates at startup and offers **Update now** when a newer version exists — it downloads, installs, and relaunches. You can also check manually: **Settings → Software Update → Check for updates**. Update packages are signature-verified before installation; a package with an invalid signature is never installed.
 
-Homebrew users should keep using `brew upgrade --cask skillone`.
+Homebrew users should keep using `brew upgrade --cask skill-one`.
 
 ### macOS first launch
 
@@ -45,7 +45,7 @@ The app is ad-hoc signed, so a manually downloaded `.dmg` may be blocked by Gate
 
 - Right-click (or Control-click) the app → **Open** → **Open** in the dialog;
 - **System Settings → Privacy & Security** → **Open Anyway** next to the blocked-app notice;
-- Run `xattr -d com.apple.quarantine /Applications/skillone.app` in Terminal.
+- Run `xattr -d com.apple.quarantine "/Applications/Skill One.app"` in Terminal.
 
 After that the app opens normally, and later in-app updates never prompt again. Homebrew installs skip this entirely.
 
