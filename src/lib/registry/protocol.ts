@@ -79,7 +79,7 @@ export interface RankingData {
 }
 
 /** Repos-page sort orders (mirrored by the worker's cached aggregation). */
-export type RepoSortOrder = "stars" | "skills" | "downloads" | "name";
+export type RepoSortOrder = "stars" | "skills" | "name";
 
 /** One aggregated source repository, for the repos page. */
 export interface RepoInfo {
@@ -87,8 +87,6 @@ export interface RepoInfo {
   repo: string;
   /** Number of registry skills that live in this repository. */
   skills: number;
-  /** Sum of the repositories' skills' install counts. */
-  downloads: number;
   /** GitHub star count of the repository (identical across its skills). */
   stars: number;
 }

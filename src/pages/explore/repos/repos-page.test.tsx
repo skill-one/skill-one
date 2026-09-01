@@ -116,7 +116,7 @@ describe("ReposPage", () => {
     expect(await screen.findByText("acme/alpha")).toBeInTheDocument();
     expect(screen.getByText("acme/beta")).toBeInTheDocument();
     expect(screen.getByText("git/x")).toBeInTheDocument();
-    // The star count sits in the card header, next to the repo name.
+    // The star count and skill count share the card's metrics line.
     expect(screen.getByLabelText("Star 数 50")).toBeInTheDocument();
     expect(screen.getByLabelText("Star 数 10")).toBeInTheDocument();
     expect(screen.getByLabelText("Star 数 1")).toBeInTheDocument();

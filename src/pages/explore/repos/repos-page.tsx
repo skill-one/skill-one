@@ -32,7 +32,6 @@ const SEARCH_DEBOUNCE_MS = 150;
 const SORT_OPTIONS: Array<{ value: RepoSortOrder; label: string }> = [
   { value: "stars", label: "按 Star 数" },
   { value: "skills", label: "按 Skill 数" },
-  { value: "downloads", label: "按下载量" },
   { value: "name", label: "按名称" },
 ];
 

@@ -503,8 +503,8 @@ describe("createRegistryController — getRanking", () => {
 });
 
 describe("createRegistryController — getRepos", () => {
-  // Four skills across three repos: alpha has 2 skills (80 downloads,
-  // 10 stars), beta 1 skill (100 downloads, 5 stars), git/x 1 skill.
+  // Four skills across three repos: alpha has 2 skills (10 stars),
+  // beta 1 skill (5 stars), git/x 1 skill (1 star).
   const reposSkills: Skill[] = [
     { ...skill(0), name: "a1", repo: "acme/alpha", downloads: 50, stars: 10 },
     { ...skill(1), name: "a2", repo: "acme/alpha", downloads: 30, stars: 10 },
@@ -527,7 +527,7 @@ describe("createRegistryController — getRepos", () => {
     );
   }
 
-  it("aggregates per-repo skill counts, downloads and stars", async () => {
+  it("aggregates per-repo skill counts and stars", async () => {
     const t = await reposSetup(reposSkills);
     const data = requestRepos(t, {
       query: "",
@@ -538,9 +538,9 @@ describe("createRegistryController — getRepos", () => {
     expect(data.total).toBe(3);
     // Star order: most stars first, repo name as the tie-break.
     expect(data.repos).toEqual([
-      { repo: "acme/alpha", skills: 2, downloads: 80, stars: 10 },
-      { repo: "acme/beta", skills: 1, downloads: 100, stars: 5 },
-      { repo: "git/x", skills: 1, downloads: 1, stars: 1 },
+      { repo: "acme/alpha", skills: 2, stars: 10 },
+      { repo: "acme/beta", skills: 1, stars: 5 },
+      { repo: "git/x", skills: 1, stars: 1 },
     ]);
   });
 
@@ -564,7 +564,7 @@ describe("createRegistryController — getRepos", () => {
     ).toBe("acme/beta");
   });
 
-  it("sorts by stars, skills, downloads and name", async () => {
+  it("sorts by stars, skills and name", async () => {
     const t = await reposSetup(reposSkills);
     const names = (sort: RepoSortOrder) =>
       requestRepos(t, { query: "", sort, page: 0, pageSize: 10 }).repos.map(
@@ -572,7 +572,6 @@ describe("createRegistryController — getRepos", () => {
       );
     expect(names("stars")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
     expect(names("skills")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
-    expect(names("downloads")).toEqual(["acme/beta", "acme/alpha", "git/x"]);
     expect(names("name")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
   });
 

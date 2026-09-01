@@ -275,14 +275,12 @@ export function createRegistryController(
       const entry = byRepo.get(skill.repo);
       if (entry) {
         entry.skills++;
-        entry.downloads += skill.downloads;
         // Same repo, same star count; max() simply tolerates bad data.
         entry.stars = Math.max(entry.stars, skill.stars);
       } else {
         byRepo.set(skill.repo, {
           repo: skill.repo,
           skills: 1,
-          downloads: skill.downloads,
           stars: skill.stars,
         });
       }
@@ -307,11 +305,9 @@ export function createRegistryController(
     repos = [...repos].sort((a, b) =>
       sort === "skills"
         ? b.skills - a.skills || byName(a, b)
-        : sort === "downloads"
-          ? b.downloads - a.downloads || byName(a, b)
-          : sort === "name"
-            ? byName(a, b)
-            : b.stars - a.stars || byName(a, b),
+        : sort === "name"
+          ? byName(a, b)
+          : b.stars - a.stars || byName(a, b),
     );
     const start = page * pageSize;
     return { repos: repos.slice(start, start + pageSize), total: repos.length };

@@ -9,7 +9,6 @@ import { RepoCard } from "./repo-card";
 const repo: RepoInfo = {
   repo: "acme/alpha",
   skills: 2,
-  downloads: 80,
   stars: 10,
 };
 
@@ -33,19 +32,18 @@ function renderCard() {
 }
 
 describe("RepoCard", () => {
-  it("renders the repo name, header star count and skill count, but no downloads", () => {
+  it("renders the repo name with its skill count and star count on one line", () => {
     renderCard();
 
     expect(
       screen.getByRole("heading", { name: "acme/alpha" }),
     ).toBeInTheDocument();
-    // The star count sits in the card header, next to the repo name.
-    expect(screen.getByLabelText("Star 数 10")).toBeInTheDocument();
-    expect(screen.getByText("个 Skill")).toBeInTheDocument();
-    // The skill count renders as its own tabular span next to the label.
+    // The skill count and the star count share the same metrics line.
+    const metricsRow = screen.getByText("个 Skill").closest("div");
+    expect(metricsRow).toContainElement(screen.getByLabelText("Star 数 10"));
+    // The counts render as their own tabular spans next to the labels.
     expect(screen.getByText("2")).toBeInTheDocument();
-    // The download count is intentionally not shown on repo cards.
-    expect(screen.queryByText("80")).not.toBeInTheDocument();
+    expect(screen.getByText("10")).toBeInTheDocument();
   });
 
   it("navigates to the repo detail page on click", async () => {

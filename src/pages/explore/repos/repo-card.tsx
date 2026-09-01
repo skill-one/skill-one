@@ -7,9 +7,9 @@ import { OwnerAvatar } from "../../../components/owner-avatar";
 
 /**
  * A single source-repository card on the repos page: the repository avatar
- * and name, how many registry skills it contains, and its aggregate
- * installs/stars. Clicking through opens the repo detail page listing every
- * registry skill of the repository.
+ * and name, with its skill count and star count on one metrics line.
+ * Clicking through opens the repo detail page listing every registry skill
+ * of the repository.
  */
 export function RepoCard({ repo }: { repo: RepoInfo }) {
   const navigate = useNavigate();
@@ -35,20 +35,21 @@ export function RepoCard({ repo }: { repo: RepoInfo }) {
     >
       <div className="flex items-start gap-2.5">
         <OwnerAvatar owner={owner} className="h-9 w-9 text-[15px]" />
-        <div className="min-w-0">
-          <h3 className="truncate text-[15px] font-semibold tracking-tight text-foreground">
-            {repo.repo}
-          </h3>
-          <p className="mt-0.5 flex items-center gap-1 text-[12px] text-muted-foreground">
-            <Package className="h-3.5 w-3.5" />
-            <span className="font-medium tabular-nums">
-              {formatCount(repo.skills)}
-            </span>
-            个 Skill
-          </p>
-        </div>
+        <h3 className="min-w-0 truncate pt-1.5 text-[15px] font-semibold tracking-tight text-foreground">
+          {repo.repo}
+        </h3>
+      </div>
+
+      <div className="mt-3 flex items-center gap-4 text-[12px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <Package className="h-3.5 w-3.5" />
+          <span className="font-medium tabular-nums">
+            {formatCount(repo.skills)}
+          </span>
+          个 Skill
+        </span>
         <span
-          className="ml-auto flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground"
+          className="flex items-center gap-1"
           aria-label={`Star 数 ${repo.stars}`}
         >
           <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
