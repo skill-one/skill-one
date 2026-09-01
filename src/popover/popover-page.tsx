@@ -51,7 +51,7 @@ export function PopoverPage() {
         <span className="flex size-6 items-center justify-center rounded-md bg-muted">
           <Sparkles className="size-3.5 text-muted-foreground" />
         </span>
-        <h1 className="text-sm font-semibold">SkillOne</h1>
+        <h1 className="text-sm font-semibold">Skill One</h1>
         {!isLoading && !isError && (
           <span className="ml-auto text-xs text-muted-foreground">
             {skills.length} 个技能

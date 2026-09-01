@@ -25,8 +25,8 @@ Release, then bumps the Homebrew cask:
 
 | File | Consumed by |
 | --- | --- |
-| `skillone_X.Y.Z_aarch64.dmg` | new users, Homebrew |
-| `skillone.app.tar.gz` | existing installs — the updater payload |
+| `Skill One_X.Y.Z_aarch64.dmg` | new users, Homebrew |
+| `Skill One.app.tar.gz` | existing installs — the updater payload |
 | `latest.json` | the in-app updater (version + signature) |
 
 No per-release config: the app always follows the newest release.
@@ -78,14 +78,14 @@ Serve a manifest from localhost and point a throwaway build at it
 
 ```sh
 pnpm tauri build --bundles app --config '{"version":"9.9.9"}'          # the "new" build
-mv src-tauri/target/release/bundle/macos/skillone.app.tar.gz* /tmp/upd/
+mv "src-tauri/target/release/bundle/macos/Skill One.app.tar.gz"* /tmp/upd/
 # hand-write /tmp/upd/latest.json → version "9.9.9",
-#   url "http://127.0.0.1:8099/skillone.app.tar.gz", signature = contents of the .sig file
+#   url "http://127.0.0.1:8099/Skill One.app.tar.gz", signature = contents of the .sig file
 (cd /tmp/upd && python3 -m http.server 8099)
 
 # the "old" build: same code, endpoint aimed at localhost
 pnpm tauri build --bundles app --config '{"version":"0.0.1","plugins":{"updater":{"endpoints":["http://127.0.0.1:8099/latest.json"],"dangerousInsecureTransportProtocol":true}}}'
-open src-tauri/target/release/bundle/macos/skillone.app               # startup offers the 9.9.9 update
+open "src-tauri/target/release/bundle/macos/Skill One.app"             # startup offers the 9.9.9 update
 ```
 
 ## Key rotation
