@@ -62,7 +62,7 @@ describe("App routing", () => {
   it("redirects the root route to /my-skills", async () => {
     render(<App />);
 
-    // MySkillsPage renders mock skill cards synchronously.
+    // MySkillsPage renders mock skill rows synchronously.
     expect(await screen.findByText("共 6 个")).toBeInTheDocument();
   });
 

@@ -164,7 +164,7 @@ describe("FeaturedPage", () => {
       within(hero).getAllByText(efficiency.skills[0].name).length,
     ).toBeGreaterThanOrEqual(2);
 
-    // Sections follow the curated order with one grid per category.
+    // Sections follow the curated order with one list per category.
     for (const category of FEATURED_CATEGORIES) {
       expect(
         screen.getByRole("region", { name: category.title }),
@@ -198,7 +198,7 @@ describe("FeaturedPage", () => {
     expect(screen.queryByText(writing.title)).not.toBeInTheDocument();
   });
 
-  it("opens the detail panel when a card is clicked", async () => {
+  it("opens the detail panel when a row is clicked", async () => {
     const user = userEvent.setup();
     bootRegistry(curatedIndex());
     renderWithRouter(<FeaturedPage />);

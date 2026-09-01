@@ -172,7 +172,7 @@ const mockAgentRows: Array<{
     display: "Cursor",
     linked: false,
     canonical: false,
-    // Carries skills and non-skill files in its own dir → clicking the card
+    // Carries skills and non-skill files in its own dir → clicking the row
     // opens the decision dialog offering 导入并链接 / 直接链接.
     internalSkills: ["pdf", "docx"],
     internalOthers: ["README.md"],

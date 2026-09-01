@@ -54,9 +54,10 @@ skillone/
 │   │   ├── app-sidebar.tsx # 侧边栏导航（路由 + 标题栏共用）
 │   │   ├── agent-icon.tsx  # agent 品牌图标
 │   │   ├── owner-avatar.tsx# 仓库头像
+│   │   ├── skill-detail/    # 共享的 skill 详情面板与模态抽屉
 │   │   └── placeholder-page.tsx # 未实现页面的占位
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
-│   │   ├── explore/        # 商店探索页（skill-card / skill-detail-panel）
+│   │   ├── explore/        # 商店探索相关页面（skill-list-row / skill-install-button）
 │   │   │   └── featured/   # 精选页（hero 榜单轮播 + 分类区块）
 │   │   ├── my-skills/      # 我的 Skills 页（agent-icon-grid / agent-icon-button / link-confirm-dialog 等）
 │   │   └── settings/       # 设置页

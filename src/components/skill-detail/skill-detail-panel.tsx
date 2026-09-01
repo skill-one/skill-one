@@ -99,7 +99,7 @@ export function SkillDetailPanel({
   const owner = shown?.repo.split("/")[0] ?? "";
   // No repo at all → a skill placed manually into the global directory:
   // nothing to link to, and the stats it cannot have stay hidden (the same
-  // Puzzle placeholder the my-skills card uses).
+  // Puzzle placeholder the my-skills row uses).
   const isLocalSkill = shown != null && !shown.repo;
   const description = detail?.description || shown?.description;
   // Link to the skill's folder in GitHub; without a known path, the repo root.

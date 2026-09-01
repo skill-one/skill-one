@@ -4,7 +4,7 @@ export interface Skill {
   /** Source repository in "owner/repo" form, e.g. "vercel-labs/skills" */
   repo: string;
   /**
-   * Short human-readable description (shown truncated to 2 lines on the card).
+   * Short human-readable description (shown on one truncated line in a row).
    */
   description: string;
   /** GitHub star count of the source repo; 0 when the index entry lacks it. */

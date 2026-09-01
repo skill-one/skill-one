@@ -27,6 +27,7 @@ import type {
   RegistryWorkerMessage,
   RepoSortOrder,
   ReposRequest,
+  SortOrder,
 } from "./protocol";
 import type { Skill } from "../../types/skill";
 
@@ -393,6 +394,50 @@ describe("createRegistryController — getPage", () => {
     ]);
   });
 
+  it("answers a search in relevance order whatever sort is asked for", async () => {
+    const t = setup({
+      skills: [
+        // Equally relevant to "redis"; only the install boost separates them.
+        { ...skill(0), name: "zeta-redis", repo: "acme/zeta", downloads: 100 },
+        { ...skill(1), name: "alpha-redis", repo: "acme/alpha", downloads: 1 },
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    const searchNames = (sort: SortOrder, index: number) => {
+      t.controller.handle({
+        type: "getPage",
+        id: index + 1,
+        payload: { query: "redis", sort, page: 0, pageSize: 5 },
+      });
+      return resultData<{ hits: Array<{ skill: Skill }> }>(
+        t.recorded.results[index],
+      ).hits.map((h) => h.skill.name);
+    };
+
+    // The requested sort changes nothing about a search's order: the ranking is
+    // what made these two match, and the install boost is part of that ranking.
+    expect(searchNames("default", 0)).toEqual([
+      "zeta-redis",
+      "alpha-redis",
+    ]);
+    expect(searchNames("name", 1)).toEqual(["zeta-redis", "alpha-redis"]);
+
+    // The browsed list, by contrast, does honour the sort — and its name order
+    // is the opposite of the search's, which is what this pairing proves.
+    t.controller.handle({
+      type: "getPage",
+      id: 3,
+      payload: { query: "", sort: "name", page: 0, pageSize: 5 },
+    });
+    expect(
+      resultData<{ hits: Array<{ skill: Skill }> }>(
+        t.recorded.results[2],
+      ).hits.map((h) => h.skill.name),
+    ).toEqual(["alpha-redis", "zeta-redis"]);
+  });
+
   it("filters exactly by repo for the repo detail page", async () => {
     const t = setup({
       skills: [
@@ -486,7 +531,7 @@ describe("createRegistryController — featured + lookup", () => {
     // The weekly board exists and ranks alpha above beta by weekly installs.
     const weekly = data.slides.find((s) => s.id === "weekly");
     expect(weekly?.entries.map((e) => e.skill.name)).toEqual(["alpha", "beta"]);
-    // Curated sections number their cards globally for the detail panel.
+    // Curated sections number their rows globally for the detail panel.
     const indexes = data.sections.flatMap((s) => s.skills.map((x) => x.index));
     expect(indexes).toEqual([...indexes].sort((a, b) => a - b));
     expect(indexes[0]).toBe(0);

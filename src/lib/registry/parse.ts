@@ -53,7 +53,7 @@ function toSkill(raw: RawSkill): Skill {
     name: raw.name ?? raw.skillId,
     repo: raw.source,
     // The JSONL index exposes descriptions; fall back to an empty placeholder
-    // when an entry lacks one so the card layout stays stable.
+    // when an entry lacks one so the row layout stays stable.
     description: raw.description ?? "",
     // GitHub stars and install counts are separate metrics; entries missing
     // either (e.g. the old skills.sh snapshot) normalize to 0.

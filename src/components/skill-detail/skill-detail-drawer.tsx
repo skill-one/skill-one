@@ -8,7 +8,7 @@ import { SkillDetailPanel } from "./skill-detail-panel";
  * (dimmed overlay; opening or closing never reflows the grid) with prev/next
  * walking the caller's list.
  *
- * The selection index stays in the caller so its cards can highlight the
+ * The selection index stays in the caller so its rows can highlight the
  * open skill; a stale index (e.g. after a shrinking refetch) resolves to a
  * closed panel.
  */
