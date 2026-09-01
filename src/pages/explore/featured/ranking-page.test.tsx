@@ -40,10 +40,10 @@ const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
  * to appear on the rising board.
  */
 const INDEX: Skill[] = [
-  { name: "alpha", repo: "acme/alpha", description: "Alpha skill.", stars: 900, downloads: 50_000, weeklyInstalls: 3_000 },
-  { name: "beta", repo: "acme/beta", description: "Beta skill.", stars: 800, downloads: 90_000, weeklyInstalls: 1_000 },
-  { name: "gamma", repo: "acme/gamma", description: "Gamma skill.", stars: 700, downloads: 1_000, weeklyInstalls: 50 },
-  { name: "delta", repo: "acme/delta", description: "Delta skill.", stars: 600, downloads: 5_000, weeklyInstalls: 5_000 },
+  { name: "alpha", repo: "acme/alpha", description: "Alpha skill.", stars: 900, downloads: 50_000, weeklyInstalls: 3_000, path: "skills/alpha" },
+  { name: "beta", repo: "acme/beta", description: "Beta skill.", stars: 800, downloads: 90_000, weeklyInstalls: 1_000, path: "skills/beta" },
+  { name: "gamma", repo: "acme/gamma", description: "Gamma skill.", stars: 700, downloads: 1_000, weeklyInstalls: 50, path: "skills/gamma" },
+  { name: "delta", repo: "acme/delta", description: "Delta skill.", stars: 600, downloads: 5_000, weeklyInstalls: 5_000, path: "skills/delta" },
 ];
 
 /** Mount the page as the ranking route would. */

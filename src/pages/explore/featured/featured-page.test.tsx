@@ -68,6 +68,7 @@ function curatedIndex(): Skill[] {
       stars: 100 + si,
       downloads: 10_000 - ci * 10 - si,
       weeklyInstalls: 50 - si,
+      path: `skills/${ref.name}`,
     })),
   );
 }

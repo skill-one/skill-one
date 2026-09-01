@@ -165,6 +165,15 @@ pub struct ListedSkillDto {
     pub enabled: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillMdDto {
+    /// Absolute path of the `SKILL.md` file on disk.
+    pub path: String,
+    /// Raw file content (frontmatter included) — parsed on the frontend.
+    pub content: String,
+}
+
 // ============================ Conversion helpers ============================
 
 #[derive(serde::Deserialize)]
@@ -197,6 +206,21 @@ fn extract_description(skill_dir: &std::path::Path) -> Option<String> {
     let (_, description) = parse_skill_md(&skill_dir.join("SKILL.md"))?;
     let folded = description.split_whitespace().collect::<Vec<_>>().join(" ");
     (!folded.is_empty()).then_some(folded)
+}
+
+/// Read an installed skill's `SKILL.md` from its directory on disk.
+///
+/// The frontend parses the content (the same frontmatter parser the store
+/// detail view uses), so this stays a thin file read: resolve `SKILL.md`
+/// inside the given skill dir and return the file path with its raw text.
+fn read_skill_md_file(skill_dir: &std::path::Path) -> Result<SkillMdDto, String> {
+    let file = skill_dir.join("SKILL.md");
+    let content =
+        std::fs::read_to_string(&file).map_err(|e| format!("read {}: {e}", file.display()))?;
+    Ok(SkillMdDto {
+        path: file.display().to_string(),
+        content,
+    })
 }
 
 /// Map a library link outcome to the flat DTO the frontend consumes. Every
@@ -312,6 +336,21 @@ mod tests {
     fn tolerates_bom_and_missing_description() {
         let dir = skill_dir_with("\u{feff}---\nname: x\n---\n正文");
         assert_eq!(extract_description(dir.path()), None);
+    }
+
+    #[test]
+    fn read_skill_md_file_returns_path_and_raw_content() {
+        let dir = skill_dir_with("---\nname: pdf\ndescription: d\n---\nbody");
+        let dto = read_skill_md_file(dir.path()).expect("read");
+        assert!(dto.path.ends_with("SKILL.md"));
+        assert!(dto.content.starts_with("---\n"));
+        assert!(dto.content.ends_with("body"));
+    }
+
+    #[test]
+    fn read_skill_md_file_errors_when_missing() {
+        let dir = tempdir().expect("tempdir");
+        assert!(read_skill_md_file(dir.path()).is_err());
     }
 
     #[test]
@@ -556,6 +595,28 @@ pub async fn link_status() -> Result<Vec<AgentStatusDto>, String> {
                 }),
             })
             .collect())
+    })
+    .await
+}
+
+/// Read the raw `SKILL.md` of a locally installed skill (enabled or disabled).
+///
+/// Powers the detail view for skills without a registry source. The name is
+/// resolved through the same `list` the UI shows — so no path traversal is
+/// possible and skills parked by disable stay readable.
+#[tauri::command]
+pub async fn read_skill_md(name: String) -> Result<SkillMdDto, String> {
+    run_blocking("read skill md", move |manager| {
+        let req = ListRequest {
+            global: true,
+            agents: vec![],
+        };
+        let listed = manager.list(&req).map_err(|e| e.to_string())?;
+        let skill = listed
+            .into_iter()
+            .find(|s| s.name == name)
+            .ok_or_else(|| format!("skill {name} is not installed"))?;
+        read_skill_md_file(&skill.path)
     })
     .await
 }

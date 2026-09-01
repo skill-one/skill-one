@@ -1,21 +1,22 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, ExternalLink, Loader2, Star } from "lucide-react";
+import { Download, ExternalLink, Loader2, Puzzle, Star } from "lucide-react";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { fetchLocalSkillDetail } from "../../lib/local-skills";
 import { openExternal } from "../../lib/open-external";
 import { formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import {
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
   DrawerTitle,
-} from "../../components/ui/drawer";
-import { Markdown } from "../../components/markdown";
-import { OwnerAvatar } from "../../components/owner-avatar";
+} from "../ui/drawer";
+import { Markdown } from "../markdown";
+import { OwnerAvatar } from "../owner-avatar";
 
 interface SkillDetailPanelProps {
   /** The skill to show; null renders nothing. */
@@ -28,10 +29,14 @@ interface SkillDetailPanelProps {
  * Detail drawer for one skill, shown as a standard shadcn Drawer sliding
  * in from the right edge of the window. The grid itself never reflows —
  * opening or closing the drawer leaves its layout and scroll position
- * untouched. The drawer is modal (dimmed overlay, focus trap, scroll
- * lock); Escape, clicking the overlay, or dragging the drawer sideways
- * closes it, and ←/→ switch skills. Each skill's SKILL.md is fetched
- * through TanStack Query and cached independently, so revisits are instant.
+ * untouched. The drawer is modal (dimmed overlay, focus trap, scroll lock); Escape,
+ * clicking the overlay, or dragging the drawer sideways closes it, and ←/→
+ * switch skills. Each skill's SKILL.md is fetched through TanStack Query and
+ * cached independently, so revisits are instant. The source is picked per
+ * skill: a registry-known `path` reads from the GitHub repo (store pages),
+ * while an installed skill without one — local skills included — is read from
+ * the local skills directory instead, so the view always shows the copy the
+ * user actually installed.
  */
 export function SkillDetailPanel({
   skill,
@@ -47,6 +52,11 @@ export function SkillDetailPanel({
   }, [skill]);
   const shown = skill ?? lastSkill;
 
+  // Remote when the registry knows the skill's repo directory, local disk
+  // otherwise (local installs, or store installs whose index entry is gone
+  // or not loaded yet). The source is part of the key so both variants of
+  // the same repo/name never share a cache entry.
+  const fromDisk = shown != null && shown.path == null;
   const {
     data: detail,
     isPending,
@@ -54,8 +64,16 @@ export function SkillDetailPanel({
     error,
     refetch,
   } = useQuery({
-    queryKey: ["skill-detail", shown?.repo, shown?.name],
-    queryFn: () => fetchSkillDetail(shown!.repo, shown!.name, shown!.path),
+    queryKey: [
+      "skill-detail",
+      fromDisk ? "local" : "remote",
+      shown?.repo,
+      shown?.name,
+    ],
+    queryFn: () =>
+      fromDisk
+        ? fetchLocalSkillDetail(shown!.name)
+        : fetchSkillDetail(shown!.repo, shown!.name, shown!.path),
     enabled: shown != null,
   });
 
@@ -75,6 +93,10 @@ export function SkillDetailPanel({
   // animation. With no skill (and no latch yet) the drawer is empty, which
   // only happens before the first selection.
   const owner = shown?.repo.split("/")[0] ?? "";
+  // No repo at all → a skill placed manually into the global directory:
+  // nothing to link to, and the stats it cannot have stay hidden (the same
+  // Puzzle placeholder the my-skills card uses).
+  const isLocalSkill = shown != null && !shown.repo;
   const description = detail?.description || shown?.description;
   // Link to the skill's folder in GitHub; without a known path, the repo root.
   const sourcePath = shown?.path?.replace(/^\/+|\/+$/g, "");
@@ -90,22 +112,35 @@ export function SkillDetailPanel({
   return (
     <DrawerContent>
       <DrawerHeader>
-        <OwnerAvatar owner={owner} className="h-11 w-11 text-[18px]" />
-        <DrawerTitle className="truncate">{shown?.name}</DrawerTitle>
-        <DrawerDescription asChild>
-          <a
-            href={sourceHref}
-            onClick={(e) => {
-              e.preventDefault();
-              void openExternal(sourceHref);
-            }}
-            title="在 GitHub 中打开该技能的目录"
-            className="min-w-0 items-center gap-1"
+        {isLocalSkill ? (
+          <div
+            aria-label="skill 头像"
+            className="flex h-11 w-11 items-center justify-center self-start rounded-lg border border-border/60 bg-muted text-muted-foreground"
           >
-            <span className="truncate">{shown?.repo}</span>
-            <ExternalLink className="h-3 w-3 shrink-0" />
-          </a>
-        </DrawerDescription>
+            <Puzzle className="h-5 w-5" />
+          </div>
+        ) : (
+          <OwnerAvatar owner={owner} className="h-11 w-11 text-[18px]" />
+        )}
+        <DrawerTitle className="truncate">{shown?.name}</DrawerTitle>
+        {isLocalSkill ? (
+          <DrawerDescription>本地安装</DrawerDescription>
+        ) : (
+          <DrawerDescription asChild>
+            <a
+              href={sourceHref}
+              onClick={(e) => {
+                e.preventDefault();
+                void openExternal(sourceHref);
+              }}
+              title="在 GitHub 中打开该技能的目录"
+              className="min-w-0 items-center gap-1"
+            >
+              <span className="truncate">{shown?.repo}</span>
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </a>
+          </DrawerDescription>
+        )}
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           {detail?.version && (
             <Badge variant="secondary">v{detail.version}</Badge>
@@ -114,18 +149,22 @@ export function SkillDetailPanel({
             <Badge variant="secondary">{detail.license}</Badge>
           )}
           {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
-          <span className="ml-0.5 flex items-center gap-1 text-[12px] text-muted-foreground">
-            <Download className="h-3.5 w-3.5" />
-            <span className="font-medium tabular-nums">
-              {formatCount(shown?.downloads ?? 0)}
-            </span>
-          </span>
-          <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
-            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-            <span className="font-medium tabular-nums">
-              {formatCount(shown?.stars ?? 0)}
-            </span>
-          </span>
+          {!isLocalSkill && (
+            <>
+              <span className="ml-0.5 flex items-center gap-1 text-[12px] text-muted-foreground">
+                <Download className="h-3.5 w-3.5" />
+                <span className="font-medium tabular-nums">
+                  {formatCount(shown?.downloads ?? 0)}
+                </span>
+              </span>
+              <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                <span className="font-medium tabular-nums">
+                  {formatCount(shown?.stars ?? 0)}
+                </span>
+              </span>
+            </>
+          )}
         </div>
       </DrawerHeader>
 
@@ -140,7 +179,7 @@ export function SkillDetailPanel({
               加载失败：
               {error instanceof Error ? error.message : "未知错误"}
               <br />
-              该仓库可能没有可访问的 SKILL.md。
+              该技能目录下可能没有可访问的 SKILL.md。
             </p>
             <Button
               variant="outline"
@@ -159,20 +198,26 @@ export function SkillDetailPanel({
               </p>
             )}
             <div>
-              <a
-                href={`https://github.com/${shown?.repo}/blob/HEAD/${filePath}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  void openExternal(
-                    `https://github.com/${shown?.repo}/blob/HEAD/${filePath}`,
-                  );
-                }}
-                title="在 GitHub 中打开 SKILL.md"
-                className="mb-2 flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground"
-              >
-                <span className="truncate">{detail.path}</span>
-                <ExternalLink className="h-3 w-3 shrink-0" />
-              </a>
+              {isLocalSkill ? (
+                <p className="mb-2 truncate font-mono text-[11px] text-muted-foreground/70">
+                  {detail.path}
+                </p>
+              ) : (
+                <a
+                  href={`https://github.com/${shown?.repo}/blob/HEAD/${filePath}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void openExternal(
+                      `https://github.com/${shown?.repo}/blob/HEAD/${filePath}`,
+                    );
+                  }}
+                  title="在 GitHub 中打开 SKILL.md"
+                  className="mb-2 flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground"
+                >
+                  <span className="truncate">{detail.path}</span>
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                </a>
+              )}
               {detail.instructions ? (
                 <Markdown repo={shown?.repo ?? ""} filePath={filePath}>
                   {detail.instructions}

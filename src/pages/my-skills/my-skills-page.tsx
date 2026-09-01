@@ -20,6 +20,8 @@ import { useRegistrySkillMeta } from "../../hooks/use-registry-skill-meta";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import type { SkillRef } from "../../lib/registry/protocol";
 import type { InstalledSkill } from "../../lib/skills-manager";
+import type { Skill } from "../../types/skill";
+import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { Button } from "../../components/ui/button";
@@ -62,27 +64,67 @@ function sourceLabelFor(skill: InstalledSkill): string {
   return skill.source || skill.sourceType || "本地";
 }
 
+/**
+ * The `Skill` shape the shared detail panel consumes. With a registry entry
+ * the skill keeps its repo path, so the panel fetches SKILL.md from GitHub;
+ * without one it is synthesized from the installed record — `path` stays
+ * undefined, which makes the panel read the SKILL.md from the local skills
+ * directory instead (the source repo, when known, is still only used for
+ * display and links).
+ */
+function detailSkillFor(skill: InstalledSkill, meta: Map<string, Skill>): Skill {
+  const entry = skill.source
+    ? meta.get(`${skill.source}/${skill.name}`)
+    : undefined;
+  return (
+    entry ?? {
+      name: skill.name,
+      repo: skill.source ?? "",
+      description: skill.description ?? "",
+      stars: 0,
+      downloads: 0,
+    }
+  );
+}
+
 function SkillCardItem({
   skill,
   enabled,
   removing,
+  selected,
   description,
   onToggle,
   onRemove,
+  onOpen,
 }: {
   skill: InstalledSkill;
   enabled: boolean;
   removing: boolean;
+  /** Whether this card is the one shown in the detail panel. */
+  selected: boolean;
   description: string;
   onToggle: (enabled: boolean) => void;
   onRemove: () => void;
+  /** Opens the shared skill detail panel. */
+  onOpen: () => void;
 }) {
   return (
     <div
       data-skill={skill.name}
+      role="button"
+      tabIndex={0}
+      aria-label={`查看 ${skill.name} 详情`}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
       className={cn(
-        "relative rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:border-border hover:shadow-[0_6px_20px_-12px_rgba(15,23,42,0.15)]",
+        "relative cursor-pointer rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:border-border hover:shadow-[0_6px_20px_-12px_rgba(15,23,42,0.15)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         !enabled && "opacity-60",
+        selected && "border-primary ring-1 ring-primary",
       )}
     >
       {/* Top: avatar + name + source; the right side stays empty for the toggle in the top-right corner. */}
@@ -120,8 +162,12 @@ function SkillCardItem({
         </div>
       </div>
 
-      {/* Top-right corner: enable toggle */}
-      <div className="absolute right-4 top-4">
+      {/* Top-right corner: enable toggle. Clicks stay local — the card opens
+          the detail panel, this control must not. */}
+      <div
+        className="absolute right-4 top-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         <Switch
           checked={enabled}
           onCheckedChange={onToggle}
@@ -135,8 +181,11 @@ function SkillCardItem({
         {description || "暂无描述"}
       </p>
 
-      {/* Bottom: remove action, right-aligned. */}
-      <div className="mt-3 flex items-center justify-end">
+      {/* Bottom: remove action, right-aligned; not a card-open click. */}
+      <div
+        className="mt-3 flex items-center justify-end"
+        onClick={(e) => e.stopPropagation()}
+      >
         <Button
           variant="ghost"
           size="icon"
@@ -219,6 +268,11 @@ export function MySkillsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<EnabledFilter>("all");
+  // Open skill in the shared detail drawer: an index into `filtered` (the
+  // whole result set, across pages), null keeps the drawer closed. Toolbar
+  // changes rebuild `filtered`, so they close the drawer to avoid walking a
+  // shifted or vanished selection.
+  const [selected, setSelected] = useState<number | null>(null);
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS)
     .trim()
     .toLowerCase();
@@ -227,10 +281,12 @@ export function MySkillsPage() {
   const handleSearch = (q: string) => {
     setPage(1);
     setSearch(q);
+    setSelected(null);
   };
   const handleFilter = (next: EnabledFilter) => {
     setPage(1);
     setFilter(next);
+    setSelected(null);
   };
 
   // Deep link from the menu bar popover: `/my-skills?skill=<name>` pre-fills
@@ -242,6 +298,7 @@ export function MySkillsPage() {
     if (!target) return;
     setPage(1);
     setSearch(target);
+    setSelected(null);
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -271,6 +328,14 @@ export function MySkillsPage() {
   }, [page, totalPages]);
 
   const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageOffset = (page - 1) * PAGE_SIZE;
+
+  // The drawer walks the whole filtered result set, not just the current
+  // page, so ←/→ keeps going across page boundaries.
+  const detailSkills = useMemo(
+    () => filtered.map((skill) => detailSkillFor(skill, meta)),
+    [filtered, meta],
+  );
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
@@ -343,14 +408,16 @@ export function MySkillsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-              {visible.map((skill) => {
+              {visible.map((skill, i) => {
                 const id = rowId(skill);
+                const index = pageOffset + i;
                 const indexEntry = meta.get(`${skill.source}/${skill.name}`);
                 return (
                   <SkillCardItem
                     key={id}
                     skill={skill}
                     enabled={pendingEnabled[id] ?? skill.enabled}
+                    selected={selected === index}
                     description={
                       skill.description ?? indexEntry?.description ?? ""
                     }
@@ -363,6 +430,7 @@ export function MySkillsPage() {
                       toggleMutation.mutate({ skill, enabled })
                     }
                     onRemove={() => removeMutation.mutate(skill)}
+                    onOpen={() => setSelected(index)}
                   />
                 );
               })}
@@ -379,6 +447,14 @@ export function MySkillsPage() {
           />
         )}
       </div>
+
+      {/* Same right-side detail drawer the store pages use; ←/→ walks the
+          whole filtered result set, across page boundaries. */}
+      <SkillDetailDrawer
+        skills={detailSkills}
+        selected={selected}
+        onSelect={setSelected}
+      />
     </div>
   );
 }

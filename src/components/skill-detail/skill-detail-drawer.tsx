@@ -1,11 +1,12 @@
 import type { Skill } from "../../types/skill";
-import { Drawer } from "../../components/ui/drawer";
+import { Drawer } from "../ui/drawer";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
 /**
- * The skill detail drawer shared by the explore and featured pages: a modal
- * right-side Drawer (dimmed overlay; opening or closing never reflows the
- * grid) with prev/next walking the caller's list.
+ * The skill detail drawer shared by the store pages (explore, featured,
+ * ranking, repo detail) and the my-skills page: a modal right-side Drawer
+ * (dimmed overlay; opening or closing never reflows the grid) with prev/next
+ * walking the caller's list.
  *
  * The selection index stays in the caller so its cards can highlight the
  * open skill; a stale index (e.g. after a shrinking refetch) resolves to a

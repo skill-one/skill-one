@@ -24,6 +24,7 @@ pub fn run() {
             skills::enable_skills,
             skills::link_agents,
             skills::link_status,
+            skills::read_skill_md,
         ])
         .setup(|app| {
             tray::create_tray(app.handle())?;

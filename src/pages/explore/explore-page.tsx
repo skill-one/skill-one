@@ -18,7 +18,7 @@ import {
 import { Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { SkillCard } from "./skill-card";
-import { SkillDetailDrawer } from "./skill-detail-drawer";
+import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { ListPager } from "../../components/list-pager";
 
 /** Number of skills shown per page in the paginated registry view. */
