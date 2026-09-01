@@ -111,7 +111,7 @@ export function ReposPage() {
   };
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
+    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
       {/* Toolbar: search on the left; sort on the right. */}
       <div className="mb-4 flex items-center gap-3">
         <div className="relative w-full max-w-sm">
@@ -160,7 +160,7 @@ export function ReposPage() {
               unchanged) reserves room beside the cards for the overlay
               scrollbar instead of letting it overlap them, and keeps the
               outside-painted ink unclipped. */}
-          <div className="min-h-0 flex-1 -mx-3 -mt-1 overflow-y-auto px-3 pb-6 pt-1">
+          <div className="min-h-0 flex-1 -mx-3 -mt-1 overflow-y-auto px-3 pb-0 pt-1">
             {failure ? (
               <Placeholder message={`加载失败：${failure}`}>
                 <Button

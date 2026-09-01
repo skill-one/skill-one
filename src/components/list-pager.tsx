@@ -61,7 +61,7 @@ export function ListPager({
   const range = pageRange(page, totalPages);
 
   return (
-    <div className="relative flex items-center justify-center border-t border-border py-2">
+    <div className="relative flex min-h-14 items-center justify-center border-t border-border px-4 py-3">
       <Pagination className="w-auto">
         <PaginationContent>
           <PaginationItem>
@@ -159,7 +159,7 @@ export function ListPager({
           </PaginationItem>
         </PaginationContent>
       </Pagination>
-      <span className="absolute right-0 whitespace-nowrap text-sm text-muted-foreground tabular-nums">
+      <span className="absolute right-4 whitespace-nowrap text-sm text-muted-foreground tabular-nums">
         {count}
       </span>
     </div>
