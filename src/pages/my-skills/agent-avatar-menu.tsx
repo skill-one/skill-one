@@ -70,9 +70,11 @@ export function AgentAvatarMenu() {
     staleTime: 0,
   });
 
+  // Fire-and-forget: a refresh is a background refetch, and a failure here is
+  // already surfaced by each useQuery's own error state.
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["agent-status"] });
-    queryClient.invalidateQueries({ queryKey: INSTALLED_SKILLS_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: ["agent-status"] });
+    void queryClient.invalidateQueries({ queryKey: INSTALLED_SKILLS_QUERY_KEY });
   };
 
   /** Build the confirm target for an unlinked agent, or `null` when its dir is empty. */

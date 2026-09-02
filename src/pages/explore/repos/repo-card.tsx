@@ -22,7 +22,7 @@ export function RepoCard({ repo }: { repo: RepoInfo }) {
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          navigate(target);
+          void navigate(target);
         }
       }}
       role="button"

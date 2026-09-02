@@ -229,9 +229,9 @@ export function MySkillsPage() {
 
   const removeMutation = useMutation({
     mutationFn: (skill: InstalledSkill) => removeInstalledSkill(skill.name),
-    onSuccess: () => {
+    onSuccess: async () => {
       setActionError(null);
-      invalidate();
+      await invalidate();
     },
     onError: (e) => setActionError(errorMessage(e, "移除失败")),
   });
@@ -254,7 +254,9 @@ export function MySkillsPage() {
     onError: (e) => {
       setPendingEnabled({});
       setActionError(errorMessage(e, "切换失败"));
-      invalidate();
+      // Best-effort refresh: the error is already shown, so keep the promise
+      // from turning into an unhandled rejection.
+      void invalidate();
     },
   });
 

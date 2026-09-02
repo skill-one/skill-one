@@ -44,6 +44,12 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # Type-aware rules (no-floating-promises, await-thenable, unbound-method,
+      # ...) need a type graph, so they run as a separate step: `pnpm lint`
+      # above stays instant, and this one only pays for the program build.
+      - name: Lint (type-aware)
+        run: pnpm exec oxlint --type-aware
+
       - name: Test
         run: pnpm test:run
 
