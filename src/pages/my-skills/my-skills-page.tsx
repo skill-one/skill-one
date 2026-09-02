@@ -32,16 +32,12 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
-import { Input } from "../../components/ui/input";
 import { ListPager } from "../../components/list-pager";
 import { Switch } from "../../components/ui/switch";
 import { cn, errorMessage } from "../../lib/utils";
-
-/** Skills shown per page; same rhythm as the store's full list. */
-const PAGE_SIZE = 24;
-
-/** Keystrokes settle this long before the local list is filtered. */
-const SEARCH_DEBOUNCE_MS = 150;
+import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
+import { useClampedPage } from "../../hooks/use-clamped-page";
+import { SearchInput } from "../../components/search-input";
 
 /** Enablement filter offered by the toolbar dropdown. */
 type EnabledFilter = "all" | "enabled" | "disabled";
@@ -322,11 +318,7 @@ export function MySkillsPage() {
   );
 
   const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  const totalPages = useClampedPage(page, total, PAGE_SIZE, setPage);
 
   const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const pageOffset = (page - 1) * PAGE_SIZE;
@@ -343,16 +335,7 @@ export function MySkillsPage() {
       {/* Toolbar, styled like the store's full list: search first, controls
           clustered on the right. */}
       <div className="mb-4 flex items-center gap-3">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="搜索 Skill..."
-            aria-label="搜索 Skill"
-            className="h-9 rounded-full pl-9"
-          />
-        </div>
+        <SearchInput value={search} onChange={handleSearch} label="搜索 Skill" />
 
         <div className="ml-auto flex items-center gap-2">
           <AgentAvatarMenu />

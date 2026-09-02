@@ -5,8 +5,16 @@
  * of buttons. When there are few pages (≤ SHOW_ALL_THRESHOLD) every page number
  * is shown directly.
  *
- * Used by the shared ListPager component.
+ * Used by the shared ListPager component, and the home of the defaults every
+ * paginated list page shares.
  */
+
+/** Rows per page across the store's lists — one rhythm on every surface. */
+export const PAGE_SIZE = 24;
+
+/** Keystrokes settle this long before a search takes effect (worker query or
+ * local filter). */
+export const SEARCH_DEBOUNCE_MS = 150;
 
 /** Pages at or below this count render every page number directly. */
 const SHOW_ALL_THRESHOLD = 9;

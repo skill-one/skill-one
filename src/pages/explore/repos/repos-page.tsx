@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
-import { ChevronDown, Search } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { useRegistryRepos } from "../../../hooks/use-registry-repos";
 import { useDebouncedValue } from "../../../hooks/use-debounced-value";
 import { useRegistryStats } from "../../../hooks/use-registry-stats";
+import { useClampedPage } from "../../../hooks/use-clamped-page";
+import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../../lib/pagination";
 import type { RepoSortOrder } from "../../../lib/registry/protocol";
 import { Button } from "../../../components/ui/button";
 import {
@@ -13,17 +15,11 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "../../../components/ui/dropdown-menu";
-import { Input } from "../../../components/ui/input";
 import { SkeletonList } from "../../../components/skeleton-list";
 import { Placeholder } from "../../../components/placeholder";
 import { ListPager } from "../../../components/list-pager";
+import { SearchInput } from "../../../components/search-input";
 import { RepoCard } from "./repo-card";
-
-/** Number of repos shown per page in the paginated view. */
-const PAGE_SIZE = 24;
-
-/** Keystrokes settle this long before a search query reaches the worker. */
-const SEARCH_DEBOUNCE_MS = 150;
 
 /**
  * The sort orders offered by the toolbar dropdown. "stars" (the default)
@@ -79,12 +75,8 @@ export function ReposPage() {
 
   const repos = data?.repos ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
   // A background refetch can shrink the list below the current page.
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  const totalPages = useClampedPage(page, total, PAGE_SIZE, setPage);
 
   // The gated query reports the download failure only once there is nothing
   // to show; a mid-session source switch keeps serving the old dataset.
@@ -111,16 +103,7 @@ export function ReposPage() {
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
       {/* Toolbar: search on the left; sort on the right. */}
       <div className="mb-4 flex items-center gap-3">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="搜索仓库..."
-            aria-label="搜索仓库"
-            className="h-9 rounded-full pl-9"
-          />
-        </div>
+        <SearchInput value={search} onChange={handleSearch} label="搜索仓库" />
 
         <div className="ml-auto flex items-center gap-2">
           <DropdownMenu>

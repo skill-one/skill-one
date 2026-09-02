@@ -13,9 +13,8 @@ import { Placeholder } from "../../../components/placeholder";
 import { ListPager } from "../../../components/list-pager";
 import { SkillListRow } from "../skill-list-row";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
-
-/** Number of skills shown per page on the repo detail page. */
-const PAGE_SIZE = 24;
+import { PAGE_SIZE } from "../../../lib/pagination";
+import { useClampedPage } from "../../../hooks/use-clamped-page";
 
 /** Where the back button points; the repos list lives one level up. */
 const REPOS_PATH = "/explore/repos";
@@ -86,12 +85,8 @@ export function RepoDetailPage() {
     isLoading || (hits.length === 0 && stats.count === 0 && !failure);
 
   const total = pageData?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
   // A background refetch can shrink the list below the current page.
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  const totalPages = useClampedPage(page, total, PAGE_SIZE, setPage);
 
   // Switching repos replaces the whole list, so any open drawer would point
   // at a skill that is no longer on screen (e.g. the popover navigating).
