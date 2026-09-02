@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { Skeleton } from "../../../components/ui/skeleton";
+import { SkeletonList } from "../../../components/skeleton-list";
 import { useFeaturedData } from "../../../hooks/use-featured-data";
 import { Button } from "../../../components/ui/button";
 import type { Skill } from "../../../types/skill";
@@ -8,6 +9,7 @@ import { Placeholder } from "../../../components/placeholder";
 import { SkillListRow } from "../skill-list-row";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 import { FeaturedHero } from "./featured-hero";
+import { errorMessage } from "../../../lib/utils";
 
 /** Rows per curated section in the loading placeholder. */
 const SKELETON_ROWS = 6;
@@ -20,11 +22,11 @@ function FeaturedSkeleton() {
       {[0, 1].map((section) => (
         <div key={section}>
           <Skeleton className="mb-4 h-7 w-24" />
-          <div className="flex flex-col gap-2">
-            {Array.from({ length: SKELETON_ROWS }, (_, i) => (
-              <Skeleton key={i} className="h-16 rounded-xl" />
-            ))}
-          </div>
+          <SkeletonList
+            rows={SKELETON_ROWS}
+            listClassName="flex flex-col gap-2"
+            itemClassName="h-16 rounded-xl"
+          />
         </div>
       ))}
     </div>
@@ -70,7 +72,7 @@ export function FeaturedPage() {
       <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-6">
         {isError ? (
           <Placeholder
-            message={`加载失败：${error instanceof Error ? error.message : "未知错误"}`}
+            message={`加载失败：${errorMessage(error)}`}
           >
             <Button
               variant="outline"

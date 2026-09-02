@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
-import { Skeleton } from "../../components/ui/skeleton";
+import { SkeletonList } from "../../components/skeleton-list";
 import { SkillListRow } from "./skill-list-row";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { ListPager } from "../../components/list-pager";
@@ -57,11 +57,11 @@ const LIST_CLASS = "flex flex-col gap-2";
  */
 function ExploreSkeleton() {
   return (
-    <div className={LIST_CLASS} aria-hidden>
-      {Array.from({ length: 12 }, (_, i) => (
-        <Skeleton key={i} className="h-16 rounded-xl" />
-      ))}
-    </div>
+    <SkeletonList
+      rows={12}
+      listClassName={LIST_CLASS}
+      itemClassName="h-16 rounded-xl"
+    />
   );
 }
 

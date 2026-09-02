@@ -4,7 +4,7 @@ import { ArrowLeft, Star } from "lucide-react";
 
 import { OwnerAvatar } from "../../../components/owner-avatar";
 import { Button } from "../../../components/ui/button";
-import { Skeleton } from "../../../components/ui/skeleton";
+import { SkeletonList } from "../../../components/skeleton-list";
 import { useRegistryPage } from "../../../hooks/use-registry-page";
 import { useRegistryStats } from "../../../hooks/use-registry-stats";
 import { formatCount } from "../../../lib/utils";
@@ -27,11 +27,11 @@ const REPOS_PATH = "/explore/repos";
  */
 function RepoDetailSkeleton() {
   return (
-    <div className="flex flex-col gap-2" aria-hidden>
-      {Array.from({ length: 9 }, (_, i) => (
-        <Skeleton key={i} className="h-16 rounded-xl" />
-      ))}
-    </div>
+    <SkeletonList
+      rows={9}
+      listClassName="flex flex-col gap-2"
+      itemClassName="h-16 rounded-xl"
+    />
   );
 }
 

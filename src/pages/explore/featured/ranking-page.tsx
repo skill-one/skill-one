@@ -7,7 +7,7 @@ import { Button } from "../../../components/ui/button";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { useRanking } from "../../../hooks/use-ranking";
 import { RANKINGS, rankingById, type RankEntry } from "../../../lib/registry/featured-rankings";
-import { cn } from "../../../lib/utils";
+import { cn, errorMessage } from "../../../lib/utils";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../../../components/placeholder";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
@@ -235,7 +235,7 @@ export function RankingPage() {
       <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-6">
         {isError ? (
           <Placeholder
-            message={`加载失败：${error instanceof Error ? error.message : "未知错误"}`}
+            message={`加载失败：${errorMessage(error)}`}
           >
             <Button
               variant="outline"

@@ -1,9 +1,9 @@
 import type { AgentStatus } from "../../lib/skills-manager";
 
 /**
- * The three link states an agent can present in the icon layers (the expanded
- * icon buttons and the collapsed avatar group). One derivation shared by both
- * views keeps their visuals telling the same story.
+ * The three link states an agent can present, derived once for the menu rows
+ * that carry every action. The collapsed avatar strip is deliberately not a
+ * consumer: it shows no state, leaving the menu it opens to report it.
  */
 export type AgentLinkState = "linked" | "warning" | "unlinked";
 
@@ -27,7 +27,7 @@ export function agentStateLabel(agent: AgentStatus): string {
   return agentLinkState(agent) === "linked" ? "已链接" : "未链接";
 }
 
-/** Status dot color used in tooltips (expanded grid and collapsed preview). */
+/** Status dot color used in the menu rows' tooltips. */
 export const agentStateDotClass: Record<AgentLinkState, string> = {
   linked: "bg-emerald-500",
   warning: "bg-amber-500",

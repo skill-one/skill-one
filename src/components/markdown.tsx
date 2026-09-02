@@ -2,6 +2,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { openExternal } from "../lib/open-external";
+import { githubBlobUrl } from "../lib/cdn-config";
 
 /** URL schemes handed to the system browser; anything else stays inert. */
 const EXTERNAL_SCHEME = /^(https?|mailto):/;
@@ -30,7 +31,7 @@ function resolveUrl(
   if (EXTERNAL_SCHEME.test(url) || url.startsWith("#")) return url;
   const base =
     kind === "blob"
-      ? `https://github.com/${repo}/blob/HEAD/${filePath}`
+      ? githubBlobUrl(repo, filePath)
       : `https://raw.githubusercontent.com/${repo}/HEAD/${filePath}`;
   return new URL(url, base).toString();
 }

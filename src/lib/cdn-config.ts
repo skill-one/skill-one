@@ -92,6 +92,15 @@ export function fileCandidates(
 }
 
 /**
+ * GitHub's human-facing blob page for one file, pinned to the branch head.
+ * Distinct from `fileCandidates`, which builds machine-facing raw/CDN download
+ * URLs; this is the link a person clicks to see the file in context.
+ */
+export function githubBlobUrl(repo: string | undefined, path: string): string {
+  return `https://github.com/${repo}/blob/HEAD/${path}`;
+}
+
+/**
  * Append a unique `t` parameter so the request bypasses every cached copy on
  * the way (WebView HTTP cache, CDN edge).
  *

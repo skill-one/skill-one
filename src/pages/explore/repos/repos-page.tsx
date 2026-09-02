@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "../../../components/ui/dropdown-menu";
 import { Input } from "../../../components/ui/input";
-import { Skeleton } from "../../../components/ui/skeleton";
+import { SkeletonList } from "../../../components/skeleton-list";
 import { Placeholder } from "../../../components/placeholder";
 import { ListPager } from "../../../components/list-pager";
 import { RepoCard } from "./repo-card";
@@ -42,14 +42,11 @@ const SORT_OPTIONS: Array<{ value: RepoSortOrder; label: string }> = [
  */
 function ReposSkeleton() {
   return (
-    <div
-      className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-      aria-hidden
-    >
-      {Array.from({ length: 12 }, (_, i) => (
-        <Skeleton key={i} className="h-[118px] rounded-xl" />
-      ))}
-    </div>
+    <SkeletonList
+      rows={12}
+      listClassName="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      itemClassName="h-[118px] rounded-xl"
+    />
   );
 }
 

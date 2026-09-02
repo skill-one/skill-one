@@ -35,7 +35,7 @@ import {
 import { Input } from "../../components/ui/input";
 import { ListPager } from "../../components/list-pager";
 import { Switch } from "../../components/ui/switch";
-import { cn } from "../../lib/utils";
+import { cn, errorMessage } from "../../lib/utils";
 
 /** Skills shown per page; same rhythm as the store's full list. */
 const PAGE_SIZE = 24;
@@ -238,7 +238,7 @@ export function MySkillsPage() {
       setActionError(null);
       invalidate();
     },
-    onError: (e) => setActionError(errMessage(e, "移除失败")),
+    onError: (e) => setActionError(errorMessage(e, "移除失败")),
   });
 
   const toggleMutation = useMutation({
@@ -258,7 +258,7 @@ export function MySkillsPage() {
     },
     onError: (e) => {
       setPendingEnabled({});
-      setActionError(errMessage(e, "切换失败"));
+      setActionError(errorMessage(e, "切换失败"));
       invalidate();
     },
   });
@@ -388,7 +388,7 @@ export function MySkillsPage() {
             <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
               <Users className="h-7 w-7 opacity-40" />
               <p className="text-[12px]">
-                加载失败：{error instanceof Error ? error.message : "未知错误"}
+                加载失败：{errorMessage(error)}
               </p>
             </div>
           ) : isLoading ? (
@@ -495,11 +495,4 @@ function FilterDropdown<T extends string>({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-/** Best-effort message from a rejected mutation (Tauri rejects with non-Error). */
-function errMessage(err: unknown, fallback: string): string {
-  if (err instanceof Error && err.message) return err.message;
-  if (typeof err === "string" && err.trim()) return err;
-  return fallback;
 }

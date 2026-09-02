@@ -7,7 +7,7 @@ import {
   markSkillsChanged,
   useInstalledSkills,
 } from "../../hooks/use-installed-skills";
-import { cn } from "../../lib/utils";
+import { cn, errorMessage } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { Button } from "../../components/ui/button";
 import {
@@ -38,17 +38,6 @@ const INSTALL_BUTTON: Record<
   installed: { label: "已安装", icon: <Check />, variant: "secondary" },
   error: { label: "重试", icon: <RefreshCw />, variant: "default" },
 };
-
-/** Best-effort message from a rejection; Tauri rejects with a non-`Error` value. */
-function toErrorMessage(err: unknown): string {
-  if (err instanceof Error && err.message) return err.message;
-  if (typeof err === "string" && err.trim()) return err;
-  if (err && typeof err === "object") {
-    const msg = (err as { message?: unknown }).message;
-    if (typeof msg === "string" && msg.trim()) return msg;
-  }
-  return "安装失败，请重试";
-}
 
 /**
  * The install action shared by every skill surface (store rows, leaderboard
@@ -111,7 +100,7 @@ export function SkillInstallButton({
       setInstallState("installed");
     } catch (err) {
       setInstallState("error");
-      onError?.(toErrorMessage(err));
+      onError?.(errorMessage(err, "安装失败，请重试"));
     }
   };
 
