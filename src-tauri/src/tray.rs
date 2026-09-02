@@ -77,20 +77,28 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Apply the native frosted-glass popover material (the same
-/// `NSVisualEffectView` material system popovers use), with the vibrancy view
-/// itself rounded to `radius` points.
-#[cfg(target_os = "macos")]
-pub fn apply_popover_material(window: &tauri::WebviewWindow, radius: f64) {
-    use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+/// Logical corner radius of the popover panel. Shared by the native material
+/// and the content clip; keep in sync with `--popover-radius` in
+/// `src/popover/popover.css`.
+pub const POPOVER_MATERIAL_RADIUS: f64 = 16.0;
 
-    if let Err(err) = apply_vibrancy(
-        window,
-        NSVisualEffectMaterial::Popover,
-        Some(NSVisualEffectState::FollowsWindowActiveState),
-        Some(radius),
-    ) {
-        eprintln!("failed to apply popover vibrancy: {err}");
+/// Apply the native panel material to the popover window: real Liquid Glass
+/// (`NSGlassEffectView`) on macOS 26+, rounded to `POPOVER_MATERIAL_RADIUS`.
+/// On older macOS the plugin falls back to `NSVisualEffectView`; on other
+/// platforms it is a no-op. The material resolves light/dark from the app
+/// appearance (`set_theme`), the same source the popover's
+/// `prefers-color-scheme` styling reads.
+#[cfg(target_os = "macos")]
+pub fn apply_popover_material<R: Runtime>(app: &AppHandle<R>, window: &tauri::WebviewWindow<R>) {
+    use tauri_plugin_liquid_glass::{GlassMaterialVariant, LiquidGlassConfig, LiquidGlassExt};
+
+    let config = LiquidGlassConfig {
+        corner_radius: POPOVER_MATERIAL_RADIUS,
+        variant: GlassMaterialVariant::Regular,
+        ..Default::default()
+    };
+    if let Err(err) = app.liquid_glass().set_effect(window, config) {
+        eprintln!("failed to apply popover glass material: {err}");
     }
 }
 

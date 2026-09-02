@@ -105,6 +105,16 @@ describe("PopoverPage", () => {
     expect(screen.getByText("Word 工具")).toBeInTheDocument();
   });
 
+  it("clips the content to the native material's corner radius", async () => {
+    renderWithRouter(<PopoverPage />);
+    const root = (await screen.findByText("Skill One")).closest(".h-screen");
+
+    // The glass backdrop is rounded natively (`POPOVER_MATERIAL_RADIUS` in
+    // tray.rs); row highlights must never bleed past those corners.
+    expect(root?.className).toContain("overflow-hidden");
+    expect(root?.className).toContain("rounded-[var(--popover-radius)]");
+  });
+
   it("shows an empty state when no skill is enabled", async () => {
     fetchInstalledSkillsMock.mockResolvedValue([
       skill({ name: "parked", enabled: false }),

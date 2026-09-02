@@ -22,9 +22,10 @@ import { useSkillsLiveSync } from "./use-skills-live-sync";
  * glanceable list, so they are filtered out here. Clicking an entry deep
  * links into the my-skills page with that skill pre-filtered; the footer
  * button opens the same page unfiltered. The window size is fixed (see
- * `tauri.conf.json`); the frosted-glass panel is the native vibrancy
+ * `tauri.conf.json`); the panel backdrop is the native glass/vibrancy
  * material applied by Rust (`tray.rs`), so nothing is drawn behind the
- * content.
+ * content: `popover.css` re-tokens the shadcn colors to translucent system
+ * values, and the root clips the content to the material's corner radius.
  *
  * Dismissal: the native side hides the window on focus loss; Escape is the
  * keyboard equivalent (hidden via the core window API).
@@ -44,7 +45,7 @@ export function PopoverPage() {
   const skills = (data ?? []).filter((skill) => skill.enabled);
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col overflow-hidden rounded-[var(--popover-radius)]">
       {/* Header: app title + enabled count, matching the screenshot the user
           approved. Hidden while loading / on error since the count is empty. */}
       <header className="flex items-center gap-2 px-3 py-2">

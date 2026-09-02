@@ -15,6 +15,9 @@ pub fn run() {
         // GitHub Releases; `process` lets the frontend relaunch after install.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // Native panel material for the menu bar popover (Liquid Glass on
+        // macOS 26+, NSVisualEffectView fallback on older macOS, no-op else).
+        .plugin(tauri_plugin_liquid_glass::init())
         .manage(tray::PopoverState::default())
         .invoke_handler(tauri::generate_handler![
             skills::install_skill,
@@ -28,11 +31,11 @@ pub fn run() {
         ])
         .setup(|app| {
             tray::create_tray(app.handle())?;
-            // Native frosted-glass popover material, rounded to match the
-            // CSS corner radius of the panel inside.
+            // Native popover material, rounded to the CSS corner radius of the
+            // content clip (see `POPOVER_MATERIAL_RADIUS` in `tray.rs`).
             #[cfg(target_os = "macos")]
             if let Some(popover) = app.get_webview_window(tray::POPOVER_WINDOW_LABEL) {
-                tray::apply_popover_material(&popover, 16.0);
+                tray::apply_popover_material(app.handle(), &popover);
             }
             // A popover navigation request shows + focuses the main window;
             // the main window's own listener performs the actual routing.
