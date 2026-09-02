@@ -40,7 +40,7 @@ serde_json = "1"
 # and the facade's `ListedSkill` from `Manager::list` carries no `description`,
 # so reading SKILL.md here remains the only way to get one.
 serde_yaml = "0.9"
-window-vibrancy = "0.8.0"
+window-vibrancy = "0.6.0"
 
 [dev-dependencies]
 tempfile = "3"

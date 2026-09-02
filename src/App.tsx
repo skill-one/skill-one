@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { listen } from "@tauri-apps/api/event";
@@ -10,14 +10,44 @@ import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 import { createQueryClient } from "./lib/query-client";
 import { checkForUpdate } from "./lib/update-store";
 import { isTauri } from "./lib/tauri";
-import { ExplorePage } from "./pages/explore/explore-page";
-import { FeaturedPage } from "./pages/explore/featured/featured-page";
-import { RankingPage } from "./pages/explore/featured/ranking-page";
-import { ReposPage } from "./pages/explore/repos/repos-page";
-import { RepoDetailPage } from "./pages/explore/repos/repo-detail-page";
 import { MySkillsPage } from "./pages/my-skills/my-skills-page";
-import { SettingsPage } from "./pages/settings/settings-page";
 import { POPOVER_NAVIGATE_EVENT } from "./popover/popover-events";
+
+/**
+ * Route-level code splitting: every page but the landing one ships as its own
+ * chunk, so the first paint carries only the shell plus My Skills (where "/"
+ * redirects) and the rest are read from the app bundle on navigation.
+ */
+const ExplorePage = lazy(() =>
+  import("./pages/explore/explore-page").then((m) => ({
+    default: m.ExplorePage,
+  })),
+);
+const FeaturedPage = lazy(() =>
+  import("./pages/explore/featured/featured-page").then((m) => ({
+    default: m.FeaturedPage,
+  })),
+);
+const RankingPage = lazy(() =>
+  import("./pages/explore/featured/ranking-page").then((m) => ({
+    default: m.RankingPage,
+  })),
+);
+const ReposPage = lazy(() =>
+  import("./pages/explore/repos/repos-page").then((m) => ({
+    default: m.ReposPage,
+  })),
+);
+const RepoDetailPage = lazy(() =>
+  import("./pages/explore/repos/repo-detail-page").then((m) => ({
+    default: m.RepoDetailPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("./pages/settings/settings-page").then((m) => ({
+    default: m.SettingsPage,
+  })),
+);
 
 const queryClient = createQueryClient();
 
@@ -65,29 +95,34 @@ export default function App() {
           >
             <AppSidebar />
             <SidebarInset className="overflow-hidden">
-              <Routes>
-                <Route
-                  path="/"
-                  element={<Navigate to="/my-skills" replace />}
-                />
-                <Route path="/explore" element={<ExplorePage />} />
-                <Route path="/my-skills" element={<MySkillsPage />} />
-                <Route path="/explore/featured" element={<FeaturedPage />} />
-                <Route
-                  path="/explore/featured/ranking/:rankingId"
-                  element={<RankingPage />}
-                />
-                <Route path="/explore/repos" element={<ReposPage />} />
-                <Route
-                  path="/explore/repos/:owner/:repo"
-                  element={<RepoDetailPage />}
-                />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route
-                  path="*"
-                  element={<Navigate to="/my-skills" replace />}
-                />
-              </Routes>
+              <Suspense fallback={null}>
+                <Routes>
+                  <Route
+                    path="/"
+                    element={<Navigate to="/my-skills" replace />}
+                  />
+                  <Route path="/explore" element={<ExplorePage />} />
+                  <Route path="/my-skills" element={<MySkillsPage />} />
+                  <Route
+                    path="/explore/featured"
+                    element={<FeaturedPage />}
+                  />
+                  <Route
+                    path="/explore/featured/ranking/:rankingId"
+                    element={<RankingPage />}
+                  />
+                  <Route path="/explore/repos" element={<ReposPage />} />
+                  <Route
+                    path="/explore/repos/:owner/:repo"
+                    element={<RepoDetailPage />}
+                  />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route
+                    path="*"
+                    element={<Navigate to="/my-skills" replace />}
+                  />
+                </Routes>
+              </Suspense>
             </SidebarInset>
           </SidebarProvider>
         </div>
