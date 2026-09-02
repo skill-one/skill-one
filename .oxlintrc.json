@@ -1,6 +1,13 @@
-// oxlint rather than eslint: typescript-eslint still refuses TypeScript 7 (this
-// repo is on TS 7), and unused-code checks already belong to the compiler via
-// noUnusedLocals / noUnusedParameters in tsconfig.app.json.
+// oxlint rather than eslint: it is one fast binary with no plugin graph, and
+// unused-code checks already belong to the compiler via noUnusedLocals /
+// noUnusedParameters in tsconfig.app.json.
+//
+// Type-aware rules are a second pass, not a replacement: `pnpm lint` runs the
+// syntax-only set, `pnpm exec oxlint --type-aware` adds the rules that need a
+// type graph (no-floating-promises, await-thenable, unbound-method, ...). The
+// backend for that pass is oxlint-tsgolint (tsgolint), which is a native
+// implementation rather than typescript-eslint — so it does not inherit
+// typescript-eslint's TypeScript-version support window and works on TS 7.
 // Rules are switched off below where the flagged pattern is deliberate.
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",

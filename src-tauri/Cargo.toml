@@ -39,7 +39,9 @@ serde_json = "1"
 # its own parser behind a private `core` module (only `Skill` is re-exported),
 # and the facade's `ListedSkill` from `Manager::list` carries no `description`,
 # so reading SKILL.md here remains the only way to get one.
-serde_yaml = "0.9"
+# `yaml_serde` is the actively maintained `serde_yaml` fork, adopted by the
+# official YAML organization after upstream was deprecated (0.9.34+deprecated).
+yaml_serde = "0.10"
 # Menu bar popover material: real Liquid Glass (NSGlassEffectView) on macOS
 # 26+, automatic NSVisualEffectView fallback on older macOS, no-op elsewhere.
 tauri-plugin-liquid-glass = "0.1"

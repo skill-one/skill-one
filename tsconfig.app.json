@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES2021",
+    // ES2022 is the floor: react-router v8 ships ESM-only with ES2022 lib
+    // types. (The Vite build target stays es2021 — see vite.config.ts — since
+    // that is what the Tauri WebView supports.)
+    "target": "ES2022",
     "useDefineForClassFields": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",

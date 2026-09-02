@@ -72,12 +72,17 @@ if (typeof globalThis.requestIdleCallback !== "function") {
 }
 
 // jsdom lacks scrollIntoView and pointer-capture APIs used by Radix.
+// The lib.dom types declare every one of them as always present, so probing
+// `Element.prototype` with `in` narrows it to `never` in the "missing" branch
+// and the patch stops typechecking. Go through a widened handle instead: it
+// keeps the runtime check while leaving the type alone. (`in` rather than
+// reading the member — a read hands out an unbound-method reference, which the
+// type-aware lint rejects, and would throw if the member were a throwing
+// getter.)
 if (typeof Element !== "undefined") {
-  Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => {});
-  Element.prototype.hasPointerCapture =
-    Element.prototype.hasPointerCapture ?? (() => false);
-  Element.prototype.releasePointerCapture =
-    Element.prototype.releasePointerCapture ?? (() => {});
-  Element.prototype.setPointerCapture =
-    Element.prototype.setPointerCapture ?? (() => {});
+  const proto = Element.prototype as unknown as Record<string, unknown>;
+  if (!("scrollIntoView" in proto)) proto.scrollIntoView = () => {};
+  if (!("hasPointerCapture" in proto)) proto.hasPointerCapture = () => false;
+  if (!("releasePointerCapture" in proto)) proto.releasePointerCapture = () => {};
+  if (!("setPointerCapture" in proto)) proto.setPointerCapture = () => {};
 }

@@ -70,10 +70,32 @@ const queryClient = createQueryClient();
  * (keyed by the query client), so the two never hold the same fact.
  */
 const persister = createSyncStoragePersister({
+  // Every access is guarded: the WebView's localStorage quota (~5-10 MB) is a
+  // hard limit, and a full or blocked storage (private browsing, disabled
+  // storage) throws on write and on read. Failing to persist must degrade to
+  // "no cache" — never take the app down with it.
   storage: {
-    getItem: (key) => window.localStorage.getItem(key),
-    setItem: (key, value) => window.localStorage.setItem(key, value),
-    removeItem: (key) => window.localStorage.removeItem(key),
+    getItem: (key) => {
+      try {
+        return window.localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    },
+    setItem: (key, value) => {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch {
+        // Out of quota or storage disabled: drop the write silently.
+      }
+    },
+    removeItem: (key) => {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        // Nothing to remove if storage is unavailable.
+      }
+    },
   },
 });
 
