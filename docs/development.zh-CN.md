@@ -10,14 +10,15 @@
 | ---------- | ----------------------------------------------------------------------------------------------- |
 | 桌面运行时 | [Tauri v2](https://v2.tauri.app/) + Rust                                                        |
 | UI         | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/)（Radix UI + Tailwind CSS） |
-| 路由       | [react-router v7](https://reactrouter.com/)（HashRouter）                                       |
+| 路由       | [react-router v8](https://reactrouter.com/)（HashRouter）                                       |
 | 数据请求   | [TanStack Query v5](https://tanstack.com/query)（持久化到 localStorage）                        |
 | 构建       | [Vite 8](https://vite.dev/) + TypeScript 7.0                                                    |
 | 测试       | [Vitest 4](https://vitest.dev/) + Testing Library                                               |
 
 ## 环境要求
 
-- **Node.js**（≥ 18）与 [pnpm](https://pnpm.io/)（版本由 `package.json` 的 `packageManager` 字段锁定）
+- **Node.js**（≥ 24，当前的 Active LTS，见 `.nvmrc`）与 [pnpm](https://pnpm.io/)（版本由 `package.json` 的 `packageManager` 字段锁定）
+  - 这个下限不是随意定的：Vite 8 要求 Node 20.19+/22.12+，而 react-router v8 要求 Node 22.22+，且只支持维护期 LTS 线的「最新小版本」。Node 24 是 Active LTS，因此 CI 与本地开发都统一以它为目标。`package.json` 用 `engines.node` 声明该约束（默认只是警告，不会强制拦截；若要强制，请在 `.npmrc` 中加 `engine-strict=true`）。
 - **Rust** 工具链，`rustc >= 1.88`
 - **Tauri 系统依赖**：参见 [Tauri 前置依赖](https://v2.tauri.app/start/prerequisites/)
 
@@ -43,6 +44,8 @@ pnpm tauri build     # 构建发布包
 | `pnpm tauri dev`                                | 启动桌面应用（开发模式）          |
 | `pnpm tauri build`                              | 打包桌面应用                      |
 | `pnpm test` / `test:run` / `test:coverage`      | 运行 / 单次运行 / 覆盖率测试      |
+| `pnpm lint` / `lint:fix`                        | 代码检查（仅语法规则）/ 带自动修复 |
+| `pnpm lint:types`                               | 代码检查（含类型感知规则，需要类型图，更慢） |
 
 ## 项目结构
 
@@ -106,7 +109,35 @@ shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 
 
 ## 测试
 
-测试使用 Vitest + Testing Library，运行在 `jsdom` 环境。组件测试与 `src/lib` 下的单元测试均遵循「一个文件对应一个 `*.test.ts(x)`」的约定，可通过 `pnpm test:run` 一键运行。
+分两层，每层补齐另一层覆盖不到的部分：
+
+| 层 | 工具 | 命令 | 覆盖范围 |
+| --- | --- | --- | --- |
+| 单元 / 组件 | Vitest + Testing Library（jsdom） | `pnpm test` / `test:run` | 纯逻辑与组件的隔离行为 |
+| 覆盖率门禁 | Vitest（`@vitest/coverage-v8`） | `pnpm test:coverage` | 校验 `vite.config.ts` 中的阈值 |
+
+组件测试与 `src/lib` 下的单元测试均遵循「一个文件对应一个 `*.test.ts(x)`」的约定，可通过 `pnpm test:run` 一键运行。
+
+## 内容安全策略（CSP）
+
+`src-tauri/tauri.conf.json` 中配置了 `app.security.csp`。不配置时应用完全没有任何策略；配置后 WebView 会拒绝指令不允许的一切。构建时 Tauri 会为打包代码追加 nonce 与 hash。
+
+| 指令 | 值 | 原因 |
+| --- | --- | --- |
+| `default-src` | `'self'` | 未在下面列出的资源都来自打包产物。 |
+| `script-src` | `'self'` | 不允许 inline 与 `eval` —— Tauri 会对打包脚本做 nonce 匹配。 |
+| `style-src` | `'self' 'unsafe-inline'` | Tailwind 产出独立样式表，但 React 会写内联 `style` 属性。 |
+| `img-src` | `'self' https: data: blob:` | 仓库头像与 `SKILL.md` 里的图片天然是远程的。 |
+| `font-src` | `'self' data:` | 内联的字体子集。 |
+| `worker-src` | `'self' blob:` | registry worker 是打包出的 ES module；`blob:` 兼容被内联的情况。 |
+| `connect-src` | `'self' ipc: http://ipc.localhost https: http://localhost:* http://127.0.0.1:*` | `ipc:` 是 Tauri 的命令通道；`https:` 用于 registry、`SKILL.md` 与头像；环回地址允许自建镜像走明文 HTTP。 |
+
+修改时有两点要留意：
+
+- **`connect-src` 里的 `https:` 是刻意且宽泛的。** 下载源在「设置」里由用户自定义，构建时无法预知主机名。非环回地址的明文 HTTP 自定义 CDN 会被拦截 —— 要收紧这里，必须同时给该输入框加上校验。
+- **CSP 只存在于打包后的应用中。** 开发时（`pnpm dev`）页面由 Vite 提供，不带任何策略。目前没有自动附加 CSP 的测试，修改 CSP 后请在 `pnpm tauri build` 的产物上手动验证。
+
+渲染远程 `SKILL.md` 内容与 CSP 是两件事：`react-markdown` 没有启用 `rehype-raw`，源码里的裸 HTML 不会被渲染，链接与图片 URL 也会经过 scheme 白名单解析（`src/components/markdown.tsx`）。CSP 是兜底，不是主要防线。
 
 ## 隔离 worktree
 

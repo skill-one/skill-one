@@ -10,14 +10,15 @@ Build, tech stack, architecture, testing, and release notes for developers. For 
 | -------------- | ----------------------------------------------------------------------------------------------- |
 | Desktop runtime | [Tauri v2](https://v2.tauri.app/) + Rust                                                        |
 | UI             | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/) (Radix UI + Tailwind CSS)  |
-| Routing        | [react-router v7](https://reactrouter.com/) (HashRouter)                                        |
+| Routing        | [react-router v8](https://reactrouter.com/) (HashRouter)                                        |
 | Data fetching  | [TanStack Query v5](https://tanstack.com/query) (persisted to localStorage)                     |
 | Build          | [Vite 8](https://vite.dev/) + TypeScript 7.0                                                    |
 | Testing        | [Vitest 4](https://vitest.dev/) + Testing Library                                               |
 
 ## Prerequisites
 
-- **Node.js** (≥ 18) and [pnpm](https://pnpm.io/) (the version is pinned by the `packageManager` field in `package.json`)
+- **Node.js** (≥ 24, the active LTS — see `.nvmrc`) and [pnpm](https://pnpm.io/) (the version is pinned by the `packageManager` field in `package.json`)
+  - The floor is not arbitrary: Vite 8 requires Node 20.19+/22.12+, and react-router v8 requires Node 22.22+ while only supporting the *latest minor* of a maintenance-LTS line. Node 24 is the active LTS, so it is the version CI and local development both target. `package.json` declares this as `engines.node` (a warning, not a hard gate — add `engine-strict=true` to `.npmrc` to enforce it).
 - **Rust** toolchain, `rustc >= 1.88`
 - **Tauri system dependencies**: see [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
 
@@ -43,6 +44,8 @@ pnpm tauri build     # Build release packages
 | `pnpm tauri dev`                                | Launch the desktop app (dev mode)                 |
 | `pnpm tauri build`                              | Package the desktop app                           |
 | `pnpm test` / `test:run` / `test:coverage`      | Watch mode / single run / coverage tests          |
+| `pnpm lint` / `lint:fix`                        | Lint (syntax-only rules) / with autofix           |
+| `pnpm lint:types`                               | Lint with the type-aware rules (needs a type graph, so slower) |
 
 ## Project Structure
 
@@ -106,7 +109,35 @@ Conventions when styling new UI:
 
 ## Testing
 
-Tests use Vitest + Testing Library and run in the `jsdom` environment. Component tests and unit tests under `src/lib` follow the "one file, one `*.test.ts(x)`" convention and can be run in one go with `pnpm test:run`.
+Two layers, each covering what the other cannot:
+
+| Layer | Tool | Command | Covers |
+| --- | --- | --- | --- |
+| Unit / component | Vitest + Testing Library (jsdom) | `pnpm test` / `test:run` | Pure logic and components in isolation |
+| Coverage gate | Vitest (`@vitest/coverage-v8`) | `pnpm test:coverage` | Enforces the thresholds in `vite.config.ts` |
+
+Component tests and unit tests under `src/lib` follow the "one file, one `*.test.ts(x)`" convention and can be run in one go with `pnpm test:run`.
+
+## Content Security Policy
+
+`src-tauri/tauri.conf.json` sets `app.security.csp`. Without it the app ships with no policy at all; with it the WebView refuses anything the directives do not allow. Tauri appends nonces and hashes for bundled code at build time.
+
+| Directive | Value | Why |
+| --- | --- | --- |
+| `default-src` | `'self'` | Everything not named below comes from the bundle. |
+| `script-src` | `'self'` | No inline and no `eval` — Tauri nonce-matches the bundled scripts. |
+| `style-src` | `'self' 'unsafe-inline'` | Tailwind emits a stylesheet, but React sets inline `style` attributes. |
+| `img-src` | `'self' https: data: blob:` | Owner avatars and images inside `SKILL.md` are remote by nature. |
+| `font-src` | `'self' data:` | Inlined font subsets. |
+| `worker-src` | `'self' blob:` | The registry worker is a bundled ES module; `blob:` covers an inlined one. |
+| `connect-src` | `'self' ipc: http://ipc.localhost https: http://localhost:* http://127.0.0.1:*` | `ipc:` is Tauri's command channel; `https:` is the registry, `SKILL.md` fetches and avatars; the loopback entries let a self-hosted mirror sit on plain HTTP. |
+
+Two things to keep in mind when editing it:
+
+- **`https:` in `connect-src` is deliberate but broad.** The download source is user-configurable in Settings, so the host set is not known at build time. A custom CDN on plain HTTP outside loopback will be blocked — tighten this only together with a matching validation on that field.
+- **The CSP only exists in the packaged app.** In dev (`pnpm dev`) the page comes from the Vite server, which sets no policy. There is no automated test that attaches it today — verify CSP changes against a `pnpm tauri build` output.
+
+Rendering remote `SKILL.md` content is a separate question from the CSP: `react-markdown` is configured without `rehype-raw`, so raw HTML in the source is never rendered, and link/image URLs are resolved against a scheme allowlist (`src/components/markdown.tsx`). The CSP is the backstop, not the primary defence.
 
 ## Isolated Worktrees
 
