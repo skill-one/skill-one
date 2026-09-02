@@ -31,7 +31,7 @@ export function pageRange(current: number, total: number): Array<number | "...">
   }
   const sorted = [...pages]
     .filter((p) => p >= 1 && p <= total)
-    .sort((a, b) => a - b);
+    .toSorted((a, b) => a - b);
   const out: Array<number | "..."> = [];
   let prev = 0;
   for (const p of sorted) {

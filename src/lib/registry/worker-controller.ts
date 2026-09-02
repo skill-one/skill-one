@@ -14,7 +14,6 @@ import type {
   RepoInfo,
   RepoPageData,
   ReposRequest,
-  RegistryEvent,
   RegistryRequest,
   RegistryWorkerMessage,
   SearchHit,
@@ -340,7 +339,7 @@ export function createRegistryController(
         });
       }
     }
-    const repos = [...byRepo.values()].sort(
+    const repos = Array.from(byRepo.values()).toSorted(
       (a, b) => b.skills - a.skills || a.repo.localeCompare(b.repo),
     );
     if (complete) repoCache = { version: dataVersion, repos };
@@ -357,7 +356,7 @@ export function createRegistryController(
     let repos = reposFor();
     if (q) repos = repos.filter((repo) => repo.repo.toLowerCase().includes(q));
     const byName = (a: RepoInfo, b: RepoInfo) => a.repo.localeCompare(b.repo);
-    repos = [...repos].sort((a, b) =>
+    repos = repos.toSorted((a, b) =>
       sort === "skills"
         ? b.skills - a.skills || byName(a, b)
         : sort === "name"

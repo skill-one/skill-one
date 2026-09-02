@@ -14,7 +14,6 @@ import { HashRouter, Route, Routes } from "react-router";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import type { Skill } from "../../types/skill";
-import { createRegistryClientMock } from "../../test/registry-harness";
 import type { RegistryHarness } from "../../test/registry-harness";
 import { ExplorePage } from "./explore-page";
 

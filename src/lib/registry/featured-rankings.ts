@@ -119,8 +119,8 @@ export function rankSkills(
   const pool = skills.filter(
     (skill) => (!def.filter || def.filter(skill)) && def.metric(skill) >= floor,
   );
-  const entries = [...pool]
-    .sort((a, b) => def.metric(b) - def.metric(a))
+  const entries = pool
+    .toSorted((a, b) => def.metric(b) - def.metric(a))
     .slice(0, limit)
     .map((skill, i) => ({ rank: i + 1, skill, label: def.label(skill) }));
   return { entries, total: pool.length };

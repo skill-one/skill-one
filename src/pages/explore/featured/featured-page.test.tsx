@@ -5,7 +5,6 @@ import { act, within } from "@testing-library/react";
 import { FEATURED_CATEGORIES } from "../../../data/featured-content";
 import { renderWithRouter, screen, waitFor } from "../../../test/test-utils";
 import { fetchSkillDetail } from "../../../lib/skill-detail-api";
-import { createRegistryClientMock } from "../../../test/registry-harness";
 import type { RegistryHarness } from "../../../test/registry-harness";
 import type { Skill } from "../../../types/skill";
 import { FeaturedPage } from "./featured-page";
@@ -52,7 +51,8 @@ vi.mock("../../../lib/skill-detail-api", () => ({
 
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 
-const [efficiency, design, development, writing] = FEATURED_CATEGORIES;
+// 榜单测试只用三个分类：省略位跳过 design。
+const [efficiency, , development, writing] = FEATURED_CATEGORIES;
 
 /**
  * Build a registry fixture from the curated references: every skill gets

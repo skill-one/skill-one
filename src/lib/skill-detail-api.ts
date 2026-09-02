@@ -1,6 +1,7 @@
 import { parse as parseYaml } from "yaml";
 
 import type { SkillDetail } from "../types/skill";
+import { errorMessage } from "./utils";
 import { SourceFetchError, fetchFirstText, fileCandidates } from "./cdn-config";
 
 /** Frontmatter fields surfaced in the detail view. */
@@ -46,11 +47,13 @@ export async function fetchSkillDetail(
     // timeout, server error) is a connectivity problem, so name the underlying
     // cause instead of misreporting it as a missing file.
     if (err instanceof SourceFetchError && err.kind === "http" && err.status === 404) {
-      throw new Error(`SKILL.md for ${skillId} not found in ${repo}`);
+      throw new Error(`SKILL.md for ${skillId} not found in ${repo}`, {
+        cause: err,
+      });
     }
-    throw new Error(
-      `无法获取 ${skillId} 的 SKILL.md：${err instanceof Error ? err.message : String(err)}`,
-    );
+    throw new Error(`无法获取 ${skillId} 的 SKILL.md：${errorMessage(err)}`, {
+      cause: err,
+    });
   }
 }
 

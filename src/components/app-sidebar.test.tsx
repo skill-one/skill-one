@@ -1,7 +1,6 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { act, screen, waitFor } from "@testing-library/react";
 
-import { createRegistryClientMock } from "../test/registry-harness";
 import type { RegistryHarness } from "../test/registry-harness";
 import type { RegistrySnapshot } from "../lib/registry/client";
 import { AppSidebar } from "./app-sidebar";

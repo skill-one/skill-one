@@ -4,7 +4,6 @@ import { Skeleton } from "../../../components/ui/skeleton";
 import { SkeletonList } from "../../../components/skeleton-list";
 import { useFeaturedData } from "../../../hooks/use-featured-data";
 import { Button } from "../../../components/ui/button";
-import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../../../components/placeholder";
 import { SkillListRow } from "../skill-list-row";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";

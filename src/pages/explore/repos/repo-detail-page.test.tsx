@@ -5,7 +5,6 @@ import userEvent from "@testing-library/user-event";
 import { HashRouter, Route, Routes } from "react-router";
 
 import type { Skill } from "../../../types/skill";
-import { createRegistryClientMock } from "../../../test/registry-harness";
 import type { RegistryHarness } from "../../../test/registry-harness";
 import { ReposPage } from "./repos-page";
 import { RepoDetailPage } from "./repo-detail-page";

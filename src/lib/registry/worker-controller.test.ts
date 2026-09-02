@@ -533,7 +533,7 @@ describe("createRegistryController — featured + lookup", () => {
     expect(weekly?.entries.map((e) => e.skill.name)).toEqual(["alpha", "beta"]);
     // Curated sections number their rows globally for the detail panel.
     const indexes = data.sections.flatMap((s) => s.skills.map((x) => x.index));
-    expect(indexes).toEqual([...indexes].sort((a, b) => a - b));
+    expect(indexes).toEqual(indexes.toSorted((a, b) => a - b));
     expect(indexes[0]).toBe(0);
   });
 

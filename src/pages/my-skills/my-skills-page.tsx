@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Puzzle,
   RefreshCw,
-  Search,
   Trash2,
   Users,
 } from "lucide-react";
