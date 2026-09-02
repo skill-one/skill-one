@@ -29,7 +29,32 @@ export default defineConfig({
     css: false,
     // Git worktrees under .worktrees carry their own (stale) test copies;
     // running them here fails on duplicated React resolution.
-    exclude: [...configDefaults.exclude, "**/.worktrees/**"],
+    // e2e/ is Playwright's: same *.spec.ts filenames, different runner.
+    exclude: [...configDefaults.exclude, "**/.worktrees/**", "**/e2e/**"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      // Measure what ships: pages, components, hooks and lib. Test files, the
+      // setup helpers, type-only modules and the browser mock (a test double,
+      // never shipped) are not the subject.
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "**/*.test.{ts,tsx}",
+        "**/src/test/**",
+        "**/src/types/**",
+        "**/src/lib/mock-local.ts",
+        "**/src/lib/registry/protocol.ts",
+      ],
+      thresholds: {
+        // A couple of points under today's figures: tight enough to catch a
+        // real drop, loose enough that touching one file cannot fail CI.
+        // Raise them as coverage improves.
+        statements: 80,
+        branches: 77,
+        functions: 77,
+        lines: 82,
+      },
+    },
   },
   // Tauri expects a fixed dev server port and a clean terminal.
   clearScreen: false,
