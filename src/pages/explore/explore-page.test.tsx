@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   act,
+  configure,
   render,
   screen,
   waitFor,
@@ -16,6 +17,14 @@ import type { Skill } from "../../types/skill";
 import { createRegistryClientMock } from "../../test/registry-harness";
 import type { RegistryHarness } from "../../test/registry-harness";
 import { ExplorePage } from "./explore-page";
+
+/**
+ * Search cases wait out the page's real 150 ms debounce plus the worker
+ * round-trip, so they measure elapsed time rather than ticks. The default 1 s
+ * budget is exceeded when the CPU is busy (typecheck in parallel), which fails
+ * the test without any product bug; 5 s keeps the wait honest and stable.
+ */
+configure({ asyncUtilTimeout: 5000 });
 
 /**
  * The registry client is replaced by a real-controller-driven harness, so

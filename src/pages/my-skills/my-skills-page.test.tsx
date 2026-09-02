@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { screen, fireEvent, waitFor, within } from "@testing-library/react";
+import {
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+  configure,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { MySkillsPage } from "./my-skills-page";
@@ -11,6 +17,9 @@ import {
   resetMockInstalledSkills,
   setMockSkillEnabled,
 } from "../../lib/mock-local";
+
+/** The page's search box debounces for real; 1 s is a contention flake. */
+configure({ asyncUtilTimeout: 5000 });
 
 // The page reads installed skills through local-skills, which falls back to
 // the mutable mock store in the browser (this test env), so mutations below

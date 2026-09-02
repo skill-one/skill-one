@@ -34,14 +34,9 @@ describe("agent-icons", () => {
     expect(isMonochromeAgentIcon("not-an-agent")).toBe(false);
   });
 
-  it("classifies every registered icon file with no gaps", () => {
-    for (const url of Object.values(AGENT_ICON_BY_NAME)) {
-      expect(isMonochromeAgentIconOnUrl(url)).toBe(MONOCHROME_ICON_FILES.has(url));
+  it("classifies every registered agent consistently with its icon table", () => {
+    for (const [name, url] of Object.entries(AGENT_ICON_BY_NAME)) {
+      expect(isMonochromeAgentIcon(name)).toBe(MONOCHROME_ICON_FILES.has(url));
     }
   });
 });
-
-/** Mirrors `isMonochromeAgentIcon`'s rule directly against an icon URL. */
-function isMonochromeAgentIconOnUrl(url: string): boolean {
-  return !url.endsWith("-color.svg");
-}
