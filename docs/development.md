@@ -122,7 +122,9 @@ Two setup details save real time:
   worktree keeps `pnpm build`, `pnpm typecheck` and CI behaving identically.
 - **Share the Rust build cache.** `src-tauri/target` is tens of gigabytes, so
   point cargo at the main checkout instead of recompiling the world per
-  worktree: `CARGO_TARGET_DIR=<repo>/src-tauri/target cargo check`.
+  worktree: `CARGO_TARGET_DIR=<repo>/src-tauri/target cargo check`. Do not run
+  `cargo clean` with that variable set — it deletes the main checkout's cache
+  too; unset it first, or scope the cleanup to the worktree's own target.
 
 ## Release
 
