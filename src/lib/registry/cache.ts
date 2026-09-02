@@ -1,3 +1,5 @@
+import { createStore, del, get, set } from "idb-keyval";
+
 import type { Skill } from "../../types/skill";
 
 /**
@@ -8,13 +10,17 @@ import type { Skill } from "../../types/skill";
  * the multi-megabyte download be skipped outright.
  */
 
-const DB_NAME = "skill-one-registry";
-const DB_VERSION = 1;
-const STORE = "index";
 const KEY = "skills";
 
 /** Bump when the stored Skill shape changes so stale records are dropped. */
 const SCHEMA_VERSION = 1;
+
+/**
+ * The same database and object store this module used before it delegated to
+ * `idb-keyval` (which opens at version 1 and creates the store when missing),
+ * so a cache written by an earlier build is still read here.
+ */
+const store = createStore("skill-one-registry", "index");
 
 /** Identity of the published snapshot a record was built from. */
 export interface CacheIdentity {
@@ -40,62 +46,35 @@ export interface CachedIndex extends CacheIdentity {
   fetchedAt: number;
 }
 
-/** Minimal `IDBOpenDBRequest`-like factory, injectable for tests. */
-type OpenDb = () => Promise<IDBDatabase>;
-
-function defaultOpenDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+/** The three key/value operations the cache needs. */
+export interface KeyValueStore {
+  get<T>(key: string): Promise<T | undefined>;
+  set(key: string, value: unknown): Promise<void>;
+  del(key: string): Promise<void>;
 }
 
-function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
+const keyVal: KeyValueStore = {
+  get: (key) => get(key, store),
+  set: (key, value) => set(key, value, store),
+  del: (key) => del(key, store),
+};
 
 /**
- * Registry cache backed by IndexedDB. Every method degrades to a no-op (or
- * null) when the database cannot be opened — private-mode WebViews must keep
- * the app working uncached, not crash the worker.
+ * Registry cache over IndexedDB. Every method degrades to a no-op (or null)
+ * when the database cannot be reached — private-mode WebViews must keep the
+ * app working uncached, not crash the worker. `store` is injectable so tests
+ * exercise the record rules without an IndexedDB implementation.
  */
-export function createRegistryCache(openDb: OpenDb = defaultOpenDb) {
-  async function withStore<T>(
-    mode: IDBTransactionMode,
-    run: (store: IDBObjectStore) => Promise<T>,
-  ): Promise<T | null> {
-    let db: IDBDatabase;
-    try {
-      db = await openDb();
-    } catch {
-      return null;
-    }
-    try {
-      const tx = db.transaction(STORE, mode);
-      return await run(tx.objectStore(STORE));
-    } catch {
-      return null;
-    } finally {
-      db.close();
-    }
-  }
-
+export function createRegistryCache(kv: KeyValueStore = keyVal) {
   return {
     /** Cached dataset, or null on miss, version mismatch, or DB failure. */
     async load(): Promise<CachedIndex | null> {
-      const record = await withStore("readonly", (store) =>
-        requestToPromise(store.get(KEY) as IDBRequest<CacheRecord | undefined>),
-      );
+      let record: CacheRecord | undefined;
+      try {
+        record = await kv.get<CacheRecord>(KEY);
+      } catch {
+        return null;
+      }
       if (!record || record.schemaVersion !== SCHEMA_VERSION) return null;
       const { skills, commit, formatVersion, generatedAt, fetchedAt } = record;
       return { skills, commit, formatVersion, generatedAt, fetchedAt };
@@ -111,16 +90,20 @@ export function createRegistryCache(openDb: OpenDb = defaultOpenDb) {
         generatedAt: identity.generatedAt,
         skills,
       };
-      await withStore("readwrite", (store) =>
-        requestToPromise(store.put(record, KEY)),
-      );
+      try {
+        await kv.set(KEY, record);
+      } catch {
+        // Caching is an optimization; losing the write costs a re-download.
+      }
     },
 
     /** Drop the cache (a source switch invalidates the stored data). */
     async clear(): Promise<void> {
-      await withStore("readwrite", (store) =>
-        requestToPromise(store.delete(KEY)),
-      );
+      try {
+        await kv.del(KEY);
+      } catch {
+        // Nothing stored means nothing to drop.
+      }
     },
   };
 }
