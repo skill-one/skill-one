@@ -64,6 +64,10 @@ const queryClient = createQueryClient();
  * The storage adapter accesses `window.localStorage` lazily (inside the
  * methods) so merely wiring up persistence never touches the getter — Node's
  * experimental global localStorage emits an ExperimentalWarning when read.
+ *
+ * This is the only localStorage reader/writer besides `lib/cdn-config`: user
+ * settings belong to cdn-config, while this is React Query's cache journal
+ * (keyed by the query client), so the two never hold the same fact.
  */
 const persister = createSyncStoragePersister({
   storage: {
