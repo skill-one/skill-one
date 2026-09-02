@@ -64,24 +64,17 @@ pub struct RemoveResult {
     pub removed: Vec<String>,
 }
 
+/// Outcome of one enable/disable pass. `changed` holds the skills moved in the
+/// requested direction; `inventory` is the set they were chosen from, so the
+/// no-argument call can report the current state without guessing.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DisableResult {
-    pub installed: Vec<String>,
+pub struct ToggleResult {
+    pub changed: Vec<String>,
     pub requested: Vec<String>,
-    pub disabled: Vec<String>,
     pub already: Vec<String>,
     pub missing: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EnableResult {
-    pub disabled: Vec<String>,
-    pub requested: Vec<String>,
-    pub enabled: Vec<String>,
-    pub already: Vec<String>,
-    pub missing: Vec<String>,
+    pub inventory: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -502,52 +495,48 @@ pub async fn remove_skills(
     .await
 }
 
-/// Disable installed skills (moves them out of the canonical dir). With no
-/// `skills` and no `all`, only reports what is currently enabled.
+/// Move skills between the canonical dir and the parked `disabled-skills`
+/// dir (`enabled` picks the direction). With no `skills` and no `all`, only
+/// reports the inventory they would have been chosen from.
 #[tauri::command]
-pub async fn disable_skills(
+pub async fn set_skills_enabled(
     skills: Option<Vec<String>>,
     all: Option<bool>,
-) -> Result<DisableResult, String> {
-    run_blocking("disable", move |manager| {
-        let req = DisableRequest {
-            skills: skills.unwrap_or_default(),
-            global: true,
-            all: all.unwrap_or(false),
-        };
-        let outcome = manager.disable(&req).map_err(|e| e.to_string())?;
-        Ok(DisableResult {
-            installed: outcome.installed,
-            requested: outcome.requested,
-            disabled: outcome.disabled,
-            already: outcome.already,
-            missing: outcome.missing,
-        })
-    })
-    .await
-}
-
-/// Enable disabled skills (moves them back into the canonical dir). With no
-/// `skills` and no `all`, only reports what is currently disabled.
-#[tauri::command]
-pub async fn enable_skills(
-    skills: Option<Vec<String>>,
-    all: Option<bool>,
-) -> Result<EnableResult, String> {
-    run_blocking("enable", move |manager| {
-        let req = EnableRequest {
-            skills: skills.unwrap_or_default(),
-            global: true,
-            all: all.unwrap_or(false),
-        };
-        let outcome = manager.enable(&req).map_err(|e| e.to_string())?;
-        Ok(EnableResult {
-            disabled: outcome.disabled,
-            requested: outcome.requested,
-            enabled: outcome.enabled,
-            already: outcome.already,
-            missing: outcome.missing,
-        })
+    enabled: bool,
+) -> Result<ToggleResult, String> {
+    run_blocking(if enabled { "enable" } else { "disable" }, move |manager| {
+        let (names, every) = (skills.unwrap_or_default(), all.unwrap_or(false));
+        if enabled {
+            let outcome = manager
+                .enable(&EnableRequest {
+                    skills: names,
+                    global: true,
+                    all: every,
+                })
+                .map_err(|e| e.to_string())?;
+            Ok(ToggleResult {
+                changed: outcome.enabled,
+                requested: outcome.requested,
+                already: outcome.already,
+                missing: outcome.missing,
+                inventory: outcome.disabled,
+            })
+        } else {
+            let outcome = manager
+                .disable(&DisableRequest {
+                    skills: names,
+                    global: true,
+                    all: every,
+                })
+                .map_err(|e| e.to_string())?;
+            Ok(ToggleResult {
+                changed: outcome.disabled,
+                requested: outcome.requested,
+                already: outcome.already,
+                missing: outcome.missing,
+                inventory: outcome.installed,
+            })
+        }
     })
     .await
 }

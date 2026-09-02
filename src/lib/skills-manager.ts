@@ -61,20 +61,13 @@ export interface RemoveResult {
   removed: string[];
 }
 
-export interface DisableResult {
-  installed: string[];
+/** Outcome of one enable/disable pass; `changed` moved in the asked direction. */
+export interface ToggleResult {
+  changed: string[];
   requested: string[];
-  disabled: string[];
   already: string[];
   missing: string[];
-}
-
-export interface EnableResult {
-  disabled: string[];
-  requested: string[];
-  enabled: string[];
-  already: string[];
-  missing: string[];
+  inventory: string[];
 }
 
 export type AgentLinkStatus =
@@ -211,27 +204,17 @@ export async function removeSkills(
   });
 }
 
-/** Disable installed skills (moves them out of the canonical dir). */
-export async function disableSkills(
+/** Move skills between the canonical dir and the parked disabled dir. */
+export async function setSkillsEnabled(
+  enabled: boolean,
   skills: string[] = [],
   options: { all?: boolean } = {},
-): Promise<DisableResult> {
+): Promise<ToggleResult> {
   requireTauri();
-  return invoke<DisableResult>("disable_skills", {
+  return invoke<ToggleResult>("set_skills_enabled", {
     skills,
     all: options.all,
-  });
-}
-
-/** Enable disabled skills (moves them back into the canonical dir). */
-export async function enableSkills(
-  skills: string[] = [],
-  options: { all?: boolean } = {},
-): Promise<EnableResult> {
-  requireTauri();
-  return invoke<EnableResult>("enable_skills", {
-    skills,
-    all: options.all,
+    enabled,
   });
 }
 
