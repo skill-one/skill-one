@@ -94,9 +94,9 @@ shadcn/ui ships the dark palette out of the box: `src/index.css` defines both a 
 
 - `src/components/theme-provider.tsx` — the single shared configuration (`attribute="class"`, `defaultTheme="system"`, `enableColorScheme`, `storageKey="skill-one-theme"`), also responsible for mirroring the theme onto the native window.
 - `src/components/theme-mode-toggle.tsx` — the three-way `ToggleGroup` on the settings page.
-- `src/hooks/use-native-theme.ts` — calls `getCurrentWindow().setTheme()` inside Tauri so OS-drawn surfaces (title bar, scrollbars, form controls, the tray popover's vibrancy) follow along. `system` maps to `null`, leaving that case to the OS.
+- `src/hooks/use-native-theme.ts` — calls `getCurrentWindow().setTheme()` inside Tauri so OS-drawn surfaces (title bar, scrollbars, form controls, the tray popover's glass material) follow along. `system` maps to `null`, leaving that case to the OS. On macOS `set_theme` is app-wide, so the main window's call covers every window.
 
-Both window entries mount the provider: `src/main.tsx` (main window) and `src/popover/popover-main.tsx` (menu bar popover). They are separate HTML documents with their own `<html>`, but share a localStorage origin and therefore the same stored choice.
+Only `src/main.tsx` (main window) mounts the provider. The menu bar popover (`src/popover/popover-main.tsx`) deliberately uses no theme provider: `src/popover/popover.css` re-tokens the shadcn variables for that document with translucent system colors (label / secondary label / fills / hairline separators) driven by `prefers-color-scheme` — the same appearance source the native glass material behind the transparent window resolves from, so content and backdrop can never disagree about light or dark.
 
 Conventions when styling new UI:
 

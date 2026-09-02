@@ -1,0 +1,71 @@
+/* Native menu look for the menu bar popover.
+
+   The popover is a transparent window with the native glass/vibrancy material
+   behind the webview (applied in `src-tauri/src/tray.rs`). A real macOS panel
+   paints no opaque surface: text, fills and separators are translucent and
+   the desktop shows through. So this document re-tokens the shadcn semantic
+   variables with their system-color equivalents, letting the stock components
+   (Button, Separator, `bg-muted`, `hover:bg-accent`, ...) keep rendering with
+   default classes.
+
+   Light/dark is driven purely by `prefers-color-scheme` — the exact same
+   app-appearance source (`set_theme`, see `src/components/theme-provider.tsx`)
+   that the native material resolves from, so content and backdrop can never
+   disagree. The next-themes `.dark` class is deliberately not used here.
+
+   Values mirror AppKit resolved colors on macOS (Tahoe): labelColor ≈ 85%,
+   secondaryLabelColor ≈ 50/55%, fills ≈ 12-32%, hairline separators ≈ 10%. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Keep in sync with POPOVER_MATERIAL_RADIUS in src-tauri/src/tray.rs. */
+  --popover-radius: 16px;
+
+  /* The material is the panel background; the webview stays transparent. */
+  --background: transparent;
+  --card: transparent;
+  --popover: transparent;
+
+  --foreground: rgb(0 0 0 / 85%);
+  --card-foreground: var(--foreground);
+  --popover-foreground: var(--foreground);
+
+  /* Bordered (capsule) button fill + label-color text. */
+  --primary: rgb(120 120 128 / 16%);
+  --primary-foreground: var(--foreground);
+  --secondary: rgb(120 120 128 / 12%);
+  --secondary-foreground: var(--foreground);
+
+  /* Header icon chip / quiet fills. */
+  --muted: rgb(120 120 128 / 12%);
+  --muted-foreground: rgb(0 0 0 / 50%);
+
+  /* Menu-item hover highlight. */
+  --accent: rgb(0 0 0 / 8%);
+  --accent-foreground: var(--foreground);
+
+  --border: rgb(0 0 0 / 10%);
+  --input: rgb(0 0 0 / 10%);
+  --ring: rgb(0 122 255 / 50%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground: rgb(255 255 255 / 85%);
+    --muted-foreground: rgb(255 255 255 / 55%);
+
+    --primary: rgb(120 120 128 / 32%);
+    --secondary: rgb(120 120 128 / 24%);
+    --muted: rgb(120 120 128 / 24%);
+
+    --accent: rgb(255 255 255 / 12%);
+
+    --border: rgb(255 255 255 / 12%);
+    --input: rgb(255 255 255 / 12%);
+    --ring: rgb(10 132 255 / 60%);
+  }
+}
+
+/* Content must not paint anything opaque behind itself; see popover.html for
+   the pre-hydration inline guard against index.css's `bg-background` body. */

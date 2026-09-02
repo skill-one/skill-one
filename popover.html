@@ -4,10 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Skill One</title>
-    <!-- The popover window is transparent (frosted-glass vibrancy behind the
-         webview, rounded corners over the desktop); the page background must
-         stay transparent for it to show through. `!important` beats the
-         opaque `body { @apply bg-background }` that index.css injects later. -->
+    <!-- The popover window is transparent (native liquid-glass / vibrancy
+         material behind the webview, rounded corners over the desktop); the
+         page background must stay transparent for it to show through. This
+         inline guard beats the opaque `body { @apply bg-background }` from
+         index.css before popover.css has loaded; `popover.css` then keeps
+         every surface translucent so the material shows through. -->
     <style>
       html,
       body {
