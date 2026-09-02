@@ -21,6 +21,7 @@ src-tauri/gen/schemas
 !.gitignore
 !.github/
 !.oxlintrc.json
+!.nvmrc
 
 # Editor / OS leftovers without a leading dot
 *.suo

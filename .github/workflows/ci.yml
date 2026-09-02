@@ -18,10 +18,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Read from .nvmrc so CI, local development and the `engines.node`
+      # floor in package.json can never drift apart. Vite 8 needs Node
+      # 20.19+/22.12+, react-router v8 needs 22.22+; 24 is the active LTS.
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: .nvmrc
 
       # No `version` input: pnpm/setup reads `packageManager` from
       # package.json, and passing a conflicting pin errors the workflow.
