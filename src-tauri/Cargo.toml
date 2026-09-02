@@ -18,7 +18,7 @@ name = "app_lib"
 crate-type = ["rlib"]
 
 [build-dependencies]
-tauri-build = "2"
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # tray-icon: menu bar tray; image-png: load the template tray icon from bytes;
