@@ -191,7 +191,7 @@ fn parse_skill_md(skill_md: &std::path::Path) -> Option<(String, String)> {
         .strip_prefix("---\r\n")
         .or_else(|| content.strip_prefix("---\n"))?;
     let end = rest.find("\n---")?;
-    let fm: Frontmatter = serde_yaml::from_str(&rest[..end]).ok()?;
+    let fm: Frontmatter = yaml_serde::from_str(&rest[..end]).ok()?;
     Some((fm.name?, fm.description?))
 }
 
