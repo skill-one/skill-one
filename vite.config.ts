@@ -37,6 +37,12 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     strictPort: true,
+    watch: {
+      // Git worktrees under .worktrees hold their own copies of the app
+      // sources; without this, an edit in another checkout (a parallel
+      // session) reloads this dev server. Mirrors `test.exclude` above.
+      ignored: ["**/.worktrees/**"],
+    },
   },
   // Env variables starting with TAURI_ are exposed to the client.
   envPrefix: ["VITE_", "TAURI_"],
