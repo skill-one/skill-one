@@ -39,7 +39,7 @@ The app checks for updates at startup and offers **Update now** when a newer ver
 
 Homebrew users should keep using `brew upgrade --cask skill-one`.
 
-### macOS first launch
+## macOS first launch
 
 The app is ad-hoc signed, so a manually downloaded `.dmg` may be blocked by Gatekeeper on first launch. Clear it once, using any of these:
 

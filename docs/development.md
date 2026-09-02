@@ -108,11 +108,27 @@ Conventions when styling new UI:
 
 Tests use Vitest + Testing Library and run in the `jsdom` environment. Component tests and unit tests under `src/lib` follow the "one file, one `*.test.ts(x)`" convention and can be run in one go with `pnpm test:run`.
 
+## Isolated Worktrees
+
+New work happens in a `git worktree` under `.worktrees/` so the checkout on
+`main` keeps running, and a dev server there must never take port 5173 (that is
+`main`'s, and it runs with `strictPort`) — use `pnpm dev:test` on 5273.
+
+Two setup details save real time:
+
+- **Install dependencies for real.** Symlinking the main checkout's
+  `node_modules` makes `pnpm build` fail, because pnpm first runs an install
+  precheck the symlinked tree does not satisfy. A plain `pnpm install` in the
+  worktree keeps `pnpm build`, `pnpm typecheck` and CI behaving identically.
+- **Share the Rust build cache.** `src-tauri/target` is tens of gigabytes, so
+  point cargo at the main checkout instead of recompiling the world per
+  worktree: `CARGO_TARGET_DIR=<repo>/src-tauri/target cargo check`.
+
 ## Release
 
 Cutting a release is one annotated tag — see [auto-update.md](auto-update.md) for the full procedure and the published artifacts. In short:
 
-1. **Bump the version**: keep `version` identical in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` **and** `src-tauri/Cargo.lock` — the release commit carries all four.
+1. **Bump the version** in every field that must match — step 1 of [auto-update.md](auto-update.md) lists them and carries the commit command.
 2. **Commit and tag**: `chore(release): bump version to X.Y.Z`, then `git tag -a vX.Y.Z -m "vX.Y.Z"`.
 3. **Push**: `git push origin main`, then push the tag — pushing a `v*` tag is what triggers the build.
 

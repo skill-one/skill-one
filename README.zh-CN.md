@@ -41,6 +41,7 @@ Homebrew 用户请继续用 `brew upgrade --cask skill-one` 升级。
 
 应用为 ad-hoc 签名，手动下载的 `.dmg` 首次启动可能被 Gatekeeper 拦截。任选一种方式放行一次：
 
+- 右键（或 Control + 点击）应用 → **打开** → 在弹窗里再点**打开**；
 - **系统设置 → 隐私与安全性** → 点被拦截提示处的**仍要打开**；
 - 终端执行 `xattr -d com.apple.quarantine "/Applications/Skill One.app"`。
 
