@@ -55,7 +55,7 @@ skill-one/
 │   │   ├── agent-icon.tsx  # Agent brand icons
 │   │   ├── owner-avatar.tsx# Repository avatar
 │   │   ├── skill-detail/    # Shared skill detail panel + modal drawer
-│   │   └── placeholder-page.tsx # Placeholder for unimplemented pages
+│   │   └── placeholder.tsx # Shared "nothing to show" empty state for list pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)
 │   │   ├── explore/        # Store explore pages (skill-list-row / skill-install-button)
 │   │   │   └── featured/   # Curated featured page (hero leaderboards + category sections)

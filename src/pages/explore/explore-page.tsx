@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, Search, SearchX } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Search } from "lucide-react";
 
 import { useRegistryPage } from "../../hooks/use-registry-page";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
@@ -20,6 +20,7 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { SkillListRow } from "./skill-list-row";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { ListPager } from "../../components/list-pager";
+import { Placeholder } from "../../components/placeholder";
 
 /** Number of skills shown per page in the paginated registry view. */
 const PAGE_SIZE = 24;
@@ -41,26 +42,6 @@ const SORT_OPTIONS: Array<{ value: SortOrder; label: string }> = [
   { value: "downloads", label: "按下载量" },
   { value: "name", label: "按名称" },
 ];
-
-/**
- * Centered "nothing to show" state with an optional retry action, shared by
- * the explore and featured pages (search misses, load failures, empty lists).
- */
-export function Placeholder({
-  message,
-  children,
-}: {
-  message: string;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 pb-[12vh] text-muted-foreground">
-      <SearchX className="h-8 w-8 opacity-40" />
-      <p className="text-[13px]">{message}</p>
-      {children}
-    </div>
-  );
-}
 
 /**
  * Container of the skill list — one row per skill, leaderboard style.

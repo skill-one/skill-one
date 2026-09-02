@@ -9,7 +9,7 @@ import { useRegistryPage } from "../../../hooks/use-registry-page";
 import { useRegistryStats } from "../../../hooks/use-registry-stats";
 import { formatCount } from "../../../lib/utils";
 import type { Skill } from "../../../types/skill";
-import { Placeholder } from "../explore-page";
+import { Placeholder } from "../../../components/placeholder";
 import { ListPager } from "../../../components/list-pager";
 import { SkillListRow } from "../skill-list-row";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";

@@ -9,9 +9,9 @@
  */
 
 /** Pages at or below this count render every page number directly. */
-export const SHOW_ALL_THRESHOLD = 9;
+const SHOW_ALL_THRESHOLD = 9;
 /** Pages rendered on each side of the current one in the collapsed window. */
-export const PAGE_WINDOW = 2;
+const PAGE_WINDOW = 2;
 
 export function pageRange(current: number, total: number): Array<number | "..."> {
   if (total <= SHOW_ALL_THRESHOLD) {

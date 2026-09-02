@@ -6,7 +6,7 @@ import type { ReposRequest } from "../lib/registry/protocol";
 import { useRegistryStats } from "./use-registry-stats";
 
 /** Query-key prefix shared by every paged repos query. */
-export const REGISTRY_REPOS_QUERY_PREFIX = "registry-repos";
+const REGISTRY_REPOS_QUERY_PREFIX = "registry-repos";
 
 /**
  * One paged slice of the per-repo aggregation, fetched from the worker.

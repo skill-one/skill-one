@@ -41,7 +41,7 @@ export interface CachedIndex extends CacheIdentity {
 }
 
 /** Minimal `IDBOpenDBRequest`-like factory, injectable for tests. */
-export type OpenDb = () => Promise<IDBDatabase>;
+type OpenDb = () => Promise<IDBDatabase>;
 
 function defaultOpenDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {

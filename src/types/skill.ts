@@ -50,8 +50,6 @@ export interface SkillDetail {
   description: string;
   /** Frontmatter `license`, when present. */
   license?: string;
-  /** Frontmatter `version`, when present. */
-  version?: string;
   /** Frontmatter `author`, when present. */
   author?: string;
   /** Markdown body below the frontmatter. */

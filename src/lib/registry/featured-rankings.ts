@@ -38,7 +38,7 @@ export interface HeroSlide {
  * never disagree: both rank the same registry with the same `metric` and
  * print the same `label`, only taking a different slice of it.
  */
-export interface RankingDef {
+interface RankingDef {
   /** Stable identifier; also the leaderboard page's route param. */
   id: string;
   /** Leaderboard heading. */

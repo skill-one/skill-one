@@ -59,7 +59,6 @@ const detail = {
   name: "pdf",
   description: "Read and merge PDF documents.",
   license: "MIT",
-  version: "1.2.0",
   author: "Anthropic",
   instructions: "Use this skill for PDFs.",
   path: "skills/pdf/SKILL.md",
@@ -136,10 +135,8 @@ describe("SkillDetailPanel", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
-    // The author-declared frontmatter version is not shown: the registry's own
-    // content fingerprint is the version on display.
-    expect(screen.queryByText("v1.2.0")).not.toBeInTheDocument();
-    // This entry carries no registry identity, so the meta row stays out.
+    // No registry identity on this entry, so the version row stays out: the
+    // fingerprint is the only version the panel can show.
     expect(screen.queryByText(/^版本/)).not.toBeInTheDocument();
     expect(screen.queryByText(/^收录时间/)).not.toBeInTheDocument();
     expect(screen.getByText("MIT")).toBeInTheDocument();

@@ -9,7 +9,7 @@ import { useRanking } from "../../../hooks/use-ranking";
 import { RANKINGS, rankingById, type RankEntry } from "../../../lib/registry/featured-rankings";
 import { cn } from "../../../lib/utils";
 import type { Skill } from "../../../types/skill";
-import { Placeholder } from "../explore-page";
+import { Placeholder } from "../../../components/placeholder";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 import { SkillInstallButton } from "../skill-install-button";
 

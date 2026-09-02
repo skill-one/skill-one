@@ -54,13 +54,10 @@ const mockGlobalRows = [
 ];
 
 function buildMockSkills(): InstalledSkill[] {
-  return mockGlobalRows.map((row, i) => ({
+  return mockGlobalRows.map((row) => ({
     name: row.name,
     path: mockPathFor(row.name),
-    scope: "global",
-    agents: i === 0 ? ["claude-code"] : [],
     source: row.source,
-    sourceUrl: null,
     sourceType: row.sourceType,
     description: row.description,
     enabled: true,
@@ -90,10 +87,7 @@ export function installMockSkill(repo: string, name: string): void {
     {
       name,
       path: mockPathFor(name),
-      scope: "global",
-      agents: [],
       source: repo,
-      sourceUrl: null,
       sourceType: "github",
       enabled: true,
     },
@@ -112,10 +106,7 @@ export function addMockLocalSkill(name: string): void {
     {
       name,
       path: mockPathFor(name),
-      scope: "global",
-      agents: [],
       source: null,
-      sourceUrl: null,
       sourceType: null,
       description: "本地 skill 的描述。",
       enabled: true,

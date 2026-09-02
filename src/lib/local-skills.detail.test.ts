@@ -28,10 +28,12 @@ describe("fetchLocalSkillDetail", () => {
     expect(detail).toMatchObject({
       name: "pdf",
       description: "读取 PDF。",
-      version: "1.2",
       instructions: "BODY",
       path: "/Users/me/.agents/skills/pdf/SKILL.md",
     });
+    // The author-declared frontmatter version is deliberately not surfaced:
+    // the registry's own content fingerprint is the version on display.
+    expect(detail).not.toHaveProperty("version");
   });
 
   it("synthesizes a detail record from the mock store (browser)", async () => {

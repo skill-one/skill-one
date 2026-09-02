@@ -55,7 +55,7 @@ skill-one/
 │   │   ├── agent-icon.tsx  # agent 品牌图标
 │   │   ├── owner-avatar.tsx# 仓库头像
 │   │   ├── skill-detail/    # 共享的 skill 详情面板与模态抽屉
-│   │   └── placeholder-page.tsx # 未实现页面的占位
+│   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
 │   │   ├── explore/        # 商店探索相关页面（skill-list-row / skill-install-button）
 │   │   │   └── featured/   # 精选页（hero 榜单轮播 + 分类区块）

@@ -18,7 +18,7 @@ name = "app_lib"
 crate-type = ["rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = "2"
 
 [dependencies]
 # tray-icon: menu bar tray; image-png: load the template tray icon from bytes;
@@ -35,8 +35,10 @@ agents-skills = "0.10"
 serde = { version = "1", features = ["derive"] }
 # Required directly by the `tauri::generate_context!` macro (updater config).
 serde_json = "1"
-# Frontmatter parsing for description extraction (same parser agents-skills uses;
-# the library's own parser is private since 0.8).
+# Frontmatter parsing for description extraction. agents-skills 0.10 still keeps
+# its own parser behind a private `core` module (only `Skill` is re-exported),
+# and the facade's `ListedSkill` from `Manager::list` carries no `description`,
+# so reading SKILL.md here remains the only way to get one.
 serde_yaml = "0.9"
 window-vibrancy = "0.8.0"
 

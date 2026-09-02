@@ -11,15 +11,14 @@ import { isTauri } from "./tauri";
  * drives list/update.
  */
 
-/** A listed skill, enriched with lock metadata (mirrors `list --json`). */
+/**
+ * A listed skill, enriched with lock metadata. Models the subset of
+ * `list --json` the UI reads; the backend DTO may carry more.
+ */
 export interface InstalledSkill {
   name: string;
   path: string;
-  /** Always `"global"` — skills live only in the global directory. */
-  scope: "global";
-  agents: string[];
   source: string | null;
-  sourceUrl: string | null;
   sourceType: string | null;
   /**
    * Whether the skill is enabled (`true`) or parked in the disabled dir

@@ -15,7 +15,7 @@ import {
 } from "../../../components/ui/dropdown-menu";
 import { Input } from "../../../components/ui/input";
 import { Skeleton } from "../../../components/ui/skeleton";
-import { Placeholder } from "../explore-page";
+import { Placeholder } from "../../../components/placeholder";
 import { ListPager } from "../../../components/list-pager";
 import { RepoCard } from "./repo-card";
 

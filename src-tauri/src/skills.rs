@@ -184,11 +184,14 @@ struct Frontmatter {
 
 /// Read a SKILL.md frontmatter and return its `name` and `description`.
 ///
-/// `agents-skills` 0.8 made its frontmatter parser private, so the same shape
-/// is parsed here: a `---`-fenced YAML block, with both `name` and
-/// `description` mandatory in the skill format. Returns `None` on any
-/// deviation — unreadable file, missing fence, invalid YAML, missing fields,
-/// or a UTF-8 BOM before the fence (the YAML parser rejects one).
+/// `agents-skills` still keeps its frontmatter parser inside the private `core`
+/// module as of 0.10 (only the `Skill` type is re-exported, so the crate's own
+/// `parse_skill_md` is unreachable, and `ListedSkill` from `Manager::list`
+/// carries no description), so the same shape is parsed here: a `---`-fenced
+/// YAML block, with both `name` and `description` mandatory in the skill
+/// format. Returns `None` on any deviation — unreadable file, missing fence,
+/// invalid YAML, missing fields, or a UTF-8 BOM before the fence (the YAML
+/// parser rejects one).
 fn parse_skill_md(skill_md: &std::path::Path) -> Option<(String, String)> {
     let content = std::fs::read_to_string(skill_md).ok()?;
     let rest = content

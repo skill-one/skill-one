@@ -8,7 +8,6 @@ const FRONTMATTER_FIELDS = [
   "name",
   "description",
   "license",
-  "version",
   "author",
 ] as const;
 
@@ -86,7 +85,7 @@ export function parseFrontmatter(raw: string): {
       for (const field of FRONTMATTER_FIELDS) {
         const value = record[field];
         if (typeof value === "string") frontmatter[field] = value;
-        // YAML parses `version: 2` as a number; keep it displayable.
+        // YAML parses `license: 2` as a number; keep it displayable.
         else if (typeof value === "number") frontmatter[field] = String(value);
       }
     }
@@ -109,7 +108,6 @@ export function toDetail(raw: string, skillId: string, path: string): SkillDetai
     name: frontmatter.name ?? skillId,
     description: frontmatter.description ?? "",
     license: frontmatter.license,
-    version: frontmatter.version,
     author: frontmatter.author,
     instructions: body,
     path,
