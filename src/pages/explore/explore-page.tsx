@@ -114,7 +114,12 @@ export function ExplorePage() {
   // slide-in animation.
   const [selected, setSelected] = useState<number | null>(null);
   // The sheet indexes a plain Skill list (the paged search hits, unwrapped).
-  const pageSkills = useMemo(() => hits.map((hit) => hit.skill), [hits]);
+  // Depends on the query result, not the derived array: `hits` is a fresh
+  // identity whenever the page re-renders, which would recompute this every time.
+  const pageSkills = useMemo(
+    () => (pageData?.hits ?? []).map((hit) => hit.skill),
+    [pageData],
+  );
 
   const handleSearch = (q: string) => {
     setSelected(null);

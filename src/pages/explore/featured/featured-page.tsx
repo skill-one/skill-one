@@ -52,9 +52,11 @@ export function FeaturedPage() {
   const slides = data?.slides ?? [];
   const sections = data?.sections ?? [];
 
+  // Depends on the query result, not the derived array: `sections` is a fresh
+  // identity on every re-render, which would recompute this every time.
   const flat = useMemo(
-    () => sections.flatMap((section) => section.skills),
-    [sections],
+    () => (data?.sections ?? []).flatMap((section) => section.skills),
+    [data],
   );
 
   // Index into `flat` of the skill shown in the detail panel; null keeps the

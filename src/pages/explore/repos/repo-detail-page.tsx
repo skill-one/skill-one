@@ -64,9 +64,11 @@ export function RepoDetailPage() {
   } = useRegistryPage("", "default", page - 1, PAGE_SIZE, repoId);
 
   const hits = pageData?.hits ?? [];
+  // Depends on the query result, not the derived array: `hits` is a fresh
+  // identity on every re-render, which would recompute this every time.
   const pageSkills: Skill[] = useMemo(
-    () => hits.map((hit) => hit.skill),
-    [hits],
+    () => (pageData?.hits ?? []).map((hit) => hit.skill),
+    [pageData],
   );
 
   // Repo-level header facts from the first skill (same repo ⇒ same stars).
