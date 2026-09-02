@@ -12,7 +12,7 @@
 /** Default CDN mirror of GitHub repo files (jsDelivr mirror, CORS-enabled). */
 export const DEFAULT_CDN_BASE = "https://cdn.jsdmirror.com";
 
-const SETTINGS_KEY = "skillone.cdn";
+const SETTINGS_KEY = "skill-one.cdn";
 
 // Persist via `window.localStorage` where available, with an in-memory fallback
 // so reads still work in environments without a storage backend (e.g. Vitest's

@@ -7,7 +7,7 @@ import { useNativeTheme } from "../hooks/use-native-theme";
  * separate HTML documents, so each root needs its own provider). They share a
  * localStorage origin and therefore the same key, keeping the two in sync.
  */
-const STORAGE_KEY = "skillone-theme";
+const STORAGE_KEY = "skill-one-theme";
 
 /**
  * shadcn/ui already ships the dark palette: `src/index.css` defines both a

@@ -32,7 +32,7 @@ Homebrew cask：
 
 ## 工作原理
 
-- **更新源**：`https://github.com/skill-one/skillone/releases/latest/download/latest.json`，启动时检查。
+- **更新源**：`https://github.com/skill-one/skill-one/releases/latest/download/latest.json`，启动时检查。
 - **校验**：更新包签名与 `src-tauri/tauri.conf.json` 里的 `plugins.updater.pubkey` 比对；
   未签名或由其他密钥签名的包永远不会被安装。
 - **流程**：`src/lib/update-store.ts`（状态）→ `UpdateDialog`（全局挂载，启动时自动弹出）
@@ -44,15 +44,15 @@ Homebrew cask：
 
 | 项目 | 值 |
 | --- | --- |
-| 私钥（本地副本） | `~/.tauri/skillone.updater.key` — **务必备份**；一旦丢失，已安装的用户将永远无法再收到任何更新 |
-| 公钥 | `~/.tauri/skillone.updater.key.pub`，已写入 `tauri.conf.json` |
+| 私钥（本地副本） | `~/.tauri/skill-one.updater.key` — **务必备份**；一旦丢失，已安装的用户将永远无法再收到任何更新 |
+| 公钥 | `~/.tauri/skill-one.updater.key.pub`，已写入 `tauri.conf.json` |
 | GitHub secrets | `TAURI_SIGNING_PRIVATE_KEY`（另有 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，值为空串） |
-| 生成密钥对 | `pnpm tauri signer generate --ci -p "" -w ~/.tauri/skillone.updater.key` |
+| 生成密钥对 | `pnpm tauri signer generate --ci -p "" -w ~/.tauri/skill-one.updater.key` |
 
 本地构建带签名的 bundle 同样需要这把密钥：
 
 ```sh
-export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/skillone.updater.key)"
+export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/skill-one.updater.key)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 pnpm tauri build --bundles app
 ```

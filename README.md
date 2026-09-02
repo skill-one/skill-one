@@ -18,7 +18,7 @@ A desktop app for finding, installing, and managing agent skills. Built on Tauri
 
 ### Download from Releases (recommended)
 
-Grab the latest `.dmg` from the [Releases](https://github.com/skill-one/skillone/releases) page (currently macOS on Apple Silicon), then:
+Grab the latest `.dmg` from the [Releases](https://github.com/skill-one/skill-one/releases) page (currently macOS on Apple Silicon), then:
 
 1. Open the `.dmg` and drag **Skill One** into your **Applications** folder.
 2. Launch it — see the [macOS first-launch note](#macos-first-launch) for the one-time Gatekeeper step.

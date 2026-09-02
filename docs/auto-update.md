@@ -33,7 +33,7 @@ No per-release config: the app always follows the newest release.
 
 ## How it works
 
-- **Endpoint**: `https://github.com/skill-one/skillone/releases/latest/download/latest.json`, checked at startup.
+- **Endpoint**: `https://github.com/skill-one/skill-one/releases/latest/download/latest.json`, checked at startup.
 - **Verification**: the package signature is checked against `plugins.updater.pubkey` in
   `src-tauri/tauri.conf.json`. Unsigned packages, or packages signed by another key, are
   never installed.
@@ -47,15 +47,15 @@ No per-release config: the app always follows the newest release.
 
 | Item | Value |
 | --- | --- |
-| Private key (local copy) | `~/.tauri/skillone.updater.key` — **back it up**; if it is lost, no existing install can ever accept an update again |
-| Public key | `~/.tauri/skillone.updater.key.pub`, embedded in `tauri.conf.json` |
+| Private key (local copy) | `~/.tauri/skill-one.updater.key` — **back it up**; if it is lost, no existing install can ever accept an update again |
+| Public key | `~/.tauri/skill-one.updater.key.pub`, embedded in `tauri.conf.json` |
 | GitHub secrets | `TAURI_SIGNING_PRIVATE_KEY` (+ `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, empty string) |
-| Generate a keypair | `pnpm tauri signer generate --ci -p "" -w ~/.tauri/skillone.updater.key` |
+| Generate a keypair | `pnpm tauri signer generate --ci -p "" -w ~/.tauri/skill-one.updater.key` |
 
 Building the signed bundle locally needs the same key:
 
 ```sh
-export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/skillone.updater.key)"
+export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/skill-one.updater.key)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 pnpm tauri build --bundles app
 ```

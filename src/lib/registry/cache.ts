@@ -8,7 +8,7 @@ import type { Skill } from "../../types/skill";
  * the multi-megabyte download be skipped outright.
  */
 
-const DB_NAME = "skillone-registry";
+const DB_NAME = "skill-one-registry";
 const DB_VERSION = 1;
 const STORE = "index";
 const KEY = "skills";

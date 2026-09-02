@@ -71,7 +71,7 @@ describe("ThemeModeToggle", () => {
     expect(document.documentElement.classList.contains("light")).toBe(false);
     // enableColorScheme drives native scrollbars / form controls.
     expect(document.documentElement.style.colorScheme).toBe("dark");
-    expect(stored.get("skillone-theme")).toBe("dark");
+    expect(stored.get("skill-one-theme")).toBe("dark");
   });
 
   it("returns to light when picked again", async () => {
@@ -84,7 +84,7 @@ describe("ThemeModeToggle", () => {
     expect(document.documentElement.classList.contains("light")).toBe(true);
     expect(document.documentElement.classList.contains("dark")).toBe(false);
     expect(document.documentElement.style.colorScheme).toBe("light");
-    expect(stored.get("skillone-theme")).toBe("light");
+    expect(stored.get("skill-one-theme")).toBe("light");
   });
 
   it("keeps the current theme when the active option is clicked again", async () => {
@@ -95,11 +95,11 @@ describe("ThemeModeToggle", () => {
     await user.click(screen.getByText("深色"));
 
     expect(document.documentElement.classList.contains("dark")).toBe(true);
-    expect(stored.get("skillone-theme")).toBe("dark");
+    expect(stored.get("skill-one-theme")).toBe("dark");
   });
 
   it("restores a previously stored dark theme on mount", () => {
-    stored.set("skillone-theme", "dark");
+    stored.set("skill-one-theme", "dark");
 
     renderToggle();
 

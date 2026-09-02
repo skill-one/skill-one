@@ -47,7 +47,7 @@ pnpm tauri build     # 构建发布包
 ## 项目结构
 
 ```
-skillone/
+skill-one/
 ├── src/                    # 前端（React + TypeScript）
 │   ├── components/         # 跨页面共享组件
 │   │   ├── ui/             # shadcn/ui 组件
@@ -92,7 +92,7 @@ skillone/
 
 shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 与 `.dark` 两套 oklch 变量，并声明了 `@custom-variant dark (&:is(.dark *))`，`src/components/ui/` 下的组件全部读取语义化 token。因此支持暗黑模式只需在 `<html>` 上切换 `dark` 类，这正是 [next-themes](https://github.com/pacocoursey/next-themes) 所做的事：
 
-- `src/components/theme-provider.tsx` —— 唯一的共享配置（`attribute="class"`、`defaultTheme="system"`、`enableColorScheme`、`storageKey="skillone-theme"`），并负责把主题同步到原生窗口。
+- `src/components/theme-provider.tsx` —— 唯一的共享配置（`attribute="class"`、`defaultTheme="system"`、`enableColorScheme`、`storageKey="skill-one-theme"`），并负责把主题同步到原生窗口。
 - `src/components/theme-mode-toggle.tsx` —— 设置页上的三选 `ToggleGroup` 分段控件。
 - `src/hooks/use-native-theme.ts` —— 在 Tauri 环境中调用 `getCurrentWindow().setTheme()`，让系统绘制的部分（标题栏、滚动条、表单控件、菜单栏 popover 的毛玻璃材质）一并跟随；`system` 映射为 `null`，交由操作系统自行决定。
 

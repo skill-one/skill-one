@@ -133,7 +133,7 @@ jobs:
             url "${DMG_URL}"
             name "Skill One"
             desc "Find, install and manage agent skills (Tauri v2 desktop app)"
-            homepage "https://github.com/skill-one/skillone"
+            homepage "https://github.com/skill-one/skill-one"
             app "Skill One.app"
           end
           RUBY

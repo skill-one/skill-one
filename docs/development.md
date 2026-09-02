@@ -47,7 +47,7 @@ pnpm tauri build     # Build release packages
 ## Project Structure
 
 ```
-skillone/
+skill-one/
 ├── src/                    # Frontend (React + TypeScript)
 │   ├── components/         # Components shared across pages
 │   │   ├── ui/             # shadcn/ui components
@@ -92,7 +92,7 @@ The app supports light, dark, and system-following appearance, switchable from t
 
 shadcn/ui ships the dark palette out of the box: `src/index.css` defines both a `:root` and a `.dark` set of oklch variables plus the `@custom-variant dark (&:is(.dark *))` rule, and every component under `src/components/ui/` reads semantic tokens. Supporting dark mode is therefore only a matter of toggling the `dark` class on `<html>` — which is what [next-themes](https://github.com/pacocoursey/next-themes) does:
 
-- `src/components/theme-provider.tsx` — the single shared configuration (`attribute="class"`, `defaultTheme="system"`, `enableColorScheme`, `storageKey="skillone-theme"`), also responsible for mirroring the theme onto the native window.
+- `src/components/theme-provider.tsx` — the single shared configuration (`attribute="class"`, `defaultTheme="system"`, `enableColorScheme`, `storageKey="skill-one-theme"`), also responsible for mirroring the theme onto the native window.
 - `src/components/theme-mode-toggle.tsx` — the three-way `ToggleGroup` on the settings page.
 - `src/hooks/use-native-theme.ts` — calls `getCurrentWindow().setTheme()` inside Tauri so OS-drawn surfaces (title bar, scrollbars, form controls, the tray popover's vibrancy) follow along. `system` maps to `null`, leaving that case to the OS.
 

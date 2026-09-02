@@ -18,7 +18,7 @@
 
 ### 从 Releases 下载（推荐）
 
-到 [Releases](https://github.com/skill-one/skillone/releases) 页面下载最新的 `.dmg`（目前提供 macOS Apple Silicon 版），然后：
+到 [Releases](https://github.com/skill-one/skill-one/releases) 页面下载最新的 `.dmg`（目前提供 macOS Apple Silicon 版），然后：
 
 1. 打开 `.dmg`，把 **Skill One** 拖入「应用程序」文件夹。
 2. 启动应用——首次启动只需按 [macOS 首次安装须知](#macos-首次安装须知) 放行一次 Gatekeeper。
