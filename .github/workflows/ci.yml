@@ -1,0 +1,68 @@
+name: ci
+
+# Runs the checks that already exist locally. Neither is covered by
+# `release.yml`, which only builds on a `v*` tag — so without this, a pushed
+# branch could fail typecheck, lint, tests or even Rust compilation and
+# nothing would notice until a release is attempted.
+#
+# `push` is limited to `main` so a pull request triggers exactly one run.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      # No `version` input: pnpm/setup reads `packageManager` from
+      # package.json, and passing a conflicting pin errors the workflow.
+      - name: Setup pnpm
+        uses: pnpm/setup@v1
+        with:
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Fails on lint errors only; the remaining warnings are reported in the
+      # log (see .oxlintrc.json for why each rule is on or off).
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test:run
+
+  # The commands in src-tauri are only exercised at runtime by the app, so a
+  # signature or handler-list mistake would otherwise surface at release time.
+  # macos-14 matches the release runner, which avoids installing the Linux
+  # GTK/WebKit toolchain just to type-check the crate.
+  rust:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+
+      - name: Check
+        run: cargo check --all-targets
+
+      - name: Test
+        run: cargo test
