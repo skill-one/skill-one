@@ -115,7 +115,7 @@ shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 
 两个设置细节能省下真实的时间：
 
 - **依赖要真装。** 软链主检出的 `node_modules` 会让 `pnpm build` 失败：pnpm 会先跑一遍安装预检，而软链目录满足不了它。在 worktree 里正常执行 `pnpm install`，`pnpm build`、`pnpm typecheck` 与 CI 的行为才会完全一致。
-- **共用 Rust 构建缓存。** `src-tauri/target` 有几十 GB，别让每个 worktree 从头编译一遍：用 `CARGO_TARGET_DIR=<repo>/src-tauri/target cargo check` 指回主检出。
+- **共用 Rust 构建缓存。** `src-tauri/target` 有几十 GB，别让每个 worktree 从头编译一遍：用 `CARGO_TARGET_DIR=<repo>/src-tauri/target cargo check` 指回主检出。注意：设了这个变量就**不要**执行 `cargo clean`，它会连主检出的缓存一起删掉；要先取消该变量，或只对 worktree 自己的 target 做清理。
 
 ## 发布
 
