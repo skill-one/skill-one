@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 
-import { OwnerAvatar } from "../../../components/owner-avatar";
 import { Button } from "../../../components/ui/button";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { useRanking } from "../../../hooks/use-ranking";
@@ -11,7 +10,7 @@ import { cn, errorMessage } from "../../../lib/utils";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../../../components/placeholder";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
-import { SkillInstallButton } from "../skill-install-button";
+import { SkillListRow } from "../skill-list-row";
 
 /** Where the back button points; the tabs live under the same route. */
 const FEATURED_PATH = "/explore/featured";
@@ -58,55 +57,18 @@ function RankingRow({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const { skill } = entry;
-  const owner = skill.repo.split("/")[0];
-
   return (
-    <li>
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label={`查看 ${skill.name} 详情`}
-        onClick={onSelect}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onSelect();
-          }
-        }}
-        className={cn(
-          "flex cursor-pointer items-center gap-4 rounded-xl border border-border/70 bg-card px-3.5 py-3 transition-all duration-150",
-          "hover:-translate-y-px hover:border-border hover:bg-accent/40 hover:shadow-[0_8px_24px_-16px_rgba(15,23,42,0.25)]",
-          selected && "border-primary ring-1 ring-primary",
-        )}
-      >
-        <RankBadge rank={entry.rank} />
-
-        <OwnerAvatar owner={owner} className="h-10 w-10 text-[15px]" />
-
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-baseline gap-2">
-            <h3 className="truncate text-[14px] font-semibold tracking-tight text-foreground">
-              {skill.name}
-            </h3>
-            <span className="truncate text-[12px] text-muted-foreground">
-              {skill.repo}
-            </span>
-          </div>
-          <p className="mt-0.5 hidden truncate text-[13px] leading-relaxed text-muted-foreground lg:block">
-            {skill.description || "暂无描述"}
-          </p>
-        </div>
-
+    <SkillListRow
+      skill={entry.skill}
+      selected={selected}
+      onSelect={onSelect}
+      leading={<RankBadge rank={entry.rank} />}
+      metric={
         <span className="shrink-0 text-[13px] font-medium tabular-nums text-foreground">
           {entry.label}
         </span>
-
-        {/* The install button stops its own click, so it never opens the
-            detail drawer behind it. */}
-        <SkillInstallButton skill={skill} />
-      </div>
-    </li>
+      }
+    />
   );
 }
 
