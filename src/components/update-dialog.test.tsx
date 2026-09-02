@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -42,7 +42,11 @@ describe("UpdateDialog", () => {
   it("shows version + notes once an update is available", async () => {
     mocks.check.mockResolvedValue(fakeUpdate());
     render(<UpdateDialog />);
-    await checkForUpdate();
+    // checkForUpdate resolves outside React's act scope; wrap it so the
+    // store-driven re-render does not warn.
+    await act(async () => {
+      await checkForUpdate();
+    });
 
     expect(
       await screen.findByRole("heading", { name: "更新到 v9.9.9" }),
@@ -63,7 +67,9 @@ describe("UpdateDialog", () => {
       },
     );
     render(<UpdateDialog />);
-    await checkForUpdate();
+    await act(async () => {
+      await checkForUpdate();
+    });
 
     await user.click(screen.getByRole("button", { name: "立即更新" }));
     await waitFor(() => expect(mocks.downloadAndInstall).toHaveBeenCalled());
@@ -75,7 +81,9 @@ describe("UpdateDialog", () => {
     mocks.check.mockResolvedValue(fakeUpdate());
     mocks.downloadAndInstall.mockRejectedValue(new Error("bad signature"));
     render(<UpdateDialog />);
-    await checkForUpdate();
+    await act(async () => {
+      await checkForUpdate();
+    });
 
     await user.click(screen.getByRole("button", { name: "立即更新" }));
 
@@ -92,7 +100,9 @@ describe("UpdateDialog", () => {
     const user = userEvent.setup();
     mocks.check.mockResolvedValue(fakeUpdate());
     render(<UpdateDialog />);
-    await checkForUpdate();
+    await act(async () => {
+      await checkForUpdate();
+    });
 
     await user.click(screen.getByRole("button", { name: "稍后再说" }));
     await waitFor(() =>

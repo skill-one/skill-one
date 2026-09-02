@@ -25,6 +25,10 @@ function renderCard() {
     <MemoryRouter initialEntries={["/explore/repos"]}>
       <Routes>
         <Route path="/explore/repos" element={<RepoCard repo={repo} />} />
+        <Route
+          path="/explore/repos/:owner/:name"
+          element={<div>repo detail</div>}
+        />
       </Routes>
       <LocationProbe />
     </MemoryRouter>,

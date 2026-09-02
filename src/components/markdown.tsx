@@ -45,7 +45,7 @@ export function Markdown({ children, repo, filePath }: MarkdownProps) {
   const components: Components = {
     // Links must never navigate the Tauri WebView itself; only external
     // schemes are handed to the system browser.
-    a: ({ href, children }) => {
+    a: ({ href, children: linkChildren }) => {
       const resolved =
         href && repo && filePath
           ? resolveUrl(href, "blob", repo, filePath)
@@ -60,7 +60,7 @@ export function Markdown({ children, repo, filePath }: MarkdownProps) {
             }
           }}
         >
-          {children}
+          {linkChildren}
         </a>
       );
     },

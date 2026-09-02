@@ -80,7 +80,7 @@ let queryClient: QueryClient;
  * `open = skill != null` wiring.
  */
 function DetailDrawer({
-  skill,
+  skill: currentSkill,
   onPrev,
   onNext,
 }: {
@@ -88,12 +88,12 @@ function DetailDrawer({
   onPrev?: () => void;
   onNext?: () => void;
 }) {
-  const [open, setOpen] = useState(skill != null);
+  const [open, setOpen] = useState(currentSkill != null);
   return (
     <QueryClientProvider client={queryClient}>
       <Drawer direction="right" open={open} onOpenChange={setOpen}>
         <SkillDetailPanel
-          skill={skill}
+          skill={currentSkill}
           onPrev={onPrev ?? (() => {})}
           onNext={onNext ?? (() => {})}
         />

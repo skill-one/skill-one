@@ -16,20 +16,20 @@ type EventHandler = (event: { payload: unknown }) => void;
 
 const { emitMock, hideMock, listenMock, focusChangedMock, eventHandlers, focusHandlers } =
   vi.hoisted(() => {
-    const eventHandlers = new Map<string, EventHandler>();
-    const focusHandlers = new Set<EventHandler>();
+    const handlerMap = new Map<string, EventHandler>();
+    const focusSet = new Set<EventHandler>();
     const unlisten = () => {};
     return {
       emitMock: vi.fn(),
       hideMock: vi.fn(),
-      eventHandlers,
-      focusHandlers,
+      eventHandlers: handlerMap,
+      focusHandlers: focusSet,
       listenMock: vi.fn((event: string, handler: EventHandler) => {
-        eventHandlers.set(event, handler);
+        handlerMap.set(event, handler);
         return Promise.resolve(unlisten);
       }),
       focusChangedMock: vi.fn((handler: EventHandler) => {
-        focusHandlers.add(handler);
+        focusSet.add(handler);
         return Promise.resolve(unlisten);
       }),
     };
