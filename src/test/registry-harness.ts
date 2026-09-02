@@ -1,7 +1,6 @@
 import { createRegistryController } from "../lib/registry/worker-controller";
 import type {
   FeaturedData,
-  IndexInfo,
   PageData,
   PageRequest,
   RankingData,
@@ -78,6 +77,8 @@ export function createRegistryHarness(): RegistryHarness {
     queued = true;
     queueMicrotask(() => {
       queued = false;
+      // Snapshot the Set: a listener that unsubscribes must not disturb this walk.
+      // eslint-disable-next-line unicorn/no-useless-spread
       for (const listener of [...listeners]) listener();
     });
   };

@@ -9,9 +9,9 @@ import { getRegistrySnapshot, subscribeRegistry } from "../lib/registry/client";
  * against the new registry instead of serving a stale answer.
  *
  * Shared by the queries that only mean anything against the whole registry —
- * featured curation and leaderboards. Queries that also track the streaming
- * download (paged browse/search) keep their own subscription, since their
- * invalidation rule is broader.
+ * featured curation, leaderboards and the repos list. The paged skill browse
+ * query keeps its own subscription: it also repaints while the download
+ * streams in, so its invalidation rule is broader than an epoch bump.
  */
 export function useInvalidateOnRegistryEpoch(queryKey: readonly unknown[]) {
   const queryClient = useQueryClient();

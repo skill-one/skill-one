@@ -49,7 +49,7 @@ class IntersectionObserverMock {
   /** Test-only: simulate the observed element entering/leaving the viewport. */
   trigger(intersecting = true) {
     const entries: IntersectionObserverEntry[] = [...this.elements].map(
-      (el) => ({ isIntersecting: intersecting }) as IntersectionObserverEntry,
+      () => ({ isIntersecting: intersecting }) as IntersectionObserverEntry,
     );
     this.callback(entries, this as unknown as IntersectionObserver);
   }

@@ -6,7 +6,7 @@ import { useInvalidateOnRegistryEpoch } from "./use-invalidate-on-registry-epoch
 import { useRegistryStats } from "./use-registry-stats";
 
 /** Query-key prefix shared by every leaderboard query. */
-export const RANKING_QUERY_PREFIX = "ranking";
+const RANKING_QUERY_PREFIX = "ranking";
 
 /**
  * One leaderboard, fully ranked inside the registry worker. Like the featured

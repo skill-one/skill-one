@@ -55,7 +55,7 @@ skill-one/
 │   │   ├── agent-icon.tsx  # agent 品牌图标
 │   │   ├── owner-avatar.tsx# 仓库头像
 │   │   ├── skill-detail/    # 共享的 skill 详情面板与模态抽屉
-│   │   └── placeholder-page.tsx # 未实现页面的占位
+│   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
 │   │   ├── explore/        # 商店探索相关页面（skill-list-row / skill-install-button）
 │   │   │   └── featured/   # 精选页（hero 榜单轮播 + 分类区块）
@@ -108,11 +108,20 @@ shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 
 
 测试使用 Vitest + Testing Library，运行在 `jsdom` 环境。组件测试与 `src/lib` 下的单元测试均遵循「一个文件对应一个 `*.test.ts(x)`」的约定，可通过 `pnpm test:run` 一键运行。
 
+## 隔离 worktree
+
+新任务在 `.worktrees/` 下的 `git worktree` 里进行，以保证 `main` 的检出照常可用；worktree 里的 dev server 不能占用 5173（那是 `main` 的端口，且启用 `strictPort`），请用 5273 的 `pnpm dev:test`。
+
+两个设置细节能省下真实的时间：
+
+- **依赖要真装。** 软链主检出的 `node_modules` 会让 `pnpm build` 失败：pnpm 会先跑一遍安装预检，而软链目录满足不了它。在 worktree 里正常执行 `pnpm install`，`pnpm build`、`pnpm typecheck` 与 CI 的行为才会完全一致。
+- **共用 Rust 构建缓存。** `src-tauri/target` 有几十 GB，别让每个 worktree 从头编译一遍：用 `CARGO_TARGET_DIR=<repo>/src-tauri/target cargo check` 指回主检出。注意：设了这个变量就**不要**执行 `cargo clean`，它会连主检出的缓存一起删掉；要先取消该变量，或只对 worktree 自己的 target 做清理。
+
 ## 发布
 
 发版就是推一个附注 tag——完整流程与产物说明见 [auto-update.zh-CN.md](auto-update.zh-CN.md)。简要：
 
-1. **更新版本号**：`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` **和** `src-tauri/Cargo.lock` 四处的 `version` 必须完全一致，发布提交里四处一起带上。
+1. **更新版本号**：必须保持一致的位置见 [auto-update.zh-CN.md](auto-update.zh-CN.md) 第 1 步，那份文档同时给出提交命令。
 2. **提交并打 tag**：`chore(release): bump version to X.Y.Z`，随后 `git tag -a vX.Y.Z -m "vX.Y.Z"`。
 3. **推送**：先 `git push origin main`，再推 tag——推送 `v*` tag 正是触发构建的动作。
 

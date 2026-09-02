@@ -27,6 +27,21 @@ export function formatRev(rev: string): string {
 }
 
 /**
+ * Best-effort displayable message for a rejected action. Tauri commands reject
+ * with a plain string rather than an `Error`, so reading `err.message` alone
+ * loses the reason; `fallback` covers anything with no usable text.
+ */
+export function errorMessage(err: unknown, fallback = "未知错误"): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === "string" && err.trim()) return err;
+  if (err && typeof err === "object") {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+  }
+  return fallback;
+}
+
+/**
  * Date part of an ISO timestamp, in the user's locale and time zone. Returns
  * null when there is nothing to show (absent or unparseable), so callers can
  * skip the field instead of rendering a placeholder.

@@ -4,8 +4,9 @@ import { Download, ExternalLink, Loader2, Puzzle, Star } from "lucide-react";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { fetchLocalSkillDetail } from "../../lib/local-skills";
+import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
-import { formatDate, formatCount, formatRev } from "../../lib/utils";
+import { errorMessage, formatDate, formatCount, formatRev } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -112,6 +113,8 @@ export function SkillDetailPanel({
   // Repo-relative SKILL.md path, reused for the GitHub file link and to
   // resolve relative URLs inside the markdown body.
   const filePath = detail?.path.replace(/^\/+|\/+$/g, "") ?? "";
+  // The link's href and its open-externally handler point at the same place.
+  const skillBlobUrl = githubBlobUrl(shown?.repo, filePath);
   // Version identity as the registry sees it: the directory fingerprint, and
   // how long the index has carried that exact content. From the index entry,
   // not the SKILL.md — so absent on unscanned entries and on local installs
@@ -201,7 +204,7 @@ export function SkillDetailPanel({
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <p className="text-[13px] leading-relaxed text-muted-foreground">
               加载失败：
-              {error instanceof Error ? error.message : "未知错误"}
+              {errorMessage(error)}
               <br />
               该技能目录下可能没有可访问的 SKILL.md。
             </p>
@@ -228,12 +231,10 @@ export function SkillDetailPanel({
                 </p>
               ) : (
                 <a
-                  href={`https://github.com/${shown?.repo}/blob/HEAD/${filePath}`}
+                  href={skillBlobUrl}
                   onClick={(e) => {
                     e.preventDefault();
-                    void openExternal(
-                      `https://github.com/${shown?.repo}/blob/HEAD/${filePath}`,
-                    );
+                    void openExternal(skillBlobUrl);
                   }}
                   title="在 GitHub 中打开 SKILL.md"
                   className="mb-2 flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground"

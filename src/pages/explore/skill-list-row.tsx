@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Download } from "lucide-react";
 
 import type { SearchField } from "../../lib/registry/protocol";
@@ -64,6 +64,8 @@ export function SkillListRow({
   matched,
   selected = false,
   onSelect,
+  leading,
+  metric,
 }: {
   skill: Skill;
   /** Search-hit highlights; absent outside a search (nothing highlighted). */
@@ -72,6 +74,10 @@ export function SkillListRow({
   selected?: boolean;
   /** Opens the skill detail panel. */
   onSelect?: () => void;
+  /** Slot before the avatar — a leaderboard rank badge. */
+  leading?: ReactNode;
+  /** Replaces the download-count metric when the surface has its own unit. */
+  metric?: ReactNode;
 }) {
   // The failure message of the last install attempt, shown under the row.
   const [installError, setInstallError] = useState<string | null>(null);
@@ -98,6 +104,7 @@ export function SkillListRow({
           selected && "border-primary ring-1 ring-primary",
         )}
       >
+        {leading}
         <OwnerAvatar owner={owner} className="h-10 w-10 text-[15px]" />
 
         <div className="min-w-0 flex-1">
@@ -117,12 +124,14 @@ export function SkillListRow({
           </p>
         </div>
 
-        <span className="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground">
-          <Download className="h-3.5 w-3.5" />
-          <span className="font-medium tabular-nums">
-            {formatCount(skill.downloads)}
+        {metric ?? (
+          <span className="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground">
+            <Download className="h-3.5 w-3.5" />
+            <span className="font-medium tabular-nums">
+              {formatCount(skill.downloads)}
+            </span>
           </span>
-        </span>
+        )}
 
         {/* The install button stops its own click, so it never opens the
             detail panel behind it. */}

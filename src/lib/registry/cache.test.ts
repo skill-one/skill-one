@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { createRegistryCache } from "./cache";
+import type { KeyValueStore } from "./cache";
 import type { Skill } from "../../types/skill";
 
 const skills: Skill[] = [
@@ -8,51 +9,30 @@ const skills: Skill[] = [
   { name: "b", repo: "o/b", description: "", stars: 3, downloads: 4 },
 ];
 
-/** A request object that completes on the next microtask, like real IDB. */
-function makeRequest(result?: unknown, fail = false): IDBRequest {
-  const request = {
-    result,
-    onsuccess: null as null | (() => void),
-    onerror: null as null | (() => void),
-  };
-  queueMicrotask(() => (fail ? request.onerror?.() : request.onsuccess?.()));
-  return request as unknown as IDBRequest;
-}
-
 /**
- * Minimal in-memory stand-in for the IndexedDB surface the cache uses:
- * one object store keyed by a single string. `failGets` turns every read
- * into a failing request.
+ * In-memory stand-in for the key/value layer, with switches to make every
+ * operation reject (a blocked database) or only reads reject.
  */
-function fakeDb(failGets = false) {
-  const store = new Map<string, unknown>();
-  const db = {
-    close: vi.fn(),
-    transaction: () => ({
-      objectStore: () => ({
-        get: (key: string) => makeRequest(store.get(key), failGets),
-        put: (value: unknown, key: string) => {
-          store.set(key, value);
-          return makeRequest();
-        },
-        delete: (key: string) => {
-          store.delete(key);
-          return makeRequest();
-        },
-      }),
-    }),
-  };
-  return { db, store };
-}
-
-function openDbOf(db: object) {
-  return () => Promise.resolve(db as unknown as IDBDatabase);
+function fakeStore(reject: "all" | "get" | "none" = "none") {
+  const data = new Map<string, unknown>();
+  const down = () => Promise.reject(new Error("blocked"));
+  const blocked = reject === "all";
+  return {
+    data,
+    get: <T>(key: string) =>
+      blocked || reject === "get"
+        ? down()
+        : Promise.resolve(data.get(key) as T | undefined),
+    set: (key: string, value: unknown) =>
+      blocked ? down() : (data.set(key, value), Promise.resolve()),
+    del: (key: string) =>
+      blocked ? down() : (data.delete(key), Promise.resolve()),
+  } satisfies KeyValueStore & { data: Map<string, unknown> };
 }
 
 describe("createRegistryCache", () => {
   it("round-trips the parsed registry and its identity through save/load", async () => {
-    const { db } = fakeDb();
-    const cache = createRegistryCache(openDbOf(db));
+    const cache = createRegistryCache(fakeStore());
 
     await cache.save(skills, {
       commit: "e52627fe",
@@ -71,8 +51,7 @@ describe("createRegistryCache", () => {
   });
 
   it("loads a record saved without an identity as an unknown commit", async () => {
-    const { db } = fakeDb();
-    const cache = createRegistryCache(openDbOf(db));
+    const cache = createRegistryCache(fakeStore());
 
     await cache.save(skills);
     // A record from before commit addressing (or from a run that could not
@@ -84,42 +63,39 @@ describe("createRegistryCache", () => {
   });
 
   it("returns null on an empty store", async () => {
-    const { db } = fakeDb();
-    const cache = createRegistryCache(openDbOf(db));
-    await expect(cache.load()).resolves.toBeNull();
+    await expect(createRegistryCache(fakeStore()).load()).resolves.toBeNull();
   });
 
   it("drops records written by an older schema version", async () => {
-    const { db, store } = fakeDb();
-    const cache = createRegistryCache(openDbOf(db));
+    const store = fakeStore();
+    const cache = createRegistryCache(store);
     await cache.save(skills, { commit: "e52627fe" });
 
     // Age the stored record into a previous schema version.
-    const record = [...store.values()][0] as { schemaVersion: number };
+    const record = [...store.data.values()][0] as { schemaVersion: number };
     record.schemaVersion = -1;
     await expect(cache.load()).resolves.toBeNull();
   });
 
   it("clear() removes the stored record", async () => {
-    const { db } = fakeDb();
-    const cache = createRegistryCache(openDbOf(db));
+    const cache = createRegistryCache(fakeStore());
     await cache.save(skills, { commit: "e52627fe" });
     await cache.clear();
     await expect(cache.load()).resolves.toBeNull();
   });
 
-  it("degrades to null / no-ops when the database cannot open", async () => {
-    const cache = createRegistryCache(() =>
-      Promise.reject(new Error("blocked")),
-    );
+  it("degrades to null / no-ops when the database is unreachable", async () => {
+    const cache = createRegistryCache(fakeStore("all"));
     await expect(cache.load()).resolves.toBeNull();
-    await expect(cache.save(skills, { commit: "e52627fe" })).resolves.toBeUndefined();
+    await expect(
+      cache.save(skills, { commit: "e52627fe" }),
+    ).resolves.toBeUndefined();
     await expect(cache.clear()).resolves.toBeUndefined();
   });
 
-  it("degrades to null when a read request fails", async () => {
-    const { db } = fakeDb(true);
-    const cache = createRegistryCache(openDbOf(db));
-    await expect(cache.load()).resolves.toBeNull();
+  it("degrades to null when a read fails", async () => {
+    await expect(
+      createRegistryCache(fakeStore("get")).load(),
+    ).resolves.toBeNull();
   });
 });

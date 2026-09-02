@@ -15,14 +15,13 @@ import { isTauri } from "./tauri";
 import { toDetail } from "./skill-detail-api";
 import type { SkillDetail } from "../types/skill";
 import {
-  disableSkills,
-  enableSkills,
   getLinkStatus,
   installSkill,
   linkAgents,
   listInstalledSkills,
   readSkillMd,
   removeSkills,
+  setSkillsEnabled,
   unlinkAgents,
   type AgentLinkResult,
   type AgentStatus,
@@ -226,11 +225,7 @@ export async function setSkillEnabled(
   enabled: boolean,
 ): Promise<void> {
   if (isTauri()) {
-    if (enabled) {
-      await enableSkills([name]);
-    } else {
-      await disableSkills([name]);
-    }
+    await setSkillsEnabled(enabled, [name]);
     return;
   }
   setMockSkillEnabled(name, enabled);

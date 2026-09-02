@@ -5,13 +5,21 @@
  * of buttons. When there are few pages (≤ SHOW_ALL_THRESHOLD) every page number
  * is shown directly.
  *
- * Used by the shared ListPager component.
+ * Used by the shared ListPager component, and the home of the defaults every
+ * paginated list page shares.
  */
 
+/** Rows per page across the store's lists — one rhythm on every surface. */
+export const PAGE_SIZE = 24;
+
+/** Keystrokes settle this long before a search takes effect (worker query or
+ * local filter). */
+export const SEARCH_DEBOUNCE_MS = 150;
+
 /** Pages at or below this count render every page number directly. */
-export const SHOW_ALL_THRESHOLD = 9;
+const SHOW_ALL_THRESHOLD = 9;
 /** Pages rendered on each side of the current one in the collapsed window. */
-export const PAGE_WINDOW = 2;
+const PAGE_WINDOW = 2;
 
 export function pageRange(current: number, total: number): Array<number | "..."> {
   if (total <= SHOW_ALL_THRESHOLD) {
@@ -23,7 +31,7 @@ export function pageRange(current: number, total: number): Array<number | "...">
   }
   const sorted = [...pages]
     .filter((p) => p >= 1 && p <= total)
-    .sort((a, b) => a - b);
+    .toSorted((a, b) => a - b);
   const out: Array<number | "..."> = [];
   let prev = 0;
   for (const p of sorted) {

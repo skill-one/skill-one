@@ -1,6 +1,8 @@
-// Self-update state store — a tiny external store (same pattern as
-// `lib/projects.ts`) so both the global UpdateDialog and the settings page
-// share one source of truth without context plumbing.
+// Self-update state store — a tiny external store so the global
+// UpdateDialog and the settings page share one source of truth without
+// context plumbing. Update state is deliberately outside React Query: the
+// flow is a multi-step imperative one (check, then download with progress,
+// then relaunch), not a read-once query.
 //
 // The real work is done by the official updater plugin: `check()` fetches the
 // endpoint declared in tauri.conf.json (GitHub Releases `latest.json`), and
@@ -11,6 +13,7 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
+import { errorMessage } from "./utils";
 import { isTauri } from "./tauri";
 
 export type UpdatePhase = "idle" | "checking" | "upToDate" | "available" | "error";
@@ -81,7 +84,7 @@ export async function checkForUpdate(): Promise<void> {
     });
   } catch (error) {
     pending = null;
-    emit({ ...INITIAL, phase: "error", error: String(error) });
+    emit({ ...INITIAL, phase: "error", error: errorMessage(error) });
   }
 }
 

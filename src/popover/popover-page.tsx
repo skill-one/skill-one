@@ -6,6 +6,7 @@ import { LoaderCircle, Sparkles } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
+import { errorMessage } from "../lib/utils";
 import { isTauri } from "../lib/tauri";
 import {
   MY_SKILLS_PATH,
@@ -64,7 +65,7 @@ export function PopoverPage() {
         {isError ? (
           <Notice
             title="技能列表加载失败"
-            detail={error instanceof Error ? error.message : "未知错误"}
+            detail={errorMessage(error)}
           />
         ) : isLoading ? (
           <div className="flex h-full items-center justify-center">

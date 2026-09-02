@@ -5,7 +5,6 @@ import { act, within, fireEvent } from "@testing-library/react";
 
 import { renderWithRouter, screen, waitFor } from "../../../test/test-utils";
 import { fetchSkillDetail } from "../../../lib/skill-detail-api";
-import { createRegistryClientMock } from "../../../test/registry-harness";
 import type { RegistryHarness } from "../../../test/registry-harness";
 import type { Skill } from "../../../types/skill";
 import { RankingPage } from "./ranking-page";

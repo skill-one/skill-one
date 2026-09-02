@@ -15,7 +15,7 @@ import {
   unlinkAgent,
 } from "../../lib/local-skills";
 import type { AgentStatus } from "../../lib/skills-manager";
-import { cn } from "../../lib/utils";
+import { cn, errorMessage } from "../../lib/utils";
 import { INSTALLED_SKILLS_QUERY_KEY } from "../../hooks/use-installed-skills";
 import { AgentIcon } from "../../components/agent-icon";
 import { Button } from "../../components/ui/button";
@@ -98,7 +98,7 @@ export function AgentAvatarMenu() {
     },
     onError: (err) =>
       setNotice({
-        text: `链接失败：${err instanceof Error ? err.message : String(err)}`,
+        text: `链接失败：${errorMessage(err)}`,
         kind: "error",
       }),
   });
@@ -111,7 +111,7 @@ export function AgentAvatarMenu() {
     },
     onError: (err) =>
       setNotice({
-        text: `链接失败：${err instanceof Error ? err.message : String(err)}`,
+        text: `链接失败：${errorMessage(err)}`,
         kind: "error",
       }),
   });
@@ -124,7 +124,7 @@ export function AgentAvatarMenu() {
     },
     onError: (err) =>
       setNotice({
-        text: `取消链接失败：${err instanceof Error ? err.message : String(err)}`,
+        text: `取消链接失败：${errorMessage(err)}`,
         kind: "error",
       }),
   });
@@ -137,7 +137,7 @@ export function AgentAvatarMenu() {
     },
     onError: (err) =>
       setNotice({
-        text: `一键链接失败：${err instanceof Error ? err.message : String(err)}`,
+        text: `一键链接失败：${errorMessage(err)}`,
         kind: "error",
       }),
   });
@@ -223,7 +223,7 @@ export function AgentAvatarMenu() {
         <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
           <Users className="h-7 w-7 opacity-40" />
           <p className="text-[12px]">
-            加载失败：{error instanceof Error ? error.message : "未知错误"}
+            加载失败：{errorMessage(error)}
           </p>
         </div>
       ) : isLoading ? (

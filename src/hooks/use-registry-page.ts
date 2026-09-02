@@ -9,7 +9,7 @@ import {
 import type { SortOrder } from "../lib/registry/protocol";
 
 /** Query-key prefix shared by every paged registry query. */
-export const REGISTRY_PAGE_QUERY_PREFIX = "registry-page";
+const REGISTRY_PAGE_QUERY_PREFIX = "registry-page";
 
 /**
  * One paged slice of the registry (browse, search, or a single repo's

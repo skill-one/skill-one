@@ -38,7 +38,7 @@ export interface HeroSlide {
  * never disagree: both rank the same registry with the same `metric` and
  * print the same `label`, only taking a different slice of it.
  */
-export interface RankingDef {
+interface RankingDef {
   /** Stable identifier; also the leaderboard page's route param. */
   id: string;
   /** Leaderboard heading. */
@@ -119,8 +119,8 @@ export function rankSkills(
   const pool = skills.filter(
     (skill) => (!def.filter || def.filter(skill)) && def.metric(skill) >= floor,
   );
-  const entries = [...pool]
-    .sort((a, b) => def.metric(b) - def.metric(a))
+  const entries = pool
+    .toSorted((a, b) => def.metric(b) - def.metric(a))
     .slice(0, limit)
     .map((skill, i) => ({ rank: i + 1, skill, label: def.label(skill) }));
   return { entries, total: pool.length };

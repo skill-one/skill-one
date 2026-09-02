@@ -4,18 +4,17 @@ import { ArrowLeft, Star } from "lucide-react";
 
 import { OwnerAvatar } from "../../../components/owner-avatar";
 import { Button } from "../../../components/ui/button";
-import { Skeleton } from "../../../components/ui/skeleton";
+import { SkeletonList } from "../../../components/skeleton-list";
 import { useRegistryPage } from "../../../hooks/use-registry-page";
 import { useRegistryStats } from "../../../hooks/use-registry-stats";
 import { formatCount } from "../../../lib/utils";
 import type { Skill } from "../../../types/skill";
-import { Placeholder } from "../explore-page";
+import { Placeholder } from "../../../components/placeholder";
 import { ListPager } from "../../../components/list-pager";
 import { SkillListRow } from "../skill-list-row";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
-
-/** Number of skills shown per page on the repo detail page. */
-const PAGE_SIZE = 24;
+import { PAGE_SIZE } from "../../../lib/pagination";
+import { useClampedPage } from "../../../hooks/use-clamped-page";
 
 /** Where the back button points; the repos list lives one level up. */
 const REPOS_PATH = "/explore/repos";
@@ -27,11 +26,11 @@ const REPOS_PATH = "/explore/repos";
  */
 function RepoDetailSkeleton() {
   return (
-    <div className="flex flex-col gap-2" aria-hidden>
-      {Array.from({ length: 9 }, (_, i) => (
-        <Skeleton key={i} className="h-16 rounded-xl" />
-      ))}
-    </div>
+    <SkeletonList
+      rows={9}
+      listClassName="flex flex-col gap-2"
+      itemClassName="h-16 rounded-xl"
+    />
   );
 }
 
@@ -65,9 +64,11 @@ export function RepoDetailPage() {
   } = useRegistryPage("", "default", page - 1, PAGE_SIZE, repoId);
 
   const hits = pageData?.hits ?? [];
+  // Depends on the query result, not the derived array: `hits` is a fresh
+  // identity on every re-render, which would recompute this every time.
   const pageSkills: Skill[] = useMemo(
-    () => hits.map((hit) => hit.skill),
-    [hits],
+    () => (pageData?.hits ?? []).map((hit) => hit.skill),
+    [pageData],
   );
 
   // Repo-level header facts from the first skill (same repo ⇒ same stars).
@@ -86,12 +87,8 @@ export function RepoDetailPage() {
     isLoading || (hits.length === 0 && stats.count === 0 && !failure);
 
   const total = pageData?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
   // A background refetch can shrink the list below the current page.
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  const totalPages = useClampedPage(page, total, PAGE_SIZE, setPage);
 
   // Switching repos replaces the whole list, so any open drawer would point
   // at a skill that is no longer on screen (e.g. the popover navigating).

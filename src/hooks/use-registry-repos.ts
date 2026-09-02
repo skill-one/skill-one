@@ -1,12 +1,12 @@
-import { useEffect, useRef } from "react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
-import { getRepos, getRegistrySnapshot, subscribeRegistry } from "../lib/registry/client";
+import { getRepos } from "../lib/registry/client";
 import type { ReposRequest } from "../lib/registry/protocol";
+import { useInvalidateOnRegistryEpoch } from "./use-invalidate-on-registry-epoch";
 import { useRegistryStats } from "./use-registry-stats";
 
 /** Query-key prefix shared by every paged repos query. */
-export const REGISTRY_REPOS_QUERY_PREFIX = "registry-repos";
+const REGISTRY_REPOS_QUERY_PREFIX = "registry-repos";
 
 /**
  * One paged slice of the per-repo aggregation, fetched from the worker.
@@ -24,20 +24,8 @@ export function useRegistryRepos(
   pageSize: number,
 ) {
   const { ready } = useRegistryStats();
-  const queryClient = useQueryClient();
-  const seenEpoch = useRef(getRegistrySnapshot().epoch);
 
-  useEffect(() => {
-    return subscribeRegistry(() => {
-      const { epoch } = getRegistrySnapshot();
-      if (epoch !== seenEpoch.current) {
-        seenEpoch.current = epoch;
-        void queryClient.invalidateQueries({
-          queryKey: [REGISTRY_REPOS_QUERY_PREFIX],
-        });
-      }
-    });
-  }, [queryClient]);
+  useInvalidateOnRegistryEpoch([REGISTRY_REPOS_QUERY_PREFIX]);
 
   return useQuery({
     queryKey: [REGISTRY_REPOS_QUERY_PREFIX, query, sort, page, pageSize],

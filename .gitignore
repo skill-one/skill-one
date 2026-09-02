@@ -15,10 +15,12 @@ src-tauri/target
 src-tauri/gen/schemas
 
 # Ignore dotfiles and dot-directories by default; re-include the few that
-# belong in version control (.gitignore files and the GitHub workflows).
+# belong in version control (.gitignore files, the GitHub workflows, the
+# linter config).
 .*
 !.gitignore
 !.github/
+!.oxlintrc.json
 
 # Editor / OS leftovers without a leading dot
 *.suo

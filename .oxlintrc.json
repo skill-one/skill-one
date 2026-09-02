@@ -1,0 +1,31 @@
+// oxlint rather than eslint: typescript-eslint still refuses TypeScript 7 (this
+// repo is on TS 7), and unused-code checks already belong to the compiler via
+// noUnusedLocals / noUnusedParameters in tsconfig.app.json.
+// Rules are switched off below where the flagged pattern is deliberate.
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react-hooks", "import", "promise"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "eslint/no-shadow": "warn",
+    "eslint/preserve-caught-error": "error",
+    "unicorn/no-array-sort": "error",
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+    "react/set-state-in-effect": "off",
+    "react/purity": "off",
+    "react/globals": "off",
+    "typescript/triple-slash-reference": "off",
+    "unicorn/prefer-add-event-listener": "off",
+    "unicorn/require-post-message-target-origin": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "eslint/no-underscore-dangle": "off",
+    "vitest/require-mock-type-parameters": "off"
+  },
+  "ignorePatterns": ["dist", "coverage", "src-tauri"],
+  "env": {
+    "builtin": true
+  }
+}

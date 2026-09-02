@@ -1,6 +1,7 @@
 import { parse as parseYaml } from "yaml";
 
 import type { SkillDetail } from "../types/skill";
+import { errorMessage } from "./utils";
 import { SourceFetchError, fetchFirstText, fileCandidates } from "./cdn-config";
 
 /** Frontmatter fields surfaced in the detail view. */
@@ -8,7 +9,6 @@ const FRONTMATTER_FIELDS = [
   "name",
   "description",
   "license",
-  "version",
   "author",
 ] as const;
 
@@ -47,11 +47,13 @@ export async function fetchSkillDetail(
     // timeout, server error) is a connectivity problem, so name the underlying
     // cause instead of misreporting it as a missing file.
     if (err instanceof SourceFetchError && err.kind === "http" && err.status === 404) {
-      throw new Error(`SKILL.md for ${skillId} not found in ${repo}`);
+      throw new Error(`SKILL.md for ${skillId} not found in ${repo}`, {
+        cause: err,
+      });
     }
-    throw new Error(
-      `无法获取 ${skillId} 的 SKILL.md：${err instanceof Error ? err.message : String(err)}`,
-    );
+    throw new Error(`无法获取 ${skillId} 的 SKILL.md：${errorMessage(err)}`, {
+      cause: err,
+    });
   }
 }
 
@@ -86,7 +88,7 @@ export function parseFrontmatter(raw: string): {
       for (const field of FRONTMATTER_FIELDS) {
         const value = record[field];
         if (typeof value === "string") frontmatter[field] = value;
-        // YAML parses `version: 2` as a number; keep it displayable.
+        // YAML parses `license: 2` as a number; keep it displayable.
         else if (typeof value === "number") frontmatter[field] = String(value);
       }
     }
@@ -109,7 +111,6 @@ export function toDetail(raw: string, skillId: string, path: string): SkillDetai
     name: frontmatter.name ?? skillId,
     description: frontmatter.description ?? "",
     license: frontmatter.license,
-    version: frontmatter.version,
     author: frontmatter.author,
     instructions: body,
     path,

@@ -19,17 +19,12 @@ export const INSTALLED_SKILLS_QUERY_KEY = ["installed-skills"] as const;
  * they all read the same cache entry via the shared key.
  */
 export function useInstalledSkills() {
-  const query = useQuery({
+  // v5 already names these isLoading (=== isPending), isError and error, so
+  // there is nothing to translate; the wrapper exists to own the shared key.
+  return useQuery({
     queryKey: INSTALLED_SKILLS_QUERY_KEY,
     queryFn: fetchInstalledSkills,
   });
-
-  return {
-    data: query.data,
-    isLoading: query.isPending,
-    isError: query.isError,
-    error: query.error,
-  };
 }
 
 /**

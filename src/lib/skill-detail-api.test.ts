@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 describe("parseFrontmatter", () => {
-  it("extracts single-line fields, quoted values and the body", () => {
+  it("extracts single-line fields and the body, ignoring unmodeled keys", () => {
     const raw = `---
 name: pdf
 description: "Read and merge PDF documents."
@@ -38,9 +38,11 @@ Use this skill for PDFs.`;
       name: "pdf",
       description: "Read and merge PDF documents.",
       license: "MIT",
-      version: "1.2.0",
       author: "Anthropic",
     });
+    // Deliberate: the registry's content fingerprint, not the author's own
+    // version string, is the version identity the detail view shows.
+    expect(frontmatter).not.toHaveProperty("version");
     expect(body).toBe("# Instructions\n\nUse this skill for PDFs.");
   });
 
@@ -61,7 +63,7 @@ metadata:
 description: >-
   Comprehensive PDF
   processing toolkit
-version: 2
+license: 2
 ---
 Body`;
 
@@ -69,7 +71,7 @@ Body`;
     expect(frontmatter).toEqual({
       name: "pdf",
       description: "Comprehensive PDF processing toolkit",
-      version: "2",
+      license: "2",
     });
   });
 
@@ -118,7 +120,6 @@ describe("fetchSkillDetail", () => {
       name: "pdf",
       description: "",
       license: undefined,
-      version: undefined,
       author: undefined,
       instructions: "Body",
       path: "skills/pdf/SKILL.md",
