@@ -125,7 +125,7 @@ function BrandHeader() {
           className="size-8 shrink-0 object-contain"
         />
         <span className="text-[14px] font-semibold text-foreground">
-          Skill ONE
+          Skill One
         </span>
       </div>
     </SidebarHeader>
