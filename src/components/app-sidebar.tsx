@@ -120,7 +120,7 @@ function BrandHeader() {
       {isTauri() && <div data-tauri-drag-region className="h-6 shrink-0" />}
       <div className="flex items-center gap-2.5 px-1 py-2">
         <img
-          src="/skill-one.png"
+          src="/skill-one-transparent.png"
           alt=""
           className="size-8 shrink-0 rounded-lg object-cover shadow-sm"
         />
