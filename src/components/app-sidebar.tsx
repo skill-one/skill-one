@@ -119,9 +119,11 @@ function BrandHeader() {
           it draggable so the window can be moved from the sidebar top. */}
       {isTauri() && <div data-tauri-drag-region className="h-6 shrink-0" />}
       <div className="flex items-center gap-2.5 px-1 py-2">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold shadow-sm">
-          S
-        </div>
+        <img
+          src="/skill-one.png"
+          alt=""
+          className="size-8 shrink-0 rounded-lg object-cover shadow-sm"
+        />
         <span className="text-[14px] font-semibold text-foreground">
           Skill One
         </span>
