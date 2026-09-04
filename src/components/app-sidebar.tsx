@@ -122,10 +122,10 @@ function BrandHeader() {
         <img
           src="/skill-one-transparent.png"
           alt=""
-          className="size-8 shrink-0 rounded-lg object-cover shadow-sm"
+          className="size-8 shrink-0 object-contain"
         />
         <span className="text-[14px] font-semibold text-foreground">
-          Skill One
+          Skill ONE
         </span>
       </div>
     </SidebarHeader>
