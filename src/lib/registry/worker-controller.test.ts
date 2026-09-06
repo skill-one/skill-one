@@ -46,8 +46,8 @@ function skill(i: number, over: Partial<Skill> = {}): Skill {
 type ResultMessage = Extract<RegistryWorkerMessage, { type: "result" }>;
 
 /** A stored record as the cache hands it back: skills plus their identity. */
-function record(skills: Skill[], commit?: string): CachedIndex {
-  return { skills, commit, fetchedAt: 1 };
+function record(skills: Skill[], generatedAt?: string): CachedIndex {
+  return { skills, generatedAt, fetchedAt: 1 };
 }
 
 /** Unwrap a posted result, asserting it succeeded. */
@@ -72,6 +72,8 @@ function setup(options?: {
   now?: () => number;
   /** What the sources advertise as published; null = probe found nothing. */
   published?: PublishedIndex | null;
+  /** What the trending source serves; null (default) = list unavailable. */
+  trending?: string[] | null;
 }) {
   const messages: RegistryWorkerMessage[] = [];
   const recorded: Recorded = {
@@ -96,15 +98,15 @@ function setup(options?: {
     resolve(): void;
     reject(err: unknown): void;
   }> = [];
-  /** Commit each started download was pinned to (undefined = branch ref). */
+  /** Tag each started download was pinned to (undefined = branch ref). */
   const pins: Array<string | undefined> = [];
   const readIndex = async (
     _cdnBase: string,
-    commit: string | undefined,
+    tag: string | undefined,
     line: (skill: Skill) => void,
   ): Promise<void> => {
     onLine = line;
-    pins.push(commit);
+    pins.push(tag);
     if (options?.skills) {
       for (const s of options.skills) line(s);
       return;
@@ -118,6 +120,7 @@ function setup(options?: {
     {
       probeMeta: async () => options?.published ?? null,
       readIndex,
+      readTrending: async () => options?.trending ?? null,
       cache: options?.cache ?? {
         load: async () => null,
         save: async () => {},
@@ -181,7 +184,7 @@ describe("createRegistryController — boot", () => {
   });
 
   it("serves instantly from the cold-start cache, then revalidates", async () => {
-    const cached = record([skill(0), skill(1)], "a".repeat(8));
+    const cached = record([skill(0), skill(1)], "2026-09-01T14:25:32Z");
     const saved: Skill[][] = [];
     const t = setup({
       cache: {
@@ -203,9 +206,9 @@ describe("createRegistryController — boot", () => {
       ready: true,
     });
 
-    // What is on screen is announced as such, including the commit it came from.
+    // What is on screen is announced as such, including the run it came from.
     expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
-      commit: "a".repeat(8),
+      generatedAt: "2026-09-01T14:25:32Z",
       origin: "cache",
     });
 
@@ -221,87 +224,95 @@ describe("createRegistryController — boot", () => {
     expect(t.recorded.indexes.at(-1)?.info).toMatchObject({ origin: "updated" });
   });
 
-  it("skips the body download when the published commit is unchanged", async () => {
-    const commit = "a".repeat(8);
+  it("skips the body download when the published run is unchanged", async () => {
+    const generatedAt = "2026-09-01T14:25:32Z";
     const saved: Array<[Skill[], unknown]> = [];
     const t = setup({
       cache: {
-        load: async () => record([skill(0), skill(1)], commit),
+        load: async () => record([skill(0), skill(1)], generatedAt),
         save: async (skills, identity) => {
           saved.push([skills, identity]);
         },
         clear: async () => {},
       },
-      published: { commit, generatedAt: "2026-09-01T14:25:32Z", total: 2 },
+      published: {
+        tag: "dist-2026-09-01",
+        generatedAt,
+        total: 2,
+      },
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    // No stream was ever opened: the cached bytes belong to this commit.
+    // No stream was ever opened: the cached bytes belong to this run.
     expect(t.pins).toEqual([]);
     expect(saved).toEqual([]);
     expect(t.controller.stats()).toMatchObject({ count: 2, ready: true });
-    // The read-out still carries what the probe learned (fresh stamp, count).
+    // The read-out still carries what the probe learned (fresh tag, count).
     expect(t.recorded.indexes.at(-1)?.info).toEqual({
-      commit,
-      generatedAt: "2026-09-01T14:25:32Z",
+      tag: "dist-2026-09-01",
+      generatedAt,
       total: 2,
-      formatVersion: undefined,
       origin: "unchanged",
     });
   });
 
-  it("downloads a newer commit pinned to that snapshot and records it", async () => {
-    const publishedCommit = "b".repeat(8);
+  it("downloads a newer run pinned to its tag and records it", async () => {
     const saved: Array<[Skill[], unknown]> = [];
     const t = setup({
       cache: {
-        load: async () => record([skill(0)], "a".repeat(8)),
+        load: async () => record([skill(0)], "2026-09-01T14:25:32Z"),
         save: async (skills, identity) => {
           saved.push([skills, identity]);
         },
         clear: async () => {},
       },
-      published: { commit: publishedCommit, formatVersion: 4, total: 23734 },
+      published: {
+        tag: "dist-2026-09-06",
+        generatedAt: "2026-09-06T15:32:29.423Z",
+        total: 8945,
+      },
       skills: [skill(0), skill(1)],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    // The download is addressed at the published commit, not the branch.
-    expect(t.pins).toEqual([publishedCommit]);
+    // The download is addressed at the published tag, not the branch.
+    expect(t.pins).toEqual(["dist-2026-09-06"]);
     expect(saved).toEqual([
-      [[skill(0), skill(1)], { commit: publishedCommit, formatVersion: 4 }],
+      [
+        [skill(0), skill(1)],
+        { tag: "dist-2026-09-06", generatedAt: "2026-09-06T15:32:29.423Z" },
+      ],
     ]);
     expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
-      commit: publishedCommit,
-      total: 23734,
-      formatVersion: 4,
+      tag: "dist-2026-09-06",
+      total: 8945,
       origin: "updated",
     });
   });
 
-  it("re-downloads an unchanged commit when the user forces a reload", async () => {
-    const commit = "a".repeat(8);
+  it("re-downloads an unchanged run when the user forces a reload", async () => {
+    const generatedAt = "2026-09-01T14:25:32Z";
     const t = setup({
-      published: { commit },
+      published: { tag: "dist-2026-09-01", generatedAt },
       skills: [skill(0)],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
-    expect(t.pins).toEqual([commit]);
+    expect(t.pins).toEqual(["dist-2026-09-01"]);
 
-    // Second boot-equivalent: the commit never moved, but a manual retry (or a
+    // Second boot-equivalent: the run never moved, but a manual retry (or a
     // source switch) must still fetch rather than report "nothing to do".
     t.controller.reload({ cdnBase: "other" });
     await t.flush();
-    expect(t.pins).toEqual([commit, commit]);
+    expect(t.pins).toEqual(["dist-2026-09-01", "dist-2026-09-01"]);
   });
 
   it("falls back to the branch ref when no meta can be reached", async () => {
     const t = setup({
       cache: {
-        load: async () => record([skill(0)], "a".repeat(8)),
+        load: async () => record([skill(0)], "2026-09-01T14:25:32Z"),
         save: async () => {},
         clear: async () => {},
       },
@@ -311,7 +322,7 @@ describe("createRegistryController — boot", () => {
     await t.flush();
 
     // Nothing to compare against: download unpinned instead of trusting a
-    // commit that may no longer be current.
+    // tag that may no longer be current.
     expect(t.pins).toEqual([undefined]);
   });
 
@@ -516,9 +527,11 @@ describe("createRegistryController — featured + lookup", () => {
   it("computes hero slides and resolves curated sections with global indexes", async () => {
     const t = setup({
       skills: [
-        { ...skill(0), name: "alpha", repo: "acme/alpha", weeklyInstalls: 500 },
-        { ...skill(1), name: "beta", repo: "acme/beta", weeklyInstalls: 100 },
+        { ...skill(0), name: "alpha", repo: "acme/alpha", downloads: 500 },
+        { ...skill(1), name: "beta", repo: "acme/beta", downloads: 100 },
       ],
+      // Upstream rank order differs from the downloads order — trending wins.
+      trending: ["acme/beta/beta", "acme/alpha/alpha"],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
@@ -528,13 +541,31 @@ describe("createRegistryController — featured + lookup", () => {
       slides: Array<{ id: string; entries: Array<{ skill: Skill }> }>;
       sections: Array<{ skills: Array<{ index: number }> }>;
     }>(t.recorded.results[0]);
-    // The weekly board exists and ranks alpha above beta by weekly installs.
-    const weekly = data.slides.find((s) => s.id === "weekly");
-    expect(weekly?.entries.map((e) => e.skill.name)).toEqual(["alpha", "beta"]);
+    // The trending board exists and follows the upstream id order.
+    const trending = data.slides.find((s) => s.id === "trending");
+    expect(trending?.entries.map((e) => e.skill.name)).toEqual([
+      "beta",
+      "alpha",
+    ]);
     // Curated sections number their rows globally for the detail panel.
     const indexes = data.sections.flatMap((s) => s.skills.map((x) => x.index));
     expect(indexes).toEqual(indexes.toSorted((a, b) => a - b));
     expect(indexes[0]).toBe(0);
+  });
+
+  it("omits the trending slide when no trending list was served", async () => {
+    const t = setup({
+      skills: [{ ...skill(0), name: "alpha", repo: "acme/alpha" }],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({ type: "getFeatured", id: 1 });
+    const data = resultData<{
+      slides: Array<{ id: string }>;
+    }>(t.recorded.results[0]);
+
+    expect(data.slides.map((s) => s.id)).toEqual(["popular"]);
   });
 
   it("resolves installed-skill refs by name and by path basename", async () => {
@@ -575,24 +606,32 @@ describe("createRegistryController — featured + lookup", () => {
 
 describe("createRegistryController — getRanking", () => {
   /** Boot a complete registry of `n` ranked skills (skill-0 leads). */
-  async function boot(n: number) {
+  async function boot(n: number, trending?: string[] | null) {
     const t = setup({
       skills: Array.from({ length: n }, (_, i) =>
-        skill(i, { downloads: (n - i) * 1_000, weeklyInstalls: n - i }),
+        skill(i, { downloads: (n - i) * 1_000 }),
       ),
+      trending,
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
     return t;
   }
 
-  it("returns the leaderboard ranked, truncated and counted", async () => {
-    const t = await boot(150);
+  it("returns the trending leaderboard in upstream order", async () => {
+    // Upstream ranks the *least* downloaded skill first: its order, not the
+    // registry's, decides the leaderboard.
+    // skill(2) lives in owner-2/repo-0 (the factory's repo = i % 2).
+    const t = await boot(3, [
+      "owner-2/repo-0/skill-2",
+      "owner-0/repo-0/skill-0",
+      "missing/repo/x",
+    ]);
 
     t.controller.handle({
       type: "getRanking",
       id: 1,
-      payload: { rankingId: "weekly" },
+      payload: { rankingId: "trending" },
     });
     const data = resultData<{
       id: string;
@@ -600,11 +639,35 @@ describe("createRegistryController — getRanking", () => {
       total: number;
     }>(t.recorded.results[0]);
 
-    expect(data.id).toBe("weekly");
+    expect(data.id).toBe("trending");
+    expect(data.entries.map((e) => e.skill.name)).toEqual([
+      "skill-2",
+      "skill-0",
+    ]);
+    expect(data.entries.map((e) => e.rank)).toEqual([1, 2]);
+    expect(data.entries[0].label).toBe("1K");
+    expect(data.total).toBe(2);
+  });
+
+  it("returns the popular leaderboard ranked, truncated and counted", async () => {
+    const t = await boot(150);
+
+    t.controller.handle({
+      type: "getRanking",
+      id: 1,
+      payload: { rankingId: "popular" },
+    });
+    const data = resultData<{
+      id: string;
+      entries: Array<{ rank: number; skill: Skill; label: string }>;
+      total: number;
+    }>(t.recorded.results[0]);
+
+    expect(data.id).toBe("popular");
     // Truncated to the page size, but counted in full.
     expect(data.entries).toHaveLength(100);
     expect(data.total).toBe(150);
-    expect(data.entries[0]).toMatchObject({ rank: 1, label: "150/周" });
+    expect(data.entries[0]).toMatchObject({ rank: 1, label: "150K" });
     expect(data.entries[0].skill.name).toBe("skill-0");
     expect(data.entries[99]).toMatchObject({ rank: 100 });
   });
@@ -626,17 +689,13 @@ describe("createRegistryController — getRanking", () => {
   });
 
   it("answers with an empty leaderboard instead of failing", async () => {
-    // Nothing clears the lifetime floor, so the rising board has no entries.
-    const t = setup({
-      skills: [skill(0, { downloads: 0, weeklyInstalls: 0 })],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
+    // No trending list was served, so the trending board has no entries.
+    const t = await boot(5, null);
 
     t.controller.handle({
       type: "getRanking",
       id: 1,
-      payload: { rankingId: "rising" },
+      payload: { rankingId: "trending" },
     });
     const data = resultData<{ entries: unknown[]; total: number }>(
       t.recorded.results[0],

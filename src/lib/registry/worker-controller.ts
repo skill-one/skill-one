@@ -43,12 +43,12 @@ const PROGRESS_INTERVAL_MS = 400;
 
 export interface ControllerDeps {
   /**
-   * Read the published index metadata: the freshness oracle that decides
+   * Read the published snapshot stats: the freshness oracle that decides
    * whether the body needs downloading at all. Null when no source answered.
    */
   probeMeta(cdnBase: string): Promise<PublishedIndex | null>;
   /**
-   * Stream the JSONL index, handing every parsed skill to `onLine`. `commit`
+   * Stream the JSONL index, handing every parsed skill to `onLine`. `tag`
    * pins the download to an immutable snapshot; undefined falls back to the
    * mutable branch ref. `onRestart` is called at the start of each candidate
    * attempt so the controller can drop its partial buffer (a failed mid-stream
@@ -56,10 +56,15 @@ export interface ControllerDeps {
    */
   readIndex(
     cdnBase: string,
-    commit: string | undefined,
+    tag: string | undefined,
     onLine: (skill: Skill) => void,
     onRestart: () => void,
   ): Promise<void>;
+  /**
+   * Fetch the trending view's id list (skills.sh's trending rank). Null when
+   * unavailable — a garnish, never a download failure.
+   */
+  readTrending(cdnBase: string): Promise<string[] | null>;
   /** Cold-start cache; every method may silently no-op. */
   cache: RegistryCache;
   /** Clock for progress throttling, injectable for tests. */
@@ -84,10 +89,15 @@ export function createRegistryController(
   // Bumped on every init/reload; responses from a superseded download are
   // dropped instead of clobbering newer data.
   let generation = 0;
-  // The published commit the served `store` was built from. Undefined until a
-  // download records one (a cold-start cache written before commit addressing
-  // counts as unknown, so it always re-downloads once).
-  let servedCommit: string | undefined;
+  // The producing run (`finishedAt`) the served `store` was built from. A
+  // probed run equal to this one means equal bytes, so the download is
+  // skipped; undefined until a download records one (a cold-start cache
+  // written before run addressing counts as unknown, so it always
+  // re-downloads once).
+  let servedGeneratedAt: string | undefined;
+  // skills.sh's trending rank, as an id list fetched alongside the index.
+  // Null while unavailable; superseded downloads never write it (gen guard).
+  let trendingIds: string[] | null = null;
   // Last announced snapshot identity, kept for `stats()` and for tests.
   let indexInfo: IndexInfo | null = null;
 
@@ -105,8 +115,8 @@ export function createRegistryController(
   let announcedCount = 0;
   let lastNotify = 0;
 
-  // Sort orders are cached per data version: navigating pages of a 24k-entry
-  // sorted list re-slices but never re-sorts.
+  // Sort orders are cached per data version: navigating pages of a multi-
+  // thousand-entry sorted list re-slices but never re-sorts.
   let dataVersion = 0;
   let orderCache: { version: number; sort: SortOrder; ids: number[] } | null =
     null;
@@ -142,8 +152,9 @@ export function createRegistryController(
   };
 
   const buildIndex = () => {
-    // Hundreds of milliseconds for ~24k entries — acceptable inside the
-    // worker, which is exactly why it lives here and not on the main thread.
+    // Hundreds of milliseconds for the ~9k-entry snapshot — acceptable inside
+    // the worker, which is exactly why it lives here and not on the main
+    // thread.
     search = buildSkillSearch(store);
     ready = true;
     emitProgress();
@@ -151,31 +162,41 @@ export function createRegistryController(
   };
 
   /**
-   * Bring the served dataset up to date. The published snapshot is probed
-   * first (~300 B); only a differing commit downloads the body, which is then
-   * streamed into a fresh buffer while any data already being served (cold-start
-   * cache, previous source) stays visible and queryable — a revalidation never
-   * blanks the UI.
+   * Bring the served dataset up to date. The published stats are probed
+   * first (~300 B); only a differing run downloads the body, which is then
+   * streamed into a fresh buffer while any data already being served
+   * (cold-start cache, previous source) stays visible and queryable — a
+   * revalidation never blanks the UI.
+   *
+   * The trending id list is fetched concurrently with the probe so its
+   * latency hides inside the multi-megabyte body download; it is awaited
+   * before `ready` is announced, so featured/ranking queries never race it.
+   * Its failure only trims the trending leaderboard, never the dataset.
    *
    * `force` skips the "unchanged" short-circuit: a source switch or a user
-   * retry must re-download even when the published commit has not moved.
+   * retry must re-download even when the published run has not moved.
    */
   const download = async (gen: number, force = false) => {
-    // Null means no source answered: no commit to pin, nothing to compare.
+    // Started before the probe so its latency hides inside the body download;
+    // the result is only assigned at the landing points below, so an early
+    // resolution can never be clobbered by the partial-buffer reset.
+    const trending = deps.readTrending(cdnBase).catch(() => null);
+    // Null means no source answered: nothing to pin, nothing to compare.
     const published = await deps.probeMeta(cdnBase);
     if (gen !== generation) return;
-    const commit = published?.commit;
-    const identity = {
-      commit,
-      generatedAt: published?.generatedAt,
-      formatVersion: published?.formatVersion,
-    };
+    const tag = published?.tag;
+    const identity = { tag, generatedAt: published?.generatedAt };
     const total = published?.total;
 
-    if (!force && commit && commit === servedCommit) {
-      // The body is addressed by this commit, so equal commits mean equal
-      // bytes: keep serving the cache and skip the download entirely.
+    if (
+      !force &&
+      published?.generatedAt !== undefined &&
+      published.generatedAt === servedGeneratedAt
+    ) {
+      // The published run is the one already served, so the body is byte
+      // -identical: keep serving the cache and skip the download entirely.
       emitIndex({ ...identity, total, origin: "unchanged" });
+      trendingIds = (await trending) ?? trendingIds;
       return;
     }
 
@@ -186,6 +207,7 @@ export function createRegistryController(
       // count-0 reset itself needs no event — the main-thread client boots
       // at count 0 and only paints once the first skills notify.
       store = buffer;
+      trendingIds = null;
       announcedCount = 0;
       lastNotify = 0;
       dataVersion++;
@@ -195,7 +217,7 @@ export function createRegistryController(
     try {
       await deps.readIndex(
         cdnBase,
-        commit,
+        tag,
         (skill) => {
           buffer.push(skill);
           if (!revalidating) notifyThrottled(buffer.length);
@@ -217,8 +239,8 @@ export function createRegistryController(
         dataVersion++;
         announcedCount = 0;
         // Nothing is being served, so the stored record (possibly from an
-        // older commit) must not be reused by the next cold start either.
-        servedCommit = undefined;
+        // older snapshot) must not be reused by the next cold start either.
+        servedGeneratedAt = undefined;
         indexInfo = null;
         void deps.cache.clear();
         emitProgress();
@@ -241,9 +263,13 @@ export function createRegistryController(
     dataVersion++;
     orderCache = null;
     repoCache = null;
+    // Land the trending list with the data it belongs to. A failed fetch
+    // keeps whatever was served before (null on a fresh boot) rather than
+    // dropping the board outright.
+    trendingIds = (await trending) ?? trendingIds;
     // No separate "landed" event: buildIndex immediately emits the settled
     // count and posts ready — the index build is synchronous from here.
-    servedCommit = commit;
+    servedGeneratedAt = identity.generatedAt;
     void deps.cache.save(store, identity);
     emitIndex({ ...identity, total, origin: "updated" });
     buildIndex();
@@ -369,7 +395,7 @@ export function createRegistryController(
 
   /** Featured payload: hero slides plus resolved curated sections. */
   const getFeatured = () => {
-    const slides = buildHeroSlides(store);
+    const slides = buildHeroSlides(store, trendingIds);
     const resolved = FEATURED_CATEGORIES.map((category) => ({
       id: category.id,
       title: category.title,
@@ -400,7 +426,7 @@ export function createRegistryController(
   const getRanking = ({ rankingId }: RankingRequest): RankingData => {
     const def = rankingById(rankingId);
     if (!def) throw new Error(`未知榜单：${rankingId}`);
-    const { entries, total } = rankSkills(store, def, RANKING_SIZE);
+    const { entries, total } = rankSkills(store, def, RANKING_SIZE, trendingIds);
     return {
       id: def.id,
       title: def.title,
@@ -450,16 +476,15 @@ export function createRegistryController(
         const cached = await deps.cache.load();
         if (cached && cached.skills.length > 0 && gen === generation) {
           store = cached.skills;
-          servedCommit = cached.commit;
+          servedGeneratedAt = cached.generatedAt;
           complete = true;
           announcedCount = cached.skills.length;
           emitProgress();
           buildIndex();
           // What is on screen until the probe below answers.
           emitIndex({
-            commit: cached.commit,
+            tag: cached.tag,
             generatedAt: cached.generatedAt,
-            formatVersion: cached.formatVersion,
             total: cached.skills.length,
             origin: "cache",
           });

@@ -46,6 +46,7 @@ const harness = (
 ).__harness;
 
 vi.mock("../../../lib/skill-detail-api", () => ({
+  MIRROR: { repo: "skill-one/skills-sh-scraper", ref: "dist" },
   fetchSkillDetail: vi.fn(),
 }));
 
@@ -57,7 +58,7 @@ const [efficiency, , development, writing] = FEATURED_CATEGORIES;
 /**
  * Build a registry fixture from the curated references: every skill gets
  * formulaic install numbers, so the hero leaderboards have a deterministic
- * ranking (the first curated skill always tops weekly and lifetime).
+ * ranking (the first curated skill always tops trending and lifetime).
  */
 function curatedIndex(): Skill[] {
   return FEATURED_CATEGORIES.flatMap((category, ci) =>
@@ -67,8 +68,7 @@ function curatedIndex(): Skill[] {
       description: `${ref.name} description`,
       stars: 100 + si,
       downloads: 10_000 - ci * 10 - si,
-      weeklyInstalls: 50 - si,
-      path: `skills/${ref.name}`,
+      path: `skills/${ref.repo}/${ref.name}`,
     })),
   );
 }
@@ -82,6 +82,9 @@ function curatedIndexWithout(omit: Array<{ repo: string; name: string }>) {
 /** Load the harness with a complete registry before the page mounts. */
 function bootRegistry(skills: Skill[]) {
   harness.reset();
+  // The trending list serves the fixture in registry order, so the first
+  // curated skill tops the trending board too.
+  harness.publishTrending(skills.map((s) => `${s.repo}/${s.name}`));
   harness.init();
   harness.pushAll(skills);
   harness.complete();
@@ -157,9 +160,9 @@ describe("FeaturedPage", () => {
 
     // Hero: computed slides ranked from the registry fixture.
     const hero = await screen.findByRole("region", { name: "精选推荐" });
-    expect(within(hero).getByText("Skill 周榜")).toBeInTheDocument();
+    expect(within(hero).getByText("趋势热榜")).toBeInTheDocument();
     expect(within(hero).getByText("人气总榜")).toBeInTheDocument();
-    // The first curated skill tops both the weekly and lifetime boards.
+    // The first curated skill tops both the trending and lifetime boards.
     expect(
       within(hero).getAllByText(efficiency.skills[0].name).length,
     ).toBeGreaterThanOrEqual(2);

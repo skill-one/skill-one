@@ -5,15 +5,15 @@ import type { Skill } from "../../types/skill";
 /**
  * Cold-start cache for the parsed registry, kept in IndexedDB and read
  * inside the worker. The cache only serves "show first, verify later": every
- * session still probes the published metadata and re-downloads the index when
- * the advertised commit differs from the cached one — a matching commit lets
- * the multi-megabyte download be skipped outright.
+ * session still probes the published stats and re-downloads the index when
+ * the advertised run differs from the cached one — a matching run lets the
+ * multi-megabyte download be skipped outright.
  */
 
 const KEY = "skills";
 
 /** Bump when the stored Skill shape changes so stale records are dropped. */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 /**
  * The same database and object store this module used before it delegated to
@@ -24,11 +24,9 @@ const store = createStore("skill-one-registry", "index");
 
 /** Identity of the published snapshot a record was built from. */
 export interface CacheIdentity {
-  /** `distCommit` the index was fetched at; absent for pre-pinning records. */
-  commit?: string;
-  /** Upstream `formatVersion` of those records. */
-  formatVersion?: number;
-  /** Upstream `generatedAt` of that snapshot (display only; never compared). */
+  /** `dist-<date>` tag the index was fetched at; absent when unpinned. */
+  tag?: string;
+  /** The producing run's `finishedAt`, the snapshot's freshness identity. */
   generatedAt?: string;
 }
 
@@ -76,8 +74,8 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
         return null;
       }
       if (!record || record.schemaVersion !== SCHEMA_VERSION) return null;
-      const { skills, commit, formatVersion, generatedAt, fetchedAt } = record;
-      return { skills, commit, formatVersion, generatedAt, fetchedAt };
+      const { skills, tag, generatedAt, fetchedAt } = record;
+      return { skills, tag, generatedAt, fetchedAt };
     },
 
     /** Persist the parsed registry with its snapshot identity (overwrites). */
@@ -85,8 +83,7 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
       const record: CacheRecord = {
         schemaVersion: SCHEMA_VERSION,
         fetchedAt: Date.now(),
-        commit: identity.commit,
-        formatVersion: identity.formatVersion,
+        tag: identity.tag,
         generatedAt: identity.generatedAt,
         skills,
       };

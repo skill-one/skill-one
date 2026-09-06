@@ -9,39 +9,35 @@ export interface Skill {
   description: string;
   /** GitHub star count of the source repo; 0 when the index entry lacks it. */
   stars: number;
-  /** Lifetime install count recorded by the registry; 0 when absent. */
+  /** Lifetime install count recorded by skills.sh; 0 when absent. */
   downloads: number;
   /**
-   * Installs recorded over the most recent week (the last entry of the
-   * registry's weekly install series); absent when the entry carries no
-   * weekly data.
-   */
-  weeklyInstalls?: number;
-  /**
-   * Skill directory inside the repo as recorded by the registry index (e.g.
-   * "skills/find-skills"); absent on the old skills.sh snapshot. Used to fetch
-   * the SKILL.md directly without path probing.
+   * Directory the skill's files live in, relative to the skills-sh-scraper
+   * mirror snapshot ("skills/{owner}/{repo}/{slug}"). Used to fetch the
+   * SKILL.md directly from the mirror without path probing; absent for
+   * installed skills that the mirror does not list.
    */
   path?: string;
   /**
-   * Content fingerprint the registry computed for the skill directory (e.g.
-   * "t1-a4cf6ce14f6d65b3"; the `t1` segment is the fingerprint scheme). The
-   * authoritative identity of *which version of the skill* the index describes:
-   * it changes when any file in the directory changes, including its mode.
-   * Absent on entries whose repository content was never scanned.
+   * SHA-256 content hash the scraper computed for the skill directory. The
+   * authoritative identity of *which version of the skill* the snapshot
+   * describes: it changes when any upstream file changes. Absent when the
+   * scraper could not compute it.
    */
   rev?: string;
   /**
-   * When the registry first recorded this `rev` (ISO, UTC) — i.e. how long the
-   * skill has been published in its current version, not when the skill first
-   * appeared. Absent together with `rev`.
+   * When the scraper first fetched this content version (ISO, UTC) — i.e. how
+   * long the skill has been published in its current version, not when the
+   * skill first appeared. Absent together with `rev`.
    */
   firstSeenAt?: string;
+  /** The skill's page on skills.sh, when the index carries one. */
+  url?: string;
 }
 
 /**
- * A single skill's SKILL.md content, fetched from its source repo on demand
- * when the detail sheet is opened.
+ * A single skill's SKILL.md content, fetched from the skills-sh-scraper
+ * mirror on demand when the detail sheet is opened.
  */
 export interface SkillDetail {
   /** Frontmatter `name`, falling back to the registry skill id. */
@@ -54,6 +50,6 @@ export interface SkillDetail {
   author?: string;
   /** Markdown body below the frontmatter. */
   instructions: string;
-  /** Repo path the SKILL.md was found at, e.g. "skills/pdf/SKILL.md". */
+  /** Path the SKILL.md was found at, e.g. "skills/pdf/SKILL.md". */
   path: string;
 }

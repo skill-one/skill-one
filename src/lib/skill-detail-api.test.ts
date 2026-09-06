@@ -103,7 +103,7 @@ Body`;
 });
 
 describe("fetchSkillDetail", () => {
-  it("fetches the SKILL.md directly from the known index path", async () => {
+  it("fetches the SKILL.md directly from the known mirror path", async () => {
     fetchMock.mockImplementation(async (url: string) =>
       String(url).endsWith("skills/pdf/SKILL.md")
         ? ok("---\nname: pdf\n---\n\nBody")
@@ -126,7 +126,7 @@ describe("fetchSkillDetail", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/anthropics/skills/HEAD/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/skill-one/skills-sh-scraper/dist/skills/pdf/SKILL.md",
       { signal: expect.anything() },
     );
   });
@@ -146,7 +146,7 @@ describe("fetchSkillDetail", () => {
 
     expect(detail.path).toBe("skills/pdf/SKILL.md");
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/anthropics/skills/HEAD/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/skill-one/skills-sh-scraper/dist/skills/pdf/SKILL.md",
       { signal: expect.anything() },
     );
   });
@@ -165,7 +165,7 @@ describe("fetchSkillDetail", () => {
       fetchSkillDetail("owner/repo", "pdf", "skills/pdf"),
     ).rejects.toThrow("SKILL.md for pdf not found in owner/repo");
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/owner/repo/HEAD/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/skill-one/skills-sh-scraper/dist/skills/pdf/SKILL.md",
       { signal: expect.anything() },
     );
   });

@@ -4,6 +4,17 @@ import type { SkillDetail } from "../types/skill";
 import { errorMessage } from "./utils";
 import { SourceFetchError, fetchFirstText, fileCandidates } from "./cdn-config";
 
+/**
+ * The skills-sh-scraper repo mirrors every indexed skill's full files on its
+ * `dist` branch — the same snapshot the registry index was built from. The
+ * index and the mirror are guaranteed to match (a row exists if and only if
+ * its directory exists), so a registry-known path resolves in one request.
+ */
+export const MIRROR = {
+  repo: "skill-one/skills-sh-scraper",
+  ref: "dist",
+} as const;
+
 /** Frontmatter fields surfaced in the detail view. */
 const FRONTMATTER_FIELDS = [
   "name",
@@ -17,7 +28,7 @@ type FrontmatterField = (typeof FRONTMATTER_FIELDS)[number];
 type Frontmatter = Partial<Record<FrontmatterField, string>>;
 
 /**
- * Fetch a skill's SKILL.md from its source GitHub repo.
+ * Fetch a skill's SKILL.md from the skills-sh-scraper mirror snapshot.
  *
  * The file is fetched through the configurable download source (direct GitHub
  * raw by default, with a jsDelivr-mirror CDN fallback), which works identically
@@ -25,9 +36,10 @@ type Frontmatter = Partial<Record<FrontmatterField, string>>;
  * from mainland China. Caching (and persistence across restarts) is delegated
  * to TanStack Query.
  *
- * `knownPath` is the skill's directory as recorded in the registry index
- * (e.g. "skills/find-skills") and always present for registry skills, so the
- * SKILL.md resolves in a single request. A missing or stale path throws.
+ * `knownPath` is the skill's directory inside the mirror snapshot
+ * ("skills/{owner}/{repo}/{slug}", as recorded in the registry index) and
+ * always present for registry skills, so the SKILL.md resolves in a single
+ * request. A missing or stale path throws.
  */
 export async function fetchSkillDetail(
   repo: string,
@@ -39,13 +51,16 @@ export async function fetchSkillDetail(
   }
   const path = `${knownPath.replace(/\/+$/, "")}/SKILL.md`;
   try {
-    const { text } = await fetchFirstText(fileCandidates({ repo, path }));
+    const { text } = await fetchFirstText(
+      fileCandidates({ repo: MIRROR.repo, ref: MIRROR.ref, path }),
+    );
     return toDetail(text, skillId, path);
   } catch (err) {
-    // A 404 on every candidate means the index path is stale or the file was
-    // removed — worth a precise "not found". Anything else (network failure,
-    // timeout, server error) is a connectivity problem, so name the underlying
-    // cause instead of misreporting it as a missing file.
+    // A 404 on every candidate means the mirror no longer ships this
+    // directory (a stale registry entry) — worth a precise "not found".
+    // Anything else (network failure, timeout, server error) is a
+    // connectivity problem, so name the underlying cause instead of
+    // misreporting it as a missing file.
     if (err instanceof SourceFetchError && err.kind === "http" && err.status === 404) {
       throw new Error(`SKILL.md for ${skillId} not found in ${repo}`, {
         cause: err,

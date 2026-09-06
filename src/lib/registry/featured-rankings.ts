@@ -8,18 +8,19 @@ export const HERO_RANK_SIZE = 3;
 export const RANKING_SIZE = 100;
 
 /**
- * Minimum lifetime installs for the rising leaderboard. Without this floor
- * the weekly/lifetime ratio is dominated by brand-new skills with a handful
- * of installs rather than genuinely fast-growing ones.
+ * Canonical skills.sh id of a skill (`{owner}/{repo}/{slug}`): the join key
+ * between the registry and an upstream id list such as trending.json.
  */
-const RISING_MIN_DOWNLOADS = 10_000;
+export function skillIdOf(skill: Skill): string {
+  return `${skill.repo}/${skill.name}`;
+}
 
 /** One ranked entry, shared by the hero slides and the leaderboard page. */
 export interface RankEntry {
   /** 1-based position on the leaderboard. */
   rank: number;
   skill: Skill;
-  /** Preformatted metric shown next to the name, e.g. "113.8K/周". */
+  /** Preformatted metric shown next to the name, e.g. "3.3M". */
   label: string;
 }
 
@@ -35,8 +36,8 @@ export interface HeroSlide {
 
 /**
  * One leaderboard, fully described so the hero and the leaderboard page can
- * never disagree: both rank the same registry with the same `metric` and
- * print the same `label`, only taking a different slice of it.
+ * never disagree: both rank the same registry through the same `def`, only
+ * taking a different slice of it.
  */
 interface RankingDef {
   /** Stable identifier; also the leaderboard page's route param. */
@@ -47,11 +48,14 @@ interface RankingDef {
   subtitle: string;
   /** Tailwind gradient classes painting the hero slide background. */
   gradient: string;
-  /** Pre-filter excluding skills that cannot rank (e.g. too new to rise). */
-  filter?: (skill: Skill) => boolean;
-  /** The sort key, descending. */
-  metric: (skill: Skill) => number;
-  /** Preformatted metric shown next to the name, e.g. "113.8K/周". */
+  /**
+   * Set for the order-driven leaderboard: entries come from an upstream id
+   * list (trending.json, in upstream rank order) instead of a metric sort.
+   */
+  order?: "trending";
+  /** The sort key, descending. Metric leaderboards only. */
+  metric?: (skill: Skill) => number;
+  /** Preformatted metric shown next to the name, e.g. "3.3M". */
   label: (skill: Skill) => string;
   /**
    * Lowest `metric` value that still ranks; defaults to 1. Ratio metrics sit
@@ -60,23 +64,19 @@ interface RankingDef {
   min?: number;
 }
 
-/** Number of installs recorded over the most recent week. */
-const weekly = (skill: Skill) => skill.weeklyInstalls ?? 0;
-
 /**
- * The leaderboards, in display order: the weekly leaderboard (current-week
- * installs), the all-time popularity leaderboard (lifetime installs) and the
- * rising leaderboard (highest share of installs coming from the current
- * week).
+ * The leaderboards, in display order: the trending leaderboard (skills.sh's
+ * own trending view, as an id list fetched alongside the index) and the
+ * all-time popularity leaderboard (lifetime installs).
  */
 export const RANKINGS: readonly RankingDef[] = [
   {
-    id: "weekly",
-    title: "Skill 周榜",
-    subtitle: "每周精选热门 Skill，点击查看完整榜单",
+    id: "trending",
+    title: "趋势热榜",
+    subtitle: "skills.sh 官方趋势榜，点击查看完整榜单",
     gradient: "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400",
-    metric: weekly,
-    label: (skill) => `${formatCount(weekly(skill))}/周`,
+    order: "trending",
+    label: (skill) => formatCount(skill.downloads),
   },
   {
     id: "popular",
@@ -86,18 +86,6 @@ export const RANKINGS: readonly RankingDef[] = [
     metric: (skill) => skill.downloads,
     label: (skill) => formatCount(skill.downloads),
   },
-  {
-    id: "rising",
-    title: "新晋热门",
-    subtitle: "本周增长最快的新星 Skill，点击查看完整榜单",
-    gradient: "bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500",
-    filter: (skill) => skill.downloads >= RISING_MIN_DOWNLOADS,
-    metric: (skill) => weekly(skill) / Math.max(skill.downloads, 1),
-    label: (skill) => `${formatCount(weekly(skill))}/周`,
-    // The floor is the download pre-filter; ratios sit below 1, so the
-    // default "metric >= 1" cutoff would empty the leaderboard.
-    min: 0,
-  },
 ];
 
 /** The leaderboard with this id; undefined for an unknown id. */
@@ -106,21 +94,36 @@ export function rankingById(id: string): RankingDef | undefined {
 }
 
 /**
- * Rank `skills` by `def`, descending, and keep the first `limit` entries.
- * `total` counts everything that clears the floor, so a truncated
- * leaderboard can still report how many skills qualified.
+ * Rank `skills` by `def` and keep the first `limit` entries. `total` counts
+ * everything that qualified, so a truncated leaderboard can still report how
+ * many skills made the cut.
+ *
+ * Metric leaderboards sort by `def.metric` descending. The order-driven
+ * trending leaderboard instead walks `trendingIds` — skills.sh's trending
+ * rank — keeping only skills present in the registry; an absent or empty
+ * list simply ranks nothing.
  */
 export function rankSkills(
   skills: Skill[],
   def: RankingDef,
   limit: number,
+  trendingIds?: readonly string[] | null,
 ): { entries: RankEntry[]; total: number } {
+  if (def.order === "trending") {
+    const byId = new Map(skills.map((skill) => [skillIdOf(skill), skill]));
+    const pool = (trendingIds ?? [])
+      .map((id) => byId.get(id))
+      .filter((skill): skill is Skill => skill != null);
+    const entries = pool
+      .slice(0, limit)
+      .map((skill, i) => ({ rank: i + 1, skill, label: def.label(skill) }));
+    return { entries, total: pool.length };
+  }
+  const metric = def.metric ?? (() => 0);
   const floor = def.min ?? 1;
-  const pool = skills.filter(
-    (skill) => (!def.filter || def.filter(skill)) && def.metric(skill) >= floor,
-  );
+  const pool = skills.filter((skill) => metric(skill) >= floor);
   const entries = pool
-    .toSorted((a, b) => def.metric(b) - def.metric(a))
+    .toSorted((a, b) => metric(b) - metric(a))
     .slice(0, limit)
     .map((skill, i) => ({ rank: i + 1, skill, label: def.label(skill) }));
   return { entries, total: pool.length };
@@ -129,12 +132,15 @@ export function rankSkills(
 /**
  * Build the hero slides from the parsed registry index, in `RANKINGS` order,
  * showing only the top `HERO_RANK_SIZE` entries of each. Leaderboards with no
- * qualifying skill are dropped, so an empty or degenerate index yields fewer
- * slides.
+ * qualifying skill are dropped, so an empty or degenerate index — or a
+ * missing trending list — yields fewer slides.
  */
-export function buildHeroSlides(skills: Skill[]): HeroSlide[] {
+export function buildHeroSlides(
+  skills: Skill[],
+  trendingIds?: readonly string[] | null,
+): HeroSlide[] {
   return RANKINGS.map((def) => {
-    const { entries } = rankSkills(skills, def, HERO_RANK_SIZE);
+    const { entries } = rankSkills(skills, def, HERO_RANK_SIZE, trendingIds);
     return {
       id: def.id,
       title: def.title,

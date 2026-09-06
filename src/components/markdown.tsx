@@ -12,6 +12,8 @@ interface MarkdownProps {
   children: string;
   /** Repo slug ("owner/name") the source file lives in. */
   repo?: string;
+  /** Git ref the source file is viewed at; defaults to the branch head. */
+  gitRef?: string;
   /** Path of the source file inside the repo; enables relative-URL resolution. */
   filePath?: string;
 }
@@ -27,12 +29,13 @@ function resolveUrl(
   kind: "blob" | "raw",
   repo: string,
   filePath: string,
+  gitRef: string,
 ): string {
   if (EXTERNAL_SCHEME.test(url) || url.startsWith("#")) return url;
   const base =
     kind === "blob"
-      ? githubBlobUrl(repo, filePath)
-      : `https://raw.githubusercontent.com/${repo}/HEAD/${filePath}`;
+      ? githubBlobUrl(repo, filePath, gitRef)
+      : `https://raw.githubusercontent.com/${repo}/${gitRef}/${filePath}`;
   return new URL(url, base).toString();
 }
 
@@ -41,14 +44,14 @@ function resolveUrl(
  * Raw HTML in the source is ignored and unsafe link URLs are stripped
  * by react-markdown defaults, so no sanitizer is needed.
  */
-export function Markdown({ children, repo, filePath }: MarkdownProps) {
+export function Markdown({ children, repo, gitRef = "HEAD", filePath }: MarkdownProps) {
   const components: Components = {
     // Links must never navigate the Tauri WebView itself; only external
     // schemes are handed to the system browser.
     a: ({ href, children: linkChildren }) => {
       const resolved =
         href && repo && filePath
-          ? resolveUrl(href, "blob", repo, filePath)
+          ? resolveUrl(href, "blob", repo, filePath, gitRef)
           : href;
       return (
         <a
@@ -68,7 +71,7 @@ export function Markdown({ children, repo, filePath }: MarkdownProps) {
       <img
         src={
           src && repo && filePath
-            ? resolveUrl(src, "raw", repo, filePath)
+            ? resolveUrl(src, "raw", repo, filePath, gitRef)
             : src
         }
         alt={alt}

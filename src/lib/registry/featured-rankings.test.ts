@@ -7,6 +7,7 @@ import {
   RANKING_SIZE,
   rankSkills,
   rankingById,
+  skillIdOf,
 } from "./featured-rankings";
 import type { Skill } from "../../types/skill";
 
@@ -22,16 +23,13 @@ function skill(name: string, over: Partial<Skill> = {}): Skill {
 }
 
 /**
- * A registry every leaderboard ranks the same way: `s0` leads, then `s1`,
- * and so on. Downloads taper linearly while weekly installs taper
- * quadratically, so the weekly/lifetime ratio tapers too — putting the
- * weekly, popular and rising boards in one and the same order.
+ * A registry the popular leaderboard ranks the same way every time: `s0`
+ * leads, then `s1`, and so on.
  */
 function ladder(n: number, over: Partial<Skill> = {}): Skill[] {
   return Array.from({ length: n }, (_, i) =>
     skill(`s${i}`, {
       downloads: (n - i) * 1_000,
-      weeklyInstalls: (n - i) * (n - i),
       ...over,
     }),
   );
@@ -40,13 +38,12 @@ function ladder(n: number, over: Partial<Skill> = {}): Skill[] {
 describe("RANKINGS", () => {
   it("keeps every id unique and stable", () => {
     const ids = RANKINGS.map((ranking) => ranking.id);
-    expect(ids).toEqual(["weekly", "popular", "rising"]);
+    expect(ids).toEqual(["trending", "popular"]);
   });
 
   it("looks a leaderboard up by id", () => {
-    expect(rankingById("weekly")?.title).toBe("Skill 周榜");
+    expect(rankingById("trending")?.title).toBe("趋势热榜");
     expect(rankingById("popular")?.title).toBe("人气总榜");
-    expect(rankingById("rising")?.title).toBe("新晋热门");
   });
 
   it("returns undefined for an unknown id", () => {
@@ -54,8 +51,16 @@ describe("RANKINGS", () => {
   });
 });
 
+describe("skillIdOf", () => {
+  it("joins repo and name into the canonical skills.sh id", () => {
+    expect(skillIdOf(skill("pdf", { repo: "anthropics/skills" }))).toBe(
+      "anthropics/skills/pdf",
+    );
+  });
+});
+
 describe("rankSkills", () => {
-  it("ranks by the definition's metric, descending", () => {
+  it("ranks the popular leaderboard by installs, descending", () => {
     const skills = [
       skill("low", { downloads: 10 }),
       skill("high", { downloads: 999 }),
@@ -93,42 +98,50 @@ describe("rankSkills", () => {
     expect(total).toBe(1);
   });
 
-  it("reads weekly installs, treating a missing series as zero", () => {
-    const skills = [
-      skill("none"),
-      skill("some", { weeklyInstalls: 5, downloads: 1 }),
-    ];
-    const { entries } = rankSkills(skills, RANKINGS[0], RANKING_SIZE);
+  it("ranks the trending leaderboard in upstream order, joining by id", () => {
+    const skills = ladder(5);
+    const ids = ["acme/s4/s4", "acme/s1/s1", "absent/repo/x", "acme/s0/s0"];
+    const { entries, total } = rankSkills(skills, RANKINGS[0], RANKING_SIZE, ids);
 
-    expect(entries.map((entry) => entry.skill.name)).toEqual(["some"]);
+    // Upstream rank order wins; ids missing from the registry are skipped.
+    expect(entries.map((entry) => entry.skill.name)).toEqual([
+      "s4",
+      "s1",
+      "s0",
+    ]);
+    expect(entries.map((entry) => entry.rank)).toEqual([1, 2, 3]);
+    expect(entries[0].label).toBe("1K");
+    // The total counts registry hits only.
+    expect(total).toBe(3);
   });
 
-  it("keeps the rising leaderboard behind its lifetime-install floor", () => {
-    const skills = [
-      // A brand-new skill: a perfect ratio, but far too small to rank.
-      skill("tiny", { downloads: 100, weeklyInstalls: 100 }),
-      skill("grown", { downloads: 20_000, weeklyInstalls: 5_000 }),
-    ];
-    const { entries, total } = rankSkills(skills, RANKINGS[2], RANKING_SIZE);
+  it("truncates the trending leaderboard to the limit", () => {
+    const { entries, total } = rankSkills(
+      ladder(50),
+      RANKINGS[0],
+      3,
+      ladder(50).map(skillIdOf),
+    );
 
-    expect(entries.map((entry) => entry.skill.name)).toEqual(["grown"]);
-    expect(total).toBe(1);
+    expect(entries).toHaveLength(3);
+    expect(total).toBe(50);
   });
 
-  it("ranks the rising leaderboard by ratio, not by raw weekly installs", () => {
-    const skills = [
-      skill("big", { downloads: 100_000, weeklyInstalls: 1_000 }),
-      skill("hot", { downloads: 10_000, weeklyInstalls: 900 }),
-    ];
-    const { entries } = rankSkills(skills, RANKINGS[2], RANKING_SIZE);
+  it("ranks nothing when the trending list is missing or empty", () => {
+    const skills = ladder(5);
 
-    expect(entries.map((entry) => entry.skill.name)).toEqual(["hot", "big"]);
+    expect(rankSkills(skills, RANKINGS[0], RANKING_SIZE, null).entries).toEqual(
+      [],
+    );
+    expect(rankSkills(skills, RANKINGS[0], RANKING_SIZE, []).total).toBe(0);
   });
 });
 
 describe("buildHeroSlides", () => {
   it("shows the top 3 of every leaderboard", () => {
-    const slides = buildHeroSlides(ladder(50));
+    const skills = ladder(50);
+    const trendingIds = skills.map(skillIdOf);
+    const slides = buildHeroSlides(skills, trendingIds);
 
     expect(slides).toHaveLength(RANKINGS.length);
     for (const slide of slides) {
@@ -146,17 +159,20 @@ describe("buildHeroSlides", () => {
     // The guard this refactor exists for: the banner's top 3 must be the
     // first 3 rows of the page's list, not a second, drifting ranking.
     const skills = ladder(150);
-    const slides = buildHeroSlides(skills);
+    const trendingIds = skills.map(skillIdOf);
+    const slides = buildHeroSlides(skills, trendingIds);
 
     for (const def of RANKINGS) {
       const slide = slides.find((s) => s.id === def.id)!;
-      const { entries } = rankSkills(skills, def, RANKING_SIZE);
+      const { entries } = rankSkills(skills, def, RANKING_SIZE, trendingIds);
       expect(slide.entries).toEqual(entries.slice(0, HERO_RANK_SIZE));
     }
   });
 
   it("carries the presentation of its leaderboard", () => {
-    const slides = buildHeroSlides(ladder(50));
+    const skills = ladder(50);
+    const trendingIds = skills.map(skillIdOf);
+    const slides = buildHeroSlides(skills, trendingIds);
 
     expect(slides).toHaveLength(RANKINGS.length);
     for (const def of RANKINGS) {
@@ -167,17 +183,15 @@ describe("buildHeroSlides", () => {
     }
   });
 
-  it("drops a leaderboard no skill qualifies for", () => {
-    // Installs exist, but nothing was installed this week and nothing is
-    // old enough to rise — only the lifetime board survives.
-    const skills = ladder(5, { downloads: 5_000, weeklyInstalls: 0 });
+  it("drops the trending slide when the trending list is unavailable", () => {
+    const skills = ladder(5);
 
-    expect(buildHeroSlides(skills).map((slide) => slide.id)).toEqual([
+    expect(buildHeroSlides(skills, null).map((slide) => slide.id)).toEqual([
       "popular",
     ]);
   });
 
   it("renders no slides at all for an empty registry", () => {
-    expect(buildHeroSlides([])).toEqual([]);
+    expect(buildHeroSlides([], ["acme/s0/s0"])).toEqual([]);
   });
 });

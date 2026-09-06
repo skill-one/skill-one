@@ -12,6 +12,7 @@ import { Drawer } from "../ui/drawer";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
 vi.mock("../../lib/skill-detail-api", () => ({
+  MIRROR: { repo: "skill-one/skills-sh-scraper", ref: "dist" },
   fetchSkillDetail: vi.fn(),
 }));
 
@@ -33,7 +34,8 @@ const skill: Skill = {
   description: "Read and merge PDF documents.",
   stars: 169600,
   downloads: 2991984,
-  path: "skills/pdf",
+  path: "skills/anthropics/skills/pdf",
+  url: "https://www.skills.sh/anthropics/skills/pdf",
 };
 
 /** A skill placed manually into the global directory: no repo, disk read. */
@@ -45,10 +47,10 @@ const localSkill: Skill = {
   downloads: 0,
 };
 
-/** A registry entry that carries its version identity (the scanned majority). */
+/** A registry entry that carries its version identity (the indexed majority). */
 const versionedSkill: Skill = {
   ...skill,
-  rev: "t1-a4cf6ce14f6d65b3",
+  rev: "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
   firstSeenAt: "2026-08-12T04:34:54Z",
 };
 
@@ -61,7 +63,7 @@ const detail = {
   license: "MIT",
   author: "Anthropic",
   instructions: "Use this skill for PDFs.",
-  path: "skills/pdf/SKILL.md",
+  path: "skills/anthropics/skills/pdf/SKILL.md",
 };
 
 const localDetail = {
@@ -141,14 +143,14 @@ describe("SkillDetailPanel", () => {
     expect(screen.queryByText(/^收录时间/)).not.toBeInTheDocument();
     expect(screen.getByText("MIT")).toBeInTheDocument();
     expect(screen.getByText("Anthropic")).toBeInTheDocument();
-    expect(screen.getByText("skills/pdf/SKILL.md")).toBeInTheDocument();
+    expect(screen.getByText("skills/anthropics/skills/pdf/SKILL.md")).toBeInTheDocument();
     // Both popularity metrics render in the badge row.
     expect(screen.getByText("3M")).toBeInTheDocument();
     expect(screen.getByText("169.6K")).toBeInTheDocument();
     expect(mockFetchSkillDetail).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
-      "skills/pdf",
+      "skills/anthropics/skills/pdf",
     );
   });
 
@@ -157,30 +159,34 @@ describe("SkillDetailPanel", () => {
     renderDrawer({ skill: versionedSkill });
 
     await screen.findByText("Use this skill for PDFs.");
-    // Compact form: the fingerprint scheme segment stays out of the row.
-    expect(screen.getByText(/^版本/)).toHaveTextContent("#a4cf6ce1");
+    // Compact form: the hash abbreviates to its first 8 hex digits.
+    expect(screen.getByText(/^版本/)).toHaveTextContent("#b1460085");
     expect(screen.getByText(/^收录时间/)).toHaveTextContent(SEEN_AT_LOCALE);
     // The value it abbreviates, and what it means, live in the tooltips.
-    expect(screen.getByTitle(/t1-a4cf6ce14f6d65b3/)).toBeInTheDocument();
+    expect(screen.getByTitle(/b146008599c31057/)).toBeInTheDocument();
   });
 
-  it("links the source repo to the skill's GitHub directory when known", async () => {
+  it("links the source repo, its skills.sh page and the mirror SKILL.md", async () => {
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderDrawer({ skill: { ...skill, path: "skills/pdf" } });
+    renderDrawer({ skill: { ...skill, path: "skills/anthropics/skills/pdf" } });
 
     await screen.findByText("Use this skill for PDFs.");
+    // The repo link lands on the repo root: the mirror id no longer carries
+    // the skill's directory inside the upstream repo.
     expect(
-      screen.getByRole("link", { name: /anthropics\/skills/ }),
-    ).toHaveAttribute(
+      screen.getByRole("link", { name: "anthropics/skills" }),
+    ).toHaveAttribute("href", "https://github.com/anthropics/skills");
+    // The skills.sh page is the deepest upstream link that survives.
+    expect(screen.getByRole("link", { name: /skills\.sh/ })).toHaveAttribute(
       "href",
-      "https://github.com/anthropics/skills/tree/HEAD/skills/pdf",
+      "https://www.skills.sh/anthropics/skills/pdf",
     );
-    // The file path links to the exact SKILL.md on GitHub.
+    // The file path links to the exact SKILL.md in the mirror snapshot.
     expect(
       screen.getByRole("link", { name: /skills\/pdf\/SKILL\.md/ }),
     ).toHaveAttribute(
       "href",
-      "https://github.com/anthropics/skills/blob/HEAD/skills/pdf/SKILL.md",
+      "https://github.com/skill-one/skills-sh-scraper/blob/dist/skills/anthropics/skills/pdf/SKILL.md",
     );
   });
 
@@ -192,7 +198,7 @@ describe("SkillDetailPanel", () => {
     expect(mockFetchLocalSkillDetail).toHaveBeenCalledWith("pdf");
     expect(mockFetchSkillDetail).not.toHaveBeenCalled();
     expect(
-      screen.getByRole("link", { name: /anthropics\/skills/ }),
+      screen.getByRole("link", { name: "anthropics/skills" }),
     ).toHaveAttribute("href", "https://github.com/anthropics/skills");
   });
 
@@ -218,9 +224,9 @@ describe("SkillDetailPanel", () => {
     renderDrawer({ skill: { ...skill, path: "skills/pdf" } });
 
     await screen.findByText("Use this skill for PDFs.");
-    await user.click(screen.getByRole("link", { name: /anthropics\/skills/ }));
+    await user.click(screen.getByRole("link", { name: "anthropics/skills" }));
     expect(mockOpenExternal).toHaveBeenCalledWith(
-      "https://github.com/anthropics/skills/tree/HEAD/skills/pdf",
+      "https://github.com/anthropics/skills",
     );
   });
 
