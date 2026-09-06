@@ -43,6 +43,17 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(tray::handle_window_event)
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // Clicking the dock icon while running must bring the main window
+            // back (it hides on close instead of quitting). `Reopen` is
+            // macOS-only. We don't trust `has_visible_windows`: the tray
+            // popover is itself a visible window, so the flag can be true
+            // while the main window is hidden.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                tray::show_main(app_handle);
+            }
+        });
 }
