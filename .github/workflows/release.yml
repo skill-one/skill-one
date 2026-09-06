@@ -78,6 +78,8 @@ jobs:
           node --input-type=module -e '
             import fs from "node:fs";
             const [version, tarName, sigPath] = process.argv.slice(1);
+            // GitHub replaces spaces with dots in release asset filenames.
+            const urlName = tarName.replace(/ /g, ".");
             fs.writeFileSync("latest.json", JSON.stringify({
               version,
               notes: `Skill One ${version}`,
@@ -85,7 +87,7 @@ jobs:
               platforms: {
                 "darwin-aarch64": {
                   url: `https://github.com/${process.env.GITHUB_REPOSITORY}` +
-                    `/releases/download/v${version}/${tarName}`,
+                    `/releases/download/v${version}/${urlName}`,
                   signature: fs.readFileSync(sigPath, "utf8").trim(),
                 },
               },
