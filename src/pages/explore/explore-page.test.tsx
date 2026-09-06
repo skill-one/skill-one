@@ -454,26 +454,34 @@ describe("ExplorePage", () => {
       "gadget",
     );
 
-    // Highlighting splits the name into <mark> segments, so match the row
-    // via its aria-label, which stays intact.
-    expect(
-      await screen.findByRole("button", {
-        name: "查看 gadget-master 详情",
-      }),
-    ).toBeInTheDocument();
-    // The search is debounced, so wait for the worker's answer to land. The
-    // count names the ranking as well: relevance, not the toolbar's sort.
-    expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
-    // The grid went back to its first page and shows only the match.
-    expect(screen.queryByText("tool-24")).not.toBeInTheDocument();
-    // A single result fits on one page: the pager controls stay visible but
-    // both ends are clamped (disabled).
-    expect(
-      screen.getByRole("link", { name: "下一页" }),
-    ).toHaveAttribute("aria-disabled", "true");
-    expect(
-      screen.getByRole("link", { name: "上一页" }),
-    ).toHaveAttribute("aria-disabled", "true");
+    // Under a loaded runner one keystroke can outlast the 150 ms debounce, so
+    // an intermediate prefix query ("g", "ga", …) may briefly render the very
+    // row this test targets before the final "gadget" query swaps in a
+    // skeleton. Asserting element-by-element races that swap: `findByRole`
+    // resolves on the intermediate row and the follow-up assertion then sees
+    // it detached. One `waitFor` over the whole settled block re-runs on the
+    // swap's mutations and passes only once the final answer is on screen.
+    await waitFor(() => {
+      // Highlighting splits the name into <mark> segments, so match the row
+      // via its aria-label, which stays intact.
+      expect(
+        screen.getByRole("button", { name: "查看 gadget-master 详情" }),
+      ).toBeInTheDocument();
+      // The count names the ranking as well: relevance, not the toolbar's
+      // sort — and "共 1 个" is the final answer's total, never a prefix's.
+      expect(screen.getByText("共 1 个 · 按相关度")).toBeInTheDocument();
+      // The grid went back to its first page and shows only the match.
+      expect(screen.queryByText("tool-24")).not.toBeInTheDocument();
+      // A single result fits on one page: the pager controls stay visible but
+      // both ends are clamped (disabled). Its totals follow the search too,
+      // so the pager belongs inside the same settled block.
+      expect(
+        screen.getByRole("link", { name: "下一页" }),
+      ).toHaveAttribute("aria-disabled", "true");
+      expect(
+        screen.getByRole("link", { name: "上一页" }),
+      ).toHaveAttribute("aria-disabled", "true");
+    });
   });
 
   it("restores the full registry when the search is cleared", async () => {
