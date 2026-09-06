@@ -68,7 +68,7 @@ export interface FeaturedData {
 
 /** Parameters of a leaderboard request. */
 export interface RankingRequest {
-  /** A `RANKINGS` id, e.g. "weekly". */
+  /** A `RANKINGS` id, e.g. "trending". */
   rankingId: string;
 }
 
@@ -117,9 +117,9 @@ export interface RepoPageData {
  * Surfaced in Settings so a user can tell a real refresh from a cache reuse.
  */
 export type IndexOrigin =
-  /** A newer commit was downloaded (or this was the first cold-start fetch). */
+  /** A newer snapshot was downloaded (or this was the first cold-start fetch). */
   | "updated"
-  /** The published commit matches the cached one: the download was skipped. */
+  /** The published run matches the cached one: the download was skipped. */
   | "unchanged"
   /** Serving the cold-start cache while the revalidation is still in flight. */
   | "cache";
@@ -127,16 +127,14 @@ export type IndexOrigin =
 /** Published metadata describing the dataset currently served by the worker. */
 export interface IndexInfo {
   /**
-   * The `distCommit` the served index was fetched at; absent for records
-   * written before commit addressing existed.
+   * The `dist-<date>` tag the served snapshot was fetched at; absent when
+   * the probe could not derive one and the mutable branch was used.
    */
-  commit?: string;
-  /** Upstream `generatedAt` (second-precision UTC). */
+  tag?: string;
+  /** The producing run's `finishedAt` (UTC). */
   generatedAt?: string;
-  /** Upstream `counts.total`: published entries, before the GitHub filter. */
+  /** Published row count (`indexedRows`), before any consumer-side filtering. */
   total?: number;
-  /** Upstream `formatVersion` of the served index. */
-  formatVersion?: number;
   /** Origin of the served dataset for this run. */
   origin: IndexOrigin;
 }

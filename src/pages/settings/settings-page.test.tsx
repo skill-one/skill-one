@@ -25,10 +25,9 @@ vi.mock("../../hooks/use-registry-stats", () => ({
 }));
 
 const SERVED: IndexInfo = {
-  commit: "e52627feff2681df05ad537627f651a2121a7013",
+  tag: "dist-2026-09-06",
   generatedAt: "2026-01-01T00:00:00Z",
   total: 23734,
-  formatVersion: 4,
   origin: "unchanged",
 };
 
@@ -70,8 +69,8 @@ describe("SettingsPage", () => {
     renderSettings();
 
     expect(screen.getByText("技能索引")).toBeInTheDocument();
-    // A prefix is enough to recognize a commit; the full sha would only wrap.
-    expect(screen.getByText("e52627feff26")).toBeInTheDocument();
+    // The tag names the snapshot day; displayed whole.
+    expect(screen.getByText("dist-2026-09-06")).toBeInTheDocument();
     expect(screen.getByText("23,734")).toBeInTheDocument();
     expect(screen.getByText(GENERATED_AT_LOCALE)).toBeInTheDocument();
     expect(

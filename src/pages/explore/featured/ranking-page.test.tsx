@@ -28,6 +28,7 @@ const harness = (
 ).__harness;
 
 vi.mock("../../../lib/skill-detail-api", () => ({
+  MIRROR: { repo: "skill-one/skills-sh-scraper", ref: "dist" },
   fetchSkillDetail: vi.fn(),
 }));
 
@@ -35,18 +36,21 @@ const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 
 /**
  * A registry where every leaderboard ranks differently, so switching tabs is
- * observable: alpha leads the week, beta leads all time, and delta is too new
- * to appear on the rising board.
+ * observable: the trending list puts delta first, lifetime installs put beta
+ * on top of the popular board.
  */
 const INDEX: Skill[] = [
-  { name: "alpha", repo: "acme/alpha", description: "Alpha skill.", stars: 900, downloads: 50_000, weeklyInstalls: 3_000, path: "skills/alpha" },
-  { name: "beta", repo: "acme/beta", description: "Beta skill.", stars: 800, downloads: 90_000, weeklyInstalls: 1_000, path: "skills/beta" },
-  { name: "gamma", repo: "acme/gamma", description: "Gamma skill.", stars: 700, downloads: 1_000, weeklyInstalls: 50, path: "skills/gamma" },
-  { name: "delta", repo: "acme/delta", description: "Delta skill.", stars: 600, downloads: 5_000, weeklyInstalls: 5_000, path: "skills/delta" },
+  { name: "alpha", repo: "acme/alpha", description: "Alpha skill.", stars: 900, downloads: 50_000, path: "skills/acme/alpha/alpha" },
+  { name: "beta", repo: "acme/beta", description: "Beta skill.", stars: 800, downloads: 90_000, path: "skills/acme/beta/beta" },
+  { name: "gamma", repo: "acme/gamma", description: "Gamma skill.", stars: 700, downloads: 1_000, path: "skills/acme/gamma/gamma" },
+  { name: "delta", repo: "acme/delta", description: "Delta skill.", stars: 600, downloads: 5_000, path: "skills/acme/delta/delta" },
 ];
 
+/** The trending list serves delta first, then alpha, beta, gamma. */
+const TRENDING_IDS = ["acme/delta/delta", "acme/alpha/alpha", "acme/beta/beta", "acme/gamma/gamma"];
+
 /** Mount the page as the ranking route would. */
-function renderPage(rankingId = "weekly") {
+function renderPage(rankingId = "trending") {
   return renderWithRouter(
     <Routes>
       <Route
@@ -59,8 +63,12 @@ function renderPage(rankingId = "weekly") {
 }
 
 /** Load the harness with a complete registry before the page mounts. */
-function bootRegistry(skills: Skill[] = INDEX) {
+function bootRegistry(
+  skills: Skill[] = INDEX,
+  trending: string[] | null = TRENDING_IDS,
+) {
   harness.reset();
+  harness.publishTrending(trending);
   harness.init();
   harness.pushAll(skills);
   harness.complete();
@@ -74,7 +82,7 @@ beforeEach(() => {
       name,
       description: `Description of ${name}.`,
       instructions: `Instructions for ${name}.`,
-      path: `skills/${name}/SKILL.md`,
+      path: `skills/acme/x/${name}/SKILL.md`,
     }),
   );
 });
@@ -91,44 +99,29 @@ describe("RankingPage", () => {
     expect(screen.queryByRole("button", { name: /查看 .+ 详情/ })).not.toBeInTheDocument();
   });
 
-  it("renders the leaderboard in rank order with its metric", async () => {
+  it("renders the leaderboard in upstream rank order with its metric", async () => {
     bootRegistry();
-    renderPage("weekly");
+    renderPage("trending");
 
     const rows = await screen.findAllByRole("listitem");
-    // Ranked by weekly installs: delta (5K), alpha (3K), beta (1K), gamma (50).
+    // Ranked by the trending id list, not by any registry metric: delta first.
     expect(rows.map((row) => within(row).getByRole("heading").textContent)).toEqual([
       "delta",
       "alpha",
       "beta",
       "gamma",
     ]);
-    // Weekly installs, preformatted by the worker; the first row is rank 1.
-    expect(within(rows[0]).getByText("5K/周")).toBeInTheDocument();
+    // Lifetime installs, preformatted by the worker; the first row is rank 1.
+    expect(within(rows[0]).getByText("5K")).toBeInTheDocument();
     expect(within(rows[0]).getByText("1")).toBeInTheDocument();
-  });
-
-  it("keeps the rising leaderboard behind its lifetime-install floor", async () => {
-    const user = userEvent.setup();
-    bootRegistry();
-    renderPage("weekly");
-
-    expect(
-      await screen.findByRole("heading", { name: "Skill 周榜" }),
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole("link", { name: "新晋热门" }));
-
-    // Delta is brand new and clears the ratio only, not the 10k floor.
-    await screen.findByRole("heading", { name: "alpha" });
-    expect(screen.queryByRole("heading", { name: "delta" })).not.toBeInTheDocument();
   });
 
   it("switches leaderboards through the tabs", async () => {
     const user = userEvent.setup();
     bootRegistry();
-    renderPage("weekly");
+    renderPage("trending");
 
-    expect(await screen.findByRole("heading", { name: "alpha" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "delta" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("link", { name: "人气总榜" }));
 
@@ -140,7 +133,7 @@ describe("RankingPage", () => {
 
   it("reports how many skills ranked", async () => {
     bootRegistry();
-    renderPage("weekly");
+    renderPage("trending");
 
     expect(await screen.findByText(/共 4 个 Skill/)).toBeInTheDocument();
   });
@@ -148,14 +141,14 @@ describe("RankingPage", () => {
   it("opens the detail drawer and walks the leaderboard with arrow keys", async () => {
     const user = userEvent.setup();
     bootRegistry();
-    renderPage("weekly");
+    renderPage("trending");
 
-    await user.click(await screen.findByRole("button", { name: "查看 alpha 详情" }));
-    expect(await screen.findByText("Instructions for alpha.")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "查看 delta 详情" }));
+    expect(await screen.findByText("Instructions for delta.")).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(
-      await screen.findByText("Instructions for beta."),
+      await screen.findByText("Instructions for alpha."),
     ).toBeInTheDocument();
 
     fireEvent.keyDown(document.body, { key: "Escape" });
@@ -165,10 +158,11 @@ describe("RankingPage", () => {
   });
 
   it("reports an empty leaderboard instead of failing", async () => {
+    // No trending list was served: the board exists but has no entries.
     bootRegistry([
       { name: "solo", repo: "acme/solo", description: "", stars: 1, downloads: 0 },
-    ]);
-    renderPage("rising");
+    ], null);
+    renderPage("trending");
 
     expect(await screen.findByText("暂无上榜 Skill")).toBeInTheDocument();
   });
@@ -177,13 +171,13 @@ describe("RankingPage", () => {
     const user = userEvent.setup();
     bootRegistry();
     harness.setRpcError(new Error("network error"));
-    renderPage("weekly");
+    renderPage("trending");
 
     expect(await screen.findByText("加载失败：network error")).toBeInTheDocument();
 
     harness.setRpcError(null);
     await user.click(screen.getByRole("button", { name: "重试" }));
-    expect(await screen.findByRole("heading", { name: "alpha" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "delta" })).toBeInTheDocument();
   });
 
   it("reports an unknown leaderboard and offers the way back", async () => {
@@ -210,10 +204,10 @@ describe("RankingPage", () => {
         />
         <Route path="/explore/featured" element={<div>featured page</div>} />
       </Routes>,
-      { route: "/explore/featured/ranking/weekly" },
+      { route: "/explore/featured/ranking/trending" },
     );
 
-    await screen.findByRole("heading", { name: "Skill 周榜" });
+    await screen.findByRole("heading", { name: "趋势热榜" });
     await user.click(screen.getByRole("link", { name: "返回精选" }));
 
     expect(await screen.findByText("featured page")).toBeInTheDocument();

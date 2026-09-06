@@ -92,12 +92,17 @@ export function fileCandidates(
 }
 
 /**
- * GitHub's human-facing blob page for one file, pinned to the branch head.
- * Distinct from `fileCandidates`, which builds machine-facing raw/CDN download
- * URLs; this is the link a person clicks to see the file in context.
+ * GitHub's human-facing blob page for one file, pinned to `ref` (the branch
+ * head by default). Distinct from `fileCandidates`, which builds machine-facing
+ * raw/CDN download URLs; this is the link a person clicks to see the file in
+ * context.
  */
-export function githubBlobUrl(repo: string | undefined, path: string): string {
-  return `https://github.com/${repo}/blob/HEAD/${path}`;
+export function githubBlobUrl(
+  repo: string | undefined,
+  path: string,
+  ref = "HEAD",
+): string {
+  return `https://github.com/${repo}/blob/${ref}/${path}`;
 }
 
 /**

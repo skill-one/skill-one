@@ -42,13 +42,13 @@ function skill(name: string, over: Partial<Skill> = {}): Skill {
 
 const slides: HeroSlide[] = [
   {
-    id: "weekly",
-    title: "Skill 周榜",
-    subtitle: "每周精选热门 Skill，点击查看完整榜单",
+    id: "trending",
+    title: "趋势热榜",
+    subtitle: "skills.sh 官方趋势榜，点击查看完整榜单",
     gradient: "bg-gradient-to-r from-violet-500 to-cyan-400",
     entries: [
-      { rank: 1, skill: skill("alpha", { weeklyInstalls: 1_200 }), label: "1.2K/周" },
-      { rank: 2, skill: skill("beta", { weeklyInstalls: 300 }), label: "300/周" },
+      { rank: 1, skill: skill("alpha", { downloads: 1_200 }), label: "1.2K" },
+      { rank: 2, skill: skill("beta", { downloads: 300 }), label: "300" },
     ],
   },
   {
@@ -69,14 +69,14 @@ describe("FeaturedHero", () => {
   it("renders every slide with its leaderboard entries", () => {
     renderWithRouter(<FeaturedHero slides={slides} />);
 
-    expect(screen.getByText("Skill 周榜")).toBeInTheDocument();
+    expect(screen.getByText("趋势热榜")).toBeInTheDocument();
     expect(
-      screen.getByText("每周精选热门 Skill，点击查看完整榜单"),
+      screen.getByText("skills.sh 官方趋势榜，点击查看完整榜单"),
     ).toBeInTheDocument();
     // The ranked list shows rank, name and the preformatted metric.
     expect(screen.getByText("alpha", { selector: "span" })).toBeInTheDocument();
-    expect(screen.getByText("1.2K/周")).toBeInTheDocument();
-    expect(screen.getByText("300/周")).toBeInTheDocument();
+    expect(screen.getByText("1.2K")).toBeInTheDocument();
+    expect(screen.getByText("300")).toBeInTheDocument();
     expect(screen.getByText("2", { selector: "span" })).toBeInTheDocument();
   });
 
@@ -96,7 +96,7 @@ describe("FeaturedHero", () => {
     renderWithRouter(<FeaturedHero slides={slides} />);
 
     expect(
-      screen.getByRole("button", { name: "第 1 张：Skill 周榜" }),
+      screen.getByRole("button", { name: "第 1 张：趋势热榜" }),
     ).toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: "第 2 张：人气总榜" }),
@@ -124,18 +124,18 @@ describe("FeaturedHero", () => {
         />
         <Route
           path="/explore/featured/ranking/:rankingId"
-          element={<div>weekly leaderboard</div>}
+          element={<div>trending leaderboard</div>}
         />
       </Routes>,
       { route: "/explore/featured" },
     );
 
     await user.click(
-      screen.getByRole("button", { name: "Skill 周榜，查看完整榜单" }),
+      screen.getByRole("button", { name: "趋势热榜，查看完整榜单" }),
     );
 
     await waitFor(() =>
-      expect(screen.getByText("weekly leaderboard")).toBeInTheDocument(),
+      expect(screen.getByText("trending leaderboard")).toBeInTheDocument(),
     );
   });
 

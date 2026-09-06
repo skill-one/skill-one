@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { DEFAULT_CDN_BASE, SourceFetchError } from "../cdn-config";
-import { probeIndexMeta, readIndex, readLines } from "./index-stream";
+import { probeIndexMeta, readIndex, readLines, readTrending } from "./index-stream";
 
 /** Chunk a string into UTF-8 byte segments of the given size. */
 function chunksOf(text: string, size: number): Uint8Array[] {
   const bytes = new TextEncoder().encode(text);
   const chunks: Uint8Array[] = [];
   for (let i = 0; i < bytes.length; i += size) {
-    chunks.push(bytes.slice(i, i + size));
+    chunks.push(bytes.slice(i, size + i));
   }
   return chunks;
 }
@@ -39,23 +39,6 @@ describe("readLines", () => {
     expect(await collectLines("a\nbb\nccc", 2)).toEqual(["a", "bb", "ccc"]);
   });
 
-  it("keeps a line fragment buffered until its remainder arrives", async () => {
-    const lines: string[] = [];
-    const seen: string[][] = [];
-    const stream = streamOf(chunksOf("aaa\nbbb\n", 2));
-    const reader = stream.getReader();
-    // Feed manually so the partial-line boundary is observable per chunk.
-    const decoderChunks = chunksOf("aaa\nbbb\n", 2);
-    void reader; // replaced below with a synchronous fake stream
-
-    // Re-run through readLines but record snapshots after each chunk by
-    // using a one-byte-at-a-time stream and collecting at the end; the
-    // buffering behavior is covered by the multi-chunk cases above.
-    await readLines(streamOf(decoderChunks), (line) => lines.push(line));
-    seen.push(lines);
-    expect(seen[0]).toEqual(["aaa", "bbb"]);
-  });
-
   it("decodes multi-byte characters split across chunks", async () => {
     // "你" is 3 bytes; split it across chunks to prove streaming decode.
     expect(await collectLines("你好\n世界", 1)).toEqual(["你好", "世界"]);
@@ -73,14 +56,14 @@ describe("readLines", () => {
 describe("probeIndexMeta", () => {
   // Candidate URLs as produced by `fileCandidates(META_SPEC, "")`: the direct
   // GitHub origin first, the default CDN mirror second.
-  const ORIGIN_META =
-    "https://raw.githubusercontent.com/skill-one/skills-index/dist/index-meta.json";
-  const CDN_META = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-index@dist/index-meta.json`;
+  const ORIGIN_STATS =
+    "https://raw.githubusercontent.com/skill-one/skills-sh-scraper/dist/stats.json";
+  const CDN_STATS = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-scraper@dist/stats.json`;
 
   const fetchMock = vi.fn();
 
-  /** A 200 meta response carrying the given body. */
-  function metaResponse(body: unknown): Response {
+  /** A 200 stats response carrying the given body. */
+  function statsResponse(body: unknown): Response {
     return {
       ok: true,
       status: 200,
@@ -88,12 +71,12 @@ describe("probeIndexMeta", () => {
     } as unknown as Response;
   }
 
-  /** The published snapshot as upstream CI writes it, commit included. */
+  /** The published run as upstream CI writes it. */
   const PUBLISHED = {
-    formatVersion: 4,
-    generatedAt: "2026-09-01T14:25:32Z",
-    counts: { total: 23734 },
-    distCommit: "e52627feff2681df05ad537627f651a2121a7013",
+    startedAt: "2026-09-06T15:02:30.557Z",
+    finishedAt: "2026-09-06T15:32:29.423Z",
+    indexedRows: 8945,
+    changed: 15,
   };
 
   /** URLs actually fetched, with any cache-busting stamp stripped off. */
@@ -105,7 +88,7 @@ describe("probeIndexMeta", () => {
     requested = [];
     fetchMock.mockImplementation(async (url: string) => {
       requested.push(url.split("?")[0]);
-      return metaResponse(PUBLISHED);
+      return statsResponse(PUBLISHED);
     });
   });
 
@@ -113,65 +96,64 @@ describe("probeIndexMeta", () => {
     vi.unstubAllGlobals();
   });
 
-  it("normalizes the published snapshot and asks for it cache-busted", async () => {
+  it("derives the snapshot identity and tag from the run stats", async () => {
     const published = await probeIndexMeta("");
 
     expect(published).toEqual({
-      commit: "e52627feff2681df05ad537627f651a2121a7013",
-      generatedAt: "2026-09-01T14:25:32Z",
-      total: 23734,
-      formatVersion: 4,
+      tag: "dist-2026-09-06",
+      generatedAt: "2026-09-06T15:32:29.423Z",
+      total: 8945,
     });
     // The origin answers, so no further source is consulted.
-    expect(requested).toEqual([ORIGIN_META]);
+    expect(requested).toEqual([ORIGIN_STATS]);
   });
 
   it("busts the CDN cache on every pointer request", async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(ORIGIN_META)) throw new TypeError("network down");
+      if (url.startsWith(ORIGIN_STATS)) throw new TypeError("network down");
       requested.push(url);
-      return metaResponse(PUBLISHED);
+      return statsResponse(PUBLISHED);
     });
 
     await probeIndexMeta("");
     // The pointer is the freshness oracle: an edge copy as much as the WebView's
-    // own cache would make yesterday's commit look current.
+    // own cache would make yesterday's snapshot look current.
     expect(requested).toHaveLength(1);
-    expect(requested[0].startsWith(`${CDN_META}?t=`)).toBe(true);
+    expect(requested[0].startsWith(`${CDN_STATS}?t=`)).toBe(true);
   });
 
-  it("drops a malformed commit rather than pinning a download to it", async () => {
-    // Anything interpolated into a URL must be a sha; junk would build a
-    // bogus address, so it degrades to the branch fallback instead.
+  it("pins nothing when the finished stamp is not a UTC date", async () => {
+    // Anything interpolated into a URL must be a `dist-<date>` tag the
+    // upstream CI actually creates; junk would build a bogus address, so it
+    // degrades to the branch fallback instead.
     fetchMock.mockImplementation(async () =>
-      metaResponse({ ...PUBLISHED, distCommit: "../../evil" }),
+      statsResponse({ ...PUBLISHED, finishedAt: "../../evil" }),
     );
     const published = await probeIndexMeta("");
-    expect(published?.commit).toBeUndefined();
-    expect(published?.generatedAt).toBe("2026-09-01T14:25:32Z");
+    expect(published?.tag).toBeUndefined();
+    expect(published?.generatedAt).toBe("../../evil");
   });
 
-  it("accepts a commit-less meta from a source lagging behind the format", async () => {
+  it("accepts a stamp-less stats file from a source lagging behind the format", async () => {
     fetchMock.mockImplementation(async () =>
-      metaResponse({ formatVersion: 2, generatedAt: "2026-08-31T04:34:54Z" }),
+      statsResponse({ startedAt: "2026-08-31T04:34:54Z" }),
     );
     expect(await probeIndexMeta("")).toEqual({
-      commit: undefined,
-      generatedAt: "2026-08-31T04:34:54Z",
+      tag: undefined,
+      generatedAt: undefined,
       total: undefined,
-      formatVersion: 2,
     });
   });
 
   it("walks to the next source when one is unreachable", async () => {
     fetchMock.mockImplementation(async (url: string) => {
       requested.push(url.split("?")[0]);
-      if (url.startsWith(ORIGIN_META)) return { ok: false, status: 503 };
-      return metaResponse(PUBLISHED);
+      if (url.startsWith(ORIGIN_STATS)) return { ok: false, status: 503 };
+      return statsResponse(PUBLISHED);
     });
 
     expect(await probeIndexMeta("")).not.toBeNull();
-    expect(requested).toEqual([ORIGIN_META, CDN_META]);
+    expect(requested).toEqual([ORIGIN_STATS, CDN_STATS]);
   });
 
   it("returns null when no source answers", async () => {
@@ -182,24 +164,69 @@ describe("probeIndexMeta", () => {
   });
 
   it("returns null on a body that is not a JSON object", async () => {
-    fetchMock.mockImplementation(async () => metaResponse("<html>"));
+    fetchMock.mockImplementation(async () => statsResponse("<html>"));
     await expect(probeIndexMeta("")).resolves.toBeNull();
   });
 });
 
+describe("readTrending", () => {
+  const ORIGIN_TRENDING =
+    "https://raw.githubusercontent.com/skill-one/skills-sh-scraper/dist/trending.json";
+
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the id list cache-busted", async () => {
+    const ids = ["a/b/c", "d/e/f"];
+    fetchMock.mockImplementation(async () => {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ids,
+      } as unknown as Response;
+    });
+
+    expect(await readTrending("")).toEqual(ids);
+    expect(fetchMock.mock.calls[0][0]).toMatch(`${ORIGIN_TRENDING}?t=`);
+  });
+
+  it("returns null when every source fails or serves a malformed list", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      // First candidate: 404 (a snapshot from before the file existed).
+      // Second candidate: not an id array.
+      if (url.startsWith(ORIGIN_TRENDING)) return { ok: false, status: 404 };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ trending: [] }),
+      } as unknown as Response;
+    });
+
+    await expect(readTrending("")).resolves.toBeNull();
+  });
+});
+
 describe("readIndex", () => {
-  const COMMIT = "e52627feff2681df05ad537627f651a2121a7013";
-  // Commit-addressed candidates: immutable, so no busting is needed.
-  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-index/${COMMIT}/index.jsonl`;
-  const PINNED_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-index@${COMMIT}/index.jsonl`;
-  // Branch candidates, used only when no commit is known.
+  const TAG = "dist-2026-09-06";
+  // Tag-addressed candidates: immutable, so no busting is needed.
+  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-sh-scraper/${TAG}/skills.jsonl`;
+  const PINNED_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-scraper@${TAG}/skills.jsonl`;
+  // Branch candidates, used only when no tag is known.
   const BRANCH_ORIGIN =
-    "https://raw.githubusercontent.com/skill-one/skills-index/dist/index.jsonl";
+    "https://raw.githubusercontent.com/skill-one/skills-sh-scraper/dist/skills.jsonl";
 
   const fetchMock = vi.fn();
 
   /** A minimal parseable index line (no stars / installs data). */
-  const MINIMAL_LINE = JSON.stringify({ source: "acme/tools", skillId: "x" });
+  const MINIMAL_LINE = JSON.stringify({ id: "acme/tools/x", installs: 0 });
 
   /**
    * A 200 index response streaming out `text`; with `failAfterChunks` the
@@ -244,21 +271,19 @@ describe("readIndex", () => {
     vi.unstubAllGlobals();
   });
 
-  it("parses the body line by line, skipping junk and non-GitHub sources", async () => {
+  it("parses the body line by line, skipping junk and non-GitHub ids", async () => {
     const body = [
       JSON.stringify({
-        source: "acme/tools",
-        skillId: "hammer",
+        id: "acme/tools/hammer",
         installs: 10,
         stars: 3,
+        url: "https://www.skills.sh/acme/tools/hammer",
         description: "Hammers.",
-        path: "skills/hammer",
-        weeklyInstalls: [1, 2],
-        rev: "t1-a4cf6ce14f6d65b3",
-        firstSeenAt: "2026-08-12T04:34:54Z",
+        hash: "b146008599c31057",
+        fetchedAt: "2026-09-06T07:57:37.803Z",
       }),
       "not json", // malformed → skipped
-      JSON.stringify({ source: "open.feishu.cn", skillId: "x", installs: 1 }), // non-GitHub → skipped
+      JSON.stringify({ id: "open.feishu.cn/tools/x", installs: 1 }), // non-GitHub → skipped
       "",
     ].join("\n");
     fetchMock.mockImplementation(async (url: string) => {
@@ -270,7 +295,7 @@ describe("readIndex", () => {
     let restarts = 0;
     await readIndex(
       "",
-      COMMIT,
+      TAG,
       (skill) => skills.push(skill),
       () => restarts++,
     );
@@ -283,29 +308,29 @@ describe("readIndex", () => {
         description: "Hammers.",
         stars: 3,
         downloads: 10,
-        weeklyInstalls: 2,
-        path: "skills/hammer",
-        rev: "t1-a4cf6ce14f6d65b3",
-        firstSeenAt: "2026-08-12T04:34:54Z",
+        path: "skills/acme/tools/hammer",
+        rev: "b146008599c31057",
+        firstSeenAt: "2026-09-06T07:57:37.803Z",
+        url: "https://www.skills.sh/acme/tools/hammer",
       },
     ]);
   });
 
-  it("downloads the commit-addressed URL untouched by a busting stamp", async () => {
+  it("downloads the tag-addressed URL untouched by a busting stamp", async () => {
     await readIndex(
       "",
-      COMMIT,
+      TAG,
       () => {},
       () => {},
     );
 
-    // The commit makes the URL content-addressed: a cached copy is by
+    // The tag makes the URL content-addressed: a cached copy is by
     // definition the right copy, so busting it would only cost a full
     // origin download.
     expect(requested).toEqual([PINNED_ORIGIN]);
   });
 
-  it("busts the mutable branch URL when no commit is known", async () => {
+  it("busts the mutable branch URL when no tag is known", async () => {
     await readIndex(
       "",
       undefined,
@@ -314,7 +339,7 @@ describe("readIndex", () => {
     );
 
     // Without a pin, an edge copy could be a day old and indistinguishable
-    // from the current index — the failure commit addressing exists to kill.
+    // from the current index — the failure tag addressing exists to kill.
     expect(requested).toHaveLength(1);
     expect(requested[0].startsWith(`${BRANCH_ORIGIN}?t=`)).toBe(true);
   });
@@ -332,7 +357,7 @@ describe("readIndex", () => {
     // the parse from scratch and completes it.
     await readIndex(
       DEFAULT_CDN_BASE,
-      COMMIT,
+      TAG,
       (skill) => skills.push(skill),
       () => restarts++,
     );
@@ -346,8 +371,7 @@ describe("readIndex", () => {
         description: "",
         stars: 0,
         downloads: 0,
-        weeklyInstalls: undefined,
-        path: undefined,
+        path: "skills/acme/tools/x",
       },
     ]);
   });
@@ -360,7 +384,7 @@ describe("readIndex", () => {
 
     const err = await readIndex(
       "",
-      COMMIT,
+      TAG,
       () => {},
       () => {},
     ).catch((e) => e);

@@ -31,10 +31,10 @@ const INDEX_ORIGIN_LABEL: Record<IndexOrigin, string> = {
  * source immediately (it has no `localStorage` access, so the base is
  * passed in).
  *
- * The index card is the read-out for commit-based caching: it names the
- * snapshot being served and whether this launch re-downloaded it or reused the
- * local copy. Its button is the manual escape hatch — a reload always
- * re-downloads, even when the published commit has not moved.
+ * The index card is the read-out for run-based caching: it names the snapshot
+ * being served and whether this launch re-downloaded it or reused the local
+ * copy. Its button is the manual escape hatch — a reload always re-downloads,
+ * even when the published run has not moved.
  */
 export function SettingsPage() {
   const [value, setValue] = useState(getCdnBase());
@@ -51,13 +51,12 @@ export function SettingsPage() {
     if (previous !== next) reloadRegistry();
   };
 
-  // Facts about the snapshot the store is actually serving. A commit prefix
-  // is enough to recognize it and to diff against a release, and the full sha
-  // would only wrap.
+  // Facts about the snapshot the store is actually serving. The `dist-<date>`
+  // tag is short enough to display whole and to diff against a release.
   const indexRows = [
     {
       term: "索引版本",
-      value: index?.commit ? index.commit.slice(0, 12) : "未知",
+      value: index?.tag ?? "未知",
     },
     { term: "发布于", value: formatIndexTime(index?.generatedAt) },
     { term: "条目数", value: formatTotal(index?.total) },
@@ -186,8 +185,9 @@ export function SettingsPage() {
                 技能索引
               </h3>
               <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                商店数据来自 skill-one/skills-index 发布的快照。索引按 commit
-                定址：版本未变时启动直接复用本地缓存，不再下载全量数据。
+                商店数据来自 skill-one/skills-sh-scraper 发布的每日快照
+                （skills.sh 全量榜单）。快照按日期标签定址：版本未变时启动直接复用本地缓存，
+                不再下载全量数据。
               </p>
             </div>
             <Button

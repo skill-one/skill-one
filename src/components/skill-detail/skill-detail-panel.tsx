@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, ExternalLink, Loader2, Puzzle, Star } from "lucide-react";
 
-import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { fetchSkillDetail, MIRROR } from "../../lib/skill-detail-api";
 import { fetchLocalSkillDetail } from "../../lib/local-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
@@ -34,14 +34,15 @@ interface SkillDetailPanelProps {
  * clicking the overlay, or dragging the drawer sideways closes it, and ←/→
  * switch skills. Each skill's SKILL.md is fetched through TanStack Query and
  * cached independently, so revisits are instant. The source is picked per
- * skill: a registry-known `path` reads from the GitHub repo (store pages),
- * while an installed skill without one — local skills included — is read from
- * the local skills directory instead, so the view always shows the copy the
- * user actually installed.
+ * skill: a registry-known `path` reads from the skills-sh-scraper mirror
+ * snapshot (the same content the registry indexed), while an installed skill
+ * without one — local skills included — is read from the local skills
+ * directory instead, so the view always shows the copy the user actually
+ * installed.
  *
- * The header's version identity (content fingerprint + the date the registry
- * first recorded it) comes from the index entry rather than the SKILL.md, so
- * unscanned entries and local installs simply show no such row.
+ * The header's version identity (content hash + the date the scraper first
+ * fetched it) comes from the index entry rather than the SKILL.md, so
+ * unhashed entries and local installs simply show no such row.
  */
 export function SkillDetailPanel({
   skill,
@@ -103,22 +104,21 @@ export function SkillDetailPanel({
   // Puzzle placeholder the my-skills row uses).
   const isLocalSkill = shown != null && !shown.repo;
   const description = detail?.description || shown?.description;
-  // Link to the skill's folder in GitHub; without a known path, the repo root.
-  const sourcePath = shown?.path?.replace(/^\/+|\/+$/g, "");
-  const sourceHref = !shown
-    ? ""
-    : sourcePath
-      ? `https://github.com/${shown.repo}/tree/HEAD/${sourcePath}`
-      : `https://github.com/${shown.repo}`;
-  // Repo-relative SKILL.md path, reused for the GitHub file link and to
-  // resolve relative URLs inside the markdown body.
+  // The mirror-relative SKILL.md path, reused for the mirror's GitHub file
+  // link and to resolve relative URLs inside the markdown body.
   const filePath = detail?.path.replace(/^\/+|\/+$/g, "") ?? "";
+  // The upstream repo the skill ships in; without a known path inside it,
+  // the link lands on the repo root.
+  const sourceHref = !shown || !shown.repo ? "" : `https://github.com/${shown.repo}`;
+  // The skill's page on skills.sh, when the index carries one — the deepest
+  // upstream link that survives without the repo-internal path.
+  const skillsShHref = shown?.url ?? "";
   // The link's href and its open-externally handler point at the same place.
-  const skillBlobUrl = githubBlobUrl(shown?.repo, filePath);
-  // Version identity as the registry sees it: the directory fingerprint, and
-  // how long the index has carried that exact content. From the index entry,
-  // not the SKILL.md — so absent on unscanned entries and on local installs
-  // the registry never listed.
+  const skillBlobUrl = githubBlobUrl(MIRROR.repo, filePath, MIRROR.ref);
+  // Version identity as the scraper sees it: the content hash, and how long
+  // the mirror has carried that exact content. From the index entry, not the
+  // SKILL.md — so absent on unhashed entries and on local installs the
+  // mirror never listed.
   const rev = shown?.rev ? formatRev(shown.rev) : null;
   const seenAt = formatDate(shown?.firstSeenAt);
 
@@ -146,7 +146,7 @@ export function SkillDetailPanel({
                 e.preventDefault();
                 void openExternal(sourceHref);
               }}
-              title="在 GitHub 中打开该技能的目录"
+              title="在 GitHub 中打开源仓库"
               className="min-w-0 items-center gap-1"
             >
               <span className="truncate">{shown?.repo}</span>
@@ -173,13 +173,27 @@ export function SkillDetailPanel({
                   {formatCount(shown?.stars ?? 0)}
                 </span>
               </span>
+              {skillsShHref && (
+                <a
+                  href={skillsShHref}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void openExternal(skillsShHref);
+                  }}
+                  title="在 skills.sh 中打开"
+                  className="ml-0.5 flex items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <span>skills.sh</span>
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                </a>
+              )}
             </>
           )}
         </div>
         {(rev || seenAt) && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground/70">
             {rev && (
-              <span title={`技能目录的内容指纹（目录内任何文件或其权限变化都会改变）：${shown?.rev}`}>
+              <span title={`技能文件的内容哈希（上游文件一变即改变）：${shown?.rev}`}>
                 版本 <span className="font-mono">{rev}</span>
               </span>
             )}
@@ -187,7 +201,7 @@ export function SkillDetailPanel({
               <span aria-hidden="true">·</span>
             )}
             {seenAt && (
-              <span title="注册表首次收录当前版本内容的时间；内容一变即重新起算">
+              <span title="镜像首次抓取当前版本内容的时间；内容一变即重新起算">
                 收录时间 {seenAt}
               </span>
             )}
@@ -236,7 +250,7 @@ export function SkillDetailPanel({
                     e.preventDefault();
                     void openExternal(skillBlobUrl);
                   }}
-                  title="在 GitHub 中打开 SKILL.md"
+                  title="在 GitHub 中打开镜像快照里的 SKILL.md"
                   className="mb-2 flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground"
                 >
                   <span className="truncate">{detail.path}</span>
@@ -244,7 +258,11 @@ export function SkillDetailPanel({
                 </a>
               )}
               {detail.instructions ? (
-                <Markdown repo={shown?.repo ?? ""} filePath={filePath}>
+                <Markdown
+                  repo={isLocalSkill ? shown?.repo ?? "" : MIRROR.repo}
+                  gitRef={isLocalSkill ? undefined : MIRROR.ref}
+                  filePath={filePath}
+                >
                   {detail.instructions}
                 </Markdown>
               ) : (

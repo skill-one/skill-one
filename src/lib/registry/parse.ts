@@ -1,83 +1,76 @@
 import type { Skill } from "../../types/skill";
 
 /**
- * Pure parsing of the registry index's JSONL lines into the app's Skill
- * model. Runs inside the registry worker, one line at a time while the
+ * Pure parsing of the skills-sh-scraper index's JSONL lines into the app's
+ * Skill model. Runs inside the registry worker, one line at a time while the
  * download streams in.
  */
 
 /** Raw skill shape as stored in one JSONL index line. */
 interface RawSkill {
-  source: string;
-  skillId: string;
-  /** Present in the old skills.sh snapshot; absent in the JSONL index. */
-  name?: string;
+  /**
+   * Canonical skills.sh id encoding source and slug: `{owner}/{repo}/{slug}`.
+   * The slug is slash-free — multi-segment slugs upstream are keyed with the
+   * slashes stripped.
+   */
+  id: string;
   installs: number;
-  /** Absent on some live index lines despite always being drawn. */
-  weeklyInstalls?: number[];
-  /** Provided by the JSONL index; may be missing on individual entries. */
-  description?: string;
-  /** Skill directory inside the repo, e.g. "skills/find-skills". */
-  path?: string;
-  /** GitHub stars of the source repo; absent on the old skills.sh snapshot. */
-  stars?: number;
-  /** Content fingerprint of the skill directory (e.g. "t1-a4cf6ce14f6d65b3"). */
-  rev?: string;
-  /** When the registry first recorded that fingerprint (ISO, UTC). */
-  firstSeenAt?: string;
+  /** GitHub stargazers of the source repo; null when the repo is gone. */
+  stars?: number | null;
+  /** The skill's page on skills.sh. */
+  url?: string | null;
+  /** From the SKILL.md frontmatter; null when it has none. */
+  description?: string | null;
+  /** SHA-256 of the skill's files; null when unknown. */
+  hash?: string | null;
+  /** When the current content version was first fetched (ISO, UTC). */
+  fetchedAt?: string | null;
 }
 
 /**
- * Whether a source is a GitHub repo in "owner/repo" form.
+ * Whether an id is a canonical skills.sh id for a GitHub repo.
  *
- * The index also lists non-GitHub sources (e.g. "open.feishu.cn"), which
- * would otherwise produce broken `https://github.com/<source>.png` avatar URLs
- * and are not addressable repos, so they are filtered out.
+ * The mirror only lists GitHub-sourced skills, but a defensive shape check
+ * keeps a malformed line from interpolating junk into download URLs and
+ * avatar paths: exactly three non-empty segments, and a dot-free owner (a
+ * dotted first segment would be a domain, not a GitHub user).
  */
-function isGitHubRepo(source: string): boolean {
-  const parts = source.split("/");
+function isCanonicalId(id: string): boolean {
+  const parts = id.split("/");
   return (
-    parts.length === 2 &&
-    parts[0].length > 0 &&
-    parts[1].length > 0 &&
-    // GitHub usernames never contain a dot; a dot means a domain (e.g.
-    // "open.feishu.cn") rather than an owner.
+    parts.length === 3 &&
+    parts.every((part) => part.length > 0) &&
     !parts[0].includes(".")
   );
 }
 
 function toSkill(raw: RawSkill): Skill {
+  const [owner, repo, slug] = raw.id.split("/");
   return {
-    // The JSONL index has no separate `name` field; the skill name lives in
-    // `skillId` (the old skills.sh snapshot still carries both).
-    name: raw.name ?? raw.skillId,
-    repo: raw.source,
-    // The JSONL index exposes descriptions; fall back to an empty placeholder
+    // The slug is the skill's name: the directory the skill ships in, and
+    // what a locally installed copy of it is called.
+    name: slug,
+    repo: `${owner}/${repo}`,
+    // The mirror exposes descriptions; fall back to an empty placeholder
     // when an entry lacks one so the row layout stays stable.
     description: raw.description ?? "",
-    // GitHub stars and install counts are separate metrics; entries missing
-    // either (e.g. the old skills.sh snapshot) normalize to 0.
+    // GitHub stars and install counts are separate metrics; an entry
+    // missing either (a deleted repo, a null count) normalizes to 0.
     stars: raw.stars ?? 0,
     downloads: raw.installs ?? 0,
-    // The registry records a weekly install series in chronological order;
-    // the featured page ranks by the most recent week, its last entry. The
-    // field is absent on some index lines, so guard before reading it.
-    weeklyInstalls:
-      raw.weeklyInstalls && raw.weeklyInstalls.length > 0
-        ? raw.weeklyInstalls[raw.weeklyInstalls.length - 1]
-        : undefined,
-    path: raw.path,
-    // Identity of the version the index describes, and how long the registry
-    // has carried it. Both are absent on unscanned entries (~2.5%).
-    rev: raw.rev,
-    firstSeenAt: raw.firstSeenAt,
+    // The skill's files live in the mirror snapshot at this directory; the
+    // basename equals the skill name, so a locally installed copy still
+    // matches its registry entry.
+    path: `skills/${raw.id}`,
+    rev: raw.hash ?? undefined,
+    firstSeenAt: raw.fetchedAt ?? undefined,
+    url: raw.url ?? undefined,
   };
 }
 
 /**
  * Parse one JSONL index line into a GitHub skill. Returns null for blank
- * lines, malformed JSON, and entries that are not GitHub repos — the same
- * skips the previous whole-text parse applied.
+ * lines, malformed JSON, and ids that are not canonical GitHub ids.
  */
 export function parseSkillLine(line: string): Skill | null {
   const trimmed = line.trim();
@@ -88,5 +81,7 @@ export function parseSkillLine(line: string): Skill | null {
   } catch {
     return null;
   }
-  return isGitHubRepo(raw.source) ? toSkill(raw) : null;
+  return typeof raw.id === "string" && isCanonicalId(raw.id)
+    ? toSkill(raw)
+    : null;
 }

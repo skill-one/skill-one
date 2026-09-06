@@ -35,30 +35,30 @@ describe("createRegistryCache", () => {
     const cache = createRegistryCache(fakeStore());
 
     await cache.save(skills, {
-      commit: "e52627fe",
-      formatVersion: 4,
+      tag: "dist-2026-09-01",
+      
       generatedAt: "2026-09-01T14:25:32Z",
     });
     const loaded = await cache.load();
     expect(loaded?.skills).toEqual(skills);
     expect(loaded).toMatchObject({
-      commit: "e52627fe",
-      formatVersion: 4,
+      tag: "dist-2026-09-01",
+      
       generatedAt: "2026-09-01T14:25:32Z",
     });
     // When the record was written is kept for display, never for comparison.
     expect(loaded?.fetchedAt).toBeGreaterThan(0);
   });
 
-  it("loads a record saved without an identity as an unknown commit", async () => {
+  it("loads a record saved without an identity as an unknown tag", async () => {
     const cache = createRegistryCache(fakeStore());
 
     await cache.save(skills);
-    // A record from before commit addressing (or from a run that could not
+    // A record from before run addressing (or from a run that could not
     // reach any meta): usable data, but nothing to compare a probe against.
     await expect(cache.load()).resolves.toMatchObject({
       skills,
-      commit: undefined,
+      tag: undefined,
     });
   });
 
@@ -69,7 +69,7 @@ describe("createRegistryCache", () => {
   it("drops records written by an older schema version", async () => {
     const store = fakeStore();
     const cache = createRegistryCache(store);
-    await cache.save(skills, { commit: "e52627fe" });
+    await cache.save(skills, { tag: "dist-2026-09-01" });
 
     // Age the stored record into a previous schema version.
     const record = [...store.data.values()][0] as { schemaVersion: number };
@@ -79,7 +79,7 @@ describe("createRegistryCache", () => {
 
   it("clear() removes the stored record", async () => {
     const cache = createRegistryCache(fakeStore());
-    await cache.save(skills, { commit: "e52627fe" });
+    await cache.save(skills, { tag: "dist-2026-09-01" });
     await cache.clear();
     await expect(cache.load()).resolves.toBeNull();
   });
@@ -88,7 +88,7 @@ describe("createRegistryCache", () => {
     const cache = createRegistryCache(fakeStore("all"));
     await expect(cache.load()).resolves.toBeNull();
     await expect(
-      cache.save(skills, { commit: "e52627fe" }),
+      cache.save(skills, { tag: "dist-2026-09-01" }),
     ).resolves.toBeUndefined();
     await expect(cache.clear()).resolves.toBeUndefined();
   });
