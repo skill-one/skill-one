@@ -124,6 +124,10 @@ export function createRegistryController(
   // order: grouping the registry is an O(n) pass, page requests only filter,
   // sort and slice the (much smaller) repo list.
   let repoCache: { version: number; repos: RepoInfo[] } | null = null;
+  // Lookup index for `lookupSkills`, cached per data version: resolving each
+  // ref by a `store.find` is O(n·m), so instead the earliest matching skill
+  // per key is indexed once and every request is a pair of map reads.
+  let lookupCache: { version: number; map: Map<string, Skill> } | null = null;
 
   const emitProgress = () => {
     post({
@@ -213,6 +217,7 @@ export function createRegistryController(
       dataVersion++;
       orderCache = null;
       repoCache = null;
+      lookupCache = null;
     }
     try {
       await deps.readIndex(
@@ -263,6 +268,7 @@ export function createRegistryController(
     dataVersion++;
     orderCache = null;
     repoCache = null;
+    lookupCache = null;
     // Land the trending list with the data it belongs to. A failed fetch
     // keeps whatever was served before (null on a fresh boot) rather than
     // dropping the board outright.
@@ -437,22 +443,42 @@ export function createRegistryController(
   };
 
   /**
-   * Registry metadata for installed skills, in ref order (null on miss).
-   * A ref matches by skillId or by the registry path's basename, since a
-   * locally installed skill's SKILL.md name may differ from the skillId.
+   * The lookup index for one data version, built lazily. A skill is keyed
+   * by its repo+name and by its repo+path basename (a locally installed
+   * skill's SKILL.md name may differ from the registry skillId); the first
+   * skill in registry order wins each key, mirroring what a `store.find`
+   * over the same condition would answer.
    */
-  const lookupSkills = (refs: Array<{ repo: string; name: string }>) => ({
-    entries: refs.map((ref) => {
-      const base = (path?: string) => path?.split("/").pop();
-      return (
-        store.find(
-          (s) =>
-            s.repo === ref.repo &&
-            (s.name === ref.name || base(s.path) === ref.name),
-        ) ?? null
-      );
-    }),
-  });
+  const lookupIndex = (): Map<string, Skill> => {
+    if (complete && lookupCache?.version === dataVersion) {
+      return lookupCache.map;
+    }
+    const map = new Map<string, Skill>();
+    for (const skill of store) {
+      const key = `${skill.repo}\u0000${skill.name}`;
+      if (!map.has(key)) map.set(key, skill);
+      const base = skill.path?.split("/").pop();
+      if (base) {
+        const alt = `${skill.repo}\u0000${base}`;
+        if (!map.has(alt)) map.set(alt, skill);
+      }
+    }
+    lookupCache = { version: dataVersion, map };
+    return map;
+  };
+
+  /**
+   * Registry metadata for installed skills, in ref order (null on miss).
+   * A ref matches by name first, then by the registry path's basename.
+   */
+  const lookupSkills = (refs: Array<{ repo: string; name: string }>) => {
+    const byKey = lookupIndex();
+    return {
+      entries: refs.map(
+        (ref) => byKey.get(`${ref.repo}\u0000${ref.name}`) ?? null,
+      ),
+    };
+  };
 
   return {
     /** Current snapshot for tests and assertions. */

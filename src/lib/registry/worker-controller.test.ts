@@ -602,6 +602,70 @@ describe("createRegistryController — featured + lookup", () => {
     expect(entries[1]?.name).toBe("beta");
     expect(entries[2]).toBeNull();
   });
+
+  it("keeps the first in-store match when name and basename both hit a key", async () => {
+    // A skill whose path basename collides with a later skill's name: the
+    // index mirrors a `store.find` — the earliest skill satisfying repo +
+    // (name || basename) wins, whichever of the two it matched by.
+    const t = setup({
+      skills: [
+        {
+          ...skill(0),
+          name: "alpha",
+          repo: "acme/alpha",
+          path: "skills/rename-me",
+        },
+        {
+          ...skill(1),
+          name: "rename-me",
+          repo: "acme/alpha",
+          path: "skills/alpha",
+        },
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "lookupSkills",
+      id: 1,
+      payload: { refs: [{ repo: "acme/alpha", name: "rename-me" }] },
+    });
+    const entries = resultData<{ entries: Array<Skill | null> }>(
+      t.recorded.results[0],
+    ).entries;
+    expect(entries[0]?.name).toBe("alpha");
+  });
+
+  it("rebuilds the lookup index as the registry lands", async () => {
+    const t = setup();
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    // Mid-stream: only the loaded prefix answers (no stale cache from a
+    // previous data version).
+    t.push({ ...skill(0), name: "alpha", repo: "acme/alpha" });
+    t.controller.handle({
+      type: "lookupSkills",
+      id: 1,
+      payload: { refs: [{ repo: "acme/alpha", name: "alpha" }] },
+    });
+    let entries = resultData<{ entries: Array<Skill | null> }>(
+      t.recorded.results[0],
+    ).entries;
+    expect(entries[0]?.name).toBe("alpha");
+
+    t.push({ ...skill(1), name: "beta", repo: "acme/beta" });
+    t.controller.handle({
+      type: "lookupSkills",
+      id: 2,
+      payload: { refs: [{ repo: "acme/beta", name: "beta" }] },
+    });
+    entries = resultData<{ entries: Array<Skill | null> }>(
+      t.recorded.results[1],
+    ).entries;
+    expect(entries[0]?.name).toBe("beta");
+  });
 });
 
 describe("createRegistryController — getRanking", () => {
