@@ -129,9 +129,7 @@ pub fn handle_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) 
                 .state::<PopoverState>()
                 .shown_at
                 .lock()
-                .map(|shown_at| {
-                    shown_at.is_some_and(|at| at.elapsed() < BLUR_GRACE)
-                })
+                .map(|shown_at| shown_at.is_some_and(|at| at.elapsed() < BLUR_GRACE))
                 .unwrap_or(true);
             if !within_grace {
                 let _ = window.hide();
@@ -226,7 +224,10 @@ fn rect_px(rect: &Rect, scale: f64) -> (f64, f64, f64, f64) {
 
 /// Bounds of the monitor under the cursor (tray icons live on one monitor),
 /// falling back to the primary monitor and finally to unclamped coordinates.
-fn monitor_bounds<R: Runtime>(app: &AppHandle<R>, cursor: PhysicalPosition<f64>) -> (f64, f64, f64, f64) {
+fn monitor_bounds<R: Runtime>(
+    app: &AppHandle<R>,
+    cursor: PhysicalPosition<f64>,
+) -> (f64, f64, f64, f64) {
     let monitor = app
         .monitor_from_point(cursor.x, cursor.y)
         .ok()

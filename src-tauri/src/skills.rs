@@ -299,20 +299,25 @@ mod tests {
     #[test]
     fn extracts_single_line_description() {
         let dir = skill_dir_with("---\nname: pdf\ndescription: 读取 PDF 文件。\n---\n正文");
-        assert_eq!(extract_description(dir.path()).as_deref(), Some("读取 PDF 文件。"));
+        assert_eq!(
+            extract_description(dir.path()).as_deref(),
+            Some("读取 PDF 文件。")
+        );
     }
 
     #[test]
     fn extracts_quoted_description() {
         let dir = skill_dir_with("---\nname: pdf\ndescription: \"a quoted description\"\n---\n");
-        assert_eq!(extract_description(dir.path()).as_deref(), Some("a quoted description"));
+        assert_eq!(
+            extract_description(dir.path()).as_deref(),
+            Some("a quoted description")
+        );
     }
 
     #[test]
     fn folds_block_scalar_description() {
-        let dir = skill_dir_with(
-            "---\nname: pdf\ndescription: |\n  第一行描述\n  第二行描述\n---\n",
-        );
+        let dir =
+            skill_dir_with("---\nname: pdf\ndescription: |\n  第一行描述\n  第二行描述\n---\n");
         assert_eq!(
             extract_description(dir.path()).as_deref(),
             Some("第一行描述 第二行描述")
@@ -378,7 +383,10 @@ mod tests {
             },
         });
         assert_eq!(dto.status, "refused");
-        assert_eq!(dto.message.as_deref(), Some("a previous backup is still parked"));
+        assert_eq!(
+            dto.message.as_deref(),
+            Some("a previous backup is still parked")
+        );
         assert!(dto.parked_skills.is_empty());
         assert!(dto.backup_dir.is_none());
     }
