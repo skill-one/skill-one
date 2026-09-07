@@ -24,7 +24,7 @@ import {
 import { isTauri } from "../lib/tauri";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
 import { useRegistryRepos } from "../hooks/use-registry-repos";
-import { useRegistryStats } from "../hooks/use-registry-stats";
+import { useRegistrySnapshot } from "../hooks/use-registry-snapshot";
 
 export interface NavItem {
   path: string;
@@ -74,7 +74,10 @@ export const footerItems: NavItem[] = [
  * computed over a partial download is simply wrong.
  */
 function useNavCounts(): Partial<Record<string, number>> {
-  const stats = useRegistryStats();
+  // Progress flags and identity changes (index/epoch/ready transitions) never
+  // touch the badge, so only the count and the failure flag are subscribed.
+  const count = useRegistrySnapshot((s) => s.count);
+  const error = useRegistrySnapshot((s) => s.error);
   const { data: installedSkills } = useInstalledSkills();
   // A single-row page fetch: only `total` is of interest here.
   const { data: reposPage } = useRegistryRepos("", "stars", 0, 1);
@@ -82,8 +85,7 @@ function useNavCounts(): Partial<Record<string, number>> {
   return {
     // Hidden while nothing has loaded yet and on a failed download: an empty
     // registry is not a meaningful count to advertise.
-    "/explore":
-      stats.error == null && stats.count > 0 ? stats.count : undefined,
+    "/explore": error == null && count > 0 ? count : undefined,
     "/explore/repos": repoTotal > 0 ? repoTotal : undefined,
     "/my-skills": installedSkills?.length,
   };

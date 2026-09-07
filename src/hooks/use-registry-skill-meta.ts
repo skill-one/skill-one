@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { lookupSkills } from "../lib/registry/client";
 import type { SkillRef } from "../lib/registry/protocol";
 import type { Skill } from "../types/skill";
-import { useRegistryStats } from "./use-registry-stats";
+import { useRegistrySnapshot } from "./use-registry-snapshot";
 
 /** Query-key prefix of the installed-skills ↔ registry metadata join. */
 const REGISTRY_SKILL_META_PREFIX = "registry-skill-meta";
@@ -18,7 +18,7 @@ const REGISTRY_SKILL_META_PREFIX = "registry-skill-meta";
  * fallbacks — the same contract the full download used to provide.
  */
 export function useRegistrySkillMeta(refs: SkillRef[]): Map<string, Skill> {
-  const { ready } = useRegistryStats();
+  const ready = useRegistrySnapshot((s) => s.ready);
   // Arrays are new objects every render; serialize for a stable query key.
   const key = JSON.stringify(refs);
   const { data } = useQuery({

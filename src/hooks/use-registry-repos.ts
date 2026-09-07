@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getRepos } from "../lib/registry/client";
 import type { ReposRequest } from "../lib/registry/protocol";
 import { useInvalidateOnRegistryEpoch } from "./use-invalidate-on-registry-epoch";
-import { useRegistryStats } from "./use-registry-stats";
+import { useRegistrySnapshot } from "./use-registry-snapshot";
 
 /** Query-key prefix shared by every paged repos query. */
 const REGISTRY_REPOS_QUERY_PREFIX = "registry-repos";
@@ -23,7 +23,7 @@ export function useRegistryRepos(
   page: number,
   pageSize: number,
 ) {
-  const { ready } = useRegistryStats();
+  const ready = useRegistrySnapshot((s) => s.ready);
 
   useInvalidateOnRegistryEpoch([REGISTRY_REPOS_QUERY_PREFIX]);
 

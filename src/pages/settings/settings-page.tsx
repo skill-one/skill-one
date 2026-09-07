@@ -9,7 +9,7 @@ import {
 import { reloadRegistry } from "../../lib/registry/client";
 import type { IndexOrigin } from "../../lib/registry/protocol";
 import { useAppUpdate } from "../../hooks/use-app-update";
-import { useRegistryStats } from "../../hooks/use-registry-stats";
+import { useRegistrySnapshot } from "../../hooks/use-registry-snapshot";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { ThemeModeToggle } from "../../components/theme-mode-toggle";
@@ -40,7 +40,9 @@ export function SettingsPage() {
   const [value, setValue] = useState(getCdnBase());
   const [saved, setSaved] = useState(false);
   const update = useAppUpdate();
-  const { index } = useRegistryStats();
+  // Only the served snapshot identity drives this card; count climbs and
+  // progress flags during a streaming download must not re-render the page.
+  const index = useRegistrySnapshot((s) => s.index);
 
   const apply = (next: string) => {
     const previous = getCdnBase();

@@ -11,17 +11,13 @@ const stats = vi.hoisted(() => ({
   current: null as IndexInfo | null,
 }));
 
-vi.mock("../../hooks/use-registry-stats", () => ({
-  useRegistryStats: () => ({
-    count: 0,
-    complete: true,
-    indexing: false,
-    ready: true,
-    epoch: 0,
-    error: null,
-    index: stats.current,
-    refetch: () => {},
-  }),
+vi.mock("../../hooks/use-registry-snapshot", () => ({
+  useRegistrySnapshot: (selector: (snapshot: {
+    index: IndexInfo | null;
+  }) => unknown) =>
+    selector({
+      index: stats.current,
+    }),
 }));
 
 const SERVED: IndexInfo = {
