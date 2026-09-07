@@ -10,6 +10,12 @@ import pkg from "./package.json" with { type: "json" };
 
 const srcDir = path.dirname(fileURLToPath(import.meta.url));
 
+// Git worktrees under .worktrees carry their own (stale) copies of the app
+// sources: a parallel session editing another checkout would otherwise reload
+// this dev server and duplicate React in a vitest run. Ignore them in both
+// the test runner and the dev server watcher.
+const worktreeGlob = "**/.worktrees/**";
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [tailwindcss(), react()],
@@ -27,10 +33,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
-    // Git worktrees under .worktrees carry their own (stale) test copies;
-    // running them here fails on duplicated React resolution.
     // e2e/ is Playwright's: same *.spec.ts filenames, different runner.
-    exclude: [...configDefaults.exclude, "**/.worktrees/**", "**/e2e/**"],
+    exclude: [...configDefaults.exclude, worktreeGlob, "**/e2e/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
@@ -63,10 +67,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     watch: {
-      // Git worktrees under .worktrees hold their own copies of the app
-      // sources; without this, an edit in another checkout (a parallel
-      // session) reloads this dev server. Mirrors `test.exclude` above.
-      ignored: ["**/.worktrees/**"],
+      // Mirrors `test.exclude` above.
+      ignored: [worktreeGlob],
     },
   },
   // Env variables starting with TAURI_ are exposed to the client.
