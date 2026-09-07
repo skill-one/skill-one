@@ -6,6 +6,7 @@ import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppSidebar } from "./components/app-sidebar";
 import { UpdateDialog } from "./components/update-dialog";
+import { Toaster } from "./components/ui/sonner";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 import { createQueryClient } from "./lib/query-client";
 import { checkForUpdate } from "./lib/update-store";
@@ -114,6 +115,7 @@ export default function App() {
         <PopoverNavigation />
         <StartupUpdateCheck />
         <UpdateDialog />
+        <Toaster />
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
           <SidebarProvider
             style={{ minHeight: 0 }}

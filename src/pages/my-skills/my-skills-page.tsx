@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  AlertCircle,
-  ChevronDown,
-  Puzzle,
-  RefreshCw,
-  Trash2,
-  Users,
-} from "lucide-react";
+import { ChevronDown, Puzzle, RefreshCw, Trash2, Users } from "lucide-react";
+import { toast } from "sonner";
 
 import { removeInstalledSkill, setSkillEnabled } from "../../lib/local-skills";
 import {
@@ -221,19 +215,15 @@ export function MySkillsPage() {
   const [pendingEnabled, setPendingEnabled] = useState<Record<string, boolean>>(
     {},
   );
-  // A single, dismissible banner for a failed remove / toggle, since the two
-  // row actions share one surface and there is no toast layer yet.
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const invalidate = () => markSkillsChanged(queryClient);
 
   const removeMutation = useMutation({
     mutationFn: (skill: InstalledSkill) => removeInstalledSkill(skill.name),
     onSuccess: async () => {
-      setActionError(null);
       await invalidate();
     },
-    onError: (e) => setActionError(errorMessage(e, "移除失败")),
+    onError: (e) => toast.error(errorMessage(e, "移除失败")),
   });
 
   const toggleMutation = useMutation({
@@ -247,13 +237,12 @@ export function MySkillsPage() {
     onMutate: ({ skill, enabled }) =>
       setPendingEnabled((prev) => ({ ...prev, [rowId(skill)]: enabled })),
     onSuccess: async () => {
-      setActionError(null);
       await invalidate();
       setPendingEnabled({});
     },
     onError: (e) => {
       setPendingEnabled({});
-      setActionError(errorMessage(e, "切换失败"));
+      toast.error(errorMessage(e, "切换失败"));
       // Best-effort refresh: the error is already shown, so keep the promise
       // from turning into an unhandled rejection.
       void invalidate();
@@ -349,20 +338,6 @@ export function MySkillsPage() {
           />
         </div>
       </div>
-
-      {actionError && (
-        <div className="mb-3 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span className="flex-1">{actionError}</span>
-          <button
-            type="button"
-            className="shrink-0 font-medium underline-offset-2 hover:underline"
-            onClick={() => setActionError(null)}
-          >
-            知道了
-          </button>
-        </div>
-      )}
 
       {/* The skill list, in the store's row shape, with the pager row pinned to
           the bottom. */}
