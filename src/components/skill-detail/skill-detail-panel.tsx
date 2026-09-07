@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, ExternalLink, Loader2, Puzzle, Star } from "lucide-react";
 
@@ -10,14 +10,33 @@ import { errorMessage, formatDate, formatCount, formatRev } from "../../lib/util
 import type { Skill } from "../../types/skill";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import {
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "../ui/drawer";
-import { Markdown } from "../markdown";
+import { DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "../ui/drawer";
+import { Skeleton } from "../ui/skeleton";
 import { OwnerAvatar } from "../owner-avatar";
+
+/**
+ * The markdown body is the heaviest subtree the drawer shows: react-markdown
+ * + remark-gfm (plus their unified/mdast stack) only render once a skill's
+ * detail has actually loaded, so the whole tree is code-split and pulled in on
+ * first open instead of on app boot. The skeleton-loading detail keeps its
+ * layout while the chunk arrives.
+ */
+const LazyMarkdown = lazy(() =>
+  import("../markdown").then((m) => ({ default: m.Markdown })),
+);
+
+/** Placeholder for the code-split markdown body on the first drawer open. */
+function MarkdownSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <Skeleton className="h-5 w-3/5" />
+      <Skeleton className="h-3 w-full" />
+      <Skeleton className="h-3 w-11/12" />
+      <Skeleton className="h-3 w-full" />
+      <Skeleton className="h-3 w-2/3" />
+    </div>
+  );
+}
 
 interface SkillDetailPanelProps {
   /** The skill to show; null renders nothing. */
@@ -258,13 +277,15 @@ export function SkillDetailPanel({
                 </a>
               )}
               {detail.instructions ? (
-                <Markdown
-                  repo={isLocalSkill ? shown?.repo ?? "" : MIRROR.repo}
-                  gitRef={isLocalSkill ? undefined : MIRROR.ref}
-                  filePath={filePath}
-                >
-                  {detail.instructions}
-                </Markdown>
+                <Suspense fallback={<MarkdownSkeleton />}>
+                  <LazyMarkdown
+                    repo={isLocalSkill ? shown?.repo ?? "" : MIRROR.repo}
+                    gitRef={isLocalSkill ? undefined : MIRROR.ref}
+                    filePath={filePath}
+                  >
+                    {detail.instructions}
+                  </LazyMarkdown>
+                </Suspense>
               ) : (
                 <p className="text-[13px] leading-relaxed text-muted-foreground">
                   （SKILL.md 无正文内容）

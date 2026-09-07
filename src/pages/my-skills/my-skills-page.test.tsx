@@ -162,8 +162,12 @@ describe("MySkillsPage", () => {
     expect(
       within(dialog).getByText("PDF 文档读取、生成、合并、拆分与标注。"),
     ).toBeInTheDocument();
+    // The markdown body is code-split (see skill-detail-panel): it resolves
+    // async on first open, so wait for the rendered instructions.
     expect(
-      within(dialog).getByText("（浏览器演示数据：模拟的本地 SKILL.md）"),
+      await within(dialog).findByText(
+        "（浏览器演示数据：模拟的本地 SKILL.md）",
+      ),
     ).toBeInTheDocument();
   });
 
