@@ -14,7 +14,7 @@ capabilities to the frontend. The frontend reaches these Tauri commands via the
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.10"
+agents-skills = "0.12"
 ```
 
 Since 0.8 the library's `core` module is private: everything the app needs is

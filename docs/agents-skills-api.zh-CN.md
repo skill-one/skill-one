@@ -13,7 +13,7 @@
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.10"
+agents-skills = "0.12"
 ```
 
 自 0.8 起，库的 `core` 模块不再公开：应用所需的一切都从 crate 根导出
