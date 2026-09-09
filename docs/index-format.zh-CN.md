@@ -2,7 +2,7 @@
 
 [English](index-format.md) | [简体中文](index-format.zh-CN.md)
 
-商店内容来自 [skill-one/skills-sh-scraper](https://github.com/skill-one/skills-sh-scraper)——对 [skills.sh](https://www.skills.sh) 上全部 GitHub 来源技能的每日镜像。快照发布在 `dist` 分支：`skills.jsonl` 每行一个技能，`skills/` 目录则存放每个技能的完整文件。
+商店内容来自 [skill-one/skills-sh-mirror](https://github.com/skill-one/skills-sh-mirror)——对 [skills.sh](https://www.skills.sh) 上全部 GitHub 来源技能的每日镜像。快照发布在 `dist` 分支：`skills.jsonl` 每行一个技能，`skills/` 目录则存放每个技能的完整文件。
 
 ## 格式
 
@@ -51,7 +51,7 @@
 ### 拉取策略
 
 - 先探测这个指针文件：走可配置下载源（见 [../src/lib/cdn-config.ts](../src/lib/cdn-config.ts)），并且**带打散缓存的时间戳**——一个负责报告新鲜度的可变文件绝不能从缓存里拿，否则旧快照会被当成当前版本。它只有约 300 B，打散几乎没有代价。
-- 正文随后按推导出的 `dist-<date>` 标签拉取（`…/skills-sh-scraper@dist-2026-09-06/skills.jsonl`）。标签对单个快照不可变，因此不打散缓存，且镜像边缘的副本必然就是正确的字节。（同日重跑会强制把标签移到最新快照；变化了的 `finishedAt` 会察觉这一点并触发重下。）
+- 正文随后按推导出的 `dist-<date>` 标签拉取（`…/skills-sh-mirror@dist-2026-09-06/skills.jsonl`）。标签对单个快照不可变，因此不打散缓存，且镜像边缘的副本必然就是正确的字节。（同日重跑会强制把标签移到最新快照；变化了的 `finishedAt` 会察觉这一点并触发重下。）
 - 若没有任何源给出可用的日期，则退回可变的 `dist` ref——此时必须打散缓存，因为没有定址锚点时，一份一天前的边缘副本与当前索引无从分辨。
 - 解析结果连同其身份（`tag` + `finishedAt`）一起持久化到 IndexedDB。下次启动立即用该缓存渲染，再把探测到的时间戳与存储的比较：相同则**完全跳过多 MB 的正文下载**。
 - [index-stream.ts](../src/lib/registry/index-stream.ts) 中的 `INDEX_SPEC` 固定 `repo` / `path: "skills.jsonl"` / `ref: "dist"`（上面的标签由每次下载注入）。

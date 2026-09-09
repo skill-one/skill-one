@@ -2,7 +2,7 @@
 
 [English](index-format.md) | [简体中文](index-format.zh-CN.md)
 
-The store content comes from [skill-one/skills-sh-scraper](https://github.com/skill-one/skills-sh-scraper), a daily mirror of every GitHub-sourced skill on [skills.sh](https://www.skills.sh). The snapshot is published to the `dist` branch: one `skills.jsonl` row per skill, plus a `skills/` directory holding each skill's full files.
+The store content comes from [skill-one/skills-sh-mirror](https://github.com/skill-one/skills-sh-mirror), a daily mirror of every GitHub-sourced skill on [skills.sh](https://www.skills.sh). The snapshot is published to the `dist` branch: one `skills.jsonl` row per skill, plus a `skills/` directory holding each skill's full files.
 
 ## Format
 
@@ -51,7 +51,7 @@ The run stats published beside the index are what make caching possible:
 ### Fetch strategy
 
 - The pointer is probed first, through the configurable download source (see [src/lib/cdn-config.ts](../src/lib/cdn-config.ts)) and **with a cache-busting stamp**: a mutable file that reports freshness must never be served from a cache, or an old snapshot looks current. At ~300 B, busting it costs nothing.
-- The body is then fetched at the derived `dist-<date>` tag (`…/skills-sh-scraper@dist-2026-09-06/skills.jsonl`). Tags are immutable per snapshot, so no busting is applied and a CDN edge copy is necessarily the right bytes. (A same-day re-run force-moves the tag to the newest snapshot; the changed `finishedAt` detects it and re-downloads.)
+- The body is then fetched at the derived `dist-<date>` tag (`…/skills-sh-mirror@dist-2026-09-06/skills.jsonl`). Tags are immutable per snapshot, so no busting is applied and a CDN edge copy is necessarily the right bytes. (A same-day re-run force-moves the tag to the newest snapshot; the changed `finishedAt` detects it and re-downloads.)
 - If no source advertises a usable date, the download falls back to the mutable `dist` ref — busted, because without a pin a day-old edge copy would be indistinguishable from the current index.
 - The parsed list plus its identity (`tag` + `finishedAt`) are persisted to IndexedDB. Next launch serves that cache immediately, then compares the probed stamp with the stored one: equal means the multi-megabyte body is not downloaded at all.
 - `INDEX_SPEC` in [index-stream.ts](../src/lib/registry/index-stream.ts) pins `repo` / `path: "skills.jsonl"` / `ref: "dist"` (the ref above is supplied per download).

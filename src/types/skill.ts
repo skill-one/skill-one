@@ -12,7 +12,7 @@ export interface Skill {
   /** Lifetime install count recorded by skills.sh; 0 when absent. */
   downloads: number;
   /**
-   * Directory the skill's files live in, relative to the skills-sh-scraper
+   * Directory the skill's files live in, relative to the skills-sh-mirror
    * mirror snapshot ("skills/{owner}/{repo}/{slug}"). Used to fetch the
    * SKILL.md directly from the mirror without path probing; absent for
    * installed skills that the mirror does not list.
@@ -36,7 +36,7 @@ export interface Skill {
 }
 
 /**
- * A single skill's SKILL.md content, fetched from the skills-sh-scraper
+ * A single skill's SKILL.md content, fetched from the skills-sh-mirror
  * mirror on demand when the detail sheet is opened.
  */
 export interface SkillDetail {

@@ -57,8 +57,8 @@ describe("probeIndexMeta", () => {
   // Candidate URLs as produced by `fileCandidates(META_SPEC, "")`: the direct
   // GitHub origin first, the default CDN mirror second.
   const ORIGIN_STATS =
-    "https://raw.githubusercontent.com/skill-one/skills-sh-scraper/dist/stats.json";
-  const CDN_STATS = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-scraper@dist/stats.json`;
+    "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/stats.json";
+  const CDN_STATS = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-mirror@dist/stats.json`;
 
   const fetchMock = vi.fn();
 
@@ -171,7 +171,7 @@ describe("probeIndexMeta", () => {
 
 describe("readTrending", () => {
   const ORIGIN_TRENDING =
-    "https://raw.githubusercontent.com/skill-one/skills-sh-scraper/dist/trending.json";
+    "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/trending.json";
 
   const fetchMock = vi.fn();
 
@@ -217,11 +217,11 @@ describe("readTrending", () => {
 describe("readIndex", () => {
   const TAG = "dist-2026-09-06";
   // Tag-addressed candidates: immutable, so no busting is needed.
-  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-sh-scraper/${TAG}/skills.jsonl`;
-  const PINNED_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-scraper@${TAG}/skills.jsonl`;
+  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-sh-mirror/${TAG}/skills.jsonl`;
+  const PINNED_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-mirror@${TAG}/skills.jsonl`;
   // Branch candidates, used only when no tag is known.
   const BRANCH_ORIGIN =
-    "https://raw.githubusercontent.com/skill-one/skills-sh-scraper/dist/skills.jsonl";
+    "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/skills.jsonl";
 
   const fetchMock = vi.fn();
 

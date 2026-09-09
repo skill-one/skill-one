@@ -187,7 +187,7 @@ export function SettingsPage() {
                 技能索引
               </h3>
               <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                商店数据来自 skill-one/skills-sh-scraper 发布的每日快照
+                商店数据来自 skill-one/skills-sh-mirror 发布的每日快照
                 （skills.sh 全量榜单）。快照按日期标签定址：版本未变时启动直接复用本地缓存，
                 不再下载全量数据。
               </p>

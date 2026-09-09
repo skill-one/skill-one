@@ -29,11 +29,11 @@ import { parseSkillLine } from "./parse";
  */
 
 /**
- * The skills-sh-scraper repo publishes the full index (JSONL) to its `dist`
+ * The skills-sh-mirror repo publishes the full index (JSONL) to its `dist`
  * branch as a daily snapshot.
  */
 const INDEX_SPEC = {
-  repo: "skill-one/skills-sh-scraper",
+  repo: "skill-one/skills-sh-mirror",
   path: "skills.jsonl",
   ref: "dist",
 } as const;

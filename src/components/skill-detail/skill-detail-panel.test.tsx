@@ -12,7 +12,7 @@ import { Drawer } from "../ui/drawer";
 import { SkillDetailPanel } from "./skill-detail-panel";
 
 vi.mock("../../lib/skill-detail-api", () => ({
-  MIRROR: { repo: "skill-one/skills-sh-scraper", ref: "dist" },
+  MIRROR: { repo: "skill-one/skills-sh-mirror", ref: "dist" },
   fetchSkillDetail: vi.fn(),
 }));
 
@@ -186,7 +186,7 @@ describe("SkillDetailPanel", () => {
       screen.getByRole("link", { name: /skills\/pdf\/SKILL\.md/ }),
     ).toHaveAttribute(
       "href",
-      "https://github.com/skill-one/skills-sh-scraper/blob/dist/skills/anthropics/skills/pdf/SKILL.md",
+      "https://github.com/skill-one/skills-sh-mirror/blob/dist/skills/anthropics/skills/pdf/SKILL.md",
     );
   });
 

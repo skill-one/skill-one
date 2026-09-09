@@ -1,7 +1,7 @@
 import type { Skill } from "../../types/skill";
 
 /**
- * Pure parsing of the skills-sh-scraper index's JSONL lines into the app's
+ * Pure parsing of the skills-sh-mirror index's JSONL lines into the app's
  * Skill model. Runs inside the registry worker, one line at a time while the
  * download streams in.
  */

@@ -53,7 +53,7 @@ interface SkillDetailPanelProps {
  * clicking the overlay, or dragging the drawer sideways closes it, and ←/→
  * switch skills. Each skill's SKILL.md is fetched through TanStack Query and
  * cached independently, so revisits are instant. The source is picked per
- * skill: a registry-known `path` reads from the skills-sh-scraper mirror
+ * skill: a registry-known `path` reads from the skills-sh-mirror mirror
  * snapshot (the same content the registry indexed), while an installed skill
  * without one — local skills included — is read from the local skills
  * directory instead, so the view always shows the copy the user actually
