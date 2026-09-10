@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 
 import { MySkillsPage } from "./my-skills-page";
 import { renderWithRouter } from "../../test/test-utils";
+import { PAGE_SIZE } from "../../lib/pagination";
 import {
   addMockLocalSkill,
   installMockSkill,
@@ -312,19 +313,23 @@ describe("MySkillsPage", () => {
 
   it("pages through the list and clamps back when the last page empties", async () => {
     const user = userEvent.setup();
-    // installMockSkill prepends, so page 1 holds extra-18..extra-0 plus the
+    // installMockSkill prepends, so page 1 holds extra-44..extra-0 plus the
     // first five base skills and the tail base skill lands on page 2.
-    for (let i = 0; i < 19; i++) installMockSkill("test/repo", `extra-${i}`);
+    for (let i = 0; i < PAGE_SIZE - 5; i++) {
+      installMockSkill("test/repo", `extra-${i}`);
+    }
     renderWithRouter(<MySkillsPage />);
 
-    expect(await screen.findByText("共 25 个")).toBeInTheDocument();
-    expect(screen.getByText("extra-18")).toBeInTheDocument();
+    expect(await screen.findByText(`共 ${PAGE_SIZE + 1} 个`)).toBeInTheDocument();
+    expect(screen.getByText(`extra-${PAGE_SIZE - 6}`)).toBeInTheDocument();
     expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
 
     await user.click(screen.getByLabelText("下一页"));
 
     expect(await screen.findByText("frontend-design")).toBeInTheDocument();
-    expect(screen.queryByText("extra-18")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(`extra-${PAGE_SIZE - 6}`),
+    ).not.toBeInTheDocument();
 
     // Removing the only skill on the last page clamps back to page 1.
     const [onlyRemove] = await screen.findAllByTitle("移除");
@@ -332,8 +337,8 @@ describe("MySkillsPage", () => {
     await waitFor(() => {
       expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
     });
-    expect(await screen.findByText("共 24 个")).toBeInTheDocument();
-    expect(screen.getByText("extra-18")).toBeInTheDocument();
+    expect(await screen.findByText(`共 ${PAGE_SIZE} 个`)).toBeInTheDocument();
+    expect(screen.getByText(`extra-${PAGE_SIZE - 6}`)).toBeInTheDocument();
   });
 
   it("lists every detected agent in the strip's dropdown menu", async () => {

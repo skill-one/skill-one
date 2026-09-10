@@ -10,7 +10,7 @@
  */
 
 /** Rows per page across the store's lists — one rhythm on every surface. */
-export const PAGE_SIZE = 24;
+export const PAGE_SIZE = 50;
 
 /** Keystrokes settle this long before a search takes effect (worker query or
  * local filter). */

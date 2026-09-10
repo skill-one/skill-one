@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { ListPager } from "../../components/list-pager";
+import { RankBadge } from "../../components/rank-badge";
 import { Switch } from "../../components/ui/switch";
 import { cn, errorMessage } from "../../lib/utils";
 import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
@@ -82,6 +83,7 @@ function detailSkillFor(skill: InstalledSkill, meta: Map<string, Skill>): Skill 
  */
 function InstalledSkillRow({
   skill,
+  serial,
   enabled,
   removing,
   selected,
@@ -91,6 +93,8 @@ function InstalledSkillRow({
   onOpen,
 }: {
   skill: InstalledSkill;
+  /** 1-based position of the row in the (paged) filtered list. */
+  serial: number;
   enabled: boolean;
   removing: boolean;
   /** Whether this row is the one shown in the detail panel. */
@@ -123,6 +127,7 @@ function InstalledSkillRow({
           selected && "border-primary ring-1 ring-primary",
         )}
       >
+        <RankBadge rank={serial} />
         {skill.sourceType !== "local" && skill.source?.includes("/") ? (
           <OwnerAvatar
             owner={skill.source.split("/")[0]}
@@ -376,6 +381,7 @@ export function MySkillsPage() {
                   <InstalledSkillRow
                     key={id}
                     skill={skill}
+                    serial={index + 1}
                     enabled={pendingEnabled[id] ?? skill.enabled}
                     selected={selected === index}
                     description={

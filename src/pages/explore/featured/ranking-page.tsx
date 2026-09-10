@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { Button } from "../../../components/ui/button";
 import { Skeleton } from "../../../components/ui/skeleton";
+import { RankBadge } from "../../../components/rank-badge";
 import { useRanking } from "../../../hooks/use-ranking";
 import { RANKINGS, rankingById, type RankEntry } from "../../../lib/registry/featured-rankings";
 import { cn, errorMessage } from "../../../lib/utils";
@@ -18,34 +19,6 @@ const RANKING_PATH = `${FEATURED_PATH}/ranking`;
 
 /** Rows of the loading skeleton; roughly a viewport of the real list. */
 const SKELETON_ROWS = 10;
-
-/**
- * Rank badge of a leaderboard row. The top three get a tinted chip and a
- * heavier weight; the rest recede into the background, so the eye lands on
- * the podium first without the list turning into a wall of accents.
- */
-function RankBadge({ rank }: { rank: number }) {
-  const podium =
-    rank === 1
-      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-      : rank === 2
-        ? "bg-slate-500/15 text-slate-600 dark:text-slate-300"
-        : rank === 3
-          ? "bg-amber-700/15 text-amber-800 dark:text-amber-600"
-          : null;
-
-  return (
-    <span
-      className={cn(
-        "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[13px] tabular-nums",
-        podium ?? "text-muted-foreground/70",
-        podium ? "font-bold" : "font-medium",
-      )}
-    >
-      {rank}
-    </span>
-  );
-}
 
 /** One leaderboard row: the ranked skill, its metric and its install action. */
 function RankingRow({
@@ -62,7 +35,7 @@ function RankingRow({
       skill={entry.skill}
       selected={selected}
       onSelect={onSelect}
-      leading={<RankBadge rank={entry.rank} />}
+      leading={<RankBadge rank={entry.rank} podium />}
       metric={
         <span className="shrink-0 text-[13px] font-medium tabular-nums text-foreground">
           {entry.label}

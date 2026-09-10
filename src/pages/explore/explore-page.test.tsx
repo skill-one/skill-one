@@ -13,6 +13,7 @@ import userEvent from "@testing-library/user-event";
 import { HashRouter, Route, Routes } from "react-router";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { PAGE_SIZE } from "../../lib/pagination";
 import type { Skill } from "../../types/skill";
 import type { RegistryHarness } from "../../test/registry-harness";
 import { ExplorePage } from "./explore-page";
@@ -74,9 +75,10 @@ function bootRegistry(total: number) {
 }
 
 /**
- * A registry of one distinctive "gadget" skill among 49 filler "tool" skills.
+ * A registry of one distinctive "gadget" skill among filler "tool" skills.
  * The names are mutually distant enough that fuzzy search stays deterministic:
- * "gadget" matches exactly one skill, never the fillers.
+ * "gadget" matches exactly one skill, never the fillers. The fillers spill
+ * onto a second page, so a "reset to page 1" is observable.
  */
 function gadgetRegistry(): Skill[] {
   return [
@@ -88,7 +90,7 @@ function gadgetRegistry(): Skill[] {
       downloads: 99,
       path: "skills/gadget-master",
     },
-    ...Array.from({ length: 49 }, (_, i) => ({
+    ...Array.from({ length: PAGE_SIZE + 10 }, (_, i) => ({
       name: `tool-${i}`,
       repo: `acme/tool-${i}`,
       description: "A general purpose utility.",
@@ -147,21 +149,42 @@ beforeEach(() => {
 });
 
 describe("ExplorePage", () => {
-  it("renders the first 24 skills with the total count", async () => {
-    bootRegistry(50);
+  it("renders the first page of skills with the total count", async () => {
+    bootRegistry(PAGE_SIZE * 2 + 2);
     renderExplorePage();
 
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
-    expect(screen.getByText("skill-23")).toBeInTheDocument();
-    // Page 1 holds exactly 24 skills; skill-24 belongs to page 2.
-    expect(screen.queryByText("skill-24")).not.toBeInTheDocument();
+    expect(screen.getByText(`skill-${PAGE_SIZE - 1}`)).toBeInTheDocument();
+    // Page 1 holds exactly PAGE_SIZE skills; the next one belongs to page 2.
+    expect(screen.queryByText(`skill-${PAGE_SIZE}`)).not.toBeInTheDocument();
     // The page answered one RPC; paging never re-downloads the registry.
     expect(harness.downloads).toBe(1);
-    expect(screen.getByText("共 50 个")).toBeInTheDocument();
+    expect(screen.getByText(`共 ${PAGE_SIZE * 2 + 2} 个`)).toBeInTheDocument();
+  });
+
+  it("numbers rows with their global position across pages", async () => {
+    const user = userEvent.setup();
+    bootRegistry(PAGE_SIZE * 2 + 2);
+    renderExplorePage();
+
+    // The first row carries the list's serial number 1.
+    const first = await screen.findByRole("button", {
+      name: "查看 skill-0 详情",
+    });
+    expect(within(first).getByText("1")).toBeInTheDocument();
+
+    // The numbering continues across pages instead of restarting.
+    await user.click(screen.getByRole("link", { name: "下一页" }));
+    const firstOfPageTwo = await screen.findByRole("button", {
+      name: `查看 skill-${PAGE_SIZE} 详情`,
+    });
+    expect(
+      within(firstOfPageTwo).getByText(String(PAGE_SIZE + 1)),
+    ).toBeInTheDocument();
   });
 
   it("disables previous on the first page and enables next", async () => {
-    bootRegistry(50);
+    bootRegistry(PAGE_SIZE * 2 + 2);
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -177,40 +200,46 @@ describe("ExplorePage", () => {
 
   it("renders the next page via the next control without refetching", async () => {
     const user = userEvent.setup();
-    bootRegistry(50);
+    bootRegistry(PAGE_SIZE * 2 + 2);
     renderExplorePage();
     await screen.findByText("skill-0");
 
     await user.click(screen.getByRole("link", { name: "下一页" }));
 
-    expect(await screen.findByText("skill-24")).toBeInTheDocument();
-    expect(screen.getByText("skill-47")).toBeInTheDocument();
-    expect(screen.queryByText("skill-48")).not.toBeInTheDocument();
+    expect(await screen.findByText(`skill-${PAGE_SIZE}`)).toBeInTheDocument();
+    expect(
+      screen.getByText(`skill-${2 * PAGE_SIZE - 1}`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(`skill-${2 * PAGE_SIZE}`),
+    ).not.toBeInTheDocument();
     // The worker keeps the registry; page turns are pure RPCs.
     expect(harness.downloads).toBe(1);
   });
 
   it("jumps to a page by clicking its numbered button", async () => {
     const user = userEvent.setup();
-    bootRegistry(50);
+    bootRegistry(PAGE_SIZE * 2 + 2);
     renderExplorePage();
     await screen.findByText("skill-0");
 
     await goToPage(user, 3);
 
-    expect(await screen.findByText("skill-48")).toBeInTheDocument();
-    expect(screen.getByText("skill-49")).toBeInTheDocument();
+    expect(
+      await screen.findByText(`skill-${2 * PAGE_SIZE}`),
+    ).toBeInTheDocument();
+    expect(screen.getByText(`skill-${2 * PAGE_SIZE + 1}`)).toBeInTheDocument();
     expect(harness.downloads).toBe(1);
   });
 
   it("disables next on the last page", async () => {
     const user = userEvent.setup();
-    bootRegistry(50);
+    bootRegistry(PAGE_SIZE * 2 + 2);
     renderExplorePage();
     await screen.findByText("skill-0");
 
     await goToPage(user, 3);
-    await screen.findByText("skill-48");
+    await screen.findByText(`skill-${2 * PAGE_SIZE}`);
 
     expect(screen.getByRole("link", { name: "下一页" })).toHaveAttribute(
       "aria-disabled",
@@ -223,7 +252,7 @@ describe("ExplorePage", () => {
   });
 
   it("shows every page number directly when there are few pages", async () => {
-    bootRegistry(216); // 9 pages — exactly the "show all" threshold
+    bootRegistry(PAGE_SIZE * 9); // 9 pages — exactly the "show all" threshold
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -239,7 +268,7 @@ describe("ExplorePage", () => {
 
   it("collapses distant page numbers into an ellipsis window", async () => {
     const user = userEvent.setup();
-    bootRegistry(240); // 10 pages
+    bootRegistry(PAGE_SIZE * 10); // 10 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -257,7 +286,7 @@ describe("ExplorePage", () => {
     await user.clear(jump);
     await user.type(jump, "3");
     await user.keyboard("{Enter}");
-    await screen.findByText("skill-48");
+    await screen.findByText(`skill-${2 * PAGE_SIZE}`);
     expect(screen.getByRole("link", { name: "4" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "5" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
@@ -294,7 +323,7 @@ describe("ExplorePage", () => {
 
   it("jumps directly to a typed page number", async () => {
     const user = userEvent.setup();
-    bootRegistry(50); // 3 pages
+    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -303,7 +332,9 @@ describe("ExplorePage", () => {
     await user.type(jump, "3");
     await user.keyboard("{Enter}");
 
-    expect(await screen.findByText("skill-48")).toBeInTheDocument();
+    expect(
+      await screen.findByText(`skill-${2 * PAGE_SIZE}`),
+    ).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
       "3",
     );
@@ -311,7 +342,7 @@ describe("ExplorePage", () => {
 
   it("clamps an out-of-range jump to the last page", async () => {
     const user = userEvent.setup();
-    bootRegistry(50); // 3 pages
+    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -320,12 +351,14 @@ describe("ExplorePage", () => {
     await user.type(jump, "99");
     await user.keyboard("{Enter}");
 
-    expect(await screen.findByText("skill-48")).toBeInTheDocument();
+    expect(
+      await screen.findByText(`skill-${2 * PAGE_SIZE}`),
+    ).toBeInTheDocument();
   });
 
   it("commits a typed jump on blur", async () => {
     const user = userEvent.setup();
-    bootRegistry(50); // 3 pages
+    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -334,12 +367,12 @@ describe("ExplorePage", () => {
     await user.type(jump, "2");
     await user.tab(); // Move focus away → blur commits.
 
-    expect(await screen.findByText("skill-24")).toBeInTheDocument();
+    expect(await screen.findByText(`skill-${PAGE_SIZE}`)).toBeInTheDocument();
   });
 
   it("keeps the current page while a number is typed but not committed", async () => {
     const user = userEvent.setup();
-    bootRegistry(50); // 3 pages
+    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -348,14 +381,14 @@ describe("ExplorePage", () => {
     await user.type(jump, "2");
 
     // Still on page 1 until the value is committed.
-    expect(screen.getByText("skill-23")).toBeInTheDocument();
-    expect(screen.queryByText("skill-24")).not.toBeInTheDocument();
+    expect(screen.getByText(`skill-${PAGE_SIZE - 1}`)).toBeInTheDocument();
+    expect(screen.queryByText(`skill-${PAGE_SIZE}`)).not.toBeInTheDocument();
     expect(jump).toHaveValue("2");
   });
 
   it("reverts to the current page on Escape", async () => {
     const user = userEvent.setup();
-    bootRegistry(50); // 3 pages
+    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -366,8 +399,8 @@ describe("ExplorePage", () => {
 
     // Still on page 1, and the box shows the current page again — the
     // discarded draft must not be committed by the blur that Escape causes.
-    expect(screen.getByText("skill-23")).toBeInTheDocument();
-    expect(screen.queryByText("skill-24")).not.toBeInTheDocument();
+    expect(screen.getByText(`skill-${PAGE_SIZE - 1}`)).toBeInTheDocument();
+    expect(screen.queryByText(`skill-${PAGE_SIZE}`)).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
       "1",
     );
@@ -375,7 +408,7 @@ describe("ExplorePage", () => {
 
   it("reverts an empty commit to the current page", async () => {
     const user = userEvent.setup();
-    bootRegistry(50); // 3 pages
+    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -384,7 +417,7 @@ describe("ExplorePage", () => {
     await user.keyboard("{Enter}");
 
     // An empty value means "no jump": page 1 stays, box restores "1".
-    expect(screen.getByText("skill-23")).toBeInTheDocument();
+    expect(screen.getByText(`skill-${PAGE_SIZE - 1}`)).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
       "1",
     );
@@ -414,7 +447,7 @@ describe("ExplorePage", () => {
     // default href="#" navigation would push a new hash route and remount the
     // page. onClick must preventDefault to keep the hash (and the route) fixed.
     const user = userEvent.setup();
-    bootRegistry(50);
+    bootRegistry(PAGE_SIZE * 2 + 2);
     window.history.replaceState(null, "", "#/explore");
     render(
       <QueryClientProvider client={queryClient}>
@@ -431,13 +464,13 @@ describe("ExplorePage", () => {
     const hashBefore = window.location.hash;
 
     await goToPage(user, 2);
-    await screen.findByText("skill-24");
+    await screen.findByText(`skill-${PAGE_SIZE}`);
 
     // The hash (and therefore the active route) must be unchanged.
     expect(window.location.hash).toBe(hashBefore);
     // Page 2 still loads its own data, proving the click handled the page turn
     // without relying on a route change.
-    expect(screen.getByText("skill-47")).toBeInTheDocument();
+    expect(screen.getByText(`skill-${2 * PAGE_SIZE - 1}`)).toBeInTheDocument();
   });
 
   it("filters skills by search text and resets to the first page", async () => {
@@ -448,7 +481,7 @@ describe("ExplorePage", () => {
 
     // Move to page 2 first so the reset is observable.
     await goToPage(user, 2);
-    await screen.findByText("tool-24");
+    await screen.findByText(`tool-${PAGE_SIZE - 1}`);
 
     await user.type(
       screen.getByRole("textbox", { name: "搜索 Skill" }),
@@ -472,7 +505,9 @@ describe("ExplorePage", () => {
       // sort — and "共 1 个" is the final answer's total, never a prefix's.
       expect(screen.getByText("共 1 个 · 按相关度")).toBeInTheDocument();
       // The grid went back to its first page and shows only the match.
-      expect(screen.queryByText("tool-24")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(`tool-${PAGE_SIZE - 1}`),
+      ).not.toBeInTheDocument();
       // A single result fits on one page: the pager controls stay visible but
       // both ends are clamped (disabled). Its totals follow the search too,
       // so the pager belongs inside the same settled block.
@@ -498,7 +533,7 @@ describe("ExplorePage", () => {
     await user.clear(input);
 
     expect(await screen.findByText("tool-0")).toBeInTheDocument();
-    expect(screen.getByText("共 50 个")).toBeInTheDocument();
+    expect(screen.getByText(`共 ${PAGE_SIZE + 11} 个`)).toBeInTheDocument();
   });
 
   it("shows a no-match empty state for a search with no results", async () => {
@@ -719,7 +754,9 @@ describe("ExplorePage", () => {
 
     // Clearing the search gives the choice back, still on 按名称.
     await user.clear(input);
-    expect(await screen.findByText("共 50 个")).toBeInTheDocument();
+    expect(
+      await screen.findByText(`共 ${PAGE_SIZE + 11} 个`),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "按名称" })).toBeEnabled();
   });
 
@@ -805,13 +842,13 @@ describe("ExplorePage", () => {
 
   it("opens the drawer without reflowing the list", async () => {
     const user = userEvent.setup();
-    bootRegistry(50);
+    bootRegistry(PAGE_SIZE * 2 + 2);
     const { container } = renderExplorePage();
     await screen.findByText("skill-0");
 
     const list = container.querySelector("ul.flex-col")!;
     expect(list.className).toBe("flex flex-col gap-2");
-    expect(list.querySelectorAll("li")).toHaveLength(24);
+    expect(list.querySelectorAll("li")).toHaveLength(PAGE_SIZE);
 
     // Opening the drawer overlays the list: its classes — and with them its
     // layout and scroll position — stay exactly the same while the drawer is
@@ -825,7 +862,7 @@ describe("ExplorePage", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(list.className).toBe("flex flex-col gap-2");
-    expect(list.querySelectorAll("li")).toHaveLength(24);
+    expect(list.querySelectorAll("li")).toHaveLength(PAGE_SIZE);
   });
 });
 
@@ -853,20 +890,22 @@ describe("ExplorePage streaming", () => {
     renderExplorePage();
     await act(async () => {});
 
-    harness.pushAll(makeSkills(30, 0));
+    harness.pushAll(makeSkills(PAGE_SIZE + 5, 0));
 
     // Page one paints from the partial data; the count reports what has
     // loaded so far and says it is still loading.
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
-    expect(screen.getByText("skill-23")).toBeInTheDocument();
-    expect(screen.queryByText("skill-24")).not.toBeInTheDocument();
-    expect(screen.getByText(/共 30 个/)).toBeInTheDocument();
+    expect(screen.getByText(`skill-${PAGE_SIZE - 1}`)).toBeInTheDocument();
+    expect(screen.queryByText(`skill-${PAGE_SIZE}`)).not.toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`共 ${PAGE_SIZE + 5} 个`))).toBeInTheDocument();
     expect(screen.getByText(/加载中/)).toBeInTheDocument();
 
     // A later snapshot grows the registry (and the count) in place.
-    harness.pushAll(makeSkills(60, 0).slice(30));
-    expect(await screen.findByText(/共 60 个/)).toBeInTheDocument();
-    expect(screen.getByText("共 60 个 · 加载中")).toBeInTheDocument();
+    harness.pushAll(makeSkills(PAGE_SIZE + 20, 0).slice(PAGE_SIZE + 5));
+    expect(
+      await screen.findByText(new RegExp(`共 ${PAGE_SIZE + 20} 个`)),
+    ).toBeInTheDocument();
+    expect(screen.getByText(`共 ${PAGE_SIZE + 20} 个 · 加载中`)).toBeInTheDocument();
   });
 
   it("falls back to substring search while streaming and fuzzy search once complete", async () => {

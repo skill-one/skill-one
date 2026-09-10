@@ -14,6 +14,7 @@ import { ListPager } from "../../../components/list-pager";
 import { SkillListRow } from "../skill-list-row";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 import { PAGE_SIZE } from "../../../lib/pagination";
+import { RankBadge } from "../../../components/rank-badge";
 import { useClampedPage } from "../../../hooks/use-clamped-page";
 
 /** Where the back button points; the repos list lives one level up. */
@@ -168,6 +169,9 @@ export function RepoDetailPage() {
                     skill={hit.skill}
                     selected={i === selected}
                     onSelect={() => setSelected(i)}
+                    leading={
+                      <RankBadge rank={(page - 1) * PAGE_SIZE + i + 1} />
+                    }
                   />
                 ))}
               </ul>

@@ -6,6 +6,7 @@ import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useClampedPage } from "../../hooks/use-clamped-page";
 import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
+import { RankBadge } from "../../components/rank-badge";
 import type { SearchHit, SortOrder } from "../../lib/registry/protocol";
 import { Button } from "../../components/ui/button";
 import {
@@ -244,6 +245,9 @@ export function ExplorePage() {
                     matched={hit.matched}
                     selected={i === selected}
                     onSelect={() => setSelected(i)}
+                    leading={
+                      <RankBadge rank={(page - 1) * PAGE_SIZE + i + 1} />
+                    }
                   />
                 ))}
               </ul>

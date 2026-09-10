@@ -6,6 +6,7 @@ import { HashRouter, Route, Routes } from "react-router";
 
 import type { Skill } from "../../../types/skill";
 import type { RegistryHarness } from "../../../test/registry-harness";
+import { PAGE_SIZE } from "../../../lib/pagination";
 import { ExplorePage } from "../explore-page";
 import { ReposPage } from "./repos-page";
 import { RepoDetailPage } from "./repo-detail-page";
@@ -191,16 +192,22 @@ describe("ReposPage", () => {
 
   it("pages the repo list without re-downloading the registry", async () => {
     const user = userEvent.setup();
-    bootRegistry(makeSingleSkillRepos(50));
+    bootRegistry(makeSingleSkillRepos(PAGE_SIZE + 5));
     renderReposPage();
     await screen.findByText("repo-00/skills");
 
-    // Page 1 holds exactly 24 cards; repo-24 belongs to page 2.
-    expect(screen.getByText("repo-23/skills")).toBeInTheDocument();
-    expect(screen.queryByText("repo-24/skills")).not.toBeInTheDocument();
+    // Page 1 holds exactly PAGE_SIZE cards; the next repo belongs to page 2.
+    expect(
+      screen.getByText(`repo-${PAGE_SIZE - 1}/skills`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(`repo-${PAGE_SIZE}/skills`),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("link", { name: "下一页" }));
-    expect(await screen.findByText("repo-24/skills")).toBeInTheDocument();
+    expect(
+      await screen.findByText(`repo-${PAGE_SIZE}/skills`),
+    ).toBeInTheDocument();
     expect(harness.downloads).toBe(1);
   });
 
