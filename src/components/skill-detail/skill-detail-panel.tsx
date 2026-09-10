@@ -8,11 +8,15 @@ import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
 import { errorMessage, formatDate, formatCount, formatRev } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
+import { DomainBadge } from "../domain-badge";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "../ui/drawer";
 import { Skeleton } from "../ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { OwnerAvatar } from "../owner-avatar";
+import { SkillInstallButton } from "../skill-install-button";
+import { SkillProfileView } from "./skill-profile-view";
 
 /**
  * The markdown body is the heaviest subtree the drawer shows: react-markdown
@@ -76,6 +80,9 @@ export function SkillDetailPanel({
     if (skill) setLastSkill(skill);
   }, [skill]);
   const shown = skill ?? lastSkill;
+  // The failure message of the last install attempt (the header CTA),
+  // shown under the header.
+  const [installError, setInstallError] = useState<string | null>(null);
 
   // Remote when the registry knows the skill's repo directory, local disk
   // otherwise (local installs, or store installs whose index entry is gone
@@ -122,6 +129,10 @@ export function SkillDetailPanel({
   // nothing to link to, and the stats it cannot have stay hidden (the same
   // Puzzle placeholder the my-skills row uses).
   const isLocalSkill = shown != null && !shown.repo;
+  // Profiled registry skills get the 画像 tab (the dataset's per-skill
+  // files resolve through the mirror path); local installs and skills the
+  // dataset has not profiled keep the plain SKILL.md body.
+  const hasProfile = shown?.profile != null && shown.path != null;
   const description = detail?.description || shown?.description;
   // The mirror-relative SKILL.md path, reused for the mirror's GitHub file
   // link and to resolve relative URLs inside the markdown body.
@@ -143,35 +154,61 @@ export function SkillDetailPanel({
 
   return (
     <DrawerContent>
-      <DrawerHeader>
-        {isLocalSkill ? (
-          <div
-            aria-label="skill 头像"
-            className="flex h-11 w-11 items-center justify-center self-start rounded-lg border border-border/60 bg-muted text-muted-foreground"
-          >
-            <Puzzle className="h-5 w-5" />
-          </div>
-        ) : (
-          <OwnerAvatar owner={owner} className="h-11 w-11 text-[18px]" />
-        )}
-        <DrawerTitle className="truncate">{shown?.name}</DrawerTitle>
-        {isLocalSkill ? (
-          <DrawerDescription>本地安装</DrawerDescription>
-        ) : (
-          <DrawerDescription asChild>
-            <a
-              href={sourceHref}
-              onClick={(e) => {
-                e.preventDefault();
-                void openExternal(sourceHref);
-              }}
-              title="在 GitHub 中打开源仓库"
-              className="min-w-0 items-center gap-1"
+      <DrawerHeader className="gap-1.5 px-6 pt-5">
+        <div className="flex items-start gap-3">
+          {isLocalSkill ? (
+            <div
+              aria-label="skill 头像"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-muted-foreground"
             >
-              <span className="truncate">{shown?.repo}</span>
-              <ExternalLink className="h-3 w-3 shrink-0" />
-            </a>
-          </DrawerDescription>
+              <Puzzle className="h-5 w-5" />
+            </div>
+          ) : (
+            <OwnerAvatar
+              owner={owner}
+              className="h-12 w-12 shrink-0 text-xl"
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <DrawerTitle className="truncate text-lg font-bold tracking-tight">
+              {shown?.name}
+            </DrawerTitle>
+            {isLocalSkill ? (
+              <DrawerDescription>本地安装</DrawerDescription>
+            ) : (
+              <DrawerDescription asChild>
+                <a
+                  href={sourceHref}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void openExternal(sourceHref);
+                  }}
+                  title="在 GitHub 中打开源仓库"
+                  className="min-w-0 items-center gap-1"
+                >
+                  <span className="truncate">{shown?.repo}</span>
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                </a>
+              </DrawerDescription>
+            )}
+          </div>
+          {/* The primary action lives in the header, like every store's
+              detail view: it stays visible while the content scrolls. */}
+          {!isLocalSkill && (
+            <SkillInstallButton
+              skill={shown!}
+              className="h-8 w-8"
+              onError={setInstallError}
+            />
+          )}
+        </div>
+        {/* The skill's own summary — shared chrome, visible whichever tab
+            is open. Served from the index immediately, refined by the
+            fetched SKILL.md frontmatter once it lands. */}
+        {description && (
+          <p className="whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground">
+            {description}
+          </p>
         )}
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           {detail?.license && (
@@ -228,12 +265,10 @@ export function SkillDetailPanel({
         )}
         {shown?.profile && (
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <Badge
-              variant="outline"
-              title={shown.profile.reason ?? shown.profile.domain}
-            >
-              {shown.profile.domain}
-            </Badge>
+            <DomainBadge
+              domain={shown.profile.domain}
+              reason={shown.profile.reason}
+            />
             {shown.profile.persona?.role && (
               <span
                 className="text-[12px] text-muted-foreground"
@@ -244,9 +279,41 @@ export function SkillDetailPanel({
             )}
           </div>
         )}
+        {/* Where this SKILL.md copy lives — metadata too, so it belongs in
+            the header rather than pushing the body down inside the tab. */}
+        {detail && (
+          <div className="flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground/70">
+            {isLocalSkill ? (
+              <span className="truncate" title="本地 SKILL.md 路径">
+                {detail.path}
+              </span>
+            ) : (
+              <a
+                href={skillBlobUrl}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void openExternal(skillBlobUrl);
+                }}
+                title="在 GitHub 中打开镜像快照里的 SKILL.md"
+                className="flex min-w-0 items-center gap-1 transition-colors hover:text-foreground"
+              >
+                <span className="truncate">{detail.path}</span>
+                <ExternalLink className="h-3 w-3 shrink-0" />
+              </a>
+            )}
+          </div>
+        )}
       </DrawerHeader>
+      {installError && (
+        <p
+          role="alert"
+          className="mx-6 line-clamp-2 text-[12px] leading-relaxed text-destructive"
+        >
+          {installError}
+        </p>
+      )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
         {isPending ? (
           <div className="flex h-40 items-center justify-center text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -269,39 +336,48 @@ export function SkillDetailPanel({
             </Button>
           </div>
         ) : detail ? (
-          <div className="flex flex-col gap-5 pt-2">
-            {description && (
-              <p className="whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground">
-                {description}
-              </p>
-            )}
-            {shown?.profile?.persona?.scene && (
-              <p
-                className="text-[12px] italic leading-relaxed text-muted-foreground/80"
-                title="skills-profiles 为该技能生成的使用场景画像"
+          hasProfile ? (
+            // A profiled skill: SKILL.md and the generated profile live in
+            // separate tabs. SKILL.md stays the default so opening the
+            // drawer still lands on the documentation first. The tab bar is
+            // a GitHub-style underlined row that sticks below the header
+            // while long content scrolls underneath it.
+            <Tabs defaultValue="skill-md" className="flex flex-col gap-5">
+              <TabsList
+                variant="line"
+                className="sticky top-0 z-10 w-full justify-start rounded-none border-b bg-background"
               >
-                “{shown.profile.persona.scene}”
-              </p>
-            )}
-            <div>
-              {isLocalSkill ? (
-                <p className="mb-2 truncate font-mono text-[11px] text-muted-foreground/70">
-                  {detail.path}
-                </p>
-              ) : (
-                <a
-                  href={skillBlobUrl}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void openExternal(skillBlobUrl);
-                  }}
-                  title="在 GitHub 中打开镜像快照里的 SKILL.md"
-                  className="mb-2 flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground"
-                >
-                  <span className="truncate">{detail.path}</span>
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                </a>
-              )}
+                <TabsTrigger value="skill-md">SKILL.md</TabsTrigger>
+                <TabsTrigger value="profile">画像</TabsTrigger>
+              </TabsList>
+              <TabsContent value="skill-md">
+                {detail.instructions ? (
+                  <Suspense fallback={<MarkdownSkeleton />}>
+                    <LazyMarkdown
+                      repo={MIRROR.repo}
+                      gitRef={MIRROR.ref}
+                      filePath={filePath}
+                    >
+                      {detail.instructions}
+                    </LazyMarkdown>
+                  </Suspense>
+                ) : (
+                  <p className="text-[13px] leading-relaxed text-muted-foreground">
+                    （SKILL.md 无正文内容）
+                  </p>
+                )}
+              </TabsContent>
+              <TabsContent value="profile">
+                <SkillProfileView
+                  skillId={shown!.name}
+                  knownPath={shown!.path}
+                  scene={shown!.profile?.persona?.scene}
+                  tool={shown!.profile?.persona?.tool}
+                />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div className="pt-2">
               {detail.instructions ? (
                 <Suspense fallback={<MarkdownSkeleton />}>
                   <LazyMarkdown
@@ -318,7 +394,7 @@ export function SkillDetailPanel({
                 </p>
               )}
             </div>
-          </div>
+          )
         ) : null}
       </div>
     </DrawerContent>

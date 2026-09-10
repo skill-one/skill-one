@@ -128,6 +128,10 @@ export function createRegistryController(
   // built from; undefined until one is served. An equal probed stamp means
   // equal bytes, so the profiles download is skipped.
   let servedProfilesAt: string | undefined;
+  // The immutable tag the profiles files were fetched at, surfaced through
+  // the index event so per-skill profile fetches can pin to the same
+  // snapshot. Undefined when the fetch was not pinned.
+  let servedProfilesTag: string | undefined;
   // Last announced snapshot identity, kept for `stats()` and for tests.
   let indexInfo: IndexInfo | null = null;
 
@@ -249,6 +253,7 @@ export function createRegistryController(
     if (gen !== generation) return false;
     profilesMap = map;
     servedProfilesAt = meta?.generatedAt;
+    servedProfilesTag = meta?.tag;
     decorate();
     dataVersion++;
     orderCache = null;
@@ -294,14 +299,26 @@ export function createRegistryController(
     ) {
       // The published run is the one already served, so the body is byte
       // -identical: keep serving the cache and skip the download entirely.
-      emitIndex({ ...identity, total, origin: "unchanged" });
+      emitIndex({ ...identity, total, profilesTag: servedProfilesTag, origin: "unchanged" });
       trendingIds = (await trending) ?? trendingIds;
       // The profiles dataset moves on its own schedule — an unchanged
       // registry index says nothing about it, so revalidate it here too.
       // A refresh re-decorates the cached skills in place, so the record is
-      // re-saved with the new stamp (still no registry body download).
+      // re-saved with the new stamp (still no registry body download), and
+      // the re-announced index carries the new profiles tag so per-skill
+      // profile fetches pin to the snapshot now being served.
       if (await loadProfiles(gen, force)) {
-        void deps.cache.save(store, { ...identity, profilesAt: servedProfilesAt });
+        void deps.cache.save(store, {
+          ...identity,
+          profilesAt: servedProfilesAt,
+          profilesTag: servedProfilesTag,
+        });
+        emitIndex({
+          ...identity,
+          total,
+          profilesTag: servedProfilesTag,
+          origin: "unchanged",
+        });
       }
       return;
     }
@@ -384,8 +401,17 @@ export function createRegistryController(
     // No separate "landed" event: buildIndex immediately emits the settled
     // count and posts ready — the index build is synchronous from here.
     servedGeneratedAt = identity.generatedAt;
-    void deps.cache.save(store, { ...identity, profilesAt: servedProfilesAt });
-    emitIndex({ ...identity, total, origin: "updated" });
+    void deps.cache.save(store, {
+      ...identity,
+      profilesAt: servedProfilesAt,
+      profilesTag: servedProfilesTag,
+    });
+    emitIndex({
+      ...identity,
+      total,
+      profilesTag: servedProfilesTag,
+      origin: "updated",
+    });
     buildIndex();
   };
 
@@ -692,9 +718,11 @@ export function createRegistryController(
           store = cached.skills;
           servedGeneratedAt = cached.generatedAt;
           // The cached skills are already decorated with the profiles they
-          // were saved with; the stamp below is what the revalidation's
-          // profiles probe is compared against.
+          // were saved with; the stamp/tag below is what the revalidation's
+          // profiles probe is compared against, and what per-skill profile
+          // fetches pin to until a newer snapshot lands.
           servedProfilesAt = cached.profilesAt;
+          servedProfilesTag = cached.profilesTag;
           complete = true;
           announcedCount = cached.skills.length;
           emitProgress();
@@ -704,6 +732,7 @@ export function createRegistryController(
             tag: cached.tag,
             generatedAt: cached.generatedAt,
             total: cached.skills.length,
+            profilesTag: cached.profilesTag,
             origin: "cache",
           });
         }

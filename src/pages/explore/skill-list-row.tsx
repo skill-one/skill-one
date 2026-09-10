@@ -5,8 +5,8 @@ import type { SearchField } from "../../lib/registry/protocol";
 import { cn, formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { OwnerAvatar } from "../../components/owner-avatar";
-import { Badge } from "../../components/ui/badge";
-import { SkillInstallButton } from "./skill-install-button";
+import { DomainBadge } from "../../components/domain-badge";
+import { SkillInstallButton } from "../../components/skill-install-button";
 
 /** Matched indexed terms per field, from the search that produced this hit. */
 export type SkillMatched = Partial<Record<SearchField, readonly string[]>>;
@@ -119,16 +119,11 @@ export function SkillListRow({
             {/* Domain from the profiles dataset; absent for skills it has
                 not profiled, so most rows stay unchanged for now. */}
             {skill.profile?.domain && (
-              <Badge
-                variant="outline"
+              <DomainBadge
+                domain={skill.profile.domain}
+                reason={skill.profile.reason}
                 className="shrink-0 rounded-full px-2 py-0 text-[10px] font-normal text-muted-foreground"
-                title={skill.profile.reason ?? skill.profile.domain}
-              >
-                <HighlightedText
-                  text={skill.profile.domain}
-                  terms={matched?.domain}
-                />
-              </Badge>
+              />
             )}
           </div>
           <p className="mt-0.5 hidden truncate text-[13px] leading-relaxed text-muted-foreground lg:block">

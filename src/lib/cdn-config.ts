@@ -23,6 +23,9 @@ const SETTINGS_KEY = "skill-one.cdn";
 /** localStorage key for the served registry snapshot tag (`dist-<date>`). */
 const INDEX_TAG_KEY = "skill-one.indexTag";
 
+/** localStorage key for the served profiles dataset tag (`dist-<date>[-N]`). */
+const PROFILES_TAG_KEY = "skill-one.profilesTag";
+
 // Persist via `window.localStorage` where available, with an in-memory fallback
 // so reads still work in environments without a storage backend (e.g. Vitest's
 // node runner). The fallback never throws.
@@ -80,6 +83,21 @@ export function getIndexTag(): string {
 /** Record the served registry snapshot tag (empty = clear). */
 export function setIndexTag(value: string): void {
   writeStored(INDEX_TAG_KEY, value.trim());
+}
+
+/**
+ * The profiles dataset tag (`dist-<date>[-N]`) currently recorded, or ""
+ * before any profiles snapshot has been served. Used to pin per-skill
+ * profile fetches (the detail drawer's 画像 tab) to the same immutable
+ * snapshot the served registry was decorated from.
+ */
+export function getProfilesTag(): string {
+  return readStored(PROFILES_TAG_KEY);
+}
+
+/** Record the served profiles dataset tag (empty = clear). */
+export function setProfilesTag(value: string): void {
+  writeStored(PROFILES_TAG_KEY, value.trim());
 }
 
 /** Direct GitHub raw URL. No ref → default branch (`HEAD`). */

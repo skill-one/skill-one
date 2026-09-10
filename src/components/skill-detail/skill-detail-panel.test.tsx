@@ -5,7 +5,11 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
-import { fetchLocalSkillDetail } from "../../lib/local-skills";
+import { fetchSkillProfile } from "../../lib/skill-profile-api";
+import {
+  fetchInstalledSkills,
+  fetchLocalSkillDetail,
+} from "../../lib/local-skills";
 import { openExternal } from "../../lib/open-external";
 import type { Skill } from "../../types/skill";
 import { Drawer } from "../ui/drawer";
@@ -16,8 +20,13 @@ vi.mock("../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
 }));
 
+vi.mock("../../lib/skill-profile-api", () => ({
+  fetchSkillProfile: vi.fn(),
+}));
+
 vi.mock("../../lib/local-skills", () => ({
   fetchLocalSkillDetail: vi.fn(),
+  fetchInstalledSkills: vi.fn(),
 }));
 
 vi.mock("../../lib/open-external", () => ({
@@ -25,6 +34,7 @@ vi.mock("../../lib/open-external", () => ({
 }));
 
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
+const mockFetchSkillProfile = vi.mocked(fetchSkillProfile);
 const mockFetchLocalSkillDetail = vi.mocked(fetchLocalSkillDetail);
 const mockOpenExternal = vi.mocked(openExternal);
 
@@ -115,8 +125,13 @@ beforeEach(() => {
     defaultOptions: { queries: { retry: false } },
   });
   mockFetchSkillDetail.mockReset();
+  mockFetchSkillProfile.mockReset();
   mockFetchLocalSkillDetail.mockReset();
   mockOpenExternal.mockReset();
+  mockFetchSkillDetail.mockResolvedValue(detail);
+  // The header install button reads the installed list; nothing is
+  // installed unless a test says otherwise.
+  vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
 });
 
 describe("SkillDetailPanel", () => {
@@ -284,5 +299,59 @@ describe("SkillDetailPanel", () => {
     await vi.waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
+  });
+
+  it("shows the profile in a second tab for a profiled skill", async () => {
+    const user = userEvent.setup();
+    mockFetchSkillProfile.mockResolvedValue({
+      scenario: "找不到现成 skill？它替你搜。",
+      taglines: ["一搜即装", "只荐对的"],
+      blackbox: {
+        function: "把一句话需求变成装好的 skill。",
+        inputOutput: [{ input: "我想做 X", output: "推荐的 skill" }],
+      },
+      comments: [
+        { user: "后端老兵", category: "妙用", comment: "用 --owner 锁定官方源。" },
+      ],
+    });
+    // A profiled skill carries both the index profile and a mirror path.
+    renderDrawer({
+      skill: {
+        ...skill,
+        profile: {
+          domain: "开发编程",
+          reason: "dev tooling",
+          persona: { tool: "npx skills", role: "技能猎头", scene: "需要找 skill 时" },
+        },
+      },
+    });
+
+    // SKILL.md is the default tab; the 画像 tab exists alongside it.
+    expect(await screen.findByText("Use this skill for PDFs.")).toBeInTheDocument();
+    const profileTab = screen.getByRole("tab", { name: "画像" });
+    await user.click(profileTab);
+
+    // Structured layout: lead quote + tool, slogans, pitch, input/output,
+    // and categorized user notes.
+    // The scene renders as a curly-quoted lead paragraph.
+    expect(await screen.findByText(/需要找 skill 时/)).toBeInTheDocument();
+    expect(screen.getByText("谋生工具：")).toBeInTheDocument();
+    expect(screen.getByText("一搜即装")).toBeInTheDocument();
+    expect(screen.getByText("找不到现成 skill？它替你搜。")).toBeInTheDocument();
+    expect(screen.getByText(/把一句话需求变成装好的 skill。/)).toBeInTheDocument();
+    expect(screen.getByText("我想做 X")).toBeInTheDocument();
+    expect(screen.getByText("推荐的 skill")).toBeInTheDocument();
+    expect(screen.getByText("妙用")).toBeInTheDocument();
+    expect(screen.getByText("用 --owner 锁定官方源。")).toBeInTheDocument();
+  });
+
+  it("keeps the plain SKILL.md body for an unprofiled skill", async () => {
+    mockFetchSkillDetail.mockResolvedValue(detail);
+    renderDrawer({ skill });
+
+    await screen.findByText("Use this skill for PDFs.");
+    // No tabs at all when the dataset has not profiled the skill.
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(mockFetchSkillProfile).not.toHaveBeenCalled();
   });
 });

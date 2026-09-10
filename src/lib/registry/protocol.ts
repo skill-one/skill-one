@@ -147,6 +147,11 @@ export interface IndexInfo {
   generatedAt?: string;
   /** Published row count (`indexedRows`), before any consumer-side filtering. */
   total?: number;
+  /**
+   * The profiles dataset tag the served skills were decorated from, when
+   * known. Immutable address: per-skill profile fetches pin to it.
+   */
+  profilesTag?: string;
   /** Origin of the served dataset for this run. */
   origin: IndexOrigin;
 }

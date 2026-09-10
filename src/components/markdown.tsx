@@ -81,7 +81,11 @@ export function Markdown({ children, repo, gitRef = "HEAD", filePath }: Markdown
   };
 
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+    // Base prose (16px), not prose-sm: the detail panel reads at document
+    // width (600-700px ≈ 75ch), where the 13-14px prose-sm would force
+    // ~90-character lines. Headings scale with it, so long SKILL.md files
+    // keep a visible hierarchy.
+    <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none break-words">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {children}
       </ReactMarkdown>

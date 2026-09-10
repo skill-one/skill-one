@@ -62,6 +62,32 @@ export interface Skill {
 }
 
 /**
+ * The full per-skill profile, assembled from the five angle files the
+ * profiles dataset ships per skill (skills/<id>/<angle>.json) on demand
+ * when the detail drawer's 画像 tab opens. `domain` and `persona` are not
+ * re-fetched — they already ride along on the index entry (`Skill.profile`)
+ * and the dataset guarantees the files never contradict the index.
+ *
+ * Every angle is optional: one file being unreachable hides its section
+ * without breaking the others.
+ */
+export interface SkillProfileDetail {
+  /** One ≤100-character pitch built around the user's pain point. */
+  scenario?: string;
+  /** Three ≤20-character slogans. */
+  taglines?: string[];
+  /** Outside view: what you hand it → what you get back. */
+  blackbox?: {
+    function: string;
+    inputOutput: Array<{ input: string; output: string }>;
+  };
+  /** Inside view: the happy path plus the key mechanisms behind it. */
+  whitebox?: { executionFlow: string[]; mechanisms: string[] };
+  /** First-person user notes, categorized 妙用/坑/注意/启发. */
+  comments?: Array<{ user: string; category: string; comment: string }>;
+}
+
+/**
  * A single skill's SKILL.md content, fetched from the skills-sh-mirror
  * mirror on demand when the detail sheet is opened.
  */

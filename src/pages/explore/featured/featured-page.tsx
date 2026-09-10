@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { Skeleton } from "../../../components/ui/skeleton";
 import { SkeletonList } from "../../../components/skeleton-list";
+import { domainMeta } from "../../../data/domains";
 import { useFeaturedData } from "../../../hooks/use-featured-data";
 import { Button } from "../../../components/ui/button";
 import { Placeholder } from "../../../components/placeholder";
@@ -93,7 +94,12 @@ export function FeaturedPage() {
             <FeaturedHero slides={slides} />
             {sections.map((section) => (
               <section key={section.id} aria-label={section.title}>
-                <h2 className="mb-4 text-xl font-bold tracking-tight text-foreground">
+                <h2 className="mb-4 flex items-center gap-2 text-xl font-bold tracking-tight text-foreground">
+                  {domainMeta(section.title) && (
+                    <span aria-hidden="true">
+                      {domainMeta(section.title)!.emoji}
+                    </span>
+                  )}
                   {section.title}
                 </h2>
                 {/* The detail drawer overlays the list; the layout never

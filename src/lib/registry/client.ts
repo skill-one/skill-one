@@ -1,4 +1,4 @@
-import { getCdnBase, setIndexTag } from "../cdn-config";
+import { getCdnBase, setIndexTag, setProfilesTag } from "../cdn-config";
 import type {
   DomainInfo,
   FeaturedData,
@@ -91,11 +91,13 @@ function onMessage(message: RegistryWorkerMessage) {
     };
     emit();
   } else if (message.type === "index") {
-    // Record the served snapshot tag: it pins SKILL.md detail fetches (and
-    // the Settings read-out) to the same snapshot the index was built from.
-    // A null info (a failed download with nothing served) keeps the last
-    // good tag rather than un-pinning known-good data.
+    // Record the served snapshot tags: the index tag pins SKILL.md detail
+    // fetches (and the Settings read-out), the profiles tag pins per-skill
+    // profile fetches, both to the same snapshots the served data was built
+    // from. A null info (a failed download with nothing served) keeps the
+    // last good tags rather than un-pinning known-good data.
     if (message.info?.tag) setIndexTag(message.info.tag);
+    if (message.info?.profilesTag) setProfilesTag(message.info.profilesTag);
     snapshot = { ...snapshot, index: message.info };
     emit();
   } else if (message.type === "error") {

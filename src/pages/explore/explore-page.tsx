@@ -7,6 +7,7 @@ import { useRegistryDomains } from "../../hooks/use-registry-domains";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useClampedPage } from "../../hooks/use-clamped-page";
 import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
+import { domainMeta } from "../../data/domains";
 import { RankBadge } from "../../components/rank-badge";
 import type { SearchHit, SortOrder } from "../../lib/registry/protocol";
 import { Button } from "../../components/ui/button";
@@ -178,7 +179,14 @@ export function ExplorePage() {
               >
                 <DropdownMenuRadioItem value="all">全部</DropdownMenuRadioItem>
                 {domains.map(({ domain: name, count }) => (
-                  <DropdownMenuRadioItem key={name} value={name}>
+                  <DropdownMenuRadioItem
+                    key={name}
+                    value={name}
+                    title={domainMeta(name)?.description}
+                  >
+                    {domainMeta(name) && (
+                      <span aria-hidden="true">{domainMeta(name)!.emoji}</span>
+                    )}
                     {name}
                     <span className="ml-auto pl-4 text-xs text-muted-foreground tabular-nums">
                       {count}

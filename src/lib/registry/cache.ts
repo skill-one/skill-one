@@ -34,6 +34,8 @@ export interface CacheIdentity {
    * registry re-download. Absent when profiles were unavailable.
    */
   profilesAt?: string;
+  /** The profiles dataset's tag the stored skills were decorated from. */
+  profilesTag?: string;
 }
 
 /** A single cached record. */
@@ -80,8 +82,9 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
         return null;
       }
       if (!record || record.schemaVersion !== SCHEMA_VERSION) return null;
-      const { skills, tag, generatedAt, profilesAt, fetchedAt } = record;
-      return { skills, tag, generatedAt, profilesAt, fetchedAt };
+      const { skills, tag, generatedAt, profilesAt, profilesTag, fetchedAt } =
+        record;
+      return { skills, tag, generatedAt, profilesAt, profilesTag, fetchedAt };
     },
 
     /** Persist the parsed registry with its snapshot identity (overwrites). */
@@ -92,6 +95,7 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
         tag: identity.tag,
         generatedAt: identity.generatedAt,
         profilesAt: identity.profilesAt,
+        profilesTag: identity.profilesTag,
         skills,
       };
       try {

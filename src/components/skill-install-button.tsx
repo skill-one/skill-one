@@ -2,20 +2,20 @@ import { useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, Download, Loader2, RefreshCw } from "lucide-react";
 
-import { installSkillFromSource } from "../../lib/local-skills";
+import { installSkillFromSource } from "../lib/local-skills";
 import {
   markSkillsChanged,
   useInstalledSkills,
-} from "../../hooks/use-installed-skills";
-import { cn, errorMessage } from "../../lib/utils";
-import type { Skill } from "../../types/skill";
-import { Button } from "../../components/ui/button";
+} from "../hooks/use-installed-skills";
+import { cn, errorMessage } from "../lib/utils";
+import type { Skill } from "../types/skill";
+import { Button } from "./ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "../../components/ui/tooltip";
+} from "./ui/tooltip";
 
 /** Install button state machine: idle → installing → installed | error. */
 type InstallState = "idle" | "installing" | "installed" | "error";
