@@ -1,14 +1,15 @@
 import MiniSearch from "minisearch";
 
 import type { Skill } from "../types/skill";
+import { popularity } from "./popularity";
 import type { SearchField, SearchHit } from "./registry/protocol";
 
 /**
  * Client-side fuzzy search over the skill registry, powered by MiniSearch
  * (inverted index + BM25+ ranking). Runs inside the registry worker.
  * Relevance is computed per field with field boosts keeping the priority
- * name > repo > description, and a log-scale popularity boost nudges heavily
- * installed skills upward — relevance stays the primary signal.
+ * name > repo > description, and a log-scale popularity boost nudges
+ * high-popularity skills upward — relevance stays the primary signal.
  */
 
 /** Search query → hits in relevance order. */
@@ -21,25 +22,25 @@ type IndexedSkill = Skill & { id: number };
 
 // MiniSearch multiplies each field's BM25 term score by its boost, so these
 // are relative magnitudes, not weights that must sum to 1. The ratios are
-// tuned against the popularity boost (max ~2.3×): popularity can outweigh
+// tuned against the popularity boost (max ~2.2×): popularity can outweigh
 // one step of field priority (2×) but never two (4×) — a hugely popular
 // repo match may outrank a zero-install name match, while a description match
 // cannot.
 const FIELD_BOOSTS = { name: 4, repo: 2, description: 1, domain: 1 };
 
-// Popularity boost divisor: 5 tops out at a ~2.3× multiplier for the most
-// installed skills (log10(1 + ~3M) ≈ 6.5 → ~2.3), so popularity can jump
-// over a "one notch" relevance gap but rarely further.
+// Popularity boost divisor: 5 tops out at a ~2.2× multiplier for the most
+// popular skills (log10 of the top blended figure ≈ 5.9), so popularity can
+// jump over a "one notch" relevance gap but rarely further.
 const POPULARITY_DIVISOR = 5;
 
 /**
- * Log-scale popularity multiplier: more installs rank higher, but huge
- * counts stay comparable instead of drowning out match quality. Guarded
- * against missing/negative values so the result is always ≥ 1 (a falsy
- * boost would drop the document from the results entirely).
+ * Log-scale popularity multiplier: a higher blended installs-and-stars figure
+ * ranks higher, but huge counts stay comparable instead of drowning out match
+ * quality. Guarded against missing/negative values so the result is always
+ * ≥ 1 (a falsy boost would drop the document from the results entirely).
  */
-function popularityBoost(downloads: number): number {
-  return 1 + Math.log10(1 + Math.max(0, downloads || 0)) / POPULARITY_DIVISOR;
+function popularityBoost(skill: Skill): number {
+  return 1 + Math.log10(1 + popularity(skill)) / POPULARITY_DIVISOR;
 }
 
 /**
@@ -79,8 +80,8 @@ export function buildSkillSearch(skills: Skill[]): SkillSearch {
       // term length).
       prefix: true,
       fuzzy: 0.2,
-      // Popularity: multiply each document's score by its install-count boost.
-      boostDocument: (id) => popularityBoost(skills[id].downloads),
+      // Popularity: multiply each document's score by its blended-figures boost.
+      boostDocument: (id) => popularityBoost(skills[id]),
     },
   });
   miniSearch.addAll(skills.map((skill, id) => ({ ...skill, id })));

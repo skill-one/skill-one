@@ -111,8 +111,9 @@ describe("RankingPage", () => {
       "beta",
       "gamma",
     ]);
-    // Lifetime installs, preformatted by the worker; the first row is rank 1.
-    expect(within(rows[0]).getByText("5K")).toBeInTheDocument();
+    // The row metric is the blended figure, preformatted by the worker (delta:
+    // 5K installs against 600 stars scores 1.7K); the first row is rank 1.
+    expect(within(rows[0]).getByText("1.7K")).toBeInTheDocument();
     expect(within(rows[0]).getByText("1")).toBeInTheDocument();
   });
 
@@ -125,7 +126,7 @@ describe("RankingPage", () => {
 
     await user.click(screen.getByRole("link", { name: "人气总榜" }));
 
-    // Lifetime installs put beta on top instead.
+    // Ranking by the blended figure puts beta on top instead.
     await waitFor(() =>
       expect(screen.getByRole("list").firstChild).toHaveTextContent("beta"),
     );

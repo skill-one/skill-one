@@ -1,15 +1,50 @@
 import { useState, type ReactNode } from "react";
-import { Download } from "lucide-react";
+import { Download, Flame, Star, type LucideIcon } from "lucide-react";
 
 import type { SearchField } from "../../lib/registry/protocol";
+import { popularity } from "../../lib/popularity";
 import { cn, formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { DomainBadge } from "../../components/domain-badge";
 import { SkillInstallButton } from "../../components/skill-install-button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /** Matched indexed terms per field, from the search that produced this hit. */
 export type SkillMatched = Partial<Record<SearchField, readonly string[]>>;
+
+/**
+ * One labelled row of the popularity tooltip — icon, field name and a
+ * right-aligned value, so the blended figure and the two counts behind it read
+ * as the same kind of line.
+ */
+function TooltipRow({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  /** Colour for the icon only (the star's amber). */
+  tone?: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Icon className={cn("h-3.5 w-3.5", tone)} />
+      <span className="text-muted-foreground">{label}</span>
+      <span className="ml-auto pl-3 font-medium tabular-nums text-foreground">
+        {value}
+      </span>
+    </div>
+  );
+}
 
 /**
  * Splits text on the same separator class MiniSearch's default tokenizer uses,
@@ -52,8 +87,9 @@ function HighlightedText({
 
 /**
  * One skill in the store's list — the shape every skill surface uses: avatar,
- * name and source, description, download count and the install action on a
- * single line, in the reading order of a leaderboard row.
+ * name and source, description, popularity figure and the install action on a
+ * single line, in the reading order of a leaderboard row. Hovering or focusing
+ * the figure breaks it back down into the installs and stars it blends.
  *
  * The row body opens the detail panel (`onSelect`); the install action goes
  * through the skills backend (Tauri) or the mock store (browser), reflects
@@ -77,13 +113,19 @@ export function SkillListRow({
   onSelect?: () => void;
   /** Slot before the avatar — a leaderboard rank badge. */
   leading?: ReactNode;
-  /** Replaces the download-count metric when the surface has its own unit. */
+  /** Replaces the popularity metric when the surface has its own unit. */
   metric?: ReactNode;
 }) {
   // The failure message of the last install attempt, shown under the row.
   const [installError, setInstallError] = useState<string | null>(null);
 
   const owner = skill.repo.split("/")[0];
+
+  // Formatted once: the trigger, its accessible name and the tooltip lines all
+  // read these, so they cannot disagree about what the figure is.
+  const installed = formatCount(skill.downloads);
+  const starred = formatCount(skill.stars);
+  const blended = formatCount(popularity(skill));
 
   return (
     <li>
@@ -134,13 +176,33 @@ export function SkillListRow({
           </p>
         </div>
 
+        {/* Like the install action, the metric is its own control: a click on
+            it stops there instead of opening the detail panel behind the row. */}
         {metric ?? (
-          <span className="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground">
-            <Download className="h-3.5 w-3.5" />
-            <span className="font-medium tabular-nums">
-              {formatCount(skill.downloads)}
-            </span>
-          </span>
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger
+                aria-label={`热度 ${blended}：安装 ${installed} · Star ${starred}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex shrink-0 cursor-default items-center gap-1 rounded text-[12px] text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <Flame className="h-3.5 w-3.5" />
+                <span className="font-medium tabular-nums">{blended}</span>
+              </TooltipTrigger>
+              <TooltipContent side="right" align="start">
+                <div className="flex flex-col gap-1.5 text-[12px]">
+                  <TooltipRow icon={Flame} label="热度" value={blended} />
+                  <TooltipRow icon={Download} label="安装" value={installed} />
+                  <TooltipRow
+                    icon={Star}
+                    label="Star"
+                    value={starred}
+                    tone="text-amber-400"
+                  />
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
 
         {/* The install button stops its own click, so it never opens the

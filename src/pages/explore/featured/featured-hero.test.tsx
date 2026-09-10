@@ -54,7 +54,7 @@ const slides: HeroSlide[] = [
   {
     id: "popular",
     title: "人气总榜",
-    subtitle: "安装量最高的经典 Skill，点击查看完整榜单",
+    subtitle: "热度最高的经典 Skill，点击查看完整榜单",
     gradient: "bg-gradient-to-r from-amber-400 to-rose-500",
     entries: [{ rank: 1, skill: skill("gamma"), label: "1K" }],
   },

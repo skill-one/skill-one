@@ -26,10 +26,12 @@ export interface SearchHit {
 /**
  * Explore page sort orders (mirrored by the worker's cached sort). "default"
  * keeps the registry index order — the explore toolbar no longer offers it, but
- * the repo detail page still asks for it. A non-empty query ignores `sort`
- * entirely and answers in relevance order.
+ * the repo detail page still asks for it. "popularity" orders by the blended
+ * installs-and-stars figure the rows display (`lib/popularity.ts`), so the
+ * order and the number beside it can never disagree. A non-empty query ignores
+ * `sort` entirely and answers in relevance order.
  */
-export type SortOrder = "default" | "downloads" | "name";
+export type SortOrder = "default" | "popularity" | "name";
 
 /** Parameters of a paged explore request. */
 export interface PageRequest {

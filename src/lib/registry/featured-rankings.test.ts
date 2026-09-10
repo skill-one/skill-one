@@ -60,7 +60,7 @@ describe("skillIdOf", () => {
 });
 
 describe("rankSkills", () => {
-  it("ranks the popular leaderboard by installs, descending", () => {
+  it("ranks the popular leaderboard by popularity, descending", () => {
     const skills = [
       skill("low", { downloads: 10 }),
       skill("high", { downloads: 999 }),
@@ -75,7 +75,10 @@ describe("rankSkills", () => {
     ]);
     // Ranks are 1-based and follow the sorted order.
     expect(entries.map((entry) => entry.rank)).toEqual([1, 2, 3]);
-    expect(entries[0].label).toBe("999");
+    // The label is the blended figure (999 installs against the fixture's 1
+    // star scores 44), not the install count: the board and the rows it fills
+    // say the same thing.
+    expect(entries[0].label).toBe("44");
   });
 
   it("truncates to the limit but reports the full qualifying total", () => {
@@ -110,7 +113,8 @@ describe("rankSkills", () => {
       "s0",
     ]);
     expect(entries.map((entry) => entry.rank)).toEqual([1, 2, 3]);
-    expect(entries[0].label).toBe("1K");
+    // Upstream decides the order; the number is still the row metric.
+    expect(entries[0].label).toBe("44");
     // The total counts registry hits only.
     expect(total).toBe(3);
   });

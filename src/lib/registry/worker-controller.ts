@@ -1,5 +1,6 @@
 import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
+import { popularity } from "../popularity";
 import {
   buildSkillSearch,
   containsSearch,
@@ -44,6 +45,10 @@ import {
 
 /** How often partial counts are pushed while the download streams in. */
 const PROGRESS_INTERVAL_MS = 400;
+
+/** Descending order on the row metric, so list order and displayed figure agree. */
+const byPopularity = (a: Skill, b: Skill): number =>
+  popularity(b) - popularity(a);
 
 export interface ControllerDeps {
   /**
@@ -427,8 +432,8 @@ export function createRegistryController(
       return orderCache.ids;
     }
     const ids = store.map((_, id) => id);
-    if (sort === "downloads") {
-      ids.sort((a, b) => store[b].downloads - store[a].downloads);
+    if (sort === "popularity") {
+      ids.sort((a, b) => byPopularity(store[a], store[b]));
     } else if (sort === "name") {
       ids.sort((a, b) => store[a].name.localeCompare(store[b].name));
     }
@@ -454,8 +459,8 @@ export function createRegistryController(
         if (skill.repo === repo) hits.push({ skill, matched: {} });
       }
       if (sort !== "default") {
-        if (sort === "downloads") {
-          hits.sort((a, b) => b.skill.downloads - a.skill.downloads);
+        if (sort === "popularity") {
+          hits.sort((a, b) => byPopularity(a.skill, b.skill));
         } else {
           hits.sort((a, b) => a.skill.name.localeCompare(b.skill.name));
         }

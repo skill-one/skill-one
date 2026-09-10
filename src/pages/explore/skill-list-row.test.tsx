@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SkillListRow } from "./skill-list-row";
@@ -23,13 +23,16 @@ const skill: Skill = {
   downloads: 2991984,
 };
 
+// √((2991984 + 1) × (169600 + 1)) − 1 = 712350, rendered compactly.
+const BLENDED = "712.4K";
+
 describe("SkillListRow", () => {
   beforeEach(() => {
     // No skills are installed unless a test says otherwise.
     vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
   });
 
-  it("renders as a list item with name, repo, description and downloads", () => {
+  it("renders as a list item with name, repo, description and popularity", () => {
     const { container } = renderWithRouter(<SkillListRow skill={skill} />);
 
     expect(container.querySelector("li")).not.toBeNull();
@@ -38,9 +41,73 @@ describe("SkillListRow", () => {
     expect(
       screen.getByText("Read and merge PDF documents."),
     ).toBeInTheDocument();
-    // Compact download count, and deliberately no star count.
-    expect(screen.getByText("3M")).toBeInTheDocument();
+    // One blended figure inline; neither source count leaks into the row.
+    expect(screen.getByText(BLENDED)).toBeInTheDocument();
+    expect(screen.queryByText("3M")).not.toBeInTheDocument();
     expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
+  });
+
+  it("breaks the figure down into installs and stars on hover", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SkillListRow skill={skill} />);
+
+    await user.hover(screen.getByRole("button", { name: /^热度 / }));
+    const tip = await screen.findByRole("tooltip");
+
+    // Labelled, so the blend is never mistaken for a count of anything.
+    expect(within(tip).getByText("热度")).toHaveTextContent("热度");
+    expect(within(tip).getByText("712.4K")).toBeInTheDocument();
+    expect(within(tip).getByText("安装")).toBeInTheDocument();
+    expect(within(tip).getByText("3M")).toBeInTheDocument();
+    expect(within(tip).getByText("Star")).toBeInTheDocument();
+    expect(within(tip).getByText("169.6K")).toBeInTheDocument();
+  });
+
+  it("labels the figure with its breakdown for assistive tech", () => {
+    renderWithRouter(<SkillListRow skill={skill} />);
+
+    expect(
+      screen.getByRole("button", {
+        name: "热度 712.4K：安装 3M · Star 169.6K",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("reaches the same breakdown from the keyboard", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SkillListRow skill={skill} />);
+
+    // The metric is the row's first control, so one tab lands on it and the
+    // tooltip opens the same way it does for a pointer.
+    await user.tab();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("169.6K");
+  });
+
+  it("lets a missing count pull the blend down instead of hiding it", () => {
+    renderWithRouter(<SkillListRow skill={{ ...skill, downloads: 0 }} />);
+
+    // √(1 × 169601) − 1 = 411: an equal weighting has to show the absent side,
+    // rather than quietly falling back to the star count.
+    expect(screen.getByText("411")).toBeInTheDocument();
+    expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
+  });
+
+  it("renders 0 when neither count exists", () => {
+    renderWithRouter(
+      <SkillListRow skill={{ ...skill, downloads: 0, stars: 0 }} />,
+    );
+
+    expect(screen.getByText("0")).toBeInTheDocument();
+  });
+
+  it("shows a surface-provided metric instead of the blend", () => {
+    renderWithRouter(
+      <SkillListRow skill={skill} metric={<span>5K</span>} />,
+    );
+
+    // Leaderboards rank in their own unit, so they replace the metric whole.
+    expect(screen.getByText("5K")).toBeInTheDocument();
+    expect(screen.queryByText(BLENDED)).not.toBeInTheDocument();
   });
 
   it("keeps a missing description readable", () => {
@@ -104,14 +171,6 @@ describe("SkillListRow", () => {
     expect(screen.getByRole("button", { name: "查看 pdf 详情" })).toHaveClass(
       "ring-primary",
     );
-  });
-
-  it("renders downloads of 0 rather than hiding a missing metric", () => {
-    renderWithRouter(<SkillListRow skill={{ ...skill, downloads: 0 }} />);
-
-    expect(screen.getByText("0")).toBeInTheDocument();
-    // Stars never render, not even when the underlying data is present.
-    expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
   });
 
   it("wraps matched search tokens in <mark>", () => {

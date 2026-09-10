@@ -31,6 +31,8 @@ import type {
   SortOrder,
 } from "./protocol";
 import type { Skill, SkillProfile } from "../../types/skill";
+import { popularity } from "../popularity";
+import { formatCount } from "../utils";
 
 /** Deterministic skill factory; `i` varies name, repo and metrics. */
 function skill(i: number, over: Partial<Skill> = {}): Skill {
@@ -382,9 +384,11 @@ describe("createRegistryController — getPage", () => {
     expect(page0).toBeUndefined();
   });
 
-  it("sorts by downloads and by name with per-version caching", async () => {
+  it("sorts by popularity and by name with per-version caching", async () => {
     const t = setup({
-      skills: [skill(0), skill(1), skill(2)], // downloads 100, 99, 98
+      // Installs fall with the index (100, 99, 98) while stars rise (0, 1, 2),
+      // so the blended figure orders these three the opposite way round.
+      skills: [skill(0), skill(1), skill(2)],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
@@ -392,15 +396,15 @@ describe("createRegistryController — getPage", () => {
     t.controller.handle({
       type: "getPage",
       id: 1,
-      payload: { query: "", sort: "downloads", page: 0, pageSize: 3 },
+      payload: { query: "", sort: "popularity", page: 0, pageSize: 3 },
     });
-    const byDownloads = resultData<{ hits: Array<{ skill: Skill }> }>(
+    const byPopularity = resultData<{ hits: Array<{ skill: Skill }> }>(
       t.recorded.results[0],
     );
-    expect(byDownloads.hits.map((h) => h.skill.name)).toEqual([
-      "skill-0",
-      "skill-1",
+    expect(byPopularity.hits.map((h) => h.skill.name)).toEqual([
       "skill-2",
+      "skill-1",
+      "skill-0",
     ]);
 
     t.controller.handle({
@@ -722,7 +726,9 @@ describe("createRegistryController — getRanking", () => {
       "skill-0",
     ]);
     expect(data.entries.map((e) => e.rank)).toEqual([1, 2]);
-    expect(data.entries[0].label).toBe("1K");
+    // Upstream decides the order; the number is the row metric (1000 installs
+    // against 2 stars scores 54), not the install count.
+    expect(data.entries[0].label).toBe("54");
     expect(data.total).toBe(2);
   });
 
@@ -744,8 +750,13 @@ describe("createRegistryController — getRanking", () => {
     // Truncated to the page size, but counted in full.
     expect(data.entries).toHaveLength(100);
     expect(data.total).toBe(150);
-    expect(data.entries[0]).toMatchObject({ rank: 1, label: "150K" });
-    expect(data.entries[0].skill.name).toBe("skill-0");
+    // Each label is the row metric, and the ranks follow it descending. Which
+    // skill leads is the metric's business (see popularity.test.ts), so this
+    // asserts the wiring rather than one tie-prone name.
+    const values = data.entries.map((e) => popularity(e.skill));
+    expect(data.entries.map((e) => e.label)).toEqual(values.map(formatCount));
+    expect(values).toEqual([...values].toSorted((a, b) => b - a));
+    expect(data.entries[0]).toMatchObject({ rank: 1 });
     expect(data.entries[99]).toMatchObject({ rank: 100 });
   });
 
@@ -1061,7 +1072,7 @@ describe("createRegistryController — profiles", () => {
       id: 2,
       payload: {
         query: "skill-",
-        sort: "downloads",
+        sort: "popularity",
         page: 0,
         pageSize: 10,
         domain: "开发编程",

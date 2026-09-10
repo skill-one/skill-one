@@ -602,7 +602,7 @@ describe("ExplorePage", () => {
     expect(cardOrder()).toEqual(["widget-pack", "misc-tools", "docgen"]);
   });
 
-  it("ranks search results by install count among equally relevant matches", async () => {
+  it("ranks search results by popularity among equally relevant matches", async () => {
     const user = userEvent.setup();
     // Registry order: ["alpha-redis-clip", "beta-redis-tool"] — the same
     // sequence the name sort produces, and the opposite of the popularity one.
@@ -637,7 +637,7 @@ describe("ExplorePage", () => {
         );
 
     // Start from the name order, so the page is knowingly un-popular first.
-    await user.click(screen.getByRole("button", { name: "按下载量" }));
+    await user.click(screen.getByRole("button", { name: "按热度" }));
     await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
     expect(cardOrder()).toEqual(["alpha-redis-clip", "beta-redis-tool"]);
 
@@ -719,7 +719,7 @@ describe("ExplorePage", () => {
     expect(cardOrder()).toEqual(["beta", "gamma", "alpha"]);
 
     // The dropdown offers the two browsed-list orders and nothing else.
-    await user.click(screen.getByRole("button", { name: "按下载量" }));
+    await user.click(screen.getByRole("button", { name: "按热度" }));
     expect(
       screen.queryByRole("menuitemradio", { name: "默认排序" }),
     ).toBeNull();
@@ -728,7 +728,7 @@ describe("ExplorePage", () => {
 
     // The trigger label follows the active order, so it can be opened again.
     await user.click(screen.getByRole("button", { name: "按名称" }));
-    await user.click(screen.getByRole("menuitemradio", { name: "按下载量" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "按热度" }));
     expect(cardOrder()).toEqual(["beta", "gamma", "alpha"]);
   });
 
@@ -740,7 +740,7 @@ describe("ExplorePage", () => {
 
     // Choose a browsed-list order first, so the control's return is
     // distinguishable from a reset.
-    await user.click(screen.getByRole("button", { name: "按下载量" }));
+    await user.click(screen.getByRole("button", { name: "按热度" }));
     await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
 
     const input = screen.getByRole("textbox", { name: "搜索 Skill" });

@@ -29,16 +29,18 @@ import { SearchInput } from "../../components/search-input";
 
 /**
  * The sort orders offered by the toolbar dropdown; both are applied inside the
- * worker and order the *browsed* list. Downloads is the entry order — "most
- * installed first" is the reading a store visitor wants, and the registry index
- * order was never a choice worth exposing.
+ * worker and order the *browsed* list. Popularity is the entry order — "most
+ * wanted first" is the reading a store visitor wants, the registry index order
+ * was never a choice worth exposing, and a separate by-installs order would
+ * only split one metric into two competing definitions. The two counts behind
+ * the blend stay readable on every row's tooltip.
  *
  * A search is the exception: the worker answers it in relevance order, so the
  * dropdown is replaced by a read-only 相关度 pill rather than claiming an order
  * the results do not follow.
  */
 const SORT_OPTIONS: Array<{ value: SortOrder; label: string }> = [
-  { value: "downloads", label: "按下载量" },
+  { value: "popularity", label: "按热度" },
   { value: "name", label: "按名称" },
 ];
 
@@ -71,7 +73,7 @@ export function ExplorePage() {
   // Search text and sort order; any change invalidates the page/selection
   // because the result list (and the meaning of a row index) changes.
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortOrder>("downloads");
+  const [sort, setSort] = useState<SortOrder>("popularity");
   // Selected profile domain ("开发编程", ...); undefined browses all.
   const [domain, setDomain] = useState<string>();
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
