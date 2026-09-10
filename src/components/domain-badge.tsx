@@ -10,10 +10,11 @@ import {
 
 /**
  * A skill's profile-domain chip: the canonical emoji (from the dataset's
- * fixed taxonomy) next to the domain name, hovering to explain what the
- * category covers. The per-skill `reason` (why the generator picked this
- * domain) is the fallback tooltip content for a name the taxonomy no longer
- * knows, and decorates the description otherwise.
+ * fixed taxonomy) next to the domain name. Hovering answers the question a
+ * reader actually has — *why is this skill in that category* — so the
+ * per-skill `reason` is the tooltip content whenever the index carries
+ * one; the taxonomy's scope description only stands in for skills that
+ * lack a reason (or a reason for a name the taxonomy no longer knows).
  */
 export function DomainBadge({
   domain,
@@ -26,9 +27,11 @@ export function DomainBadge({
   className?: string;
 }) {
   const meta = domainMeta(domain);
-  const tooltip = meta
-    ? `${meta.emoji} ${meta.description}${reason ? ` —— ${reason}` : ""}`
-    : (reason ?? domain);
+  const tooltip = reason
+    ? `${meta ? `${meta.emoji} ` : ""}${reason}`
+    : meta
+      ? `${meta.emoji} ${meta.description}`
+      : domain;
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip>
