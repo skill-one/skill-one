@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 import { fetchSkillDetail, parseFrontmatter } from "./skill-detail-api";
+import { setIndexTag } from "./cdn-config";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -17,6 +18,7 @@ function notFound() {
 
 afterEach(() => {
   fetchMock.mockReset();
+  setIndexTag("");
 });
 
 describe("parseFrontmatter", () => {
@@ -147,6 +149,24 @@ describe("fetchSkillDetail", () => {
     expect(detail.path).toBe("skills/pdf/SKILL.md");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/skills/pdf/SKILL.md",
+      { signal: expect.anything() },
+    );
+  });
+
+  it("pins the fetch to the recorded snapshot tag instead of the dist branch", async () => {
+    setIndexTag("dist-2026-09-06");
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).endsWith("skills/pdf/SKILL.md")
+        ? ok("---\nname: pdf\n---\n\nBody")
+        : notFound(),
+    );
+
+    await fetchSkillDetail("anthropics/skills", "pdf", "skills/pdf");
+
+    // The recorded tag is the snapshot the served index was built from, so
+    // the SKILL.md body must come from exactly that snapshot.
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist-2026-09-06/skills/pdf/SKILL.md",
       { signal: expect.anything() },
     );
   });

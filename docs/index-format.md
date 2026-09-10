@@ -50,19 +50,20 @@ The run stats published beside the index are what make caching possible:
 
 ### Fetch strategy
 
-- The pointer is probed first, through the configurable download source (see [src/lib/cdn-config.ts](../src/lib/cdn-config.ts)) and **with a cache-busting stamp**: a mutable file that reports freshness must never be served from a cache, or an old snapshot looks current. At ~300 B, busting it costs nothing.
-- The body is then fetched at the derived `dist-<date>` tag (`…/skills-sh-mirror@dist-2026-09-06/skills.jsonl`). Tags are immutable per snapshot, so no busting is applied and a CDN edge copy is necessarily the right bytes. (A same-day re-run force-moves the tag to the newest snapshot; the changed `finishedAt` detects it and re-downloads.)
-- If no source advertises a usable date, the download falls back to the mutable `dist` ref — busted, because without a pin a day-old edge copy would be indistinguishable from the current index.
-- The parsed list plus its identity (`tag` + `finishedAt`) are persisted to IndexedDB. Next launch serves that cache immediately, then compares the probed stamp with the stored one: equal means the multi-megabyte body is not downloaded at all.
+- The snapshot version is resolved **from the repo's tags**: the newest `dist-<date>` tag is listed directly (GitHub's tags API first, the jsDelivr data API as a fallback — see `resolveLatestTag` in [index-stream.ts](../src/lib/registry/index-stream.ts)), so the download is addressed at the same tag upstream CI publishes. Both listing requests carry a **cache-busting stamp**: a mutable pointer that reports freshness must never be answered from a cache, or an old snapshot looks current.
+- `stats.json` is then read **pinned to that tag** — an immutable address, so no busting — for the publication stamp and row count. If it cannot be read, the tag alone still pins the body (only the "unchanged" short-circuit is lost). When no tag can be listed at all, the legacy path applies: `stats.json` on the mutable `dist` branch is probed cache-busted and its `finishedAt` derives the tag.
+- The body is fetched at the `dist-<date>` tag (`…/skills-sh-mirror@dist-2026-09-06/skills.jsonl`). Tags are immutable per snapshot, so no busting is applied and a CDN edge copy is necessarily the right bytes. (A same-day re-run force-moves the tag to the newest snapshot; the changed `finishedAt` detects it and re-downloads.)
+- If no tag and no stats could be resolved, the download falls back to the mutable `dist` ref — busted, because without a pin a day-old edge copy would be indistinguishable from the current index.
+- The parsed list plus its identity (`tag` + `finishedAt`) are persisted to IndexedDB, and the tag is recorded to localStorage (`skill-one.indexTag`) where it pins SKILL.md detail fetches and shows in Settings. Next launch serves that cache immediately, then compares the probed stamp with the stored one: equal means the multi-megabyte body is not downloaded at all.
 - `INDEX_SPEC` in [index-stream.ts](../src/lib/registry/index-stream.ts) pins `repo` / `path: "skills.jsonl"` / `ref: "dist"` (the ref above is supplied per download).
 - After parsing, ids that are not canonical GitHub ids (three segments, dot-free owner) are filtered out, and every row is mapped to the `Skill` model.
 - The download is streamed: the response body is decoded line by line and each line is parsed as soon as it arrives, so the UI never waits for the whole ~5.7MB file. Progress is pushed at most every 400ms, and the live buffer is rewound when a source fails mid-stream and the next candidate restarts the file — announced counts are therefore monotonic.
-- `trending.json` (the trending view's top-100 ids, in upstream rank order) is fetched concurrently with the download; the trending leaderboard and hero slide rank the registry by that order. An absent or unreachable list simply hides the section.
+- `trending.json` (the trending view's top-100 ids, in upstream rank order) is fetched pinned to the same snapshot tag once it is known, so the leaderboard is read from the same snapshot as the index. An absent or unreachable list simply hides the section.
 
 ### UI
 
 - The explore page renders progressively while the stream runs (the count reads "N · 加载中" until it finishes) and the sidebar's 全部 badge climbs with it.
 - Pages that need the whole registry — the featured page's leaderboards and curated joins, and My Skills' metadata join — gate on completion and keep their skeleton until the stream finishes, because partial data would rank the wrong skills.
-- Settings reports the served snapshot (`dist-<date>` tag, publication time, published row count) and whether this launch downloaded it or reused the local copy; its button forces a re-download even when the run has not moved.
+- Settings reports the served snapshot (`dist-<date>` tag, publication time, published row count) and whether this launch downloaded it or reused the local copy; until the live identity arrives it falls back to the recorded tag. Its button forces a re-download even when the run has not moved.
 
-A skill's `SKILL.md` is fetched from the mirror snapshot at `skills/{id}/SKILL.md`; see [src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts).
+A skill's `SKILL.md` is fetched from the mirror snapshot at `skills/{id}/SKILL.md`, pinned to the recorded snapshot tag when one exists (the mutable `dist` branch otherwise); see [src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts).

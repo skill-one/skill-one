@@ -7,7 +7,9 @@ import {
   fetchFirstStreamInOrder,
   fetchFirstText,
   getCdnBase,
+  getIndexTag,
   setCdnBase,
+  setIndexTag,
 } from "./cdn-config";
 
 const ORIGIN =
@@ -27,6 +29,7 @@ function bad() {
 afterEach(() => {
   fetchMock.mockReset();
   setCdnBase("");
+  setIndexTag("");
 });
 
 const spec = { repo: "anthropics/skills", path: "skills/pdf/SKILL.md" };
@@ -64,6 +67,16 @@ describe("getCdnBase / setCdnBase", () => {
     expect(getCdnBase()).toBe("");
     setCdnBase("  https://cdn.example.com  ");
     expect(getCdnBase()).toBe("https://cdn.example.com");
+  });
+});
+
+describe("getIndexTag / setIndexTag", () => {
+  it("records the served snapshot tag and clears it with an empty value", () => {
+    expect(getIndexTag()).toBe("");
+    setIndexTag("  dist-2026-09-06  ");
+    expect(getIndexTag()).toBe("dist-2026-09-06");
+    setIndexTag("");
+    expect(getIndexTag()).toBe("");
   });
 });
 

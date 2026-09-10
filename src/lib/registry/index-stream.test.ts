@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { DEFAULT_CDN_BASE, SourceFetchError } from "../cdn-config";
-import { probeIndexMeta, readIndex, readLines, readTrending } from "./index-stream";
+import {
+  probeIndexMeta,
+  readIndex,
+  readLines,
+  readTrending,
+  resolveLatestTag,
+} from "./index-stream";
 
 /** Chunk a string into UTF-8 byte segments of the given size. */
 function chunksOf(text: string, size: number): Uint8Array[] {
@@ -53,12 +59,91 @@ describe("readLines", () => {
   });
 });
 
+/** Tag-listing endpoints, in probe order. */
+const GITHUB_TAGS =
+  "https://api.github.com/repos/skill-one/skills-sh-mirror/tags?per_page=5";
+const GITHUB_TAGS_BASE = GITHUB_TAGS.split("?")[0];
+const JSDELIVR_TAGS =
+  "https://data.jsdelivr.com/v1/packages/gh/skill-one/skills-sh-mirror";
+
+describe("resolveLatestTag", () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the newest dist-<date> tag from the GitHub tags API", async () => {
+    fetchMock.mockImplementation(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { name: "dist-2026-09-09", commit: { sha: "c38455a" } },
+        { name: "dist-2026-09-08" },
+        { name: "not-a-snapshot" },
+      ],
+    }) as unknown as Response);
+
+    await expect(resolveLatestTag()).resolves.toBe("dist-2026-09-09");
+    // The listing is a mutable freshness pointer: fetched cache-busted.
+    expect(fetchMock.mock.calls[0][0]).toMatch(
+      new RegExp(`^${GITHUB_TAGS.replace("?", "\\?")}[&]t=`),
+    );
+  });
+
+  it("falls back to the jsDelivr data API when GitHub is unreachable", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(GITHUB_TAGS)) throw new TypeError("network down");
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          versions: [
+            { version: "dist-2026-09-08" },
+            { version: "dist-2026-09-07" },
+          ],
+        }),
+      } as unknown as Response;
+    });
+
+    await expect(resolveLatestTag()).resolves.toBe("dist-2026-09-08");
+  });
+
+  it("ignores listings without a dist-<date> tag", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(GITHUB_TAGS)) return { ok: false, status: 404 };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ versions: [{ version: "v1.2.3" }] }),
+      } as unknown as Response;
+    });
+
+    await expect(resolveLatestTag()).resolves.toBeNull();
+  });
+
+  it("returns null when no endpoint answers", async () => {
+    fetchMock.mockRejectedValue(new TypeError("network down"));
+    await expect(resolveLatestTag()).resolves.toBeNull();
+  });
+});
+
 describe("probeIndexMeta", () => {
   // Candidate URLs as produced by `fileCandidates(META_SPEC, "")`: the direct
   // GitHub origin first, the default CDN mirror second.
   const ORIGIN_STATS =
     "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/stats.json";
   const CDN_STATS = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-mirror@dist/stats.json`;
+
+  const TAG = "dist-2026-09-06";
+  // Tag-pinned stats candidates: immutable, so no busting is needed.
+  const PINNED_STATS_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-sh-mirror/${TAG}/stats.json`;
+  const PINNED_STATS_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-mirror@${TAG}/stats.json`;
 
   const fetchMock = vi.fn();
 
@@ -86,20 +171,63 @@ describe("probeIndexMeta", () => {
     vi.stubGlobal("fetch", fetchMock);
     fetchMock.mockReset();
     requested = [];
-    fetchMock.mockImplementation(async (url: string) => {
-      requested.push(url.split("?")[0]);
-      return statsResponse(PUBLISHED);
-    });
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("derives the snapshot identity and tag from the run stats", async () => {
-    const published = await probeIndexMeta("");
+  /** Make both tag-listing endpoints unreachable (legacy fallback path). */
+  function withoutTagListing() {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(GITHUB_TAGS) || url.startsWith(JSDELIVR_TAGS)) {
+        throw new TypeError("network down");
+      }
+      requested.push(url.split("?")[0]);
+      return statsResponse(PUBLISHED);
+    });
+  }
 
-    expect(published).toEqual({
+  it("resolves the snapshot from the latest tag and reads the stats pinned to it", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      requested.push(url.split("?")[0]);
+      if (url.startsWith(GITHUB_TAGS)) {
+        return statsResponse([{ name: TAG }]);
+      }
+      return statsResponse(PUBLISHED);
+    });
+
+    expect(await probeIndexMeta("")).toEqual({
+      tag: TAG,
+      generatedAt: "2026-09-06T15:32:29.423Z",
+      total: 8945,
+    });
+    // The listing is busted; the pinned stats are not — the tag makes the
+    // URL immutable, so the origin answering means the CDN is never asked.
+    expect(requested).toEqual([GITHUB_TAGS_BASE, PINNED_STATS_ORIGIN]);
+  });
+
+  it("pins the tag even when the stats cannot be read", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      requested.push(url.split("?")[0]);
+      if (url.startsWith(GITHUB_TAGS)) return statsResponse([{ name: TAG }]);
+      return { ok: false, status: 404 } as unknown as Response;
+    });
+
+    // The tag alone still pins the body download; only the stamp/count are
+    // unknown, which costs the caller its "unchanged" short-circuit.
+    expect(await probeIndexMeta("")).toEqual({ tag: TAG });
+    expect(requested).toEqual([
+      GITHUB_TAGS_BASE,
+      PINNED_STATS_ORIGIN,
+      PINNED_STATS_CDN,
+    ]);
+  });
+
+  it("falls back to the mutable-branch probe when no tag can be resolved", async () => {
+    withoutTagListing();
+
+    expect(await probeIndexMeta("")).toEqual({
       tag: "dist-2026-09-06",
       generatedAt: "2026-09-06T15:32:29.423Z",
       total: 8945,
@@ -108,9 +236,15 @@ describe("probeIndexMeta", () => {
     expect(requested).toEqual([ORIGIN_STATS]);
   });
 
-  it("busts the CDN cache on every pointer request", async () => {
+  it("busts the CDN cache on every legacy pointer request", async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(ORIGIN_STATS)) throw new TypeError("network down");
+      if (
+        url.startsWith(GITHUB_TAGS) ||
+        url.startsWith(JSDELIVR_TAGS) ||
+        url.startsWith(ORIGIN_STATS)
+      ) {
+        throw new TypeError("network down");
+      }
       requested.push(url);
       return statsResponse(PUBLISHED);
     });
@@ -122,22 +256,29 @@ describe("probeIndexMeta", () => {
     expect(requested[0].startsWith(`${CDN_STATS}?t=`)).toBe(true);
   });
 
-  it("pins nothing when the finished stamp is not a UTC date", async () => {
+  it("pins nothing from a finished stamp that is not a UTC date", async () => {
     // Anything interpolated into a URL must be a `dist-<date>` tag the
     // upstream CI actually creates; junk would build a bogus address, so it
     // degrades to the branch fallback instead.
-    fetchMock.mockImplementation(async () =>
-      statsResponse({ ...PUBLISHED, finishedAt: "../../evil" }),
-    );
+    withoutTagListing();
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(GITHUB_TAGS) || url.startsWith(JSDELIVR_TAGS)) {
+        throw new TypeError("network down");
+      }
+      return statsResponse({ ...PUBLISHED, finishedAt: "../../evil" });
+    });
     const published = await probeIndexMeta("");
     expect(published?.tag).toBeUndefined();
     expect(published?.generatedAt).toBe("../../evil");
   });
 
   it("accepts a stamp-less stats file from a source lagging behind the format", async () => {
-    fetchMock.mockImplementation(async () =>
-      statsResponse({ startedAt: "2026-08-31T04:34:54Z" }),
-    );
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(GITHUB_TAGS) || url.startsWith(JSDELIVR_TAGS)) {
+        throw new TypeError("network down");
+      }
+      return statsResponse({ startedAt: "2026-08-31T04:34:54Z" });
+    });
     expect(await probeIndexMeta("")).toEqual({
       tag: undefined,
       generatedAt: undefined,
@@ -147,6 +288,9 @@ describe("probeIndexMeta", () => {
 
   it("walks to the next source when one is unreachable", async () => {
     fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(GITHUB_TAGS) || url.startsWith(JSDELIVR_TAGS)) {
+        throw new TypeError("network down");
+      }
       requested.push(url.split("?")[0]);
       if (url.startsWith(ORIGIN_STATS)) return { ok: false, status: 503 };
       return statsResponse(PUBLISHED);
@@ -164,7 +308,12 @@ describe("probeIndexMeta", () => {
   });
 
   it("returns null on a body that is not a JSON object", async () => {
-    fetchMock.mockImplementation(async () => statsResponse("<html>"));
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith(GITHUB_TAGS) || url.startsWith(JSDELIVR_TAGS)) {
+        throw new TypeError("network down");
+      }
+      return statsResponse("<html>");
+    });
     await expect(probeIndexMeta("")).resolves.toBeNull();
   });
 });
@@ -172,6 +321,8 @@ describe("probeIndexMeta", () => {
 describe("readTrending", () => {
   const ORIGIN_TRENDING =
     "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/trending.json";
+  const TAG = "dist-2026-09-06";
+  const PINNED_TRENDING = `https://raw.githubusercontent.com/skill-one/skills-sh-mirror/${TAG}/trending.json`;
 
   const fetchMock = vi.fn();
 
@@ -184,7 +335,7 @@ describe("readTrending", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns the id list cache-busted", async () => {
+  it("returns the id list cache-busted from the mutable branch", async () => {
     const ids = ["a/b/c", "d/e/f"];
     fetchMock.mockImplementation(async () => {
       return {
@@ -196,6 +347,21 @@ describe("readTrending", () => {
 
     expect(await readTrending("")).toEqual(ids);
     expect(fetchMock.mock.calls[0][0]).toMatch(`${ORIGIN_TRENDING}?t=`);
+  });
+
+  it("pins the fetch to the snapshot tag without busting", async () => {
+    const ids = ["a/b/c"];
+    fetchMock.mockImplementation(async () => {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ids,
+      } as unknown as Response;
+    });
+
+    expect(await readTrending("", TAG)).toEqual(ids);
+    // The tag-addressed URL is immutable: fetched untouched, no bust stamp.
+    expect(fetchMock.mock.calls[0][0]).toBe(PINNED_TRENDING);
   });
 
   it("returns null when every source fails or serves a malformed list", async () => {

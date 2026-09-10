@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "../../components/theme-provider";
 import { SettingsPage } from "./settings-page";
 import type { IndexInfo } from "../../lib/registry/protocol";
+import { setIndexTag } from "../../lib/cdn-config";
 
 /** Snapshot the mocked registry hook reports; per-test overrides apply next. */
 const stats = vi.hoisted(() => ({
@@ -50,6 +51,7 @@ describe("SettingsPage", () => {
   afterEach(() => {
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
+    setIndexTag("");
   });
 
   it("hosts the appearance picker alongside the CDN settings", () => {
@@ -82,6 +84,15 @@ describe("SettingsPage", () => {
 
     expect(screen.getAllByText("未知")).toHaveLength(3);
     expect(screen.getByText("索引尚未就绪")).toBeInTheDocument();
+  });
+
+  it("shows the recorded snapshot tag when the live identity has not arrived", () => {
+    // The registry client persists the served tag; a fresh session reads it
+    // back before the first index event lands.
+    setIndexTag("dist-2026-09-06");
+    renderSettings();
+
+    expect(screen.getByText("dist-2026-09-06")).toBeInTheDocument();
   });
 
   it("shows the 软件更新 card with a manual check control", () => {

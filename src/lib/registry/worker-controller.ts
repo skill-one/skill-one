@@ -61,10 +61,12 @@ export interface ControllerDeps {
     onRestart: () => void,
   ): Promise<void>;
   /**
-   * Fetch the trending view's id list (skills.sh's trending rank). Null when
-   * unavailable — a garnish, never a download failure.
+   * Fetch the trending view's id list (skills.sh's trending rank). Called
+   * with the resolved snapshot tag so the leaderboard is read from the same
+   * snapshot as the index. Null when unavailable — a garnish, never a
+   * download failure.
    */
-  readTrending(cdnBase: string): Promise<string[] | null>;
+  readTrending(cdnBase: string, tag?: string): Promise<string[] | null>;
   /** Cold-start cache; every method may silently no-op. */
   cache: RegistryCache;
   /** Clock for progress throttling, injectable for tests. */
@@ -166,29 +168,30 @@ export function createRegistryController(
   };
 
   /**
-   * Bring the served dataset up to date. The published stats are probed
-   * first (~300 B); only a differing run downloads the body, which is then
-   * streamed into a fresh buffer while any data already being served
-   * (cold-start cache, previous source) stays visible and queryable — a
-   * revalidation never blanks the UI.
+   * Bring the served dataset up to date. The published snapshot is probed
+   * first (its tag listed, then the ~300 B stats read pinned to that tag);
+   * only a differing run downloads the body, which is then streamed into a
+   * fresh buffer while any data already being served (cold-start cache,
+   * previous source) stays visible and queryable — a revalidation never
+   * blanks the UI.
    *
-   * The trending id list is fetched concurrently with the probe so its
-   * latency hides inside the multi-megabyte body download; it is awaited
-   * before `ready` is announced, so featured/ranking queries never race it.
-   * Its failure only trims the trending leaderboard, never the dataset.
+   * The trending id list is fetched once the tag is known, so its latency
+   * hides inside the multi-megabyte body download; it is awaited before
+   * `ready` is announced, so featured/ranking queries never race it. Its
+   * failure only trims the trending leaderboard, never the dataset.
    *
    * `force` skips the "unchanged" short-circuit: a source switch or a user
    * retry must re-download even when the published run has not moved.
    */
   const download = async (gen: number, force = false) => {
-    // Started before the probe so its latency hides inside the body download;
-    // the result is only assigned at the landing points below, so an early
-    // resolution can never be clobbered by the partial-buffer reset.
-    const trending = deps.readTrending(cdnBase).catch(() => null);
     // Null means no source answered: nothing to pin, nothing to compare.
     const published = await deps.probeMeta(cdnBase);
     if (gen !== generation) return;
     const tag = published?.tag;
+    // Started before the body download so its latency hides inside it; the
+    // result is only assigned at the landing points below, so an early
+    // resolution can never be clobbered by the partial-buffer reset.
+    const trending = deps.readTrending(cdnBase, tag).catch(() => null);
     const identity = { tag, generatedAt: published?.generatedAt };
     const total = published?.total;
 

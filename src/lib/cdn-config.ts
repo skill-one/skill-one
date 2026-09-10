@@ -7,12 +7,21 @@
  * same host the app already uses). The user can configure a custom CDN base in
  * Settings, which is then tried first (with the direct origin and the default
  * CDN as fallbacks). A configured CDN base is persisted to localStorage.
+ *
+ * Besides the CDN base, this module also records the snapshot tag of the
+ * registry index currently in use (`getIndexTag` / `setIndexTag`). The tag is
+ * written by the registry client whenever the worker announces the snapshot it
+ * serves, and is read back to pin SKILL.md detail fetches — and displayed in
+ * Settings — to the same snapshot the index was built from.
  */
 
 /** Default CDN mirror of GitHub repo files (jsDelivr mirror, CORS-enabled). */
 export const DEFAULT_CDN_BASE = "https://cdn.jsdmirror.com";
 
 const SETTINGS_KEY = "skill-one.cdn";
+
+/** localStorage key for the served registry snapshot tag (`dist-<date>`). */
+const INDEX_TAG_KEY = "skill-one.indexTag";
 
 // Persist via `window.localStorage` where available, with an in-memory fallback
 // so reads still work in environments without a storage backend (e.g. Vitest's
@@ -57,6 +66,20 @@ export function getCdnBase(): string {
 /** Persist the configured CDN base (empty = disabled). */
 export function setCdnBase(value: string): void {
   writeStored(SETTINGS_KEY, value.trim());
+}
+
+/**
+ * The registry snapshot tag (`dist-<date>`) currently recorded, or "" before
+ * any snapshot has been served. Used to pin SKILL.md detail fetches to the
+ * same snapshot the index was built from, and shown in Settings.
+ */
+export function getIndexTag(): string {
+  return readStored(INDEX_TAG_KEY);
+}
+
+/** Record the served registry snapshot tag (empty = clear). */
+export function setIndexTag(value: string): void {
+  writeStored(INDEX_TAG_KEY, value.trim());
 }
 
 /** Direct GitHub raw URL. No ref → default branch (`HEAD`). */

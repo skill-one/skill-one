@@ -1,4 +1,4 @@
-import { getCdnBase } from "../cdn-config";
+import { getCdnBase, setIndexTag } from "../cdn-config";
 import type {
   FeaturedData,
   IndexInfo,
@@ -90,6 +90,11 @@ function onMessage(message: RegistryWorkerMessage) {
     };
     emit();
   } else if (message.type === "index") {
+    // Record the served snapshot tag: it pins SKILL.md detail fetches (and
+    // the Settings read-out) to the same snapshot the index was built from.
+    // A null info (a failed download with nothing served) keeps the last
+    // good tag rather than un-pinning known-good data.
+    if (message.info?.tag) setIndexTag(message.info.tag);
     snapshot = { ...snapshot, index: message.info };
     emit();
   } else if (message.type === "error") {

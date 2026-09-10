@@ -2,18 +2,34 @@ import { parse as parseYaml } from "yaml";
 
 import type { SkillDetail } from "../types/skill";
 import { errorMessage } from "./utils";
-import { SourceFetchError, fetchFirstText, fileCandidates } from "./cdn-config";
+import {
+  SourceFetchError,
+  fetchFirstText,
+  fileCandidates,
+  getIndexTag,
+} from "./cdn-config";
 
 /**
  * The skills-sh-mirror repo mirrors every indexed skill's full files on its
  * `dist` branch — the same snapshot the registry index was built from. The
  * index and the mirror are guaranteed to match (a row exists if and only if
  * its directory exists), so a registry-known path resolves in one request.
+ *
+ * Detail fetches are pinned to the snapshot tag recorded by the registry
+ * client (`getIndexTag`) whenever it can, so the SKILL.md body is read from
+ * exactly the snapshot the served index describes; without a recorded tag
+ * the mutable `dist` branch is used.
  */
 export const MIRROR = {
   repo: "skill-one/skills-sh-mirror",
+  /** Fallback ref when no snapshot tag has been recorded yet. */
   ref: "dist",
 } as const;
+
+/** The ref detail fetches are pinned to: the recorded tag, or `dist`. */
+function mirrorRef(): string {
+  return getIndexTag() || MIRROR.ref;
+}
 
 /** Frontmatter fields surfaced in the detail view. */
 const FRONTMATTER_FIELDS = [
@@ -52,7 +68,7 @@ export async function fetchSkillDetail(
   const path = `${knownPath.replace(/\/+$/, "")}/SKILL.md`;
   try {
     const { text } = await fetchFirstText(
-      fileCandidates({ repo: MIRROR.repo, ref: MIRROR.ref, path }),
+      fileCandidates({ repo: MIRROR.repo, ref: mirrorRef(), path }),
     );
     return toDetail(text, skillId, path);
   } catch (err) {

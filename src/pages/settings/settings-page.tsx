@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 import {
   DEFAULT_CDN_BASE,
   getCdnBase,
+  getIndexTag,
   setCdnBase,
 } from "../../lib/cdn-config";
 import { reloadRegistry } from "../../lib/registry/client";
@@ -54,11 +55,13 @@ export function SettingsPage() {
   };
 
   // Facts about the snapshot the store is actually serving. The `dist-<date>`
-  // tag is short enough to display whole and to diff against a release.
+  // tag is short enough to display whole and to diff against a release. The
+  // recorded tag (persisted by the registry client) stands in until the live
+  // snapshot identity arrives, so a fresh session still names its snapshot.
   const indexRows = [
     {
       term: "索引版本",
-      value: index?.tag ?? "未知",
+      value: index?.tag ?? (getIndexTag() || "未知"),
     },
     { term: "发布于", value: formatIndexTime(index?.generatedAt) },
     { term: "条目数", value: formatTotal(index?.total) },
@@ -76,142 +79,148 @@ export function SettingsPage() {
         Skill One v{__APP_VERSION__}
       </p>
 
-      <div className="mt-6 flex flex-col gap-4">
-        <div className="rounded-xl border border-border/70 bg-card p-4">
-          <h3 className="text-[13px] font-medium text-foreground">外观</h3>
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            选择应用的配色方案，「跟随系统」会随系统外观设置自动切换。
-          </p>
-          <div className="mt-3">
-            <ThemeModeToggle />
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border/70 bg-card p-4">
-          <div className="flex items-baseline justify-between gap-3">
-            <div>
-              <h3 className="text-[13px] font-medium text-foreground">
-                软件更新
-              </h3>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                启动时自动检查新版本（GitHub Releases，签名校验后安装），也可手动检查。
-              </p>
+      {/* The cards scroll while the header stays put, like every other
+          page's list region. The symmetric 12px horizontal padding (offset
+          by matching negative margins) reserves room for the macOS-style
+          overlay scrollbar at the same edge as the store pages. */}
+      <div className="-mx-3 mt-6 min-h-0 flex-1 overflow-y-auto px-3 pb-6">
+        <div className="flex flex-col gap-4">
+          <div className="rounded-xl border border-border/70 bg-card p-4">
+            <h3 className="text-[13px] font-medium text-foreground">外观</h3>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              选择应用的配色方案，「跟随系统」会随系统外观设置自动切换。
+            </p>
+            <div className="mt-3">
+              <ThemeModeToggle />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              disabled={update.phase === "checking"}
-              onClick={() => void update.check()}
-            >
-              {update.phase === "checking" ? "正在检查…" : "检查更新"}
-            </Button>
           </div>
-          {update.phase === "upToDate" && (
-            <p className="mt-2 flex items-center gap-1 text-[12px] text-primary">
-              <Check className="h-3.5 w-3.5" />
-              已是最新版本。
-            </p>
-          )}
-          {update.phase === "available" && (
-            <p className="mt-2 text-[12px] text-primary">
-              发现新版本 v{update.version}，可在更新弹窗中安装。
-            </p>
-          )}
-          {update.phase === "error" && (
-            <p role="alert" className="mt-2 text-[12px] text-destructive">
-              {update.error}
-            </p>
-          )}
-        </div>
 
-        <div className="rounded-xl border border-border/70 bg-card p-4">
-          <div className="flex items-baseline justify-between gap-3">
-            <label
-              htmlFor="cdn-base"
-              className="block text-[13px] font-medium text-foreground"
-            >
-              CDN 基址
-            </label>
-            {saved && (
-              <span className="flex items-center gap-1 text-[12px] text-primary">
+          <div className="rounded-xl border border-border/70 bg-card p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <div>
+                <h3 className="text-[13px] font-medium text-foreground">
+                  软件更新
+                </h3>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  启动时自动检查新版本（GitHub
+                  Releases，签名校验后安装），也可手动检查。
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                disabled={update.phase === "checking"}
+                onClick={() => void update.check()}
+              >
+                {update.phase === "checking" ? "正在检查…" : "检查更新"}
+              </Button>
+            </div>
+            {update.phase === "upToDate" && (
+              <p className="mt-2 flex items-center gap-1 text-[12px] text-primary">
                 <Check className="h-3.5 w-3.5" />
-                已保存
-              </span>
+                已是最新版本。
+              </p>
+            )}
+            {update.phase === "available" && (
+              <p className="mt-2 text-[12px] text-primary">
+                发现新版本 v{update.version}，可在更新弹窗中安装。
+              </p>
+            )}
+            {update.phase === "error" && (
+              <p role="alert" className="mt-2 text-[12px] text-destructive">
+                {update.error}
+              </p>
             )}
           </div>
-          <p className="mb-3 mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            留空 = 优先直连 GitHub（
-            <span className="font-mono">raw.githubusercontent.com</span>
-            ），连不上时回退到默认 CDN。填入自定义值后将优先使用它。
-          </p>
-          <Input
-            id="cdn-base"
-            value={value}
-            placeholder={DEFAULT_CDN_BASE}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setSaved(false);
-            }}
-          />
-          <p className="mt-2 text-[12px] text-muted-foreground">
-            示例：直连 GitHub 留空；默认 CDN 为{" "}
-            <span className="font-mono">{DEFAULT_CDN_BASE}</span>
-          </p>
-        </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => apply("")}
-          >
-            直连 GitHub
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => apply(DEFAULT_CDN_BASE)}
-          >
-            使用默认 CDN
-          </Button>
-          <Button size="sm" onClick={() => apply(value)}>
-            保存
-          </Button>
-        </div>
-
-        <div className="rounded-xl border border-border/70 bg-card p-4">
-          <div className="flex items-baseline justify-between gap-3">
-            <div>
-              <h3 className="text-[13px] font-medium text-foreground">
-                技能索引
-              </h3>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                商店数据来自 skill-one/skills-sh-mirror 发布的每日快照
-                （skills.sh 全量榜单）。快照按日期标签定址：版本未变时启动直接复用本地缓存，
-                不再下载全量数据。
-              </p>
+          <div className="rounded-xl border border-border/70 bg-card p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <label
+                htmlFor="cdn-base"
+                className="block text-[13px] font-medium text-foreground"
+              >
+                CDN 基址
+              </label>
+              {saved && (
+                <span className="flex items-center gap-1 text-[12px] text-primary">
+                  <Check className="h-3.5 w-3.5" />
+                  已保存
+                </span>
+              )}
             </div>
+            <p className="mb-3 mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              留空 = 优先直连 GitHub（
+              <span className="font-mono">raw.githubusercontent.com</span>
+              ），连不上时回退到默认 CDN。填入自定义值后将优先使用它。
+            </p>
+            <Input
+              id="cdn-base"
+              value={value}
+              placeholder={DEFAULT_CDN_BASE}
+              onChange={(e) => {
+                setValue(e.target.value);
+                setSaved(false);
+              }}
+            />
+            <p className="mt-2 text-[12px] text-muted-foreground">
+              示例：直连 GitHub 留空；默认 CDN 为{" "}
+              <span className="font-mono">{DEFAULT_CDN_BASE}</span>
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => apply("")}>
+              直连 GitHub
+            </Button>
             <Button
               variant="outline"
               size="sm"
-              className="shrink-0"
-              onClick={() => reloadRegistry()}
+              onClick={() => apply(DEFAULT_CDN_BASE)}
             >
-              立即重新下载
+              使用默认 CDN
+            </Button>
+            <Button size="sm" onClick={() => apply(value)}>
+              保存
             </Button>
           </div>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
-            {indexRows.map(({ term, value: detail }) => (
-              <div key={term} className="contents">
-                <dt className="text-muted-foreground">{term}</dt>
-                <dd className="min-w-0 break-all text-foreground">{detail}</dd>
+
+          <div className="rounded-xl border border-border/70 bg-card p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <div>
+                <h3 className="text-[13px] font-medium text-foreground">
+                  技能索引
+                </h3>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  商店数据来自 skill-one/skills-sh-mirror 发布的每日快照
+                  （skills.sh 全量榜单）。快照通过仓库最新的 dist-日期
+                  标签（tag） 定址下载，并在本地记录当前使用的标签：
+                  版本未变时启动直接复用缓存，不再下载全量数据。
+                </p>
               </div>
-            ))}
-          </dl>
-          <p className="mt-2 text-[12px] text-muted-foreground">
-            {index ? INDEX_ORIGIN_LABEL[index.origin] : "索引尚未就绪"}
-          </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => reloadRegistry()}
+              >
+                立即重新下载
+              </Button>
+            </div>
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
+              {indexRows.map(({ term, value: detail }) => (
+                <div key={term} className="contents">
+                  <dt className="text-muted-foreground">{term}</dt>
+                  <dd className="min-w-0 break-all text-foreground">
+                    {detail}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-2 text-[12px] text-muted-foreground">
+              {index ? INDEX_ORIGIN_LABEL[index.origin] : "索引尚未就绪"}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -227,5 +236,7 @@ function formatIndexTime(iso?: string): string {
 
 /** Digits with thousands separators; a published count should not be fuzzy. */
 function formatTotal(total?: number): string {
-  return total === undefined ? "未知" : new Intl.NumberFormat("en").format(total);
+  return total === undefined
+    ? "未知"
+    : new Intl.NumberFormat("en").format(total);
 }
