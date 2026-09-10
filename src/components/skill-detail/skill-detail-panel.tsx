@@ -226,6 +226,24 @@ export function SkillDetailPanel({
             )}
           </div>
         )}
+        {shown?.profile && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <Badge
+              variant="outline"
+              title={shown.profile.reason ?? shown.profile.domain}
+            >
+              {shown.profile.domain}
+            </Badge>
+            {shown.profile.persona?.role && (
+              <span
+                className="text-[12px] text-muted-foreground"
+                title="skills-profiles 为该技能生成的职业画像"
+              >
+                {shown.profile.persona.role}
+              </span>
+            )}
+          </div>
+        )}
       </DrawerHeader>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -255,6 +273,14 @@ export function SkillDetailPanel({
             {description && (
               <p className="whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground">
                 {description}
+              </p>
+            )}
+            {shown?.profile?.persona?.scene && (
+              <p
+                className="text-[12px] italic leading-relaxed text-muted-foreground/80"
+                title="skills-profiles 为该技能生成的使用场景画像"
+              >
+                “{shown.profile.persona.scene}”
               </p>
             )}
             <div>

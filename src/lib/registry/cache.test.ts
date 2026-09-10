@@ -36,15 +36,15 @@ describe("createRegistryCache", () => {
 
     await cache.save(skills, {
       tag: "dist-2026-09-01",
-      
       generatedAt: "2026-09-01T14:25:32Z",
+      profilesAt: "2026-09-10T07:22:00Z",
     });
     const loaded = await cache.load();
     expect(loaded?.skills).toEqual(skills);
     expect(loaded).toMatchObject({
       tag: "dist-2026-09-01",
-      
       generatedAt: "2026-09-01T14:25:32Z",
+      profilesAt: "2026-09-10T07:22:00Z",
     });
     // When the record was written is kept for display, never for comparison.
     expect(loaded?.fetchedAt).toBeGreaterThan(0);

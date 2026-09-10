@@ -27,6 +27,7 @@ export function useRegistryPage(
   page: number,
   pageSize: number,
   repo?: string,
+  domain?: string,
 ) {
   const queryClient = useQueryClient();
   const seenEpoch = useRef(getRegistrySnapshot().epoch);
@@ -56,11 +57,12 @@ export function useRegistryPage(
     queryKey: [
       REGISTRY_PAGE_QUERY_PREFIX,
       repo ?? null,
+      domain ?? null,
       query,
       sort,
       page,
       pageSize,
     ],
-    queryFn: () => getPage({ query, sort, page, pageSize, repo }),
+    queryFn: () => getPage({ query, sort, page, pageSize, repo, domain }),
   });
 }

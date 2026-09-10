@@ -779,6 +779,37 @@ describe("ExplorePage", () => {
     ).toHaveAttribute("aria-disabled", "true");
   });
 
+  it("filters the list by the selected profile domain", async () => {
+    const user = userEvent.setup();
+    harness.reset();
+    harness.init();
+    harness.pushAll(makeSkills(6, 0));
+    harness.complete();
+    // Profiles land with the same boot; the domain list settles once the
+    // index is rebuilt over the decorated skills.
+    harness.publishProfiles({
+      "repo-0/skills/skill-0": { domain: "开发编程" },
+      "repo-1/skills/skill-1": { domain: "内容创作" },
+    });
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    // Before the profiles land the menu is still the placeholder.
+    await user.click(screen.getByRole("button", { name: "分类" }));
+    await user.click(screen.getByRole("menuitemradio", { name: /开发编程/ }));
+
+    // The worker filters by domain: one matching skill, one page.
+    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
+    expect(screen.getByText("skill-0")).toBeInTheDocument();
+    expect(screen.queryByText("skill-1")).not.toBeInTheDocument();
+
+    // The trigger reflects the active filter; 全部 restores the registry.
+    await user.click(screen.getByRole("button", { name: "开发编程" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "全部" }));
+    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
+    expect(screen.getByText("skill-1")).toBeInTheDocument();
+  });
+
   it("opens the detail panel when a row is clicked", async () => {
     const user = userEvent.setup();
     bootRegistry(50);

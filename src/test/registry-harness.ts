@@ -1,5 +1,6 @@
 import { createRegistryController } from "../lib/registry/worker-controller";
 import type {
+  DomainInfo,
   FeaturedData,
   PageData,
   PageRequest,
@@ -12,7 +13,7 @@ import type {
 } from "../lib/registry/protocol";
 import type { RegistrySnapshot } from "../lib/registry/client";
 import type { PublishedIndex } from "../lib/registry/index-stream";
-import type { Skill } from "../types/skill";
+import type { Skill, SkillProfile } from "../types/skill";
 
 /**
  * In-memory stand-in for the registry worker, driven by the real controller:
@@ -46,6 +47,11 @@ export interface RegistryHarness {
   readonly pinnedTag: string | undefined;
   /** Advertise the trending id list the fake source serves (null = missing). */
   publishTrending(ids: string[] | null): void;
+  /**
+   * Advertise the profiles dataset the fake source serves, keyed by the
+   * canonical skills.sh id (null = file unreachable).
+   */
+  publishProfiles(profiles: Record<string, SkillProfile> | null): void;
   /** Make every RPC reject (worker crash stand-in) until cleared. */
   setRpcError(err: Error | null): void;
   getPage(req: PageRequest): Promise<PageData>;
@@ -53,6 +59,7 @@ export interface RegistryHarness {
   getFeatured(): Promise<FeaturedData>;
   getRanking(req: RankingRequest): Promise<RankingData>;
   lookupSkills(refs: SkillRef[]): Promise<{ entries: Array<Skill | null> }>;
+  getDomains(): Promise<DomainInfo[]>;
   getSnapshot(): RegistrySnapshot;
   subscribe(listener: () => void): () => void;
   /** Reset all state between tests; keeps registered listeners. */
@@ -102,6 +109,11 @@ export function createRegistryHarness(): RegistryHarness {
   let pinnedTag: string | undefined;
   /** The trending id list the fake source serves; null = file missing. */
   let trending: string[] | null = null;
+  /**
+   * The profiles dataset the fake source serves, keyed by the canonical
+   * skills.sh id; null = file unreachable (skills then carry no profile).
+   */
+  let profiles: Map<string, SkillProfile> | null = null;
 
   const replies = new Map<
     number,
@@ -132,6 +144,11 @@ export function createRegistryHarness(): RegistryHarness {
         },
         probeMeta: async () => published,
         readTrending: async () => trending,
+        readProfilesMeta: async () => null,
+        readProfiles: async () => {
+          if (!profiles) throw new Error("profiles unavailable");
+          return profiles;
+        },
         cache: {
           load: async () => null,
           save: async () => {},
@@ -177,7 +194,13 @@ export function createRegistryHarness(): RegistryHarness {
   }
 
   async function request<T>(
-    type: "getPage" | "getRepos" | "getFeatured" | "getRanking" | "lookupSkills",
+    type:
+      | "getPage"
+      | "getRepos"
+      | "getFeatured"
+      | "getRanking"
+      | "lookupSkills"
+      | "getDomains",
     payload?: unknown,
   ): Promise<T> {
     if (rpcError) throw rpcError;
@@ -233,6 +256,9 @@ export function createRegistryHarness(): RegistryHarness {
     publishTrending(ids) {
       trending = ids;
     },
+    publishProfiles(entries) {
+      profiles = entries && new Map(Object.entries(entries));
+    },
     setRpcError(err) {
       rpcError = err;
     },
@@ -253,6 +279,9 @@ export function createRegistryHarness(): RegistryHarness {
         refs,
       });
     },
+    getDomains() {
+      return request<DomainInfo[]>("getDomains");
+    },
     getSnapshot: () => snapshot,
     subscribe(listener) {
       listeners.add(listener);
@@ -272,6 +301,7 @@ export function createRegistryHarness(): RegistryHarness {
       published = null;
       pinnedTag = undefined;
       trending = null;
+      profiles = null;
       controller = spawnController();
     },
   };
@@ -288,6 +318,7 @@ export function createRegistryClientMock(harness: RegistryHarness) {
     getFeatured: () => harness.getFeatured(),
     getRanking: (req: RankingRequest) => harness.getRanking(req),
     lookupSkills: (refs: SkillRef[]) => harness.lookupSkills(refs),
+    getDomains: () => harness.getDomains(),
     getRegistrySnapshot: () => harness.getSnapshot(),
     subscribeRegistry: (listener: () => void) => harness.subscribe(listener),
     resetRegistryClient: () => harness.reset(),

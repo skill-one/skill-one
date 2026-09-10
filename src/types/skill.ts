@@ -1,3 +1,23 @@
+/**
+ * Extra metadata for one skill, merged in from the skill-one/skills-profiles
+ * dataset (its `dist` branch ships one JSONL line per profiled skill).
+ * Coverage is partial — only skills the profile generator has processed
+ * carry a profile — so every consumer must treat the whole field as
+ * optional garnish, never as a fact every skill has.
+ */
+export interface SkillProfile {
+  /** One of the dataset's fixed domain categories, e.g. "开发编程". */
+  domain: string;
+  /** One-line justification the generator gave for the domain. */
+  reason?: string;
+  /** The skill's anthropomorphic "job persona", written for fun. */
+  persona?: {
+    tool?: string;
+    role?: string;
+    scene?: string;
+  };
+}
+
 export interface Skill {
   /** Skill name, e.g. "algorithmic-art" */
   name: string;
@@ -33,6 +53,12 @@ export interface Skill {
   firstSeenAt?: string;
   /** The skill's page on skills.sh, when the index carries one. */
   url?: string;
+  /**
+   * Classification and persona metadata from skills-profiles, merged in by
+   * the registry worker. Absent for skills the dataset has not profiled
+   * (and whenever that source is unreachable) — the skill still works.
+   */
+  profile?: SkillProfile;
 }
 
 /**

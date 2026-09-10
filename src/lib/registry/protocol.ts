@@ -11,7 +11,7 @@ export type { SkillRef };
  */
 
 /** Registry fields a search covers (also the highlight keys). */
-export type SearchField = "name" | "repo" | "description";
+export type SearchField = "name" | "repo" | "description" | "domain";
 
 /** One search/browse result: the skill plus what matched, for highlighting. */
 export interface SearchHit {
@@ -45,6 +45,12 @@ export interface PageRequest {
    * run through the fuzzy search.
    */
   repo?: string;
+  /**
+   * Exact domain filter from the profiles dataset ("开发编程", ...).
+   * Undefined browses all; a skill without a profile falls outside every
+   * domain. Composes with both the browse and the search paths.
+   */
+  domain?: string;
 }
 
 /** One page of explore results. `total` covers the whole (filtered) list. */
@@ -112,6 +118,12 @@ export interface RepoPageData {
   total: number;
 }
 
+/** One distinct profile domain and how many profiled skills carry it. */
+export interface DomainInfo {
+  domain: string;
+  count: number;
+}
+
 /**
  * How the dataset currently served by the worker got here during this run.
  * Surfaced in Settings so a user can tell a real refresh from a cache reuse.
@@ -147,7 +159,8 @@ export type RegistryRequest =
   | { type: "getRepos"; id: number; payload: ReposRequest }
   | { type: "getFeatured"; id: number }
   | { type: "getRanking"; id: number; payload: RankingRequest }
-  | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } };
+  | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } }
+  | { type: "getDomains"; id: number };
 
 /** Per-request reply; `data` matches the request that carried the id. */
 export type RegistryResponse =

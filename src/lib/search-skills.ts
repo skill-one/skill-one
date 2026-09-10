@@ -25,7 +25,7 @@ type IndexedSkill = Skill & { id: number };
 // one step of field priority (2×) but never two (4×) — a hugely popular
 // repo match may outrank a zero-install name match, while a description match
 // cannot.
-const FIELD_BOOSTS = { name: 4, repo: 2, description: 1 };
+const FIELD_BOOSTS = { name: 4, repo: 2, description: 1, domain: 1 };
 
 // Popularity boost divisor: 5 tops out at a ~2.3× multiplier for the most
 // installed skills (log10(1 + ~3M) ≈ 6.5 → ~2.3), so popularity can jump
@@ -66,7 +66,13 @@ function invertMatch(
  */
 export function buildSkillSearch(skills: Skill[]): SkillSearch {
   const miniSearch = new MiniSearch<IndexedSkill>({
-    fields: ["name", "repo", "description"],
+    fields: ["name", "repo", "description", "domain"],
+    // The domain lives nested under the optional profile; skills without
+    // one simply do not index any domain terms.
+    extractField: (doc, field) =>
+      field === "domain"
+        ? doc.profile?.domain
+        : (doc as unknown as Record<string, unknown>)[field],
     searchOptions: {
       boost: FIELD_BOOSTS,
       // Search-as-you-type and typo tolerance (edit distance ≤ 20% of the
@@ -102,9 +108,9 @@ export function containsSearch(
   const q = query.toLowerCase();
   return skills
     .filter((skill) =>
-      [skill.name, skill.repo, skill.description].some((field) =>
-        field.toLowerCase().includes(q),
-      ),
+      [skill.name, skill.repo, skill.description, skill.profile?.domain]
+        .filter((field): field is string => typeof field === "string")
+        .some((field) => field.toLowerCase().includes(q)),
     )
     .map((skill) => ({ skill, matched: {} }));
 }

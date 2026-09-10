@@ -162,4 +162,20 @@ describe("SkillListRow", () => {
     expect(container.querySelector('[role="button"]')).toBeNull();
     expect(screen.queryByText("查看 pdf 详情")).not.toBeInTheDocument();
   });
+
+  it("shows the profile domain as a badge when the skill has one", () => {
+    renderWithRouter(
+      <SkillListRow
+        skill={{ ...skill, profile: { domain: "内容创作" } }}
+      />,
+    );
+
+    expect(screen.getByText("内容创作")).toBeInTheDocument();
+  });
+
+  it("shows no domain badge for an unprofiled skill", () => {
+    renderWithRouter(<SkillListRow skill={skill} />);
+
+    expect(screen.queryByText("内容创作")).not.toBeInTheDocument();
+  });
 });

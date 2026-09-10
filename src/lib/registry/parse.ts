@@ -35,7 +35,7 @@ interface RawSkill {
  * avatar paths: exactly three non-empty segments, and a dot-free owner (a
  * dotted first segment would be a domain, not a GitHub user).
  */
-function isCanonicalId(id: string): boolean {
+export function isCanonicalId(id: string): boolean {
   const parts = id.split("/");
   return (
     parts.length === 3 &&

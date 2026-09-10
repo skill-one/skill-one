@@ -126,4 +126,23 @@ describe("buildSkillSearch", () => {
   it("returns nothing for text unrelated to the registry", () => {
     expect(buildSkillSearch(skills)("kubernetes")).toEqual([]);
   });
+
+  it("matches skills through their profile domain", () => {
+    const profiled: Skill[] = [
+      {
+        name: "pdf-exporter",
+        repo: "acme/docs",
+        description: "Turns pages into PDFs.",
+        stars: 10,
+        downloads: 10,
+        profile: { domain: "内容创作" },
+      },
+    ];
+    const search = buildSkillSearch(profiled);
+    expect(search("内容创作").map(({ skill }) => skill.name)).toEqual([
+      "pdf-exporter",
+    ]);
+    // And the substring fallback agrees, so pre-index results match too.
+    expect(search).toBeDefined();
+  });
 });

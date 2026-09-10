@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 
 import { useRegistryPage } from "../../hooks/use-registry-page";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
+import { useRegistryDomains } from "../../hooks/use-registry-domains";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useClampedPage } from "../../hooks/use-clamped-page";
 import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
@@ -70,11 +71,17 @@ export function ExplorePage() {
   // because the result list (and the meaning of a row index) changes.
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOrder>("downloads");
+  // Selected profile domain ("开发编程", ...); undefined browses all.
+  const [domain, setDomain] = useState<string>();
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
 
   // Worker progress: the climbing count, the streaming/indexing flags and
   // the retry action for a failed download.
   const stats = useRegistryStats();
+
+  // The category choices, computed inside the worker over the decorated
+  // registry; empty while the profiles dataset has not landed yet.
+  const { data: domains = [] } = useRegistryDomains();
 
   // One page-sized answer from the registry worker; all filtering, sorting
   // and slicing happen there — the main thread never touches the registry.
@@ -84,7 +91,7 @@ export function ExplorePage() {
     isError,
     error,
     refetch: refetchPage,
-  } = useRegistryPage(query, sort, page - 1, PAGE_SIZE);
+  } = useRegistryPage(query, sort, page - 1, PAGE_SIZE, undefined, domain);
 
   const hits: SearchHit[] = pageData?.hits ?? [];
 
@@ -132,6 +139,11 @@ export function ExplorePage() {
     setPage(1);
     setSort(order);
   };
+  const handleDomain = (value: string) => {
+    setSelected(null);
+    setPage(1);
+    setDomain(value === "all" ? undefined : value);
+  };
 
   // Go to a numbered page and close any open detail panel.
   const handlePage = (p: number) => {
@@ -146,23 +158,42 @@ export function ExplorePage() {
         <SearchInput value={search} onChange={handleSearch} label="搜索 Skill" />
 
         <div className="ml-auto flex items-center gap-2">
-          {/* Placeholder: the registry index carries no category field, so
-              "全部" is the only selectable entry until the data source grows
-              real categories. The radio group without onValueChange keeps the
-              item permanently selected. */}
+          {/* Category filter over the profiles dataset's domains. Until the
+              profiles have landed the list is empty and the menu stays the
+              old placeholder; the radio group without onValueChange keeps
+              "全部" permanently selected. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="rounded-full px-4">
-                分类
+                {domain ?? "分类"}
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuRadioGroup value="all">
+              <DropdownMenuRadioGroup
+                value={domain ?? "all"}
+                onValueChange={
+                  domains.length > 0 ? handleDomain : undefined
+                }
+              >
                 <DropdownMenuRadioItem value="all">全部</DropdownMenuRadioItem>
+                {domains.map(({ domain: name, count }) => (
+                  <DropdownMenuRadioItem key={name} value={name}>
+                    {name}
+                    <span className="ml-auto pl-4 text-xs text-muted-foreground tabular-nums">
+                      {count}
+                    </span>
+                  </DropdownMenuRadioItem>
+                ))}
               </DropdownMenuRadioGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled>更多分类 · 即将上线</DropdownMenuItem>
+              {domains.length === 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem disabled>
+                    更多分类 · 即将上线
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 

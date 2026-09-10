@@ -28,6 +28,12 @@ export interface CacheIdentity {
   tag?: string;
   /** The producing run's `finishedAt`, the snapshot's freshness identity. */
   generatedAt?: string;
+  /**
+   * The profiles dataset's stamp (`fetched_at`) the stored skills were
+   * decorated from, so a profiles-only refresh can be detected without a
+   * registry re-download. Absent when profiles were unavailable.
+   */
+  profilesAt?: string;
 }
 
 /** A single cached record. */
@@ -74,8 +80,8 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
         return null;
       }
       if (!record || record.schemaVersion !== SCHEMA_VERSION) return null;
-      const { skills, tag, generatedAt, fetchedAt } = record;
-      return { skills, tag, generatedAt, fetchedAt };
+      const { skills, tag, generatedAt, profilesAt, fetchedAt } = record;
+      return { skills, tag, generatedAt, profilesAt, fetchedAt };
     },
 
     /** Persist the parsed registry with its snapshot identity (overwrites). */
@@ -85,6 +91,7 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
         fetchedAt: Date.now(),
         tag: identity.tag,
         generatedAt: identity.generatedAt,
+        profilesAt: identity.profilesAt,
         skills,
       };
       try {

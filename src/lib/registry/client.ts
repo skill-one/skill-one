@@ -1,5 +1,6 @@
 import { getCdnBase, setIndexTag } from "../cdn-config";
 import type {
+  DomainInfo,
   FeaturedData,
   IndexInfo,
   PageData,
@@ -120,7 +121,13 @@ function ensureInit() {
 }
 
 function request(
-  type: "getPage" | "getRepos" | "getFeatured" | "getRanking" | "lookupSkills",
+  type:
+    | "getPage"
+    | "getRepos"
+    | "getFeatured"
+    | "getRanking"
+    | "lookupSkills"
+    | "getDomains",
   payload?: unknown,
 ): Promise<unknown> {
   ensureInit();
@@ -175,6 +182,15 @@ export function lookupSkills(refs: SkillRef[]): Promise<{
   return request("lookupSkills", { refs }) as Promise<{
     entries: Array<Skill | null>;
   }>;
+}
+
+/**
+ * The distinct profile domains with their skill counts, most-used first.
+ * Only profiled skills contribute; an empty list means no profile data is
+ * being served yet. Call once `ready`.
+ */
+export function getDomains(): Promise<DomainInfo[]> {
+  return request("getDomains") as Promise<DomainInfo[]>;
 }
 
 /**

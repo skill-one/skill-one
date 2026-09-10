@@ -23,13 +23,14 @@ vi.mock("../../data/featured-content", () => ({
 import { createRegistryController } from "./worker-controller";
 import type { CachedIndex, RegistryCache } from "./cache";
 import type { PublishedIndex } from "./index-stream";
+import type { ProfilesMeta } from "./profiles";
 import type {
   RegistryWorkerMessage,
   RepoSortOrder,
   ReposRequest,
   SortOrder,
 } from "./protocol";
-import type { Skill } from "../../types/skill";
+import type { Skill, SkillProfile } from "../../types/skill";
 
 /** Deterministic skill factory; `i` varies name, repo and metrics. */
 function skill(i: number, over: Partial<Skill> = {}): Skill {
@@ -74,6 +75,13 @@ function setup(options?: {
   published?: PublishedIndex | null;
   /** What the trending source serves; null (default) = list unavailable. */
   trending?: string[] | null;
+  /**
+   * What the profiles source serves; null (default) = file unreachable.
+   * Its stamp is advertised through `profilesMeta` when set.
+   */
+  profiles?: Map<string, SkillProfile> | null;
+  /** What the profiles probe advertises; null (default) = probe failed. */
+  profilesMeta?: ProfilesMeta | null;
 }) {
   const messages: RegistryWorkerMessage[] = [];
   const recorded: Recorded = {
@@ -121,6 +129,11 @@ function setup(options?: {
       probeMeta: async () => options?.published ?? null,
       readIndex,
       readTrending: async () => options?.trending ?? null,
+      readProfilesMeta: async () => options?.profilesMeta ?? null,
+      readProfiles: async () => {
+        if (!options?.profiles) throw new Error("profiles unavailable");
+        return options.profiles;
+      },
       cache: options?.cache ?? {
         load: async () => null,
         save: async () => {},
@@ -973,5 +986,254 @@ describe("createRegistryController — failures", () => {
     // the stale stream's single skill.
     expect(t.recorded.readyCount).toBe(0);
     expect(t.controller.stats().complete).toBe(false);
+  });
+});
+
+describe("createRegistryController — profiles", () => {
+  const PROFILES = new Map<string, SkillProfile>([
+    ["owner-0/repo-0/skill-0", { domain: "开发编程", reason: "dev tools" }],
+    ["owner-1/repo-1/skill-1", { domain: "内容创作" }],
+  ]);
+
+  it("decorates the served skills and reports the domain list", async () => {
+    // Two skills share one domain so the count ordering is unambiguous
+    // (locale-aware tie-breaks are not asserted).
+    const t = setup({
+      skills: [skill(0), skill(1), skill(2)],
+      profiles: new Map<string, SkillProfile>([
+        ["owner-0/repo-0/skill-0", { domain: "开发编程" }],
+        ["owner-1/repo-1/skill-1", { domain: "内容创作" }],
+        ["owner-2/repo-0/skill-2", { domain: "开发编程" }],
+      ]),
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({ type: "getDomains", id: 1 });
+    const domains = resultData<Array<{ domain: string; count: number }>>(
+      t.recorded.results[0],
+    );
+    expect(domains).toEqual([
+      { domain: "开发编程", count: 2 },
+      { domain: "内容创作", count: 1 },
+    ]);
+
+    t.controller.handle({
+      type: "getPage",
+      id: 2,
+      payload: { query: "", sort: "default", page: 0, pageSize: 10 },
+    });
+    const hits = resultData<{ hits: Array<{ skill: Skill }> }>(
+      t.recorded.results[1],
+    );
+    expect(hits.hits[0].skill.profile).toEqual({ domain: "开发编程" });
+    expect(hits.hits[2].skill.profile).toEqual({ domain: "开发编程" });
+  });
+
+  it("filters both the browse list and search results by domain", async () => {
+    const t = setup({
+      skills: [skill(0), skill(1), skill(2)],
+      profiles: PROFILES,
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "getPage",
+      id: 1,
+      payload: {
+        query: "",
+        sort: "default",
+        page: 0,
+        pageSize: 10,
+        domain: "内容创作",
+      },
+    });
+    const browsed = resultData<{
+      hits: Array<{ skill: Skill }>;
+      total: number;
+    }>(t.recorded.results[0]);
+    expect(browsed.total).toBe(1);
+    expect(browsed.hits[0].skill.name).toBe("skill-1");
+
+    t.controller.handle({
+      type: "getPage",
+      id: 2,
+      payload: {
+        query: "skill-",
+        sort: "downloads",
+        page: 0,
+        pageSize: 10,
+        domain: "开发编程",
+      },
+    });
+    const searched = resultData<{
+      hits: Array<{ skill: Skill }>;
+      total: number;
+    }>(t.recorded.results[1]);
+    expect(searched.total).toBe(1);
+    expect(searched.hits[0].skill.name).toBe("skill-0");
+  });
+
+  it("keeps the registry usable when the profiles source is unreachable", async () => {
+    const t = setup({
+      skills: [skill(0), skill(1)],
+      profiles: null, // every candidate fails
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    // Ready fired exactly once (no profiles rebuild) and no skill carries a
+    // profile; the domain list is empty but not an error.
+    expect(t.recorded.readyCount).toBe(1);
+    t.controller.handle({ type: "getDomains", id: 1 });
+    expect(resultData(t.recorded.results[0])).toEqual([]);
+  });
+
+  it("revalidates profiles even when the registry index is unchanged", async () => {
+    const generatedAt = "2026-09-01T14:25:32Z";
+    const saved: Array<[Skill[], Record<string, unknown>]> = [];
+    const t = setup({
+      cache: {
+        load: async () => record([skill(0), skill(1)], generatedAt),
+        save: async (skills, identity) => {
+          saved.push([skills, identity as Record<string, unknown>]);
+        },
+        clear: async () => {},
+      },
+      published: { tag: "dist-2026-09-01", generatedAt, total: 2 },
+      profiles: PROFILES,
+      profilesMeta: { generatedAt: "2026-09-10T07:22:00Z" },
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    // The registry body was skipped, but the profiles still landed: the
+    // cached skills are decorated in place and the re-posted ready reflects
+    // the refreshed index.
+    expect(t.pins).toEqual([]);
+    expect(t.recorded.readyCount).toBe(2);
+    t.controller.handle({ type: "getDomains", id: 1 });
+    // Both domains made it; the tie-break order is locale-dependent.
+    const domains = resultData<Array<{ domain: string; count: number }>>(
+      t.recorded.results[0],
+    );
+    expect(domains).toHaveLength(2);
+    expect(domains).toEqual(
+      expect.arrayContaining([
+        { domain: "开发编程", count: 1 },
+        { domain: "内容创作", count: 1 },
+      ]),
+    );
+    // The re-save (profiles refresh without a re-download) records the
+    // profiles stamp so the next revalidation can skip again.
+    expect(saved[0]?.[1]).toMatchObject({
+      generatedAt,
+      profilesAt: "2026-09-10T07:22:00Z",
+    });
+  });
+
+  it("builds featured sections from the real domains with curated fallback", async () => {
+    const t = setup({
+      skills: [skill(0), skill(1), skill(2)],
+      profiles: new Map<string, SkillProfile>([
+        // skill-0 and skill-1 share a domain; downloads (100-i) order them.
+        ["owner-0/repo-0/skill-0", { domain: "开发编程" }],
+        ["owner-1/repo-1/skill-1", { domain: "开发编程" }],
+        ["owner-2/repo-0/skill-2", { domain: "内容创作" }],
+      ]),
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({ type: "getFeatured", id: 1 });
+    const featured = resultData<{
+      sections: Array<{ id: string; skills: Array<{ skill: Skill }> }>;
+    }>(t.recorded.results[0]);
+
+    // Sections are the real domains, most-populated first, skills within a
+    // section led by the most installed.
+    expect(featured.sections.map((s) => s.id)).toEqual([
+      "开发编程",
+      "内容创作",
+    ]);
+    expect(featured.sections[0].skills.map((s) => s.skill.name)).toEqual([
+      "skill-0",
+      "skill-1",
+    ]);
+    expect(featured.sections[1].skills.map((s) => s.skill.name)).toEqual([
+      "skill-2",
+    ]);
+  });
+
+  it("falls back to curated featured sections when no profiles are served", async () => {
+    // Skills shaped to match the mocked FEATURED_CATEGORIES refs, but with
+    // no profiles: the domain sections cannot be built, so the hand-curated
+    // ones answer instead.
+    const t = setup({
+      skills: [
+        { ...skill(0), name: "alpha", repo: "acme/alpha" },
+        { ...skill(1), name: "beta", repo: "acme/beta" },
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({ type: "getFeatured", id: 1 });
+    const featured = resultData<{
+      sections: Array<{ id: string; skills: Array<{ skill: Skill }> }>;
+    }>(t.recorded.results[0]);
+
+    expect(featured.sections.map((s) => s.id)).toEqual([
+      "curated",
+      "curated-2",
+    ]);
+    expect(featured.sections[0].skills.map((s) => s.skill.name)).toEqual([
+      "alpha",
+      "beta",
+    ]);
+  });
+
+  it("skips the profiles download when the published stamp is unchanged", async () => {
+    // The cold cache was decorated from the same profiles snapshot the probe
+    // advertises: no re-fetch happens, so the index is never rebuilt and
+    // ready is posted exactly once.
+    const cachedSkill: Skill = {
+      ...skill(0),
+      profile: { domain: "开发编程", reason: "dev tools" },
+    };
+    const t = setup({
+      cache: {
+        load: async () => ({
+          ...record([cachedSkill], "2026-09-01T14:25:32Z"),
+          profilesAt: "2026-09-10T07:22:00Z",
+        }),
+        save: async () => {},
+        clear: async () => {},
+      },
+      published: {
+        tag: "dist-2026-09-01",
+        generatedAt: "2026-09-01T14:25:32Z",
+        total: 1,
+      },
+      profilesMeta: { generatedAt: "2026-09-10T07:22:00Z" },
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    expect(t.recorded.readyCount).toBe(1);
+    t.controller.handle({
+      type: "getPage",
+      id: 1,
+      payload: { query: "", sort: "default", page: 0, pageSize: 10 },
+    });
+    const hits = resultData<{ hits: Array<{ skill: Skill }> }>(
+      t.recorded.results[0],
+    );
+    // The cached skill keeps the profile it was saved with.
+    expect(hits.hits[0].skill.profile).toEqual({
+      domain: "开发编程",
+      reason: "dev tools",
+    });
   });
 });
