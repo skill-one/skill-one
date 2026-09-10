@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "../../components/theme-provider";
 import { SettingsPage } from "./settings-page";
 import type { IndexInfo } from "../../lib/registry/protocol";
-import { setIndexTag } from "../../lib/cdn-config";
+import { setIndexTag, setProfilesTag } from "../../lib/cdn-config";
 
 /** Snapshot the mocked registry hook reports; per-test overrides apply next. */
 const stats = vi.hoisted(() => ({
@@ -25,13 +25,15 @@ const SERVED: IndexInfo = {
   tag: "dist-2026-09-06",
   generatedAt: "2026-01-01T00:00:00Z",
   total: 23734,
+  profilesTag: "dist-2026-09-10-2",
+  profilesAt: "2026-09-10T07:22:00Z",
   origin: "unchanged",
 };
 
-/** How the card renders `SERVED.generatedAt` in the host's local time zone. */
-const GENERATED_AT_LOCALE = new Date(
-  "2026-01-01T00:00:00Z",
-).toLocaleString();
+/** How the card renders a snapshot stamp in the host's local time zone. */
+const localeStamp = (iso: string) => new Date(iso).toLocaleString();
+const GENERATED_AT_LOCALE = localeStamp("2026-01-01T00:00:00Z");
+const PROFILES_AT_LOCALE = localeStamp("2026-09-10T07:22:00Z");
 
 function renderSettings() {
   return render(
@@ -52,6 +54,7 @@ describe("SettingsPage", () => {
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
     setIndexTag("");
+    setProfilesTag("");
   });
 
   it("hosts the appearance picker alongside the CDN settings", () => {
@@ -62,15 +65,17 @@ describe("SettingsPage", () => {
     expect(screen.getByText("跟随系统")).toBeInTheDocument();
   });
 
-  it("names the served index snapshot and that it was reused, not downloaded", () => {
+  it("names the served snapshots of both sources and that they were reused, not downloaded", () => {
     stats.current = SERVED;
     renderSettings();
 
-    expect(screen.getByText("技能索引")).toBeInTheDocument();
-    // The tag names the snapshot day; displayed whole.
+    expect(screen.getByText("数据源")).toBeInTheDocument();
+    // The tags name the snapshot days; displayed whole.
     expect(screen.getByText("dist-2026-09-06")).toBeInTheDocument();
+    expect(screen.getByText("dist-2026-09-10-2")).toBeInTheDocument();
     expect(screen.getByText("23,734")).toBeInTheDocument();
     expect(screen.getByText(GENERATED_AT_LOCALE)).toBeInTheDocument();
+    expect(screen.getByText(PROFILES_AT_LOCALE)).toBeInTheDocument();
     expect(
       screen.getByText("索引未更新，已复用本地缓存"),
     ).toBeInTheDocument();
@@ -82,17 +87,20 @@ describe("SettingsPage", () => {
   it("holds placeholders until a snapshot is being served", () => {
     renderSettings();
 
-    expect(screen.getAllByText("未知")).toHaveLength(3);
-    expect(screen.getByText("索引尚未就绪")).toBeInTheDocument();
+    // Two snapshot tags + two stamps + the index row count.
+    expect(screen.getAllByText("未知")).toHaveLength(5);
+    expect(screen.getByText("数据尚未就绪")).toBeInTheDocument();
   });
 
-  it("shows the recorded snapshot tag when the live identity has not arrived", () => {
-    // The registry client persists the served tag; a fresh session reads it
-    // back before the first index event lands.
+  it("shows the recorded snapshot tags when the live identity has not arrived", () => {
+    // The registry client persists the served tags; a fresh session reads
+    // them back before the first index event lands.
     setIndexTag("dist-2026-09-06");
+    setProfilesTag("dist-2026-09-10-2");
     renderSettings();
 
     expect(screen.getByText("dist-2026-09-06")).toBeInTheDocument();
+    expect(screen.getByText("dist-2026-09-10-2")).toBeInTheDocument();
   });
 
   it("shows the 软件更新 card with a manual check control", () => {

@@ -5,6 +5,7 @@ import {
   DEFAULT_CDN_BASE,
   getCdnBase,
   getIndexTag,
+  getProfilesTag,
   setCdnBase,
 } from "../../lib/cdn-config";
 import { reloadRegistry } from "../../lib/registry/client";
@@ -32,10 +33,11 @@ const INDEX_ORIGIN_LABEL: Record<IndexOrigin, string> = {
  * source immediately (it has no `localStorage` access, so the base is
  * passed in).
  *
- * The index card is the read-out for run-based caching: it names the snapshot
- * being served and whether this launch re-downloaded it or reused the local
- * copy. Its button is the manual escape hatch — a reload always re-downloads,
- * even when the published run has not moved.
+ * The data-source card is the read-out for run-based caching: it names the
+ * snapshot each source (registry index, profiles dataset) is serving and
+ * whether this launch re-downloaded or reused the local copy. Its button is
+ * the manual escape hatch — a reload always re-downloads, even when the
+ * published runs have not moved.
  */
 export function SettingsPage() {
   const [value, setValue] = useState(getCdnBase());
@@ -54,17 +56,25 @@ export function SettingsPage() {
     if (previous !== next) reloadRegistry();
   };
 
-  // Facts about the snapshot the store is actually serving. The `dist-<date>`
-  // tag is short enough to display whole and to diff against a release. The
-  // recorded tag (persisted by the registry client) stands in until the live
-  // snapshot identity arrives, so a fresh session still names its snapshot.
+  // Facts about the snapshots the store is actually serving, one group per
+  // GitHub source. The `dist-<date>` tag is short enough to display whole
+  // and to diff against a release. A recorded tag (persisted by the
+  // registry client) stands in until the live snapshot identity arrives,
+  // so a fresh session still names its snapshots.
   const indexRows = [
     {
-      term: "索引版本",
+      term: "快照",
       value: index?.tag ?? (getIndexTag() || "未知"),
     },
     { term: "发布于", value: formatIndexTime(index?.generatedAt) },
     { term: "条目数", value: formatTotal(index?.total) },
+  ];
+  const profileRows = [
+    {
+      term: "快照",
+      value: index?.profilesTag ?? (getProfilesTag() || "未知"),
+    },
+    { term: "发布于", value: formatIndexTime(index?.profilesAt) },
   ];
 
   return (
@@ -189,13 +199,11 @@ export function SettingsPage() {
             <div className="flex items-baseline justify-between gap-3">
               <div>
                 <h3 className="text-[13px] font-medium text-foreground">
-                  技能索引
+                  数据源
                 </h3>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  商店数据来自 skill-one/skills-sh-mirror 发布的每日快照
-                  （skills.sh 全量榜单）。快照通过仓库最新的 dist-日期
-                  标签（tag） 定址下载，并在本地记录当前使用的标签：
-                  版本未变时启动直接复用缓存，不再下载全量数据。
+                  商店数据来自两个 GitHub
+                  仓库发布的每日快照，按标签定址并在本地缓存复用。
                 </p>
               </div>
               <Button
@@ -208,7 +216,33 @@ export function SettingsPage() {
               </Button>
             </div>
             <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
+              <div className="contents">
+                <dt className="pt-1 font-medium text-foreground">
+                  技能索引
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    （skills-sh-mirror）
+                  </span>
+                </dt>
+                <dd className="pt-1" />
+              </div>
               {indexRows.map(({ term, value: detail }) => (
+                <div key={term} className="contents">
+                  <dt className="text-muted-foreground">{term}</dt>
+                  <dd className="min-w-0 break-all text-foreground">
+                    {detail}
+                  </dd>
+                </div>
+              ))}
+              <div className="contents">
+                <dt className="pt-2 font-medium text-foreground">
+                  画像数据集
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    （skills-profiles）
+                  </span>
+                </dt>
+                <dd className="pt-2" />
+              </div>
+              {profileRows.map(({ term, value: detail }) => (
                 <div key={term} className="contents">
                   <dt className="text-muted-foreground">{term}</dt>
                   <dd className="min-w-0 break-all text-foreground">
@@ -218,7 +252,7 @@ export function SettingsPage() {
               ))}
             </dl>
             <p className="mt-2 text-[12px] text-muted-foreground">
-              {index ? INDEX_ORIGIN_LABEL[index.origin] : "索引尚未就绪"}
+              {index ? INDEX_ORIGIN_LABEL[index.origin] : "数据尚未就绪"}
             </p>
           </div>
         </div>

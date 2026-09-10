@@ -304,7 +304,13 @@ export function createRegistryController(
     ) {
       // The published run is the one already served, so the body is byte
       // -identical: keep serving the cache and skip the download entirely.
-      emitIndex({ ...identity, total, profilesTag: servedProfilesTag, origin: "unchanged" });
+      emitIndex({
+        ...identity,
+        total,
+        profilesAt: servedProfilesAt,
+        profilesTag: servedProfilesTag,
+        origin: "unchanged",
+      });
       trendingIds = (await trending) ?? trendingIds;
       // The profiles dataset moves on its own schedule — an unchanged
       // registry index says nothing about it, so revalidate it here too.
@@ -321,6 +327,7 @@ export function createRegistryController(
         emitIndex({
           ...identity,
           total,
+          profilesAt: servedProfilesAt,
           profilesTag: servedProfilesTag,
           origin: "unchanged",
         });
@@ -414,6 +421,7 @@ export function createRegistryController(
     emitIndex({
       ...identity,
       total,
+      profilesAt: servedProfilesAt,
       profilesTag: servedProfilesTag,
       origin: "updated",
     });
@@ -737,6 +745,7 @@ export function createRegistryController(
             tag: cached.tag,
             generatedAt: cached.generatedAt,
             total: cached.skills.length,
+            profilesAt: cached.profilesAt,
             profilesTag: cached.profilesTag,
             origin: "cache",
           });
