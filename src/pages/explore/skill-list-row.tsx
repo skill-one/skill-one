@@ -199,6 +199,13 @@ export function SkillListRow({
                     value={starred}
                     tone="text-amber-400"
                   />
+                  {/* The relationship the three figures above have to each
+                      other: the blend is a geometric mean, so neither count
+                      can outrun the other — the question this line answers
+                      is "why is 3M installs only 713K heat?". */}
+                  <p className="border-t border-border/60 pt-1.5 text-[11px] leading-relaxed text-muted-foreground/80">
+                    热度 = √(安装 × Star)，安装与 Star 各占一半
+                  </p>
                 </div>
               </TooltipContent>
             </Tooltip>
