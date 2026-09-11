@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Download, Flame, Star, type LucideIcon } from "lucide-react";
+import { Download, Flame, Star } from "lucide-react";
 
 import type { SearchField } from "../../lib/registry/protocol";
 import { popularity } from "../../lib/popularity";
@@ -17,34 +17,6 @@ import {
 
 /** Matched indexed terms per field, from the search that produced this hit. */
 export type SkillMatched = Partial<Record<SearchField, readonly string[]>>;
-
-/**
- * One labelled row of the popularity tooltip — icon, field name and a
- * right-aligned value, so the blended figure and the two counts behind it read
- * as the same kind of line.
- */
-function TooltipRow({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  /** Colour for the icon only (the star's amber). */
-  tone?: string;
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <Icon className={cn("h-3.5 w-3.5", tone)} />
-      <span className="text-background/65">{label}</span>
-      <span className="ml-auto pl-3 font-medium tabular-nums text-background">
-        {value}
-      </span>
-    </div>
-  );
-}
 
 /**
  * Splits text on the same separator class MiniSearch's default tokenizer uses,
@@ -190,22 +162,20 @@ export function SkillListRow({
                 <span className="font-medium tabular-nums">{blended}</span>
               </TooltipTrigger>
               <TooltipContent side="right" align="start">
-                <div className="flex flex-col gap-1.5 text-[12px]">
-                  <TooltipRow icon={Flame} label="热度" value={blended} />
-                  <TooltipRow icon={Download} label="安装" value={installed} />
-                  <TooltipRow
-                    icon={Star}
-                    label="Star"
-                    value={starred}
-                    tone="text-amber-400"
+                {/* One-line breakdown: the trigger already shows the blend,
+                    so the tooltip reveals only the two counts behind it,
+                    each icon standing in for its label. */}
+                <div className="flex items-center gap-1.5 text-[12px]">
+                  <Download aria-hidden="true" className="h-3.5 w-3.5" />
+                  <span className="tabular-nums">{installed}</span>
+                  <span aria-hidden="true" className="text-background/55">
+                    ·
+                  </span>
+                  <Star
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 text-amber-400"
                   />
-                  {/* The relationship the three figures above have to each
-                      other: the blend is a geometric mean, so neither count
-                      can outrun the other — the question this line answers
-                      is "why is 3M installs only 713K heat?". */}
-                  <p className="border-t border-border/60 pt-1.5 text-[11px] leading-relaxed text-background/55">
-                    热度 = √(安装 × Star)，安装与 Star 各占一半
-                  </p>
+                  <span className="tabular-nums">{starred}</span>
                 </div>
               </TooltipContent>
             </Tooltip>

@@ -54,13 +54,15 @@ describe("SkillListRow", () => {
     await user.hover(screen.getByRole("button", { name: /^热度 / }));
     const tip = await screen.findByRole("tooltip");
 
-    // Labelled, so the blend is never mistaken for a count of anything.
-    expect(within(tip).getByText("热度")).toHaveTextContent("热度");
-    expect(within(tip).getByText("712.4K")).toBeInTheDocument();
-    expect(within(tip).getByText("安装")).toBeInTheDocument();
+    // Minimal one-line form: the blend already sits on the trigger, so the
+    // tooltip is just icon + count for the two source figures, no labels
+    // and no formula line.
     expect(within(tip).getByText("3M")).toBeInTheDocument();
-    expect(within(tip).getByText("Star")).toBeInTheDocument();
     expect(within(tip).getByText("169.6K")).toBeInTheDocument();
+    expect(tip.textContent).toMatch(/3M\s*·\s*169\.6K/);
+    expect(within(tip).queryByText("热度")).not.toBeInTheDocument();
+    expect(within(tip).queryByText("安装")).not.toBeInTheDocument();
+    expect(tip.textContent).not.toContain("√");
   });
 
   it("labels the figure with its breakdown for assistive tech", () => {
