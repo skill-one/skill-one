@@ -386,7 +386,8 @@ describe("SkillDetailPanel", () => {
     expect(screen.getByText("我想做 X")).toBeInTheDocument();
     expect(screen.getByText("推荐的 skill")).toBeInTheDocument();
     // User comments render as an avatar-less stream: section heading,
-    // nickname, category badge and body, separated by hairlines.
+    // category badge + nickname attribution above the body, each note
+    // hanging off a category-colored left rail.
     expect(screen.getByText("用户评论")).toBeInTheDocument();
     expect(screen.getByText("后端老兵")).toBeInTheDocument();
     expect(screen.getByText("妙用")).toBeInTheDocument();

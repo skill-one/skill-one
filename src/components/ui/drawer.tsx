@@ -59,11 +59,12 @@ function DrawerContent({
           "data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[80vh] data-[vaul-drawer-direction=bottom]:rounded-t-lg data-[vaul-drawer-direction=bottom]:border-t",
           // Document-width side panel (the skill detail view): the shadcn
           // phone-width sm:max-w-sm default is unreadable for markdown
-          // prose and code blocks. 600px on small windows, 700px once the
-          // window affords it — still leaving the list visible behind the
-          // dimmed overlay.
-          "data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=right]:sm:max-w-[600px] data-[vaul-drawer-direction=right]:lg:max-w-[700px]",
-          "data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=left]:sm:max-w-[600px] data-[vaul-drawer-direction=left]:lg:max-w-[700px]",
+          // prose and code blocks, while the old 700px column stretched the
+          // 13px prose past a comfortable line length. A single 600px
+          // column everywhere stays readable and keeps more of the list
+          // visible behind the dimmed overlay.
+          "data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-full data-[vaul-drawer-direction=right]:max-w-[600px] data-[vaul-drawer-direction=right]:border-l",
+          "data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-full data-[vaul-drawer-direction=left]:max-w-[600px] data-[vaul-drawer-direction=left]:border-r",
           className
         )}
         {...props}

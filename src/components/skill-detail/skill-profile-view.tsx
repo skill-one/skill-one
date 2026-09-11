@@ -20,21 +20,38 @@ import { Skeleton } from "../ui/skeleton";
  */
 
 /** First-person note categories, in reading order. */
-const COMMENT_CATEGORIES: Record<string, string> = {
-  妙用: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  启发: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-400",
-  注意: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  坑: "border-destructive/40 bg-destructive/10 text-destructive",
+const COMMENT_CATEGORIES: Record<string, { badge: string; rail: string }> = {
+  妙用: {
+    badge:
+      "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    rail: "border-emerald-500/50",
+  },
+  启发: {
+    badge: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-400",
+    rail: "border-sky-500/50",
+  },
+  注意: {
+    badge:
+      "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    rail: "border-amber-500/50",
+  },
+  坑: {
+    badge: "border-destructive/40 bg-destructive/10 text-destructive",
+    rail: "border-destructive/50",
+  },
+};
+
+/** Neutral fallback for a category the dataset may add later. */
+const DEFAULT_COMMENT_STYLE = {
+  badge: "border-border/60 bg-muted text-muted-foreground",
+  rail: "border-border/60",
 };
 
 function CommentBadge({ category }: { category: string }) {
   return (
     <Badge
       variant="outline"
-      className={
-        COMMENT_CATEGORIES[category] ??
-        "border-border/60 bg-muted text-muted-foreground"
-      }
+      className={COMMENT_CATEGORIES[category]?.badge ?? DEFAULT_COMMENT_STYLE.badge}
     >
       {category}
     </Badge>
@@ -169,26 +186,28 @@ function ProfileBody({ profile }: { profile: SkillProfileDetail }) {
 
       {profile.comments && profile.comments.length > 0 && (
         <Section title="用户评论">
-          {/* Quote-style comments: the body is the point, so it leads and
-              carries the stronger color; nickname + category sit below it as
-              a quiet, right-aligned attribution. Hairlines, plus a gap after
-              the section heading, keep the blocks distinct. The dataset has
-              no avatars or timestamps. */}
-          <ul className="mt-1 flex flex-col divide-y divide-border/60">
+          {/* Quote-style notes: each one hangs off a category-colored left
+              rail, so the category reads before the words. Badge + nickname
+              form a left-aligned attribution line above the body — the
+              dataset has no avatars or timestamps. */}
+          <ul className="mt-1 flex flex-col gap-3">
             {profile.comments.map(({ user, category, comment }, i) => (
               <li
                 key={i}
-                className="flex flex-col gap-2 py-4 first:pt-3 last:pb-0"
+                className={`flex flex-col gap-1.5 border-l-2 pl-3 ${
+                  COMMENT_CATEGORIES[category]?.rail ??
+                  DEFAULT_COMMENT_STYLE.rail
+                }`}
               >
+                <div className="flex items-center gap-2">
+                  <CommentBadge category={category} />
+                  <span className="truncate text-[11px] text-muted-foreground">
+                    {user}
+                  </span>
+                </div>
                 <p className="text-[13px] leading-relaxed text-foreground/85">
                   {comment}
                 </p>
-                <div className="flex items-center justify-end gap-2">
-                  <span className="text-[11px] text-muted-foreground/70">
-                    {user}
-                  </span>
-                  <CommentBadge category={category} />
-                </div>
               </li>
             ))}
           </ul>
