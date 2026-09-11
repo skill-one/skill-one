@@ -1,5 +1,5 @@
 import { Download, Flame, Star } from "lucide-react";
-import type { ComponentProps } from "react";
+import { useId, type ComponentProps } from "react";
 
 import { popularity } from "../lib/popularity";
 import { cn, formatCount } from "../lib/utils";
@@ -40,6 +40,12 @@ export function SkillPopularity({
   const starred = formatCount(skill.stars);
   const blended = formatCount(popularity(skill));
 
+  // A flame reads warm, so the metric's icon is filled with an orange→amber
+  // gradient (rather than the neutral grey of the rest of the row). The id is
+  // scoped per instance via useId (sanitized: ':' is unstable inside url(#..))
+  // so the many rows on a list can each carry their own defs without clashing.
+  const gradientId = useId().replace(/[^a-zA-Z0-9]/g, "");
+
   return (
     <TooltipProvider delayDuration={0}>
       <Tooltip>
@@ -53,7 +59,18 @@ export function SkillPopularity({
             className,
           )}
         >
-          <Flame className="h-3.5 w-3.5" />
+          <span className="relative inline-flex h-3.5 w-3.5 items-center justify-center">
+            <svg aria-hidden="true" focusable="false" className="absolute h-0 w-0">
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  {/* tip amber → base orange, so the outline reads as fire */}
+                  <stop offset="0%" stopColor="#fbbf24" />
+                  <stop offset="100%" stopColor="#f97316" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <Flame className="h-3.5 w-3.5" color={`url(#${gradientId})`} />
+          </span>
           <span className="font-medium tabular-nums">{blended}</span>
         </TooltipTrigger>
         <TooltipContent side={side} align={align}>
