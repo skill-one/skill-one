@@ -35,6 +35,13 @@ import { RepoCard } from "./repo-card";
  * Each option is led by the same glyph the repo card uses for that figure
  * (Star, Package), so the sort keys read as the metrics already on show; name
  * falls back to an alphabetical ArrowDownAZ.
+ *
+ * The glyphs stay neutral here even though the card tints its star: the tint
+ * marks the data, not the control, and echoing it in the menu would both
+ * contradict the cards whenever another order is active and duplicate the
+ * palette in the chrome. Selection belongs to the radio dot and the foreground
+ * label, so the active option just steps up from muted to foreground as in any
+ * other shadcn menu — nothing per-metric to drift out of sync with the cards.
  */
 const SORT_OPTIONS: Array<{
   value: RepoSortOrder;

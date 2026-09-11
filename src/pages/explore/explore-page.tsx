@@ -49,6 +49,14 @@ import { SearchInput } from "../../components/search-input";
  * Each option is led by a lucide glyph that mirrors the metric the row already
  * shows (the same Flame that stands for 热度), so "sort by popularity" and the
  * popularity figure read as one idea rather than two unrelated labels.
+ *
+ * The glyph stays neutral here even though the row's figure is tinted: the tint
+ * marks the data, and repeating it in the control would either contradict the
+ * list (a grey flame in the menu while the rows stay warm) or clone the whole
+ * palette into the menu. Selection is the menu's job, and its radio dot plus
+ * the foreground label already carry it, so the active option only steps up
+ * from muted to foreground like every other shadcn menu item — no per-metric
+ * color, and nothing that can drift away from the rows.
  */
 const SORT_OPTIONS: Array<{
   value: SortOrder;
