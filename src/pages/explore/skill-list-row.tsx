@@ -1,19 +1,12 @@
 import { useState, type ReactNode } from "react";
-import { Download, Flame, Star } from "lucide-react";
 
 import type { SearchField } from "../../lib/registry/protocol";
-import { popularity } from "../../lib/popularity";
-import { cn, formatCount } from "../../lib/utils";
+import { cn } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { DomainBadge } from "../../components/domain-badge";
 import { SkillInstallButton } from "../../components/skill-install-button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { SkillPopularity } from "../../components/skill-popularity";
 
 /** Matched indexed terms per field, from the search that produced this hit. */
 export type SkillMatched = Partial<Record<SearchField, readonly string[]>>;
@@ -93,12 +86,6 @@ export function SkillListRow({
 
   const owner = skill.repo.split("/")[0];
 
-  // Formatted once: the trigger, its accessible name and the tooltip lines all
-  // read these, so they cannot disagree about what the figure is.
-  const installed = formatCount(skill.downloads);
-  const starred = formatCount(skill.stars);
-  const blended = formatCount(popularity(skill));
-
   return (
     <li>
       <div
@@ -148,39 +135,10 @@ export function SkillListRow({
           </p>
         </div>
 
-        {/* Like the install action, the metric is its own control: a click on
-            it stops there instead of opening the detail panel behind the row. */}
-        {metric ?? (
-          <TooltipProvider delayDuration={0}>
-            <Tooltip>
-              <TooltipTrigger
-                aria-label={`热度 ${blended}：安装 ${installed} · Star ${starred}`}
-                onClick={(e) => e.stopPropagation()}
-                className="flex shrink-0 cursor-default items-center gap-1 rounded text-[12px] text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <Flame className="h-3.5 w-3.5" />
-                <span className="font-medium tabular-nums">{blended}</span>
-              </TooltipTrigger>
-              <TooltipContent side="right" align="start">
-                {/* One-line breakdown: the trigger already shows the blend,
-                    so the tooltip reveals only the two counts behind it,
-                    each icon standing in for its label. */}
-                <div className="flex items-center gap-1.5 text-[12px]">
-                  <Download aria-hidden="true" className="h-3.5 w-3.5" />
-                  <span className="tabular-nums">{installed}</span>
-                  <span aria-hidden="true" className="text-background/55">
-                    ·
-                  </span>
-                  <Star
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5 text-amber-400"
-                  />
-                  <span className="tabular-nums">{starred}</span>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+        {/* Like the install action, the metric is its own control: the shared
+            popularity figure stops clicks so it never opens the detail panel
+            behind the row. */}
+        {metric ?? <SkillPopularity skill={skill} side="right" align="start" />}
 
         {/* The install button stops its own click, so it never opens the
             detail panel behind it. */}

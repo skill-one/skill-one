@@ -155,9 +155,22 @@ describe("SkillDetailPanel", () => {
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
     expect(screen.getByText("MIT")).toBeInTheDocument();
     expect(screen.getByText("Anthropic")).toBeInTheDocument();
-    // Both popularity metrics render in the one meta row.
-    expect(screen.getByText("3M")).toBeInTheDocument();
-    expect(screen.getByText("169.6K")).toBeInTheDocument();
+    // One blended popularity figure, exactly like the list rows: the source
+    // counts stay hidden until the figure is hovered.
+    expect(
+      screen.getByRole("button", {
+        name: "热度 712.4K：安装 3M · Star 169.6K",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("712.4K")).toBeInTheDocument();
+    expect(screen.queryByText("3M")).not.toBeInTheDocument();
+    expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
+    // Keyboard focus opens the same breakdown (also the a11y path).
+    const heat = screen.getByRole("button", { name: /^热度 / });
+    heat.focus();
+    const heatTip = await screen.findByRole("tooltip");
+    expect(heatTip.textContent).toMatch(/3M\s*·\s*169\.6K/);
+    heat.blur();
     // The exact path is provenance detail: hidden behind the 源 tip by
     // default, and an unhashed entry's tip carries no version lines at all.
     expect(screen.queryByText(detail.path)).not.toBeInTheDocument();
@@ -241,6 +254,10 @@ describe("SkillDetailPanel", () => {
     await user.hover(screen.getByText("本地文件"));
     const tip = await screen.findByRole("tooltip");
     expect(within(tip).getByText(localDetail.path)).toBeInTheDocument();
+    // No registry stats for a pure local skill: no popularity figure at all.
+    expect(
+      screen.queryByRole("button", { name: /^热度 / }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("3M")).not.toBeInTheDocument();
   });
 
@@ -355,7 +372,7 @@ describe("SkillDetailPanel", () => {
     ).not.toBeInTheDocument();
 
     // Structured layout: lead quote + tool, slogans, pitch, input/output,
-    // and categorized user notes.
+    // and categorized user comments.
     // The scene renders as a curly-quoted lead paragraph.
     expect(await screen.findByText(/需要找 skill 时/)).toBeInTheDocument();
     expect(screen.getByText("谋生工具：")).toBeInTheDocument();
@@ -368,8 +385,13 @@ describe("SkillDetailPanel", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("我想做 X")).toBeInTheDocument();
     expect(screen.getByText("推荐的 skill")).toBeInTheDocument();
+    // User comments render as an avatar-less stream: section heading,
+    // nickname, category badge and body, separated by hairlines.
+    expect(screen.getByText("用户评论")).toBeInTheDocument();
+    expect(screen.getByText("后端老兵")).toBeInTheDocument();
     expect(screen.getByText("妙用")).toBeInTheDocument();
     expect(screen.getByText("用 --owner 锁定官方源。")).toBeInTheDocument();
+    expect(screen.queryByText("用户笔记")).not.toBeInTheDocument();
 
     // The canonical source is one click away.
     await user.click(screen.getByRole("tab", { name: "SKILL.md" }));

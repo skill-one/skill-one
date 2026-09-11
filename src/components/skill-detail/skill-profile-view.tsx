@@ -10,7 +10,7 @@ import { Skeleton } from "../ui/skeleton";
  * multi-angle profile the skills-profiles dataset generated for one skill,
  * laid out by content shape — pitch first, then slogans, the outside view
  * (what you hand it → what you get back), the inside view (happy path +
- * mechanisms), and the first-person user notes. `domain` and persona.role
+ * mechanisms), and first-person user comments. `domain` and persona.role
  * already show in the drawer header; the persona's scene and tool lead this
  * view instead of being repeated twice.
  *
@@ -168,22 +168,27 @@ function ProfileBody({ profile }: { profile: SkillProfileDetail }) {
       )}
 
       {profile.comments && profile.comments.length > 0 && (
-        <Section title="用户笔记">
-          <ul className="flex flex-col gap-2">
+        <Section title="用户评论">
+          {/* Quote-style comments: the body is the point, so it leads and
+              carries the stronger color; nickname + category sit below it as
+              a quiet, right-aligned attribution. Hairlines, plus a gap after
+              the section heading, keep the blocks distinct. The dataset has
+              no avatars or timestamps. */}
+          <ul className="mt-1 flex flex-col divide-y divide-border/60">
             {profile.comments.map(({ user, category, comment }, i) => (
               <li
                 key={i}
-                className="flex flex-col gap-1 rounded-lg border border-border/60 px-3 py-2"
+                className="flex flex-col gap-2 py-4 first:pt-3 last:pb-0"
               >
-                <div className="flex items-center gap-2">
-                  <CommentBadge category={category} />
+                <p className="text-[13px] leading-relaxed text-foreground/85">
+                  {comment}
+                </p>
+                <div className="flex items-center justify-end gap-2">
                   <span className="text-[11px] text-muted-foreground/70">
                     {user}
                   </span>
+                  <CommentBadge category={category} />
                 </div>
-                <p className="text-[12px] leading-relaxed text-muted-foreground">
-                  {comment}
-                </p>
               </li>
             ))}
           </ul>

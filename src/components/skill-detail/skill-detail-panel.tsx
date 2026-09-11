@@ -1,21 +1,15 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Download,
-  ExternalLink,
-  Globe,
-  Loader2,
-  Puzzle,
-  Star,
-} from "lucide-react";
+import { ExternalLink, Globe, Loader2, Puzzle } from "lucide-react";
 
 import { fetchSkillDetail, MIRROR } from "../../lib/skill-detail-api";
 import { fetchLocalSkillDetail } from "../../lib/local-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
-import { errorMessage, formatDate, formatCount } from "../../lib/utils";
+import { errorMessage, formatDate } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { DomainBadge } from "../domain-badge";
+import { SkillPopularity } from "../skill-popularity";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -242,6 +236,28 @@ export function SkillDetailPanel({
   const rev = shown?.rev ?? null;
   const seenAt = shown?.firstSeenAt ? formatDate(shown.firstSeenAt) : null;
 
+  // The canonical SKILL.md body, shared by the profiled-skill tab and the
+  // plain view. Registry skills resolve relative links against the mirror
+  // snapshot the index was built from (a profiled skill is always one);
+  // local installs read their own repo without a git ref.
+  const skillMdBody = detail ? (
+    detail.instructions ? (
+      <Suspense fallback={<MarkdownSkeleton />}>
+        <LazyMarkdown
+          repo={isLocalSkill ? (shown?.repo ?? "") : MIRROR.repo}
+          gitRef={isLocalSkill ? undefined : MIRROR.ref}
+          filePath={filePath}
+        >
+          {detail.instructions}
+        </LazyMarkdown>
+      </Suspense>
+    ) : (
+      <p className="text-[13px] leading-relaxed text-muted-foreground">
+        （SKILL.md 无正文内容）
+      </p>
+    )
+  ) : null;
+
   return (
     <DrawerContent>
       <DrawerHeader className="gap-2 px-6 pt-5">
@@ -305,20 +321,11 @@ export function SkillDetailPanel({
             <Badge variant="secondary">{detail.license}</Badge>
           )}
           {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
-          {!isLocalSkill && (
+          {!isLocalSkill && shown && (
             <>
-              <span className="flex items-center gap-1">
-                <Download className="h-3.5 w-3.5" />
-                <span className="font-medium tabular-nums">
-                  {formatCount(shown?.downloads ?? 0)}
-                </span>
-              </span>
-              <span className="flex items-center gap-1">
-                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                <span className="font-medium tabular-nums">
-                  {formatCount(shown?.stars ?? 0)}
-                </span>
-              </span>
+              {/* The same blended popularity figure the list rows show;
+                  hover/focus breaks it into installs and stars. */}
+              <SkillPopularity skill={shown} />
               {skillsShHref && (
                 <a
                   href={skillsShHref}
@@ -393,7 +400,7 @@ export function SkillDetailPanel({
           hasProfile ? (
             // A profiled skill: the generated overview and SKILL.md live in
             // separate tabs. 概述 is the default — its structured pitch,
-            // I/O and notes answer "what is this and is it worth it" faster
+            // I/O and user comments answer "what is this and is it worth it" faster
             // than the raw (sometimes one-line) SKILL.md, which stays one
             // click away as the canonical source. The tab bar is a
             // GitHub-style underlined row that sticks below the header while
@@ -418,42 +425,10 @@ export function SkillDetailPanel({
                   tool={shown!.profile?.persona?.tool}
                 />
               </TabsContent>
-              <TabsContent value="skill-md">
-                {detail.instructions ? (
-                  <Suspense fallback={<MarkdownSkeleton />}>
-                    <LazyMarkdown
-                      repo={MIRROR.repo}
-                      gitRef={MIRROR.ref}
-                      filePath={filePath}
-                    >
-                      {detail.instructions}
-                    </LazyMarkdown>
-                  </Suspense>
-                ) : (
-                  <p className="text-[13px] leading-relaxed text-muted-foreground">
-                    （SKILL.md 无正文内容）
-                  </p>
-                )}
-              </TabsContent>
+              <TabsContent value="skill-md">{skillMdBody}</TabsContent>
             </Tabs>
           ) : (
-            <div className="pt-3">
-              {detail.instructions ? (
-                <Suspense fallback={<MarkdownSkeleton />}>
-                  <LazyMarkdown
-                    repo={isLocalSkill ? (shown?.repo ?? "") : MIRROR.repo}
-                    gitRef={isLocalSkill ? undefined : MIRROR.ref}
-                    filePath={filePath}
-                  >
-                    {detail.instructions}
-                  </LazyMarkdown>
-                </Suspense>
-              ) : (
-                <p className="text-[13px] leading-relaxed text-muted-foreground">
-                  （SKILL.md 无正文内容）
-                </p>
-              )}
-            </div>
+            <div className="pt-3">{skillMdBody}</div>
           )
         ) : null}
       </div>
