@@ -158,18 +158,52 @@ export interface IndexInfo {
   profilesAt?: string;
   /** Origin of the served dataset for this run. */
   origin: IndexOrigin;
+  /**
+   * When the freshness probe behind this identity completed, in ms since the
+   * epoch. Absent on the `cache` origin, which is served before the probe has
+   * answered — so consumers can tell "checked, nothing new" from "not checked
+   * yet" and re-check only once the last answer has gone stale.
+   */
+  checkedAt?: number;
 }
 
-/** Main-thread → worker messages. */
-export type RegistryRequest =
+/** How a cheap freshness check ended. */
+export type RevalidateStatus =
+  /** A newer index and/or profiles snapshot landed; the store serves it now. */
+  | "updated"
+  /** The served snapshot is still the published one — nothing changed. */
+  | "current"
+  /**
+   * Freshness could not be established: no probe answered, or the newer
+   * snapshot failed to download. Nothing being served was replaced.
+   */
+  | "unknown";
+
+/** Reply to a `revalidate` command. */
+export interface RevalidateResult {
+  status: RevalidateStatus;
+}
+
+/**
+ * Main-thread → worker commands the controller answers on its own schedule
+ * (boot, source switch, auto-refresh) rather than synchronously in `handle`.
+ */
+export type RegistryCommand =
   | { type: "init"; payload: { cdnBase: string } }
   | { type: "reload"; payload: { cdnBase: string } }
+  | { type: "revalidate"; id: number };
+
+/** Main-thread → worker queries answered synchronously by `handle`. */
+export type RegistryQuery =
   | { type: "getPage"; id: number; payload: PageRequest }
   | { type: "getRepos"; id: number; payload: ReposRequest }
   | { type: "getFeatured"; id: number }
   | { type: "getRanking"; id: number; payload: RankingRequest }
   | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } }
   | { type: "getDomains"; id: number };
+
+/** Everything the main thread can send the worker. */
+export type RegistryRequest = RegistryCommand | RegistryQuery;
 
 /** Per-request reply; `data` matches the request that carried the id. */
 export type RegistryResponse =

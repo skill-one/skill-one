@@ -17,8 +17,9 @@ import type {
   RepoInfo,
   RepoPageData,
   ReposRequest,
-  RegistryRequest,
+  RegistryQuery,
   RegistryWorkerMessage,
+  RevalidateStatus,
   SearchHit,
   SortOrder,
 } from "./protocol";
@@ -284,10 +285,19 @@ export function createRegistryController(
    *
    * `force` skips the "unchanged" short-circuit: a source switch or a user
    * retry must re-download even when the published run has not moved.
+   *
+   * `probed` lets a caller that already read the published stats hand the
+   * answer in, so the freshness probe is never paid for twice (the check
+   * behind `revalidate`). Omit it to probe here, as boot and reload do.
    */
-  const download = async (gen: number, force = false) => {
+  const download = async (
+    gen: number,
+    force = false,
+    probed?: PublishedIndex | null,
+  ) => {
     // Null means no source answered: nothing to pin, nothing to compare.
-    const published = await deps.probeMeta(cdnBase);
+    const published =
+      probed !== undefined ? probed : await deps.probeMeta(cdnBase);
     if (gen !== generation) return;
     const tag = published?.tag;
     // Started before the body download so its latency hides inside it; the
@@ -310,6 +320,7 @@ export function createRegistryController(
         profilesAt: servedProfilesAt,
         profilesTag: servedProfilesTag,
         origin: "unchanged",
+        checkedAt: deps.now(),
       });
       trendingIds = (await trending) ?? trendingIds;
       // The profiles dataset moves on its own schedule — an unchanged
@@ -330,6 +341,7 @@ export function createRegistryController(
           profilesAt: servedProfilesAt,
           profilesTag: servedProfilesTag,
           origin: "unchanged",
+          checkedAt: deps.now(),
         });
       }
       return;
@@ -424,6 +436,7 @@ export function createRegistryController(
       profilesAt: servedProfilesAt,
       profilesTag: servedProfilesTag,
       origin: "updated",
+      checkedAt: deps.now(),
     });
     buildIndex();
   };
@@ -754,17 +767,76 @@ export function createRegistryController(
       })();
     },
 
-    /** Source switch or manual retry: drop the cache and download afresh. */
+    /**
+     * Source switch or manual retry: download afresh even when the published
+     * run has not moved. The stored record is deliberately left alone — it is
+     * addressed by the snapshot's own identity, not by the source it came
+     * from, so a switch that fails still leaves the next cold start something
+     * to serve (a successful download overwrites it below).
+     */
     reload({ cdnBase: base }: { cdnBase: string }) {
       cdnBase = base;
       const gen = ++generation;
-      void deps.cache.clear();
       void download(gen, true);
     },
 
-    /** Handle one message from the main thread. */
-    handle(message: RegistryRequest) {
-      if (!("id" in message)) return; // init/reload are handled above
+    /**
+     * Cheap, non-destructive freshness check: the periodic one behind the
+     * app's silent auto-refresh, and the Settings button.
+     *
+     * It probes the published stats and downloads only what actually moved.
+     * Unlike a boot or a forced reload it never falls through to an unpinned
+     * body fetch, so a probe that answers nothing leaves the served data
+     * untouched instead of pulling the multi-megabyte index on a guess.
+     */
+    async revalidate({ id }: { id: number }) {
+      const gen = generation;
+      const published = await deps.probeMeta(cdnBase).catch(() => null);
+      // The stamp is the snapshot's freshness identity. A superseded run, an
+      // unreachable probe, and a partial probe (tag resolved but stats
+      // unreadable) all leave it unknown: nothing can be compared, so nothing
+      // is downloaded and the check stays undated — the caller retries on its
+      // next tick.
+      if (
+        gen !== generation ||
+        published === null ||
+        published.generatedAt === undefined
+      ) {
+        post({ type: "result", id, ok: true, data: { status: "unknown" } });
+        return;
+      }
+      let status: RevalidateStatus;
+      if (published.generatedAt === servedGeneratedAt) {
+        // The published run is the one already being served. The profiles
+        // dataset moves on its own schedule, so it is still revalidated; the
+        // (unchanged) identity is re-announced either way, which is what
+        // dates the check and re-pins per-skill profile fetches to a
+        // refreshed profiles tag.
+        const profilesRefreshed = await loadProfiles(gen, false);
+        emitIndex({
+          tag: published.tag,
+          generatedAt: published.generatedAt,
+          total: published.total,
+          profilesAt: servedProfilesAt,
+          profilesTag: servedProfilesTag,
+          origin: "unchanged",
+          checkedAt: deps.now(),
+        });
+        status = profilesRefreshed ? "updated" : "current";
+      } else {
+        // A newer run is published: the ordinary non-blanking download path,
+        // pinned to the tag the probe just resolved.
+        await download(gen, false, published);
+        // A failed body download keeps the previous snapshot, so the check
+        // learned something it could not act on.
+        status =
+          servedGeneratedAt === published.generatedAt ? "updated" : "unknown";
+      }
+      post({ type: "result", id, ok: true, data: { status } });
+    },
+
+    /** Handle one synchronous query from the main thread. */
+    handle(message: RegistryQuery) {
       try {
         let data: unknown;
         switch (message.type) {

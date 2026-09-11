@@ -31,6 +31,8 @@ self.onmessage = (event: MessageEvent<RegistryWorkerMessage>) => {
     controller.init(message.payload);
   } else if (message.type === "reload") {
     controller.reload(message.payload);
+  } else if (message.type === "revalidate") {
+    void controller.revalidate(message);
   } else if (
     message.type === "getPage" ||
     message.type === "getRepos" ||

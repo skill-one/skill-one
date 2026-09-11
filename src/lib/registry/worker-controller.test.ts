@@ -28,6 +28,7 @@ import type {
   RegistryWorkerMessage,
   RepoSortOrder,
   ReposRequest,
+  RevalidateResult,
   SortOrder,
 } from "./protocol";
 import type { Skill, SkillProfile } from "../../types/skill";
@@ -263,12 +264,14 @@ describe("createRegistryController — boot", () => {
     expect(t.pins).toEqual([]);
     expect(saved).toEqual([]);
     expect(t.controller.stats()).toMatchObject({ count: 2, ready: true });
-    // The read-out still carries what the probe learned (fresh tag, count).
+    // The read-out still carries what the probe learned (fresh tag, count),
+    // and dates the check so the next one is only due once the window passes.
     expect(t.recorded.indexes.at(-1)?.info).toEqual({
       tag: "dist-2026-09-01",
       generatedAt,
       total: 2,
       origin: "unchanged",
+      checkedAt: 0,
     });
   });
 
@@ -304,6 +307,7 @@ describe("createRegistryController — boot", () => {
       tag: "dist-2026-09-06",
       total: 8945,
       origin: "updated",
+      checkedAt: 0,
     });
   });
 
@@ -358,6 +362,139 @@ describe("createRegistryController — boot", () => {
     clock += 500; // past PROGRESS_INTERVAL_MS
     t.push(skill(3));
     expect(t.recorded.progress.map((p) => p.count)).toEqual([1, 4]);
+  });
+});
+
+describe("createRegistryController — revalidate", () => {
+  /**
+   * The harness reads the source config lazily on every probe, so passing the
+   * object itself (rather than a copy) lets a test publish a new snapshot
+   * mid-run — which is exactly the situation this check exists for.
+   */
+  type SourceOptions = NonNullable<Parameters<typeof setup>[0]>;
+
+  it("downloads nothing and dates the check when the run is unchanged", async () => {
+    let clock = 0;
+    const generatedAt = "2026-09-01T14:25:32Z";
+    const t = setup({
+      now: () => clock,
+      cache: {
+        load: async () => record([skill(0)], generatedAt),
+        save: async () => {},
+        clear: async () => {},
+      },
+      published: { tag: "dist-2026-09-01", generatedAt, total: 1 },
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+    expect(t.pins).toEqual([]);
+
+    clock = 5_000;
+    void t.controller.revalidate({ id: 1 });
+    await t.flush();
+
+    expect(t.pins).toEqual([]);
+    expect(resultData<RevalidateResult>(t.recorded.results.at(-1)!)).toEqual({
+      status: "current",
+    });
+    // The check is dated, which is what starts the freshness window.
+    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
+      origin: "unchanged",
+      checkedAt: 5_000,
+    });
+  });
+
+  it("pulls in the newer run when the published stamp moved", async () => {
+    const options: SourceOptions = {
+      skills: [skill(0)],
+      published: {
+        tag: "dist-2026-09-01",
+        generatedAt: "2026-09-01T00:00:00Z",
+        total: 1,
+      },
+    };
+    const t = setup(options);
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+    expect(t.pins).toEqual(["dist-2026-09-01"]);
+
+    // A new day publishes while the app stays open.
+    options.published = {
+      tag: "dist-2026-09-02",
+      generatedAt: "2026-09-02T00:00:00Z",
+      total: 1,
+    };
+    void t.controller.revalidate({ id: 1 });
+    await t.flush();
+
+    expect(t.pins).toEqual(["dist-2026-09-01", "dist-2026-09-02"]);
+    expect(resultData<RevalidateResult>(t.recorded.results.at(-1)!)).toEqual({
+      status: "updated",
+    });
+  });
+
+  it("downloads nothing when the probe cannot answer", async () => {
+    const generatedAt = "2026-09-01T14:25:32Z";
+    const options: SourceOptions = {
+      published: { tag: "dist-2026-09-01", generatedAt, total: 1 },
+      cache: {
+        load: async () => record([skill(0)], generatedAt),
+        save: async () => {},
+        clear: async () => {},
+      },
+    };
+    const t = setup(options);
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+    expect(t.pins).toEqual([]);
+
+    // The tag listing is unreachable now. Boot and a forced reload fall back
+    // to the mutable branch here; a periodic check must not — that would pull
+    // the whole multi-megabyte index on a probe that answered nothing.
+    options.published = null;
+    void t.controller.revalidate({ id: 1 });
+    await t.flush();
+
+    expect(t.pins).toEqual([]);
+    expect(resultData<RevalidateResult>(t.recorded.results.at(-1)!)).toEqual({
+      status: "unknown",
+    });
+  });
+
+  it("reports updated when only the profiles dataset moved", async () => {
+    const generatedAt = "2026-09-01T14:25:32Z";
+    const before = "2026-09-10T07:22:00Z";
+    const after = "2026-09-11T07:22:00Z";
+    const options: SourceOptions = {
+      published: { tag: "dist-2026-09-01", generatedAt, total: 1 },
+      profilesMeta: { generatedAt: before },
+      profiles: new Map([["owner-0/repo-0/skill-0", { domain: "开发编程" }]]),
+      cache: {
+        load: async () => ({
+          ...record([skill(0)], generatedAt),
+          profilesAt: before,
+        }),
+        save: async () => {},
+        clear: async () => {},
+      },
+    };
+    const t = setup(options);
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+    // Both snapshots are the ones already served: nothing was fetched.
+    expect(t.pins).toEqual([]);
+
+    // The profiles dataset moves on its own schedule, independent of the
+    // registry index it decorates.
+    options.profilesMeta = { generatedAt: after };
+    void t.controller.revalidate({ id: 1 });
+    await t.flush();
+
+    expect(t.pins).toEqual([]);
+    expect(resultData<RevalidateResult>(t.recorded.results.at(-1)!)).toEqual({
+      status: "updated",
+    });
+    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({ profilesAt: after });
   });
 });
 

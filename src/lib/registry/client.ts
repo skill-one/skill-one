@@ -10,6 +10,7 @@ import type {
   RepoPageData,
   ReposRequest,
   RegistryWorkerMessage,
+  RevalidateResult,
 } from "./protocol";
 import type { SkillRef } from "../../data/featured-content";
 import type { Skill } from "../../types/skill";
@@ -129,7 +130,8 @@ function request(
     | "getFeatured"
     | "getRanking"
     | "lookupSkills"
-    | "getDomains",
+    | "getDomains"
+    | "revalidate",
   payload?: unknown,
 ): Promise<unknown> {
   ensureInit();
@@ -193,6 +195,16 @@ export function lookupSkills(refs: SkillRef[]): Promise<{
  */
 export function getDomains(): Promise<DomainInfo[]> {
   return request("getDomains") as Promise<DomainInfo[]>;
+}
+
+/**
+ * Cheap freshness check: probe the published snapshots and pull in only what
+ * actually moved. The served data keeps rendering throughout — nothing is
+ * blanked, and an unreachable probe downloads nothing at all. Resolves with
+ * what the check found.
+ */
+export function revalidateRegistry(): Promise<RevalidateResult> {
+  return request("revalidate") as Promise<RevalidateResult>;
 }
 
 /**

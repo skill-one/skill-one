@@ -21,6 +21,16 @@ vi.mock("../../hooks/use-registry-snapshot", () => ({
     }),
 }));
 
+/** The manual freshness check the 数据源 card drives. */
+const refresh = vi.hoisted(() => ({ check: vi.fn() }));
+
+vi.mock("../../lib/registry/refresh", () => ({
+  checkForRegistryUpdate: refresh.check,
+}));
+
+/** When the freshness probe behind `SERVED` last completed. */
+const CHECKED_AT_ISO = "2026-09-11T08:00:00Z";
+
 const SERVED: IndexInfo = {
   tag: "dist-2026-09-06",
   generatedAt: "2026-01-01T00:00:00Z",
@@ -28,12 +38,14 @@ const SERVED: IndexInfo = {
   profilesTag: "dist-2026-09-10-2",
   profilesAt: "2026-09-10T07:22:00Z",
   origin: "unchanged",
+  checkedAt: Date.parse(CHECKED_AT_ISO),
 };
 
 /** How the card renders a snapshot stamp in the host's local time zone. */
 const localeStamp = (iso: string) => new Date(iso).toLocaleString();
 const GENERATED_AT_LOCALE = localeStamp("2026-01-01T00:00:00Z");
 const PROFILES_AT_LOCALE = localeStamp("2026-09-10T07:22:00Z");
+const CHECKED_AT_LOCALE = localeStamp(CHECKED_AT_ISO);
 
 function renderSettings() {
   return render(
@@ -76,6 +88,8 @@ describe("SettingsPage", () => {
     expect(screen.getByText("23,734")).toBeInTheDocument();
     expect(screen.getByText(GENERATED_AT_LOCALE)).toBeInTheDocument();
     expect(screen.getByText(PROFILES_AT_LOCALE)).toBeInTheDocument();
+    // The last completed check is dated too — it covers both sources.
+    expect(screen.getByText(CHECKED_AT_LOCALE)).toBeInTheDocument();
     expect(
       screen.getByText("索引未更新，已复用本地缓存"),
     ).toBeInTheDocument();
@@ -87,8 +101,8 @@ describe("SettingsPage", () => {
   it("holds placeholders until a snapshot is being served", () => {
     renderSettings();
 
-    // Two snapshot tags + two stamps + the index row count.
-    expect(screen.getAllByText("未知")).toHaveLength(5);
+    // Two snapshot tags + two stamps + the index row count + last check.
+    expect(screen.getAllByText("未知")).toHaveLength(6);
     expect(screen.getByText("数据尚未就绪")).toBeInTheDocument();
   });
 
@@ -131,5 +145,21 @@ describe("SettingsPage", () => {
 
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(document.documentElement.style.colorScheme).toBe("dark");
+  });
+
+  it.each([
+    ["current", "已是最新快照"],
+    ["updated", "发现新快照，已在后台更新"],
+    ["unknown", "检测失败，请稍后重试"],
+  ] as const)("reports a %s manual check", async (status, label) => {
+    const user = userEvent.setup();
+    refresh.check.mockResolvedValue({ status });
+    renderSettings();
+
+    await user.click(screen.getByRole("button", { name: "检测更新" }));
+
+    expect(await screen.findByText(label)).toBeInTheDocument();
+    // Asking explicitly must ignore the freshness window.
+    expect(refresh.check).toHaveBeenCalledWith({ force: true });
   });
 });

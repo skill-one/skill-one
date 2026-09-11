@@ -8,6 +8,7 @@ import { AppSidebar } from "./components/app-sidebar";
 import { UpdateDialog } from "./components/update-dialog";
 import { Toaster } from "./components/ui/sonner";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
+import { useRegistryRefresh } from "./hooks/use-registry-refresh";
 import { createQueryClient } from "./lib/query-client";
 import { checkForUpdate } from "./lib/update-store";
 import { isTauri } from "./lib/tauri";
@@ -114,6 +115,7 @@ export default function App() {
       <HashRouter>
         <PopoverNavigation />
         <StartupUpdateCheck />
+        <RegistryAutoRefresh />
         <UpdateDialog />
         <Toaster />
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
@@ -187,5 +189,16 @@ function StartupUpdateCheck() {
     if (!isTauri()) return;
     void checkForUpdate();
   }, []);
+  return null;
+}
+
+/**
+ * Silent in-session freshness: once the last check has gone stale (the
+ * sources publish daily), the registry re-checks the published snapshots and
+ * pulls in anything new on its own. Nothing is surfaced — the user is never
+ * asked to care about this.
+ */
+function RegistryAutoRefresh() {
+  useRegistryRefresh();
   return null;
 }

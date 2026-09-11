@@ -20,6 +20,7 @@ const INITIAL_SNAPSHOT = vi.hoisted(() => ({
 vi.mock("./lib/registry/client", () => ({
   initRegistry: vi.fn(),
   reloadRegistry: vi.fn(),
+  revalidateRegistry: vi.fn(() => new Promise(() => {})),
   getPage: vi.fn(() => new Promise(() => {})),
   getFeatured: vi.fn(() => new Promise(() => {})),
   lookupSkills: vi.fn(() => new Promise(() => {})),

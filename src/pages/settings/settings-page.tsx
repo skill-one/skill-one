@@ -9,7 +9,11 @@ import {
   setCdnBase,
 } from "../../lib/cdn-config";
 import { reloadRegistry } from "../../lib/registry/client";
-import type { IndexOrigin } from "../../lib/registry/protocol";
+import { checkForRegistryUpdate } from "../../lib/registry/refresh";
+import type {
+  IndexOrigin,
+  RevalidateStatus,
+} from "../../lib/registry/protocol";
 import { useAppUpdate } from "../../hooks/use-app-update";
 import { useRegistrySnapshot } from "../../hooks/use-registry-snapshot";
 import { Button } from "../../components/ui/button";
@@ -18,9 +22,16 @@ import { ThemeModeToggle } from "../../components/theme-mode-toggle";
 
 /** How the served snapshot got here, phrased for the settings page. */
 const INDEX_ORIGIN_LABEL: Record<IndexOrigin, string> = {
-  updated: "本次启动已下载最新索引",
+  updated: "已下载最新索引",
   unchanged: "索引未更新，已复用本地缓存",
   cache: "正在校验本地缓存…",
+};
+
+/** Outcome of a manual freshness check, phrased for the settings page. */
+const CHECK_LABEL: Record<RevalidateStatus, string> = {
+  updated: "发现新快照，已在后台更新",
+  current: "已是最新快照",
+  unknown: "检测失败，请稍后重试",
 };
 
 /**
@@ -42,6 +53,10 @@ const INDEX_ORIGIN_LABEL: Record<IndexOrigin, string> = {
 export function SettingsPage() {
   const [value, setValue] = useState(getCdnBase());
   const [saved, setSaved] = useState(false);
+  // Outcome of the last manual check, or "checking" while it is in flight.
+  const [check, setCheck] = useState<RevalidateStatus | "checking" | null>(
+    null,
+  );
   const update = useAppUpdate();
   // Only the served snapshot identity drives this card; count climbs and
   // progress flags during a streaming download must not re-render the page.
@@ -54,6 +69,13 @@ export function SettingsPage() {
     setSaved(true);
     // A source switch invalidates the downloaded registry: re-fetch it.
     if (previous !== next) reloadRegistry();
+  };
+
+  // A user-initiated check skips the freshness window — asking is the point.
+  const checkNow = async () => {
+    setCheck("checking");
+    const result = await checkForRegistryUpdate({ force: true });
+    setCheck(result?.status ?? "unknown");
   };
 
   // Facts about the snapshots the store is actually serving, one group per
@@ -203,17 +225,26 @@ export function SettingsPage() {
                 </h3>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                   商店数据来自两个 GitHub
-                  仓库发布的每日快照，按标签定址并在本地缓存复用。
+                  仓库发布的每日快照。启动时自动校验、之后每日静默更新，无需手动干预。
                 </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => reloadRegistry()}
-              >
-                立即重新下载
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={check === "checking"}
+                  onClick={() => void checkNow()}
+                >
+                  {check === "checking" ? "正在检测…" : "检测更新"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => reloadRegistry()}
+                >
+                  立即重新下载
+                </Button>
+              </div>
             </div>
             <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
               <div className="contents">
@@ -250,9 +281,34 @@ export function SettingsPage() {
                   </dd>
                 </div>
               ))}
+              {/* One check covers both sources, so it reads outside the two
+                  per-source groups. */}
+              <div className="contents">
+                <dt className="pt-2 text-muted-foreground">上次校验</dt>
+                <dd className="pt-2 text-foreground">
+                  {formatCheckedAt(index?.checkedAt)}
+                </dd>
+              </div>
             </dl>
-            <p className="mt-2 text-[12px] text-muted-foreground">
-              {index ? INDEX_ORIGIN_LABEL[index.origin] : "数据尚未就绪"}
+            {/* One freshness read-out for both the automatic and the manual
+                path: the manual check's outcome while one is showing,
+                otherwise how the served snapshot got here. Two lines would
+                just say the same thing twice. */}
+            <p
+              role={check === "unknown" ? "alert" : undefined}
+              className={`mt-2 text-[12px] ${
+                check === "unknown"
+                  ? "text-destructive"
+                  : check === "updated"
+                    ? "text-primary"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {check && check !== "checking"
+                ? CHECK_LABEL[check]
+                : index
+                  ? INDEX_ORIGIN_LABEL[index.origin]
+                  : "数据尚未就绪"}
             </p>
           </div>
         </div>
@@ -266,6 +322,11 @@ function formatIndexTime(iso?: string): string {
   if (!iso) return "未知";
   const ms = Date.parse(iso);
   return Number.isNaN(ms) ? "未知" : new Date(ms).toLocaleString();
+}
+
+/** A ms-epoch stamp rendered in the user's locale and time zone. */
+function formatCheckedAt(ms?: number): string {
+  return ms === undefined ? "未知" : new Date(ms).toLocaleString();
 }
 
 /** Digits with thousands separators; a published count should not be fuzzy. */
