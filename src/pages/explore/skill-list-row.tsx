@@ -38,8 +38,8 @@ function TooltipRow({
   return (
     <div className="flex items-center gap-1.5">
       <Icon className={cn("h-3.5 w-3.5", tone)} />
-      <span className="text-muted-foreground">{label}</span>
-      <span className="ml-auto pl-3 font-medium tabular-nums text-foreground">
+      <span className="text-background/65">{label}</span>
+      <span className="ml-auto pl-3 font-medium tabular-nums text-background">
         {value}
       </span>
     </div>
@@ -203,7 +203,7 @@ export function SkillListRow({
                       other: the blend is a geometric mean, so neither count
                       can outrun the other — the question this line answers
                       is "why is 3M installs only 713K heat?". */}
-                  <p className="border-t border-border/60 pt-1.5 text-[11px] leading-relaxed text-muted-foreground/80">
+                  <p className="border-t border-border/60 pt-1.5 text-[11px] leading-relaxed text-background/55">
                     热度 = √(安装 × Star)，安装与 Star 各占一半
                   </p>
                 </div>
