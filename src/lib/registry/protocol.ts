@@ -11,7 +11,7 @@ export type { SkillRef };
  */
 
 /** Registry fields a search covers (also the highlight keys). */
-export type SearchField = "name" | "repo" | "description" | "domain";
+export type SearchField = "name" | "repo" | "description";
 
 /** One search/browse result: the skill plus what matched, for highlighting. */
 export interface SearchHit {

@@ -127,7 +127,9 @@ describe("buildSkillSearch", () => {
     expect(buildSkillSearch(skills)("kubernetes")).toEqual([]);
   });
 
-  it("matches skills through their profile domain", () => {
+  it("does not search a skill's profile domain", () => {
+    // The profile domain is a filter, not a search field: only name, repo and
+    // description are indexed.
     const profiled: Skill[] = [
       {
         name: "pdf-exporter",
@@ -138,11 +140,7 @@ describe("buildSkillSearch", () => {
         profile: { domain: "内容创作" },
       },
     ];
-    const search = buildSkillSearch(profiled);
-    expect(search("内容创作").map(({ skill }) => skill.name)).toEqual([
-      "pdf-exporter",
-    ]);
-    // And the substring fallback agrees, so pre-index results match too.
-    expect(search).toBeDefined();
+
+    expect(buildSkillSearch(profiled)("内容创作")).toEqual([]);
   });
 });

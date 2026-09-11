@@ -11,12 +11,18 @@ export function SearchInput({
   value,
   onChange,
   label,
+  disabled = false,
+  placeholder,
 }: {
   value: string;
   /** Receives the raw field value; debouncing is the caller's. */
   onChange: (value: string) => void;
   /** e.g. "搜索 Skill" / "搜索仓库". */
   label: string;
+  /** Locks the field while what it searches is not available yet. */
+  disabled?: boolean;
+  /** Overrides the `${label}...` hint, e.g. to say why the field is locked. */
+  placeholder?: string;
 }) {
   return (
     <div className="relative w-full max-w-sm">
@@ -24,8 +30,9 @@ export function SearchInput({
       <Input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={`${label}...`}
+        placeholder={placeholder ?? `${label}...`}
         aria-label={label}
+        disabled={disabled}
         className="h-9 rounded-full pl-9"
       />
     </div>

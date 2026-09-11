@@ -1,11 +1,7 @@
 import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
 import { popularity } from "../popularity";
-import {
-  buildSkillSearch,
-  containsSearch,
-  type SkillSearch,
-} from "../search-skills";
+import { buildSkillSearch, type SkillSearch } from "../search-skills";
 import type {
   DomainInfo,
   FeaturedSectionData,
@@ -142,8 +138,9 @@ export function createRegistryController(
   let indexInfo: IndexInfo | null = null;
 
   // The array every query reads. During a fresh (non-revalidating) download
-  // it points at the growing buffer, so paged browse / substring search /
-  // lookups see the loaded prefix while the stream is still in flight.
+  // it points at the growing buffer, so paged browse and lookups see the
+  // loaded prefix while the stream is still in flight. Search is the one
+  // exception: it waits for the index over the settled dataset (see getPage).
   let store: Skill[] = [];
   let complete = false;
   let ready = false; // complete AND search index built
@@ -490,15 +487,17 @@ export function createRegistryController(
     }
     const q = query.trim();
     if (q) {
-      // Fuzzy once the index is up; substring over what has loaded so far
-      // while the download is still streaming. The results settle once the
-      // index lands (the main thread refetches on `ready`).
-      //
+      // A search owns the whole registry, so there is nothing to answer with
+      // until the index over it exists: it is built once the download lands,
+      // and before that a query yields nothing rather than a guess over the
+      // partial prefix. The main thread keeps its search field disabled until
+      // `ready`, so this branch is the contract's backstop.
+      if (!search) return { hits: [], total: 0 };
       // Always in relevance order: `sort` orders the browsed list, and
       // re-ranking search hits by download count or name would throw away the
       // ranking (name match > repo > description, install count as tie-break)
       // that made them hits in the first place.
-      let hits: SearchHit[] = search ? search(q) : containsSearch(store, q);
+      let hits: SearchHit[] = search(q);
       // A category filter narrows the search results; skills the profiles
       // dataset has not reached simply fall outside every category.
       if (domain) {

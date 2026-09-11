@@ -178,7 +178,16 @@ export function ExplorePage() {
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
       {/* Toolbar: search on the left; category and sort on the right. */}
       <div className="mb-4 flex items-center gap-3">
-        <SearchInput value={search} onChange={handleSearch} label="搜索 Skill" />
+        {/* Search runs on the worker's MiniSearch index, which only exists
+            once the whole registry has landed. Before that the field is
+            locked, so a query is never answered over a partial registry. */}
+        <SearchInput
+          value={search}
+          onChange={handleSearch}
+          label="搜索 Skill"
+          disabled={!stats.ready}
+          placeholder={stats.ready ? undefined : "索引构建中…"}
+        />
 
         <div className="ml-auto flex items-center gap-2">
           {/* Category filter over the profiles dataset's domains. The worker

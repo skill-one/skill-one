@@ -16,10 +16,11 @@ const REGISTRY_PAGE_QUERY_PREFIX = "registry-page";
  * skills), fetched from the worker. Pages are small (one viewport of rows),
  * so the main thread never holds — or re-renders over — the full registry.
  *
- * While the download streams in, the first query answer is computed over the
- * loaded prefix; when the worker's search index lands (a new `epoch`), every
- * cached page is invalidated so substring results settle into fuzzy-ranked
- * ones and revalidated data replaces the snapshot in place.
+ * While the download streams in, an answer is computed over the loaded prefix
+ * (browse pages the prefix; search stays disabled until the index exists);
+ * when the worker's index lands (a new `epoch`), every cached page is
+ * invalidated so answers resettle over the full dataset and revalidated data
+ * replaces the snapshot in place.
  */
 export function useRegistryPage(
   query: string,

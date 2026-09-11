@@ -636,7 +636,7 @@ describe("createRegistryController — getPage", () => {
     expect(data.hits.map((h) => h.skill.name)).toEqual(["skill-0", "skill-6"]);
   });
 
-  it("searches by substring while streaming and fuzzy once indexed", async () => {
+  it("answers no search until the index over the registry is built", async () => {
     const t = setup();
     t.controller.init({ cdnBase: "test" });
     await t.flush();
@@ -644,27 +644,33 @@ describe("createRegistryController — getPage", () => {
     t.push({ ...skill(0), name: "gadget-master", repo: "acme/gadgets" });
     t.push({ ...skill(1), name: "tool-a", repo: "acme/tools" });
 
-    // Mid-stream: substring match over the loaded prefix only.
+    // Mid-stream there is no index over the registry to rank against, so a
+    // query is answered with nothing rather than a guess over the prefix; the
+    // main thread keeps its search field disabled until `ready`.
     t.controller.handle({
       type: "getPage",
       id: 1,
       payload: { query: "gadget", sort: "default", page: 0, pageSize: 5 },
     });
-    const substring = resultData<{ total: number }>(t.recorded.results[0]);
-    expect(substring.total).toBe(1);
-
-    t.controller.handle({
-      type: "getPage",
-      id: 2,
-      payload: { query: "gadgt", sort: "default", page: 0, pageSize: 5 },
-    });
-    const typoMidStream = resultData<{ total: number }>(t.recorded.results[1]);
-    expect(typoMidStream.total).toBe(0);
+    const midStream = resultData<{ hits: unknown[]; total: number }>(
+      t.recorded.results[0],
+    );
+    expect(midStream).toEqual({ hits: [], total: 0 });
 
     t.complete();
     await t.flush();
 
-    // Indexed: the same typo fuzzy-matches.
+    // Indexed: the query — and a typo of it — are answered by the fuzzy index.
+    t.controller.handle({
+      type: "getPage",
+      id: 2,
+      payload: { query: "gadget", sort: "default", page: 0, pageSize: 5 },
+    });
+    const exact = resultData<{ hits: Array<{ skill: Skill }> }>(
+      t.recorded.results[1],
+    );
+    expect(exact.hits.map((h) => h.skill.name)).toEqual(["gadget-master"]);
+
     t.controller.handle({
       type: "getPage",
       id: 3,

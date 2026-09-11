@@ -6,7 +6,9 @@ import type { SearchField, SearchHit } from "./registry/protocol";
 
 /**
  * Client-side fuzzy search over the skill registry, powered by MiniSearch
- * (inverted index + BM25+ ranking). Runs inside the registry worker.
+ * (inverted index + BM25+ ranking). Runs inside the registry worker, and only
+ * once the whole registry has landed: a query is answered by this index or not
+ * at all — the caller returns nothing while it is still being built.
  * Relevance is computed per field with field boosts keeping the priority
  * name > repo > description, and a log-scale popularity boost nudges
  * high-popularity skills upward — relevance stays the primary signal.
@@ -26,7 +28,7 @@ type IndexedSkill = Skill & { id: number };
 // one step of field priority (2×) but never two (4×) — a hugely popular
 // repo match may outrank a zero-install name match, while a description match
 // cannot.
-const FIELD_BOOSTS = { name: 4, repo: 2, description: 1, domain: 1 };
+const FIELD_BOOSTS = { name: 4, repo: 2, description: 1 };
 
 // Popularity boost divisor: 5 tops out at a ~2.2× multiplier for the most
 // popular skills (log10 of the top blended figure ≈ 5.9), so popularity can
@@ -67,13 +69,7 @@ function invertMatch(
  */
 export function buildSkillSearch(skills: Skill[]): SkillSearch {
   const miniSearch = new MiniSearch<IndexedSkill>({
-    fields: ["name", "repo", "description", "domain"],
-    // The domain lives nested under the optional profile; skills without
-    // one simply do not index any domain terms.
-    extractField: (doc, field) =>
-      field === "domain"
-        ? doc.profile?.domain
-        : (doc as unknown as Record<string, unknown>)[field],
+    fields: ["name", "repo", "description"],
     searchOptions: {
       boost: FIELD_BOOSTS,
       // Search-as-you-type and typo tolerance (edit distance ≤ 20% of the
@@ -93,25 +89,4 @@ export function buildSkillSearch(skills: Skill[]): SkillSearch {
       skill: skills[id],
       matched: invertMatch(match),
     }));
-}
-
-/**
- * Plain case-insensitive substring search over the same fields, used whenever
- * the fuzzy index is not ready: while the registry is still streaming in
- * (building MiniSearch for every progress snapshot would cost more than the
- * whole streaming window). No ranking and no highlighting (matched stays
- * empty) — results settle into the full fuzzy search once the index lands.
- */
-export function containsSearch(
-  skills: Skill[],
-  query: string,
-): SearchHit[] {
-  const q = query.toLowerCase();
-  return skills
-    .filter((skill) =>
-      [skill.name, skill.repo, skill.description, skill.profile?.domain]
-        .filter((field): field is string => typeof field === "string")
-        .some((field) => field.toLowerCase().includes(q)),
-    )
-    .map((skill) => ({ skill, matched: {} }));
 }

@@ -29,7 +29,7 @@ configure({ asyncUtilTimeout: 5000 });
 /**
  * The registry client is replaced by a real-controller-driven harness, so
  * the page tests exercise the exact RPC/event contract the worker speaks —
- * including streaming progress, substring→fuzzy search handover and the
+ * including streaming progress, the search field's unlock on `ready`, and the
  * ready-epoch invalidation.
  */
 vi.mock("../../lib/registry/client", async () => {
@@ -128,6 +128,17 @@ async function goToPage(
   page: number,
 ) {
   await user.click(screen.getByRole("link", { name: String(page) }));
+}
+
+/**
+ * The search field, once the worker's index is ready to answer it. The field
+ * stays locked until then, so every search case waits for the same unlock
+ * instead of racing the index build.
+ */
+async function searchField(): Promise<HTMLElement> {
+  const input = screen.getByRole("textbox", { name: "搜索 Skill" });
+  await waitFor(() => expect(input).toBeEnabled());
+  return input;
 }
 
 beforeEach(() => {
@@ -483,10 +494,7 @@ describe("ExplorePage", () => {
     await goToPage(user, 2);
     await screen.findByText(`tool-${PAGE_SIZE - 1}`);
 
-    await user.type(
-      screen.getByRole("textbox", { name: "搜索 Skill" }),
-      "gadget",
-    );
+    await user.type(await searchField(), "gadget");
 
     // Under a loaded runner one keystroke can outlast the 150 ms debounce, so
     // an intermediate prefix query ("g", "ga", …) may briefly render the very
@@ -526,7 +534,7 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("gadget-master");
 
-    const input = screen.getByRole("textbox", { name: "搜索 Skill" });
+    const input = await searchField();
     await user.type(input, "gadget");
     expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
 
@@ -542,10 +550,7 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("skill-0");
 
-    await user.type(
-      screen.getByRole("textbox", { name: "搜索 Skill" }),
-      "zzzzzzqqqq",
-    );
+    await user.type(await searchField(), "zzzzzzqqqq");
 
     expect(
       await screen.findByText("未找到匹配“zzzzzzqqqq”的 Skill"),
@@ -585,10 +590,7 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("widget-pack");
 
-    await user.type(
-      screen.getByRole("textbox", { name: "搜索 Skill" }),
-      "widget",
-    );
+    await user.type(await searchField(), "widget");
 
     expect(await screen.findByText("docgen")).toBeInTheDocument();
     // Rows appear in DOM order; read each row's aria-label, which stays
@@ -641,10 +643,7 @@ describe("ExplorePage", () => {
     await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
     expect(cardOrder()).toEqual(["alpha-redis-clip", "beta-redis-tool"]);
 
-    await user.type(
-      screen.getByRole("textbox", { name: "搜索 Skill" }),
-      "redis",
-    );
+    await user.type(await searchField(), "redis");
 
     // Both matches are equally relevant, so the search's install boost puts the
     // popular one first — a reorder the name sort alone cannot explain, which is
@@ -664,10 +663,7 @@ describe("ExplorePage", () => {
     // Without a search nothing is highlighted.
     expect(container.querySelector("mark")).toBeNull();
 
-    await user.type(
-      screen.getByRole("textbox", { name: "搜索 Skill" }),
-      "gadget",
-    );
+    await user.type(await searchField(), "gadget");
 
     // The name's matched token is wrapped in a <mark>; the full name stays
     // one logical string across the highlight segments.
@@ -743,7 +739,7 @@ describe("ExplorePage", () => {
     await user.click(screen.getByRole("button", { name: "按热度" }));
     await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
 
-    const input = screen.getByRole("textbox", { name: "搜索 Skill" });
+    const input = await searchField();
     await user.type(input, "gadget");
     expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
 
@@ -934,7 +930,7 @@ describe("ExplorePage streaming", () => {
     expect(screen.getByText(`共 ${PAGE_SIZE + 20} 个 · 加载中`)).toBeInTheDocument();
   });
 
-  it("falls back to substring search while streaming and fuzzy search once complete", async () => {
+  it("keeps search locked until the index over the registry is ready", async () => {
     harness.init();
     renderExplorePage();
     await act(async () => {});
@@ -943,29 +939,21 @@ describe("ExplorePage streaming", () => {
     harness.pushAll(gadgetRegistry().slice(0, 10));
     await screen.findByText("gadget-master");
 
-    const user = userEvent.setup();
-    const input = screen.getByRole("textbox", { name: "搜索 Skill" });
+    // Nothing is searchable mid-stream: the field is locked and says why,
+    // rather than answering a query over the partial registry.
+    const input = screen.getByLabelText("搜索 Skill");
+    expect(input).toBeDisabled();
+    expect(input).toHaveAttribute("placeholder", "索引构建中…");
 
-    // Exact substring still matches during streaming...
-    await user.type(input, "gadget");
-    // The row is also on the unfiltered streaming page one, and the search
-    // itself is debounced — the count is what proves the filter applied.
-    expect(await screen.findByText(/共 1 个/)).toBeInTheDocument();
-    expect(
-      await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
-    ).toBeInTheDocument();
-
-    // ...but a typo cannot, since the fallback has no fuzzy matching.
-    await user.clear(input);
-    await user.type(input, "gadgt");
-    expect(
-      await screen.findByText("未找到匹配“gadgt”的 Skill"),
-    ).toBeInTheDocument();
-
-    // The stream completes; the MiniSearch index builds over the full
-    // registry and the same typo now fuzzy-matches with no user retry.
+    // The stream completes, the MiniSearch index builds over the full registry
+    // and the field unlocks — a typo now fuzzy-matches, with no user retry.
     harness.pushAll(gadgetRegistry().slice(10));
     harness.complete();
+    await waitFor(() => expect(input).toBeEnabled());
+
+    const user = userEvent.setup();
+    await user.type(input, "gadgt");
+    expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
     expect(
       await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
