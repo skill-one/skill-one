@@ -1,5 +1,4 @@
 import { domainMeta } from "../data/domains";
-import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
 import {
   Tooltip,
@@ -36,15 +35,12 @@ export function DomainBadge({
     <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Badge
-            variant="outline"
-            className={cn("cursor-help", className)}
-          >
+          <Badge variant="outline" className={className}>
             {meta && <span aria-hidden="true">{meta.emoji}</span>}
             {domain}
           </Badge>
         </TooltipTrigger>
-        <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
+        <TooltipContent>{tooltip}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
