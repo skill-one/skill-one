@@ -495,8 +495,8 @@ export function createRegistryController(
       if (!search) return { hits: [], total: 0 };
       // Always in relevance order: `sort` orders the browsed list, and
       // re-ranking search hits by download count or name would throw away the
-      // ranking (name match > repo > description, install count as tie-break)
-      // that made them hits in the first place.
+      // ranking (all terms matched, exact/prefix name first, then name > repo
+      // > description, popularity as a nudge) that made them hits.
       let hits: SearchHit[] = search(q);
       // A category filter narrows the search results; skills the profiles
       // dataset has not reached simply fall outside every category.
