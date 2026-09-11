@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Puzzle, RefreshCw, Trash2, Users } from "lucide-react";
+import {
+  Ban,
+  Check,
+  ChevronDown,
+  LayoutGrid,
+  Puzzle,
+  RefreshCw,
+  Trash2,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { removeInstalledSkill, setSkillEnabled } from "../../lib/local-skills";
@@ -36,10 +46,14 @@ import { SearchInput } from "../../components/search-input";
 /** Enablement filter offered by the toolbar dropdown. */
 type EnabledFilter = "all" | "enabled" | "disabled";
 
-const ENABLE_OPTIONS: Array<{ value: EnabledFilter; label: string }> = [
-  { value: "all", label: "全部" },
-  { value: "enabled", label: "已启用" },
-  { value: "disabled", label: "已禁用" },
+const ENABLE_OPTIONS: Array<{
+  value: EnabledFilter;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { value: "all", label: "全部", icon: LayoutGrid },
+  { value: "enabled", label: "已启用", icon: Check },
+  { value: "disabled", label: "已禁用", icon: Ban },
 ];
 
 /** Stable identity for a row: a skill's name is unique in the global directory. */
@@ -436,16 +450,24 @@ function FilterDropdown<T extends string>({
 }: {
   label: string;
   value: T;
-  options: Array<{ value: T; label: string }>;
+  options: Array<{ value: T; label: string; icon: LucideIcon }>;
   onChange: (next: T) => void;
 }) {
+  // The selected option, so the trigger can lead with the same glyph its menu
+  // row shows (keeping the closed and open states of one value in agreement).
+  const current =
+    options.find((option) => option.value === value) ?? options[0];
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="rounded-full px-4">
-          {value === ("all" as T)
-            ? label
-            : options.find((option) => option.value === value)?.label}
+          <span className="flex items-center gap-1.5">
+            <current.icon
+              aria-hidden="true"
+              className="h-4 w-4 text-foreground"
+            />
+            {value === ("all" as T) ? label : current.label}
+          </span>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
@@ -453,6 +475,15 @@ function FilterDropdown<T extends string>({
         <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as T)}>
           {options.map((option) => (
             <DropdownMenuRadioItem key={option.value} value={option.value}>
+              <option.icon
+                aria-hidden="true"
+                className={cn(
+                  "h-4 w-4",
+                  option.value === value
+                    ? "text-foreground"
+                    : "text-muted-foreground",
+                )}
+              />
               {option.label}
             </DropdownMenuRadioItem>
           ))}

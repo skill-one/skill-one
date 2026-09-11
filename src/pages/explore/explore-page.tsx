@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import {
+  ArrowDownAZ,
+  ChevronDown,
+  Flame,
+  LayoutGrid,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 
 import { useRegistryPage } from "../../hooks/use-registry-page";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
@@ -8,13 +15,13 @@ import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useClampedPage } from "../../hooks/use-clamped-page";
 import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
 import { domainMeta } from "../../data/domains";
+import { cn } from "../../lib/utils";
 import { RankBadge } from "../../components/rank-badge";
 import type { SearchHit, SortOrder } from "../../lib/registry/protocol";
 import { Button } from "../../components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -38,10 +45,18 @@ import { SearchInput } from "../../components/search-input";
  * A search is the exception: the worker answers it in relevance order, so the
  * dropdown is replaced by a read-only 相关度 pill rather than claiming an order
  * the results do not follow.
+ *
+ * Each option is led by a lucide glyph that mirrors the metric the row already
+ * shows (the same Flame that stands for 热度), so "sort by popularity" and the
+ * popularity figure read as one idea rather than two unrelated labels.
  */
-const SORT_OPTIONS: Array<{ value: SortOrder; label: string }> = [
-  { value: "popularity", label: "按热度" },
-  { value: "name", label: "按名称" },
+const SORT_OPTIONS: Array<{
+  value: SortOrder;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { value: "popularity", label: "按热度", icon: Flame },
+  { value: "name", label: "按名称", icon: ArrowDownAZ },
 ];
 
 /**
@@ -154,6 +169,11 @@ export function ExplorePage() {
     setPage(p);
   };
 
+  // The chosen sort, resolved once so the trigger echoes its label and glyph
+  // and reads exactly like the same-named row inside the menu.
+  const activeSort =
+    SORT_OPTIONS.find((option) => option.value === sort) ?? SORT_OPTIONS[0];
+
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
       {/* Toolbar: search on the left; category and sort on the right. */}
@@ -161,51 +181,82 @@ export function ExplorePage() {
         <SearchInput value={search} onChange={handleSearch} label="搜索 Skill" />
 
         <div className="ml-auto flex items-center gap-2">
-          {/* Category filter over the profiles dataset's domains. Until the
-              profiles have landed the list is empty and the menu stays the
-              old placeholder; the radio group without onValueChange keeps
-              "全部" permanently selected. */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="rounded-full px-4">
-                {domain ?? "分类"}
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuRadioGroup
-                value={domain ?? "all"}
-                onValueChange={
-                  domains.length > 0 ? handleDomain : undefined
-                }
-              >
-                <DropdownMenuRadioItem value="all">全部</DropdownMenuRadioItem>
-                {domains.map(({ domain: name, count }) => (
-                  <DropdownMenuRadioItem
-                    key={name}
-                    value={name}
-                    title={domainMeta(name)?.description}
-                  >
-                    {domainMeta(name) && (
-                      <span aria-hidden="true">{domainMeta(name)!.emoji}</span>
+          {/* Category filter over the profiles dataset's domains. The worker
+              hands back an empty list until the profiles land, so the whole
+              control stays hidden then — a filter whose only choice is "all"
+              is noise, not a decision. */}
+          {domains.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant={domain ? "secondary" : "outline"}
+                  className="rounded-full px-4"
+                >
+                  {/* The trigger leads with the selected row's own glyph — the
+                      LayoutGrid of "全部分类" or the chosen domain's emoji — so
+                      the closed and open states of the same value agree. */}
+                  <span className="flex items-center gap-1.5">
+                    {domain ? (
+                      domainMeta(domain) && (
+                        <span aria-hidden="true">
+                          {domainMeta(domain)!.emoji}
+                        </span>
+                      )
+                    ) : (
+                      <LayoutGrid
+                        aria-hidden="true"
+                        className="h-4 w-4 text-foreground"
+                      />
                     )}
-                    {name}
+                    {domain ?? "全部分类"}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup
+                  value={domain ?? "all"}
+                  onValueChange={handleDomain}
+                >
+                  {/* "全部分类" is the clear-filter default, set above the
+                      divider so it never reads as a peer of the misc "其他".
+                      LayoutGrid keeps its label aligned with the emoji rows and
+                      the figure is the full registry total, not a domain sum. */}
+                  <DropdownMenuRadioItem value="all">
+                    <LayoutGrid
+                      aria-hidden="true"
+                      className={cn(
+                        "h-4 w-4",
+                        !domain ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    />
+                    全部分类
                     <span className="ml-auto pl-4 text-xs text-muted-foreground tabular-nums">
-                      {count}
+                      {stats.count}
                     </span>
                   </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-              {domains.length === 0 && (
-                <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem disabled>
-                    更多分类 · 即将上线
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  {domains.map(({ domain: name, count }) => (
+                    <DropdownMenuRadioItem
+                      key={name}
+                      value={name}
+                      title={domainMeta(name)?.description}
+                    >
+                      {domainMeta(name) && (
+                        <span aria-hidden="true">
+                          {domainMeta(name)!.emoji}
+                        </span>
+                      )}
+                      {name}
+                      <span className="ml-auto pl-4 text-xs text-muted-foreground tabular-nums">
+                        {count}
+                      </span>
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {/* A search is ordered by relevance — the ranking is what decided
               these skills match — so the sort control is replaced by a static
@@ -214,13 +265,25 @@ export function ExplorePage() {
               user last picked for the browsed list. */}
           {query ? (
             <Button variant="outline" className="rounded-full px-4" disabled>
-              相关度
+              <span className="flex items-center gap-1.5">
+                <Sparkles
+                  aria-hidden="true"
+                  className="h-4 w-4 text-muted-foreground"
+                />
+                相关度
+              </span>
             </Button>
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="rounded-full px-4">
-                  {SORT_OPTIONS.find((option) => option.value === sort)?.label}
+                  <span className="flex items-center gap-1.5">
+                    <activeSort.icon
+                      aria-hidden="true"
+                      className="h-4 w-4 text-foreground"
+                    />
+                    {activeSort.label}
+                  </span>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
@@ -234,6 +297,15 @@ export function ExplorePage() {
                       key={option.value}
                       value={option.value}
                     >
+                      <option.icon
+                        aria-hidden="true"
+                        className={cn(
+                          "h-4 w-4",
+                          option.value === sort
+                            ? "text-foreground"
+                            : "text-muted-foreground",
+                        )}
+                      />
                       {option.label}
                     </DropdownMenuRadioItem>
                   ))}

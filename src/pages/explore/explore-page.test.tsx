@@ -760,23 +760,16 @@ describe("ExplorePage", () => {
     expect(screen.getByRole("button", { name: "按名称" })).toBeEnabled();
   });
 
-  it("offers the category placeholder menu with 全部 preselected", async () => {
-    const user = userEvent.setup();
+  it("hides the category filter until the profile domains land", async () => {
     bootRegistry(50);
     renderExplorePage();
     await screen.findByText("skill-0");
 
-    await user.click(screen.getByRole("button", { name: "分类" }));
-
-    // The registry index has no category field: 全部 is the only selectable
-    // entry (permanently checked) and the rest is a disabled coming-soon hint.
-    expect(screen.getByRole("menuitemradio", { name: "全部" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
+    // No profiles yet: the worker returns an empty domain list, so the whole
+    // category control is absent rather than a filter whose only choice is all.
     expect(
-      screen.getByRole("menuitem", { name: "更多分类 · 即将上线" }),
-    ).toHaveAttribute("aria-disabled", "true");
+      screen.queryByRole("button", { name: "全部分类" }),
+    ).not.toBeInTheDocument();
   });
 
   it("filters the list by the selected profile domain", async () => {
@@ -794,8 +787,8 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("skill-0");
 
-    // Before the profiles land the menu is still the placeholder.
-    await user.click(screen.getByRole("button", { name: "分类" }));
+    // The category control is present once domains exist; open it and pick one.
+    await user.click(screen.getByRole("button", { name: "全部分类" }));
     await user.click(screen.getByRole("menuitemradio", { name: /开发编程/ }));
 
     // The worker filters by domain: one matching skill, one page.
@@ -803,9 +796,11 @@ describe("ExplorePage", () => {
     expect(screen.getByText("skill-0")).toBeInTheDocument();
     expect(screen.queryByText("skill-1")).not.toBeInTheDocument();
 
-    // The trigger reflects the active filter; 全部 restores the registry.
+    // The trigger reflects the active filter; 全部分类 restores the registry.
     await user.click(screen.getByRole("button", { name: "开发编程" }));
-    await user.click(screen.getByRole("menuitemradio", { name: "全部" }));
+    await user.click(
+      screen.getByRole("menuitemradio", { name: /全部分类/ }),
+    );
     expect(await screen.findByText("共 6 个")).toBeInTheDocument();
     expect(screen.getByText("skill-1")).toBeInTheDocument();
   });

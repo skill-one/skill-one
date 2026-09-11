@@ -1,11 +1,18 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import {
+  ArrowDownAZ,
+  ChevronDown,
+  Package,
+  Star,
+  type LucideIcon,
+} from "lucide-react";
 
 import { useRegistryRepos } from "../../../hooks/use-registry-repos";
 import { useDebouncedValue } from "../../../hooks/use-debounced-value";
 import { useRegistryStats } from "../../../hooks/use-registry-stats";
 import { useClampedPage } from "../../../hooks/use-clamped-page";
 import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../../lib/pagination";
+import { cn } from "../../../lib/utils";
 import type { RepoSortOrder } from "../../../lib/registry/protocol";
 import { Button } from "../../../components/ui/button";
 import {
@@ -24,11 +31,19 @@ import { RepoCard } from "./repo-card";
 /**
  * The sort orders offered by the toolbar dropdown. "stars" (the default)
  * puts the most-starred repositories first, repo name as the tie-break.
+ *
+ * Each option is led by the same glyph the repo card uses for that figure
+ * (Star, Package), so the sort keys read as the metrics already on show; name
+ * falls back to an alphabetical ArrowDownAZ.
  */
-const SORT_OPTIONS: Array<{ value: RepoSortOrder; label: string }> = [
-  { value: "stars", label: "按 Star 数" },
-  { value: "skills", label: "按 Skill 数" },
-  { value: "name", label: "按名称" },
+const SORT_OPTIONS: Array<{
+  value: RepoSortOrder;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { value: "stars", label: "按 Star 数", icon: Star },
+  { value: "skills", label: "按 Skill 数", icon: Package },
+  { value: "name", label: "按名称", icon: ArrowDownAZ },
 ];
 
 /**
@@ -99,6 +114,11 @@ export function ReposPage() {
     setPage(p);
   };
 
+  // The chosen sort, resolved once so the trigger echoes its label and glyph
+  // and reads exactly like the same-named row inside the menu.
+  const activeSort =
+    SORT_OPTIONS.find((option) => option.value === sort) ?? SORT_OPTIONS[0];
+
   return (
     <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
       {/* Toolbar: search on the left; sort on the right. */}
@@ -109,7 +129,13 @@ export function ReposPage() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="rounded-full px-4">
-                {SORT_OPTIONS.find((option) => option.value === sort)?.label}
+                <span className="flex items-center gap-1.5">
+                  <activeSort.icon
+                    aria-hidden="true"
+                    className="h-4 w-4 text-foreground"
+                  />
+                  {activeSort.label}
+                </span>
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
@@ -123,6 +149,15 @@ export function ReposPage() {
                     key={option.value}
                     value={option.value}
                   >
+                    <option.icon
+                      aria-hidden="true"
+                      className={cn(
+                        "h-4 w-4",
+                        option.value === sort
+                          ? "text-foreground"
+                          : "text-muted-foreground",
+                      )}
+                    />
                     {option.label}
                   </DropdownMenuRadioItem>
                 ))}
