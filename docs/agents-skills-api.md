@@ -4,7 +4,7 @@
 
 Through the Tauri backend (`src-tauri/src/skills.rs`), this project calls the
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
-facade of `agents-skills` v0.10 to expose skill installation and agent-linking
+facade of `agents-skills` v0.12 to expose skill installation and agent-linking
 capabilities to the frontend. The frontend reaches these Tauri commands via the
 `invoke` wrapper in `src/lib/skills-manager.ts`.
 

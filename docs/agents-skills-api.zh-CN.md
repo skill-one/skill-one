@@ -2,7 +2,7 @@
 
 [English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
-本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.10 的
+本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.12 的
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
 门面，将技能安装与 agent 链接能力暴露给前端。前端经 `src/lib/skills-manager.ts`
 的 `invoke` 封装访问这些 Tauri 命令。

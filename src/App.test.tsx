@@ -2,8 +2,6 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-
 import App from "./App";
 
 // The routing tests never need registry data: hold the worker client at its
@@ -30,18 +28,25 @@ vi.mock("./lib/registry/client", () => ({
   resetRegistryClient: vi.fn(),
 }));
 
+// Vitest 5 clears mock history before every test (`clearMocks` defaults to
+// true), which would wipe the module-load call into the factory below before
+// the assertion runs. Count the wiring-up in a plain object instead: it is not
+// a mock, so that reset leaves it alone.
+const persisterWiring = vi.hoisted(() => ({ calls: 0 }));
+
 // The real persister would read/write localStorage during provider restoration;
 // stub it with a no-op persister so the routing tests stay deterministic and
 // never touch Node's experimental localStorage getter.
 vi.mock("@tanstack/query-sync-storage-persister", () => ({
-  createSyncStoragePersister: vi.fn(() => ({
-    persistClient: vi.fn(),
-    restoreClient: vi.fn().mockResolvedValue(undefined),
-    removeClient: vi.fn(),
-  })),
+  createSyncStoragePersister: vi.fn(() => {
+    persisterWiring.calls += 1;
+    return {
+      persistClient: vi.fn(),
+      restoreClient: vi.fn().mockResolvedValue(undefined),
+      removeClient: vi.fn(),
+    };
+  }),
 }));
-
-const mockCreateSyncStoragePersister = vi.mocked(createSyncStoragePersister);
 
 describe("App routing", () => {
   afterEach(() => {
@@ -53,7 +58,7 @@ describe("App routing", () => {
     render(<App />);
 
     // The sync-storage persister is wired up once at module load.
-    expect(mockCreateSyncStoragePersister).toHaveBeenCalledTimes(1);
+    expect(persisterWiring.calls).toBe(1);
 
     // Default route is /my-skills; wait for its content to settle.
     await screen.findByText("共 6 个");
