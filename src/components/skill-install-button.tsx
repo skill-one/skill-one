@@ -46,17 +46,24 @@ const INSTALL_BUTTON: Record<
  *
  * `onError` hands the failure message to the caller, which decides where to
  * show it; without one the failure still shows up as the button's 重试 state.
+ *
+ * Two shapes: the default icon-only button for dense list rows, and a
+ * `labeled` compact button with the state word visible — the primary action
+ * of a detail view, where a lone corner icon is too weak.
  */
 export function SkillInstallButton({
   skill,
   className,
   onError,
+  labeled = false,
 }: {
   skill: Skill;
   /** Merged onto the button; callers size and place it. */
   className?: string;
   /** Called with the failure message, or null once the install succeeds. */
   onError?: (message: string | null) => void;
+  /** Show the state label next to the icon (detail views). */
+  labeled?: boolean;
 }) {
   const [installState, setInstallState] = useState<InstallState>("idle");
 
@@ -103,6 +110,23 @@ export function SkillInstallButton({
       onError?.(errorMessage(err, "安装失败，请重试"));
     }
   };
+
+  // The labeled shape already shows its state word, so it needs neither the
+  // hover tooltip nor the icon-only sizing.
+  if (labeled) {
+    return (
+      <Button
+        variant={installMeta.variant}
+        size="sm"
+        disabled={installing || isInstalled}
+        onClick={(e) => void handleInstall(e)}
+        className={cn("h-8 shrink-0 gap-1.5 px-3", className)}
+      >
+        {installMeta.icon}
+        {installMeta.label}
+      </Button>
+    );
+  }
 
   return (
     <TooltipProvider delayDuration={300}>

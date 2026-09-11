@@ -1,19 +1,37 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, ExternalLink, Loader2, Puzzle, Star } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  Globe,
+  Loader2,
+  Puzzle,
+  Star,
+} from "lucide-react";
 
 import { fetchSkillDetail, MIRROR } from "../../lib/skill-detail-api";
 import { fetchLocalSkillDetail } from "../../lib/local-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
-import { errorMessage, formatDate, formatCount, formatRev } from "../../lib/utils";
+import { errorMessage, formatDate, formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { DomainBadge } from "../domain-badge";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "../ui/drawer";
+import {
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "../ui/drawer";
 import { Skeleton } from "../ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
 import { OwnerAvatar } from "../owner-avatar";
 import { SkillInstallButton } from "../skill-install-button";
 import { SkillProfileView } from "./skill-profile-view";
@@ -42,6 +60,77 @@ function MarkdownSkeleton() {
   );
 }
 
+/**
+ * The header's single provenance affordance: a quiet "源" link for registry
+ * skills (opens the mirror SKILL.md) or a "本地文件" label for local ones.
+ * The version hash, first-seen date and exact file path are provenance
+ * detail, so one hover reveals them in the tooltip instead of taking three
+ * permanent header rows.
+ */
+function ProvenanceTip({
+  href,
+  rev,
+  seenAt,
+  path,
+}: {
+  /** When present the trigger is a link that opens the mirror SKILL.md. */
+  href?: string;
+  /** Full content hash, as the scraper indexed it. */
+  rev?: string;
+  /** Formatted date the mirror first fetched this version. */
+  seenAt?: string;
+  path?: string;
+}) {
+  const className =
+    "flex items-center gap-1 whitespace-nowrap text-muted-foreground/70 transition-colors hover:text-foreground";
+  const body = (
+    <TooltipContent className="max-w-[260px] text-left normal-case">
+      <div className="flex flex-col gap-1">
+        {rev && (
+          <p>
+            <span className="text-background/55">版本 </span>
+            <span className="font-mono break-all">{rev}</span>
+          </p>
+        )}
+        {seenAt && (
+          <p>
+            <span className="text-background/55">收录时间 </span>
+            {seenAt}
+          </p>
+        )}
+        {path && <p className="font-mono break-all">{path}</p>}
+      </div>
+    </TooltipContent>
+  );
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {href ? (
+            <a
+              href={href}
+              title="查看版本与来源信息"
+              onClick={(e) => {
+                e.preventDefault();
+                void openExternal(href);
+              }}
+              className={className}
+            >
+              源
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </a>
+          ) : (
+            <span title="查看来源信息" className={className}>
+              本地文件
+            </span>
+          )}
+        </TooltipTrigger>
+        {body}
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 interface SkillDetailPanelProps {
   /** The skill to show; null renders nothing. */
   skill: Skill | null;
@@ -63,9 +152,10 @@ interface SkillDetailPanelProps {
  * directory instead, so the view always shows the copy the user actually
  * installed.
  *
- * The header's version identity (content hash + the date the scraper first
- * fetched it) comes from the index entry rather than the SKILL.md, so
- * unhashed entries and local installs simply show no such row.
+ * Provenance — the content hash, the date the scraper first fetched it and
+ * the exact SKILL.md path — comes from the index entry rather than the
+ * SKILL.md body, and hides behind the header's 源 tooltip so it costs no
+ * permanent rows; unhashed entries and local installs simply show less.
  */
 export function SkillDetailPanel({
   skill,
@@ -129,7 +219,7 @@ export function SkillDetailPanel({
   // nothing to link to, and the stats it cannot have stay hidden (the same
   // Puzzle placeholder the my-skills row uses).
   const isLocalSkill = shown != null && !shown.repo;
-  // Profiled registry skills get the 画像 tab (the dataset's per-skill
+  // Profiled registry skills get the 概述 tab (the dataset's per-skill
   // files resolve through the mirror path); local installs and skills the
   // dataset has not profiled keep the plain SKILL.md body.
   const hasProfile = shown?.profile != null && shown.path != null;
@@ -139,22 +229,22 @@ export function SkillDetailPanel({
   const filePath = detail?.path.replace(/^\/+|\/+$/g, "") ?? "";
   // The upstream repo the skill ships in; without a known path inside it,
   // the link lands on the repo root.
-  const sourceHref = !shown || !shown.repo ? "" : `https://github.com/${shown.repo}`;
+  const sourceHref =
+    !shown || !shown.repo ? "" : `https://github.com/${shown.repo}`;
   // The skill's page on skills.sh, when the index carries one — the deepest
   // upstream link that survives without the repo-internal path.
   const skillsShHref = shown?.url ?? "";
   // The link's href and its open-externally handler point at the same place.
   const skillBlobUrl = githubBlobUrl(MIRROR.repo, filePath, MIRROR.ref);
-  // Version identity as the scraper sees it: the content hash, and how long
-  // the mirror has carried that exact content. From the index entry, not the
-  // SKILL.md — so absent on unhashed entries and on local installs the
-  // mirror never listed.
-  const rev = shown?.rev ? formatRev(shown.rev) : null;
-  const seenAt = formatDate(shown?.firstSeenAt);
+  // Version identity as the scraper sees it: the full content hash, and the
+  // date the mirror first fetched that exact content. Provenance detail —
+  // surfaced on hover via the header's 源 tip, not as permanent header rows.
+  const rev = shown?.rev ?? null;
+  const seenAt = shown?.firstSeenAt ? formatDate(shown.firstSeenAt) : null;
 
   return (
     <DrawerContent>
-      <DrawerHeader className="gap-1.5 px-6 pt-5">
+      <DrawerHeader className="gap-2 px-6 pt-5">
         <div className="flex items-start gap-3">
           {isLocalSkill ? (
             <div
@@ -164,10 +254,7 @@ export function SkillDetailPanel({
               <Puzzle className="h-5 w-5" />
             </div>
           ) : (
-            <OwnerAvatar
-              owner={owner}
-              className="h-12 w-12 shrink-0 text-xl"
-            />
+            <OwnerAvatar owner={owner} className="h-12 w-12 shrink-0 text-xl" />
           )}
           <div className="min-w-0 flex-1">
             <DrawerTitle className="truncate text-lg font-bold tracking-tight">
@@ -184,7 +271,7 @@ export function SkillDetailPanel({
                     void openExternal(sourceHref);
                   }}
                   title="在 GitHub 中打开源仓库"
-                  className="min-w-0 items-center gap-1"
+                  className="inline-flex min-w-0 items-center gap-1"
                 >
                   <span className="truncate">{shown?.repo}</span>
                   <ExternalLink className="h-3 w-3 shrink-0" />
@@ -193,11 +280,11 @@ export function SkillDetailPanel({
             )}
           </div>
           {/* The primary action lives in the header, like every store's
-              detail view: it stays visible while the content scrolls. */}
+              detail view: labeled, and visible while the content scrolls. */}
           {!isLocalSkill && (
             <SkillInstallButton
               skill={shown!}
-              className="h-8 w-8"
+              labeled
               onError={setInstallError}
             />
           )}
@@ -210,20 +297,23 @@ export function SkillDetailPanel({
             {description}
           </p>
         )}
-        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+        {/* One meta row, in priority order: license/author, usage stats,
+            external links, provenance, and the profile chip. Everything
+            provenance-shaped (hash, date, file path) hides behind 源. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] text-muted-foreground">
           {detail?.license && (
             <Badge variant="secondary">{detail.license}</Badge>
           )}
           {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
           {!isLocalSkill && (
             <>
-              <span className="ml-0.5 flex items-center gap-1 text-[12px] text-muted-foreground">
+              <span className="flex items-center gap-1">
                 <Download className="h-3.5 w-3.5" />
                 <span className="font-medium tabular-nums">
                   {formatCount(shown?.downloads ?? 0)}
                 </span>
               </span>
-              <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+              <span className="flex items-center gap-1">
                 <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                 <span className="font-medium tabular-nums">
                   {formatCount(shown?.stars ?? 0)}
@@ -232,77 +322,41 @@ export function SkillDetailPanel({
               {skillsShHref && (
                 <a
                   href={skillsShHref}
+                  aria-label="在 skills.sh 中打开"
                   onClick={(e) => {
                     e.preventDefault();
                     void openExternal(skillsShHref);
                   }}
-                  title="在 skills.sh 中打开"
-                  className="ml-0.5 flex items-center gap-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                  className="flex items-center text-muted-foreground/70 transition-colors hover:text-foreground"
                 >
-                  <span>skills.sh</span>
-                  <ExternalLink className="h-3 w-3 shrink-0" />
+                  <Globe className="h-3.5 w-3.5" />
                 </a>
+              )}
+              {(rev || seenAt || detail) && (
+                <ProvenanceTip
+                  href={detail ? skillBlobUrl : undefined}
+                  rev={rev ?? undefined}
+                  seenAt={seenAt ?? undefined}
+                  path={detail?.path}
+                />
               )}
             </>
           )}
+          {isLocalSkill && detail && <ProvenanceTip path={detail.path} />}
+          {shown?.profile && (
+            <span className="flex items-center gap-1.5">
+              <DomainBadge
+                domain={shown.profile.domain}
+                reason={shown.profile.reason}
+              />
+              {shown.profile.persona?.role && (
+                <span title="skills-profiles 为该技能生成的职业画像">
+                  {shown.profile.persona.role}
+                </span>
+              )}
+            </span>
+          )}
         </div>
-        {(rev || seenAt) && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground/70">
-            {rev && (
-              <span title={`技能文件的内容哈希（上游文件一变即改变）：${shown?.rev}`}>
-                版本 <span className="font-mono">{rev}</span>
-              </span>
-            )}
-            {rev && seenAt && (
-              <span aria-hidden="true">·</span>
-            )}
-            {seenAt && (
-              <span title="镜像首次抓取当前版本内容的时间；内容一变即重新起算">
-                收录时间 {seenAt}
-              </span>
-            )}
-          </div>
-        )}
-        {shown?.profile && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <DomainBadge
-              domain={shown.profile.domain}
-              reason={shown.profile.reason}
-            />
-            {shown.profile.persona?.role && (
-              <span
-                className="text-[12px] text-muted-foreground"
-                title="skills-profiles 为该技能生成的职业画像"
-              >
-                {shown.profile.persona.role}
-              </span>
-            )}
-          </div>
-        )}
-        {/* Where this SKILL.md copy lives — metadata too, so it belongs in
-            the header rather than pushing the body down inside the tab. */}
-        {detail && (
-          <div className="flex min-w-0 items-center gap-1 font-mono text-[11px] text-muted-foreground/70">
-            {isLocalSkill ? (
-              <span className="truncate" title="本地 SKILL.md 路径">
-                {detail.path}
-              </span>
-            ) : (
-              <a
-                href={skillBlobUrl}
-                onClick={(e) => {
-                  e.preventDefault();
-                  void openExternal(skillBlobUrl);
-                }}
-                title="在 GitHub 中打开镜像快照里的 SKILL.md"
-                className="flex min-w-0 items-center gap-1 transition-colors hover:text-foreground"
-              >
-                <span className="truncate">{detail.path}</span>
-                <ExternalLink className="h-3 w-3 shrink-0" />
-              </a>
-            )}
-          </div>
-        )}
       </DrawerHeader>
       {installError && (
         <p
@@ -337,19 +391,33 @@ export function SkillDetailPanel({
           </div>
         ) : detail ? (
           hasProfile ? (
-            // A profiled skill: SKILL.md and the generated profile live in
-            // separate tabs. SKILL.md stays the default so opening the
-            // drawer still lands on the documentation first. The tab bar is
-            // a GitHub-style underlined row that sticks below the header
-            // while long content scrolls underneath it.
-            <Tabs defaultValue="skill-md" className="flex flex-col gap-5">
+            // A profiled skill: the generated overview and SKILL.md live in
+            // separate tabs. 概述 is the default — its structured pitch,
+            // I/O and notes answer "what is this and is it worth it" faster
+            // than the raw (sometimes one-line) SKILL.md, which stays one
+            // click away as the canonical source. The tab bar is a
+            // GitHub-style underlined row that sticks below the header while
+            // long content scrolls underneath it.
+            <Tabs defaultValue="overview" className="flex flex-col gap-4">
               <TabsList
                 variant="line"
-                className="sticky top-0 z-10 w-full justify-start rounded-none border-b bg-background"
+                className="sticky top-0 z-10 h-8 w-full justify-start rounded-none border-b bg-background"
               >
-                <TabsTrigger value="skill-md">SKILL.md</TabsTrigger>
-                <TabsTrigger value="profile">画像</TabsTrigger>
+                <TabsTrigger value="overview" className="flex-none text-[13px]">
+                  概述
+                </TabsTrigger>
+                <TabsTrigger value="skill-md" className="flex-none text-[13px]">
+                  SKILL.md
+                </TabsTrigger>
               </TabsList>
+              <TabsContent value="overview">
+                <SkillProfileView
+                  skillId={shown!.name}
+                  knownPath={shown!.path}
+                  scene={shown!.profile?.persona?.scene}
+                  tool={shown!.profile?.persona?.tool}
+                />
+              </TabsContent>
               <TabsContent value="skill-md">
                 {detail.instructions ? (
                   <Suspense fallback={<MarkdownSkeleton />}>
@@ -367,21 +435,13 @@ export function SkillDetailPanel({
                   </p>
                 )}
               </TabsContent>
-              <TabsContent value="profile">
-                <SkillProfileView
-                  skillId={shown!.name}
-                  knownPath={shown!.path}
-                  scene={shown!.profile?.persona?.scene}
-                  tool={shown!.profile?.persona?.tool}
-                />
-              </TabsContent>
             </Tabs>
           ) : (
-            <div className="pt-2">
+            <div className="pt-3">
               {detail.instructions ? (
                 <Suspense fallback={<MarkdownSkeleton />}>
                   <LazyMarkdown
-                    repo={isLocalSkill ? shown?.repo ?? "" : MIRROR.repo}
+                    repo={isLocalSkill ? (shown?.repo ?? "") : MIRROR.repo}
                     gitRef={isLocalSkill ? undefined : MIRROR.ref}
                     filePath={filePath}
                   >

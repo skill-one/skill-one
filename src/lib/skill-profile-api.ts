@@ -3,7 +3,7 @@ import { fetchFirstText, fileCandidates, getProfilesTag } from "./cdn-config";
 
 /**
  * Per-skill profile reader for the skills-profiles dataset: the five angle
- * files the detail drawer's 画像 tab renders (domain and persona already
+ * files the detail drawer's 概述 tab renders (domain and persona already
  * ride along on the registry index entry, so they are not re-fetched).
  *
  * Fetches are pinned to the profiles tag recorded by the registry client

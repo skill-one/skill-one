@@ -88,7 +88,7 @@ export function setIndexTag(value: string): void {
 /**
  * The profiles dataset tag (`dist-<date>[-N]`) currently recorded, or ""
  * before any profiles snapshot has been served. Used to pin per-skill
- * profile fetches (the detail drawer's 画像 tab) to the same immutable
+ * profile fetches (the detail drawer's 概述 tab) to the same immutable
  * snapshot the served registry was decorated from.
  */
 export function getProfilesTag(): string {

@@ -6,13 +6,13 @@ import { Badge } from "../ui/badge";
 import { Skeleton } from "../ui/skeleton";
 
 /**
- * The 画像 tab of the detail drawer: the full multi-angle profile the
- * skills-profiles dataset generated for one skill, laid out by content
- * shape — pitch first, then slogans, the outside view (what you hand it →
- * what you get back), the inside view (happy path + mechanisms), and the
- * first-person user notes. `domain` and `persona.role` already show in the
- * drawer header; the persona's scene and tool lead this view instead of
- * being repeated twice.
+ * The 概述 tab of the detail drawer — its default landing view: the full
+ * multi-angle profile the skills-profiles dataset generated for one skill,
+ * laid out by content shape — pitch first, then slogans, the outside view
+ * (what you hand it → what you get back), the inside view (happy path +
+ * mechanisms), and the first-person user notes. `domain` and persona.role
+ * already show in the drawer header; the persona's scene and tool lead this
+ * view instead of being repeated twice.
  *
  * Data comes from five small JSON files fetched on first open (cached by
  * TanStack Query like the SKILL.md body). Sections are individually
@@ -81,7 +81,7 @@ function ProfileBody({ profile }: { profile: SkillProfileDetail }) {
   if (empty) {
     return (
       <p className="py-10 text-center text-[13px] text-muted-foreground">
-        暂无画像内容
+        暂无概述内容
       </p>
     );
   }
@@ -222,9 +222,11 @@ export function SkillProfileView({
 
   if (isPending) return <ProfileLoading />;
   if (isError || !profile) {
+    // The default landing view: a failed fetch must hand the reader off to
+    // the canonical source instead of dead-ending the first impression.
     return (
       <p className="py-10 text-center text-[13px] text-muted-foreground">
-        画像内容加载失败
+        概述暂不可用，可查看 SKILL.md
       </p>
     );
   }

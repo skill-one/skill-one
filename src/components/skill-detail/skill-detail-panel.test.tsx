@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
@@ -142,6 +142,7 @@ describe("SkillDetailPanel", () => {
   });
 
   it("shows skill info and the fetched SKILL.md", async () => {
+    const user = userEvent.setup();
     mockFetchSkillDetail.mockResolvedValue(detail);
     renderDrawer({});
 
@@ -152,16 +153,19 @@ describe("SkillDetailPanel", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
-    // No registry identity on this entry, so the version row stays out: the
-    // fingerprint is the only version the panel can show.
-    expect(screen.queryByText(/^版本/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^收录时间/)).not.toBeInTheDocument();
     expect(screen.getByText("MIT")).toBeInTheDocument();
     expect(screen.getByText("Anthropic")).toBeInTheDocument();
-    expect(screen.getByText("skills/anthropics/skills/pdf/SKILL.md")).toBeInTheDocument();
-    // Both popularity metrics render in the badge row.
+    // Both popularity metrics render in the one meta row.
     expect(screen.getByText("3M")).toBeInTheDocument();
     expect(screen.getByText("169.6K")).toBeInTheDocument();
+    // The exact path is provenance detail: hidden behind the 源 tip by
+    // default, and an unhashed entry's tip carries no version lines at all.
+    expect(screen.queryByText(detail.path)).not.toBeInTheDocument();
+    await user.hover(screen.getByRole("link", { name: "源" }));
+    const tip = await screen.findByRole("tooltip");
+    expect(within(tip).getByText(detail.path)).toBeInTheDocument();
+    expect(tip).not.toHaveTextContent("版本");
+    expect(tip).not.toHaveTextContent("收录时间");
     expect(mockFetchSkillDetail).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
@@ -170,15 +174,18 @@ describe("SkillDetailPanel", () => {
   });
 
   it("shows the registry version fingerprint and when that version was recorded", async () => {
+    const user = userEvent.setup();
     mockFetchSkillDetail.mockResolvedValue(detail);
     renderDrawer({ skill: versionedSkill });
 
     await screen.findByText("Use this skill for PDFs.");
-    // Compact form: the hash abbreviates to its first 8 hex digits.
-    expect(screen.getByText(/^版本/)).toHaveTextContent("#b1460085");
-    expect(screen.getByText(/^收录时间/)).toHaveTextContent(SEEN_AT_LOCALE);
-    // The value it abbreviates, and what it means, live in the tooltips.
-    expect(screen.getByTitle(/b146008599c31057/)).toBeInTheDocument();
+    // All provenance is collapsed into the 源 tip: hover reveals the full
+    // hash, the first-seen date and the exact SKILL.md path.
+    await user.hover(screen.getByRole("link", { name: "源" }));
+    const tip = await screen.findByRole("tooltip");
+    expect(within(tip).getByText(versionedSkill.rev!)).toBeInTheDocument();
+    expect(tip).toHaveTextContent(SEEN_AT_LOCALE);
+    expect(within(tip).getByText(detail.path)).toBeInTheDocument();
   });
 
   it("links the source repo, its skills.sh page and the mirror SKILL.md", async () => {
@@ -191,15 +198,15 @@ describe("SkillDetailPanel", () => {
     expect(
       screen.getByRole("link", { name: "anthropics/skills" }),
     ).toHaveAttribute("href", "https://github.com/anthropics/skills");
-    // The skills.sh page is the deepest upstream link that survives.
+    // The skills.sh page is the deepest upstream link that survives; the
+    // header keeps it as an icon-only control next to the stats.
     expect(screen.getByRole("link", { name: /skills\.sh/ })).toHaveAttribute(
       "href",
       "https://www.skills.sh/anthropics/skills/pdf",
     );
-    // The file path links to the exact SKILL.md in the mirror snapshot.
-    expect(
-      screen.getByRole("link", { name: /skills\/pdf\/SKILL\.md/ }),
-    ).toHaveAttribute(
+    // The mirror SKILL.md is the 源 link's target; its path text hides in
+    // the link's tooltip.
+    expect(screen.getByRole("link", { name: "源" })).toHaveAttribute(
       "href",
       "https://github.com/skill-one/skills-sh-mirror/blob/dist/skills/anthropics/skills/pdf/SKILL.md",
     );
@@ -218,18 +225,22 @@ describe("SkillDetailPanel", () => {
   });
 
   it("reads pure local skills from disk without store-only header parts", async () => {
+    const user = userEvent.setup();
     mockFetchLocalSkillDetail.mockResolvedValue(localDetail);
     renderDrawer({ skill: localSkill });
 
     expect(await screen.findByText("Local skill body.")).toBeInTheDocument();
     expect(mockFetchLocalSkillDetail).toHaveBeenCalledWith("my-tool");
     expect(mockFetchSkillDetail).not.toHaveBeenCalled();
-    // No repo → no GitHub links at all, a 本地安装 caption and the Puzzle
-    // placeholder avatar, the disk path as plain text, and no stats row.
+    // No repo → no links at all, a 本地安装 caption and the Puzzle
+    // placeholder avatar; the disk path sits behind 本地文件, and no stats.
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("本地安装")).toBeInTheDocument();
     expect(screen.getByLabelText("skill 头像")).toBeInTheDocument();
-    expect(screen.getByText(localDetail.path)).toBeInTheDocument();
+    expect(screen.queryByText(localDetail.path)).not.toBeInTheDocument();
+    await user.hover(screen.getByText("本地文件"));
+    const tip = await screen.findByRole("tooltip");
+    expect(within(tip).getByText(localDetail.path)).toBeInTheDocument();
     expect(screen.queryByText("3M")).not.toBeInTheDocument();
   });
 
@@ -301,7 +312,7 @@ describe("SkillDetailPanel", () => {
     );
   });
 
-  it("shows the profile in a second tab for a profiled skill", async () => {
+  it("lands on the 概述 tab and keeps SKILL.md one click away for a profiled skill", async () => {
     const user = userEvent.setup();
     mockFetchSkillProfile.mockResolvedValue({
       scenario: "找不到现成 skill？它替你搜。",
@@ -311,7 +322,11 @@ describe("SkillDetailPanel", () => {
         inputOutput: [{ input: "我想做 X", output: "推荐的 skill" }],
       },
       comments: [
-        { user: "后端老兵", category: "妙用", comment: "用 --owner 锁定官方源。" },
+        {
+          user: "后端老兵",
+          category: "妙用",
+          comment: "用 --owner 锁定官方源。",
+        },
       ],
     });
     // A profiled skill carries both the index profile and a mirror path.
@@ -321,15 +336,23 @@ describe("SkillDetailPanel", () => {
         profile: {
           domain: "开发编程",
           reason: "dev tooling",
-          persona: { tool: "npx skills", role: "技能猎头", scene: "需要找 skill 时" },
+          persona: {
+            tool: "npx skills",
+            role: "技能猎头",
+            scene: "需要找 skill 时",
+          },
         },
       },
     });
 
-    // SKILL.md is the default tab; the 画像 tab exists alongside it.
-    expect(await screen.findByText("Use this skill for PDFs.")).toBeInTheDocument();
-    const profileTab = screen.getByRole("tab", { name: "画像" });
-    await user.click(profileTab);
+    // 概述 is the default landing tab (tabs mount once the detail fetch
+    // resolves), and the inactive SKILL.md body is not even mounted yet.
+    expect(
+      await screen.findByRole("tab", { name: "概述" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Use this skill for PDFs."),
+    ).not.toBeInTheDocument();
 
     // Structured layout: lead quote + tool, slogans, pitch, input/output,
     // and categorized user notes.
@@ -337,12 +360,22 @@ describe("SkillDetailPanel", () => {
     expect(await screen.findByText(/需要找 skill 时/)).toBeInTheDocument();
     expect(screen.getByText("谋生工具：")).toBeInTheDocument();
     expect(screen.getByText("一搜即装")).toBeInTheDocument();
-    expect(screen.getByText("找不到现成 skill？它替你搜。")).toBeInTheDocument();
-    expect(screen.getByText(/把一句话需求变成装好的 skill。/)).toBeInTheDocument();
+    expect(
+      screen.getByText("找不到现成 skill？它替你搜。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/把一句话需求变成装好的 skill。/),
+    ).toBeInTheDocument();
     expect(screen.getByText("我想做 X")).toBeInTheDocument();
     expect(screen.getByText("推荐的 skill")).toBeInTheDocument();
     expect(screen.getByText("妙用")).toBeInTheDocument();
     expect(screen.getByText("用 --owner 锁定官方源。")).toBeInTheDocument();
+
+    // The canonical source is one click away.
+    await user.click(screen.getByRole("tab", { name: "SKILL.md" }));
+    expect(
+      await screen.findByText("Use this skill for PDFs."),
+    ).toBeInTheDocument();
   });
 
   it("keeps the plain SKILL.md body for an unprofiled skill", async () => {

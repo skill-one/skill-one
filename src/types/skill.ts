@@ -64,7 +64,7 @@ export interface Skill {
 /**
  * The full per-skill profile, assembled from the five angle files the
  * profiles dataset ships per skill (skills/<id>/<angle>.json) on demand
- * when the detail drawer's 画像 tab opens. `domain` and `persona` are not
+ * when the detail drawer's 概述 tab opens. `domain` and `persona` are not
  * re-fetched — they already ride along on the index entry (`Skill.profile`)
  * and the dataset guarantees the files never contradict the index.
  *
