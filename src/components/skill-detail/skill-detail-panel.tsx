@@ -28,6 +28,7 @@ import {
 } from "../ui/tooltip";
 import { OwnerAvatar } from "../owner-avatar";
 import { SkillInstallButton } from "../skill-install-button";
+import { ExpandableDescription } from "./expandable-description";
 import { SkillProfileView } from "./skill-profile-view";
 
 /**
@@ -307,12 +308,10 @@ export function SkillDetailPanel({
         </div>
         {/* The skill's own summary — shared chrome, visible whichever tab
             is open. Served from the index immediately, refined by the
-            fetched SKILL.md frontmatter once it lands. */}
-        {description && (
-          <p className="whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground">
-            {description}
-          </p>
-        )}
+            fetched SKILL.md frontmatter once it lands. Long summaries clamp
+            to three lines with an inline 展开, so a verbose description can
+            never push the tabs and the body out of the fixed header. */}
+        {description && <ExpandableDescription text={description} />}
         {/* One meta row, in priority order: license/author, usage stats,
             external links, provenance, and the profile chip. Everything
             provenance-shaped (hash, date, file path) hides behind 源. */}

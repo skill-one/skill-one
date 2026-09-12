@@ -410,4 +410,32 @@ describe("SkillDetailPanel", () => {
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(mockFetchSkillProfile).not.toHaveBeenCalled();
   });
+
+  it("clamps a long header summary so it cannot push the body out of the drawer", async () => {
+    const longDescription = Array.from(
+      { length: 40 },
+      () => "A long summary.",
+    ).join(" ");
+    mockFetchSkillDetail.mockResolvedValue({
+      ...detail,
+      description: longDescription,
+    });
+    renderDrawer({ skill: { ...skill, description: longDescription } });
+
+    await screen.findByText("Use this skill for PDFs.");
+    // Clamped by default, but the full text is still in the DOM: clamping is a
+    // painting concern, so the toggle is pure CSS plus the overflow check.
+    const summary = screen.getByText(longDescription);
+    expect(summary).toHaveClass("line-clamp-3");
+    expect(screen.queryByRole("button", { name: "展开" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a summary that fits free of any toggle", async () => {
+    mockFetchSkillDetail.mockResolvedValue(detail);
+    renderDrawer({});
+
+    expect(await screen.findByText(detail.description)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "展开" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "收起" })).not.toBeInTheDocument();
+  });
 });
