@@ -38,6 +38,12 @@ The detail drawer shows `hash` as 版本 (`#b1460085`, full value in the tooltip
 
 Implemented in [src/lib/registry/](../src/lib/registry/) (worker + main-thread proxy), consumed by the store pages.
 
+### The `latest` pointer
+
+Version resolution is **pointer-first**: upstream publishes a `latest` file at the root of its `dist` branch holding, on one line, the tag the branch currently points at (`dist-<date>`). Reading that one small file is what names the version — every other address is built from the tag, so no tag listing, sorting or name parsing is involved, and it works through the configured download source instead of needing an API the CDN cannot provide. The read carries a **cache-busting stamp**: a mutable pointer whose job is to report freshness must never be answered from a cache, or an old snapshot looks current.
+
+`skill-one/skills-profiles` publishes on the same contract, so `readLatestTag` in [snapshot.ts](../src/lib/registry/snapshot.ts) implements the read once for both datasets.
+
 ### The `stats.json` sidecar
 
 The run stats published beside the index are what make caching possible:
@@ -46,14 +52,13 @@ The run stats published beside the index are what make caching possible:
 | --- | --- |
 | `finishedAt` | Identifies the snapshot: a run publishes once, so equal stamps mean equal bytes — this turns "did the index change?" into a string comparison. It is also displayed in Settings as the publication time. |
 | `indexedRows` | Published row count, shown in Settings next to the number actually loaded (which can be lower: rows are filtered defensively). |
-| `startedAt` (date part) | The UTC day the run finished on — the same day upstream CI tags the snapshot with. |
 
 ### Fetch strategy
 
-- The snapshot version is resolved **from the repo's tags**: the newest `dist-<date>` tag is listed directly (GitHub's tags API first, the jsDelivr data API as a fallback — see `resolveLatestTag` in [index-stream.ts](../src/lib/registry/index-stream.ts)), so the download is addressed at the same tag upstream CI publishes. Both listing requests carry a **cache-busting stamp**: a mutable pointer that reports freshness must never be answered from a cache, or an old snapshot looks current.
-- `stats.json` is then read **pinned to that tag** — an immutable address, so no busting — for the publication stamp and row count. If it cannot be read, the tag alone still pins the body (only the "unchanged" short-circuit is lost). When no tag can be listed at all, the legacy path applies: `stats.json` on the mutable `dist` branch is probed cache-busted and its `finishedAt` derives the tag.
+- The tag comes from the `latest` pointer (above) and the download is addressed at it, i.e. at exactly the snapshot upstream publishes.
+- `stats.json` is then read **pinned to that tag** — an immutable address, so no busting — for the publication stamp and row count. If it cannot be read, the tag alone still pins the body (only the "unchanged" short-circuit is lost). When the pointer itself is unreadable, the degraded path applies: `stats.json` on the mutable `dist` branch is probed cache-busted for the stamp, and the version stays unpinned. Nothing derives a tag from a timestamp any more: the pointer is upstream's own statement of it, so inferring it from `finishedAt` would only ever be a worse guess.
 - The body is fetched at the `dist-<date>` tag (`…/skills-sh-mirror@dist-2026-09-06/skills.jsonl`). Tags are immutable per snapshot, so no busting is applied and a CDN edge copy is necessarily the right bytes. (A same-day re-run force-moves the tag to the newest snapshot; the changed `finishedAt` detects it and re-downloads.)
-- If no tag and no stats could be resolved, the download falls back to the mutable `dist` ref — busted, because without a pin a day-old edge copy would be indistinguishable from the current index.
+- If neither the pointer nor the branch stats could be resolved, the download falls back to the mutable `dist` ref — busted, because without a pin a day-old edge copy would be indistinguishable from the current index.
 - The parsed list plus its identity (`tag` + `finishedAt`) are persisted to IndexedDB, and the tag is recorded to localStorage (`skill-one.indexTag`) where it pins SKILL.md detail fetches and shows in Settings. Next launch serves that cache immediately, then compares the probed stamp with the stored one: equal means the multi-megabyte body is not downloaded at all.
 - While the app simply stays open, the probe is repeated: an hourly tick re-runs it once the last completed check is more than 12 hours old (both sources publish daily), and the window is consulted again when it comes back into view after a sleep. Nothing is asked of the user — a refresh swaps the served snapshot in place without blanking the UI, and a failed or uneventful check is not mentioned at all — but a check that actually lands a newer snapshot says so in passing, so the list changing underfoot never looks like a glitch. The `checkedAt` stamp on the served identity dates the check, which is what the window is measured from, and only a probe that actually answered writes one, so an unreachable source is simply retried on the next tick. Note that a periodic check which resolves no tag **never** falls back to an unpinned body fetch, unlike boot and a forced reload: an unreachable probe leaves the served data exactly as it was instead of pulling the whole index on a guess.
 - `INDEX_SPEC` in [index-stream.ts](../src/lib/registry/index-stream.ts) pins `repo` / `path: "skills.jsonl"` / `ref: "dist"` (the ref above is supplied per download).

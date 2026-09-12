@@ -1,54 +1,111 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
-import {
-  compareProfilesTags,
-  newestProfilesTag,
-  parseProfileLine,
-  readProfiles,
-} from "./profiles";
+import { parseProfileLine, probeProfilesMeta, readProfiles } from "./profiles";
 import type { SkillProfile } from "../../types/skill";
 
-describe("compareProfilesTags", () => {
-  it("orders batch numbers numerically, not lexically", () => {
-    expect(
-      compareProfilesTags("dist-2026-09-09-2", "dist-2026-09-09-10"),
-    ).toBeLessThan(0);
-    expect(
-      compareProfilesTags("dist-2026-09-09-10", "dist-2026-09-09-2"),
-    ).toBeGreaterThan(0);
+/** The profiles repo's `latest` pointer, as `fileCandidates` builds it. */
+const POINTER_ORIGIN =
+  "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/latest";
+
+/** The mutable branch's `stats.json`, the degraded probe's source. */
+const BRANCH_STATS =
+  "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/stats.json";
+
+/** A 200 response serving a plain-text body (the pointer file). */
+function textResponse(body: string): Response {
+  return {
+    ok: true,
+    status: 200,
+    text: async () => body,
+  } as unknown as Response;
+}
+
+/** A 200 response serving a JSON body. */
+function jsonResponse(body: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => body,
+  } as unknown as Response;
+}
+
+describe("probeProfilesMeta", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it("orders the bare baseline before its batches", () => {
-    // Lexically "dist-2026-09-09" sorts after "dist-2026-09-09-1"; the
-    // baseline is really batch 0.
-    expect(
-      compareProfilesTags("dist-2026-09-09", "dist-2026-09-09-1"),
-    ).toBeLessThan(0);
+  // Both tag forms the repo publishes: a day's baseline, and a later batch
+  // generated on top of it. The pointer names whichever is current.
+  it.each(["dist-2026-09-12", "dist-2026-09-12-3"])(
+    "resolves %s from the latest pointer and reads the stats pinned to it",
+    async (tag) => {
+      const requested: string[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          requested.push(url.split("?")[0]);
+          if (url.startsWith(POINTER_ORIGIN)) return textResponse(`${tag}\n`);
+          return jsonResponse({
+            snapshot: { ref: tag, fetched_at: "2026-09-12T07:22:00Z" },
+          });
+        }),
+      );
+
+      await expect(probeProfilesMeta("")).resolves.toEqual({
+        tag,
+        generatedAt: "2026-09-12T07:22:00Z",
+      });
+      // The pointer is busted; the tag-pinned stats are immutable, so the
+      // origin answering means the CDN is never asked.
+      expect(requested).toEqual([
+        POINTER_ORIGIN,
+        `https://raw.githubusercontent.com/skill-one/skills-profiles/${tag}/stats.json`,
+      ]);
+    },
+  );
+
+  it("keeps the tag when the pinned stats cannot be read", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.startsWith(POINTER_ORIGIN)
+          ? textResponse("dist-2026-09-12")
+          : ({ ok: false, status: 404 } as unknown as Response),
+      ),
+    );
+
+    await expect(probeProfilesMeta("")).resolves.toEqual({
+      tag: "dist-2026-09-12",
+    });
   });
 
-  it("orders dates before batch numbers", () => {
-    expect(compareProfilesTags("dist-2026-09-09-9", "dist-2026-09-10")).toBeLessThan(0);
-    expect(compareProfilesTags("dist-2026-09-10-3", "dist-2026-09-10-3")).toBe(0);
-  });
-});
+  it("falls back to the branch stats, unpinned, when the pointer is unreadable", async () => {
+    const requested: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/latest")) throw new TypeError("network down");
+        requested.push(url);
+        return jsonResponse({ snapshot: { fetched_at: "2026-09-11T07:22:00Z" } });
+      }),
+    );
 
-describe("newestProfilesTag", () => {
-  it("picks the true newest tag regardless of listing order", () => {
-    expect(
-      newestProfilesTag([
-        "dist-2026-09-09-1",
-        "dist-2026-09-10",
-        "dist-2026-09-09",
-        "dist-2026-09-10-2",
-        "dist-2026-09-10-10",
-      ]),
-    ).toBe("dist-2026-09-10-10");
+    await expect(probeProfilesMeta("")).resolves.toEqual({
+      generatedAt: "2026-09-11T07:22:00Z",
+    });
+    // Busted: a stale edge copy must not answer for the current publish.
+    expect(requested).toHaveLength(1);
+    expect(requested[0].startsWith(`${BRANCH_STATS}?t=`)).toBe(true);
   });
 
-  it("ignores names that are not dist tags", () => {
-    expect(
-      newestProfilesTag(["v1.2.3", "main", "dist", "dist-2026", "dist-x"]),
-    ).toBe(undefined);
+  it("returns null when no source answers", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("network down");
+      }),
+    );
+    await expect(probeProfilesMeta("")).resolves.toBeNull();
   });
 });
 

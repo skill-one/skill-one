@@ -6,8 +6,8 @@ import {
   readIndex,
   readLines,
   readTrending,
-  resolveLatestTag,
 } from "./index-stream";
+import { readLatestTag } from "./snapshot";
 
 /** Chunk a string into UTF-8 byte segments of the given size. */
 function chunksOf(text: string, size: number): Uint8Array[] {
@@ -59,15 +59,29 @@ describe("readLines", () => {
   });
 });
 
-/** Tag-listing endpoints, in probe order. */
-const GITHUB_TAGS =
-  "https://api.github.com/repos/skill-one/skills-sh-mirror/tags?per_page=5";
-const GITHUB_TAGS_BASE = GITHUB_TAGS.split("?")[0];
-const JSDELIVR_TAGS =
-  "https://data.jsdelivr.com/v1/packages/gh/skill-one/skills-sh-mirror";
+/** The mirror's `latest` pointer, as `fileCandidates` builds it. */
+const POINTER_ORIGIN =
+  "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/latest";
+const POINTER_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-mirror@dist/latest`;
 
-describe("resolveLatestTag", () => {
+/** A 200 response serving a plain-text body (the pointer file). */
+function textResponse(body: string): Response {
+  return {
+    ok: true,
+    status: 200,
+    text: async () => body,
+  } as unknown as Response;
+}
+
+describe("readLatestTag", () => {
   const fetchMock = vi.fn();
+
+  /** The mirror's pointer contract, as `index-stream.ts` declares it. */
+  const SOURCE = {
+    repo: "skill-one/skills-sh-mirror",
+    branch: "dist",
+    tag: /^dist-\d{4}-\d{2}-\d{2}$/,
+  };
 
   beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock);
@@ -78,58 +92,49 @@ describe("resolveLatestTag", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns the newest dist-<date> tag from the GitHub tags API", async () => {
-    fetchMock.mockImplementation(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => [
-        { name: "dist-2026-09-09", commit: { sha: "c38455a" } },
-        { name: "dist-2026-09-08" },
-        { name: "not-a-snapshot" },
-      ],
-    }) as unknown as Response);
+  it("reads the pointer's one-line body as the tag, cache-busted", async () => {
+    fetchMock.mockImplementation(async () => textResponse("dist-2026-09-12\n"));
 
-    await expect(resolveLatestTag()).resolves.toBe("dist-2026-09-09");
-    // The listing is a mutable freshness pointer: fetched cache-busted.
-    expect(fetchMock.mock.calls[0][0]).toMatch(
-      new RegExp(`^${GITHUB_TAGS.replace("?", "\\?")}[&]t=`),
+    await expect(readLatestTag("", SOURCE)).resolves.toBe("dist-2026-09-12");
+    // The pointer is a mutable freshness address: an edge copy answering with
+    // yesterday's tag would pin the whole download to yesterday's snapshot.
+    expect(fetchMock.mock.calls[0][0]).toMatch(`${POINTER_ORIGIN}?t=`);
+  });
+
+  it("trims surrounding whitespace off the body", async () => {
+    fetchMock.mockImplementation(async () => textResponse("  dist-2026-09-12  "));
+
+    await expect(readLatestTag("", SOURCE)).resolves.toBe("dist-2026-09-12");
+  });
+
+  it("refuses a body that is not a tag this repo publishes", async () => {
+    // The value is interpolated into download URLs, so anything that is not a
+    // snapshot tag must not become a ref.
+    fetchMock.mockImplementation(async (url: string) =>
+      url.startsWith(POINTER_ORIGIN)
+        ? textResponse("main")
+        : textResponse("<html>404</html>"),
     );
+
+    await expect(readLatestTag("", SOURCE)).resolves.toBeNull();
   });
 
-  it("falls back to the jsDelivr data API when GitHub is unreachable", async () => {
+  it("walks to the next source when one is unreachable", async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(GITHUB_TAGS)) throw new TypeError("network down");
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          versions: [
-            { version: "dist-2026-09-08" },
-            { version: "dist-2026-09-07" },
-          ],
-        }),
-      } as unknown as Response;
+      if (url.startsWith(POINTER_ORIGIN)) throw new TypeError("network down");
+      return textResponse("dist-2026-09-11");
     });
 
-    await expect(resolveLatestTag()).resolves.toBe("dist-2026-09-08");
+    await expect(readLatestTag("", SOURCE)).resolves.toBe("dist-2026-09-11");
+    expect(fetchMock.mock.calls.map(([url]) => url.split("?")[0])).toEqual([
+      POINTER_ORIGIN,
+      POINTER_CDN,
+    ]);
   });
 
-  it("ignores listings without a dist-<date> tag", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(GITHUB_TAGS)) return { ok: false, status: 404 };
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({ versions: [{ version: "v1.2.3" }] }),
-      } as unknown as Response;
-    });
-
-    await expect(resolveLatestTag()).resolves.toBeNull();
-  });
-
-  it("returns null when no endpoint answers", async () => {
+  it("returns null when no source answers", async () => {
     fetchMock.mockRejectedValue(new TypeError("network down"));
-    await expect(resolveLatestTag()).resolves.toBeNull();
+    await expect(readLatestTag("", SOURCE)).resolves.toBeNull();
   });
 });
 
@@ -177,10 +182,10 @@ describe("probeIndexMeta", () => {
     vi.unstubAllGlobals();
   });
 
-  /** Make both tag-listing endpoints unreachable (legacy fallback path). */
-  function withoutTagListing() {
+  /** Make the `latest` pointer unreachable (the degraded branch path). */
+  function withoutPointer() {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(GITHUB_TAGS) || url.startsWith(JSDELIVR_TAGS)) {
+      if (url.startsWith(POINTER_ORIGIN) || url.startsWith(POINTER_CDN)) {
         throw new TypeError("network down");
       }
       requested.push(url.split("?")[0]);
@@ -188,12 +193,10 @@ describe("probeIndexMeta", () => {
     });
   }
 
-  it("resolves the snapshot from the latest tag and reads the stats pinned to it", async () => {
+  it("resolves the tag from the latest pointer, then reads the stats pinned to it", async () => {
     fetchMock.mockImplementation(async (url: string) => {
       requested.push(url.split("?")[0]);
-      if (url.startsWith(GITHUB_TAGS)) {
-        return statsResponse([{ name: TAG }]);
-      }
+      if (url.startsWith(POINTER_ORIGIN)) return textResponse(TAG);
       return statsResponse(PUBLISHED);
     });
 
@@ -202,15 +205,15 @@ describe("probeIndexMeta", () => {
       generatedAt: "2026-09-06T15:32:29.423Z",
       total: 8945,
     });
-    // The listing is busted; the pinned stats are not — the tag makes the
-    // URL immutable, so the origin answering means the CDN is never asked.
-    expect(requested).toEqual([GITHUB_TAGS_BASE, PINNED_STATS_ORIGIN]);
+    // The pointer is busted; the pinned stats are not — the tag makes the URL
+    // immutable, so the origin answering means the CDN is never asked.
+    expect(requested).toEqual([POINTER_ORIGIN, PINNED_STATS_ORIGIN]);
   });
 
   it("pins the tag even when the stats cannot be read", async () => {
     fetchMock.mockImplementation(async (url: string) => {
       requested.push(url.split("?")[0]);
-      if (url.startsWith(GITHUB_TAGS)) return statsResponse([{ name: TAG }]);
+      if (url.startsWith(POINTER_ORIGIN)) return textResponse(TAG);
       return { ok: false, status: 404 } as unknown as Response;
     });
 
@@ -218,17 +221,19 @@ describe("probeIndexMeta", () => {
     // unknown, which costs the caller its "unchanged" short-circuit.
     expect(await probeIndexMeta("")).toEqual({ tag: TAG });
     expect(requested).toEqual([
-      GITHUB_TAGS_BASE,
+      POINTER_ORIGIN,
       PINNED_STATS_ORIGIN,
       PINNED_STATS_CDN,
     ]);
   });
 
-  it("falls back to the mutable-branch probe when no tag can be resolved", async () => {
-    withoutTagListing();
+  it("falls back to the branch probe, unpinned, when the pointer is unreadable", async () => {
+    withoutPointer();
 
+    // Nothing is derived from the stats stamp any more: the pointer is
+    // upstream's own statement of the tag, so a missing pointer leaves the
+    // version unpinned rather than guessing at its naming convention.
     expect(await probeIndexMeta("")).toEqual({
-      tag: "dist-2026-09-06",
       generatedAt: "2026-09-06T15:32:29.423Z",
       total: 8945,
     });
@@ -236,11 +241,26 @@ describe("probeIndexMeta", () => {
     expect(requested).toEqual([ORIGIN_STATS]);
   });
 
-  it("busts the CDN cache on every legacy pointer request", async () => {
+  it("refuses a pointer body that is not a snapshot tag", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      requested.push(url.split("?")[0]);
+      if (url.startsWith(POINTER_ORIGIN) || url.startsWith(POINTER_CDN)) {
+        return textResponse("main");
+      }
+      return statsResponse(PUBLISHED);
+    });
+
+    const published = await probeIndexMeta("");
+    expect(published?.tag).toBeUndefined();
+    expect(published?.generatedAt).toBe("2026-09-06T15:32:29.423Z");
+    expect(requested).toEqual([POINTER_ORIGIN, ORIGIN_STATS]);
+  });
+
+  it("busts the CDN cache on every branch request", async () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (
-        url.startsWith(GITHUB_TAGS) ||
-        url.startsWith(JSDELIVR_TAGS) ||
+        url.startsWith(POINTER_ORIGIN) ||
+        url.startsWith(POINTER_CDN) ||
         url.startsWith(ORIGIN_STATS)
       ) {
         throw new TypeError("network down");
@@ -250,37 +270,21 @@ describe("probeIndexMeta", () => {
     });
 
     await probeIndexMeta("");
-    // The pointer is the freshness oracle: an edge copy as much as the WebView's
-    // own cache would make yesterday's snapshot look current.
+    // Without the pointer the branch is the freshness oracle: an edge copy as
+    // much as the WebView's own cache would make yesterday's snapshot look
+    // current.
     expect(requested).toHaveLength(1);
     expect(requested[0].startsWith(`${CDN_STATS}?t=`)).toBe(true);
   });
 
-  it("pins nothing from a finished stamp that is not a UTC date", async () => {
-    // Anything interpolated into a URL must be a `dist-<date>` tag the
-    // upstream CI actually creates; junk would build a bogus address, so it
-    // degrades to the branch fallback instead.
-    withoutTagListing();
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(GITHUB_TAGS) || url.startsWith(JSDELIVR_TAGS)) {
-        throw new TypeError("network down");
-      }
-      return statsResponse({ ...PUBLISHED, finishedAt: "../../evil" });
-    });
-    const published = await probeIndexMeta("");
-    expect(published?.tag).toBeUndefined();
-    expect(published?.generatedAt).toBe("../../evil");
-  });
-
   it("accepts a stamp-less stats file from a source lagging behind the format", async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(GITHUB_TAGS) || url.startsWith(JSDELIVR_TAGS)) {
+      if (url.startsWith(POINTER_ORIGIN) || url.startsWith(POINTER_CDN)) {
         throw new TypeError("network down");
       }
       return statsResponse({ startedAt: "2026-08-31T04:34:54Z" });
     });
     expect(await probeIndexMeta("")).toEqual({
-      tag: undefined,
       generatedAt: undefined,
       total: undefined,
     });
@@ -288,7 +292,7 @@ describe("probeIndexMeta", () => {
 
   it("walks to the next source when one is unreachable", async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(GITHUB_TAGS) || url.startsWith(JSDELIVR_TAGS)) {
+      if (url.startsWith(POINTER_ORIGIN) || url.startsWith(POINTER_CDN)) {
         throw new TypeError("network down");
       }
       requested.push(url.split("?")[0]);
@@ -309,7 +313,7 @@ describe("probeIndexMeta", () => {
 
   it("returns null on a body that is not a JSON object", async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(GITHUB_TAGS) || url.startsWith(JSDELIVR_TAGS)) {
+      if (url.startsWith(POINTER_ORIGIN) || url.startsWith(POINTER_CDN)) {
         throw new TypeError("network down");
       }
       return statsResponse("<html>");

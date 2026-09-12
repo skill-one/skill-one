@@ -6,18 +6,20 @@ import {
 } from "../cdn-config";
 import type { Skill } from "../../types/skill";
 import { parseSkillLine } from "./parse";
+import { readLatestTag } from "./snapshot";
+import type { SnapshotSource } from "./snapshot";
 
 /**
  * Streaming reader for the registry snapshot: resolves which published
  * version to use, then splits the response body into JSONL lines and hands
  * every parsed skill to the caller. Runs inside the registry worker.
  *
- * Version resolution is tag-first: upstream CI publishes every daily snapshot
- * to the `dist` branch and tags it `dist-<date>` (keeping the last few), so
- * the freshest tag is listed directly and everything is fetched pinned to it.
- * Two cache policies follow:
+ * Version resolution is pointer-first (see `snapshot.ts`): upstream publishes
+ * every daily snapshot to the `dist` branch and writes a `latest` file beside
+ * it holding the tag that branch points at, so a single small read names the
+ * version everything else is addressed through. Two cache policies follow:
  *
- * - The tag list and the `dist` branch are mutable pointers, so their
+ * - The `latest` pointer and the `dist` branch are mutable pointers, so their
  *   requests are always cache-busted — a stale answer defeats their purpose.
  *   `stats.json` read pinned to the resolved tag is immutable, so it is not
  *   busted; its `finishedAt` identifies the snapshot (equal stamps mean equal
@@ -48,75 +50,14 @@ const META_SPEC = { ...INDEX_SPEC, path: "stats.json" } as const;
 const TRENDING_SPEC = { ...INDEX_SPEC, path: "trending.json" } as const;
 
 /**
- * Endpoints that list the repo's tags, newest first, tried in order. The
- * GitHub REST API is authoritative; the jsDelivr data API mirrors the same
- * tag list and serves users who cannot reach `api.github.com` directly.
- * Neither endpoint depends on the configured CDN base — a file CDN cannot
- * list refs.
+ * The mirror's pointer contract: the `latest` file at the `dist` root names a
+ * `dist-` tag with a UTC calendar date.
  */
-const TAG_LIST_URLS = [
-  `https://api.github.com/repos/${INDEX_SPEC.repo}/tags?per_page=5`,
-  `https://data.jsdelivr.com/v1/packages/gh/${INDEX_SPEC.repo}`,
-] as const;
-
-/** A UTC calendar date, the form `dist-<date>` tags are named with. */
-const UTC_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
-/** A tag name upstream CI publishes: `dist-` + a UTC calendar date. */
-const SNAPSHOT_TAG = /^dist-\d{4}-\d{2}-\d{2}$/;
-
-/** Collect the string values of `key` in a listing payload (or inside its `versions` array). */
-function listingValues(payload: unknown, key: "name" | "version"): string[] {
-  if (Array.isArray(payload)) {
-    return payload
-      .filter(
-        (entry): entry is Record<string, unknown> =>
-          entry != null && typeof entry === "object",
-      )
-      .map((entry) => entry[key])
-      .filter((value): value is string => typeof value === "string");
-  }
-  if (payload && typeof payload === "object") {
-    const versions = (payload as Record<string, unknown>).versions;
-    if (Array.isArray(versions)) return listingValues(versions, key);
-  }
-  return [];
-}
-
-/** Extract the newest `dist-<date>` tag name from a tags-API listing. */
-function newestSnapshotTag(payload: unknown): string | undefined {
-  // `api.github.com/.../tags` returns `[{ name }]`; the jsDelivr data API
-  // returns `{ versions: [{ version }] }`. Both sort newest first.
-  const names = [
-    ...listingValues(payload, "name"),
-    ...listingValues(payload, "version"),
-  ];
-  return names.find((name) => SNAPSHOT_TAG.test(name));
-}
-
-/**
- * Resolve the freshest published snapshot tag, trying each listing endpoint
- * in order (sequential, like every other candidate walk: the user's first
- * choice must win, not the fastest).
- *
- * The walk is cache-busted — a mutable pointer whose whole job is to report
- * freshness must never be answered from a cache. Returns null when no
- * endpoint could be reached or listed a usable tag, which leaves the caller
- * on the legacy `dist`-branch probe.
- */
-export async function resolveLatestTag(): Promise<string | null> {
-  for (const url of TAG_LIST_URLS) {
-    try {
-      const resp = await fetch(cacheBusted(url), { signal: fetchSignal() });
-      if (!resp.ok) continue;
-      const tag = newestSnapshotTag(await resp.json());
-      if (tag) return tag;
-    } catch {
-      // Unreachable, timed out, or not JSON: give the next endpoint a turn.
-    }
-  }
-  return null;
-}
+const INDEX_SOURCE: SnapshotSource = {
+  repo: INDEX_SPEC.repo,
+  branch: INDEX_SPEC.ref,
+  tag: /^dist-\d{4}-\d{2}-\d{2}$/,
+};
 
 /**
  * Silence allowed between body chunks before the read is treated as stalled.
@@ -204,18 +145,18 @@ export async function readLines(
 
 /**
  * Probe the currently published snapshot, resolving its identity from the
- * repo's tags first: the freshest `dist-<date>` tag is listed (see
- * `resolveLatestTag`), and `stats.json` is then read **pinned to that tag** —
- * an immutable address, so no busting is needed and a lagging CDN can only
- * serve the same snapshot's stats. The stats supply the publication stamp and
- * row count; if they cannot be read the tag alone still pins the download.
+ * repo's `latest` pointer: that single line names the tag, and `stats.json` is
+ * then read **pinned to that tag** — an immutable address, so no busting is
+ * needed and a lagging CDN can only serve the same snapshot's stats. The stats
+ * supply the publication stamp and row count; if they cannot be read the tag
+ * alone still pins the download.
  *
- * When no tag can be resolved (both listing endpoints unreachable) the
- * legacy path applies: `stats.json` on the mutable `dist` branch is probed
- * cache-busted and its `finishedAt` derives the tag, mirroring how upstream
- * CI names it. Every such pointer request is busted, so a source that
- * answers at all answers for the current publish rather than a cached one —
- * a stale mirror must not pass yesterday's snapshot off as current.
+ * When the pointer cannot be read at all, the branch's own `stats.json` is
+ * probed cache-busted for the stamp — busted because a source that answers
+ * must answer for the current publish, or a stale mirror would pass
+ * yesterday's snapshot off as current. No tag is derived on that path: the
+ * version simply stays unpinned, costing the body its immutable address while
+ * still letting the caller skip one it already has.
  *
  * Returns null when neither path could reach a source, which leaves the
  * caller to fall back to the mutable branch ref.
@@ -223,12 +164,10 @@ export async function readLines(
 export async function probeIndexMeta(
   cdnBase: string,
 ): Promise<PublishedIndex | null> {
-  const tag = await resolveLatestTag();
-  if (tag) {
-    const stats = await readStatsAt(cdnBase, tag);
-    return stats ? { ...normalize(stats), tag } : { tag };
-  }
-  return probeStatsOnDist(cdnBase);
+  const tag = await readLatestTag(cdnBase, INDEX_SOURCE);
+  if (!tag) return probeBranchStats(cdnBase);
+  const stats = await readStatsAt(cdnBase, tag);
+  return stats ? { ...normalizeStats(stats), tag } : { tag };
 }
 
 /** Fetch `stats.json` pinned to an immutable snapshot tag (no cache-busting). */
@@ -249,15 +188,22 @@ async function readStatsAt(
   return null;
 }
 
-/** Legacy probe: read `stats.json` off the mutable branch and derive the tag. */
-async function probeStatsOnDist(cdnBase: string): Promise<PublishedIndex | null> {
+/**
+ * Degraded probe, used when the `latest` pointer is unreadable: read
+ * `stats.json` off the mutable branch, cache-busted. The stamp and count still
+ * drive the caller's "unchanged" short-circuit; only the tag is unknown, which
+ * costs the download its immutable address.
+ */
+async function probeBranchStats(
+  cdnBase: string,
+): Promise<PublishedIndex | null> {
   for (const url of fileCandidates(META_SPEC, cdnBase)) {
     try {
       const resp = await fetch(cacheBusted(url), { signal: fetchSignal() });
       if (!resp.ok) continue;
       const stats: unknown = await resp.json();
       if (!stats || typeof stats !== "object") continue;
-      return normalize(stats as RawRunStats);
+      return normalizeStats(stats as RawRunStats);
     } catch {
       // Unreachable, timed out, or not JSON: give the next source a turn.
     }
@@ -266,24 +212,18 @@ async function probeStatsOnDist(cdnBase: string): Promise<PublishedIndex | null>
 }
 
 /**
- * Keep only the fields we can actually use; junk becomes `undefined`.
- *
- * The tag is derived from the run's finish date, mirroring how upstream CI
- * names its tags (the commit is stamped `date -u +%F` right after the run) —
- * only consulted on the legacy no-tag-listing path. A stamp that is not a
- * UTC calendar date pins nothing — the caller falls back to the mutable
- * branch rather than building a bogus URL.
+ * Keep only the fields we can actually use; junk becomes `undefined`. The tag
+ * is deliberately not derived here — it comes from the `latest` pointer, which
+ * is upstream's own statement of it rather than our guess at its naming
+ * convention.
  */
-function normalize(raw: RawRunStats): PublishedIndex {
+function normalizeStats(raw: RawRunStats): PublishedIndex {
   const text = (value: unknown): string | undefined =>
     typeof value === "string" && value.length > 0 ? value : undefined;
   const count = (value: unknown): number | undefined =>
     typeof value === "number" && Number.isFinite(value) ? value : undefined;
-  const finishedAt = text(raw.finishedAt);
-  const day = finishedAt?.slice(0, 10);
   return {
-    tag: day && UTC_DATE.test(day) ? `dist-${day}` : undefined,
-    generatedAt: finishedAt,
+    generatedAt: text(raw.finishedAt),
     total: count(raw.indexedRows),
   };
 }
@@ -292,7 +232,7 @@ function normalize(raw: RawRunStats): PublishedIndex {
  * Fetch the trending view's id list. When a snapshot tag is known the fetch
  * is pinned to it, so the leaderboard is read from the same snapshot as the
  * index and its URL is cache-safe; without a tag the mutable `dist` branch is
- * probed cache-busted, like the legacy stats probe.
+ * probed cache-busted, like the branch stats probe.
  *
  * The list is an optional garnish, not the dataset — an unreachable or
  * future-shaped source simply yields null, which callers treat as "no
