@@ -16,6 +16,14 @@ const srcDir = path.dirname(fileURLToPath(import.meta.url));
 // the test runner and the dev server watcher.
 const worktreeGlob = "**/.worktrees/**";
 
+// The watcher needs the same ignore anchored at this config's directory (the
+// project root). Vitest resolves `exclude` relative to the root, so the bare
+// glob above only ever matches *nested* worktrees; chokidar matches
+// `server.watch.ignored` against absolute paths, where the bare glob also
+// swallows that checkout's own sources — a dev server started from inside a
+// worktree then silently stops reloading, and every edit needs a restart.
+const worktreeWatchGlob = path.resolve(srcDir, worktreeGlob);
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [tailwindcss(), react()],
@@ -67,8 +75,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     watch: {
-      // Mirrors `test.exclude` above.
-      ignored: [worktreeGlob],
+      // Same intent as `test.exclude` above, in the root-anchored form
+      // chokidar needs — see `worktreeWatchGlob`.
+      ignored: [worktreeWatchGlob],
     },
   },
   // Env variables starting with TAURI_ are exposed to the client.
