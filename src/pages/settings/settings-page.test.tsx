@@ -6,6 +6,31 @@ import { ThemeProvider } from "../../components/theme-provider";
 import { SettingsPage } from "./settings-page";
 import type { IndexInfo } from "../../lib/registry/protocol";
 import { setIndexTag, setProfilesTag } from "../../lib/cdn-config";
+import { getUpdateStatus, resetUpdateState } from "../../lib/update-store";
+import { resetUpdateChannel } from "../../lib/update-channel";
+
+/**
+ * The 软件更新 card runs against the real update store, so the desktop toggle
+ * (off by default, matching jsdom) and the install channel are driven from here.
+ */
+const updateEnv = vi.hoisted(() => ({
+  isTauri: false,
+  managed: false,
+  release: null as { version: string; body?: string } | null,
+}));
+
+vi.mock("../../lib/tauri", () => ({ isTauri: () => updateEnv.isTauri }));
+vi.mock("@tauri-apps/plugin-updater", () => ({
+  check: async () => updateEnv.release,
+}));
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: async () => updateEnv.managed,
+}));
+// Desktop mode also reaches the native window API (theme sync); jsdom is not
+// Tauri, so the bridge is stubbed rather than exercised.
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({ setTheme: async () => {} }),
+}));
 
 /** Snapshot the mocked registry hook reports; per-test overrides apply next. */
 const stats = vi.hoisted(() => ({
@@ -60,6 +85,12 @@ describe("SettingsPage", () => {
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
     stats.current = null;
+    updateEnv.isTauri = false;
+    updateEnv.managed = false;
+    updateEnv.release = null;
+    // Store state (and the memoised channel) outlives a render.
+    resetUpdateState();
+    resetUpdateChannel();
   });
 
   afterEach(() => {
@@ -135,6 +166,48 @@ describe("SettingsPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "自动更新仅在桌面应用内可用。",
     );
+  });
+
+  it("announces a new version and opens the confirmation dialog", async () => {
+    const user = userEvent.setup();
+    updateEnv.isTauri = true;
+    updateEnv.release = { version: "9.9.9", body: "notes" };
+    renderSettings();
+
+    await user.click(screen.getByRole("button", { name: "检查更新" }));
+
+    expect(await screen.findByText("有新版本 v9.9.9")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "立即更新" }));
+    // The card hands off to the store: UpdateDialog reacts to exactly this.
+    expect(getUpdateStatus().dialogOpen).toBe(true);
+  });
+
+  it("settles on 已是最新版本 after a check finds nothing", async () => {
+    const user = userEvent.setup();
+    updateEnv.isTauri = true;
+    renderSettings();
+
+    await user.click(screen.getByRole("button", { name: "检查更新" }));
+
+    expect(await screen.findByText("已是最新版本。")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "立即更新" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hands a Homebrew-managed install back to brew", async () => {
+    const user = userEvent.setup();
+    updateEnv.isTauri = true;
+    updateEnv.managed = true;
+    renderSettings();
+
+    await user.click(screen.getByRole("button", { name: "检查更新" }));
+
+    expect(
+      await screen.findByText(/brew upgrade --cask skill-one/),
+    ).toBeInTheDocument();
+    // The button stays put but stops pretending a check could help.
+    expect(screen.getByRole("button", { name: "检查更新" })).toBeDisabled();
   });
 
   it("switches the document to dark from the settings page", async () => {

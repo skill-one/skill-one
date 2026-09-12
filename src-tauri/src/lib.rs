@@ -7,6 +7,7 @@ use tauri::{Listener, Manager};
 
 mod skills;
 mod tray;
+mod update_channel;
 
 pub fn run() {
     tauri::Builder::default()
@@ -27,6 +28,7 @@ pub fn run() {
             skills::link_agents,
             skills::link_status,
             skills::read_skill_md,
+            update_channel::is_homebrew_install,
         ])
         .setup(|app| {
             tray::create_tray(app.handle())?;

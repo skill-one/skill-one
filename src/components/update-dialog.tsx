@@ -24,7 +24,9 @@ import { Progress } from "./ui/progress";
 export function UpdateDialog() {
   const { phase, version, notes, dialogOpen, close: closeDialog, install } =
     useAppUpdate();
-  const [percent, setPercent] = useState(0);
+  // `null` = the download reported no total size, so there is no percentage to
+  // show; the label says "downloading" instead of pretending it is 0%.
+  const [percent, setPercent] = useState<number | null>(0);
   const [installing, setInstalling] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -64,9 +66,9 @@ export function UpdateDialog() {
 
         {installing ? (
           <div className="flex flex-col gap-2">
-            <Progress value={percent} />
+            <Progress value={percent ?? 0} />
             <p className="text-right text-[12px] text-muted-foreground">
-              {percent}%
+              {percent === null ? "正在下载…" : `${percent}%`}
             </p>
           </div>
         ) : (

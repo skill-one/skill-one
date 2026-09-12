@@ -3,7 +3,6 @@ import { useSyncExternalStore } from "react";
 import {
   checkForUpdate,
   closeUpdateDialog,
-  dismissUpdate,
   getUpdateStatus,
   installUpdate,
   openUpdateDialog,
@@ -14,7 +13,6 @@ import {
 /** Reactive view of the shared self-update store + its actions. */
 export function useAppUpdate(): UpdateStatus & {
   check: typeof checkForUpdate;
-  dismiss: typeof dismissUpdate;
   install: typeof installUpdate;
   open: typeof openUpdateDialog;
   close: typeof closeUpdateDialog;
@@ -23,7 +21,6 @@ export function useAppUpdate(): UpdateStatus & {
   return {
     ...status,
     check: checkForUpdate,
-    dismiss: dismissUpdate,
     install: installUpdate,
     open: openUpdateDialog,
     close: closeUpdateDialog,

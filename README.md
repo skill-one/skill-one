@@ -11,7 +11,7 @@ A desktop app for finding, installing, and managing agent skills. Built on Tauri
 - **Store / Explore**: Browse the skills registry, view each skill's description (`SKILL.md`), and install with one click.
 - **My Skills**: View, update, and uninstall installed skills.
 - **Agent Linking**: Link the skill directories of various agents (Claude Code, Cursor, Gemini CLI, etc.) to a unified directory, with support for migrating existing skills.
-- **Auto-Update**: The app checks for new releases at startup and installs signed updates in one click — no re-downloading, and no Apple Developer account involved (updates are verified with a minisign key).
+- **Auto-Update**: The app checks for new releases at startup, on refocus, and hourly, then installs signed updates in one click — no re-downloading, and no Apple Developer account involved (updates are verified with a minisign key). Homebrew installs are handed back to `brew upgrade` instead.
 - **Settings**: Configure the download source for registry files (direct GitHub or a CDN mirror).
 
 ## Installation
@@ -35,9 +35,9 @@ Brew users can keep updating with `brew upgrade --cask skill-one`; brew download
 
 ## Staying up to date
 
-The app checks for updates at startup and offers **Update now** when a newer version exists — it downloads, installs, and relaunches. You can also check manually: **Settings → Software Update → Check for updates**. Update packages are signature-verified before installation; a package with an invalid signature is never installed.
+The app checks for updates at startup, whenever it regains focus, and hourly as a fallback. When a newer version exists it offers **Update now** — download, install, relaunch. You can also check manually: **Settings → Software Update → Check for updates**. Update packages are signature-verified before installation; a package with an invalid signature is never installed.
 
-Homebrew users should keep using `brew upgrade --cask skill-one`.
+A Homebrew install is excluded from in-app updates: the app detects the cask and points you at `brew upgrade --cask skill-one` instead, so Homebrew never loses track of which version is installed.
 
 ## macOS first launch
 

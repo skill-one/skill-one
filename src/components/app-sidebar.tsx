@@ -1,12 +1,5 @@
 import { NavLink, useLocation } from "react-router";
-import {
-  Settings,
-  Sparkles,
-  GitFork,
-  LayoutGrid,
-  Boxes,
-  RotateCw,
-} from "lucide-react";
+import { Settings, Sparkles, GitFork, LayoutGrid, Boxes } from "lucide-react";
 
 import {
   Sidebar,
@@ -22,6 +15,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "./ui/sidebar";
+import { Badge } from "./ui/badge";
 import { isTauri } from "../lib/tauri";
 import { useAppUpdate } from "../hooks/use-app-update";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
@@ -93,7 +87,19 @@ function useNavCounts(): Partial<Record<string, number>> {
   };
 }
 
-function NavMenuItem({ item, count }: { item: NavItem; count?: number }) {
+function NavMenuItem({
+  item,
+  count,
+  indicator,
+}: {
+  item: NavItem;
+  count?: number;
+  /**
+   * Trailing mark in the same slot as `count`. The two never coexist — a row
+   * either counts things or flags one — so passing both is a caller bug.
+   */
+  indicator?: React.ReactNode;
+}) {
   const location = useLocation();
   const isActive =
     location.pathname === item.path ||
@@ -112,28 +118,45 @@ function NavMenuItem({ item, count }: { item: NavItem; count?: number }) {
       {count !== undefined && (
         <SidebarMenuBadge className="tabular-nums">{count}</SidebarMenuBadge>
       )}
+      {indicator !== undefined && (
+        <SidebarMenuBadge>{indicator}</SidebarMenuBadge>
+      )}
     </SidebarMenuItem>
   );
 }
 
 /**
- * Passive update affordance: appears next to 设置 only once a background check
- * has found a newer signed release. Clicking opens the confirmation dialog
- * (which downloads + relaunches on the user's go-ahead) instead of interrupting
- * them with a modal. Dismissing the dialog leaves `available` set, so this badge
- * stays put as a reminder until the update is installed.
+ * The whole in-sidebar update affordance: one chip on 设置, in the slot the
+ * other rows use for their counts — and the chip itself is the way in.
+ *
+ * Marking an icon the user already knows — rather than adding a row of its own
+ * — is how the desktop apps this one lives next to do it: VS Code badges the
+ * Settings gear, Chrome badges the ⋮ menu, Slack badges the workspace. VS Code
+ * went as far as fixing a bug where the gear badge *and* its "Update" button
+ * showed at once, on the grounds that two signals for one fact is noise.
+ *
+ * Clicking it opens the confirmation dialog from wherever the user is, so
+ * nobody has to know the update is filed under settings. It says its piece
+ * instead of being a bare dot — this sidebar's other badge is a plain count,
+ * where a silent dot reads as decoration — and it is the only coloured thing
+ * in the footer, which is what makes it read as an action among numbers. Green
+ * (`success`) rather than the palette's red: an available update is something
+ * to go and get, not a failure, and red would say the app is broken.
  */
-function UpdateNavItem() {
-  const { phase, version, open } = useAppUpdate();
-  if (phase !== "available") return null;
+function UpdateBadge() {
+  const { open } = useAppUpdate();
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton tooltip="重启以更新" onClick={() => open()}>
-        <RotateCw className="h-4 w-4" />
-        <span>更新 v{version}</span>
-      </SidebarMenuButton>
-      <SidebarMenuBadge aria-label="有可用更新">新</SidebarMenuBadge>
-    </SidebarMenuItem>
+    <Badge asChild variant="success">
+      <button
+        type="button"
+        onClick={() => open()}
+        // The badge slot is `pointer-events-none` so it never swallows clicks
+        // meant for the row; this one is a button and wants them.
+        className="pointer-events-auto cursor-pointer"
+      >
+        有新版本
+      </button>
+    </Badge>
   );
 }
 
@@ -159,6 +182,10 @@ function BrandHeader() {
 
 export function AppSidebar() {
   const counts = useNavCounts();
+  const { phase, version } = useAppUpdate();
+  // A discovered update is marked on 设置 itself (see UpdateBadge) instead of
+  // getting a row of its own.
+  const hasUpdate = phase === "available" && version !== null;
   return (
     <Sidebar collapsible="none">
       <BrandHeader />
@@ -196,9 +223,12 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           {footerItems.map((item) => (
-            <NavMenuItem key={item.label} item={item} />
+            <NavMenuItem
+              key={item.label}
+              item={item}
+              indicator={hasUpdate ? <UpdateBadge /> : undefined}
+            />
           ))}
-          <UpdateNavItem />
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

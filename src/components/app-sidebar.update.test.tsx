@@ -18,6 +18,8 @@ const updateMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../lib/tauri", () => ({ isTauri: () => updateMocks.isTauri }));
+// The store probes the install channel before every check.
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => false) }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: updateMocks.check }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: updateMocks.relaunch }));
 
@@ -33,7 +35,11 @@ const harness = (
   }
 ).__harness;
 
-import { checkForUpdate, getUpdateStatus, resetUpdateState } from "../lib/update-store";
+import {
+  checkForUpdate,
+  getUpdateStatus,
+  resetUpdateState,
+} from "../lib/update-store";
 
 function renderSidebar() {
   return renderWithRouter(
@@ -67,12 +73,27 @@ describe("AppSidebar update badge", () => {
       await checkForUpdate();
     });
 
-    expect(screen.queryByText(/更新 v/)).not.toBeInTheDocument();
-    // 设置 stays put as the anchor the badge sits next to.
-    expect(screen.getByText("设置")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "有新版本" })).toBeNull();
+    expect(screen.getByRole("link", { name: "设置" })).toBeInTheDocument();
   });
 
-  it("appears once available, and clicking it opens the confirmation dialog", async () => {
+  it("marks 设置 itself rather than adding a row of its own", async () => {
+    updateMocks.check.mockResolvedValue(fakeRelease());
+    renderSidebar();
+    await act(async () => {
+      await checkForUpdate();
+    });
+
+    const badge = await screen.findByRole("button", { name: "有新版本" });
+    // The chip hangs off the 设置 row, so the sidebar gained no destination.
+    expect(badge.closest("li")).toContainElement(
+      screen.getByRole("link", { name: "设置" }),
+    );
+    // 精选 · 仓库 · 全部 · 我的 skills · 设置 — and nothing else.
+    expect(screen.getAllByRole("link")).toHaveLength(5);
+  });
+
+  it("opens the confirmation dialog from wherever the user is", async () => {
     const user = userEvent.setup();
     updateMocks.check.mockResolvedValue(fakeRelease());
     renderSidebar();
@@ -80,13 +101,12 @@ describe("AppSidebar update badge", () => {
       await checkForUpdate();
     });
 
-    const badge = await screen.findByText("更新 v9.9.9");
-    expect(screen.getByText("新")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "有新版本" }));
 
-    await user.click(badge.closest("button")!);
-    // The badge hands off to the store: opening the dialog is exactly what the
-    // globally-mounted UpdateDialog reacts to (covered in update-dialog.test).
+    // Opening the dialog is the chip's whole job: the globally-mounted
+    // UpdateDialog reacts to exactly this, so nobody has to know the update
+    // lives under settings — while 设置 stays an ordinary route.
     expect(getUpdateStatus().dialogOpen).toBe(true);
-    expect(getUpdateStatus().phase).toBe("available");
+    expect(screen.getByRole("link", { name: "设置" })).toBeInTheDocument();
   });
 });

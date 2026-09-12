@@ -182,10 +182,18 @@ function PopoverNavigation() {
 }
 
 /**
- * Automatic update check: once on startup, and again whenever the window
- * regains focus so a long-running or tray-resident session still catches up
- * (the store throttles both to one request per interval). Failures stay quiet
- * here — the settings page surfaces them on an explicit manual check.
+ * How often the fallback timer below wakes up. It is not the check interval —
+ * the store throttles every trigger to one request per its own window — so an
+ * hour only bounds how stale a session that never loses focus can get.
+ */
+const FALLBACK_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * Automatic update check: once on startup, again whenever the window regains
+ * focus, and hourly as a fallback for a session that is never refocused. The
+ * store collapses all three into one request per interval, so the timer costs
+ * nothing. Failures stay quiet here — the settings page surfaces them on an
+ * explicit manual check.
  */
 function AppUpdateWatcher() {
   useEffect(() => {
@@ -194,7 +202,12 @@ function AppUpdateWatcher() {
     const focused = getCurrentWindow().onFocusChanged(({ payload }) => {
       if (payload) void checkForUpdate();
     });
+    const fallback = setInterval(
+      () => void checkForUpdate(),
+      FALLBACK_CHECK_INTERVAL_MS,
+    );
     return () => {
+      clearInterval(fallback);
       void focused.then((unlisten) => unlisten());
     };
   }, []);

@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../lib/tauri", () => ({ isTauri: () => mocks.isTauri }));
+// The store probes the install channel before every check.
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => false) }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: mocks.check }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: mocks.relaunch }));
 
@@ -81,6 +83,29 @@ describe("UpdateDialog", () => {
     await user.click(screen.getByRole("button", { name: "立即更新" }));
     await waitFor(() => expect(mocks.downloadAndInstall).toHaveBeenCalled());
     await waitFor(() => expect(mocks.relaunch).toHaveBeenCalled());
+  });
+
+  it("labels an unknown download size instead of a stuck 0%", async () => {
+    const user = userEvent.setup();
+    mocks.check.mockResolvedValue(fakeUpdate());
+    mocks.downloadAndInstall.mockImplementation(
+      async (onEvent: (event: unknown) => void) => {
+        // No `contentLength`: there is no percentage to show.
+        onEvent({ event: "Started", data: {} });
+      },
+    );
+    render(<UpdateDialog />);
+    await act(async () => {
+      await checkForUpdate();
+    });
+    await act(async () => {
+      openUpdateDialog();
+    });
+
+    await user.click(screen.getByRole("button", { name: "立即更新" }));
+
+    expect(await screen.findByText("正在下载…")).toBeInTheDocument();
+    expect(screen.queryByText("0%")).not.toBeInTheDocument();
   });
 
   it("offers a retry when installation fails", async () => {

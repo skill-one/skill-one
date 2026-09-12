@@ -1,5 +1,12 @@
-import { useState } from "react";
-import { Check } from "lucide-react";
+import { useState, type ComponentType, type ReactNode } from "react";
+import {
+  Check,
+  CircleAlert,
+  CircleArrowUp,
+  CircleCheck,
+  LoaderCircle,
+  Terminal,
+} from "lucide-react";
 
 import {
   DEFAULT_CDN_BASE,
@@ -14,6 +21,7 @@ import type {
   IndexOrigin,
   RevalidateStatus,
 } from "../../lib/registry/protocol";
+import { cn } from "../../lib/utils";
 import { useAppUpdate } from "../../hooks/use-app-update";
 import { useRegistrySnapshot } from "../../hooks/use-registry-snapshot";
 import { Button } from "../../components/ui/button";
@@ -134,7 +142,7 @@ export function SettingsPage() {
                   软件更新
                 </h3>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  启动和切回前台时自动检查新版本（GitHub
+                  启动、切回前台以及每小时兜底自动检查新版本（GitHub
                   Releases，签名校验后安装），也可手动检查。
                 </p>
               </div>
@@ -142,37 +150,72 @@ export function SettingsPage() {
                 variant="outline"
                 size="sm"
                 className="shrink-0"
-                disabled={update.phase === "checking"}
+                disabled={
+                  update.phase === "checking" || update.phase === "managed"
+                }
                 onClick={() => void update.check({ force: true })}
               >
                 {update.phase === "checking" ? "正在检查…" : "检查更新"}
               </Button>
             </div>
-            {update.phase === "upToDate" && (
-              <p className="mt-2 flex items-center gap-1 text-[12px] text-primary">
-                <Check className="h-3.5 w-3.5" />
-                已是最新版本。
-              </p>
+            {update.phase === "checking" && (
+              <UpdateStatusLine
+                icon={LoaderCircle}
+                iconClassName="animate-spin"
+                title="正在检查更新…"
+              />
             )}
+            {update.phase === "upToDate" && (
+              <UpdateStatusLine
+                icon={CircleCheck}
+                tone="positive"
+                title="已是最新版本。"
+              />
+            )}
+            {/* The one state worth shouting about: tinted, two-line, and the
+                only place in the card with a filled primary action. Every
+                other phase stays a quiet line, so the card draws the eye
+                exactly when there is something to do. */}
             {update.phase === "available" && (
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <p className="text-[12px] text-primary">
-                  发现新版本 v{update.version}，可下载并重启安装。
-                </p>
+              <div className="mt-3 flex items-center gap-3 rounded-lg border border-success/30 bg-success/5 px-3 py-2.5">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground">
+                  <CircleArrowUp className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-medium text-foreground">
+                    有新版本 v{update.version}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                    下载并重启即可完成安装。
+                  </p>
+                </div>
                 <Button
-                  variant="outline"
                   size="sm"
                   className="shrink-0"
                   onClick={() => update.open()}
                 >
-                  安装更新
+                  立即更新
                 </Button>
               </div>
             )}
+            {update.phase === "managed" && (
+              <UpdateStatusLine
+                icon={Terminal}
+                title="此安装由 Homebrew 管理。"
+                detail={
+                  <code className="rounded bg-muted px-1 py-0.5">
+                    brew upgrade --cask skill-one
+                  </code>
+                }
+              />
+            )}
             {update.phase === "error" && (
-              <p role="alert" className="mt-2 text-[12px] text-destructive">
-                {update.error}
-              </p>
+              <UpdateStatusLine
+                icon={CircleAlert}
+                tone="danger"
+                role="alert"
+                title={update.error}
+              />
             )}
           </div>
 
@@ -322,6 +365,53 @@ export function SettingsPage() {
             </p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A status entry under the 软件更新 header: state icon + one wrapping line, the
+ * same shape for every phase that has nothing to act on (`available` gets the
+ * callout above instead). Keeping the shape fixed means the card settles as a
+ * check resolves rather than reflowing around whatever text appears.
+ */
+function UpdateStatusLine({
+  icon: Icon,
+  tone = "muted",
+  iconClassName,
+  role,
+  title,
+  detail,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  tone?: "muted" | "positive" | "danger";
+  iconClassName?: string;
+  /** Announce the line: reserved for states the user must not miss. */
+  role?: "alert";
+  title: ReactNode;
+  /** A second, quieter line — used for the fix-it command. */
+  detail?: ReactNode;
+}) {
+  const tint = {
+    muted: "text-muted-foreground",
+    positive: "text-primary",
+    danger: "text-destructive",
+  }[tone];
+  return (
+    <div
+      role={role}
+      className={cn(
+        "mt-2 flex items-start gap-2 text-[12px] leading-relaxed",
+        tone === "danger" ? "text-destructive" : "text-muted-foreground",
+      )}
+    >
+      <Icon className={cn("mt-px size-3.5 shrink-0", tint, iconClassName)} />
+      <div className="min-w-0">
+        <p>{title}</p>
+        {detail && (
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{detail}</p>
+        )}
       </div>
     </div>
   );
