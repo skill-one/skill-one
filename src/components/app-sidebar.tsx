@@ -5,6 +5,7 @@ import {
   GitFork,
   LayoutGrid,
   Boxes,
+  RotateCw,
 } from "lucide-react";
 
 import {
@@ -22,6 +23,7 @@ import {
   SidebarSeparator,
 } from "./ui/sidebar";
 import { isTauri } from "../lib/tauri";
+import { useAppUpdate } from "../hooks/use-app-update";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
 import { useRegistryRepos } from "../hooks/use-registry-repos";
 import { useRegistrySnapshot } from "../hooks/use-registry-snapshot";
@@ -114,6 +116,27 @@ function NavMenuItem({ item, count }: { item: NavItem; count?: number }) {
   );
 }
 
+/**
+ * Passive update affordance: appears next to 设置 only once a background check
+ * has found a newer signed release. Clicking opens the confirmation dialog
+ * (which downloads + relaunches on the user's go-ahead) instead of interrupting
+ * them with a modal. Dismissing the dialog leaves `available` set, so this badge
+ * stays put as a reminder until the update is installed.
+ */
+function UpdateNavItem() {
+  const { phase, version, open } = useAppUpdate();
+  if (phase !== "available") return null;
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton tooltip="重启以更新" onClick={() => open()}>
+        <RotateCw className="h-4 w-4" />
+        <span>更新 v{version}</span>
+      </SidebarMenuButton>
+      <SidebarMenuBadge aria-label="有可用更新">新</SidebarMenuBadge>
+    </SidebarMenuItem>
+  );
+}
+
 function BrandHeader() {
   return (
     <SidebarHeader>
@@ -175,6 +198,7 @@ export function AppSidebar() {
           {footerItems.map((item) => (
             <NavMenuItem key={item.label} item={item} />
           ))}
+          <UpdateNavItem />
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

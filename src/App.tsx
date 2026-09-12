@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppSidebar } from "./components/app-sidebar";
@@ -114,7 +115,7 @@ export default function App() {
     >
       <HashRouter>
         <PopoverNavigation />
-        <StartupUpdateCheck />
+        <AppUpdateWatcher />
         <RegistryAutoRefresh />
         <UpdateDialog />
         <Toaster />
@@ -181,13 +182,21 @@ function PopoverNavigation() {
 }
 
 /**
- * Silent startup update check. Only inside Tauri; network/signature failures
- * stay quiet here (the settings page surfaces them on a manual check).
+ * Automatic update check: once on startup, and again whenever the window
+ * regains focus so a long-running or tray-resident session still catches up
+ * (the store throttles both to one request per interval). Failures stay quiet
+ * here — the settings page surfaces them on an explicit manual check.
  */
-function StartupUpdateCheck() {
+function AppUpdateWatcher() {
   useEffect(() => {
     if (!isTauri()) return;
     void checkForUpdate();
+    const focused = getCurrentWindow().onFocusChanged(({ payload }) => {
+      if (payload) void checkForUpdate();
+    });
+    return () => {
+      void focused.then((unlisten) => unlisten());
+    };
   }, []);
   return null;
 }

@@ -134,7 +134,7 @@ export function SettingsPage() {
                   软件更新
                 </h3>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  启动时自动检查新版本（GitHub
+                  启动和切回前台时自动检查新版本（GitHub
                   Releases，签名校验后安装），也可手动检查。
                 </p>
               </div>
@@ -143,7 +143,7 @@ export function SettingsPage() {
                 size="sm"
                 className="shrink-0"
                 disabled={update.phase === "checking"}
-                onClick={() => void update.check()}
+                onClick={() => void update.check({ force: true })}
               >
                 {update.phase === "checking" ? "正在检查…" : "检查更新"}
               </Button>
@@ -155,9 +155,19 @@ export function SettingsPage() {
               </p>
             )}
             {update.phase === "available" && (
-              <p className="mt-2 text-[12px] text-primary">
-                发现新版本 v{update.version}，可在更新弹窗中安装。
-              </p>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p className="text-[12px] text-primary">
+                  发现新版本 v{update.version}，可下载并重启安装。
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => update.open()}
+                >
+                  安装更新
+                </Button>
+              </div>
             )}
             {update.phase === "error" && (
               <p role="alert" className="mt-2 text-[12px] text-destructive">

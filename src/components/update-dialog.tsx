@@ -13,19 +13,23 @@ import {
 import { Progress } from "./ui/progress";
 
 /**
- * Global self-update prompt. Opens automatically whenever the shared update
- * store discovers a newer signed release (startup check or manual check from
- * settings). Install streams progress from the updater plugin; on success the
- * app relaunches into the new bundle, so this component unmounts with it.
+ * Self-update confirmation dialog. It does NOT open itself: a background or
+ * startup check only flips the store to `available`, which surfaces the sidebar
+ * badge; the user opens this dialog from that badge (or the settings page), and
+ * the dialog is shown while `available` + `dialogOpen`. Closing keeps the
+ * `available` phase (via the store's close action) so the badge persists as a
+ * reminder. Install streams progress from the updater plugin; on success the app
+ * relaunches into the new bundle, so this component unmounts with it.
  */
 export function UpdateDialog() {
-  const { phase, version, notes, dismiss, install } = useAppUpdate();
+  const { phase, version, notes, dialogOpen, close: closeDialog, install } =
+    useAppUpdate();
   const [percent, setPercent] = useState(0);
   const [installing, setInstalling] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
-  const close = () => {
-    if (!installing) dismiss();
+  const handleClose = () => {
+    if (!installing) closeDialog();
   };
 
   const startInstall = async () => {
@@ -42,7 +46,10 @@ export function UpdateDialog() {
   };
 
   return (
-    <Dialog open={phase === "available"} onOpenChange={(open) => !open && close()}>
+    <Dialog
+      open={phase === "available" && dialogOpen}
+      onOpenChange={(open) => !open && handleClose()}
+    >
       <DialogContent showCloseButton={!installing}>
         <DialogHeader>
           <DialogTitle>
@@ -77,7 +84,7 @@ export function UpdateDialog() {
         )}
 
         <DialogFooter>
-          <Button variant="ghost" onClick={close} disabled={installing}>
+          <Button variant="ghost" onClick={handleClose} disabled={installing}>
             稍后再说
           </Button>
           <Button onClick={() => void startInstall()} disabled={installing}>

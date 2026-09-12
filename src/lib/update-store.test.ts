@@ -15,9 +15,11 @@ vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: mocks.relaunch }));
 
 import {
   checkForUpdate,
+  closeUpdateDialog,
   dismissUpdate,
   getUpdateStatus,
   installUpdate,
+  openUpdateDialog,
   resetUpdateState,
   subscribeUpdate,
 } from "./update-store";
@@ -116,5 +118,71 @@ describe("update-store", () => {
     listener.mockClear();
     await checkForUpdate();
     expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+describe("update-store throttle", () => {
+  it("collapses repeated automatic checks into one request", async () => {
+    mocks.check.mockResolvedValue(null);
+    await checkForUpdate(); // startup
+    await checkForUpdate(); // a focus hop lands inside the window
+    expect(mocks.check).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets a manual force bypass the throttle window", async () => {
+    mocks.check.mockResolvedValue(null);
+    await checkForUpdate();
+    await checkForUpdate({ force: true }); // the settings-page button
+    expect(mocks.check).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears the throttle on failure so the next automatic check retries", async () => {
+    mocks.check.mockRejectedValueOnce(new Error("offline"));
+    await checkForUpdate();
+    expect(getUpdateStatus().phase).toBe("error");
+    // The cold-start race must not lock the user out for a full interval.
+    mocks.check.mockResolvedValue(null);
+    await checkForUpdate();
+    expect(mocks.check).toHaveBeenCalledTimes(2);
+    expect(getUpdateStatus().phase).toBe("upToDate");
+  });
+
+  it("leaves the current phase untouched when throttled", async () => {
+    mocks.check.mockResolvedValue(fakeUpdate());
+    await checkForUpdate();
+    expect(getUpdateStatus().phase).toBe("available");
+    // A skipped check must not reset an open dialog to checking/idle.
+    await checkForUpdate();
+    expect(getUpdateStatus().phase).toBe("available");
+  });
+});
+
+describe("update-store dialog control", () => {
+  it("does not open the dialog until the user asks", async () => {
+    mocks.check.mockResolvedValue(fakeUpdate());
+    await checkForUpdate();
+    // available alone surfaces the badge, not the modal.
+    expect(getUpdateStatus().phase).toBe("available");
+    expect(getUpdateStatus().dialogOpen).toBe(false);
+    openUpdateDialog();
+    expect(getUpdateStatus().dialogOpen).toBe(true);
+  });
+
+  it("ignores an open request when nothing is available", async () => {
+    mocks.check.mockResolvedValue(null);
+    await checkForUpdate();
+    expect(getUpdateStatus().phase).toBe("upToDate");
+    openUpdateDialog();
+    expect(getUpdateStatus().dialogOpen).toBe(false);
+  });
+
+  it("closes the dialog but keeps `available` so the badge persists", async () => {
+    mocks.check.mockResolvedValue(fakeUpdate());
+    await checkForUpdate();
+    openUpdateDialog();
+    closeUpdateDialog();
+    const status = getUpdateStatus();
+    expect(status.dialogOpen).toBe(false);
+    expect(status.phase).toBe("available");
   });
 });

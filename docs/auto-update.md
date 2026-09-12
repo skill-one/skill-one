@@ -33,13 +33,22 @@ No per-release config: the app always follows the newest release.
 
 ## How it works
 
-- **Endpoint**: `https://github.com/skill-one/skill-one/releases/latest/download/latest.json`, checked at startup.
+- **Endpoint**: `https://github.com/skill-one/skill-one/releases/latest/download/latest.json`.
+- **When it checks**: once at startup and again each time the window regains focus (so a
+  long-running or tray-resident session still catches up). Both are throttled by
+  `src/lib/update-store.ts` to **at most one request per 8 hours** per session; the
+  settings-page button bypasses the throttle (`force`) because an explicit ask should
+  always go out. A failed check clears the throttle so the next trigger retries
+  immediately instead of waiting the window out.
 - **Verification**: the package signature is checked against `plugins.updater.pubkey` in
   `src-tauri/tauri.conf.json`. Unsigned packages, or packages signed by another key, are
   never installed.
-- **Flow**: `src/lib/update-store.ts` (state) → `UpdateDialog` (mounted globally,
-  auto-opens on startup) + the settings page "Software Update" card (manual check);
-  installing verifies the package, swaps the bundle and relaunches.
+- **Flow**: a check that finds a newer release does **not** interrupt with a modal — it
+  surfaces a passive badge beside 设置 in the sidebar (plus an "安装更新" action on the
+  settings page). Clicking either opens `UpdateDialog` (version + release notes), which
+  downloads, verifies the signature, swaps the bundle and relaunches on the user's
+  go-ahead; dismissing leaves the badge up as a reminder. Shared state lives in
+  `src/lib/update-store.ts`.
 - **macOS**: the updater downloads the package itself, so the new bundle has no
   quarantine attribute and relaunches without a Gatekeeper prompt.
 

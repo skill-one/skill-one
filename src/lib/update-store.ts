@@ -9,6 +9,14 @@
 // `downloadAndInstall()` verifies the minisign signature before installing.
 // No Apple Developer account is involved: updates are trusted by this key,
 // and the downloaded bundle carries no quarantine attribute.
+//
+// WHEN to check lives in the callers (startup + window focus, plus the manual
+// button on the settings page); HOW OFTEN lives here: `checkForUpdate()` is
+// throttled to one request per MIN_CHECK_INTERVAL_MS per session, so hopping
+// between apps never triggers a burst. A manual check passes `{ force: true }`
+// to bypass the window — asking is the point. A failed check clears the stamp
+// so the next trigger retries immediately instead of waiting the window out
+// (e.g. a cold launch that raced the network).
 
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -26,6 +34,8 @@ export interface UpdateStatus {
   notes: string | null;
   /** Human-readable failure reason (`error` only). */
   error: string | null;
+  /** Whether the confirmation dialog is open (only ever true on `available`). */
+  dialogOpen: boolean;
 }
 
 const INITIAL: UpdateStatus = {
@@ -33,11 +43,17 @@ const INITIAL: UpdateStatus = {
   version: null,
   notes: null,
   error: null,
+  dialogOpen: false,
 };
+
+/** Minimum gap between two automatic update checks within one session. */
+export const MIN_CHECK_INTERVAL_MS = 8 * 60 * 60 * 1000;
 
 let status: UpdateStatus = INITIAL;
 /** The discovered update object, kept until installed or superseded. */
 let pending: Update | null = null;
+/** When the last real check was issued; 0 = never (so startup always checks). */
+let lastCheckedAt = 0;
 
 const listeners = new Set<() => void>();
 
@@ -58,16 +74,29 @@ export function subscribeUpdate(listener: () => void): () => void {
 }
 
 /**
- * Query the updater endpoint once. Concurrent calls are ignored; failures
- * surface through the `error` phase (network errors included) so the UI can
- * show an inline hint instead of throwing.
+ * Query the updater endpoint, at most once per {@link MIN_CHECK_INTERVAL_MS}
+ * unless `force` is set. A no-op while another check is in flight, and a no-op
+ * that leaves the current phase untouched when it falls inside the throttle
+ * window. Failures surface through the `error` phase (network errors included)
+ * so the UI can show an inline hint instead of throwing; a failure also clears
+ * the throttle stamp so the next trigger retries right away.
  */
-export async function checkForUpdate(): Promise<void> {
+export async function checkForUpdate(
+  options: { force?: boolean } = {},
+): Promise<void> {
   if (!isTauri()) {
     emit({ ...INITIAL, phase: "error", error: "自动更新仅在桌面应用内可用。" });
     return;
   }
   if (status.phase === "checking") return;
+  // Throttle gate first: a skipped call must not emit anything.
+  if (
+    !options.force &&
+    Date.now() - lastCheckedAt < MIN_CHECK_INTERVAL_MS
+  ) {
+    return;
+  }
+  lastCheckedAt = Date.now();
   emit({ ...INITIAL, phase: "checking" });
   try {
     const update = await check();
@@ -83,6 +112,7 @@ export async function checkForUpdate(): Promise<void> {
       notes: update.body || null,
     });
   } catch (error) {
+    lastCheckedAt = 0;
     pending = null;
     emit({ ...INITIAL, phase: "error", error: errorMessage(error) });
   }
@@ -91,6 +121,20 @@ export async function checkForUpdate(): Promise<void> {
 /** Close the update dialog; the pending update stays until the next check. */
 export function dismissUpdate(): void {
   emit({ ...INITIAL });
+}
+
+/** Open the confirmation dialog — only meaningful when an update is available. */
+export function openUpdateDialog(): void {
+  if (status.phase !== "available") return;
+  emit({ dialogOpen: true });
+}
+
+/**
+ * Hide the confirmation dialog while keeping the `available` phase, so the
+ * sidebar badge stays put as a passive reminder the user can return to.
+ */
+export function closeUpdateDialog(): void {
+  emit({ dialogOpen: false });
 }
 
 /**
@@ -129,5 +173,6 @@ export async function installUpdate(
 export function resetUpdateState(): void {
   pending = null;
   status = INITIAL;
+  lastCheckedAt = 0;
   for (const notify of listeners) notify();
 }

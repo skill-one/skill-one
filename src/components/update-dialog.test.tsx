@@ -16,6 +16,7 @@ vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: mocks.relaunch }));
 import { UpdateDialog } from "./update-dialog";
 import {
   checkForUpdate,
+  openUpdateDialog,
   resetUpdateState,
 } from "../lib/update-store";
 
@@ -47,6 +48,9 @@ describe("UpdateDialog", () => {
     await act(async () => {
       await checkForUpdate();
     });
+    await act(async () => {
+      openUpdateDialog();
+    });
 
     expect(
       await screen.findByRole("heading", { name: "更新到 v9.9.9" }),
@@ -70,6 +74,9 @@ describe("UpdateDialog", () => {
     await act(async () => {
       await checkForUpdate();
     });
+    await act(async () => {
+      openUpdateDialog();
+    });
 
     await user.click(screen.getByRole("button", { name: "立即更新" }));
     await waitFor(() => expect(mocks.downloadAndInstall).toHaveBeenCalled());
@@ -83,6 +90,9 @@ describe("UpdateDialog", () => {
     render(<UpdateDialog />);
     await act(async () => {
       await checkForUpdate();
+    });
+    await act(async () => {
+      openUpdateDialog();
     });
 
     await user.click(screen.getByRole("button", { name: "立即更新" }));
@@ -102,6 +112,9 @@ describe("UpdateDialog", () => {
     render(<UpdateDialog />);
     await act(async () => {
       await checkForUpdate();
+    });
+    await act(async () => {
+      openUpdateDialog();
     });
 
     await user.click(screen.getByRole("button", { name: "稍后再说" }));
