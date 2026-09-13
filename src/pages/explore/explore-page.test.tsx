@@ -80,7 +80,7 @@ function bootRegistry(total: number) {
 
 /**
  * A registry of one distinctive "gadget" skill among filler "tool" skills.
- * The names are mutually distant enough that fuzzy search stays deterministic:
+ * The names are mutually distant enough that the search stays deterministic:
  * "gadget" matches exactly one skill, never the fillers. The fillers spill
  * onto a second page, so a "reset to page 1" is observable.
  */
@@ -928,19 +928,28 @@ describe("ExplorePage streaming", () => {
     expect(input).toBeDisabled();
     expect(input).toHaveAttribute("placeholder", "索引构建中…");
 
-    // The stream completes, the MiniSearch index builds over the full registry
-    // and the field unlocks — a typo now fuzzy-matches, with no user retry.
+    // The stream completes, the search index builds over the full registry and
+    // the field unlocks, with no user retry.
     harness.pushAll(gadgetRegistry().slice(10));
     harness.complete();
     await waitFor(() => expect(input).toBeEnabled());
 
     const user = userEvent.setup();
-    await user.type(input, "gadgt");
+    // A half-typed word answers straight off the freshly built index.
+    await user.type(input, "gadget-m");
     expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
     expect(
       await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/加载中/)).not.toBeInTheDocument();
+
+    // A mistyped word is no longer rescued into a hit.
+    await user.clear(input);
+    await user.type(input, "gadgt");
+    expect(await screen.findByText("共 0 个 · 按相关度")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "查看 gadget-master 详情" }),
+    ).not.toBeInTheDocument();
   });
 });
 

@@ -3,6 +3,7 @@ import {
   ArrowDownAZ,
   ChevronDown,
   Package,
+  Sparkles,
   Star,
   type LucideIcon,
 } from "lucide-react";
@@ -31,6 +32,11 @@ import { RepoCard } from "./repo-card";
 /**
  * The sort orders offered by the toolbar dropdown. "stars" (the default)
  * puts the most-starred repositories first, repo name as the tie-break.
+ *
+ * A search is the exception: the worker answers it from the shared search
+ * index in relevance order, so the dropdown is replaced by a read-only 相关度
+ * pill rather than claiming an order the results do not follow — the same
+ * contract the explore page applies.
  *
  * Each option is led by the same glyph the repo card uses for that figure
  * (Star, Package), so the sort keys read as the metrics already on show; name
@@ -133,44 +139,61 @@ export function ReposPage() {
         <SearchInput value={search} onChange={handleSearch} label="搜索仓库" />
 
         <div className="ml-auto flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="rounded-full px-4">
-                <span className="flex items-center gap-1.5">
-                  <activeSort.icon
-                    aria-hidden="true"
-                    className="h-4 w-4 text-foreground"
-                  />
-                  {activeSort.label}
-                </span>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuRadioGroup
-                value={sort}
-                onValueChange={(value) => handleSort(value as RepoSortOrder)}
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <DropdownMenuRadioItem
-                    key={option.value}
-                    value={option.value}
-                  >
-                    <option.icon
+          {/* A search is ordered by relevance — the ranking is what decided
+              these repositories match — so the sort control is replaced by a
+              static label instead of claiming an order the results do not
+              follow. Clearing the search brings the choice back, still on
+              whatever the user last picked for the browsed list. */}
+          {query ? (
+            <Button variant="outline" className="rounded-full px-4" disabled>
+              <span className="flex items-center gap-1.5">
+                <Sparkles
+                  aria-hidden="true"
+                  className="h-4 w-4 text-muted-foreground"
+                />
+                相关度
+              </span>
+            </Button>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="rounded-full px-4">
+                  <span className="flex items-center gap-1.5">
+                    <activeSort.icon
                       aria-hidden="true"
-                      className={cn(
-                        "h-4 w-4",
-                        option.value === sort
-                          ? "text-foreground"
-                          : "text-muted-foreground",
-                      )}
+                      className="h-4 w-4 text-foreground"
                     />
-                    {option.label}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    {activeSort.label}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup
+                  value={sort}
+                  onValueChange={(value) => handleSort(value as RepoSortOrder)}
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <DropdownMenuRadioItem
+                      key={option.value}
+                      value={option.value}
+                    >
+                      <option.icon
+                        aria-hidden="true"
+                        className={cn(
+                          "h-4 w-4",
+                          option.value === sort
+                            ? "text-foreground"
+                            : "text-muted-foreground",
+                        )}
+                      />
+                      {option.label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
@@ -218,7 +241,7 @@ export function ReposPage() {
               page={page}
               totalPages={totalPages}
               onPage={handlePage}
-              count={`共 ${total} 个仓库`}
+              count={`共 ${total} 个仓库${query ? " · 按相关度" : ""}`}
             />
           )}
         </div>

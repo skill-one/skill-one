@@ -44,7 +44,7 @@ export interface PageRequest {
   /**
    * Exact repo filter ("owner/repo") for the repo detail page. When set the
    * query is ignored: skills are filtered by repo identity instead of being
-   * run through the fuzzy search.
+   * run through the shared search index.
    */
   repo?: string;
   /**
@@ -91,7 +91,11 @@ export interface RankingData {
   total: number;
 }
 
-/** Repos-page sort orders (mirrored by the worker's cached aggregation). */
+/**
+ * Repos-page sort orders (mirrored by the worker's cached aggregation). A
+ * non-empty query ignores them entirely and answers in relevance order, as the
+ * explore page does.
+ */
 export type RepoSortOrder = "stars" | "skills" | "name";
 
 /** One aggregated source repository, for the repos page. */
@@ -106,7 +110,10 @@ export interface RepoInfo {
 
 /** Parameters of a paged repos request. */
 export interface ReposRequest {
-  /** Trimmed search text matched against the repo name; empty browses all. */
+  /**
+   * Trimmed search text, answered by the shared search index over the repo
+   * name (see `lib/search-index.ts`); empty browses all.
+   */
   query: string;
   sort: RepoSortOrder;
   /** 0-based page index. */

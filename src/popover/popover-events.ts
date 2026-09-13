@@ -27,7 +27,8 @@ export const MY_SKILLS_PATH = "/my-skills";
 
 /**
  * Deep link into the my-skills page with the search box pre-filled with
- * `name`, so the clicked skill is the one item in the filtered list.
+ * `name`, so the clicked skill ranks near the top of the filtered list (its
+ * name is the whole query) and the box stays editable.
  */
 export function skillPath(name: string): string {
   return `${MY_SKILLS_PATH}?skill=${encodeURIComponent(name)}`;

@@ -295,6 +295,26 @@ describe("MySkillsPage", () => {
     ).toHaveLength(6);
   });
 
+  it("searches Chinese text but not a fragment inside a word", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await screen.findByText("共 6 个");
+
+    // The descriptions here are Chinese and carry no word separators; the
+    // shared index splits Han text into character bigrams, so a phrase still
+    // answers — pdf (「PDF 文档读取…」) and docx (「…Word 文档。」).
+    await user.type(screen.getByLabelText("搜索 Skill"), "文档");
+    expect(await screen.findByText("共 2 个")).toBeInTheDocument();
+    expect(screen.getByText("pdf")).toBeInTheDocument();
+    expect(screen.getByText("docx")).toBeInTheDocument();
+
+    // "df" sits inside the term "pdf": the substring filter used to answer it,
+    // a term index does not.
+    await user.clear(screen.getByLabelText("搜索 Skill"));
+    await user.type(screen.getByLabelText("搜索 Skill"), "df");
+    expect(await screen.findByText("共 0 个")).toBeInTheDocument();
+  });
+
   it("shows a no-match empty state for a search with no results", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
