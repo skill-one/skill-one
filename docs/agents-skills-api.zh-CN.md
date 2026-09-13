@@ -2,7 +2,7 @@
 
 [English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
-本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.13 的
+本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.14 的
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
 门面，将技能安装与 agent 链接能力暴露给前端。前端经 `src/lib/skills-manager.ts`
 的 `invoke` 封装访问这些 Tauri 命令。
@@ -13,8 +13,16 @@
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.13"
+agents-skills = "0.14"
 ```
+
+### 0.14 的主要变化
+
+0.14 把 `list` 简化为纯目录扫描：`ListRequest` 移除了 `agents` 字段，
+`ListedSkill` 也不再携带 `scope` / `agents`——哪些 agent 能看到某个 skill 是
+scope 级别的状态（所有已链接 agent 都能看到全局目录中的全部技能），因此按
+skill 报告 agent 可见性的字段被移除。链接状态请改用 `agent_status` 查询。
+相应地，`list_installed_skills` Tauri 命令不再接受 `agents` 参数。
 
 ### 0.13 的主要变化
 
@@ -59,7 +67,7 @@ let manager = Manager::new();                    // 使用进程当前工作目�
 | Tauri 命令 | 请求构造（`skills.rs`） |
 | --- | --- |
 | `install_skill` | `AddRequest { source, global, skills, list_only }` |
-| `list_installed_skills` | `ListRequest { global, agents }` |
+| `list_installed_skills` | `ListRequest { global }` |
 | `remove_skills` | `RemoveRequest { skills, global, all }` |
 | `disable_skills` | `DisableRequest { skills, global, all }` |
 | `enable_skills` | `EnableRequest { skills, global, all }` |
@@ -72,8 +80,9 @@ let manager = Manager::new();                    // 使用进程当前工作目�
 ## 消费的返回字段
 
 - **`AddOutcome`**：`list_only`、`installed`（`name` + `canonical_path`）、`failed`（`skill` + `error`）、`skills`（发现列表，取 `name`）。
-- **`ListedSkill`**：`name`、`path`、`scope`、`agents`、`enabled`（0.13 起不再含
-  source 字段；`description` 由 `skills.rs` 自行从磁盘 `SKILL.md` 提取）。
+- **`ListedSkill`**：`name`、`path`、`enabled`（0.13 起不再含 source 字段，
+  0.14 起不再含 `scope` / `agents`；`description` 由 `skills.rs` 自行从磁盘
+  `SKILL.md` 提取）。
 - **`AgentOutcome`**：`global`、`results: Vec<AgentLinkResult>`；每条 `AgentLinkResult` 含 `agent`、`display`、`outcome: LinkOutcome`。
 - **`AgentStatus`**：`name`、`display`、`linked`、`canonical`、`internal_skills`、
   `internal_others`、`pending_backup`。对未链接的非原生 agent，库会自行对其目录内的

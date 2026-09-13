@@ -169,13 +169,9 @@ export async function installSkill(
 }
 
 /** List installed skills in the global skills directory. */
-export async function listInstalledSkills(
-  options: { agents?: string[] } = {},
-): Promise<InstalledSkill[]> {
+export async function listInstalledSkills(): Promise<InstalledSkill[]> {
   requireTauri();
-  return invoke<InstalledSkill[]>("list_installed_skills", {
-    agents: options.agents,
-  });
+  return invoke<InstalledSkill[]>("list_installed_skills");
 }
 
 /**

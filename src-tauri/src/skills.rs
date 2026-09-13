@@ -147,8 +147,6 @@ pub struct AgentStatusDto {
 pub struct ListedSkillDto {
     pub name: String,
     pub path: String,
-    pub scope: String,
-    pub agents: Vec<String>,
     /// Short human-readable description extracted from the on-disk SKILL.md
     /// frontmatter; `None` when the file is missing or has no description.
     pub description: Option<String>,
@@ -175,7 +173,7 @@ struct Frontmatter {
 /// Read a SKILL.md frontmatter and return its `name` and `description`.
 ///
 /// `agents-skills` still keeps its frontmatter parser inside the private `core`
-/// module as of 0.13 (only the `Skill` type is re-exported, so the crate's own
+/// module as of 0.14 (only the `Skill` type is re-exported, so the crate's own
 /// `parse_skill_md` is unreachable, and `ListedSkill` from `Manager::list`
 /// carries no description), so the same shape is parsed here: a `---`-fenced
 /// YAML block, with both `name` and `description` mandatory in the skill
@@ -450,22 +448,15 @@ pub async fn install_skill(
 /// camelCase shape as `list --json`, plus a `description` extracted from each
 /// skill's on-disk SKILL.md.
 #[tauri::command]
-pub async fn list_installed_skills(
-    agents: Option<Vec<String>>,
-) -> Result<Vec<ListedSkillDto>, String> {
+pub async fn list_installed_skills() -> Result<Vec<ListedSkillDto>, String> {
     run_blocking("list", move |manager| {
-        let req = ListRequest {
-            global: true,
-            agents: agents.unwrap_or_default(),
-        };
+        let req = ListRequest { global: true };
         let listed = manager.list(&req).map_err(|e| e.to_string())?;
         Ok(listed
             .into_iter()
             .map(|s| ListedSkillDto {
                 name: s.name,
                 path: s.path.display().to_string(),
-                scope: s.scope,
-                agents: s.agents,
                 description: extract_description(&s.path),
                 enabled: s.enabled,
             })
@@ -601,10 +592,7 @@ pub async fn link_status() -> Result<Vec<AgentStatusDto>, String> {
 #[tauri::command]
 pub async fn read_skill_md(name: String) -> Result<SkillMdDto, String> {
     run_blocking("read skill md", move |manager| {
-        let req = ListRequest {
-            global: true,
-            agents: vec![],
-        };
+        let req = ListRequest { global: true };
         let listed = manager.list(&req).map_err(|e| e.to_string())?;
         let skill = listed
             .into_iter()

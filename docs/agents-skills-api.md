@@ -4,7 +4,7 @@
 
 Through the Tauri backend (`src-tauri/src/skills.rs`), this project calls the
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
-facade of `agents-skills` v0.13 to expose skill installation and agent-linking
+facade of `agents-skills` v0.14 to expose skill installation and agent-linking
 capabilities to the frontend. The frontend reaches these Tauri commands via the
 `invoke` wrapper in `src/lib/skills-manager.ts`.
 
@@ -14,8 +14,17 @@ capabilities to the frontend. The frontend reaches these Tauri commands via the
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.13"
+agents-skills = "0.14"
 ```
+
+### What 0.14 changed
+
+The 0.14 release simplified `list` to a pure directory scan: `ListRequest` lost
+its `agents` field, and `ListedSkill` no longer carries `scope` / `agents` —
+which agents see a skill is scope-level state (every linked agent sees all
+skills in the canonical dir), so per-skill agent reporting was dropped. Use
+`agent_status` to inspect link state. Consequently the `list_installed_skills`
+Tauri command no longer takes an `agents` parameter.
 
 ### What 0.13 changed
 
@@ -65,7 +74,7 @@ let manager = Manager::new();                    // process current working dire
 | Tauri command | Request construction (`skills.rs`) |
 | --- | --- |
 | `install_skill` | `AddRequest { source, global, skills, list_only }` |
-| `list_installed_skills` | `ListRequest { global, agents }` |
+| `list_installed_skills` | `ListRequest { global }` |
 | `remove_skills` | `RemoveRequest { skills, global, all }` |
 | `disable_skills` | `DisableRequest { skills, global, all }` |
 | `enable_skills` | `EnableRequest { skills, global, all }` |
@@ -79,9 +88,9 @@ let manager = Manager::new();                    // process current working dire
 ## Consumed return fields
 
 - **`AddOutcome`**: `list_only`, `installed` (`name` + `canonical_path`), `failed` (`skill` + `error`), `skills` (discovered list; `name` is used).
-- **`ListedSkill`**: `name`, `path`, `scope`, `agents`, `enabled` (source fields
-  removed in 0.13; `skills.rs` extracts `description` from the on-disk
-  `SKILL.md` itself).
+- **`ListedSkill`**: `name`, `path`, `enabled` (source fields removed in 0.13,
+  `scope` / `agents` removed in 0.14; `skills.rs` extracts `description` from
+  the on-disk `SKILL.md` itself).
 - **`AgentOutcome`**: `global`, `results: Vec<AgentLinkResult>`; each `AgentLinkResult` carries `agent`, `display`, and `outcome: LinkOutcome`.
 - **`AgentStatus`**: `name`, `display`, `linked`, `canonical`, `internal_skills`,
   `internal_others`, `pending_backup`. For unlinked, non-canonical agents the
