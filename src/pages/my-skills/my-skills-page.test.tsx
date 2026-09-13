@@ -30,6 +30,7 @@ const { getPage } = vi.hoisted(() => ({ getPage: vi.fn() }));
 vi.mock("../../lib/registry/client", () => ({
   getPage,
   getRegistrySnapshot: () => ({ ready: true, epoch: 1 }),
+  subscribeRegistry: () => () => {},
 }));
 
 beforeEach(() => {

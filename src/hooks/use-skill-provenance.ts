@@ -17,11 +17,13 @@ import type { LinkSuggestions } from "../lib/link-suggestions";
 import { isTauri } from "../lib/tauri";
 
 /**
- * The TanStack Query cache key for the provenance state. Invalidated by
- * `markSkillsChanged` together with the installed-skills list, since both
- * change on the same events (install / remove).
+ * The TanStack Query cache key for the provenance state. The version segment
+ * keeps pre-fix persisted entries (empty state written before the tiers
+ * existed) from masking the real query within the persisted staleTime.
+ * Invalidated by `markSkillsChanged` together with the installed-skills
+ * list, since both change on the same events (install / remove).
  */
-export const PROVENANCE_QUERY_KEY = ["skill-provenance"] as const;
+export const PROVENANCE_QUERY_KEY = ["skill-provenance", "v2"] as const;
 
 /** The full provenance state the UI consumes. */
 export interface ProvenanceState {
@@ -55,7 +57,8 @@ export function useSkillProvenance() {
   // markSkillsChanged still invalidates by the shared prefix.
   const epoch = useSyncExternalStore(
     subscribeRegistry,
-    (snapshot) => snapshot.epoch,
+    // getSnapshot takes no arguments: read through the module snapshot.
+    () => getRegistrySnapshot().epoch,
   );
   return useQuery({
     queryKey: [...PROVENANCE_QUERY_KEY, epoch],
