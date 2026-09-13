@@ -27,11 +27,14 @@ export interface SkillProvenance {
   /** When the skill was installed (ISO 8601). Rewritten on reinstalls. */
   installedAt: string;
   /**
-   * The upstream content hash of the skill as it was installed (the same
-   * hash the registry index publishes). Optional and purely a cache: a
-   * future update check compares it against the index's latest rev, and a
-   * locally modified skill invalidates it — recompute on demand when the
-   * answer matters.
+   * The store-side content hash recorded when the association was made —
+   * the registry entry's rev at install time (native installs) or the
+   * matched rev (hash auto-link; identical to the local content's hash by
+   * definition of the match). Absent for user-confirmed links. A future
+   * update check compares it against the index's latest rev: differ means
+   * the store published a new version. This is a version marker, NOT a
+   * description of the local files — local edits are invisible to it, by
+   * design.
    */
   hash?: string;
 }

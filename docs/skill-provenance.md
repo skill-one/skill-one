@@ -38,12 +38,15 @@ file:
 }
 ```
 
-The optional `hash` is the upstream content hash of the skill **as it was
-installed** (not the index rev at install time — the freshly installed copy
-may be newer than the indexed snapshot). It is a cache for a future update
-check — installed hash ≠ current index rev means an update is available —
-and must be recomputed when the answer matters, since local edits make it
-stale.
+The optional `hash` is the **store-side** content hash recorded when the
+association was made: the registry entry's `rev` at install time (native
+installs) or the matched rev (hash auto-link). It is a version marker, not a
+description of the local files — the freshly installed clone tracks repo
+HEAD, which can be ahead of the indexed snapshot, so a computed directory
+hash would permanently disagree with the rev and poison the update signal.
+A future update check simply compares the recorded hash against the latest
+index rev: differ means the store published a new version since install.
+Local edits are invisible to it, by design.
 
 Key properties:
 

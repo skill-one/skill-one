@@ -155,7 +155,9 @@ describe("SkillListRow", () => {
     renderWithRouter(<SkillListRow skill={skill} onSelect={onSelect} />);
 
     await user.click(screen.getByRole("button", { name: "安装" }));
-    expect(installSkillFromSource).toHaveBeenCalledWith(skill.repo, skill.name);
+    expect(installSkillFromSource).toHaveBeenCalledWith(skill.repo, skill.name, {
+      rev: skill.rev,
+    });
     expect(onSelect).not.toHaveBeenCalled();
     expect(
       await screen.findByRole("button", { name: "已安装" }),

@@ -39,7 +39,6 @@ import {
   recordSkillProvenance,
   removeSkillProvenance,
 } from "./provenance";
-import { computeSkillHash } from "./skills-manager";
 
 /** Simulated clone duration for browser mock installs, in milliseconds. */
 export const MOCK_INSTALL_DELAY_MS = 1200;
@@ -94,10 +93,20 @@ export async function fetchLocalSkillDetail(name: string): Promise<SkillDetail> 
  * clone/install can fail), so failures are surfaced here instead of being
  * silently swallowed. In the browser this records the install in the mock
  * store instead.
+ *
+ * `options.rev` is the store entry's content hash at install time (from the
+ * registry index). It is recorded in the provenance ledger as the version
+ * marker a future update check compares against the latest rev — rev changed
+ * means the store published a new version. The hash is deliberately NOT
+ * computed from the freshly installed directory: the clone tracks repo HEAD,
+ * which can be ahead of the indexed snapshot, so a computed value would
+ * permanently disagree with the rev and poison the update signal. Computing
+ * is reserved for the hash auto-link tier, where there is no rev to read.
  */
 export async function installSkillFromSource(
   repo: string,
   name: string,
+  options: { rev?: string } = {},
 ): Promise<void> {
   if (isTauri()) {
     const result = await installSkill(repo, { skills: [name] });
@@ -108,20 +117,17 @@ export async function installSkillFromSource(
     if (result.installed.length === 0) {
       throw new Error(`未在 ${repo} 中找到可安装的技能 ${name}`);
     }
-    // Record the install source in the app's provenance ledger — the only
-    // store↔install association that survives (agents-skills 0.13 keeps no
-    // install metadata). The installed content's hash is recorded too, so a
-    // future update check can compare it against the index without a disk
-    // walk. Best-effort: it never fails the install itself.
-    const hash = await computeSkillHash(name);
-    await recordSkillProvenance(repo, name, hash ?? undefined);
-    return;
+  } else {
+    // Simulate a realistic clone duration so the installing state is
+    // observable in the browser demo; the real Tauri install clones over
+    // the network.
+    await new Promise((resolve) => setTimeout(resolve, MOCK_INSTALL_DELAY_MS));
+    installMockSkill(name);
   }
-  // Simulate a realistic clone duration so the installing state is observable
-  // in the browser demo; the real Tauri install clones over the network.
-  await new Promise((resolve) => setTimeout(resolve, MOCK_INSTALL_DELAY_MS));
-  installMockSkill(name);
-  await recordSkillProvenance(repo, name);
+  // Record the install source in the app's provenance ledger — the only
+  // store↔install association that survives (agents-skills keeps no install
+  // metadata). Best-effort: it never fails the install itself.
+  await recordSkillProvenance(repo, name, options.rev);
 }
 
 /** Remove an installed skill from the global skills directory. */
