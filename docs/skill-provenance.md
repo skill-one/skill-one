@@ -134,6 +134,15 @@ proof — forks share descriptions, so 100% similarity still does not
 *identify* a skill. Nothing is written until the user picks one; the
 confirmed pick lands in the ledger indistinguishable from a native install.
 
+Why not auto-link at 100% similarity? Measured against the published
+snapshot (8,993 skills): 549 slugs are published by ≥2 repos, and 171 of
+those (31%) have ≥2 *different* repos carrying byte-identical descriptions
+— 525 skills. Every identical-description cluster spans multiple repos
+(forks copy the frontmatter verbatim), so a perfect description match is
+ambiguous by construction: it selects a fork as readily as the origin, and
+the mistake is silent (wrong source link, wrong update stream) with no
+corrective signal to the user.
+
 Deliberate non-goals: no silent auto-association from similarity (a wrong
 "installed" badge is worse than none), and no threshold at which the heuristic
 writes without the user.
