@@ -3,6 +3,7 @@ import { Package, Star } from "lucide-react";
 
 import type { RepoInfo } from "../../../lib/registry/protocol";
 import { cn, formatCount } from "../../../lib/utils";
+import { Card } from "../../../components/ui/card";
 import { OwnerAvatar } from "../../../components/owner-avatar";
 
 /**
@@ -17,7 +18,7 @@ export function RepoCard({ repo }: { repo: RepoInfo }) {
   const target = `/explore/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 
   return (
-    <article
+    <Card
       onClick={() => navigate(target)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -29,7 +30,7 @@ export function RepoCard({ repo }: { repo: RepoInfo }) {
       tabIndex={0}
       aria-label={`查看 ${repo.repo} 中的 Skill`}
       className={cn(
-        "group relative flex cursor-pointer flex-col rounded-xl border border-border/70 bg-card p-4 transition-all duration-150",
+        "group relative cursor-pointer px-4 transition-all duration-150",
         "hover:-translate-y-0.5 hover:border-border hover:shadow-[0_10px_30px_-14px_rgba(15,23,42,0.18)]",
       )}
     >
@@ -40,7 +41,7 @@ export function RepoCard({ repo }: { repo: RepoInfo }) {
         </h3>
       </div>
 
-      <div className="mt-3 flex items-center gap-4 text-[12px] text-muted-foreground">
+      <div className="flex items-center gap-4 text-[12px] text-muted-foreground">
         <span className="flex items-center gap-1">
           <Package className="h-3.5 w-3.5" />
           <span className="font-medium tabular-nums">
@@ -58,6 +59,6 @@ export function RepoCard({ repo }: { repo: RepoInfo }) {
           </span>
         </span>
       </div>
-    </article>
+    </Card>
   );
 }

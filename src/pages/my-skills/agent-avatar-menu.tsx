@@ -18,6 +18,7 @@ import type { AgentStatus } from "../../lib/skills-manager";
 import { cn, errorMessage } from "../../lib/utils";
 import { INSTALLED_SKILLS_QUERY_KEY } from "../../hooks/use-installed-skills";
 import { AgentIcon } from "../../components/agent-icon";
+import { Placeholder } from "../../components/placeholder";
 import { Button } from "../../components/ui/button";
 import {
   DropdownMenu,
@@ -222,21 +223,21 @@ export function AgentAvatarMenu() {
       )}
 
       {isError ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
-          <Users className="h-7 w-7 opacity-40" />
-          <p className="text-[12px]">
-            加载失败：{errorMessage(error)}
-          </p>
-        </div>
+        <Placeholder
+          icon={Users}
+          className="h-auto min-h-0 gap-1.5 py-8 pb-0"
+          message={`加载失败：${errorMessage(error)}`}
+        />
       ) : isLoading ? (
         <div className="flex items-center justify-center py-8 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : list.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
-          <Users className="h-7 w-7 opacity-40" />
-          <p className="text-[12px]">未检测到可用的 agent</p>
-        </div>
+        <Placeholder
+          icon={Users}
+          className="h-auto min-h-0 gap-1.5 py-8 pb-0"
+          message="未检测到可用的 agent"
+        />
       ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

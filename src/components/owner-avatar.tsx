@@ -1,5 +1,4 @@
-import { useState } from "react";
-
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "../lib/utils";
 
 /**
@@ -16,33 +15,19 @@ export function OwnerAvatar({
   owner: string;
   className?: string;
 }) {
-  const [failed, setFailed] = useState(false);
-
-  if (failed) {
-    return (
-      <div
-        aria-label={`${owner} 的头像`}
-        className={cn(
-          "flex shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted font-semibold uppercase text-muted-foreground",
-          className,
-        )}
-      >
-        {owner.charAt(0)}
-      </div>
-    );
-  }
-
   return (
-    <img
-      src={`https://github.com/${owner}.png`}
-      alt={`${owner} 的头像`}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-      className={cn(
-        "shrink-0 rounded-full border border-border/60 bg-muted",
-        className,
-      )}
-    />
+    <Avatar className={cn("border border-border/60 bg-muted", className)}>
+      <AvatarImage
+        src={`https://github.com/${owner}.png`}
+        alt={`${owner} 的头像`}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+      />
+      {/* text-inherit drops the fallback's own text-sm so the caller's font
+          size (carried on the root) still applies to the initial. */}
+      <AvatarFallback className="text-inherit font-semibold uppercase">
+        {owner.charAt(0)}
+      </AvatarFallback>
+    </Avatar>
   );
 }

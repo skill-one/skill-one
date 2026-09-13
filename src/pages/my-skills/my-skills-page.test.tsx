@@ -248,11 +248,20 @@ describe("MySkillsPage", () => {
   });
 
   it("shows the repo owner's avatar for store-sourced skills", async () => {
-    renderWithRouter(<MySkillsPage />);
+    const { container } = renderWithRouter(<MySkillsPage />);
 
     await screen.findByText("pdf");
-    expect(screen.getAllByAltText("anthropics 的头像")).toHaveLength(5);
-    expect(screen.getByAltText("obra 的头像")).toBeInTheDocument();
+    // The shadcn avatar degrades to the owner's initial while the GitHub
+    // image has not loaded — jsdom never loads images, so the initials are
+    // what the test can see. 5 of the 6 mock skills come from
+    // anthropics/skills, 1 from obra/superpowers.
+    const initials = [
+      ...container.querySelectorAll('[data-slot="avatar-fallback"]'),
+    ]
+      .map((el) => el.textContent)
+      .filter((initial): initial is string => Boolean(initial))
+      .sort();
+    expect(initials).toEqual(["a", "a", "a", "a", "a", "o"]);
   });
 
   it("labels skills without a source record as 本地", async () => {

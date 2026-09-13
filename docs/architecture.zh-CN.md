@@ -10,7 +10,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 ┌─────────────────────────────────────────────────────────┐
 │                     React 前端 (WebView)                  │
 │  components / hooks / lib                               │
-│   ├── 读取: skills-api.ts, skill-detail-api.ts           │
+│   ├── 读取: lib/registry/, skill-*-api.ts                │
 │   │         └─ cdn-config.ts (直连 GitHub / CDN 镜像)    │
 │   ├── 写入: local-skills.ts ──► skills-manager.ts        │
 │   │                             └─ invoke (Tauri IPC)    │
@@ -38,7 +38,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 ### 后端（写入）
 
 - **`src-tauri/src/skills.rs`**：暴露 7 个 Tauri 命令（`install_skill`、`list_installed_skills`、`remove_skills`、`set_skills_enabled`、`link_agents`、`link_status`、`read_skill_md`），全部经由共享的 `spawn_blocking` 辅助函数把阻塞操作（git clone、install、link 等）移出异步运行时。
-- 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。自 `agents-skills` 0.9 起，链接不再因目录已有内容而拒绝：agent 既有内容会被移入备份槽（带 migrate 时采纳进全局目录），取消链接时恢复，原先的 `remove_stray_files` 命令随之移除。
+- 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。链接不会因目录已有内容而拒绝：agent 既有内容会被移入备份槽（带 migrate 时采纳进全局目录），取消链接时恢复。
 
 ### 前端写入封装
 

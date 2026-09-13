@@ -1,11 +1,9 @@
 import { useState } from "react";
 import {
   ArrowDownAZ,
-  ChevronDown,
   Package,
   Sparkles,
   Star,
-  type LucideIcon,
 } from "lucide-react";
 
 import { useRegistryRepos } from "../../../hooks/use-registry-repos";
@@ -13,17 +11,13 @@ import { useDebouncedValue } from "../../../hooks/use-debounced-value";
 import { useRegistryStats } from "../../../hooks/use-registry-stats";
 import { useClampedPage } from "../../../hooks/use-clamped-page";
 import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../../lib/pagination";
-import { cn } from "../../../lib/utils";
 import type { RepoSortOrder } from "../../../lib/registry/protocol";
 import { Button } from "../../../components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "../../../components/ui/dropdown-menu";
 import { SkeletonList } from "../../../components/skeleton-list";
+import {
+  FilterDropdown,
+  type FilterOption,
+} from "../../../components/filter-dropdown";
 import { Placeholder } from "../../../components/placeholder";
 import { ListPager } from "../../../components/list-pager";
 import { SearchInput } from "../../../components/search-input";
@@ -49,30 +43,11 @@ import { RepoCard } from "./repo-card";
  * label, so the active option just steps up from muted to foreground as in any
  * other shadcn menu — nothing per-metric to drift out of sync with the cards.
  */
-const SORT_OPTIONS: Array<{
-  value: RepoSortOrder;
-  label: string;
-  icon: LucideIcon;
-}> = [
+const SORT_OPTIONS: FilterOption<RepoSortOrder>[] = [
   { value: "stars", label: "按 Star 数", icon: Star },
   { value: "skills", label: "按 Skill 数", icon: Package },
   { value: "name", label: "按名称", icon: ArrowDownAZ },
 ];
-
-/**
- * Loading placeholder mirroring the repo grid: a viewport's worth of
- * card-shaped skeletons. The page stays on the skeleton until the whole
- * registry has landed — a repo's skill count over partial data is wrong.
- */
-function ReposSkeleton() {
-  return (
-    <SkeletonList
-      rows={12}
-      listClassName="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-      itemClassName="h-[118px] rounded-xl"
-    />
-  );
-}
 
 /**
  * The store's "repos" page: every source repository in the registry, each
@@ -127,11 +102,6 @@ export function ReposPage() {
     setPage(p);
   };
 
-  // The chosen sort, resolved once so the trigger echoes its label and glyph
-  // and reads exactly like the same-named row inside the menu.
-  const activeSort =
-    SORT_OPTIONS.find((option) => option.value === sort) ?? SORT_OPTIONS[0];
-
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-0">
       {/* Toolbar: search on the left; sort on the right. */}
@@ -155,44 +125,11 @@ export function ReposPage() {
               </span>
             </Button>
           ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="rounded-full px-4">
-                  <span className="flex items-center gap-1.5">
-                    <activeSort.icon
-                      aria-hidden="true"
-                      className="h-4 w-4 text-foreground"
-                    />
-                    {activeSort.label}
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuRadioGroup
-                  value={sort}
-                  onValueChange={(value) => handleSort(value as RepoSortOrder)}
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <DropdownMenuRadioItem
-                      key={option.value}
-                      value={option.value}
-                    >
-                      <option.icon
-                        aria-hidden="true"
-                        className={cn(
-                          "h-4 w-4",
-                          option.value === sort
-                            ? "text-foreground"
-                            : "text-muted-foreground",
-                        )}
-                      />
-                      {option.label}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <FilterDropdown
+              value={sort}
+              options={SORT_OPTIONS}
+              onChange={handleSort}
+            />
           )}
         </div>
       </div>
@@ -221,7 +158,14 @@ export function ReposPage() {
                 </Button>
               </Placeholder>
             ) : loading || isPending ? (
-              <ReposSkeleton />
+              // A viewport's worth of card-shaped skeletons. The page stays
+              // on the skeleton until the whole registry has landed — a
+              // repo's skill count over partial data is wrong.
+              <SkeletonList
+                rows={12}
+                listClassName="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                itemClassName="h-[118px] rounded-xl"
+              />
             ) : repos.length === 0 ? (
               <Placeholder
                 message={query ? `未找到匹配“${query}”的仓库` : "暂无仓库"}

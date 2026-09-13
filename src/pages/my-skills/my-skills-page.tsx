@@ -3,13 +3,12 @@ import { useSearchParams } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Ban,
+  Boxes,
   Check,
-  ChevronDown,
   LayoutGrid,
   Puzzle,
   RefreshCw,
   Users,
-  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,7 +25,8 @@ import type { Skill } from "../../types/skill";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { OwnerAvatar } from "../../components/owner-avatar";
-import { Button } from "../../components/ui/button";
+import { FilterDropdown, type FilterOption } from "../../components/filter-dropdown";
+import { Placeholder } from "../../components/placeholder";
 import {
   Card,
   CardAction,
@@ -35,13 +35,6 @@ import {
   CardHeader,
   CardTitle,
 } from "../../components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "../../components/ui/dropdown-menu";
 import { ListPager } from "../../components/list-pager";
 import { Switch } from "../../components/ui/switch";
 import { cn, errorMessage } from "../../lib/utils";
@@ -54,12 +47,8 @@ import { SearchInput } from "../../components/search-input";
 /** Enablement filter offered by the toolbar dropdown. */
 type EnabledFilter = "all" | "enabled" | "disabled";
 
-const ENABLE_OPTIONS: Array<{
-  value: EnabledFilter;
-  label: string;
-  icon: LucideIcon;
-}> = [
-  { value: "all", label: "全部", icon: LayoutGrid },
+const ENABLE_OPTIONS: FilterOption<EnabledFilter>[] = [
+  { value: "all", label: "全部", icon: LayoutGrid, neutral: true },
   { value: "enabled", label: "已启用", icon: Check },
   { value: "disabled", label: "已禁用", icon: Ban },
 ];
@@ -356,28 +345,22 @@ export function MySkillsPage() {
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-0">
           {isError ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
-              <Users className="h-7 w-7 opacity-40" />
-              <p className="text-[12px]">
-                加载失败：{errorMessage(error)}
-              </p>
-            </div>
+            <Placeholder
+              icon={Users}
+              message={`加载失败：${errorMessage(error)}`}
+            />
           ) : isLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
               <RefreshCw className="h-6 w-6 animate-spin" />
             </div>
           ) : list.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-muted-foreground">
-              <p className="text-[13px]">还没有安装任何技能</p>
-            </div>
+            <Placeholder icon={Boxes} message="还没有安装任何技能" />
           ) : visible.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-muted-foreground">
-              <p className="text-[13px]">
-                {query
-                  ? `未找到匹配“${query}”的 Skill`
-                  : "没有符合条件的 Skill"}
-              </p>
-            </div>
+            <Placeholder
+              message={
+                query ? `未找到匹配“${query}”的 Skill` : "没有符合条件的 Skill"
+              }
+            />
           ) : (
             <ul className={SKILL_LIST_CLASS}>
               {visible.map((skill, i) => {
@@ -425,59 +408,5 @@ export function MySkillsPage() {
         onRemoved={() => setSelected(null)}
       />
     </div>
-  );
-}
-
-/** A single-select toolbar filter rendered as a pill dropdown for the
- *  enablement filter. The trigger shows the active option (or the neutral
- *  `label` when it is the "all" default). */
-function FilterDropdown<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: Array<{ value: T; label: string; icon: LucideIcon }>;
-  onChange: (next: T) => void;
-}) {
-  // The selected option, so the trigger can lead with the same glyph its menu
-  // row shows (keeping the closed and open states of one value in agreement).
-  const current =
-    options.find((option) => option.value === value) ?? options[0];
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="rounded-full px-4">
-          <span className="flex items-center gap-1.5">
-            <current.icon
-              aria-hidden="true"
-              className="h-4 w-4 text-foreground"
-            />
-            {value === ("all" as T) ? label : current.label}
-          </span>
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as T)}>
-          {options.map((option) => (
-            <DropdownMenuRadioItem key={option.value} value={option.value}>
-              <option.icon
-                aria-hidden="true"
-                className={cn(
-                  "h-4 w-4",
-                  option.value === value
-                    ? "text-foreground"
-                    : "text-muted-foreground",
-                )}
-              />
-              {option.label}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

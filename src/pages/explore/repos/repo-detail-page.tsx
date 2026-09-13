@@ -24,21 +24,6 @@ import { useClampedPage } from "../../../hooks/use-clamped-page";
 const REPOS_PATH = "/explore/repos";
 
 /**
- * Loading placeholder mirroring the skill list, so opening a repo paints its
- * final layout instantly and real rows replace the placeholders as the data
- * arrives.
- */
-function RepoDetailSkeleton() {
-  return (
-    <SkeletonList
-      rows={9}
-      listClassName={SKILL_LIST_CLASS}
-      itemClassName={SKILL_CARD_SKELETON_CLASS}
-    />
-  );
-}
-
-/**
  * The landing page behind a repos-page card: every registry skill that lives
  * in one source repository, paged inside the registry worker (an exact repo
  * filter, not a search). The repo id lives in the URL, so the page is
@@ -161,7 +146,14 @@ export function RepoDetailPage() {
                 </Button>
               </Placeholder>
             ) : loading ? (
-              <RepoDetailSkeleton />
+              // Mirrors the skill list, so opening a repo paints its final
+              // layout instantly and real rows replace the placeholders as
+              // the data arrives.
+              <SkeletonList
+                rows={9}
+                listClassName={SKILL_LIST_CLASS}
+                itemClassName={SKILL_CARD_SKELETON_CLASS}
+              />
             ) : hits.length === 0 ? (
               <Placeholder message={`仓库 ${repoId} 下暂无 Skill`} />
             ) : (

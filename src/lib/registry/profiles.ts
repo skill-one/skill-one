@@ -1,9 +1,10 @@
 import {
   cacheBusted,
+  fetchFirstJson,
   fetchFirstText,
-  fetchSignal,
   fileCandidates,
 } from "../cdn-config";
+import { record, text } from "../value";
 import type { SkillProfile } from "../../types/skill";
 import { isCanonicalId } from "./parse";
 import { readLatestTag } from "./snapshot";
@@ -68,33 +69,22 @@ interface RawProfilesStats {
 
 /** Normalize a stats payload; junk fields become `undefined`. */
 function normalizeStats(raw: RawProfilesStats): ProfilesMeta {
-  const stamp = raw.publishedAt;
-  return {
-    generatedAt:
-      typeof stamp === "string" && stamp.length > 0 ? stamp : undefined,
-  };
+  return { generatedAt: text(raw.publishedAt) };
 }
 
 /** Read `stats.json` from each candidate in order; null when all fail. */
-async function readProfilesStats(
+function readProfilesStats(
   cdnBase: string,
   ref: string | undefined,
   busted: boolean,
 ): Promise<RawProfilesStats | null> {
   const spec = ref ? { ...PROFILES_META_SPEC, ref } : PROFILES_META_SPEC;
-  for (const url of fileCandidates(spec, cdnBase)) {
-    try {
-      const resp = await fetch(busted ? cacheBusted(url) : url, {
-        signal: fetchSignal(),
-      });
-      if (!resp.ok) continue;
-      const stats: unknown = await resp.json();
-      if (stats && typeof stats === "object") return stats as RawProfilesStats;
-    } catch {
-      // Unreachable, timed out, or not JSON: give the next source a turn.
-    }
-  }
-  return null;
+  return fetchFirstJson(
+    fileCandidates(spec, cdnBase).map((url) =>
+      busted ? cacheBusted(url) : url,
+    ),
+    (raw) => record<RawProfilesStats>(raw),
+  );
 }
 
 /**
@@ -157,8 +147,6 @@ export function parseProfileLine(
   if (raw.domain == null || typeof raw.domain !== "object") return null;
   const { domain, reason } = raw.domain as { domain?: unknown; reason?: unknown };
   if (typeof domain !== "string" || domain.length === 0) return null;
-  const text = (value: unknown): string | undefined =>
-    typeof value === "string" && value.length > 0 ? value : undefined;
   const persona =
     raw.persona && typeof raw.persona === "object"
       ? (raw.persona as Record<string, unknown>)
@@ -199,9 +187,9 @@ export async function readProfiles(
   const urls = fileCandidates(spec, cdnBase).map((url) =>
     tag ? url : cacheBusted(url),
   );
-  const { text } = await fetchFirstText(urls);
+  const { text: body } = await fetchFirstText(urls);
   const profiles = new Map<string, SkillProfile>();
-  for (const line of text.split("\n")) {
+  for (const line of body.split("\n")) {
     const parsed = parseProfileLine(line);
     if (parsed) profiles.set(parsed.id, parsed.profile);
   }

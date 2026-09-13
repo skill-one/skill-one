@@ -48,6 +48,17 @@ const PROGRESS_INTERVAL_MS = 400;
 const byPopularity = (a: Skill, b: Skill): number =>
   popularity(b) - popularity(a);
 
+/** Ascending name order, the alternative toolbar sort. */
+const byName = (a: Skill, b: Skill): number => a.name.localeCompare(b.name);
+
+/** The comparator for one of the two non-default toolbar orders. */
+const skillComparator = (sort: "popularity" | "name") =>
+  sort === "popularity" ? byPopularity : byName;
+
+/** Ascending repo-name order, the tiebreak of every repos sort. */
+const byRepoName = (a: RepoInfo, b: RepoInfo): number =>
+  a.repo.localeCompare(b.repo);
+
 export interface ControllerDeps {
   /**
    * Read the published snapshot stats: the freshness oracle that decides
@@ -95,7 +106,7 @@ export interface ControllerDeps {
   now(): number;
 }
 
-export interface RegistryStats {
+interface RegistryStats {
   count: number;
   complete: boolean;
   indexing: boolean;
@@ -175,6 +186,18 @@ export function createRegistryController(
   // Distinct profile domains with their skill counts, cached per data
   // version like the repo aggregation (a single O(n) pass per dataset).
   let domainCache: { version: number; domains: DomainInfo[] } | null = null;
+
+  /**
+   * Drop every derived cache and bump the data version they are addressed
+   * by, so the next query rebuilds against the dataset now being served.
+   */
+  const invalidateDerived = () => {
+    dataVersion++;
+    orderCache = null;
+    repoCache = null;
+    lookupCache = null;
+    domainCache = null;
+  };
 
   const emitProgress = () => {
     post({
@@ -265,11 +288,7 @@ export function createRegistryController(
     servedProfilesAt = meta?.generatedAt;
     servedProfilesTag = meta?.tag;
     decorate();
-    dataVersion++;
-    orderCache = null;
-    repoCache = null;
-    lookupCache = null;
-    domainCache = null;
+    invalidateDerived();
     if (ready) buildIndex();
     return true;
   };
@@ -361,10 +380,7 @@ export function createRegistryController(
       trendingIds = null;
       announcedCount = 0;
       lastNotify = 0;
-      dataVersion++;
-      orderCache = null;
-      repoCache = null;
-      lookupCache = null;
+      invalidateDerived();
     }
     try {
       await deps.readIndex(
@@ -412,10 +428,7 @@ export function createRegistryController(
     ready = false;
     search = null;
     announcedCount = buffer.length;
-    dataVersion++;
-    orderCache = null;
-    repoCache = null;
-    lookupCache = null;
+    invalidateDerived();
     // Land the trending list with the data it belongs to. A failed fetch
     // keeps whatever was served before (null on a fresh boot) rather than
     // dropping the board outright.
@@ -457,10 +470,9 @@ export function createRegistryController(
       return orderCache.ids;
     }
     const ids = store.map((_, id) => id);
-    if (sort === "popularity") {
-      ids.sort((a, b) => byPopularity(store[a], store[b]));
-    } else if (sort === "name") {
-      ids.sort((a, b) => store[a].name.localeCompare(store[b].name));
+    if (sort !== "default") {
+      const compare = skillComparator(sort);
+      ids.sort((a, b) => compare(store[a], store[b]));
     }
     orderCache = { version: dataVersion, sort, ids };
     return ids;
@@ -484,11 +496,8 @@ export function createRegistryController(
         if (skill.repo === repo) hits.push({ skill, matched: {} });
       }
       if (sort !== "default") {
-        if (sort === "popularity") {
-          hits.sort((a, b) => byPopularity(a.skill, b.skill));
-        } else {
-          hits.sort((a, b) => a.skill.name.localeCompare(b.skill.name));
-        }
+        const compare = skillComparator(sort);
+        hits.sort((a, b) => compare(a.skill, b.skill));
       }
       return { hits: hits.slice(start, start + pageSize), total: hits.length };
     }
@@ -616,13 +625,12 @@ export function createRegistryController(
         total: hits.length,
       };
     }
-    const byName = (a: RepoInfo, b: RepoInfo) => a.repo.localeCompare(b.repo);
     const repos = reposFor().toSorted((a, b) =>
       sort === "skills"
-        ? b.skills - a.skills || byName(a, b)
+        ? b.skills - a.skills || byRepoName(a, b)
         : sort === "name"
-          ? byName(a, b)
-          : b.stars - a.stars || byName(a, b),
+          ? byRepoName(a, b)
+          : b.stars - a.stars || byRepoName(a, b),
     );
     return { repos: repos.slice(start, start + pageSize), total: repos.length };
   };
@@ -905,5 +913,3 @@ export function createRegistryController(
     },
   };
 }
-
-export type RegistryController = ReturnType<typeof createRegistryController>;

@@ -1,5 +1,6 @@
 import type { SkillProfileDetail } from "../types/skill";
 import { fetchFirstText, fileCandidates, getProfilesTag } from "./cdn-config";
+import { text, textList } from "./value";
 
 /**
  * Per-skill profile reader for the skills-profiles dataset: the five angle
@@ -34,28 +35,19 @@ async function fetchAngle<T>(
   validate: (raw: unknown) => T | null,
 ): Promise<T | null> {
   try {
-    const { text } = await fetchFirstText(
+    const { text: body } = await fetchFirstText(
       fileCandidates({
         repo: PROFILES.repo,
         ref: profilesRef(),
         path: `skills/${id}/${angle}.json`,
       }),
     );
-    return validate(JSON.parse(text));
+    return validate(JSON.parse(body));
   } catch {
     // Unreachable, not JSON, or failed validation: drop the section.
     return null;
   }
 }
-
-const text = (value: unknown): string | undefined =>
-  typeof value === "string" && value.length > 0 ? value : undefined;
-
-const textList = (value: unknown): string[] | undefined =>
-  Array.isArray(value) &&
-  value.every((item) => typeof item === "string" && item.length > 0)
-    ? (value as string[])
-    : undefined;
 
 function validateScenario(raw: unknown): string | null {
   if (!raw || typeof raw !== "object") return null;

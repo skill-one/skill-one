@@ -1,9 +1,10 @@
 import {
   cacheBusted,
+  fetchFirstJson,
   fetchFirstStreamInOrder,
-  fetchSignal,
   fileCandidates,
 } from "../cdn-config";
+import { count, record, text } from "../value";
 import type { Skill } from "../../types/skill";
 import { parseSkillLine } from "./parse";
 import { readLatestTag } from "./snapshot";
@@ -171,21 +172,14 @@ export async function probeIndexMeta(
 }
 
 /** Fetch `stats.json` pinned to an immutable snapshot tag (no cache-busting). */
-async function readStatsAt(
+function readStatsAt(
   cdnBase: string,
   tag: string,
 ): Promise<RawRunStats | null> {
-  for (const url of fileCandidates({ ...META_SPEC, ref: tag }, cdnBase)) {
-    try {
-      const resp = await fetch(url, { signal: fetchSignal() });
-      if (!resp.ok) continue;
-      const stats: unknown = await resp.json();
-      if (stats && typeof stats === "object") return stats as RawRunStats;
-    } catch {
-      // Unreachable, timed out, or not JSON: give the next source a turn.
-    }
-  }
-  return null;
+  return fetchFirstJson(
+    fileCandidates({ ...META_SPEC, ref: tag }, cdnBase),
+    (raw) => record<RawRunStats>(raw),
+  );
 }
 
 /**
@@ -197,18 +191,13 @@ async function readStatsAt(
 async function probeBranchStats(
   cdnBase: string,
 ): Promise<PublishedIndex | null> {
-  for (const url of fileCandidates(META_SPEC, cdnBase)) {
-    try {
-      const resp = await fetch(cacheBusted(url), { signal: fetchSignal() });
-      if (!resp.ok) continue;
-      const stats: unknown = await resp.json();
-      if (!stats || typeof stats !== "object") continue;
-      return normalizeStats(stats as RawRunStats);
-    } catch {
-      // Unreachable, timed out, or not JSON: give the next source a turn.
-    }
-  }
-  return null;
+  return fetchFirstJson(
+    fileCandidates(META_SPEC, cdnBase).map(cacheBusted),
+    (raw) => {
+      const stats = record<RawRunStats>(raw);
+      return stats ? normalizeStats(stats) : null;
+    },
+  );
 }
 
 /**
@@ -218,10 +207,6 @@ async function probeBranchStats(
  * convention.
  */
 function normalizeStats(raw: RawRunStats): PublishedIndex {
-  const text = (value: unknown): string | undefined =>
-    typeof value === "string" && value.length > 0 ? value : undefined;
-  const count = (value: unknown): number | undefined =>
-    typeof value === "number" && Number.isFinite(value) ? value : undefined;
   return {
     generatedAt: text(raw.finishedAt),
     total: count(raw.indexedRows),
@@ -238,25 +223,18 @@ function normalizeStats(raw: RawRunStats): PublishedIndex {
  * future-shaped source simply yields null, which callers treat as "no
  * trending leaderboard" rather than a download failure.
  */
-export async function readTrending(
+export function readTrending(
   cdnBase: string,
   tag?: string,
 ): Promise<string[] | null> {
   const spec = { ...TRENDING_SPEC, ref: tag ?? TRENDING_SPEC.ref };
-  for (const url of fileCandidates(spec, cdnBase)) {
-    try {
-      const busted = tag ? url : cacheBusted(url);
-      const resp = await fetch(busted, { signal: fetchSignal() });
-      if (!resp.ok) continue;
-      const ids: unknown = await resp.json();
-      if (!Array.isArray(ids)) continue;
-      if (!ids.every((id) => typeof id === "string")) continue;
-      return ids;
-    } catch {
-      // Unreachable, timed out, or not JSON: give the next source a turn.
-    }
-  }
-  return null;
+  return fetchFirstJson(
+    fileCandidates(spec, cdnBase).map((url) => (tag ? url : cacheBusted(url))),
+    (raw) =>
+      Array.isArray(raw) && raw.every((id) => typeof id === "string")
+        ? (raw as string[])
+        : null,
+  );
 }
 
 /**

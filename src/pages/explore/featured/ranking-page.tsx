@@ -23,17 +23,6 @@ const RANKING_PATH = `${FEATURED_PATH}/ranking`;
 /** Cards of the loading skeleton; roughly a viewport of the real list. */
 const SKELETON_ROWS = 10;
 
-/** Loading placeholder mirroring the card list, so switching tabs never jumps. */
-function RankingSkeleton() {
-  return (
-    <SkeletonList
-      rows={SKELETON_ROWS}
-      listClassName={SKILL_LIST_CLASS}
-      itemClassName={SKILL_CARD_SKELETON_CLASS}
-    />
-  );
-}
-
 /**
  * The landing page behind a featured banner: the full leaderboard behind one
  * hero slide, ranked inside the registry worker.
@@ -153,7 +142,12 @@ export function RankingPage() {
             </Button>
           </Placeholder>
         ) : isPending ? (
-          <RankingSkeleton />
+          // Mirrors the card list, so switching tabs never jumps.
+          <SkeletonList
+            rows={SKELETON_ROWS}
+            listClassName={SKILL_LIST_CLASS}
+            itemClassName={SKILL_CARD_SKELETON_CLASS}
+          />
         ) : entries.length === 0 ? (
           <Placeholder message="暂无上榜 Skill" />
         ) : (

@@ -272,6 +272,30 @@ export async function fetchFirstText(
 }
 
 /**
+ * Fetch JSON from the first candidate whose payload `validate` accepts (it
+ * returns null to reject a candidate and give the next source a turn). Null
+ * when every candidate is exhausted — the shape for optional garnish files
+ * (run stats, trending) whose absence is not an error, unlike
+ * `fetchFirstText`, which throws a typed error instead.
+ */
+export async function fetchFirstJson<T>(
+  urls: string[],
+  validate: (raw: unknown) => T | null,
+): Promise<T | null> {
+  for (const url of urls) {
+    try {
+      const resp = await fetch(url, { signal: fetchSignal() });
+      if (!resp.ok) continue;
+      const value = validate(await resp.json());
+      if (value !== null) return value;
+    } catch {
+      // Unreachable, timed out, or not JSON: give the next source a turn.
+    }
+  }
+  return null;
+}
+
+/**
  * Try each candidate URL in its given order, handing the first usable
  * response body to `consume` for streaming reads. A candidate that answers
  * non-OK — or whose body fails mid-download, or whose `consume` throws —

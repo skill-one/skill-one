@@ -53,8 +53,6 @@ const INITIAL_SNAPSHOT: RegistrySnapshot = {
 };
 
 let worker: Worker | null = null;
-let workerFactory: () => Worker = () =>
-  new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
 let inited = false;
 let nextId = 0;
 const pending = new Map<
@@ -108,7 +106,9 @@ function onMessage(message: RegistryWorkerMessage) {
 }
 
 function ensureWorker(): Worker {
-  worker ??= workerFactory();
+  worker ??= new Worker(new URL("./worker.ts", import.meta.url), {
+    type: "module",
+  });
   worker.onmessage = (event: MessageEvent<RegistryWorkerMessage>) =>
     onMessage(event.data);
   return worker;
@@ -143,8 +143,7 @@ function request(
 }
 
 /** Spawn the worker and start the download at app boot. */
-export function initRegistry(options?: { workerFactory?: () => Worker }) {
-  if (options?.workerFactory) workerFactory = options.workerFactory;
+export function initRegistry() {
   ensureInit();
 }
 

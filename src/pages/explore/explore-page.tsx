@@ -5,7 +5,6 @@ import {
   Flame,
   LayoutGrid,
   Sparkles,
-  type LucideIcon,
 } from "lucide-react";
 
 import { useRegistryPage } from "../../hooks/use-registry-page";
@@ -31,6 +30,10 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { SkeletonList } from "../../components/skeleton-list";
+import {
+  FilterDropdown,
+  type FilterOption,
+} from "../../components/filter-dropdown";
 import { SkillListRow } from "./skill-list-row";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { ListPager } from "../../components/list-pager";
@@ -61,30 +64,10 @@ import { SearchInput } from "../../components/search-input";
  * from muted to foreground like every other shadcn menu item — no per-metric
  * color, and nothing that can drift away from the rows.
  */
-const SORT_OPTIONS: Array<{
-  value: SortOrder;
-  label: string;
-  icon: LucideIcon;
-}> = [
+const SORT_OPTIONS: FilterOption<SortOrder>[] = [
   { value: "popularity", label: "按热度", icon: Flame },
   { value: "name", label: "按名称", icon: ArrowDownAZ },
 ];
-
-/**
- * Loading placeholder mirroring the skill list: a viewport's worth of
- * card-shaped skeletons, so switching to this page paints its final layout
- * instantly and real cards replace the placeholders as the index streams in
- * (instead of an empty spin that reads as "the page never switched").
- */
-function ExploreSkeleton() {
-  return (
-    <SkeletonList
-      rows={12}
-      listClassName={SKILL_LIST_CLASS}
-      itemClassName={SKILL_CARD_SKELETON_CLASS}
-    />
-  );
-}
 
 export function ExplorePage() {
   // 1-based current page.
@@ -173,11 +156,6 @@ export function ExplorePage() {
     setSelected(null);
     setPage(p);
   };
-
-  // The chosen sort, resolved once so the trigger echoes its label and glyph
-  // and reads exactly like the same-named row inside the menu.
-  const activeSort =
-    SORT_OPTIONS.find((option) => option.value === sort) ?? SORT_OPTIONS[0];
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-0">
@@ -288,44 +266,11 @@ export function ExplorePage() {
               </span>
             </Button>
           ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="rounded-full px-4">
-                  <span className="flex items-center gap-1.5">
-                    <activeSort.icon
-                      aria-hidden="true"
-                      className="h-4 w-4 text-foreground"
-                    />
-                    {activeSort.label}
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuRadioGroup
-                  value={sort}
-                  onValueChange={(value) => handleSort(value as SortOrder)}
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <DropdownMenuRadioItem
-                      key={option.value}
-                      value={option.value}
-                    >
-                      <option.icon
-                        aria-hidden="true"
-                        className={cn(
-                          "h-4 w-4",
-                          option.value === sort
-                            ? "text-foreground"
-                            : "text-muted-foreground",
-                        )}
-                      />
-                      {option.label}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <FilterDropdown
+              value={sort}
+              options={SORT_OPTIONS}
+              onChange={handleSort}
+            />
           )}
         </div>
       </div>
@@ -358,7 +303,15 @@ export function ExplorePage() {
                 </Button>
               </Placeholder>
             ) : loading ? (
-              <ExploreSkeleton />
+              // A viewport's worth of card-shaped skeletons: switching to
+              // this page paints its final layout instantly and real cards
+              // replace the placeholders as the index streams in (instead of
+              // an empty spin that reads as "the page never switched").
+              <SkeletonList
+                rows={12}
+                listClassName={SKILL_LIST_CLASS}
+                itemClassName={SKILL_CARD_SKELETON_CLASS}
+              />
             ) : hits.length === 0 ? (
               <Placeholder
                 message={query ? `未找到匹配“${query}”的 Skill` : "暂无技能"}

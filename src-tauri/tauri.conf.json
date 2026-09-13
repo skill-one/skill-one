@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Skill One",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
@@ -53,7 +54,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["app", "dmg"],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",

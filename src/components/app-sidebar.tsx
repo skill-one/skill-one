@@ -32,7 +32,7 @@ export interface NavItem {
    * page family — a plain startsWith would light up 全部 for every /explore/*
    * path, since /explore is a prefix of them.
    */
-  match?: "exact" | "prefix";
+  match?: "prefix";
 }
 
 export const shopItems: NavItem[] = [

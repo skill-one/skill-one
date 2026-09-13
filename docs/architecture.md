@@ -10,7 +10,7 @@ Skill One is a Tauri v2 desktop app. The frontend (React) handles rendering and 
 ┌─────────────────────────────────────────────────────────┐
 │                   React frontend (WebView)              │
 │  components / hooks / lib                               │
-│   ├── Read: skills-api.ts, skill-detail-api.ts          │
+│   ├── Read: lib/registry/, skill-*-api.ts               │
 │   │         └─ cdn-config.ts (direct GitHub / CDN)      │
 │   ├── Write: local-skills.ts ──► skills-manager.ts      │
 │   │                             └─ invoke (Tauri IPC)   │
@@ -38,7 +38,7 @@ Read data is cached through TanStack Query (`staleTime` 10 minutes, `gcTime` inf
 ### Backend (writes)
 
 - **`src-tauri/src/skills.rs`**: Exposes 7 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `set_skills_enabled`, `link_agents`, `link_status`, `read_skill_md`), all of which route their blocking work (git clone, install, link, etc.) through a shared `spawn_blocking` helper to keep it off the async runtime.
-- Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Since `agents-skills` 0.9, linking never refuses because of existing content: pre-existing agent content is parked into a backup slot (adopted into the canonical dir with migrate) and restored on unlink, so the former `remove_stray_files` command is gone.
+- Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Linking never refuses because of existing content: pre-existing agent content is parked into a backup slot (adopted into the canonical dir with migrate) and restored on unlink.
 
 ### Frontend write wrapper
 

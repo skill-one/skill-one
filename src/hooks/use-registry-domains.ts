@@ -1,11 +1,7 @@
-import { useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
-import {
-  getDomains,
-  getRegistrySnapshot,
-  subscribeRegistry,
-} from "../lib/registry/client";
+import { getDomains } from "../lib/registry/client";
+import { useInvalidateOnRegistryEpoch } from "./use-invalidate-on-registry-epoch";
 
 /** Query-key prefix shared by the domains query. */
 const REGISTRY_DOMAINS_QUERY_KEY = "registry-domains";
@@ -16,29 +12,13 @@ const REGISTRY_DOMAINS_QUERY_KEY = "registry-domains";
  * touches the registry) and invalidated on every `ready` epoch, so the list
  * settles once the index — decorated with the profiles dataset — lands.
  * An empty list simply hides the filter; a missing profiles dataset is not
- * an error state.
+ * an error state. Query options come from the shared QueryClient defaults
+ * (see `lib/query-client`).
  */
 export function useRegistryDomains() {
-  const queryClient = useQueryClient();
-  const seenEpoch = useRef(getRegistrySnapshot().epoch);
-
-  useEffect(() => {
-    return subscribeRegistry(() => {
-      const { epoch } = getRegistrySnapshot();
-      if (epoch !== seenEpoch.current) {
-        seenEpoch.current = epoch;
-        void queryClient.invalidateQueries({
-          queryKey: [REGISTRY_DOMAINS_QUERY_KEY],
-        });
-      }
-    });
-  }, [queryClient]);
-
+  useInvalidateOnRegistryEpoch([REGISTRY_DOMAINS_QUERY_KEY]);
   return useQuery({
     queryKey: [REGISTRY_DOMAINS_QUERY_KEY],
     queryFn: getDomains,
-    staleTime: 10 * 60 * 1000,
-    gcTime: Infinity,
-    retry: false,
   });
 }

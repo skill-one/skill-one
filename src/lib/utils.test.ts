@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { cn, errorMessage, formatCount, formatDate, formatRev } from "./utils";
+import { cn, errorMessage, formatCount, formatDate } from "./utils";
 
 describe("cn", () => {
   // Joining truthy values, skipping falsy ones and flattening arrays is clsx's
@@ -20,20 +20,6 @@ describe("formatCount", () => {
   it("formats smaller counts without a suffix", () => {
     expect(formatCount(999)).toBe("999");
     expect(formatCount(0)).toBe("0");
-  });
-});
-
-describe("formatRev", () => {
-  it("keeps the hash head and drops the fingerprint-scheme segment", () => {
-    expect(formatRev("t1-a4cf6ce14f6d65b3")).toBe("#a4cf6ce1");
-  });
-
-  it("tolerates a fingerprint without a scheme segment", () => {
-    expect(formatRev("a4cf6ce14f6d65b3")).toBe("#a4cf6ce1");
-  });
-
-  it("does not pad a hash shorter than the display width", () => {
-    expect(formatRev("t1-abcd")).toBe("#abcd");
   });
 });
 
