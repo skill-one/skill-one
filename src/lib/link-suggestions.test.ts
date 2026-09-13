@@ -60,7 +60,7 @@ beforeEach(() => {
 describe("rankNamesakes", () => {
   it("keeps same-slug namesakes, ranked by similarity", () => {
     // Exact-slug filtering already happened in findNamesakes; the ranking
-    // only orders, filters by the similarity floor and caps.
+    // only orders and caps.
     const ranked = rankNamesakes(
       [
         namesake("a/skills", { description: "Read and manipulate PDF files." }),
@@ -68,17 +68,21 @@ describe("rankNamesakes", () => {
       ],
       "Read and manipulate PDF files.",
     );
-    expect(ranked.map((c) => c.skill.repo)).toEqual(["a/skills"]);
+    expect(ranked.map((c) => c.skill.repo)).toEqual(["a/skills", "b/skills"]);
     expect(ranked[0].similarity).toBe(1);
   });
 
-  it("drops candidates below the similarity floor", () => {
-    expect(
-      rankNamesakes(
-        [namesake("a/skills", { description: "cook italian pasta" })],
-        "Read and manipulate PDF files.",
-      ),
-    ).toEqual([]);
+  it("keeps dissimilar candidates, ranked last", () => {
+    const ranked = rankNamesakes(
+      [
+        namesake("a/skills", { description: "cook italian pasta" }),
+        namesake("b/skills", { description: "Read and manipulate PDF files." }),
+      ],
+      "Read and manipulate PDF files.",
+    );
+    // No similarity floor: the user decides, low scores just sink.
+    expect(ranked.map((c) => c.skill.repo)).toEqual(["b/skills", "a/skills"]);
+    expect(ranked[1].similarity).toBe(0);
   });
 
   it("caps the candidate list", () => {

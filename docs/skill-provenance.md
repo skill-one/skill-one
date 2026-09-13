@@ -128,11 +128,14 @@ reconcile query never re-hashes known dead ends.
 For whatever remains, same-slug registry entries are ranked by description
 similarity (token Jaccard; Han text is compared as character bigrams, the
 same trick the shared search index uses) and surfaced on the card as a
-确认关联 affordance. The dialog lists at most 5 candidates scoring ≥ 0.3
-with their similarity percentage, explicitly labeled as a reference, not
-proof — forks share descriptions, so 100% similarity still does not
-*identify* a skill. Nothing is written until the user picks one; the
-confirmed pick lands in the ledger indistinguishable from a native install.
+确认关联 affordance. The dialog lists the top 5 candidates by similarity
+with their percentage, explicitly labeled as a reference, not proof — forks
+share descriptions, so 100% similarity still does not *identify* a skill.
+There is no similarity floor: a low score only sinks a candidate to the
+bottom of the list, because hiding it could hide the one correct repo
+(e.g. when the local description is missing or worded differently). Nothing
+is written until the user picks one; the confirmed pick lands in the ledger
+indistinguishable from a native install.
 
 Why not auto-link at 100% similarity? Measured against the published
 snapshot (8,993 skills): 549 slugs are published by ≥2 repos, and 171 of

@@ -66,13 +66,15 @@ async function findNamesakes(name: string): Promise<Skill[]> {
   }
 }
 
-/** Only entries scoring at least this similar are offered as candidates. */
-export const MIN_SIMILARITY = 0.3;
-
 /** Beyond a few candidates the user is better off searching the store. */
 export const MAX_CANDIDATES = 5;
 
-/** Rank prepared namesakes by description similarity, filtered and capped. */
+/**
+ * Rank prepared namesakes by description similarity, most similar first,
+ * capped. No similarity floor: a low score hides nothing — candidates sort
+ * to the bottom of the list, and dropping them could hide the one correct
+ * repo (e.g. when the local description is missing or worded differently).
+ */
 export function rankNamesakes(
   namesakes: Skill[],
   localDescription: string,
@@ -82,7 +84,6 @@ export function rankNamesakes(
       skill,
       similarity: descriptionSimilarity(localDescription, skill.description),
     }))
-    .filter((c) => c.similarity >= MIN_SIMILARITY)
     .toSorted((a, b) => b.similarity - a.similarity)
     .slice(0, MAX_CANDIDATES);
 }
