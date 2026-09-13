@@ -1,5 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
-import { getRegistrySnapshot } from "../lib/registry/client";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useSyncExternalStore } from "react";
+import {
+  getRegistrySnapshot,
+  subscribeRegistry,
+} from "../lib/registry/client";
 
 import { fetchInstalledSkills } from "../lib/local-skills";
 import { reconcileProvenance } from "../lib/provenance";
@@ -44,9 +48,19 @@ export interface ProvenanceState {
  * yields fewer suggestions, and the next invalidation retries.
  */
 export function useSkillProvenance() {
+  // The registry epoch joins the query key: the tiers only run once the
+  // snapshot is ready, so the boot-time run (registry still streaming) must
+  // be superseded the moment `ready` flips — and again on every revalidation
+  // that serves a new snapshot (new snapshot → possibly new namesakes).
+  // markSkillsChanged still invalidates by the shared prefix.
+  const epoch = useSyncExternalStore(
+    subscribeRegistry,
+    (snapshot) => snapshot.epoch,
+  );
   return useQuery({
-    queryKey: PROVENANCE_QUERY_KEY,
+    queryKey: [...PROVENANCE_QUERY_KEY, epoch],
     queryFn: fetchProvenanceState,
+    placeholderData: keepPreviousData,
   });
 }
 
