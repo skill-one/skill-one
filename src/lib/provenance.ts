@@ -200,6 +200,25 @@ export async function removeSkillProvenance(name: string): Promise<void> {
 }
 
 /**
+ * Record several freshly auto-linked skills in one read-modify-write pass —
+ * the hash tier can match a handful of skills in one reconcile, and each of
+ * them writing the file on its own would be N reads + N writes for what is
+ * logically one ledger update.
+ */
+export async function recordSkillProvenanceBatch(
+  entries: Array<{ repo: string; slug: string; hash?: string }>,
+): Promise<void> {
+  try {
+    const ledger = await loadProvenanceLedger();
+    let next = ledger;
+    for (const entry of entries) next = upsertProvenanceEntry(next, entry);
+    if (next !== ledger) await saveProvenanceLedger(next);
+  } catch (e) {
+    console.warn("provenance: failed to record install sources", e);
+  }
+}
+
+/**
  * Reconcile the ledger with the on-disk truth and return the current
  * name→provenance map. Called whenever the installed list is (re)loaded, so
  * skills removed outside the app stop claiming a source, and so consumers —

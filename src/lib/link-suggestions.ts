@@ -28,7 +28,7 @@ import type { Skill } from "../types/skill";
 import { getPage, getRegistrySnapshot } from "./registry/client";
 import { computeSkillHash } from "./skills-manager";
 import { descriptionSimilarity } from "./description-similarity";
-import { recordSkillProvenance } from "./provenance";
+import { recordSkillProvenanceBatch } from "./provenance";
 
 /** One confirmable association candidate: a namesake and how similar it looks. */
 export interface LinkCandidate {
@@ -72,6 +72,7 @@ export async function autoLinkByHash(
   unlinked: Array<{ name: string; description?: string }>,
 ): Promise<string[]> {
   const linked: string[] = [];
+  const matched: Array<{ repo: string; slug: string; hash: string }> = [];
   for (const skill of unlinked) {
     if (hashMisses.has(skill.name)) continue;
     // computeSkillHash already degrades errors to null; the catch is a
@@ -87,12 +88,14 @@ export async function autoLinkByHash(
     if (match) {
       // The hash that matched is exactly the installed content's hash —
       // store it so a future update check can skip recomputation.
-      await recordSkillProvenance(match.repo, skill.name, localHash);
+      matched.push({ repo: match.repo, slug: skill.name, hash: localHash });
       linked.push(skill.name);
     } else {
       hashMisses.add(skill.name);
     }
   }
+  // One read-modify-write for the whole batch instead of one per match.
+  await recordSkillProvenanceBatch(matched);
   return linked;
 }
 

@@ -17,6 +17,7 @@ import {
 import type { AgentStatus } from "../../lib/skills-manager";
 import { cn, errorMessage } from "../../lib/utils";
 import { INSTALLED_SKILLS_QUERY_KEY } from "../../hooks/use-installed-skills";
+import { PROVENANCE_QUERY_KEY } from "../../hooks/use-skill-provenance";
 import { AgentIcon } from "../../components/agent-icon";
 import { Placeholder } from "../../components/placeholder";
 import { Button } from "../../components/ui/button";
@@ -76,6 +77,11 @@ export function AgentAvatarMenu() {
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["agent-status"] });
     void queryClient.invalidateQueries({ queryKey: INSTALLED_SKILLS_QUERY_KEY });
+    // A migrate adopts skills into the canonical dir — freshly tool-installed
+    // skills whose store association the provenance tiers can now resolve.
+    void queryClient.invalidateQueries({
+      queryKey: PROVENANCE_QUERY_KEY,
+    });
   };
 
   /** Build the confirm target for an unlinked agent, or `null` when its dir is empty. */

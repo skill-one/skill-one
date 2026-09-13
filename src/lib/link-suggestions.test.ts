@@ -8,17 +8,21 @@ import {
 } from "./link-suggestions";
 import type { Skill } from "../types/skill";
 
-const { getPage, getRegistrySnapshot, computeSkillHash, recordSkillProvenance } =
-  vi.hoisted(() => ({
-    getPage: vi.fn(),
-    getRegistrySnapshot: vi.fn(),
-    computeSkillHash: vi.fn(),
-    recordSkillProvenance: vi.fn(),
-  }));
+const {
+  getPage,
+  getRegistrySnapshot,
+  computeSkillHash,
+  recordSkillProvenanceBatch,
+} = vi.hoisted(() => ({
+  getPage: vi.fn(),
+  getRegistrySnapshot: vi.fn(),
+  computeSkillHash: vi.fn(),
+  recordSkillProvenanceBatch: vi.fn(),
+}));
 
 vi.mock("./registry/client", () => ({ getPage, getRegistrySnapshot }));
 vi.mock("./skills-manager", () => ({ computeSkillHash }));
-vi.mock("./provenance", () => ({ recordSkillProvenance }));
+vi.mock("./provenance", () => ({ recordSkillProvenanceBatch }));
 
 /** A namesake entry; `rev` doubles as the hash-matching handle. */
 function namesake(repo: string, overrides: Partial<Skill> = {}): Skill {
@@ -101,11 +105,9 @@ describe("autoLinkByHash", () => {
 
     expect(linked).toEqual(["pdf"]);
     // The matched hash is stored as the installed content hash.
-    expect(recordSkillProvenance).toHaveBeenCalledWith(
-      "fork/skills",
-      "pdf",
-      "hash-fork",
-    );
+    expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
+      { repo: "fork/skills", slug: "pdf", hash: "hash-fork" },
+    ]);
   });
 
   it("memoizes misses for the session", async () => {
@@ -122,7 +124,7 @@ describe("autoLinkByHash", () => {
     computeSkillHash.mockRejectedValue(new Error("disk gone"));
 
     await expect(autoLinkByHash([{ name: "pdf" }])).resolves.toEqual([]);
-    expect(recordSkillProvenance).not.toHaveBeenCalled();
+    expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
   });
 
   it("re-checks a missed name once the registry epoch moves", async () => {
