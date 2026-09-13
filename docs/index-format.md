@@ -42,7 +42,7 @@ Implemented in [src/lib/registry/](../src/lib/registry/) (worker + main-thread p
 
 Version resolution is **pointer-first**: upstream publishes a `latest` file at the root of its `dist` branch holding, on one line, the tag the branch currently points at (`dist-<date>`). Reading that one small file is what names the version — every other address is built from the tag, so no tag listing, sorting or name parsing is involved, and it works through the configured download source instead of needing an API the CDN cannot provide. The read carries a **cache-busting stamp**: a mutable pointer whose job is to report freshness must never be answered from a cache, or an old snapshot looks current.
 
-`skill-one/skills-profiles` publishes on the same contract, so `readLatestTag` in [snapshot.ts](../src/lib/registry/snapshot.ts) implements the read once for both datasets.
+`skill-one/skills-profiles` publishes on the same contract, so `readLatestTag` in [snapshot.ts](../src/lib/registry/snapshot.ts) implements the read once for both datasets. What it shares is the pointer, not the stats: its `stats.json` carries no `finishedAt` — the publisher stamps `publishedAt` as the snapshot's identity (only a snapshot whose content changed gets a new time) and records in `upstream` which mirror tag the profiles were generated from, which is what its `hash` values join against.
 
 ### The `stats.json` sidecar
 

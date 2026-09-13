@@ -42,7 +42,7 @@
 
 版本解析是**指针优先**的：上游在 `dist` 分支根目录发布一个 `latest` 文件，里面一行文本就是该分支当前指向的标签（`dist-<date>`）。读这一个小文件就确定了版本——其它所有地址都由该标签拼出，因此不涉及列举标签、排序或解析标签名；而且它走用户配置的下载源，不需要一个 CDN 无法提供的 API。该请求**带打散缓存的时间戳**：一个以报告新鲜度为职责的可变指针绝不能从缓存里拿，否则旧快照会被当成当前版本。
 
-`skill-one/skills-profiles` 使用同一套约定，因此 [snapshot.ts](../src/lib/registry/snapshot.ts) 中的 `readLatestTag` 为两个数据集只实现一次这段读取。
+`skill-one/skills-profiles` 使用同一套约定，因此 [snapshot.ts](../src/lib/registry/snapshot.ts) 中的 `readLatestTag` 为两个数据集只实现一次这段读取。两者共享的只是指针，而不是统计：它的 `stats.json` 里没有 `finishedAt`——发布环节会盖上 `publishedAt` 作为快照身份（只有内容真的变了的快照才会拿到新的时间），并在 `upstream` 里写明这些画像基于镜像的哪个标签，其 `hash` 正是与该标签对齐做关联的。
 
 ### `stats.json` 附属文件
 

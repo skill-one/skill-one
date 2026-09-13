@@ -45,9 +45,7 @@ describe("probeProfilesMeta", () => {
         vi.fn(async (url: string) => {
           requested.push(url.split("?")[0]);
           if (url.startsWith(POINTER_ORIGIN)) return textResponse(`${tag}\n`);
-          return jsonResponse({
-            snapshot: { ref: tag, fetched_at: "2026-09-12T07:22:00Z" },
-          });
+          return jsonResponse({ publishedAt: "2026-09-12T07:22:00Z" });
         }),
       );
 
@@ -79,6 +77,23 @@ describe("probeProfilesMeta", () => {
     });
   });
 
+  it("reports no stamp for stats.json the publish step never stamped", async () => {
+    // Counts alone are not an identity: a probe that invented one would let the
+    // controller skip a download against a snapshot it cannot prove unchanged.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.includes("/latest")
+          ? textResponse("dist-2026-09-12")
+          : jsonResponse({ skills: { total: 1000, complete: 999 } }),
+      ),
+    );
+
+    await expect(probeProfilesMeta("")).resolves.toEqual({
+      tag: "dist-2026-09-12",
+    });
+  });
+
   it("falls back to the branch stats, unpinned, when the pointer is unreadable", async () => {
     const requested: string[] = [];
     vi.stubGlobal(
@@ -86,7 +101,7 @@ describe("probeProfilesMeta", () => {
       vi.fn(async (url: string) => {
         if (url.includes("/latest")) throw new TypeError("network down");
         requested.push(url);
-        return jsonResponse({ snapshot: { fetched_at: "2026-09-11T07:22:00Z" } });
+        return jsonResponse({ publishedAt: "2026-09-11T07:22:00Z" });
       }),
     );
 

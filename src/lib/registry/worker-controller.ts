@@ -126,7 +126,7 @@ export function createRegistryController(
   // no profile. Held across downloads so a fresh store can be decorated
   // from the previous snapshot's map before the refresh resolves.
   let profilesMap: Map<string, SkillProfile> | null = null;
-  // The profiles snapshot stamp (`fetched_at`) the decorated skills were
+  // The profiles snapshot stamp (`publishedAt`) the decorated skills were
   // built from; undefined until one is served. An equal probed stamp means
   // equal bytes, so the profiles download is skipped.
   let servedProfilesAt: string | undefined;

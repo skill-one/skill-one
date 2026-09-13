@@ -51,23 +51,24 @@ const PROFILES_SOURCE: SnapshotSource = {
 
 /**
  * Freshness and shape of the currently published profiles snapshot.
- * `generatedAt` (the snapshot's `fetched_at`) is the freshness identity the
- * controller compares its cache against — equal stamps mean equal bytes.
+ * `generatedAt` (the snapshot's stamped `publishedAt`) is the identity the
+ * controller compares its cache against — the publisher only stamps a snapshot
+ * whose content actually changed, so equal stamps mean equal bytes.
  */
 export interface ProfilesMeta {
   /** Immutable tag the profiles files can be fetched at; absent when unpinned. */
   tag?: string;
-  /** The snapshot's `fetched_at` stamp (UTC). */
+  /** The snapshot's `publishedAt` stamp (UTC). */
   generatedAt?: string;
 }
 
 interface RawProfilesStats {
-  snapshot?: { ref?: unknown; fetched_at?: unknown };
+  publishedAt?: unknown;
 }
 
 /** Normalize a stats payload; junk fields become `undefined`. */
 function normalizeStats(raw: RawProfilesStats): ProfilesMeta {
-  const stamp = raw.snapshot?.fetched_at;
+  const stamp = raw.publishedAt;
   return {
     generatedAt:
       typeof stamp === "string" && stamp.length > 0 ? stamp : undefined,

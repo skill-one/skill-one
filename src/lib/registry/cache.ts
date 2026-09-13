@@ -29,7 +29,7 @@ export interface CacheIdentity {
   /** The producing run's `finishedAt`, the snapshot's freshness identity. */
   generatedAt?: string;
   /**
-   * The profiles dataset's stamp (`fetched_at`) the stored skills were
+   * The profiles dataset's stamp (`publishedAt`) the stored skills were
    * decorated from, so a profiles-only refresh can be detected without a
    * registry re-download. Absent when profiles were unavailable.
    */

@@ -154,7 +154,7 @@ export interface IndexInfo {
    * known. Immutable address: per-skill profile fetches pin to it.
    */
   profilesTag?: string;
-  /** The profiles snapshot's `fetched_at` stamp (UTC), when known. */
+  /** The profiles snapshot's `publishedAt` stamp (UTC), when known. */
   profilesAt?: string;
   /** Origin of the served dataset for this run. */
   origin: IndexOrigin;
