@@ -12,8 +12,16 @@ import type { Skill } from "../../types/skill";
 
 const KEY = "skills";
 
-/** Bump when the stored Skill shape changes so stale records are dropped. */
-const SCHEMA_VERSION = 2;
+/**
+ * Bump when the stored Skill shape changes so stale records are dropped.
+ *
+ * Version 3 flushes records written by builds whose repos.jsonl stars join
+ * could fail silently: those hold 0 stars yet carry a current run stamp, so
+ * the "unchanged" short-circuit would keep serving them for up to a day.
+ * The join now gates the write (see the registry controller), and the bump
+ * drops whatever was written before that rule existed.
+ */
+const SCHEMA_VERSION = 3;
 
 /**
  * The same database and object store this module used before it delegated to

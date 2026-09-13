@@ -138,7 +138,13 @@ function setup(options?: {
       probeMeta: async () => options?.published ?? null,
       readIndex,
       readTrending: async () => options?.trending ?? null,
-      readRepos: async () => options?.stars ?? null,
+      // Default: the sidecar answered (an empty map is a valid join); pass
+      // `stars: null` to simulate an unreachable repos.jsonl. `??` alone
+      // would fall through on null, so the guard is explicit.
+      readRepos: async () =>
+        options && options.stars !== undefined
+          ? options.stars
+          : new Map<string, number>(),
       readProfilesMeta: async () => options?.profilesMeta ?? null,
       readProfiles: async () => {
         if (!options?.profiles) throw new Error("profiles unavailable");
@@ -316,6 +322,55 @@ describe("createRegistryController — boot", () => {
       origin: "updated",
       checkedAt: 0,
     });
+  });
+
+  it("does not persist the dataset when the stars join failed", async () => {
+    const saved: Skill[][] = [];
+    const t = setup({
+      // Unreachable repos.jsonl: skills land star-less, and the write is
+      // skipped so the "unchanged" short-circuit can never serve the loss.
+      stars: null,
+      cache: {
+        load: async () => null,
+        save: async (skills) => {
+          saved.push(skills);
+        },
+        clear: async () => {},
+      },
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+    t.push(skill(0));
+    t.push(skill(1));
+    t.complete();
+    await t.flush();
+
+    // The star-less data still serves for this session — only the write to
+    // the cold-start cache is withheld, so the next launch retries the join.
+    expect(t.controller.stats()).toMatchObject({ count: 2, ready: true });
+    expect(saved).toEqual([]);
+  });
+
+  it("persists the dataset once the stars join succeeded", async () => {
+    const saved: Skill[][] = [];
+    const t = setup({
+      stars: new Map([["owner-0/repo-0", 12]]),
+      cache: {
+        load: async () => null,
+        save: async (skills) => {
+          saved.push(skills);
+        },
+        clear: async () => {},
+      },
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+    t.push(skill(0));
+    t.push(skill(1));
+    t.complete();
+    await t.flush();
+
+    expect(saved).toEqual([[skill(0), skill(1)]]);
   });
 
   it("re-downloads an unchanged run when the user forces a reload", async () => {

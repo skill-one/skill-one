@@ -388,6 +388,9 @@ export function createRegistryController(
     // index download; never rejects — a failure resolves null, which joins
     // nothing (stars stay 0) rather than failing the dataset. Not needed on
     // the "unchanged" path above: cached skills already carry their stars.
+    // A failed join is also never persisted (see the landing point below) —
+    // an unchanged snapshot never re-runs the join, so stars-less skills
+    // would otherwise be cached for a full day.
     const stars = deps.readRepos(cdnBase, tag).catch(() => null);
     if (!revalidating) {
       // Queries read the buffer as it fills (progressive page one); the
@@ -459,12 +462,20 @@ export function createRegistryController(
     await loadProfiles(gen, force);
     // No separate "landed" event: buildIndex immediately emits the settled
     // count and posts ready — the index build is synchronous from here.
+    // The stars join is settled by now (readIndex awaited it); a failed one
+    // is served but never persisted — the "unchanged" short-circuit compares
+    // run stamps only, so stars-less skills in the cache would keep being
+    // served until the next daily snapshot. Skipping the write costs one
+    // re-download on the next launch, which retries the join.
+    const starsJoined = (await stars) !== null;
     servedGeneratedAt = identity.generatedAt;
-    void deps.cache.save(store, {
-      ...identity,
-      profilesAt: servedProfilesAt,
-      profilesTag: servedProfilesTag,
-    });
+    if (starsJoined) {
+      void deps.cache.save(store, {
+        ...identity,
+        profilesAt: servedProfilesAt,
+        profilesTag: servedProfilesTag,
+      });
+    }
     emitIndex({
       ...identity,
       total,
