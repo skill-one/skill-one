@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   screen,
   fireEvent,
@@ -18,9 +18,23 @@ import {
   resetMockInstalledSkills,
   setMockSkillEnabled,
 } from "../../lib/mock-local";
+import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
 
 /** The page's search box debounces for real; 1 s is a contention flake. */
 configure({ asyncUtilTimeout: 5000 });
+
+// The provenance hook consults the registry for namesake candidates; the
+// default mock answers "no candidates" so the worker-less test env stays
+// silent, and the link-suggestion test below overrides it.
+const { getPage } = vi.hoisted(() => ({ getPage: vi.fn() }));
+vi.mock("../../lib/registry/client", () => ({
+  getPage,
+  getRegistrySnapshot: () => ({ ready: true, epoch: 1 }),
+}));
+
+beforeEach(() => {
+  getPage.mockResolvedValue({ hits: [], total: 0 });
+});
 
 // The page reads installed skills through local-skills, which falls back to
 // the mutable mock store in the browser (this test env), so mutations below
@@ -45,6 +59,7 @@ describe("MySkillsPage", () => {
   afterEach(() => {
     resetMockInstalledSkills();
     resetMockAgentStatus();
+    resetMockProvenance();
   });
 
   it("shows the installed count in the bottom pager row", async () => {
@@ -242,9 +257,8 @@ describe("MySkillsPage", () => {
     const { container } = renderWithRouter(<MySkillsPage />);
 
     await screen.findByText("pdf");
-    // agents-skills 0.13 records no install source, so every card reads as
-    // a local install and carries the same Puzzle placeholder avatar — the
-    // owner avatar (one per shadcn `avatar-fallback`) is gone entirely.
+    // Skills installed by other tools (no ledger entry) still read as a
+    // local install and carry the Puzzle placeholder avatar.
     expect(screen.getAllByText("本地安装")).toHaveLength(6);
     expect(
       container.querySelectorAll('[aria-label="skill 头像"]'),
@@ -252,6 +266,94 @@ describe("MySkillsPage", () => {
     expect(
       container.querySelectorAll('ul [data-slot="avatar-fallback"]'),
     ).toHaveLength(0);
+  });
+
+  it("shows the recorded source repo and owner avatar on sourced cards", async () => {
+    const { container } = renderWithRouter(<MySkillsPage />);
+    // The ledger has a source for pdf (installed through this app); docx is
+    // a tool-installed skill with no entry.
+    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+
+    expect(await screen.findByText("anthropics/skills")).toBeInTheDocument();
+    // docx keeps the local-install presentation.
+    expect(screen.getAllByText("本地安装")).toHaveLength(5);
+    expect(
+      container.querySelectorAll('[aria-label="skill 头像"]'),
+    ).toHaveLength(5);
+    // The sourced card's avatar degrades to the owner's initial.
+    const fallbacks = container.querySelectorAll(
+      'ul [data-slot="avatar-fallback"]',
+    );
+    expect(fallbacks).toHaveLength(1);
+    expect(fallbacks[0]).toHaveTextContent("a");
+  });
+
+  it("links a sourced skill's detail drawer to its repo instead of 本地安装", async () => {
+    const user = userEvent.setup();
+    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    renderWithRouter(<MySkillsPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "查看 pdf 详情" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    // The panel now knows the repo: the description is the source link, not
+    // the bare 本地安装 label.
+    expect(
+      within(dialog).getByText("anthropics/skills"),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByText("本地安装")).not.toBeInTheDocument();
+  });
+
+  it("offers a confirmable store link for a tool-installed skill", async () => {
+    const user = userEvent.setup();
+    // The registry carries a same-slug entry whose description matches the
+    // installed skill's: the card offers the association, nothing is linked
+    // before the user confirms.
+    getPage.mockResolvedValue({
+      hits: [
+        {
+          skill: {
+            name: "pdf",
+            repo: "anthropics/skills",
+            description: "PDF 文档读取、生成、合并、拆分与标注。",
+            stars: 99,
+            downloads: 99,
+            path: "skills/anthropics/skills/pdf",
+          },
+          matched: {},
+        },
+      ],
+      total: 1,
+    });
+    renderWithRouter(<MySkillsPage />);
+
+    const linkButton = await screen.findByRole("button", {
+      name: "关联 pdf 的商店条目",
+    });
+    await user.click(linkButton);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText("anthropics/skills"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("100%")).toBeInTheDocument();
+
+    // Confirming writes the provenance ledger: the association becomes
+    // indistinguishable from a native install.
+    await user.click(
+      within(dialog).getByRole("button", { name: /anthropics\/skills/ }),
+    );
+    expect(await screen.findByText("anthropics/skills")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "关联 pdf 的商店条目" }),
+    ).not.toBeInTheDocument();
+    // And the persisted ledger carries the pick.
+    expect(
+      JSON.parse(localStorage.getItem("skill-one.provenance") ?? "{}").skills
+        .pdf?.repo,
+    ).toBe("anthropics/skills");
   });
 
   it("pre-fills the search box from the ?skill= deep link", async () => {

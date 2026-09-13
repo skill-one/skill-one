@@ -4,6 +4,7 @@ import { emit } from "@tauri-apps/api/event";
 import { isTauri } from "../lib/tauri";
 import { SKILLS_CHANGED_EVENT } from "../popover/popover-events";
 import { fetchInstalledSkills } from "../lib/local-skills";
+import { PROVENANCE_QUERY_KEY } from "./use-skill-provenance";
 
 /**
  * The TanStack Query cache-key prefix for the installed-skill list. Every
@@ -39,15 +40,19 @@ export function notifySkillsChanged(): void {
 
 /**
  * The single call every successful skill mutation should make: refresh this
- * window's cached list and notify the other windows. Returns the invalidation
- * promise so mutation success handlers can `await` it.
+ * window's cached list (and the provenance map, which changes with it) and
+ * notify the other windows. Returns the invalidation promise so mutation
+ * success handlers can `await` it.
  */
 export function markSkillsChanged(
   queryClient: QueryClient,
 ): Promise<void> {
-  const invalidated = queryClient.invalidateQueries({
-    queryKey: INSTALLED_SKILLS_QUERY_KEY,
-  });
+  const invalidated = Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: INSTALLED_SKILLS_QUERY_KEY,
+    }),
+    queryClient.invalidateQueries({ queryKey: PROVENANCE_QUERY_KEY }),
+  ]).then(() => undefined);
   notifySkillsChanged();
   return invalidated;
 }

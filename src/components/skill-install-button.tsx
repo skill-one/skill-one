@@ -7,6 +7,7 @@ import {
   markSkillsChanged,
   useInstalledSkills,
 } from "../hooks/use-installed-skills";
+import { useSkillProvenance } from "../hooks/use-skill-provenance";
 import { cn, errorMessage } from "../lib/utils";
 import type { Skill } from "../types/skill";
 import { Button } from "./ui/button";
@@ -75,15 +76,24 @@ export function SkillInstallButton({
   // store rows in sync with installs/removals done elsewhere; React Query
   // dedupes the shared key so a page of rows issues a single fetch.
   const { data: installedSkills } = useInstalledSkills();
+  // The app's own install-source ledger (see lib/provenance.ts). Undefined
+  // while loading and for skills installed by other tools — both degrade to
+  // the name-only match below.
+  const { data: provenanceState } = useSkillProvenance();
 
   const installing = installState === "installing";
-  // Matched by name only: agents-skills 0.13 dropped install-source metadata,
-  // so an installed skill can no longer be tied back to the repo it came
-  // from. A same-named skill from a different repo reads as installed — the
-  // known trade-off until a new store↔install association ships.
+  // A skill with this name is already on disk, and it is *this* skill: when
+  // the ledger has a source for the name, it must match the store entry's
+  // repo — a same-named skill from a different repo must stay installable.
+  // Without a ledger entry the association is unknown, so the name match
+  // stands (the pre-ledger behavior).
+  const provenance = provenanceState?.linked[skill.name];
   const isInstalled =
     installState === "installed" ||
-    !!installedSkills?.some((s) => s.name === skill.name);
+    !!installedSkills?.some(
+      (s) =>
+        s.name === skill.name && (!provenance || provenance.repo === skill.repo),
+    );
   // Installing outranks "already on disk" (the click is in flight), and the
   // on-disk state outranks a stale local one.
   const state: InstallState = installing

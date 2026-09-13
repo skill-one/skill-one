@@ -5,6 +5,8 @@
 
 use tauri::{Listener, Manager};
 
+mod provenance;
+mod skill_hash;
 mod skills;
 mod tray;
 mod update_channel;
@@ -28,6 +30,9 @@ pub fn run() {
             skills::link_agents,
             skills::link_status,
             skills::read_skill_md,
+            skills::compute_skill_hash,
+            provenance::read_provenance,
+            provenance::write_provenance,
             update_channel::is_homebrew_install,
         ])
         .setup(|app| {

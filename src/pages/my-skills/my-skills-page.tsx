@@ -17,8 +17,10 @@ import {
   markSkillsChanged,
   useInstalledSkills,
 } from "../../hooks/use-installed-skills";
+import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import type { InstalledSkill } from "../../lib/skills-manager";
+import type { SkillProvenance } from "../../lib/provenance";
 import type { Skill } from "../../types/skill";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
@@ -40,6 +42,12 @@ import { buildSearchIndex } from "../../lib/search-index";
 import { SKILL_LIST_CLASS } from "../../lib/skill-list-layout";
 import { useClampedPage } from "../../hooks/use-clamped-page";
 import { SearchInput } from "../../components/search-input";
+import { OwnerAvatar } from "../../components/owner-avatar";
+import {
+  LinkSuggestionButton,
+  LinkSuggestionDialog,
+} from "./link-suggestion-dialog";
+import type { LinkCandidate } from "../../lib/link-suggestions";
 
 /** Enablement filter offered by the toolbar dropdown. */
 type EnabledFilter = "all" | "enabled" | "disabled";
@@ -59,13 +67,18 @@ function rowId(skill: InstalledSkill): string {
  * The `Skill` shape the shared detail panel consumes, synthesized from the
  * installed record. `path` stays undefined, which makes the panel read the
  * SKILL.md from the local skills directory — the version the user actually
- * has — and the empty repo hides stats and upstream links the record cannot
- * vouch for (agents-skills 0.13 no longer reports an install source).
+ * has. The repo comes from the provenance ledger when the app recorded the
+ * install (filling in the owner avatar, source link and install-state
+ * matching); skills installed by other tools keep the empty repo, which
+ * hides the stats and upstream links the record cannot vouch for.
  */
-function detailSkillFor(skill: InstalledSkill): Skill {
+function detailSkillFor(
+  skill: InstalledSkill,
+  provenance?: Record<string, SkillProvenance>,
+): Skill {
   return {
     name: skill.name,
-    repo: "",
+    repo: provenance?.[skill.name]?.repo ?? "",
     description: skill.description ?? "",
     stars: 0,
     downloads: 0,
@@ -85,6 +98,8 @@ function InstalledSkillRow({
   enabled,
   selected,
   description,
+  source,
+  suggestion,
   onToggle,
   onOpen,
 }: {
@@ -93,10 +108,15 @@ function InstalledSkillRow({
   /** Whether this card is the one shown in the detail panel. */
   selected: boolean;
   description: string;
+  /** The recorded install source (`owner/repo`), when the ledger has one. */
+  source?: string;
+  /** Confirmable same-name store entries for a tool-installed skill. */
+  suggestion?: LinkCandidate[];
   onToggle: (enabled: boolean) => void;
   /** Opens the shared skill detail panel. */
   onOpen: () => void;
 }) {
+  const [linkOpen, setLinkOpen] = useState(false);
   return (
     <li className="flex flex-col">
       <Card
@@ -121,14 +141,22 @@ function InstalledSkillRow({
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {/* No install source since agents-skills 0.13, so every card
-                carries the same Puzzle placeholder avatar. */}
-            <div
-              aria-label="skill 头像"
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted text-muted-foreground"
-            >
-              <Puzzle className="h-3.5 w-3.5" />
-            </div>
+            {/* A recorded install source gets the owner's GitHub avatar, like
+                the store cards; skills without one (installed by other tools,
+                or before the ledger existed) keep the Puzzle placeholder. */}
+            {source ? (
+              <OwnerAvatar
+                owner={source.split("/")[0]}
+                className="h-6 w-6 shrink-0 rounded-md text-[11px]"
+              />
+            ) : (
+              <div
+                aria-label="skill 头像"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted text-muted-foreground"
+              >
+                <Puzzle className="h-3.5 w-3.5" />
+              </div>
+            )}
             <h3
               className={cn(
                 "truncate",
@@ -144,12 +172,20 @@ function InstalledSkillRow({
               !enabled && "text-muted-foreground/70",
             )}
           >
-            本地安装
+            {source ?? "本地安装"}
           </CardDescription>
           {/* The card's own control, in the same corner the store card puts its
               install action. Clicks stay here: the card body opens the detail
               panel, this must not. */}
           <CardAction onClick={(e) => e.stopPropagation()}>
+            {/* A tool-installed skill with plausible namesakes offers the
+                confirmable association; a linked one needs no affordance. */}
+            {!source && suggestion && suggestion.length > 0 && (
+              <LinkSuggestionButton
+                name={skill.name}
+                onClick={() => setLinkOpen(true)}
+              />
+            )}
             <Switch
               checked={enabled}
               onCheckedChange={onToggle}
@@ -163,6 +199,17 @@ function InstalledSkillRow({
           {description || "暂无描述"}
         </CardContent>
       </Card>
+
+      {/* Confirmable association with a store entry, for tool-installed
+          skills; confirming writes the provenance ledger. */}
+      {suggestion && suggestion.length > 0 && (
+        <LinkSuggestionDialog
+          skillName={skill.name}
+          candidates={suggestion}
+          open={linkOpen}
+          onOpenChange={setLinkOpen}
+        />
+      )}
     </li>
   );
 }
@@ -171,6 +218,14 @@ export function MySkillsPage() {
   const queryClient = useQueryClient();
 
   const { data: skills, isLoading, isError, error } = useInstalledSkills();
+
+  // Install sources recorded by this app (the provenance ledger), reconciled
+  // against the on-disk list on every fetch. Absent entries mean "installed
+  // by another tool" — those keep the local-install presentation, and if the
+  // registry has plausible namesakes the card offers a confirmable link.
+  const { data: provenanceState } = useSkillProvenance();
+  const linked = provenanceState?.linked;
+  const suggestions = provenanceState?.suggestions;
 
   const list = useMemo(() => skills ?? [], [skills]);
 
@@ -284,8 +339,8 @@ export function MySkillsPage() {
   // The drawer walks the whole filtered result set, not just the current
   // page, so ←/→ keeps going across page boundaries.
   const detailSkills = useMemo(
-    () => filtered.map((skill) => detailSkillFor(skill)),
-    [filtered],
+    () => filtered.map((skill) => detailSkillFor(skill, linked)),
+    [filtered, linked],
   );
 
   return (
@@ -340,6 +395,8 @@ export function MySkillsPage() {
                     enabled={pendingEnabled[id] ?? skill.enabled}
                     selected={selected === index}
                     description={skill.description ?? ""}
+                    source={linked?.[id]?.repo}
+                    suggestion={suggestions?.[id]}
                     onToggle={(enabled) =>
                       toggleMutation.mutate({ skill, enabled })
                     }

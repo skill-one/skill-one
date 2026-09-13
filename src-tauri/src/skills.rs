@@ -9,6 +9,7 @@ use agents_skills::{
     AddRequest, AgentRequest, DisableRequest, EnableRequest, LinkOutcome, ListRequest, Manager,
     RemoveRequest,
 };
+use crate::skill_hash;
 
 /// Build a `Manager` targeting the user-level **global** skills directory
 /// (`~/.agents/skills`). Skills only live there; project-level support has
@@ -599,6 +600,28 @@ pub async fn read_skill_md(name: String) -> Result<SkillMdDto, String> {
             .find(|s| s.name == name)
             .ok_or_else(|| format!("skill {name} is not installed"))?;
         read_skill_md_file(&skill.path)
+    })
+    .await
+}
+
+/// Compute the skills.sh upstream content hash of a locally installed skill
+/// (see `skill_hash.rs` for the algorithm).
+///
+/// `None` when the name is not installed; a hash error (unreadable files)
+/// surfaces as the command error — the frontend treats both as "no match".
+/// The name resolves through `list`, so no path is ever interpolated.
+#[tauri::command]
+pub async fn compute_skill_hash(name: String) -> Result<Option<String>, String> {
+    run_blocking("compute skill hash", move |manager| {
+        let req = ListRequest {
+            global: true,
+            agents: vec![],
+        };
+        let listed = manager.list(&req).map_err(|e| e.to_string())?;
+        match listed.into_iter().find(|s| s.name == name) {
+            None => Ok(None),
+            Some(skill) => skill_hash::hash_skill_dir(&skill.path).map(Some),
+        }
     })
     .await
 }

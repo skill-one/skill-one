@@ -35,6 +35,10 @@ import {
   setMockAgentLinked,
   setMockSkillEnabled,
 } from "./mock-local";
+import {
+  recordSkillProvenance,
+  removeSkillProvenance,
+} from "./provenance";
 
 /** Simulated clone duration for browser mock installs, in milliseconds. */
 export const MOCK_INSTALL_DELAY_MS = 1200;
@@ -103,21 +107,28 @@ export async function installSkillFromSource(
     if (result.installed.length === 0) {
       throw new Error(`未在 ${repo} 中找到可安装的技能 ${name}`);
     }
+    // Record the install source in the app's provenance ledger — the only
+    // store↔install association that survives (agents-skills 0.13 keeps no
+    // install metadata). Best-effort: it never fails the install itself.
+    await recordSkillProvenance(repo, name);
     return;
   }
   // Simulate a realistic clone duration so the installing state is observable
   // in the browser demo; the real Tauri install clones over the network.
   await new Promise((resolve) => setTimeout(resolve, MOCK_INSTALL_DELAY_MS));
   installMockSkill(name);
+  await recordSkillProvenance(repo, name);
 }
 
 /** Remove an installed skill from the global skills directory. */
 export async function removeInstalledSkill(name: string): Promise<void> {
   if (isTauri()) {
     await removeSkills([name]);
+    await removeSkillProvenance(name);
     return;
   }
   removeMockSkill(name);
+  await removeSkillProvenance(name);
 }
 
 /**

@@ -5,15 +5,18 @@ import {
   MOCK_INSTALL_DELAY_MS,
 } from "./local-skills";
 
-const { isTauri, installSkill, installMockSkill } = vi.hoisted(() => ({
-  isTauri: vi.fn(),
-  installSkill: vi.fn(),
-  installMockSkill: vi.fn(),
-}));
+const { isTauri, installSkill, installMockSkill, recordSkillProvenance } =
+  vi.hoisted(() => ({
+    isTauri: vi.fn(),
+    installSkill: vi.fn(),
+    installMockSkill: vi.fn(),
+    recordSkillProvenance: vi.fn(),
+  }));
 
 vi.mock("./tauri", () => ({ isTauri }));
 vi.mock("./skills-manager", () => ({ installSkill }));
 vi.mock("./mock-local", () => ({ installMockSkill }));
+vi.mock("./provenance", () => ({ recordSkillProvenance }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -38,6 +41,11 @@ describe("installSkillFromSource", () => {
     expect(installSkill).toHaveBeenCalledWith("anthropics/skills", {
       skills: ["pdf"],
     });
+    // The install source lands in the provenance ledger (Tauri path).
+    expect(recordSkillProvenance).toHaveBeenCalledWith(
+      "anthropics/skills",
+      "pdf",
+    );
   });
 
   it("throws the backend failure when the install reports an error", async () => {
@@ -78,6 +86,28 @@ describe("installSkillFromSource", () => {
 
     expect(installMockSkill).toHaveBeenCalledWith("pdf");
     expect(installSkill).not.toHaveBeenCalled();
+    // The browser mock records the source in the ledger too, mirroring the
+    // Tauri flow.
+    expect(recordSkillProvenance).toHaveBeenCalledWith(
+      "anthropics/skills",
+      "pdf",
+    );
+  });
+
+  it("does not record provenance when the backend reports a failure", async () => {
+    isTauri.mockReturnValue(true);
+    installSkill.mockResolvedValue({
+      listOnly: false,
+      installed: [],
+      failed: [{ skill: "pdf", error: "clone failed: network unreachable" }],
+      discovered: ["pdf"],
+    });
+
+    await expect(
+      installSkillFromSource("anthropics/skills", "pdf"),
+    ).rejects.toThrow("clone failed: network unreachable");
+
+    expect(recordSkillProvenance).not.toHaveBeenCalled();
   });
 
   it("delays the mock install so the installing state stays observable", async () => {

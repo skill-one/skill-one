@@ -238,6 +238,39 @@ export function unlinkAgents(
   return linkAgents(agents, { ...options, unlink: true });
 }
 
+/**
+ * Read the raw provenance ledger (`.skill-one.json` inside the global skills
+ * directory). Returns `null` when the file does not exist yet; parsing is the
+ * frontend's job (see `lib/provenance.ts`), which also owns the tolerance
+ * policy for corrupt or outdated content.
+ */
+export async function readProvenanceRaw(): Promise<string | null> {
+  requireTauri();
+  return invoke<string | null>("read_provenance");
+}
+
+/** Replace the provenance ledger file with the given JSON content. */
+export async function writeProvenanceRaw(content: string): Promise<void> {
+  requireTauri();
+  await invoke("write_provenance", { content });
+}
+
+/**
+ * Compute the skills.sh upstream content hash of an installed skill's
+ * directory (`lib/skill_hash.rs` on the backend). `null` when the name is
+ * not installed; the frontend treats an error the same way — hashing is
+ * always a best-effort signal, never a failure.
+ */
+export async function computeSkillHash(name: string): Promise<string | null> {
+  requireTauri();
+  try {
+    return await invoke<string | null>("compute_skill_hash", { name });
+  } catch (e) {
+    console.warn(`skill hash: failed to hash ${name}`, e);
+    return null;
+  }
+}
+
 /** Report per-agent link status. */
 export async function getLinkStatus(): Promise<AgentStatus[]> {
   requireTauri();
