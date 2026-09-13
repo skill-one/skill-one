@@ -95,7 +95,7 @@ export async function autoLinkByHash(
     }
   }
   // One read-modify-write for the whole batch instead of one per match.
-  await recordSkillProvenanceBatch(matched);
+  if (matched.length > 0) await recordSkillProvenanceBatch(matched);
   return linked;
 }
 
