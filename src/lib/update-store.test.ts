@@ -223,7 +223,7 @@ describe("update-store failure handling", () => {
 
   it("caps the backoff at the steady-state interval", async () => {
     mocks.check.mockRejectedValue(new Error("offline"));
-    // Twelve failures would ask for 2min * 2^11; the cap must hold it at 8h.
+    // Twelve failures would ask for 2min * 2^11; the cap must hold it at 6h.
     for (let i = 0; i < 12; i += 1) {
       advance(MIN_CHECK_INTERVAL_MS);
       await checkForUpdate();

@@ -10,7 +10,7 @@
 // No Apple Developer account is involved: updates are trusted by this key,
 // and the downloaded bundle carries no quarantine attribute.
 //
-// WHEN to check lives in the callers (startup + window focus + an hourly
+// WHEN to check lives in the callers (startup + window visibility + an hourly
 // fallback, plus the manual button on the settings page); HOW OFTEN lives
 // here: `checkForUpdate()` is throttled to one request per interval per
 // session, so hopping between apps never triggers a burst. A manual check
@@ -63,7 +63,7 @@ const INITIAL: UpdateStatus = {
 };
 
 /** Steady-state gap between two automatic update checks within one session. */
-export const MIN_CHECK_INTERVAL_MS = 8 * 60 * 60 * 1000;
+export const MIN_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 /**
  * How long `check()` may hang before the plugin gives up. Without it a single
@@ -76,7 +76,7 @@ export const CHECK_TIMEOUT_MS = 15 * 1000;
  * First backoff step after a failure, doubling per consecutive failure up to
  * {@link MIN_CHECK_INTERVAL_MS}. Short enough that a cold launch which raced
  * the network retries while the user is still looking at the app, long enough
- * that a permanently broken check stops being a per-focus request.
+ * that a permanently broken check stops being a per-wake request.
  */
 export const FAILURE_BACKOFF_BASE_MS = 2 * 60 * 1000;
 

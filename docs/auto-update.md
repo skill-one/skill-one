@@ -6,18 +6,18 @@ anywhere in the pipeline.
 
 ## Detection & update flow
 
-- **When it checks** — at startup, each time the window regains focus, and hourly as a fallback for
-  a session that is never refocused. `src/lib/update-store.ts` collapses all three into **at most
-  one request per 8 hours** per session; the settings-page "检查更新" button bypasses the throttle
-  (`force`). No check runs while the confirmation dialog is open or an install is in flight — an
-  `available` emit would tear the dialog away mid-decision.
+- **When it checks** — at startup, each time the window becomes visible again, and hourly as a
+  fallback for a session that stays hidden. `src/lib/update-store.ts` collapses all three into
+  **at most one request per 6 hours** per session; the settings-page "检查更新" button bypasses
+  the throttle (`force`). No check runs while the confirmation dialog is open or an install is
+  in flight — an `available` emit would tear the dialog away mid-decision.
 - **When the request hangs** — `check()` is bounded by a 15 s timeout. Without one, a stalled
   request would pin the store in `checking` and silently swallow every later check.
 - **When the check fails** — a *background* failure is silent and keeps an already-discovered update
   on screen, so a network hiccup cannot retract the badge the user was about to click. Only an
   explicit `force` check reports the error (on the settings page). Either way the retry window
-  doubles per consecutive failure — 2 min, 4 min, … capped at 8 hours — so an offline or otherwise
-  hopeless install settles into a slow poll instead of one doomed request per focus hop.
+  doubles per consecutive failure — 2 min, 4 min, … capped at 6 hours — so an offline or otherwise
+  hopeless install settles into a slow poll instead of one doomed request per wake.
 - **Requests are live** — the check is issued by Rust (`reqwest`), not the webview, so it never
   reads an HTTP cache. It reads GitHub's `releases/latest` pointer, which is edge-cached: a fresh
   release can take a minute or two to become visible.
