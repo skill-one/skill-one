@@ -7,19 +7,18 @@ import { isTauri } from "./tauri";
  * by the `agents-skills` Rust library in the Tauri shell.
  *
  * All commands operate on the user-level **global** skills directory
- * (`~/.agents/skills`); project-level support has been removed. Its lockfile
- * drives list/update.
+ * (`~/.agents/skills`); project-level support has been removed. Since
+ * agents-skills 0.13 there is no lockfile: `list`/`remove` are driven by a
+ * scan of the canonical directory alone.
  */
 
 /**
- * A listed skill, enriched with lock metadata. Models the subset of
- * `list --json` the UI reads; the backend DTO may carry more.
+ * A listed skill, as the backend's directory scan reports it. Models the
+ * subset of `list --json` the UI reads; the backend DTO may carry more.
  */
 export interface InstalledSkill {
   name: string;
   path: string;
-  source: string | null;
-  sourceType: string | null;
   /**
    * Whether the skill is enabled (`true`) or parked in the disabled dir
    * (`false`). Set by the backend from the on-disk state, not a UI preference.

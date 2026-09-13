@@ -45,8 +45,6 @@ const mockOpenExternal = vi.mocked(openExternal);
 const installedPdf = {
   name: "pdf",
   path: "/Users/me/.agents/skills/pdf",
-  source: "anthropics/skills",
-  sourceType: "git",
   enabled: true,
 };
 
@@ -367,7 +365,7 @@ describe("SkillDetailPanel", () => {
 
   it("uninstalls a local skill, which has no install action to pair with", async () => {
     vi.mocked(fetchInstalledSkills).mockResolvedValue([
-      { ...installedPdf, name: "my-tool", source: null, sourceType: "local" },
+      { ...installedPdf, name: "my-tool" },
     ]);
     mockFetchLocalSkillDetail.mockResolvedValue(localDetail);
     renderDrawer({ skill: localSkill });

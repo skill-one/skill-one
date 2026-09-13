@@ -76,7 +76,7 @@ describe("installSkillFromSource", () => {
     await vi.advanceTimersByTimeAsync(MOCK_INSTALL_DELAY_MS);
     await pending;
 
-    expect(installMockSkill).toHaveBeenCalledWith("anthropics/skills", "pdf");
+    expect(installMockSkill).toHaveBeenCalledWith("pdf");
     expect(installSkill).not.toHaveBeenCalled();
   });
 

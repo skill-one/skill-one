@@ -2,7 +2,7 @@
 
 [English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
-本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.12 的
+本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.13 的
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
 门面，将技能安装与 agent 链接能力暴露给前端。前端经 `src/lib/skills-manager.ts`
 的 `invoke` 封装访问这些 Tauri 命令。
@@ -13,8 +13,19 @@
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.12"
+agents-skills = "0.13"
 ```
+
+### 0.13 的主要变化
+
+0.13 完全移除了 lockfile（`skills-lock.json`）：`list` 与 `remove` 改为纯目录
+扫描驱动，`ListedSkill` 不再报告 `source` / `source_url` / `source_type`。
+`update` API 一并移除——刷新某个技能意味着重新调用 `add`。0.13 起安装是原子
+的（先暂存到 `.incoming-*`，再重命名就位）。
+
+对本应用的影响：已安装技能无法再关联回它当初的安装来源，因此「我的 skill」
+页面目前把所有技能都按本地安装渲染，商店侧的「已安装」判定也只按 name 匹配。
+商店与已安装技能的新关联方案待定。
 
 自 0.8 起，库的 `core` 模块不再公开：应用所需的一切都从 crate 根导出
 （`Manager`、各请求/结果类型、`LinkOutcome`、`Env`、`Source`、`Skill`、
@@ -61,6 +72,8 @@ let manager = Manager::new();                    // 使用进程当前工作目�
 ## 消费的返回字段
 
 - **`AddOutcome`**：`list_only`、`installed`（`name` + `canonical_path`）、`failed`（`skill` + `error`）、`skills`（发现列表，取 `name`）。
+- **`ListedSkill`**：`name`、`path`、`scope`、`agents`、`enabled`（0.13 起不再含
+  source 字段；`description` 由 `skills.rs` 自行从磁盘 `SKILL.md` 提取）。
 - **`AgentOutcome`**：`global`、`results: Vec<AgentLinkResult>`；每条 `AgentLinkResult` 含 `agent`、`display`、`outcome: LinkOutcome`。
 - **`AgentStatus`**：`name`、`display`、`linked`、`canonical`、`internal_skills`、
   `internal_others`、`pending_backup`。对未链接的非原生 agent，库会自行对其目录内的

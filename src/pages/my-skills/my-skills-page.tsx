@@ -17,14 +17,11 @@ import {
   markSkillsChanged,
   useInstalledSkills,
 } from "../../hooks/use-installed-skills";
-import { useRegistrySkillMeta } from "../../hooks/use-registry-skill-meta";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
-import type { SkillRef } from "../../lib/registry/protocol";
 import type { InstalledSkill } from "../../lib/skills-manager";
 import type { Skill } from "../../types/skill";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
-import { OwnerAvatar } from "../../components/owner-avatar";
 import { FilterDropdown, type FilterOption } from "../../components/filter-dropdown";
 import { Placeholder } from "../../components/placeholder";
 import {
@@ -58,34 +55,21 @@ function rowId(skill: InstalledSkill): string {
   return skill.name;
 }
 
-function sourceLabelFor(skill: InstalledSkill): string {
-  // No source record (e.g. placed manually into the global directory) or an
-  // explicit local source both mean this is a local skill.
-  if (!skill.sourceType || skill.sourceType === "local") return "本地";
-  return skill.source || skill.sourceType || "本地";
-}
-
 /**
- * The `Skill` shape the shared detail panel consumes. With a registry entry
- * the skill keeps its repo path, so the panel fetches SKILL.md from GitHub;
- * without one it is synthesized from the installed record — `path` stays
- * undefined, which makes the panel read the SKILL.md from the local skills
- * directory instead (the source repo, when known, is still only used for
- * display and links).
+ * The `Skill` shape the shared detail panel consumes, synthesized from the
+ * installed record. `path` stays undefined, which makes the panel read the
+ * SKILL.md from the local skills directory — the version the user actually
+ * has — and the empty repo hides stats and upstream links the record cannot
+ * vouch for (agents-skills 0.13 no longer reports an install source).
  */
-function detailSkillFor(skill: InstalledSkill, meta: Map<string, Skill>): Skill {
-  const entry = skill.source
-    ? meta.get(`${skill.source}/${skill.name}`)
-    : undefined;
-  return (
-    entry ?? {
-      name: skill.name,
-      repo: skill.source ?? "",
-      description: skill.description ?? "",
-      stars: 0,
-      downloads: 0,
-    }
-  );
+function detailSkillFor(skill: InstalledSkill): Skill {
+  return {
+    name: skill.name,
+    repo: "",
+    description: skill.description ?? "",
+    stars: 0,
+    downloads: 0,
+  };
 }
 
 /**
@@ -137,19 +121,14 @@ function InstalledSkillRow({
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {skill.sourceType !== "local" && skill.source?.includes("/") ? (
-              <OwnerAvatar
-                owner={skill.source.split("/")[0]}
-                className="h-6 w-6 shrink-0 text-[12px]"
-              />
-            ) : (
-              <div
-                aria-label="skill 头像"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted text-muted-foreground"
-              >
-                <Puzzle className="h-3.5 w-3.5" />
-              </div>
-            )}
+            {/* No install source since agents-skills 0.13, so every card
+                carries the same Puzzle placeholder avatar. */}
+            <div
+              aria-label="skill 头像"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted text-muted-foreground"
+            >
+              <Puzzle className="h-3.5 w-3.5" />
+            </div>
             <h3
               className={cn(
                 "truncate",
@@ -165,7 +144,7 @@ function InstalledSkillRow({
               !enabled && "text-muted-foreground/70",
             )}
           >
-            {sourceLabelFor(skill)}
+            本地安装
           </CardDescription>
           {/* The card's own control, in the same corner the store card puts its
               install action. Clicks stay here: the card body opens the detail
@@ -179,8 +158,7 @@ function InstalledSkillRow({
           </CardAction>
         </CardHeader>
 
-        {/* The disk-extracted SKILL.md description for local skills;
-            store-sourced ones fall back to the registry description. */}
+        {/* The description extracted from the on-disk SKILL.md frontmatter. */}
         <CardContent className="line-clamp-2 text-sm text-muted-foreground">
           {description || "暂无描述"}
         </CardContent>
@@ -195,16 +173,6 @@ export function MySkillsPage() {
   const { data: skills, isLoading, isError, error } = useInstalledSkills();
 
   const list = useMemo(() => skills ?? [], [skills]);
-
-  // Registry metadata (downloads / descriptions) for store-sourced skills,
-  // resolved inside the registry worker. Best-effort: until the worker is
-  // ready (or on failure) the map stays empty and the page degrades to
-  // hiding downloads and disk-extracted descriptions only.
-  const refs = useMemo<SkillRef[]>(
-    () => list.map((skill) => ({ repo: skill.source ?? "", name: skill.name })),
-    [list],
-  );
-  const meta = useRegistrySkillMeta(refs);
 
   // Enablement is a real backend state (the agents-skills library moves the
   // skill between the canonical and disabled dirs), reported by `skill.enabled`.
@@ -284,12 +252,11 @@ export function MySkillsPage() {
   // short, so the index is cheap to build here and rebuild when the list
   // changes — unlike the registry, which builds the same index in the worker.
   // The field boosts mirror the registry's priority: what a skill is called
-  // beats where it came from, which beats a description that repeats a trigger
-  // phrase.
+  // beats a description that repeats a trigger phrase.
   const searchInstalled = useMemo(
     () =>
       buildSearchIndex(list, {
-        fields: { name: 4, source: 2, description: 0.5 },
+        fields: { name: 4, description: 0.5 },
       }),
     [list],
   );
@@ -317,8 +284,8 @@ export function MySkillsPage() {
   // The drawer walks the whole filtered result set, not just the current
   // page, so ←/→ keeps going across page boundaries.
   const detailSkills = useMemo(
-    () => filtered.map((skill) => detailSkillFor(skill, meta)),
-    [filtered, meta],
+    () => filtered.map((skill) => detailSkillFor(skill)),
+    [filtered],
   );
 
   return (
@@ -366,16 +333,13 @@ export function MySkillsPage() {
               {visible.map((skill, i) => {
                 const id = rowId(skill);
                 const index = pageOffset + i;
-                const indexEntry = meta.get(`${skill.source}/${skill.name}`);
                 return (
                   <InstalledSkillRow
                     key={id}
                     skill={skill}
                     enabled={pendingEnabled[id] ?? skill.enabled}
                     selected={selected === index}
-                    description={
-                      skill.description ?? indexEntry?.description ?? ""
-                    }
+                    description={skill.description ?? ""}
                     onToggle={(enabled) =>
                       toggleMutation.mutate({ skill, enabled })
                     }

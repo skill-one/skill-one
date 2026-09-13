@@ -4,7 +4,7 @@
 
 Through the Tauri backend (`src-tauri/src/skills.rs`), this project calls the
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
-facade of `agents-skills` v0.12 to expose skill installation and agent-linking
+facade of `agents-skills` v0.13 to expose skill installation and agent-linking
 capabilities to the frontend. The frontend reaches these Tauri commands via the
 `invoke` wrapper in `src/lib/skills-manager.ts`.
 
@@ -14,8 +14,22 @@ capabilities to the frontend. The frontend reaches these Tauri commands via the
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.12"
+agents-skills = "0.13"
 ```
+
+### What 0.13 changed
+
+The 0.13 release removed the lockfile (`skills-lock.json`) entirely: `list` and
+`remove` are driven by a scan of the canonical directory alone, and
+`ListedSkill` no longer reports `source` / `source_url` / `source_type`. The
+`update` API was removed too — refreshing a skill means calling `add` again.
+Installs are atomic since 0.13 (staged into `.incoming-*`, then renamed into
+place).
+
+Consequence for this app: an installed skill can no longer be tied back to the
+repo it was installed from, so the "my skills" page currently renders every
+skill as a local install and the store's 已安装 detection matches by name only.
+A new store↔install association design is pending.
 
 Since 0.8 the library's `core` module is private: everything the app needs is
 re-exported from the crate root (`Manager`, the request/outcome types,
@@ -65,6 +79,9 @@ let manager = Manager::new();                    // process current working dire
 ## Consumed return fields
 
 - **`AddOutcome`**: `list_only`, `installed` (`name` + `canonical_path`), `failed` (`skill` + `error`), `skills` (discovered list; `name` is used).
+- **`ListedSkill`**: `name`, `path`, `scope`, `agents`, `enabled` (source fields
+  removed in 0.13; `skills.rs` extracts `description` from the on-disk
+  `SKILL.md` itself).
 - **`AgentOutcome`**: `global`, `results: Vec<AgentLinkResult>`; each `AgentLinkResult` carries `agent`, `display`, and `outcome: LinkOutcome`.
 - **`AgentStatus`**: `name`, `display`, `linked`, `canonical`, `internal_skills`,
   `internal_others`, `pending_backup`. For unlinked, non-canonical agents the

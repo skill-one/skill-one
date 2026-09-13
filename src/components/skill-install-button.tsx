@@ -77,11 +77,13 @@ export function SkillInstallButton({
   const { data: installedSkills } = useInstalledSkills();
 
   const installing = installState === "installing";
+  // Matched by name only: agents-skills 0.13 dropped install-source metadata,
+  // so an installed skill can no longer be tied back to the repo it came
+  // from. A same-named skill from a different repo reads as installed — the
+  // known trade-off until a new store↔install association ships.
   const isInstalled =
     installState === "installed" ||
-    !!installedSkills?.some(
-      (s) => s.name === skill.name && s.source === skill.repo,
-    );
+    !!installedSkills?.some((s) => s.name === skill.name);
   // Installing outranks "already on disk" (the click is in flight), and the
   // on-disk state outranks a stale local one.
   const state: InstallState = installing

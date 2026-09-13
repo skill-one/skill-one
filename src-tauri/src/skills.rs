@@ -149,9 +149,6 @@ pub struct ListedSkillDto {
     pub path: String,
     pub scope: String,
     pub agents: Vec<String>,
-    pub source: Option<String>,
-    pub source_url: Option<String>,
-    pub source_type: Option<String>,
     /// Short human-readable description extracted from the on-disk SKILL.md
     /// frontmatter; `None` when the file is missing or has no description.
     pub description: Option<String>,
@@ -178,7 +175,7 @@ struct Frontmatter {
 /// Read a SKILL.md frontmatter and return its `name` and `description`.
 ///
 /// `agents-skills` still keeps its frontmatter parser inside the private `core`
-/// module as of 0.12 (only the `Skill` type is re-exported, so the crate's own
+/// module as of 0.13 (only the `Skill` type is re-exported, so the crate's own
 /// `parse_skill_md` is unreachable, and `ListedSkill` from `Manager::list`
 /// carries no description), so the same shape is parsed here: a `---`-fenced
 /// YAML block, with both `name` and `description` mandatory in the skill
@@ -469,9 +466,6 @@ pub async fn list_installed_skills(
                 path: s.path.display().to_string(),
                 scope: s.scope,
                 agents: s.agents,
-                source: s.source,
-                source_url: s.source_url,
-                source_type: s.source_type,
                 description: extract_description(&s.path),
                 enabled: s.enabled,
             })

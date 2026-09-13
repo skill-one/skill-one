@@ -173,10 +173,11 @@ describe("MySkillsPage", () => {
     );
 
     const dialog = await screen.findByRole("dialog");
-    // The mock registry is not running, so the installed record has no index
-    // entry: the panel reads the SKILL.md from the (mock) skills directory.
+    // The installed record carries no repo (agents-skills 0.13 records no
+    // install source): the panel reads the SKILL.md from the (mock) skills
+    // directory and labels the skill 本地安装.
     expect(within(dialog).getByText("pdf")).toBeInTheDocument();
-    expect(within(dialog).getByText("anthropics/skills")).toBeInTheDocument();
+    expect(within(dialog).getByText("本地安装")).toBeInTheDocument();
     expect(
       within(dialog).getByText("PDF 文档读取、生成、合并、拆分与标注。"),
     ).toBeInTheDocument();
@@ -230,46 +231,27 @@ describe("MySkillsPage", () => {
   });
 
   it("uses '暂无描述' as a placeholder when a skill has no description", async () => {
-    installMockSkill("test/repo", "no-desc-skill");
+    installMockSkill("no-desc-skill");
     renderWithRouter(<MySkillsPage />);
 
     expect(await screen.findByText("no-desc-skill")).toBeInTheDocument();
     expect(screen.getByText("暂无描述")).toBeInTheDocument();
   });
 
-  it("shows the source under the title", async () => {
-    renderWithRouter(<MySkillsPage />);
-
-    await screen.findByText("pdf");
-    // 5 of the 6 mock skills come from anthropics/skills, 1 from
-    // obra/superpowers.
-    expect(screen.getAllByText("anthropics/skills")).toHaveLength(5);
-    expect(screen.getByText("obra/superpowers")).toBeInTheDocument();
-  });
-
-  it("shows the repo owner's avatar for store-sourced skills", async () => {
+  it("labels every card 本地安装 with the placeholder avatar", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
 
     await screen.findByText("pdf");
-    // The shadcn avatar degrades to the owner's initial while the GitHub
-    // image has not loaded — jsdom never loads images, so the initials are
-    // what the test can see. 5 of the 6 mock skills come from
-    // anthropics/skills, 1 from obra/superpowers.
-    const initials = [
-      ...container.querySelectorAll('[data-slot="avatar-fallback"]'),
-    ]
-      .map((el) => el.textContent)
-      .filter((initial): initial is string => Boolean(initial))
-      .sort();
-    expect(initials).toEqual(["a", "a", "a", "a", "a", "o"]);
-  });
-
-  it("labels skills without a source record as 本地", async () => {
-    addMockLocalSkill("local-skill");
-    renderWithRouter(<MySkillsPage />);
-
-    await screen.findByText("local-skill");
-    expect(screen.getByText("本地")).toBeInTheDocument();
+    // agents-skills 0.13 records no install source, so every card reads as
+    // a local install and carries the same Puzzle placeholder avatar — the
+    // owner avatar (one per shadcn `avatar-fallback`) is gone entirely.
+    expect(screen.getAllByText("本地安装")).toHaveLength(6);
+    expect(
+      container.querySelectorAll('[aria-label="skill 头像"]'),
+    ).toHaveLength(6);
+    expect(
+      container.querySelectorAll('ul [data-slot="avatar-fallback"]'),
+    ).toHaveLength(0);
   });
 
   it("pre-fills the search box from the ?skill= deep link", async () => {
@@ -363,7 +345,7 @@ describe("MySkillsPage", () => {
     // installMockSkill prepends, so page 1 holds extra-44..extra-0 plus the
     // first five base skills and the tail base skill lands on page 2.
     for (let i = 0; i < PAGE_SIZE - 5; i++) {
-      installMockSkill("test/repo", `extra-${i}`);
+      installMockSkill(`extra-${i}`);
     }
     renderWithRouter(<MySkillsPage />);
 

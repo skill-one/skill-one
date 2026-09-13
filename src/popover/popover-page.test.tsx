@@ -57,8 +57,6 @@ function skill(overrides: Partial<InstalledSkill>): InstalledSkill {
   return {
     name: "pdf",
     path: "/skills/pdf",
-    source: null,
-    sourceType: null,
     enabled: true,
     description: "PDF 工具",
     ...overrides,
