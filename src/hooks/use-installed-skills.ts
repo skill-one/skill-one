@@ -4,7 +4,6 @@ import { emit } from "@tauri-apps/api/event";
 import { isTauri } from "../lib/tauri";
 import { SKILLS_CHANGED_EVENT } from "../popover/popover-events";
 import { fetchInstalledSkills } from "../lib/local-skills";
-import { PROVENANCE_QUERY_KEY } from "./use-skill-provenance";
 
 /**
  * The TanStack Query cache-key prefix for the installed-skill list. Every
@@ -13,6 +12,14 @@ import { PROVENANCE_QUERY_KEY } from "./use-skill-provenance";
  * refreshes the list and the sidebar / popover counts at once.
  */
 export const INSTALLED_SKILLS_QUERY_KEY = ["installed-skills"] as const;
+
+/**
+ * The TanStack Query cache-key prefix for the provenance state (see
+ * `use-skill-provenance.ts`). Defined here — next to the installed list it
+ * is invalidated alongside — so the provenance hook can read the installed
+ * list without a circular import.
+ */
+export const PROVENANCE_QUERY_KEY = ["skill-provenance", "v2"] as const;
 
 /**
  * The installed-skills list for the global skills directory. Shared by the

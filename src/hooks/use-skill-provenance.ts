@@ -4,8 +4,10 @@ import {
   getRegistrySnapshot,
   subscribeRegistry,
 } from "../lib/registry/client";
-
-import { fetchInstalledSkills } from "../lib/local-skills";
+import {
+  PROVENANCE_QUERY_KEY,
+  useInstalledSkills,
+} from "./use-installed-skills";
 import { reconcileProvenance } from "../lib/provenance";
 import type { SkillProvenance } from "../lib/provenance";
 import {
@@ -13,22 +15,18 @@ import {
   resolveAssociations,
 } from "../lib/link-suggestions";
 import type { LinkSuggestions } from "../lib/link-suggestions";
+import type { InstalledSkill } from "../lib/skills-manager";
+
+export { PROVENANCE_QUERY_KEY };
 
 /**
- * The TanStack Query cache key for the provenance state. The version segment
- * keeps pre-fix persisted entries (empty state written before the tiers
- * existed) from masking the real query within the persisted staleTime.
- * Invalidated by `markSkillsChanged` together with the installed-skills
- * list, since both change on the same events (install / remove).
+ * The full provenance state the UI consumes.
  */
-export const PROVENANCE_QUERY_KEY = ["skill-provenance", "v2"] as const;
-
-/** The full provenance state the UI consumes. */
 export interface ProvenanceState {
   /**
    * Skills this app associated with a store entry: name → `{repo, slug,
-   * installedAt}`. Covers native installs (recorded at install time) and
-   * hash-auto-linked tool installs; user confirmations land here too.
+   * installedAt, hash?}`. Covers native installs (recorded at install
+   * time), hash-auto-linked tool installs and user confirmations.
    */
   linked: Record<string, SkillProvenance>;
   /**
@@ -40,42 +38,24 @@ export interface ProvenanceState {
 }
 
 /**
- * The provenance state for installed skills, reconciled against the on-disk
- * list on every fetch. The tiers run in order: the ledger prune, then (Tauri
- * only — the browser mock has no real files to hash) the content-hash
- * auto-link for unknown skills, then candidate suggestions for whatever
- * remains. Every tier is best-effort; a registry that is not ready yet simply
- * yields fewer suggestions, and the next invalidation retries.
+ * The provenance state for the given installed list, reconciled against it.
+ * The tiers run in order: the ledger prune, then (Tauri only — the browser
+ * mock has no real files to hash) the content-hash auto-link for unknown
+ * skills, then candidate suggestions for whatever remains. Every tier is
+ * best-effort; a registry that is not ready yet simply yields fewer
+ * suggestions, and the next run retries.
  */
-export function useSkillProvenance() {
-  // The registry epoch joins the query key: the tiers only run once the
-  // snapshot is ready, so the boot-time run (registry still streaming) must
-  // be superseded the moment `ready` flips — and again on every revalidation
-  // that serves a new snapshot (new snapshot → possibly new namesakes).
-  // markSkillsChanged still invalidates by the shared prefix.
-  const epoch = useSyncExternalStore(
-    subscribeRegistry,
-    // getSnapshot takes no arguments: read through the module snapshot.
-    () => getRegistrySnapshot().epoch,
-  );
-  return useQuery({
-    queryKey: [...PROVENANCE_QUERY_KEY, epoch],
-    queryFn: fetchProvenanceState,
-    placeholderData: keepPreviousData,
-  });
-}
-
-/** The query body, standalone for direct testing. */
-export async function fetchProvenanceState(): Promise<ProvenanceState> {
-  const installed = await fetchInstalledSkills();
+export async function fetchProvenanceState(
+  installed: InstalledSkill[],
+): Promise<ProvenanceState> {
   const names = installed.map((s) => s.name);
   let linked = await reconcileProvenance(names);
 
   const unlinked = installed.filter((s) => !linked[s.name]);
   let suggestions: LinkSuggestions = {};
   // The association tiers need the registry (namesakes by slug), so a
-  // snapshot that is still streaming skips them wholesale — the next
-  // invalidation retries.
+  // snapshot that is still streaming skips them wholesale — the next run
+  // retries.
   if (unlinked.length > 0 && getRegistrySnapshot().ready) {
     noteRegistryEpoch(getRegistrySnapshot().epoch);
     // Tier 1 — content identity: hash match auto-links (a batched ledger
@@ -90,4 +70,37 @@ export async function fetchProvenanceState(): Promise<ProvenanceState> {
   }
 
   return { linked, suggestions };
+}
+
+/**
+ * The provenance state, kept in step with two external facts:
+ *
+ * - **The installed name set** (part of the query key): any change to the
+ *   on-disk skills — from any code path, this app or not — lands here and
+ *   supersedes the state without anyone remembering to invalidate.
+ * - **The registry epoch** (also in the key): the tiers need a ready
+   * snapshot, and a new one can carry revs and namesakes the previous one
+ *   lacked.
+ *
+ * `markSkillsChanged` still invalidates the prefix, covering same-name
+ * reinstalls where the set does not change but the ledger does.
+ */
+export function useSkillProvenance() {
+  const epoch = useSyncExternalStore(
+    subscribeRegistry,
+    () => getRegistrySnapshot().epoch,
+  );
+  const { data: installed } = useInstalledSkills();
+  const signature = installed
+    ? installed
+        .map((s) => s.name)
+        .toSorted()
+        .join("\u0000")
+    : undefined;
+  return useQuery({
+    queryKey: [...PROVENANCE_QUERY_KEY, epoch, signature],
+    queryFn: () => fetchProvenanceState(installed ?? []),
+    placeholderData: keepPreviousData,
+    enabled: installed != null,
+  });
 }
