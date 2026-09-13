@@ -2,20 +2,21 @@
  * Registry-side association for skills the provenance ledger does not know:
  * skills installed by other tools (the `npx skills` CLI, manual copies).
  *
- * Two tiers, by rising effort and falling certainty:
+ * Three steps per unlinked skill, ordered cheap-first:
  *
- * 1. **Hash auto-link** — the skills.sh upstream content hash of the local
- *    skill directory equals a registry entry's `rev`. Content-level identity,
- *    so the association is written straight into the ledger, exactly like a
- *    native install. Misses are expected when the local copy's version
- *    differs from the indexed snapshot, or the mirror omitted files — those
- *    skills fall to tier 2. Per-session misses are memoized so the reconcile
- *    query never re-hashes (and re-asks the worker for) known dead ends.
- *
- * 2. **Candidate suggestions** — same-slug registry entries ranked by
- *    description similarity. A description alone cannot prove identity (forks
- *    share wording), so suggestions are only offered to the user for explicit
- *    confirmation, never written automatically.
+ * 1. **Namesake lookup** — registry entries whose exact slug equals the
+ *    skill's name. None? The skill is a plain local skill, nothing more to
+ *    do (and, importantly, no disk walk either).
+ * 2. **Hash auto-link** — compute the skills.sh upstream content hash of the
+ *    local directory and compare it against the namesakes' `rev`s. Equality
+ *    is content-level identity, so the association is written into the
+ *    ledger exactly like a native install. Computed-but-unmatched hashes
+ *    are memoized per registry epoch, so repeated reconcile passes never
+ *    re-walk the same directories for nothing.
+ * 3. **Candidate suggestions** — the same namesakes ranked by description
+ *    similarity and surfaced for the user to confirm. A description alone
+ *    cannot prove identity (forks share wording), so nothing is written
+ *    until the user picks one.
  *
  * Namesake lookup goes through the registry worker's search (`getPage` with
  * the skill name, filtered to exact slug equality client-side). When the
@@ -27,10 +28,14 @@
 import type { Skill } from "../types/skill";
 import { getPage, getRegistrySnapshot } from "./registry/client";
 import { computeSkillHash } from "./skills-manager";
+import { isTauri } from "./tauri";
 import { descriptionSimilarity } from "./description-similarity";
 import { recordSkillProvenanceBatch } from "./provenance";
 
-/** One confirmable association candidate: a namesake and how similar it looks. */
+/**
+ * Candidates offered for a skill, ranked: any hash-identical entry first
+ * (returned by the auto-link tier, not here), then by similarity.
+ */
 export interface LinkCandidate {
   skill: Skill;
   /** 0–1 description similarity against the installed skill's description. */
@@ -38,8 +43,7 @@ export interface LinkCandidate {
 }
 
 /**
- * Candidates offered for a skill, ranked: any hash-identical entry first
- * (returned by the auto-link tier, not here), then by similarity.
+ * Suggestions for skills awaiting user confirmation, keyed by skill name.
  */
 export type LinkSuggestions = Record<string, LinkCandidate[]>;
 
@@ -62,78 +66,18 @@ async function findNamesakes(name: string): Promise<Skill[]> {
   }
 }
 
-/**
- * Tier 1: auto-link installed skills whose content hash matches a registry
- * entry's `rev`. Returns the names that were linked (a ledger write per
- * link); misses are memoized for the session. Errors never propagate — the
- * hash tier is pure optimization over the ledger.
- */
-export async function autoLinkByHash(
-  unlinked: Array<{ name: string; description?: string }>,
-): Promise<string[]> {
-  const linked: string[] = [];
-  const matched: Array<{ repo: string; slug: string; hash: string }> = [];
-  for (const skill of unlinked) {
-    if (hashMisses.has(skill.name)) continue;
-    // computeSkillHash already degrades errors to null; the catch is a
-    // second belt for anything unexpected.
-    const localHash = await computeSkillHash(skill.name).catch(() => null);
-    if (!localHash) {
-      hashMisses.add(skill.name);
-      continue;
-    }
-    const match = (await findNamesakes(skill.name)).find(
-      (s) => s.rev != null && s.rev === localHash,
-    );
-    if (match) {
-      // The hash that matched is exactly the installed content's hash —
-      // store it so a future update check can skip recomputation.
-      matched.push({ repo: match.repo, slug: skill.name, hash: localHash });
-      linked.push(skill.name);
-    } else {
-      hashMisses.add(skill.name);
-    }
-  }
-  // One read-modify-write for the whole batch instead of one per match.
-  if (matched.length > 0) await recordSkillProvenanceBatch(matched);
-  return linked;
-}
-
-/** Names whose hash tier already came up empty this session. */
-const hashMisses = new Set<string>();
-
-/**
- * Forget memoized misses when the served snapshot changed: a fresh snapshot
- * can carry the rev a local hash was waiting for, or new namesakes. Called
- * by the reconcile query with the registry epoch it observed.
- */
-let lastEpoch = -1;
-export function noteRegistryEpoch(epoch: number): void {
-  if (epoch !== lastEpoch) {
-    hashMisses.clear();
-    lastEpoch = epoch;
-  }
-}
-
-/** Test hook: clear the miss memoization between tests. */
-export function resetLinkSuggestions(): void {
-  hashMisses.clear();
-}
-
-/**
- * Tier 2: rank a skill's namesakes by description similarity. Only entries
- * scoring at least {@link MIN_SIMILARITY} are offered, capped at
- * {@link MAX_CANDIDATES} — beyond a few the user is better off searching the
- * store than picking from a long list.
- */
+/** Only entries scoring at least this similar are offered as candidates. */
 export const MIN_SIMILARITY = 0.3;
+
+/** Beyond a few candidates the user is better off searching the store. */
 export const MAX_CANDIDATES = 5;
 
-export async function rankCandidates(
-  name: string,
+/** Rank prepared namesakes by description similarity, filtered and capped. */
+export function rankNamesakes(
+  namesakes: Skill[],
   localDescription: string,
-): Promise<LinkCandidate[]> {
-  const candidates = (await findNamesakes(name))
+): LinkCandidate[] {
+  return namesakes
     .map((skill) => ({
       skill,
       similarity: descriptionSimilarity(localDescription, skill.description),
@@ -141,27 +85,80 @@ export async function rankCandidates(
     .filter((c) => c.similarity >= MIN_SIMILARITY)
     .toSorted((a, b) => b.similarity - a.similarity)
     .slice(0, MAX_CANDIDATES);
-  return candidates;
 }
 
 /**
- * Suggestions for every unlinked skill at once (one namesake lookup per
- * name — cheap worker queries over the cached index, re-run per invalidate
- * since new snapshots can carry new namesakes). Skills the hash tier just
- * linked are excluded via `skipNames`.
+ * Resolve every unlinked skill in one pass. Returns the names that were
+ * auto-linked (a batched ledger write covers all of them) and the
+ * confirmable suggestions for the rest.
+ *
+ * Per-skill outcomes are memoized for the session (`resolvedNames`): both
+ * "no namesakes" and "computed but unmatched" are dead ends until the
+ * served snapshot changes, and re-running the pipeline (every install,
+ * removal or confirmation) must not re-hash the same directories.
  */
-export async function buildSuggestions(
+export async function resolveAssociations(
   unlinked: Array<{ name: string; description?: string }>,
-  skipNames: ReadonlySet<string>,
-): Promise<LinkSuggestions> {
+): Promise<{ linked: string[]; suggestions: LinkSuggestions }> {
+  const linked: string[] = [];
+  const matched: Array<{ repo: string; slug: string; hash: string }> = [];
   const suggestions: LinkSuggestions = {};
+
   for (const skill of unlinked) {
-    if (skipNames.has(skill.name)) continue;
-    const candidates = await rankCandidates(
-      skill.name,
-      skill.description ?? "",
-    );
+    // Step 1 — the cheap filter: without same-slug entries there is no
+    // association to make and no reason to walk the skill's directory.
+    const namesakes = await findNamesakes(skill.name);
+    if (namesakes.length === 0) {
+      resolvedNames.add(skill.name);
+      continue;
+    }
+
+    // Step 2 — content identity. The computed hash is only meaningful for
+    // the match itself; a matched hash equals the matched rev by definition.
+    // Hashing needs the native shell (the browser mock has no real files),
+    // so outside Tauri the tier degrades to suggestions only.
+    const localHash =
+      resolvedNames.has(skill.name) || !isTauri()
+        ? null
+        : await computeSkillHash(skill.name).catch(() => null);
+    const match =
+      localHash != null
+        ? namesakes.find((s) => s.rev != null && s.rev === localHash)
+        : undefined;
+    if (localHash != null && match) {
+      matched.push({ repo: match.repo, slug: skill.name, hash: localHash });
+      linked.push(skill.name);
+      continue;
+    }
+    // Dead end this epoch — hash failed/skipped, or computed but unmatched.
+    resolvedNames.add(skill.name);
+
+    // Step 3 — ranked candidates for the user to confirm.
+    const candidates = rankNamesakes(namesakes, skill.description ?? "");
     if (candidates.length > 0) suggestions[skill.name] = candidates;
   }
-  return suggestions;
+
+  if (matched.length > 0) await recordSkillProvenanceBatch(matched);
+  return { linked, suggestions };
+}
+
+/**
+ * Skill names already resolved to a dead end this session ("no namesakes"
+ * or "hash computed but unmatched"). Cleared when the served snapshot
+ * changes — a fresh snapshot can carry the rev a local hash was waiting
+ * for, or new namesakes.
+ */
+const resolvedNames = new Set<string>();
+
+let lastEpoch = -1;
+export function noteRegistryEpoch(epoch: number): void {
+  if (epoch !== lastEpoch) {
+    resolvedNames.clear();
+    lastEpoch = epoch;
+  }
+}
+
+/** Test hook: clear the memoization between tests. */
+export function resetLinkSuggestions(): void {
+  resolvedNames.clear();
 }

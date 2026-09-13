@@ -108,11 +108,13 @@ The store index carries the skills.sh upstream content hash per skill:
 SHA-256 over each file's `relative path + 0x00 + bytes + 0x00`, files in
 case-insensitive ICU collation order (`Intl.Collator("en", {sensitivity:
 "base"})` — *not* byte order, which reproduces only ~40% of hashes). The
-backend computes the same hash for an installed skill
-(`compute_skill_hash`, `skill_hash.rs`); equality with a namesake entry's
-`rev` is content-level identity, so the association is written into the
-ledger exactly like a native install — no user interaction, and the card
-immediately shows the source repo.
+cheap filter runs first: a skill with no same-slug registry entries is
+skipped entirely — plain local skill, no disk walk. Otherwise the backend
+computes the same hash for the installed skill (`compute_skill_hash`,
+`skill_hash.rs`); equality with a namesake entry's `rev` is content-level
+identity, so the association is written into the ledger exactly like a
+native install — no user interaction, and the card immediately shows the
+source repo.
 
 Verified against the published snapshot: 51/51 sampled skills re-hashed
 locally match the index. Misses are expected and handled: the mirror snapshot

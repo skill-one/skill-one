@@ -9,12 +9,10 @@ import { fetchInstalledSkills } from "../lib/local-skills";
 import { reconcileProvenance } from "../lib/provenance";
 import type { SkillProvenance } from "../lib/provenance";
 import {
-  autoLinkByHash,
-  buildSuggestions,
   noteRegistryEpoch,
+  resolveAssociations,
 } from "../lib/link-suggestions";
 import type { LinkSuggestions } from "../lib/link-suggestions";
-import { isTauri } from "../lib/tauri";
 
 /**
  * The TanStack Query cache key for the provenance state. The version segment
@@ -75,18 +73,20 @@ export async function fetchProvenanceState(): Promise<ProvenanceState> {
 
   const unlinked = installed.filter((s) => !linked[s.name]);
   let suggestions: LinkSuggestions = {};
-  // Both tiers need the registry (namesakes by slug), so a snapshot that is
-  // still streaming skips them wholesale — the next invalidation retries.
+  // The association tiers need the registry (namesakes by slug), so a
+  // snapshot that is still streaming skips them wholesale — the next
+  // invalidation retries.
   if (unlinked.length > 0 && getRegistrySnapshot().ready) {
     noteRegistryEpoch(getRegistrySnapshot().epoch);
-    // Tier 1 — content identity: hash match auto-links, ledger entries
-    // are written and the returned names drop out of the candidate pool.
-    const autoLinked = isTauri() ? await autoLinkByHash(unlinked) : [];
-    if (autoLinked.length > 0) {
+    // Tier 1 — content identity: hash match auto-links (a batched ledger
+    // write), the returned names drop out of the candidate pool and the
+    // refreshed reconcile below picks the entries up.
+    // Tier 2 — ranked namesakes for the user to confirm.
+    const resolved = await resolveAssociations(unlinked);
+    if (resolved.linked.length > 0) {
       linked = await reconcileProvenance(names);
     }
-    // Tier 2 — ranked namesakes for the user to confirm.
-    suggestions = await buildSuggestions(unlinked, new Set(autoLinked));
+    suggestions = resolved.suggestions;
   }
 
   return { linked, suggestions };
