@@ -26,6 +26,14 @@ export interface SkillProvenance {
   slug: string;
   /** When the skill was installed (ISO 8601). Rewritten on reinstalls. */
   installedAt: string;
+  /**
+   * The upstream content hash of the skill as it was installed (the same
+   * hash the registry index publishes). Optional and purely a cache: a
+   * future update check compares it against the index's latest rev, and a
+   * locally modified skill invalidates it — recompute on demand when the
+   * answer matters.
+   */
+  hash?: string;
 }
 
 /** The ledger document persisted as `.skill-one.json`. */
@@ -84,6 +92,7 @@ export function parseProvenanceLedger(raw: string | null | undefined): Provenanc
         repo: e.repo,
         slug: e.slug,
         installedAt: typeof e.installedAt === "string" ? e.installedAt : "",
+        ...(typeof e.hash === "string" ? { hash: e.hash } : {}),
       };
     }
   }
@@ -93,7 +102,7 @@ export function parseProvenanceLedger(raw: string | null | undefined): Provenanc
 /** Insert or replace one entry; the installedAt timestamp is set here. */
 export function upsertProvenanceEntry(
   ledger: ProvenanceLedger,
-  entry: { repo: string; slug: string },
+  entry: { repo: string; slug: string; hash?: string },
 ): ProvenanceLedger {
   return {
     ...ledger,
@@ -103,6 +112,7 @@ export function upsertProvenanceEntry(
         repo: entry.repo,
         slug: entry.slug,
         installedAt: new Date().toISOString(),
+        ...(entry.hash ? { hash: entry.hash } : {}),
       },
     },
   };
@@ -164,10 +174,13 @@ async function loadProvenanceLedger(): Promise<ProvenanceLedger> {
 export async function recordSkillProvenance(
   repo: string,
   slug: string,
+  hash?: string,
 ): Promise<void> {
   try {
     const ledger = await loadProvenanceLedger();
-    await saveProvenanceLedger(upsertProvenanceEntry(ledger, { repo, slug }));
+    await saveProvenanceLedger(
+      upsertProvenanceEntry(ledger, { repo, slug, hash }),
+    );
   } catch (e) {
     console.warn("provenance: failed to record install source", e);
   }

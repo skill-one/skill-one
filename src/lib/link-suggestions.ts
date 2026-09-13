@@ -85,7 +85,9 @@ export async function autoLinkByHash(
       (s) => s.rev != null && s.rev === localHash,
     );
     if (match) {
-      await recordSkillProvenance(match.repo, skill.name);
+      // The hash that matched is exactly the installed content's hash —
+      // store it so a future update check can skip recomputation.
+      await recordSkillProvenance(match.repo, skill.name, localHash);
       linked.push(skill.name);
     } else {
       hashMisses.add(skill.name);

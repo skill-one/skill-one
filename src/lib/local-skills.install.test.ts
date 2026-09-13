@@ -5,16 +5,22 @@ import {
   MOCK_INSTALL_DELAY_MS,
 } from "./local-skills";
 
-const { isTauri, installSkill, installMockSkill, recordSkillProvenance } =
-  vi.hoisted(() => ({
-    isTauri: vi.fn(),
-    installSkill: vi.fn(),
-    installMockSkill: vi.fn(),
-    recordSkillProvenance: vi.fn(),
-  }));
+const {
+  isTauri,
+  installSkill,
+  installMockSkill,
+  recordSkillProvenance,
+  computeSkillHash,
+} = vi.hoisted(() => ({
+  isTauri: vi.fn(),
+  installSkill: vi.fn(),
+  installMockSkill: vi.fn(),
+  recordSkillProvenance: vi.fn(),
+  computeSkillHash: vi.fn(),
+}));
 
 vi.mock("./tauri", () => ({ isTauri }));
-vi.mock("./skills-manager", () => ({ installSkill }));
+vi.mock("./skills-manager", () => ({ installSkill, computeSkillHash }));
 vi.mock("./mock-local", () => ({ installMockSkill }));
 vi.mock("./provenance", () => ({ recordSkillProvenance }));
 
@@ -35,16 +41,19 @@ describe("installSkillFromSource", () => {
       failed: [],
       discovered: ["pdf"],
     });
+    computeSkillHash.mockResolvedValue("hash-installed");
 
     await installSkillFromSource("anthropics/skills", "pdf");
 
     expect(installSkill).toHaveBeenCalledWith("anthropics/skills", {
       skills: ["pdf"],
     });
-    // The install source lands in the provenance ledger (Tauri path).
+    // The install source lands in the provenance ledger (Tauri path),
+    // together with the installed content's hash for update checks.
     expect(recordSkillProvenance).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
+      "hash-installed",
     );
   });
 
@@ -87,11 +96,9 @@ describe("installSkillFromSource", () => {
     expect(installMockSkill).toHaveBeenCalledWith("pdf");
     expect(installSkill).not.toHaveBeenCalled();
     // The browser mock records the source in the ledger too, mirroring the
-    // Tauri flow.
-    expect(recordSkillProvenance).toHaveBeenCalledWith(
-      "anthropics/skills",
-      "pdf",
-    );
+    // Tauri flow; there is no real file to hash, so no hash is passed.
+    expect(recordSkillProvenance).toHaveBeenCalledWith("anthropics/skills", "pdf");
+    expect(computeSkillHash).not.toHaveBeenCalled();
   });
 
   it("does not record provenance when the backend reports a failure", async () => {
@@ -108,6 +115,7 @@ describe("installSkillFromSource", () => {
     ).rejects.toThrow("clone failed: network unreachable");
 
     expect(recordSkillProvenance).not.toHaveBeenCalled();
+    expect(computeSkillHash).not.toHaveBeenCalled();
   });
 
   it("delays the mock install so the installing state stays observable", async () => {

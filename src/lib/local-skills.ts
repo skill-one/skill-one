@@ -39,6 +39,7 @@ import {
   recordSkillProvenance,
   removeSkillProvenance,
 } from "./provenance";
+import { computeSkillHash } from "./skills-manager";
 
 /** Simulated clone duration for browser mock installs, in milliseconds. */
 export const MOCK_INSTALL_DELAY_MS = 1200;
@@ -109,8 +110,11 @@ export async function installSkillFromSource(
     }
     // Record the install source in the app's provenance ledger — the only
     // store↔install association that survives (agents-skills 0.13 keeps no
-    // install metadata). Best-effort: it never fails the install itself.
-    await recordSkillProvenance(repo, name);
+    // install metadata). The installed content's hash is recorded too, so a
+    // future update check can compare it against the index without a disk
+    // walk. Best-effort: it never fails the install itself.
+    const hash = await computeSkillHash(name);
+    await recordSkillProvenance(repo, name, hash ?? undefined);
     return;
   }
   // Simulate a realistic clone duration so the installing state is observable

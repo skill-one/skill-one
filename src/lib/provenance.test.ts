@@ -179,6 +179,14 @@ describe("provenance browser store", () => {
     expect(map).toEqual({});
   });
 
+  it("preserves a recorded content hash through parse and prune", async () => {
+    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    await recordSkillProvenance("anthropics/skills", "pdf", "hash-1");
+
+    const map = await reconcileProvenance(["pdf"]);
+    expect(map.pdf?.hash).toBe("hash-1");
+  });
+
   it("reinstalls overwrite the recorded source", async () => {
     seedMockProvenance({ pdf: { repo: "old/repo", slug: "pdf" } });
     await recordSkillProvenance("new/repo", "pdf");

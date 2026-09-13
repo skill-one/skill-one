@@ -31,11 +31,19 @@ file:
     "pdf": {
       "repo": "anthropics/skills",
       "slug": "pdf",
-      "installedAt": "2026-09-13T08:00:00.000Z"
+      "installedAt": "2026-09-13T08:00:00.000Z",
+      "hash": "9a1f…"
     }
   }
 }
 ```
+
+The optional `hash` is the upstream content hash of the skill **as it was
+installed** (not the index rev at install time — the freshly installed copy
+may be newer than the indexed snapshot). It is a cache for a future update
+check — installed hash ≠ current index rev means an update is available —
+and must be recomputed when the answer matters, since local edits make it
+stale.
 
 Key properties:
 

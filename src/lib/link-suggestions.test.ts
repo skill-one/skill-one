@@ -100,7 +100,12 @@ describe("autoLinkByHash", () => {
     const linked = await autoLinkByHash([{ name: "pdf" }]);
 
     expect(linked).toEqual(["pdf"]);
-    expect(recordSkillProvenance).toHaveBeenCalledWith("fork/skills", "pdf");
+    // The matched hash is stored as the installed content hash.
+    expect(recordSkillProvenance).toHaveBeenCalledWith(
+      "fork/skills",
+      "pdf",
+      "hash-fork",
+    );
   });
 
   it("memoizes misses for the session", async () => {
