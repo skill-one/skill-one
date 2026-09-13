@@ -2,3 +2,4 @@ allowBuilds:
   esbuild: false
 minimumReleaseAgeExclude:
   - '@tauri-apps/plugin-updater@2.11.0'
+  - cn@0.3.0

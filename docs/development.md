@@ -107,6 +107,19 @@ Conventions when styling new UI:
 - A raw color is acceptable only when it sits on a brand gradient or image that reads the same in both themes (for example the featured page hero).
 - Where a raw color is unavoidable (status text such as `text-emerald-600`), pair it with a `dark:` variant.
 
+## Components
+
+`src/components/ui/` holds [shadcn/ui](https://ui.shadcn.com/) components from the `new-york` style of the Tailwind v4 registry. Add or refresh one with:
+
+```bash
+pnpm dlx shadcn@latest add <component>
+```
+
+Two conventions matter when touching them:
+
+- **Import `cn` from the `cn` package** — `import { cn } from "cn"` — not from `@/lib/utils`. This is what the registry emits, so a newly added component needs no import fixup. `src/lib/utils.ts` still re-exports `cn` to match the shadcn `utils` registry item, but new code should not route through it.
+- **`add` overwrites.** Several components carry deliberate local changes: `badge` adds a `success` variant, `drawer` widens to 600px, `card` retunes its density. Review `git diff` after any `add` instead of assuming the file is registry-fresh.
+
 ## Testing
 
 Two layers, each covering what the other cannot:

@@ -107,6 +107,19 @@ shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 
 - 只有当颜色位于品牌渐变或图片之上、两种主题下观感一致时，才可以使用固定色（例如精选页 hero）。
 - 确实无法避免时（如 `text-emerald-600` 这类状态文案），必须同时补上 `dark:` 变体。
 
+## 组件
+
+`src/components/ui/` 存放 [shadcn/ui](https://ui.shadcn.com/) 组件，取自 Tailwind v4 注册表的 `new-york` 风格。新增或刷新某个组件：
+
+```bash
+pnpm dlx shadcn@latest add <component>
+```
+
+改动这些组件时有两条约定：
+
+- **`cn` 要从 `cn` 包导入**——`import { cn } from "cn"`，而不是 `@/lib/utils`。这正是注册表产出的写法，因此新加的组件无需再改导入。`src/lib/utils.ts` 仍会 re-export `cn`（与 shadcn 的 `utils` 注册项保持一致），但新代码不应再绕经它。
+- **`add` 会覆盖文件。** 若干组件带有有意的本地改动：`badge` 增加了 `success` 变体，`drawer` 加宽到 600px，`card` 调整了密度。执行 `add` 后请检查 `git diff`，不要假定文件与注册表一致。
+
 ## 测试
 
 分两层，每层补齐另一层覆盖不到的部分：
