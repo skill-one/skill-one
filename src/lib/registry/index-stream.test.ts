@@ -5,6 +5,7 @@ import {
   probeIndexMeta,
   readIndex,
   readLines,
+  readRepos,
   readTrending,
 } from "./index-stream";
 import { readLatestTag } from "./snapshot";
@@ -441,12 +442,11 @@ describe("readIndex", () => {
     vi.unstubAllGlobals();
   });
 
-  it("parses the body line by line, skipping junk and non-GitHub ids", async () => {
+  it("parses the body line by line, joining stars and skipping junk", async () => {
     const body = [
       JSON.stringify({
         id: "acme/tools/hammer",
         installs: 10,
-        stars: 3,
         url: "https://www.skills.sh/acme/tools/hammer",
         description: "Hammers.",
         hash: "b146008599c31057",
@@ -466,6 +466,7 @@ describe("readIndex", () => {
     await readIndex(
       "",
       TAG,
+      Promise.resolve(new Map([["acme/tools", 3]])),
       (skill) => skills.push(skill),
       () => restarts++,
     );
@@ -486,10 +487,33 @@ describe("readIndex", () => {
     ]);
   });
 
+  it("normalizes unjoined repos to 0 stars", async () => {
+    const skills: unknown[] = [];
+    await readIndex(
+      "",
+      TAG,
+      // null = the repos.jsonl sidecar was unreachable; never rejects.
+      Promise.resolve(null),
+      (skill) => skills.push(skill),
+      () => {},
+    );
+    expect(skills).toEqual([
+      {
+        name: "x",
+        repo: "acme/tools",
+        description: "",
+        stars: 0,
+        downloads: 0,
+        path: "skills/acme/tools/x",
+      },
+    ]);
+  });
+
   it("downloads the tag-addressed URL untouched by a busting stamp", async () => {
     await readIndex(
       "",
       TAG,
+      Promise.resolve(null),
       () => {},
       () => {},
     );
@@ -504,6 +528,7 @@ describe("readIndex", () => {
     await readIndex(
       "",
       undefined,
+      Promise.resolve(null),
       () => {},
       () => {},
     );
@@ -524,10 +549,12 @@ describe("readIndex", () => {
     const skills: unknown[] = [];
     let restarts = 0;
     // A configured CDN first: it drops mid-download, so the origin restarts
-    // the parse from scratch and completes it.
+    // the parse from scratch and completes it. The already-resolved stars
+    // map is reused, not re-fetched.
     await readIndex(
       DEFAULT_CDN_BASE,
       TAG,
+      Promise.resolve(new Map([["acme/tools", 7]])),
       (skill) => skills.push(skill),
       () => restarts++,
     );
@@ -539,7 +566,7 @@ describe("readIndex", () => {
         name: "x",
         repo: "acme/tools",
         description: "",
-        stars: 0,
+        stars: 7,
         downloads: 0,
         path: "skills/acme/tools/x",
       },
@@ -555,6 +582,7 @@ describe("readIndex", () => {
     const err = await readIndex(
       "",
       TAG,
+      Promise.resolve(null),
       () => {},
       () => {},
     ).catch((e) => e);
@@ -562,5 +590,85 @@ describe("readIndex", () => {
     expect(err.kind).toBe("http");
     expect(err.status).toBe(404);
     expect(requested).toEqual([PINNED_ORIGIN, PINNED_CDN]);
+  });
+});
+
+describe("readRepos", () => {
+  const TAG = "dist-2026-09-06";
+  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-sh-mirror/${TAG}/repos.jsonl`;
+  const BRANCH_ORIGIN =
+    "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/repos.jsonl";
+
+  const fetchMock = vi.fn();
+
+  /** A 200 repos.jsonl response streaming out `text`. */
+  function bodyResponse(text: string): Response {
+    return {
+      ok: true,
+      status: 200,
+      body: streamOf(chunksOf(text, 8)),
+    } as unknown as Response;
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("builds the repo → stars map from the JSONL rows", async () => {
+    fetchMock.mockImplementation(async () =>
+      bodyResponse(
+        [
+          JSON.stringify({
+            repo: "vercel-labs/skills",
+            stars: 1523,
+            description: "Agents, skills, and plugins for Vercel",
+            pushedAt: "2026-09-11T14:02:11.000Z",
+          }),
+          JSON.stringify({ repo: "anthropics/skills", stars: 30501 }),
+          "", // blank → skipped
+          "not json", // malformed → skipped
+          JSON.stringify({ stars: 5 }), // missing repo → skipped
+          JSON.stringify({ repo: "gone/repo", stars: null }), // deleted repo → dropped
+          JSON.stringify({ repo: "bad/types", stars: "many" }), // non-number → skipped
+        ].join("\n"),
+      ),
+    );
+
+    await expect(readRepos("", TAG)).resolves.toEqual(
+      new Map([
+        ["vercel-labs/skills", 1523],
+        ["anthropics/skills", 30501],
+      ]),
+    );
+    // Tag-addressed: immutable, fetched untouched.
+    expect(fetchMock.mock.calls[0][0]).toBe(PINNED_ORIGIN);
+  });
+
+  it("busts the mutable branch URL when no tag is known", async () => {
+    fetchMock.mockImplementation(async () =>
+      bodyResponse(JSON.stringify({ repo: "a/b", stars: 1 })),
+    );
+
+    await expect(readRepos("", undefined)).resolves.toEqual(
+      new Map([["a/b", 1]]),
+    );
+    expect(fetchMock.mock.calls[0][0].startsWith(`${BRANCH_ORIGIN}?t=`)).toBe(
+      true,
+    );
+  });
+
+  it("throws the typed error when every source fails", async () => {
+    fetchMock.mockImplementation(async () => {
+      return { ok: false, status: 404 } as unknown as Response;
+    });
+
+    const err = await readRepos("", TAG).catch((e) => e);
+    expect(err).toBeInstanceOf(SourceFetchError);
+    expect(err.kind).toBe("http");
   });
 });

@@ -2,7 +2,7 @@
 
 [English](index-format.md) | [简体中文](index-format.zh-CN.md)
 
-商店内容来自 [skill-one/skills-sh-mirror](https://github.com/skill-one/skills-sh-mirror)——对 [skills.sh](https://www.skills.sh) 上全部 GitHub 来源技能的每日镜像。快照发布在 `dist` 分支：`skills.jsonl` 每行一个技能，`skills/` 目录则存放每个技能的完整文件。
+商店内容来自 [skill-one/skills-sh-mirror](https://github.com/skill-one/skills-sh-mirror)——对 [skills.sh](https://www.skills.sh) 上全部 GitHub 来源技能的每日镜像。快照发布在 `dist` 分支：`skills.jsonl` 每行一个技能，`repos.jsonl` 每行一个 GitHub 仓库，`avatars/` 目录存放各 owner 的头像，`skills/` 目录则存放每个技能的完整文件。
 
 ## 格式
 
@@ -12,7 +12,6 @@
 {
   "id": "vercel-labs/skills/find-skills",
   "installs": 3277534,
-  "stars": 30501,
   "url": "https://www.skills.sh/vercel-labs/skills/find-skills",
   "description": "Helps users discover and install agent skills …",
   "hash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
@@ -24,13 +23,33 @@
 | --- | --- | --- |
 | `id` | `string` | skills.sh 规范 id：`{owner}/{repo}/{slug}`。含 `/` 的多段 slug 会去掉斜杠后作为键，因此 id 恒为三段。 |
 | `installs` | `number` | skills.sh 记录的总安装量 |
-| `stars` | `number \| null` | 源仓库的 GitHub star 数（仓库已删除时为 `null`，应用内归一为 0） |
 | `url` | `string` | 技能在 skills.sh 的页面 |
 | `description` | `string \| null` | 来自 SKILL.md frontmatter（缺失时为空） |
 | `hash` | `string \| null` | 技能文件的 SHA-256。上游任何文件变化都会使其改变，即**快照所描述的那个版本**。 |
 | `fetchedAt` | `string` | 抓取器首次取到当前内容版本的时间（ISO，UTC）：说的是*当前内容*发布了多久，不是技能最早何时出现 |
 
-索引行与 `skills/` 目录按 id 一一对应：`skills/{owner}/{repo}/{slug}/` 内正是上游技能自带的全部文件。应用把每行映射为 `Skill` 模型：`name = slug`、`repo = {owner}/{repo}`、`path = skills/{id}`（镜像内目录，用于详情拉取与按目录名匹配）、`rev = hash`、`firstSeenAt = fetchedAt`。
+GitHub star 数**不在**技能行里：它存放在下文的 `repos.jsonl` 附属文件中，解析时 join 进来。
+
+## 仓库元数据（repos.jsonl）
+
+每行一个 JSON 对象，一个 GitHub 仓库一行，按 repo 排序：
+
+```json
+{"repo": "vercel-labs/skills", "stars": 1523, "description": "Agents, skills, and plugins for Vercel", "pushedAt": "2026-09-11T14:02:11.000Z"}
+```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `repo` | `string` | `{owner}/{repo}`——即索引 id 的前两段，join 的连接键 |
+| `stars` | `number \| null` | 仓库的 GitHub star 数；仓库已删除时为 `null`（应用内归一为 0） |
+| `description` | `string \| null` | 仓库的 GitHub About 文本。应用未使用：技能描述来自 SKILL.md frontmatter。 |
+| `pushedAt` | `string \| null` | 仓库最后一次 push。它跟踪的是**仓库**而非技能——技能级的变化由 `hash` / `fetchedAt` 描述。应用未使用。 |
+
+## Owner 头像（avatars/）
+
+镜像会把每个 owner 的 GitHub 头像复制进快照，路径固定为 `avatars/{owner}.png`（无论实际编码如何，扩展名一律为 `.png`——图片解码器会嗅探字节内容）。因此 owner 头像与 SKILL.md 走同一条下载源与 CDN 回退链，存在已记录标签时定址到该快照。GitHub 自身的头像服务（`github.com/{owner}.png`）保留在回退链末尾，兜底镜像缺失的 owner（某次运行失败会留洞，直到下次运行补上）；最后的最后是 owner 首字母占位。
+
+索引行与 `skills/` 目录按 id 一一对应：`skills/{owner}/{repo}/{slug}/` 内正是上游技能自带的全部文件。应用把每行映射为 `Skill` 模型：`name = slug`、`repo = {owner}/{repo}`、`path = skills/{id}`（镜像内目录，用于详情拉取与按目录名匹配）、`rev = hash`、`firstSeenAt = fetchedAt`——`stars` 则来自 join 到的 `repos.jsonl` 行（未 join 到时为 0）。
 
 技能详情抽屉将 `hash` 以「版本」呈现（`#b1460085`，完整值放 tooltip），`fetchedAt` 以「收录时间」呈现。作者自己在 frontmatter 写的 `version` 刻意不再并列展示：它是对另一件事的声明。
 
@@ -65,6 +84,7 @@
 - 解析后过滤掉非规范 GitHub id（非三段、owner 含 `.`）的行，其余映射为 `Skill` 模型。
 - 下载是流式的：响应体逐行解码，每凑齐一行就立即解析，界面不必等待整份约 5.7MB 的文件。进度最多每 400ms 推送一次；某个下载源中途失败、切换到下一个候选重新解析时活动缓冲区会被清空重头解析，因此推送出的计数是单调的，永远只增不减。
 - `trending.json`（趋势视图 top-100 的 id 列表，按上游排名排序）在标签确定后定址到同一快照标签拉取，保证榜单与索引发自同一快照。列表缺失或不可达时只是隐藏该板块。
+- `repos.jsonl`（GitHub star 数的 join 表，见上文）同样定址到同一快照标签拉取，与正文同时启动，因此其延迟隐藏在多 MB 的索引下载之内；解析出的行在解析阶段 join 进每一行技能数据。与 trending 一样它只是点缀：附属文件缺失或不可达时技能以 0 star 呈现，而不是让下载失败。「未变化」短路会完全跳过它——缓存里的技能早已带着各自的 star 数。
 
 ### 界面
 
@@ -73,3 +93,5 @@
 - 「设置」页报告当前服务的快照（`dist-<date>` 标签、发布时间、发布行数），以及本次启动是重新下载还是复用了本地缓存；在线身份到来之前会回退显示已记录的标签。它还会给出上次完成的校验时间（`checkedAt`），自动刷新的窗口正是以此为基准。「检测更新」按需执行同一套廉价校验（不受新鲜度窗口限制）并报告是否拉到了新快照；「立即重新下载」则即使快照没有变化也强制重下。
 
 技能详情 `SKILL.md` 从镜像快照按 `skills/{id}/SKILL.md` 拉取，存在已记录标签时定址到该快照（否则用可变的 `dist` 分支），见 [../src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。
+
+Owner 头像（仓库列表页与详情抽屉里的仓库所有者头像）从镜像快照按 `avatars/{owner}.png` 拉取，走同一条下载源回退链，存在已记录标签时定址到该快照，见 [../src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx)。

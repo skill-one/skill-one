@@ -4,6 +4,11 @@ import type { Skill } from "../../types/skill";
  * Pure parsing of the skills-sh-mirror index's JSONL lines into the app's
  * Skill model. Runs inside the registry worker, one line at a time while the
  * download streams in.
+ *
+ * Star counts are not carried by the index rows themselves: upstream keeps
+ * them in a separate `repos.jsonl` (one row per GitHub repo), which is
+ * joined in at parse time through the `starsFor` callback — see
+ * `readRepos` in `index-stream.ts`.
  */
 
 /** Raw skill shape as stored in one JSONL index line. */
@@ -15,8 +20,6 @@ interface RawSkill {
    */
   id: string;
   installs: number;
-  /** GitHub stargazers of the source repo; null when the repo is gone. */
-  stars?: number | null;
   /** The skill's page on skills.sh. */
   url?: string | null;
   /** From the SKILL.md frontmatter; null when it has none. */
@@ -44,19 +47,29 @@ export function isCanonicalId(id: string): boolean {
   );
 }
 
-function toSkill(raw: RawSkill): Skill {
+/**
+ * Repo → star-count lookup over the parsed `repos.jsonl` rows. Missing keys
+ * (a repo row that never arrived, or a deleted repo whose `stars` is null
+ * upstream) normalize to 0.
+ */
+export type StarsFor = (repo: string) => number | undefined;
+
+function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
   const [owner, repo, slug] = raw.id.split("/");
+  const repoId = `${owner}/${repo}`;
   return {
     // The slug is the skill's name: the directory the skill ships in, and
     // what a locally installed copy of it is called.
     name: slug,
-    repo: `${owner}/${repo}`,
+    repo: repoId,
     // The mirror exposes descriptions; fall back to an empty placeholder
     // when an entry lacks one so the row layout stays stable.
     description: raw.description ?? "",
-    // GitHub stars and install counts are separate metrics; an entry
-    // missing either (a deleted repo, a null count) normalizes to 0.
-    stars: raw.stars ?? 0,
+    // GitHub stars come from the joined repos.jsonl rows, not the skill row
+    // itself; an unjoined repo (missing row, null count) normalizes to 0.
+    stars: starsFor?.(repoId) ?? 0,
+    // Install counts are separate metrics; an entry missing one normalizes
+    // to 0.
     downloads: raw.installs ?? 0,
     // The skill's files live in the mirror snapshot at this directory; the
     // basename equals the skill name, so a locally installed copy still
@@ -71,8 +84,15 @@ function toSkill(raw: RawSkill): Skill {
 /**
  * Parse one JSONL index line into a GitHub skill. Returns null for blank
  * lines, malformed JSON, and ids that are not canonical GitHub ids.
+ *
+ * `starsFor` supplies the source repo's GitHub star count (see `StarsFor`);
+ * omitting it leaves every skill with 0 stars — the graceful shape when the
+ * repos.jsonl sidecar could not be fetched.
  */
-export function parseSkillLine(line: string): Skill | null {
+export function parseSkillLine(
+  line: string,
+  starsFor?: StarsFor,
+): Skill | null {
   const trimmed = line.trim();
   if (trimmed.length === 0) return null;
   let raw: RawSkill;
@@ -82,6 +102,6 @@ export function parseSkillLine(line: string): Skill | null {
     return null;
   }
   return typeof raw.id === "string" && isCanonicalId(raw.id)
-    ? toSkill(raw)
+    ? toSkill(raw, starsFor)
     : null;
 }

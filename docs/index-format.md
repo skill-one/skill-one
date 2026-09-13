@@ -2,7 +2,7 @@
 
 [English](index-format.md) | [简体中文](index-format.zh-CN.md)
 
-The store content comes from [skill-one/skills-sh-mirror](https://github.com/skill-one/skills-sh-mirror), a daily mirror of every GitHub-sourced skill on [skills.sh](https://www.skills.sh). The snapshot is published to the `dist` branch: one `skills.jsonl` row per skill, plus a `skills/` directory holding each skill's full files.
+The store content comes from [skill-one/skills-sh-mirror](https://github.com/skill-one/skills-sh-mirror), a daily mirror of every GitHub-sourced skill on [skills.sh](https://www.skills.sh). The snapshot is published to the `dist` branch: one `skills.jsonl` row per skill, a `repos.jsonl` row per GitHub repo, an `avatars/` directory holding each owner's avatar, plus a `skills/` directory holding each skill's full files.
 
 ## Format
 
@@ -12,7 +12,6 @@ One JSON object per line, sorted by installs descending:
 {
   "id": "vercel-labs/skills/find-skills",
   "installs": 3277534,
-  "stars": 30501,
   "url": "https://www.skills.sh/vercel-labs/skills/find-skills",
   "description": "Helps users discover and install agent skills …",
   "hash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
@@ -24,13 +23,33 @@ One JSON object per line, sorted by installs descending:
 | --- | --- | --- |
 | `id` | `string` | Canonical skills.sh id: `{owner}/{repo}/{slug}`. Multi-segment slugs are keyed with the slashes stripped, so the id always has exactly three segments. |
 | `installs` | `number` | Total installs recorded by skills.sh |
-| `stars` | `number \| null` | GitHub stars of the source repo (`null` when the repo is gone; normalized to 0) |
 | `url` | `string` | The skill's page on skills.sh |
 | `description` | `string \| null` | From the SKILL.md frontmatter (empty when missing) |
 | `hash` | `string \| null` | SHA-256 of the skill's files. Changes when any upstream file changes — i.e. **which version of the skill the snapshot describes**. |
 | `fetchedAt` | `string` | When the scraper first fetched this content version (ISO, UTC): how long the *current* content has been published, not when the skill first appeared |
 
-The index rows are joined with the `skills/` directory by id: `skills/{owner}/{repo}/{slug}/` holds exactly the files the upstream skill ships. The app maps each row to the `Skill` model as `name = slug`, `repo = {owner}/{repo}`, `path = skills/{id}` (the mirror directory, used for detail fetches and basename matching), `rev = hash`, `firstSeenAt = fetchedAt`.
+GitHub star counts are **not** carried by the skill rows: they live in the `repos.jsonl` sidecar below and are joined in at parse time.
+
+## Repo metadata (repos.jsonl)
+
+One JSON object per line, one per GitHub repo, sorted by repo:
+
+```json
+{"repo": "vercel-labs/skills", "stars": 1523, "description": "Agents, skills, and plugins for Vercel", "pushedAt": "2026-09-11T14:02:11.000Z"}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `repo` | `string` | `{owner}/{repo}` — the first two segments of every index id, i.e. the join key |
+| `stars` | `number \| null` | GitHub stargazers of the repo; `null` when the repo is gone (the app normalizes that to 0) |
+| `description` | `string \| null` | The repo's GitHub About text. Unused by the app: skill descriptions come from SKILL.md frontmatter. |
+| `pushedAt` | `string \| null` | The repo's last push. Tracks the **repo**, not the skill — skill-level changes are what `hash` / `fetchedAt` describe. Unused by the app. |
+
+## Owner avatars (avatars/)
+
+The mirror copies every owner's GitHub avatar into the snapshot as a regular file at `avatars/{owner}.png` (a fixed `.png` extension regardless of the actual encoding — image decoders sniff the bytes). Owner avatars are therefore fetched through the same download source and CDN fallback chain as SKILL.md, pinned to the recorded snapshot tag when one is known. GitHub's own avatar endpoint (`github.com/{owner}.png`) stays at the end of the chain as a fallback for owners whose copy the mirror missed (a failed run leaves a hole until the next one); the owner's initial is the last resort.
+
+The index rows are joined with the `skills/` directory by id: `skills/{owner}/{repo}/{slug}/` holds exactly the files the upstream skill ships. The app maps each row to the `Skill` model as `name = slug`, `repo = {owner}/{repo}`, `path = skills/{id}` (the mirror directory, used for detail fetches and basename matching), `rev = hash`, `firstSeenAt = fetchedAt` — with `stars` supplied by the joined `repos.jsonl` row (0 when unjoined).
 
 The detail drawer shows `hash` as 版本 (`#b1460085`, full value in the tooltip) and `fetchedAt` as 收录时间. An author-declared frontmatter `version` is deliberately not displayed next to it: it is a different kind of claim about a different thing.
 
@@ -65,6 +84,7 @@ The run stats published beside the index are what make caching possible:
 - After parsing, ids that are not canonical GitHub ids (three segments, dot-free owner) are filtered out, and every row is mapped to the `Skill` model.
 - The download is streamed: the response body is decoded line by line and each line is parsed as soon as it arrives, so the UI never waits for the whole ~5.7MB file. Progress is pushed at most every 400ms, and the live buffer is rewound when a source fails mid-stream and the next candidate restarts the file — announced counts are therefore monotonic.
 - `trending.json` (the trending view's top-100 ids, in upstream rank order) is fetched pinned to the same snapshot tag once it is known, so the leaderboard is read from the same snapshot as the index. An absent or unreachable list simply hides the section.
+- `repos.jsonl` (the GitHub-stars join table, above) is fetched pinned to the same snapshot tag, started alongside the body so its latency hides inside the multi-megabyte download; the parsed rows join into every skill line at parse time. Like trending it is garnish: an unreachable or absent sidecar leaves skills with 0 stars rather than failing the download. The "unchanged" short-circuit skips it entirely — cached skills already carry their stars.
 
 ### UI
 
@@ -73,3 +93,5 @@ The run stats published beside the index are what make caching possible:
 - Settings reports the served snapshot (`dist-<date>` tag, publication time, published row count) and whether this launch downloaded it or reused the local copy; until the live identity arrives it falls back to the recorded tag. It also dates the last completed check (`checkedAt`), which is what the automatic window is measured from. 检测更新 runs the same cheap check on demand, ignoring the freshness window, and reports whether anything landed; 立即重新下载 forces a re-download even when the run has not moved.
 
 A skill's `SKILL.md` is fetched from the mirror snapshot at `skills/{id}/SKILL.md`, pinned to the recorded snapshot tag when one exists (the mutable `dist` branch otherwise); see [src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts).
+
+Owner avatars (the 仓库 owner images on the repos pages and detail drawer) are fetched from the mirror snapshot at `avatars/{owner}.png` through the same download source chain, pinned to the recorded snapshot tag; see [src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx).

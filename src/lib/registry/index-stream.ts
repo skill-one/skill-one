@@ -6,7 +6,7 @@ import {
 } from "../cdn-config";
 import { count, record, text } from "../value";
 import type { Skill } from "../../types/skill";
-import { parseSkillLine } from "./parse";
+import { parseSkillLine, type StarsFor } from "./parse";
 import { readLatestTag } from "./snapshot";
 import type { SnapshotSource } from "./snapshot";
 
@@ -49,6 +49,13 @@ const META_SPEC = { ...INDEX_SPEC, path: "stats.json" } as const;
 
 /** The trending view's top ids, re-fetched from upstream on every run. */
 const TRENDING_SPEC = { ...INDEX_SPEC, path: "trending.json" } as const;
+
+/**
+ * Per-repo metadata sidecar (GitHub stars; one row per repo). Star counts
+ * left the skill rows themselves — this file is their join table, keyed by
+ * `{owner}/{repo}`, the first two segments of every index id.
+ */
+const REPOS_SPEC = { ...INDEX_SPEC, path: "repos.jsonl" } as const;
 
 /**
  * The mirror's pointer contract: the `latest` file at the `dist` root names a
@@ -238,6 +245,47 @@ export function readTrending(
 }
 
 /**
+ * Repo → GitHub-star lookup over the snapshot's `repos.jsonl` sidecar, keyed
+ * by `{owner}/{repo}`. Follows the same addressing rules as the index body:
+ * pinned to the snapshot tag when one is known (immutable, cache-safe),
+ * fetched off the mutable `dist` branch cache-busted otherwise. Rows whose
+ * `stars` is null (a deleted repo) are dropped, so lookups normalize to 0.
+ *
+ * Like trending, this is garnish, not the dataset: the caller turns a fetch
+ * failure into "no join", which leaves every skill with 0 stars rather than
+ * failing the download.
+ */
+export async function readRepos(
+  cdnBase: string,
+  tag?: string,
+): Promise<Map<string, number>> {
+  const spec = { ...REPOS_SPEC, ref: tag ?? REPOS_SPEC.ref };
+  const urls = fileCandidates(spec, cdnBase).map((url) =>
+    tag ? url : cacheBusted(url),
+  );
+  const stars = new Map<string, number>();
+  await fetchFirstStreamInOrder(urls, async (body) => {
+    stars.clear();
+    await readLines(body, (line) => {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) return;
+      let raw: unknown;
+      try {
+        raw = JSON.parse(trimmed);
+      } catch {
+        return;
+      }
+      const row = record<{ repo?: unknown; stars?: unknown }>(raw);
+      if (!row) return;
+      if (typeof row.repo === "string" && typeof row.stars === "number") {
+        stars.set(row.repo, row.stars);
+      }
+    });
+  });
+  return stars;
+}
+
+/**
  * Stream the index from the freshest source, handing every parsed skill to
  * `onLine`. `tag` pins the download to an immutable snapshot (see
  * `probeIndexMeta`); without one the mutable `dist` branch is used, and only
@@ -245,14 +293,19 @@ export function readTrending(
  * mistaken for the current index, which is exactly the failure the tag pin
  * exists to remove.
  *
- * The CDN base is passed in by the main thread: workers have no
- * `localStorage`, so the user's configured download source cannot be read
- * here. A candidate that fails mid-stream falls back to the next one,
- * restarting the parse from scratch via `onRestart`.
+ * `stars` is the in-flight `repos.jsonl` fetch started by the caller so its
+ * latency hides inside the multi-megabyte body download; it is awaited once
+ * the body's first candidate connects, so every parsed line can already join
+ * against the complete map (a null resolution — the sidecar was unreachable —
+ * joins nothing, leaving stars at 0). The CDN base is passed in by the main
+ * thread: workers have no `localStorage`, so the user's configured download
+ * source cannot be read here. A candidate that fails mid-stream falls back to
+ * the next one, restarting the parse from scratch via `onRestart`.
  */
 export async function readIndex(
   cdnBase: string,
   tag: string | undefined,
+  stars: Promise<Map<string, number> | null>,
   onLine: (skill: Skill) => void,
   onRestart: () => void,
 ): Promise<void> {
@@ -262,8 +315,16 @@ export async function readIndex(
   );
   await fetchFirstStreamInOrder(urls, async (body) => {
     onRestart();
+    // The sidecar fetch runs concurrently with the body; by the time a
+    // candidate answers it has long settled (it never rejects: the caller
+    // catches). One await per attempt — on fallback restarts it re-reads
+    // the same resolved map instead of re-fetching.
+    const starsFor: StarsFor | undefined = await stars.then(
+      (map): StarsFor | undefined =>
+        map ? (repo) => map.get(repo) : undefined,
+    );
     await readLines(body, (line) => {
-      const skill = parseSkillLine(line);
+      const skill = parseSkillLine(line, starsFor);
       if (skill) onLine(skill);
     });
   });

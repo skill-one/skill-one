@@ -1,12 +1,24 @@
+import { useEffect, useMemo, useState } from "react";
+
+import { fileCandidates, getIndexTag } from "../lib/cdn-config";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "../lib/utils";
 
 /**
- * Round owner avatar loaded from GitHub, degrading to the owner's initial
- * when the image fails to load. Avatars are user assets rather than repo
- * files, so unlike SKILL.md they cannot be served through a repo CDN mirror
- * (jsDelivr/JSDMirror) — a graceful local fallback is the best available
- * degradation when github.com is unreachable.
+ * The mirror hosts every owner's avatar as a regular repo file (copied from
+ * GitHub at snapshot time), so avatars ride the same download source and CDN
+ * fallback chain as SKILL.md and the index — `avatars/{owner}.png` at the
+ * recorded snapshot tag (immutable, cache-safe), the mutable `dist` branch
+ * before any tag has been recorded. GitHub's own avatar endpoint stays at
+ * the end of the chain as a fallback for owners whose copy the mirror
+ * missed (a failed download run leaves a hole until the next one).
+ */
+const MIRROR_REPO = "skill-one/skills-sh-mirror";
+
+/**
+ * Round owner avatar loaded from the mirror, degrading through GitHub's
+ * avatar endpoint and finally to the owner's initial. Candidate URLs are
+ * walked in order via Radix's loading status, one step per failure.
  */
 export function OwnerAvatar({
   owner,
@@ -15,13 +27,30 @@ export function OwnerAvatar({
   owner: string;
   className?: string;
 }) {
+  const candidates = useMemo(() => {
+    const spec = {
+      repo: MIRROR_REPO,
+      path: `avatars/${encodeURIComponent(owner)}.png`,
+      ref: getIndexTag() || "dist",
+    };
+    return [...fileCandidates(spec), `https://github.com/${owner}.png`];
+  }, [owner]);
+  const [step, setStep] = useState(0);
+  // A reused instance switching owners restarts the candidate chain.
+  useEffect(() => setStep(0), [owner]);
+  const src = candidates[Math.min(step, candidates.length - 1)];
+
   return (
     <Avatar className={cn("border border-border/60 bg-muted", className)}>
       <AvatarImage
-        src={`https://github.com/${owner}.png`}
+        key={src}
+        src={src}
         alt={`${owner} 的头像`}
         loading="lazy"
         referrerPolicy="no-referrer"
+        onLoadingStatusChange={(status) => {
+          if (status === "error") setStep((s) => s + 1);
+        }}
       />
       {/* text-inherit drops the fallback's own text-sm so the caller's font
           size (carried on the root) still applies to the initial. */}

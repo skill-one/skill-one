@@ -12,16 +12,20 @@ function line(raw: Record<string, unknown>): string {
   });
 }
 
+/** The stars join, as readRepos' parsed repos.jsonl rows would answer. */
+const starsFor = (repo: string) =>
+  repo === "anthropics/skills" ? 4200 : undefined;
+
 describe("parseSkillLine", () => {
   it("maps a full index line onto the app's skill model", () => {
     expect(
       parseSkillLine(
         line({
-          stars: 4200,
           url: "https://www.skills.sh/anthropics/skills/pdf",
           hash: "b146008599c31057",
           fetchedAt: "2026-09-06T07:57:37.803Z",
         }),
+        starsFor,
       ),
     ).toEqual({
       name: "pdf",
@@ -34,6 +38,17 @@ describe("parseSkillLine", () => {
       firstSeenAt: "2026-09-06T07:57:37.803Z",
       url: "https://www.skills.sh/anthropics/skills/pdf",
     });
+  });
+
+  it("joins stars by the id's repo, not the skill", () => {
+    // Sibling skills of the same repo share one stars row.
+    expect(
+      parseSkillLine(line({ id: "anthropics/skills/docx" }), starsFor)?.stars,
+    ).toBe(4200);
+    // A repo with no row in repos.jsonl normalizes to 0.
+    expect(
+      parseSkillLine(line({ id: "acme/tools/hammer" }), starsFor)?.stars,
+    ).toBe(0);
   });
 
   it("returns null for blank lines and malformed JSON", () => {
@@ -57,9 +72,7 @@ describe("parseSkillLine", () => {
   });
 
   it("normalizes absent metrics instead of leaking undefined", () => {
-    expect(
-      parseSkillLine(line({ description: null, stars: null })),
-    ).toMatchObject({
+    expect(parseSkillLine(line({ description: null }))).toMatchObject({
       description: "",
       stars: 0,
       rev: undefined,

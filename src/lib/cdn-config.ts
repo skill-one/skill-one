@@ -1,6 +1,7 @@
 /**
- * Configurable download source for registry files: the skills index, per-skill
- * SKILL.md detail, and single-file skill installs.
+ * Configurable download source for registry files: the skills index, the
+ * repos sidecar, per-skill SKILL.md detail, owner avatars, and single-file
+ * skill installs.
  *
  * Default behavior is direct GitHub (`raw.githubusercontent.com`); when it is
  * unreachable the fetch falls back to a default CDN (a jsDelivr mirror, the
