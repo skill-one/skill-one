@@ -8,13 +8,12 @@ import {
   LayoutGrid,
   Puzzle,
   RefreshCw,
-  Trash2,
   Users,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { removeInstalledSkill, setSkillEnabled } from "../../lib/local-skills";
+import { setSkillEnabled } from "../../lib/local-skills";
 import {
   markSkillsChanged,
   useInstalledSkills,
@@ -29,6 +28,14 @@ import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { Button } from "../../components/ui/button";
 import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
@@ -36,10 +43,10 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { ListPager } from "../../components/list-pager";
-import { RankBadge } from "../../components/rank-badge";
 import { Switch } from "../../components/ui/switch";
 import { cn, errorMessage } from "../../lib/utils";
 import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
+import { SKILL_LIST_CLASS } from "../../lib/skill-list-layout";
 import { useClampedPage } from "../../hooks/use-clamped-page";
 import { SearchInput } from "../../components/search-input";
 
@@ -92,36 +99,33 @@ function detailSkillFor(skill: InstalledSkill, meta: Map<string, Skill>): Skill 
 }
 
 /**
- * One installed skill, in the same row shape the store list uses: avatar, name
- * and source, description, then the row's own actions on the right.
+ * One installed skill, in the same card shape and the same slots the store list
+ * uses: avatar, name and source in the header, the enable switch in the corner
+ * the store card puts its install action in, description in the content.
+ *
+ * Uninstalling is deliberately absent: it lives in the detail panel, so a card
+ * (whose whole body is a click target) never carries an irreversible action.
  */
 function InstalledSkillRow({
   skill,
-  serial,
   enabled,
-  removing,
   selected,
   description,
   onToggle,
-  onRemove,
   onOpen,
 }: {
   skill: InstalledSkill;
-  /** 1-based position of the row in the (paged) filtered list. */
-  serial: number;
   enabled: boolean;
-  removing: boolean;
-  /** Whether this row is the one shown in the detail panel. */
+  /** Whether this card is the one shown in the detail panel. */
   selected: boolean;
   description: string;
   onToggle: (enabled: boolean) => void;
-  onRemove: () => void;
   /** Opens the shared skill detail panel. */
   onOpen: () => void;
 }) {
   return (
-    <li>
-      <div
+    <li className="flex flex-col">
+      <Card
         data-skill={skill.name}
         role="button"
         tabIndex={0}
@@ -134,78 +138,63 @@ function InstalledSkillRow({
           }
         }}
         className={cn(
-          "flex cursor-pointer items-center gap-4 rounded-xl border border-border bg-card px-3.5 py-3 transition-all duration-150",
+          "flex-1 cursor-pointer transition-all duration-150",
           "hover:-translate-y-px hover:border-border hover:bg-accent/40 hover:shadow-[0_8px_24px_-16px_rgba(15,23,42,0.25)]",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           !enabled && "opacity-60",
           selected && "border-primary ring-1 ring-primary",
         )}
       >
-        <RankBadge rank={serial} />
-        {skill.sourceType !== "local" && skill.source?.includes("/") ? (
-          <OwnerAvatar
-            owner={skill.source.split("/")[0]}
-            className="h-10 w-10 text-[16px]"
-          />
-        ) : (
-          <div
-            aria-label="skill 头像"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-muted-foreground"
-          >
-            <Puzzle className="h-5 w-5" />
-          </div>
-        )}
-
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-baseline gap-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {skill.sourceType !== "local" && skill.source?.includes("/") ? (
+              <OwnerAvatar
+                owner={skill.source.split("/")[0]}
+                className="h-6 w-6 shrink-0 text-[12px]"
+              />
+            ) : (
+              <div
+                aria-label="skill 头像"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted text-muted-foreground"
+              >
+                <Puzzle className="h-3.5 w-3.5" />
+              </div>
+            )}
             <h3
               className={cn(
-                "truncate text-[14px] font-semibold",
+                "truncate",
                 enabled ? "text-foreground" : "text-muted-foreground",
               )}
             >
               {skill.name}
             </h3>
-            <p
-              className={cn(
-                "truncate text-[12px]",
-                enabled ? "text-muted-foreground" : "text-muted-foreground/70",
-              )}
-            >
-              {sourceLabelFor(skill)}
-            </p>
-          </div>
-          {/* Description: the disk-extracted SKILL.md description for local
-              skills; store-sourced ones fall back to the registry description.
-              One line, hidden on narrow windows, so the row keeps its height. */}
-          <p className="mt-0.5 hidden truncate text-[13px] leading-relaxed text-muted-foreground lg:block">
-            {description || "暂无描述"}
-          </p>
-        </div>
-
-        {/* The row's own actions. Clicks stay here: the row body opens the
-            detail panel, these controls must not. */}
-        <div
-          className="flex shrink-0 items-center gap-2"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Switch
-            checked={enabled}
-            onCheckedChange={onToggle}
-            aria-label={`${enabled ? "关闭" : "开启"} ${skill.name}`}
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            title="移除"
-            disabled={removing}
-            onClick={onRemove}
+          </CardTitle>
+          <CardDescription
+            className={cn(
+              "truncate",
+              !enabled && "text-muted-foreground/70",
+            )}
           >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
+            {sourceLabelFor(skill)}
+          </CardDescription>
+          {/* The card's own control, in the same corner the store card puts its
+              install action. Clicks stay here: the card body opens the detail
+              panel, this must not. */}
+          <CardAction onClick={(e) => e.stopPropagation()}>
+            <Switch
+              checked={enabled}
+              onCheckedChange={onToggle}
+              aria-label={`${enabled ? "关闭" : "开启"} ${skill.name}`}
+            />
+          </CardAction>
+        </CardHeader>
+
+        {/* The disk-extracted SKILL.md description for local skills;
+            store-sourced ones fall back to the registry description. */}
+        <CardContent className="line-clamp-2 text-sm text-muted-foreground">
+          {description || "暂无描述"}
+        </CardContent>
+      </Card>
     </li>
   );
 }
@@ -236,14 +225,6 @@ export function MySkillsPage() {
   );
 
   const invalidate = () => markSkillsChanged(queryClient);
-
-  const removeMutation = useMutation({
-    mutationFn: (skill: InstalledSkill) => removeInstalledSkill(skill.name),
-    onSuccess: async () => {
-      await invalidate();
-    },
-    onError: (e) => toast.error(errorMessage(e, "移除失败")),
-  });
 
   const toggleMutation = useMutation({
     mutationFn: ({
@@ -340,7 +321,7 @@ export function MySkillsPage() {
   );
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-0">
       {/* Toolbar, styled like the store's full list: search first, controls
           clustered on the right. */}
       <div className="mb-4 flex items-center gap-3">
@@ -386,7 +367,7 @@ export function MySkillsPage() {
               </p>
             </div>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className={SKILL_LIST_CLASS}>
               {visible.map((skill, i) => {
                 const id = rowId(skill);
                 const index = pageOffset + i;
@@ -395,21 +376,14 @@ export function MySkillsPage() {
                   <InstalledSkillRow
                     key={id}
                     skill={skill}
-                    serial={index + 1}
                     enabled={pendingEnabled[id] ?? skill.enabled}
                     selected={selected === index}
                     description={
                       skill.description ?? indexEntry?.description ?? ""
                     }
-                    removing={
-                      removeMutation.isPending &&
-                      removeMutation.variables != null &&
-                      rowId(removeMutation.variables) === id
-                    }
                     onToggle={(enabled) =>
                       toggleMutation.mutate({ skill, enabled })
                     }
-                    onRemove={() => removeMutation.mutate(skill)}
                     onOpen={() => setSelected(index)}
                   />
                 );
@@ -429,11 +403,14 @@ export function MySkillsPage() {
       </div>
 
       {/* Same right-side detail drawer the store pages use; ←/→ walks the
-          whole filtered result set, across page boundaries. */}
+          whole filtered result set, across page boundaries. Uninstalling from
+          it closes it: this list shrinks with the skill, so the same index
+          would land on a different one — a swap the reader never asked for. */}
       <SkillDetailDrawer
         skills={detailSkills}
         selected={selected}
         onSelect={setSelected}
+        onRemoved={() => setSelected(null)}
       />
     </div>
   );

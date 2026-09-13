@@ -111,10 +111,11 @@ describe("RankingPage", () => {
       "beta",
       "gamma",
     ]);
-    // The row metric is the blended figure, preformatted by the worker (delta:
-    // 5K installs against 600 stars scores 1.7K); the first row is rank 1.
+    // The card is the store's own, figure included (delta: 5K installs against
+    // 600 stars scores 1.7K). The order is what makes this a leaderboard, so
+    // nothing rank-shaped is glued onto the card.
     expect(within(rows[0]).getByText("1.7K")).toBeInTheDocument();
-    expect(within(rows[0]).getByText("1")).toBeInTheDocument();
+    expect(within(rows[0]).queryByText("1")).not.toBeInTheDocument();
   });
 
   it("switches leaderboards through the tabs", async () => {

@@ -10,8 +10,12 @@ import { SkillListRow } from "../skill-list-row";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 import { FeaturedHero } from "./featured-hero";
 import { errorMessage } from "../../../lib/utils";
+import {
+  SKILL_CARD_SKELETON_CLASS,
+  SKILL_LIST_CLASS,
+} from "../../../lib/skill-list-layout";
 
-/** Rows per curated section in the loading placeholder. */
+/** Cards per curated section in the loading placeholder. */
 const SKELETON_ROWS = 6;
 
 /** Loading placeholder mirroring the page layout: hero plus two sections. */
@@ -24,8 +28,8 @@ function FeaturedSkeleton() {
           <Skeleton className="mb-4 h-7 w-24" />
           <SkeletonList
             rows={SKELETON_ROWS}
-            listClassName="flex flex-col gap-2"
-            itemClassName="h-16 rounded-xl"
+            listClassName={SKILL_LIST_CLASS}
+            itemClassName={SKILL_CARD_SKELETON_CLASS}
           />
         </div>
       ))}
@@ -66,7 +70,7 @@ export function FeaturedPage() {
   const flatSkills = useMemo(() => flat.map((s) => s.skill), [flat]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 py-5">
       {/* Symmetric 12px horizontal padding (offset by matching negative
           margins, so content position and row widths are unchanged)
           reserves room beside the rows for the overlay scrollbar instead
@@ -104,7 +108,7 @@ export function FeaturedPage() {
                 </h2>
                 {/* The detail drawer overlays the list; the layout never
                       changes when it opens or closes. */}
-                <ul className="flex flex-col gap-2">
+                <ul className={SKILL_LIST_CLASS}>
                   {section.skills.map(({ skill, index: i }) => (
                     <SkillListRow
                       key={`${skill.repo}/${skill.name}`}

@@ -75,13 +75,32 @@ describe("SkillListRow", () => {
     ).toBeInTheDocument();
   });
 
-  it("reaches the same breakdown from the keyboard", async () => {
+  it("takes the card's controls in card order: install, then the figure", async () => {
     const user = userEvent.setup();
     renderWithRouter(<SkillListRow skill={skill} />);
 
-    // The metric is the row's first control, so one tab lands on it and the
-    // tooltip opens the same way it does for a pointer.
+    // The install action lives in the header now, above the figure that used
+    // to sit beside it at the bottom, and the tab order follows the card.
     await user.tab();
+    expect(screen.getByRole("button", { name: "安装" })).toHaveFocus();
+
+    await user.tab();
+    expect(
+      screen.getByRole("button", {
+        name: "热度 712.4K：安装 3M · Star 169.6K",
+      }),
+    ).toHaveFocus();
+  });
+
+  it("reaches the same breakdown from the keyboard", async () => {
+    renderWithRouter(<SkillListRow skill={skill} />);
+
+    // The figure is a control of its own — the card body opens the panel — and
+    // its tooltip carries no delay, so focusing it opens the same breakdown the
+    // pointer gets on hover.
+    screen
+      .getByRole("button", { name: "热度 712.4K：安装 3M · Star 169.6K" })
+      .focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent("169.6K");
   });
 
@@ -100,16 +119,6 @@ describe("SkillListRow", () => {
     );
 
     expect(screen.getByText("0")).toBeInTheDocument();
-  });
-
-  it("shows a surface-provided metric instead of the blend", () => {
-    renderWithRouter(
-      <SkillListRow skill={skill} metric={<span>5K</span>} />,
-    );
-
-    // Leaderboards rank in their own unit, so they replace the metric whole.
-    expect(screen.getByText("5K")).toBeInTheDocument();
-    expect(screen.queryByText(BLENDED)).not.toBeInTheDocument();
   });
 
   it("keeps a missing description readable", () => {

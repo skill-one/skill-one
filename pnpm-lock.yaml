@@ -35,6 +35,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      cn:
+        specifier: ^0.2.6
+        version: 0.2.6
       embla-carousel-autoplay:
         specifier: ^8.6.0
         version: 8.6.0(embla-carousel@8.6.0)

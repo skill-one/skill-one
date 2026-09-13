@@ -28,6 +28,7 @@ import {
 } from "../ui/tooltip";
 import { OwnerAvatar } from "../owner-avatar";
 import { SkillInstallButton } from "../skill-install-button";
+import { SkillRemoveButton } from "../skill-remove-button";
 import { ExpandableDescription } from "./expandable-description";
 import { SkillProfileView } from "./skill-profile-view";
 
@@ -131,6 +132,8 @@ interface SkillDetailPanelProps {
   skill: Skill | null;
   onPrev: () => void;
   onNext: () => void;
+  /** Called after this skill is uninstalled, for a caller that must react. */
+  onRemoved?: () => void;
 }
 
 /**
@@ -156,6 +159,7 @@ export function SkillDetailPanel({
   skill,
   onPrev,
   onNext,
+  onRemoved,
 }: SkillDetailPanelProps) {
   // Keep the last selected skill while the drawer plays its exit
   // animation: `skill` is already null by the time Radix starts closing,
@@ -305,6 +309,10 @@ export function SkillDetailPanel({
               onError={setInstallError}
             />
           )}
+          {/* Uninstalling shares that slot, and hides itself unless the skill
+              is on disk — so the same drawer serves the store, a repo's list
+              and the installed list without any of them passing a flag. */}
+          {shown && <SkillRemoveButton skill={shown} onRemoved={onRemoved} />}
         </div>
         {/* The skill's own summary — shared chrome, visible whichever tab
             is open. Served from the index immediately, refined by the

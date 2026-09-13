@@ -14,7 +14,10 @@ import { ListPager } from "../../../components/list-pager";
 import { SkillListRow } from "../skill-list-row";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 import { PAGE_SIZE } from "../../../lib/pagination";
-import { RankBadge } from "../../../components/rank-badge";
+import {
+  SKILL_CARD_SKELETON_CLASS,
+  SKILL_LIST_CLASS,
+} from "../../../lib/skill-list-layout";
 import { useClampedPage } from "../../../hooks/use-clamped-page";
 
 /** Where the back button points; the repos list lives one level up. */
@@ -29,8 +32,8 @@ function RepoDetailSkeleton() {
   return (
     <SkeletonList
       rows={9}
-      listClassName="flex flex-col gap-2"
-      itemClassName="h-16 rounded-xl"
+      listClassName={SKILL_LIST_CLASS}
+      itemClassName={SKILL_CARD_SKELETON_CLASS}
     />
   );
 }
@@ -103,7 +106,7 @@ export function RepoDetailPage() {
   };
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-0">
       {/* One header row: back to the repos list, the repo's avatar, its name
           and its star count. */}
       <header className="mb-5 flex items-center gap-2.5">
@@ -162,16 +165,13 @@ export function RepoDetailPage() {
             ) : hits.length === 0 ? (
               <Placeholder message={`仓库 ${repoId} 下暂无 Skill`} />
             ) : (
-              <ul className="flex flex-col gap-2">
+              <ul className={SKILL_LIST_CLASS}>
                 {hits.map((hit, i) => (
                   <SkillListRow
                     key={`${hit.skill.repo}/${hit.skill.name}`}
                     skill={hit.skill}
                     selected={i === selected}
                     onSelect={() => setSelected(i)}
-                    leading={
-                      <RankBadge rank={(page - 1) * PAGE_SIZE + i + 1} />
-                    }
                   />
                 ))}
               </ul>

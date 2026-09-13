@@ -30,7 +30,7 @@ export function SkillPopularity({
 }: {
   skill: Skill;
   className?: string;
-  /** Tooltip placement: list rows open it to the right, headers on top. */
+  /** Tooltip placement; both current callers open it above the figure. */
   side?: ComponentProps<typeof TooltipContent>["side"];
   align?: ComponentProps<typeof TooltipContent>["align"];
 }) {
@@ -40,10 +40,11 @@ export function SkillPopularity({
   const starred = formatCount(skill.stars);
   const blended = formatCount(popularity(skill));
 
-  // A flame reads warm, so the metric's icon is filled with an orange→amber
-  // gradient (rather than the neutral grey of the rest of the row). The id is
-  // scoped per instance via useId (sanitized: ':' is unstable inside url(#..))
-  // so the many rows on a list can each carry their own defs without clashing.
+  // A flame reads warm, so the metric's icon is a solid flame in an
+  // orange→amber gradient (rather than the neutral grey of the rest of the
+  // card). The id is scoped per instance via useId (sanitized: ':' is unstable
+  // inside url(#..)) so the many cards on a list can each carry their own defs
+  // without clashing.
   const gradientId = useId().replace(/[^a-zA-Z0-9]/g, "");
 
   return (
@@ -63,13 +64,20 @@ export function SkillPopularity({
             <svg aria-hidden="true" focusable="false" className="absolute h-0 w-0">
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  {/* tip amber → base orange, so the outline reads as fire */}
+                  {/* tip amber → base orange, so the flame reads as fire */}
                   <stop offset="0%" stopColor="#fbbf24" />
                   <stop offset="100%" stopColor="#f97316" />
                 </linearGradient>
               </defs>
             </svg>
-            <Flame className="h-3.5 w-3.5" color={`url(#${gradientId})`} />
+            {/* Filled and stroked with the same gradient: at 14px the outline
+                alone was a hairline, and the figure is the one number the card
+                leads with. */}
+            <Flame
+              className="h-3.5 w-3.5"
+              color={`url(#${gradientId})`}
+              fill={`url(#${gradientId})`}
+            />
           </span>
           <span className="font-medium tabular-nums">{blended}</span>
         </TooltipTrigger>

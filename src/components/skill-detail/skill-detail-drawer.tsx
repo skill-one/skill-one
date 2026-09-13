@@ -16,6 +16,7 @@ export function SkillDetailDrawer({
   skills,
   selected,
   onSelect,
+  onRemoved,
 }: {
   /** Flat list that `selected` indexes into. */
   skills: Skill[];
@@ -23,6 +24,8 @@ export function SkillDetailDrawer({
   selected: number | null;
   /** Selects a skill index, or clears the selection with null. */
   onSelect: (index: number | null) => void;
+  /** Called after the open skill is uninstalled; see `SkillRemoveButton`. */
+  onRemoved?: () => void;
 }) {
   const selectedSkill = selected != null ? (skills[selected] ?? null) : null;
 
@@ -46,6 +49,7 @@ export function SkillDetailDrawer({
         skill={selectedSkill}
         onPrev={handlePrev}
         onNext={handleNext}
+        onRemoved={onRemoved}
       />
     </Drawer>
   );

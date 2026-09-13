@@ -127,7 +127,7 @@ export function ReposPage() {
     SORT_OPTIONS.find((option) => option.value === sort) ?? SORT_OPTIONS[0];
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-0">
       {/* Toolbar: search on the left; sort on the right. */}
       <div className="mb-4 flex items-center gap-3">
         <SearchInput value={search} onChange={handleSearch} label="搜索仓库" />

@@ -14,6 +14,10 @@ import { HashRouter, Route, Routes } from "react-router";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { PAGE_SIZE } from "../../lib/pagination";
+import {
+  SKILL_CARD_SKELETON_CLASS,
+  SKILL_LIST_CLASS,
+} from "../../lib/skill-list-layout";
 import type { Skill } from "../../types/skill";
 import type { RegistryHarness } from "../../test/registry-harness";
 import { ExplorePage } from "./explore-page";
@@ -171,27 +175,6 @@ describe("ExplorePage", () => {
     // The page answered one RPC; paging never re-downloads the registry.
     expect(harness.downloads).toBe(1);
     expect(screen.getByText(`共 ${PAGE_SIZE * 2 + 2} 个`)).toBeInTheDocument();
-  });
-
-  it("numbers rows with their global position across pages", async () => {
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2);
-    renderExplorePage();
-
-    // The first row carries the list's serial number 1.
-    const first = await screen.findByRole("button", {
-      name: "查看 skill-0 详情",
-    });
-    expect(within(first).getByText("1")).toBeInTheDocument();
-
-    // The numbering continues across pages instead of restarting.
-    await user.click(screen.getByRole("link", { name: "下一页" }));
-    const firstOfPageTwo = await screen.findByRole("button", {
-      name: `查看 skill-${PAGE_SIZE} 详情`,
-    });
-    expect(
-      within(firstOfPageTwo).getByText(String(PAGE_SIZE + 1)),
-    ).toBeInTheDocument();
   });
 
   it("disables previous on the first page and enables next", async () => {
@@ -868,8 +851,8 @@ describe("ExplorePage", () => {
     const { container } = renderExplorePage();
     await screen.findByText("skill-0");
 
-    const list = container.querySelector("ul.flex-col")!;
-    expect(list.className).toBe("flex flex-col gap-2");
+    const list = container.querySelector("ul.grid")!;
+    expect(list.className).toBe(SKILL_LIST_CLASS);
     expect(list.querySelectorAll("li")).toHaveLength(PAGE_SIZE);
 
     // Opening the drawer overlays the list: its classes — and with them its
@@ -877,13 +860,13 @@ describe("ExplorePage", () => {
     // open and after it closes.
     await user.click(screen.getByText("skill-0"));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(list.className).toBe("flex flex-col gap-2");
+    expect(list.className).toBe(SKILL_LIST_CLASS);
 
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    expect(list.className).toBe("flex flex-col gap-2");
+    expect(list.className).toBe(SKILL_LIST_CLASS);
     expect(list.querySelectorAll("li")).toHaveLength(PAGE_SIZE);
   });
 });
@@ -894,14 +877,14 @@ describe("ExplorePage streaming", () => {
     const { container } = renderExplorePage();
     await act(async () => {});
 
-    // The switch is instant: row-shaped skeletons fill the list instead of a
-    // spinner, and no row is rendered from nothing.
+    // The switch is instant: card-shaped skeletons fill the list instead of a
+    // spinner, and no card is rendered from nothing.
     const skeletons = container.querySelectorAll('[data-slot="skeleton"]');
     expect(skeletons).toHaveLength(12);
-    expect(skeletons[0].className).toContain("h-16");
+    expect(skeletons[0]).toHaveClass(SKILL_CARD_SKELETON_CLASS);
     expect(screen.queryByText("skill-0")).not.toBeInTheDocument();
 
-    // The first streamed batch replaces the skeleton with real rows.
+    // The first streamed batch replaces the skeleton with real cards.
     harness.pushAll(makeSkills(3, 0));
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
     expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();

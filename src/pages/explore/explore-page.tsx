@@ -14,9 +14,12 @@ import { useRegistryDomains } from "../../hooks/use-registry-domains";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useClampedPage } from "../../hooks/use-clamped-page";
 import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
+import {
+  SKILL_CARD_SKELETON_CLASS,
+  SKILL_LIST_CLASS,
+} from "../../lib/skill-list-layout";
 import { domainMeta } from "../../data/domains";
 import { cn } from "../../lib/utils";
-import { RankBadge } from "../../components/rank-badge";
 import type { SearchHit, SortOrder } from "../../lib/registry/protocol";
 import { Button } from "../../components/ui/button";
 import {
@@ -68,23 +71,17 @@ const SORT_OPTIONS: Array<{
 ];
 
 /**
- * Container of the skill list — one row per skill, leaderboard style.
- * Extracted because both the results and the loading placeholder agree on it.
- */
-const LIST_CLASS = "flex flex-col gap-2";
-
-/**
  * Loading placeholder mirroring the skill list: a viewport's worth of
- * row-shaped skeletons, so switching to this page paints its final layout
- * instantly and real rows replace the placeholders as the index streams in
+ * card-shaped skeletons, so switching to this page paints its final layout
+ * instantly and real cards replace the placeholders as the index streams in
  * (instead of an empty spin that reads as "the page never switched").
  */
 function ExploreSkeleton() {
   return (
     <SkeletonList
       rows={12}
-      listClassName={LIST_CLASS}
-      itemClassName="h-16 rounded-xl"
+      listClassName={SKILL_LIST_CLASS}
+      itemClassName={SKILL_CARD_SKELETON_CLASS}
     />
   );
 }
@@ -183,7 +180,7 @@ export function ExplorePage() {
     SORT_OPTIONS.find((option) => option.value === sort) ?? SORT_OPTIONS[0];
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 pt-5 pb-0">
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-0">
       {/* Toolbar: search on the left; category and sort on the right. */}
       <div className="mb-4 flex items-center gap-3">
         {/* Search runs on the worker's MiniSearch index, which only exists
@@ -367,7 +364,7 @@ export function ExplorePage() {
                 message={query ? `未找到匹配“${query}”的 Skill` : "暂无技能"}
               />
             ) : (
-              <ul className={LIST_CLASS}>
+              <ul className={SKILL_LIST_CLASS}>
                 {hits.map((hit, i) => (
                   <SkillListRow
                     key={`${hit.skill.repo}/${hit.skill.name}`}
@@ -375,9 +372,6 @@ export function ExplorePage() {
                     matched={hit.matched}
                     selected={i === selected}
                     onSelect={() => setSelected(i)}
-                    leading={
-                      <RankBadge rank={(page - 1) * PAGE_SIZE + i + 1} />
-                    }
                   />
                 ))}
               </ul>

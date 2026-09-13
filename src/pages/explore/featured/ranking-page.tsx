@@ -3,10 +3,13 @@ import { Link, NavLink, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 
 import { Button } from "../../../components/ui/button";
-import { Skeleton } from "../../../components/ui/skeleton";
-import { RankBadge } from "../../../components/rank-badge";
+import { SkeletonList } from "../../../components/skeleton-list";
+import {
+  SKILL_CARD_SKELETON_CLASS,
+  SKILL_LIST_CLASS,
+} from "../../../lib/skill-list-layout";
 import { useRanking } from "../../../hooks/use-ranking";
-import { RANKINGS, rankingById, type RankEntry } from "../../../lib/registry/featured-rankings";
+import { RANKINGS, rankingById } from "../../../lib/registry/featured-rankings";
 import { cn, errorMessage } from "../../../lib/utils";
 import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../../../components/placeholder";
@@ -17,60 +20,28 @@ import { SkillListRow } from "../skill-list-row";
 const FEATURED_PATH = "/explore/featured";
 const RANKING_PATH = `${FEATURED_PATH}/ranking`;
 
-/** Rows of the loading skeleton; roughly a viewport of the real list. */
+/** Cards of the loading skeleton; roughly a viewport of the real list. */
 const SKELETON_ROWS = 10;
 
-/** One leaderboard row: the ranked skill, its metric and its install action. */
-function RankingRow({
-  entry,
-  selected,
-  onSelect,
-}: {
-  entry: RankEntry;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <SkillListRow
-      skill={entry.skill}
-      selected={selected}
-      onSelect={onSelect}
-      leading={<RankBadge rank={entry.rank} podium />}
-      metric={
-        <span className="shrink-0 text-[13px] font-medium tabular-nums text-foreground">
-          {entry.label}
-        </span>
-      }
-    />
-  );
-}
-
-/** Loading placeholder mirroring the row list, so switching tabs never jumps. */
+/** Loading placeholder mirroring the card list, so switching tabs never jumps. */
 function RankingSkeleton() {
   return (
-    <div className="flex flex-col gap-2" aria-hidden>
-      {Array.from({ length: SKELETON_ROWS }, (_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-4 rounded-xl border border-border/70 bg-card px-3.5 py-3"
-        >
-          <Skeleton className="h-7 w-7 rounded-lg" />
-          <Skeleton className="h-10 w-10 rounded-full" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="hidden h-3.5 w-3/4 lg:block" />
-          </div>
-          <Skeleton className="h-4 w-14" />
-          <Skeleton className="h-7 w-7 rounded-md" />
-        </div>
-      ))}
-    </div>
+    <SkeletonList
+      rows={SKELETON_ROWS}
+      listClassName={SKILL_LIST_CLASS}
+      itemClassName={SKILL_CARD_SKELETON_CLASS}
+    />
   );
 }
 
 /**
  * The landing page behind a featured banner: the full leaderboard behind one
  * hero slide, ranked inside the registry worker.
+ *
+ * The cards are the store's own (`SkillListRow`), unchanged: what makes this a
+ * leaderboard is the order the worker put them in, not a rank chip or a
+ * different metric glued on. The figure on each card is the same blended
+ * popularity the store shows, so the two lists can never disagree about it.
  *
  * The leaderboard id lives in the URL, so the page is deep-linkable, the back
  * button returns to the featured page, and the tabs are plain links — cross
@@ -101,7 +72,7 @@ export function RankingPage() {
   // is reported here rather than as a load failure.
   if (!def) {
     return (
-      <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
+      <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 py-5">
         <Placeholder message={`榜单不存在：${rankingId ?? "未知"}`}>
           <Link to={FEATURED_PATH}>
             <Button variant="outline" size="sm" className="mt-2">
@@ -116,7 +87,7 @@ export function RankingPage() {
   const truncated = data != null && data.total > entries.length;
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col px-8 py-5">
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 py-5">
       {/* One header row: back to the featured page, the leaderboard's own
           title, and the sibling leaderboards to switch between. The tabs
           stay pinned to the right edge; the title block gives way first. */}
@@ -187,11 +158,11 @@ export function RankingPage() {
           <Placeholder message="暂无上榜 Skill" />
         ) : (
           <>
-            <ol className="flex flex-col gap-2">
+            <ol className={SKILL_LIST_CLASS}>
               {entries.map((entry, i) => (
-                <RankingRow
+                <SkillListRow
                   key={`${entry.skill.repo}/${entry.skill.name}`}
-                  entry={entry}
+                  skill={entry.skill}
                   selected={i === selected}
                   onSelect={() => setSelected(i)}
                 />

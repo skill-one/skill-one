@@ -9,6 +9,7 @@ import { fetchSkillProfile } from "../../lib/skill-profile-api";
 import {
   fetchInstalledSkills,
   fetchLocalSkillDetail,
+  removeInstalledSkill,
 } from "../../lib/local-skills";
 import { openExternal } from "../../lib/open-external";
 import type { Skill } from "../../types/skill";
@@ -27,6 +28,7 @@ vi.mock("../../lib/skill-profile-api", () => ({
 vi.mock("../../lib/local-skills", () => ({
   fetchLocalSkillDetail: vi.fn(),
   fetchInstalledSkills: vi.fn(),
+  removeInstalledSkill: vi.fn(),
 }));
 
 vi.mock("../../lib/open-external", () => ({
@@ -36,7 +38,17 @@ vi.mock("../../lib/open-external", () => ({
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 const mockFetchSkillProfile = vi.mocked(fetchSkillProfile);
 const mockFetchLocalSkillDetail = vi.mocked(fetchLocalSkillDetail);
+const mockRemoveInstalledSkill = vi.mocked(removeInstalledSkill);
 const mockOpenExternal = vi.mocked(openExternal);
+
+/** One entry of the installed list, as the backend reports it. */
+const installedPdf = {
+  name: "pdf",
+  path: "/Users/me/.agents/skills/pdf",
+  source: "anthropics/skills",
+  sourceType: "git",
+  enabled: true,
+};
 
 const skill: Skill = {
   name: "pdf",
@@ -327,6 +339,45 @@ describe("SkillDetailPanel", () => {
     await vi.waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
+  });
+
+  it("offers no uninstall for a skill that is not on disk", async () => {
+    renderDrawer({});
+
+    // The install action is the header's only action while nothing is
+    // installed — the panel is the store's detail view too.
+    expect(
+      await screen.findByRole("button", { name: "安装" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "移除" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uninstalls an installed skill from the header", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([installedPdf]);
+    mockRemoveInstalledSkill.mockResolvedValue(undefined);
+    renderDrawer({});
+
+    await user.click(await screen.findByRole("button", { name: "移除" }));
+
+    expect(mockRemoveInstalledSkill).toHaveBeenCalledWith("pdf");
+  });
+
+  it("uninstalls a local skill, which has no install action to pair with", async () => {
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([
+      { ...installedPdf, name: "my-tool", source: null, sourceType: "local" },
+    ]);
+    mockFetchLocalSkillDetail.mockResolvedValue(localDetail);
+    renderDrawer({ skill: localSkill });
+
+    expect(
+      await screen.findByRole("button", { name: "移除" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "安装" }),
+    ).not.toBeInTheDocument();
   });
 
   it("lands on the 概述 tab and keeps SKILL.md one click away for a profiled skill", async () => {

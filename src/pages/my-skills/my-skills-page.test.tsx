@@ -72,17 +72,27 @@ describe("MySkillsPage", () => {
     expect(screen.getByText("frontend-design")).toBeInTheDocument();
   });
 
-  it("removes a skill from the list and updates the stats", async () => {
+  it("removes a skill from its detail panel and updates the stats", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
 
-    const removeButtons = await screen.findAllByTitle("移除");
-    expect(removeButtons).toHaveLength(6);
+    // No card carries an uninstall control: the whole card body is a click
+    // target and removal is irreversible, so the action lives one step away.
+    await screen.findByText("共 6 个");
+    expect(screen.queryByTitle("移除")).not.toBeInTheDocument();
 
-    await user.click(removeButtons[0]); // pdf
+    await user.click(screen.getByRole("button", { name: "查看 pdf 详情" }));
+    await user.click(await screen.findByRole("button", { name: "移除" }));
 
+    // The panel closes with the skill: this list shrinks, so the index it was
+    // open at would otherwise land on a different skill.
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     await waitFor(() => {
-      expect(screen.queryByText("pdf")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "查看 pdf 详情" }),
+      ).not.toBeInTheDocument();
     });
     // The bottom pager count follows the (filtered) list size.
     expect(await screen.findByText("共 5 个")).toBeInTheDocument();
@@ -93,11 +103,18 @@ describe("MySkillsPage", () => {
     renderWithRouter(<MySkillsPage />);
 
     for (let remaining = 6; remaining > 0; remaining--) {
-      const [first] = await screen.findAllByTitle("移除");
-      await user.click(first);
-      await waitFor(() => {
-        expect(screen.queryAllByTitle("移除")).toHaveLength(remaining - 1);
+      // The cards only answer to a role query once the panel has closed, so
+      // each turn of the loop also proves the previous uninstall dismissed it.
+      const [first] = await screen.findAllByRole("button", {
+        name: /查看 .+ 详情/,
       });
+      await user.click(first);
+      await user.click(await screen.findByRole("button", { name: "移除" }));
+      await waitFor(() =>
+        expect(
+          screen.queryAllByRole("button", { name: /查看 .+ 详情/ }),
+        ).toHaveLength(remaining - 1),
+      );
     }
 
     expect(await screen.findByText("还没有安装任何技能")).toBeInTheDocument();
@@ -203,15 +220,12 @@ describe("MySkillsPage", () => {
     expect(within(dialog).queryByText("anthropics/skills")).not.toBeInTheDocument();
   });
 
-  it("does not open the drawer from the row controls", async () => {
+  it("does not open the drawer from the card's switch", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
     await screen.findByText("共 6 个");
 
     await user.click(await screen.findByRole("switch", { name: "关闭 pdf" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-
-    await user.click((await screen.findAllByTitle("移除"))[0]);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -269,12 +283,16 @@ describe("MySkillsPage", () => {
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
     expect(await screen.findByText("共 1 个")).toBeInTheDocument();
-    expect(screen.getAllByTitle("移除")).toHaveLength(1);
+    expect(
+      screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+    ).toHaveLength(1);
     expect(screen.queryByText("docx")).not.toBeInTheDocument();
 
     await user.clear(screen.getByLabelText("搜索 Skill"));
     expect(await screen.findByText("共 6 个")).toBeInTheDocument();
-    expect(screen.getAllByTitle("移除")).toHaveLength(6);
+    expect(
+      screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+    ).toHaveLength(6);
   });
 
   it("shows a no-match empty state for a search with no results", async () => {
@@ -332,10 +350,14 @@ describe("MySkillsPage", () => {
     ).not.toBeInTheDocument();
 
     // Removing the only skill on the last page clamps back to page 1.
-    const [onlyRemove] = await screen.findAllByTitle("移除");
-    await user.click(onlyRemove);
+    await user.click(
+      screen.getByRole("button", { name: "查看 frontend-design 详情" }),
+    );
+    await user.click(await screen.findByRole("button", { name: "移除" }));
     await waitFor(() => {
-      expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "查看 frontend-design 详情" }),
+      ).not.toBeInTheDocument();
     });
     expect(await screen.findByText(`共 ${PAGE_SIZE} 个`)).toBeInTheDocument();
     expect(screen.getByText(`extra-${PAGE_SIZE - 6}`)).toBeInTheDocument();
