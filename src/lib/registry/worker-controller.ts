@@ -75,6 +75,7 @@ export interface ControllerDeps {
   readIndex(
     cdnBase: string,
     tag: string | undefined,
+    stars: Promise<Map<string, number> | null>,
     onLine: (skill: Skill) => void,
     onRestart: () => void,
   ): Promise<void>;
@@ -85,6 +86,17 @@ export interface ControllerDeps {
    * download failure.
    */
   readTrending(cdnBase: string, tag?: string): Promise<string[] | null>;
+  /**
+   * Fetch the repos.jsonl sidecar (GitHub stars, keyed by `{owner}/{repo}`)
+   * whose rows join into the parsed skill rows. Called with the resolved
+   * snapshot tag so the join table comes from the same snapshot as the
+   * index. Null when unavailable — a garnish, never a download failure
+   * (unjoined skills simply carry 0 stars).
+   */
+  readRepos(
+    cdnBase: string,
+    tag?: string,
+  ): Promise<Map<string, number> | null>;
   /**
    * Probe the skills-profiles dataset's published snapshot (its freshness
    * identity). Null when no source answered — the caller then skips the
@@ -372,6 +384,11 @@ export function createRegistryController(
 
     const revalidating = complete && store.length > 0;
     const buffer: Skill[] = [];
+    // Started with the body so its latency hides inside the multi-megabyte
+    // index download; never rejects — a failure resolves null, which joins
+    // nothing (stars stay 0) rather than failing the dataset. Not needed on
+    // the "unchanged" path above: cached skills already carry their stars.
+    const stars = deps.readRepos(cdnBase, tag).catch(() => null);
     if (!revalidating) {
       // Queries read the buffer as it fills (progressive page one); the
       // count-0 reset itself needs no event — the main-thread client boots
@@ -386,6 +403,7 @@ export function createRegistryController(
       await deps.readIndex(
         cdnBase,
         tag,
+        stars,
         (skill) => {
           buffer.push(skill);
           if (!revalidating) notifyThrottled(buffer.length);

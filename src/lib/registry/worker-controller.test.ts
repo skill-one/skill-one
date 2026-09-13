@@ -79,6 +79,11 @@ function setup(options?: {
   /** What the trending source serves; null (default) = list unavailable. */
   trending?: string[] | null;
   /**
+   * What the repos.jsonl source serves (the stars join); null (default) =
+   * sidecar unavailable.
+   */
+  stars?: Map<string, number> | null;
+  /**
    * What the profiles source serves; null (default) = file unreachable.
    * Its stamp is advertised through `profilesMeta` when set.
    */
@@ -114,6 +119,7 @@ function setup(options?: {
   const readIndex = async (
     _cdnBase: string,
     tag: string | undefined,
+    _stars: Promise<Map<string, number> | null>,
     line: (skill: Skill) => void,
   ): Promise<void> => {
     onLine = line;
@@ -132,6 +138,7 @@ function setup(options?: {
       probeMeta: async () => options?.published ?? null,
       readIndex,
       readTrending: async () => options?.trending ?? null,
+      readRepos: async () => options?.stars ?? null,
       readProfilesMeta: async () => options?.profilesMeta ?? null,
       readProfiles: async () => {
         if (!options?.profiles) throw new Error("profiles unavailable");

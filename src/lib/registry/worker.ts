@@ -1,5 +1,10 @@
 import { createRegistryCache } from "./cache";
-import { probeIndexMeta, readIndex, readTrending } from "./index-stream";
+import {
+  probeIndexMeta,
+  readIndex,
+  readRepos,
+  readTrending,
+} from "./index-stream";
 import { probeProfilesMeta, readProfiles } from "./profiles";
 import { createRegistryController } from "./worker-controller";
 import type { RegistryWorkerMessage } from "./protocol";
@@ -17,6 +22,7 @@ const controller = createRegistryController(
     probeMeta: probeIndexMeta,
     readIndex,
     readTrending,
+    readRepos,
     readProfilesMeta: probeProfilesMeta,
     readProfiles,
     cache: createRegistryCache(),

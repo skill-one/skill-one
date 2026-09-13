@@ -126,7 +126,7 @@ export function createRegistryHarness(): RegistryHarness {
   function spawnController() {
     return createRegistryController(
       {
-        readIndex: async (_cdnBase, tag, line) => {
+        readIndex: async (_cdnBase, tag, _stars, line) => {
           downloads++;
           pinnedTag = tag;
           onLine = line;
@@ -144,6 +144,7 @@ export function createRegistryHarness(): RegistryHarness {
         },
         probeMeta: async () => published,
         readTrending: async () => trending,
+        readRepos: async () => null,
         readProfilesMeta: async () => null,
         readProfiles: async () => {
           if (!profiles) throw new Error("profiles unavailable");
