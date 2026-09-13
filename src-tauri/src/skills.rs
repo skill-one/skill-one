@@ -613,10 +613,7 @@ pub async fn read_skill_md(name: String) -> Result<SkillMdDto, String> {
 #[tauri::command]
 pub async fn compute_skill_hash(name: String) -> Result<Option<String>, String> {
     run_blocking("compute skill hash", move |manager| {
-        let req = ListRequest {
-            global: true,
-            agents: vec![],
-        };
+        let req = ListRequest { global: true };
         let listed = manager.list(&req).map_err(|e| e.to_string())?;
         match listed.into_iter().find(|s| s.name == name) {
             None => Ok(None),
