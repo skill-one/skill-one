@@ -92,7 +92,7 @@ export function rankNamesakes(
  * auto-linked (a batched ledger write covers all of them) and the
  * confirmable suggestions for the rest.
  *
- * Per-skill outcomes are memoized for the session (`resolvedNames`): both
+ * Per-skill outcomes are memoized for the session (`resolved`): both
  * "no namesakes" and "computed but unmatched" are dead ends until the
  * served snapshot changes, and re-running the pipeline (every install,
  * removal or confirmation) must not re-hash the same directories.
@@ -102,63 +102,82 @@ export async function resolveAssociations(
 ): Promise<{ linked: string[]; suggestions: LinkSuggestions }> {
   const linked: string[] = [];
   const matched: Array<{ repo: string; slug: string; hash: string }> = [];
-  const suggestions: LinkSuggestions = {};
 
-  for (const skill of unlinked) {
-    // Step 1 — the cheap filter: without same-slug entries there is no
-    // association to make and no reason to walk the skill's directory.
-    const namesakes = await findNamesakes(skill.name);
-    if (namesakes.length === 0) {
-      resolvedNames.add(skill.name);
-      continue;
-    }
+  // Namesake lookups run in parallel; per-skill outcomes are memoized for
+  // the session (`resolved`), so repeated reconcile passes neither re-query
+  // the worker nor re-walk skill directories until the snapshot changes.
+  await Promise.all(
+    unlinked.map(async (skill) => {
+      if (resolved.has(skill.name)) return; // dead end or cached candidates
 
-    // Step 2 — content identity. The computed hash is only meaningful for
-    // the match itself; a matched hash equals the matched rev by definition.
-    // Hashing needs the native shell (the browser mock has no real files),
-    // so outside Tauri the tier degrades to suggestions only.
-    const localHash =
-      resolvedNames.has(skill.name) || !isTauri()
+      // Step 1 — the cheap filter: without same-slug entries there is no
+      // association to make and no reason to walk the skill's directory.
+      const namesakes = await findNamesakes(skill.name);
+      if (namesakes.length === 0) {
+        resolved.set(skill.name, []);
+        return;
+      }
+
+      // Step 2 — content identity. The computed hash is only meaningful for
+      // the match itself; a matched hash equals the matched rev by
+      // definition. Hashing needs the native shell (the browser mock has no
+      // real files), so outside Tauri the tier degrades to suggestions only.
+      const localHash = !isTauri()
         ? null
         : await computeSkillHash(skill.name).catch(() => null);
-    const match =
-      localHash != null
-        ? namesakes.find((s) => s.rev != null && s.rev === localHash)
-        : undefined;
-    if (localHash != null && match) {
-      matched.push({ repo: match.repo, slug: skill.name, hash: localHash });
-      linked.push(skill.name);
-      continue;
-    }
-    // Dead end this epoch — hash failed/skipped, or computed but unmatched.
-    resolvedNames.add(skill.name);
+      const match =
+        localHash != null
+          ? namesakes.find((s) => s.rev != null && s.rev === localHash)
+          : undefined;
+      if (localHash != null && match) {
+        matched.push({ repo: match.repo, slug: skill.name, hash: localHash });
+        linked.push(skill.name);
+        // Linked — the entry leaves the candidate pool for good.
+        resolved.set(skill.name, []);
+        return;
+      }
 
-    // Step 3 — ranked candidates for the user to confirm.
-    const candidates = rankNamesakes(namesakes, skill.description ?? "");
-    if (candidates.length > 0) suggestions[skill.name] = candidates;
-  }
+      // Step 3 — ranked candidates for the user to confirm, cached so the
+      // next pass reuses them without another worker round-trip.
+      resolved.set(
+        skill.name,
+        rankNamesakes(namesakes, skill.description ?? ""),
+      );
+    }),
+  );
 
   if (matched.length > 0) await recordSkillProvenanceBatch(matched);
+
+  // Assemble suggestions from the memoized candidates (linked names were
+  // parked with an empty list, so they never appear here).
+  const suggestions: LinkSuggestions = {};
+  for (const skill of unlinked) {
+    const candidates = resolved.get(skill.name);
+    if (candidates && candidates.length > 0) {
+      suggestions[skill.name] = candidates;
+    }
+  }
   return { linked, suggestions };
 }
 
 /**
- * Skill names already resolved to a dead end this session ("no namesakes"
- * or "hash computed but unmatched"). Cleared when the served snapshot
- * changes — a fresh snapshot can carry the rev a local hash was waiting
- * for, or new namesakes.
+ * Per-skill resolution memoization for the current snapshot: `[]` marks a
+ * dead end (no namesakes, hashing unavailable) or a linked skill; a
+ * non-empty array holds the cached candidates. Cleared when the served
+ * snapshot changes — a fresh snapshot can carry the rev a local hash was
+ * waiting for, or new namesakes.
  */
-const resolvedNames = new Set<string>();
+const resolved = new Map<string, LinkCandidate[]>();
 
 let lastEpoch = -1;
 export function noteRegistryEpoch(epoch: number): void {
   if (epoch !== lastEpoch) {
-    resolvedNames.clear();
+    resolved.clear();
     lastEpoch = epoch;
   }
 }
 
 /** Test hook: clear the memoization between tests. */
 export function resetLinkSuggestions(): void {
-  resolvedNames.clear();
+  resolved.clear();
 }

@@ -19,6 +19,7 @@ import {
   setMockSkillEnabled,
 } from "../../lib/mock-local";
 import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
+import { resetLinkSuggestions } from "../../lib/link-suggestions";
 
 /** The page's search box debounces for real; 1 s is a contention flake. */
 configure({ asyncUtilTimeout: 5000 });
@@ -35,6 +36,7 @@ vi.mock("../../lib/registry/client", () => ({
 
 beforeEach(() => {
   getPage.mockResolvedValue({ hits: [], total: 0 });
+  resetLinkSuggestions();
 });
 
 // The page reads installed skills through local-skills, which falls back to
