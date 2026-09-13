@@ -1,36 +1,30 @@
-import MiniSearch from "minisearch";
-
 import type { Skill } from "../types/skill";
+import { buildSearchIndex } from "./search-index";
 import { popularity } from "./popularity";
 import type { SearchField, SearchHit } from "./registry/protocol";
 
 /**
- * Client-side fuzzy search over the skill registry, powered by MiniSearch
- * (inverted index + BM25+ ranking). Runs inside the registry worker, and only
- * once the whole registry has landed: a query is answered by this index or not
- * at all — the caller returns nothing while it is still being built.
- * Relevance is computed per field with field boosts keeping the priority
- * name > repo > description, and a log-scale popularity boost nudges
- * high-popularity skills upward — relevance stays the primary signal.
+ * Registry search over the skill list. What counts as a match is not decided
+ * here: it comes from `search-index.ts`, the single search entry point the
+ * repos grid and the installed-skill page share (term and term-prefix only, a
+ * mistyped word matching nothing). This file adds what only the registry
+ * needs, and runs inside the worker, once the whole registry has landed: a
+ * query is answered by this index or not at all — the caller returns nothing
+ * while it is still being built.
  *
- * Two query-level rules sit on top of the BM25 order:
- * - "all words" first: a hit must match every term, falling back to "any word"
- *   only when no document satisfies the whole query, so one missing term
- *   cannot blank the list;
- * - an exact or prefix name hit ranks above everything else, whatever its BM25
- *   score, and those name hits are ordered by popularity among themselves: a
- *   registry search is usually someone typing a name they already have in
- *   mind, so once the name matches the open question is which of the namesakes
- *   they meant.
+ * The ranking layered on top of the shared relevance order:
+ * - field boosts keep the priority name > repo > description, and a log-scale
+ *   popularity boost nudges high-popularity skills upward — relevance stays
+ *   the primary signal;
+ * - an exact or prefix name hit ranks above everything else, whatever its
+ *   BM25 score, and those name hits are ordered by popularity among
+ *   themselves: a registry search is usually someone typing a name they
+ *   already have in mind, so once the name matches the open question is which
+ *   of the namesakes they meant.
  */
 
 /** Search query → hits in relevance order. */
 export type SkillSearch = (query: string) => SearchHit[];
-
-// Indexed documents need a unique id; Skill carries none (a repo can host
-// several skills), so documents are decorated with their registry position
-// and results are mapped back to the original objects through the closure.
-type IndexedSkill = Skill & { id: number };
 
 // MiniSearch multiplies each field's BM25 term score by its boost, so these
 // are relative magnitudes, not weights that must sum to 1. The ratios are
@@ -84,41 +78,15 @@ function nameTier(normalizedName: string, normalizedQuery: string): number {
 }
 
 /**
- * MiniSearch reports matches as `{ [term]: field[] }`; invert to
- * `{ [field]: term[] }` so the UI can highlight each displayed field.
- */
-function invertMatch(
-  match: Record<string, string[]>,
-): Partial<Record<SearchField, readonly string[]>> {
-  const matched: Partial<Record<SearchField, string[]>> = {};
-  for (const [term, fields] of Object.entries(match)) {
-    for (const field of fields) {
-      // The keys of `match` are exactly the configured search fields.
-      (matched[field as SearchField] ??= []).push(term);
-    }
-  }
-  return matched;
-}
-
-/**
- * Build the fuzzy search over the whole registry. This costs hundreds of
+ * Build the registry search over the whole skill list. This costs hundreds of
  * milliseconds for ~24k entries, so it must only run inside the worker —
  * the main thread never calls it.
  */
 export function buildSkillSearch(skills: Skill[]): SkillSearch {
-  const miniSearch = new MiniSearch<IndexedSkill>({
-    fields: ["name", "repo", "description"],
-    searchOptions: {
-      boost: FIELD_BOOSTS,
-      // Search-as-you-type and typo tolerance (edit distance ≤ 20% of the
-      // term length).
-      prefix: true,
-      fuzzy: 0.2,
-      // Popularity: multiply each document's score by its blended-figures boost.
-      boostDocument: (id) => popularityBoost(skills[id]),
-    },
+  const search = buildSearchIndex(skills, {
+    fields: FIELD_BOOSTS,
+    boostDocument: popularityBoost,
   });
-  miniSearch.addAll(skills.map((skill, id) => ({ ...skill, id })));
 
   // Precomputed once rather than per query: both run on every hit, and
   // popularity doubles as the sort key inside each name tier.
@@ -128,17 +96,13 @@ export function buildSkillSearch(skills: Skill[]): SkillSearch {
   // An empty query yields no results (and no fallback either); the caller
   // treats it as "no search" and shows the full registry instead.
   return (query) => {
-    // "All words" first; a query no document satisfies in full falls back to
-    // "any word", so one missing term never blanks the list outright.
-    const all = miniSearch.search(query, { combineWith: "AND" });
-    const hits =
-      all.length > 0 ? all : miniSearch.search(query, { combineWith: "OR" });
-
+    // The shared index already applies its "all terms first, any term second"
+    // rule, and returns hits in BM25 order with the matched terms per field.
     const normalizedQuery = normalizeName(query);
-    return hits
-      .map(({ id, match, score }) => ({
+    return search(query)
+      .map(({ id, score, matched }) => ({
         skill: skills[id],
-        matched: invertMatch(match),
+        matched: matched as Partial<Record<SearchField, readonly string[]>>,
         score,
         popularity: popularities[id],
         tier: nameTier(normalizedNames[id], normalizedQuery),

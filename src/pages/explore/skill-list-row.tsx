@@ -20,17 +20,22 @@ import {
 /** Matched indexed terms per field, from the search that produced this hit. */
 export type SkillMatched = Partial<Record<SearchField, readonly string[]>>;
 
-/**
- * Splits text on the same separator class MiniSearch's default tokenizer uses,
- * so each non-separator segment is exactly one indexed token and can be
- * compared to the matched terms (which are always whole tokens).
- */
-const TOKEN_SPLIT = /([\n\r\p{Z}\p{P}]+)/u;
+/** Terms come from user-visible text, so they are escaped before use in a RegExp. */
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 /**
- * Text with search-match highlighting: tokens present in `terms` are wrapped in
- * `<mark>`. Without terms the text renders as a single node, keeping the
- * non-search DOM identical to an unhighlighted one.
+ * Text with search-match highlighting: matched terms are wrapped in `<mark>`.
+ * Without terms the text renders as a single node, keeping the non-search DOM
+ * identical to an unhighlighted one.
+ *
+ * The terms are whole indexed tokens, so splitting the text on the terms
+ * themselves marks exactly what the index matched — for Latin text the same
+ * whole words the old token split produced, and for Han text the characters and
+ * bigrams that sit *inside* an unsegmented run and no whole-token comparison
+ * could ever reach. The one difference is that a term is also marked where a
+ * longer word contains it.
  */
 function HighlightedText({
   text,
@@ -40,19 +45,24 @@ function HighlightedText({
   terms?: readonly string[];
 }) {
   if (!terms?.length) return text;
-  const matched = new Set(terms);
+  // Longest first: an overlapping longer term wins over a shorter one.
+  const pattern = [...new Set(terms)]
+    .toSorted((a, b) => b.length - a.length)
+    .map(escapeForRegExp)
+    .join("|");
+  const splitter = new RegExp(`(${pattern})`, "iu");
   return (
     <>
-      {text.split(TOKEN_SPLIT).map((segment, i) =>
-        matched.has(segment.toLowerCase()) ? (
+      {text.split(splitter).map((part, i) =>
+        i % 2 === 1 ? (
           <mark
             key={i}
             className="rounded-[2px] bg-primary/15 text-inherit dark:bg-primary/25"
           >
-            {segment}
+            {part}
           </mark>
         ) : (
-          segment
+          part
         ),
       )}
     </>

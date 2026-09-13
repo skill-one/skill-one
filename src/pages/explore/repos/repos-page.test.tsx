@@ -151,9 +151,43 @@ describe("ReposPage", () => {
 
     await user.type(screen.getByRole("textbox", { name: "搜索仓库" }), "alpha");
 
-    expect(await screen.findByText("共 1 个仓库")).toBeInTheDocument();
+    expect(
+      await screen.findByText("共 1 个仓库 · 按相关度"),
+    ).toBeInTheDocument();
     expect(screen.getByText("acme/alpha")).toBeInTheDocument();
     expect(screen.queryByText("acme/beta")).not.toBeInTheDocument();
+  });
+
+  it("replaces the sort control with a read-only relevance label while searching", async () => {
+    const user = userEvent.setup();
+    bootRegistry(repoSkills);
+    renderReposPage();
+    await screen.findByText("acme/alpha");
+
+    const order = () =>
+      screen.getAllByRole("heading", { level: 3 }).map((el) => el.textContent);
+    expect(order()).toEqual(["acme/beta", "acme/alpha", "git/x"]);
+
+    await user.type(screen.getByRole("textbox", { name: "搜索仓库" }), "acme");
+
+    expect(
+      await screen.findByText("共 2 个仓库 · 按相关度"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /按 Star 数/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "相关度" })).toBeDisabled();
+    // Both acme repos match the same term equally, so relevance keeps them in
+    // the order the aggregation lists them (skill count, then name) — the star
+    // sort the browsed list uses would lead with beta, which has the most stars.
+    expect(order()).toEqual(["acme/alpha", "acme/beta"]);
+
+    // Clearing the search brings the sort choice back.
+    await user.clear(screen.getByRole("textbox", { name: "搜索仓库" }));
+    expect(await screen.findByText("共 3 个仓库")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /按 Star 数/ }),
+    ).toBeInTheDocument();
   });
 
   it("shows a no-match empty state for a search with no results", async () => {

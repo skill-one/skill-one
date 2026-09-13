@@ -46,6 +46,7 @@ import { ListPager } from "../../components/list-pager";
 import { Switch } from "../../components/ui/switch";
 import { cn, errorMessage } from "../../lib/utils";
 import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
+import { buildSearchIndex } from "../../lib/search-index";
 import { SKILL_LIST_CLASS } from "../../lib/skill-list-layout";
 import { useClampedPage } from "../../hooks/use-clamped-page";
 import { SearchInput } from "../../components/search-input";
@@ -260,9 +261,7 @@ export function MySkillsPage() {
   // changes rebuild `filtered`, so they close the drawer to avoid walking a
   // shifted or vanished selection.
   const [selected, setSelected] = useState<number | null>(null);
-  const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS)
-    .trim()
-    .toLowerCase();
+  const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
 
   // Any toolbar control changes the result set, so they reset to page 1.
   const handleSearch = (q: string) => {
@@ -277,8 +276,10 @@ export function MySkillsPage() {
   };
 
   // Deep link from the menu bar popover: `/my-skills?skill=<name>` pre-fills
-  // the search box so the targeted skill is the only one in the list. The
-  // param is consumed (removed) once applied so a refresh stays on the page.
+  // the search box, which ranks the targeted skill near the top (its name is
+  // the whole query, and the name field is boosted) along with any sibling
+  // whose terms it shares. The param is consumed (removed) once applied so a
+  // refresh stays on the page.
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     const target = searchParams.get("skill");
@@ -289,23 +290,34 @@ export function MySkillsPage() {
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const filtered = useMemo(
+  // The store's single search entry point, over the installed list: a term or
+  // the start of one matches, a mistyped word does not. Installed lists are
+  // short, so the index is cheap to build here and rebuild when the list
+  // changes — unlike the registry, which builds the same index in the worker.
+  // The field boosts mirror the registry's priority: what a skill is called
+  // beats where it came from, which beats a description that repeats a trigger
+  // phrase.
+  const searchInstalled = useMemo(
     () =>
-      list.filter((skill) => {
-        if (
-          query &&
-          !`${skill.name} ${skill.description ?? ""} ${skill.source ?? ""}`
-            .toLowerCase()
-            .includes(query)
-        )
-          return false;
-        const enabled = pendingEnabled[rowId(skill)] ?? skill.enabled;
-        if (filter === "enabled") return enabled;
-        if (filter === "disabled") return !enabled;
-        return true;
+      buildSearchIndex(list, {
+        fields: { name: 4, source: 2, description: 0.5 },
       }),
-    [list, query, filter, pendingEnabled],
+    [list],
   );
+
+  // A query orders its own results by relevance; the enablement filter then
+  // narrows that list without reordering it.
+  const filtered = useMemo(() => {
+    const matched = query
+      ? searchInstalled(query).map(({ doc }) => doc)
+      : list;
+    return matched.filter((skill) => {
+      const enabled = pendingEnabled[rowId(skill)] ?? skill.enabled;
+      if (filter === "enabled") return enabled;
+      if (filter === "disabled") return !enabled;
+      return true;
+    });
+  }, [list, searchInstalled, query, filter, pendingEnabled]);
 
   const total = filtered.length;
   const totalPages = useClampedPage(page, total, PAGE_SIZE, setPage);

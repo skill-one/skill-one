@@ -210,14 +210,31 @@ describe("SkillListRow", () => {
     expect(container.querySelector("h3")).toHaveTextContent("pdf-tools");
   });
 
-  it("does not mark a token that only partially matches", () => {
+  it("marks a CJK term inside an unsegmented run", () => {
     const { container } = renderWithRouter(
-      <SkillListRow skill={skill} matched={{ name: ["pd"] }} />,
+      <SkillListRow
+        skill={{ ...skill, description: "PDF 文档读取与拆分" }}
+        matched={{ description: ["文档"] }}
+      />,
     );
 
-    // Matched terms are always whole indexed tokens; "pd" is not one.
-    expect(container.querySelector("mark")).toBeNull();
-    expect(screen.getByText("pdf")).toBeInTheDocument();
+    // The index stores Han text as characters and bigrams, all shorter than the
+    // run they came from, so this is what whole-token comparison could not mark.
+    expect(container.querySelector("mark")).toHaveTextContent("文档");
+  });
+
+  it("marks a term inside a longer word", () => {
+    const { container } = renderWithRouter(
+      <SkillListRow
+        skill={{ ...skill, description: "Handles PDFs end to end" }}
+        matched={{ description: ["pdf"] }}
+      />,
+    );
+
+    // Terms are whole indexed tokens, but a token that a longer word also
+    // contains is marked too — the one thing the term split does differently
+    // from comparing whole segments.
+    expect(container.querySelector("mark")).toHaveTextContent("PDF");
   });
 
   it("renders no marks outside a search", () => {

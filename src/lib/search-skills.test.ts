@@ -112,15 +112,15 @@ describe("buildSkillSearch", () => {
     expect(hit?.matched.repo).toBeUndefined();
   });
 
-  it("still finds a skill when the query has a typo or is a prefix", () => {
+  it("answers a half-typed word but not a mistyped one", () => {
     const search = buildSkillSearch(skills);
 
-    expect(search("redix").map(({ skill }) => skill.name)).toContain(
-      "redis-cache-helper",
-    );
+    // A prefix is an unfinished query, so it still answers.
     expect(search("redi").map(({ skill }) => skill.name)).toContain(
       "redis-cache-helper",
     );
+    // A typo is a wrong term, and the shared index forgives nothing.
+    expect(search("redix").map(({ skill }) => skill.name)).toEqual([]);
   });
 
   it("returns nothing for text unrelated to the registry", () => {

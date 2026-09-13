@@ -660,7 +660,8 @@ describe("createRegistryController — getPage", () => {
     t.complete();
     await t.flush();
 
-    // Indexed: the query — and a typo of it — are answered by the fuzzy index.
+    // Indexed: the query is answered by the search index, along with a prefix
+    // of it. A typo is not — the shared entry point forgives nothing.
     t.controller.handle({
       type: "getPage",
       id: 2,
@@ -674,12 +675,20 @@ describe("createRegistryController — getPage", () => {
     t.controller.handle({
       type: "getPage",
       id: 3,
-      payload: { query: "gadgt", sort: "default", page: 0, pageSize: 5 },
+      payload: { query: "gadget-m", sort: "default", page: 0, pageSize: 5 },
     });
-    const fuzzy = resultData<{ hits: Array<{ skill: Skill }> }>(
+    const prefix = resultData<{ hits: Array<{ skill: Skill }> }>(
       t.recorded.results[2],
     );
-    expect(fuzzy.hits[0].skill.name).toBe("gadget-master");
+    expect(prefix.hits.map((h) => h.skill.name)).toEqual(["gadget-master"]);
+
+    t.controller.handle({
+      type: "getPage",
+      id: 4,
+      payload: { query: "gadgt", sort: "default", page: 0, pageSize: 5 },
+    });
+    const typo = resultData<{ hits: unknown[] }>(t.recorded.results[3]);
+    expect(typo).toEqual({ hits: [], total: 0 });
   });
 });
 
@@ -995,24 +1004,24 @@ describe("createRegistryController — getRepos", () => {
     ]);
   });
 
-  it("filters by case-insensitive repo substring", async () => {
+  it("searches repos by term, ignoring case, without forgiving typos", async () => {
     const t = await reposSetup(reposSkills);
-    expect(
+    const repos = (query: string) =>
       requestRepos(t, {
-        query: "ACME",
+        query,
         sort: "stars",
         page: 0,
         pageSize: 10,
-      }).total,
-    ).toBe(2);
-    expect(
-      requestRepos(t, {
-        query: "beta",
-        sort: "stars",
-        page: 0,
-        pageSize: 10,
-      }).repos[0]?.repo,
-    ).toBe("acme/beta");
+      }).repos.map((r) => r.repo);
+
+    // One term of both acme repos, whatever case it was typed in.
+    expect(repos("ACME")).toEqual(["acme/alpha", "acme/beta"]);
+    // A half-typed word answers: terms match from their start.
+    expect(repos("acme/alp")).toEqual(["acme/alpha"]);
+    // What the substring filter used to answer no longer does: a fragment from
+    // the middle of a word, or a mistyped letter, matches nothing.
+    expect(repos("lpha")).toEqual([]);
+    expect(repos("aqlpha")).toEqual([]);
   });
 
   it("sorts by stars, skills and name", async () => {

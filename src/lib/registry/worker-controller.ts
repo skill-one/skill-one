@@ -2,6 +2,7 @@ import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
 import { popularity } from "../popularity";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
+import { buildSearchIndex, type Search } from "../search-index";
 import type {
   DomainInfo,
   FeaturedSectionData,
@@ -34,8 +35,8 @@ import {
  * The registry worker's brain, isolated from the Worker plumbing so the
  * whole service state machine is unit-testable without a real Worker.
  *
- * The controller owns the downloaded registry, the MiniSearch index built
- * over it, and every request the main thread can ask: paged browse/search,
+ * The controller owns the downloaded registry, the search indexes built over
+ * it, and every request the main thread can ask: paged browse/search,
  * featured-page computation, and installed-skill metadata lookups. All
  * answers are page-sized or smaller — the full registry never leaves here.
  */
@@ -159,8 +160,14 @@ export function createRegistryController(
     null;
   // Aggregated per-repo summaries, cached per data version like the sort
   // order: grouping the registry is an O(n) pass, page requests only filter,
-  // sort and slice the (much smaller) repo list.
-  let repoCache: { version: number; repos: RepoInfo[] } | null = null;
+  // sort and slice the (much smaller) repo list. The search index built over
+  // that list is cached in the same record, so it can never address a
+  // different dataset than the aggregation it indexes.
+  let repoCache: {
+    version: number;
+    repos: RepoInfo[];
+    search?: Search<RepoInfo>;
+  } | null = null;
   // Lookup index for `lookupSkills`, cached per data version: resolving each
   // ref by a `store.find` is O(n·m), so instead the earliest matching skill
   // per key is indexed once and every request is a pair of map reads.
@@ -571,24 +578,52 @@ export function createRegistryController(
     return repos;
   };
 
+  /**
+   * The search index over the aggregated repo list, built on the first query
+   * for a data version and reused by every later page of the same search. An
+   * uncached list (still streaming in) is re-indexed per request, which is
+   * also what re-indexing a settled one would cost — a couple of milliseconds
+   * over ~1k entries.
+   */
+  const reposSearch = (): Search<RepoInfo> => {
+    // Asking for the aggregation first is what makes the cached index safe:
+    // afterwards repoCache is either null (a fresh download still streaming,
+    // so nothing is cached) or addressed to the current data version.
+    const repos = reposFor();
+    if (repoCache?.search) return repoCache.search;
+    const indexed = buildSearchIndex(repos, { fields: { repo: 1 } });
+    // Only a settled aggregation is worth an index of its own.
+    if (repoCache) repoCache.search = indexed;
+    return indexed;
+  };
+
   const getRepos = ({
     query,
     sort,
     page,
     pageSize,
   }: ReposRequest): RepoPageData => {
-    const q = query.trim().toLowerCase();
-    let repos = reposFor();
-    if (q) repos = repos.filter((repo) => repo.repo.toLowerCase().includes(q));
+    const start = page * pageSize;
+    const q = query.trim();
+    if (q) {
+      // A search orders its own results: the repos list answers in relevance
+      // order and ignores the order the browsed list uses, exactly as the
+      // explore page does (its toolbar swaps the sort dropdown for a
+      // read-only 相关度 label while a query is set).
+      const hits = reposSearch()(q);
+      return {
+        repos: hits.slice(start, start + pageSize).map(({ doc }) => doc),
+        total: hits.length,
+      };
+    }
     const byName = (a: RepoInfo, b: RepoInfo) => a.repo.localeCompare(b.repo);
-    repos = repos.toSorted((a, b) =>
+    const repos = reposFor().toSorted((a, b) =>
       sort === "skills"
         ? b.skills - a.skills || byName(a, b)
         : sort === "name"
           ? byName(a, b)
           : b.stars - a.stars || byName(a, b),
     );
-    const start = page * pageSize;
     return { repos: repos.slice(start, start + pageSize), total: repos.length };
   };
 
