@@ -2,7 +2,6 @@ import { Suspense, lazy, useEffect } from "react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppSidebar } from "./components/app-sidebar";
@@ -10,6 +9,7 @@ import { UpdateDialog } from "./components/update-dialog";
 import { Toaster } from "./components/ui/sonner";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 import { useRegistryRefresh } from "./hooks/use-registry-refresh";
+import { useScheduledCheck } from "./hooks/use-scheduled-check";
 import { createQueryClient } from "./lib/query-client";
 import { checkForUpdate } from "./lib/update-store";
 import { isTauri } from "./lib/tauri";
@@ -182,35 +182,17 @@ function PopoverNavigation() {
 }
 
 /**
- * How often the fallback timer below wakes up. It is not the check interval —
- * the store throttles every trigger to one request per its own window — so an
- * hour only bounds how stale a session that never loses focus can get.
- */
-const FALLBACK_CHECK_INTERVAL_MS = 60 * 60 * 1000;
-
-/**
- * Automatic update check: once on startup, again whenever the window regains
- * focus, and hourly as a fallback for a session that is never refocused. The
+ * Automatic update check: once on startup, again whenever the window becomes
+ * visible again, and hourly as a fallback for a session that stays hidden. The
  * store collapses all three into one request per interval, so the timer costs
  * nothing. Failures stay quiet here — the settings page surfaces them on an
  * explicit manual check.
  */
 function AppUpdateWatcher() {
-  useEffect(() => {
-    if (!isTauri()) return;
-    void checkForUpdate();
-    const focused = getCurrentWindow().onFocusChanged(({ payload }) => {
-      if (payload) void checkForUpdate();
-    });
-    const fallback = setInterval(
-      () => void checkForUpdate(),
-      FALLBACK_CHECK_INTERVAL_MS,
-    );
-    return () => {
-      clearInterval(fallback);
-      void focused.then((unlisten) => unlisten());
-    };
-  }, []);
+  useScheduledCheck(() => void checkForUpdate(), {
+    immediate: true,
+    enabled: isTauri(),
+  });
   return null;
 }
 
