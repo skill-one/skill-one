@@ -12,10 +12,11 @@ import { OwnerAvatar } from "./owner-avatar";
  *
  * The avatar alone only says "someone published this" — the face is small, and
  * on the rail it is the one mark with no words next to it — so the hover card
- * answers *which* repository it belongs to and offers the one action that
- * belongs to a repository: opening it on GitHub. Clicking the avatar reveals
- * the same card (the touch path; hover and keyboard focus open it on their
- * own), and never falls through to the card, whose body opens the detail
+ * answers *which* repository it belongs to, and the name it prints is itself
+ * the one action that belongs to a repository: opening it on GitHub, with the
+ * external mark beside it saying where the click lands. Clicking the avatar
+ * reveals the same card (the touch path; hover and keyboard focus open it on
+ * their own), and never falls through to the card, whose body opens the detail
  * panel.
  */
 export function RepoHoverCard({
@@ -71,7 +72,27 @@ export function RepoHoverCard({
             "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           )}
         >
-          <p className="truncate text-[12px] font-medium">{repo}</p>
+          {/* The repository names itself and opens itself: the name *is* the
+              link, with the mark that says it leaves the app right behind it.
+              Who hovers an author chip wants the repo, not a menu of things to
+              do with it, so the separate "在 GitHub 中打开" line — a second row
+              of the same card, stating what the name already offers — is gone;
+              the icon brightens instead, which is where the pointer is. */}
+          <a
+            href={href}
+            aria-label={`在 GitHub 中打开 ${repo}`}
+            onClick={(e) => {
+              e.preventDefault();
+              void openExternal(href);
+            }}
+            className="group flex min-w-0 items-center gap-1 text-[12px] font-medium"
+          >
+            <span className="truncate">{repo}</span>
+            <ExternalLink
+              className="h-3 w-3 shrink-0 text-muted-foreground/70 transition-colors group-hover:text-foreground"
+              aria-hidden
+            />
+          </a>
           {stars != null && (
             <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
               <Star
@@ -84,18 +105,6 @@ export function RepoHoverCard({
               </span>
             </p>
           )}
-          <a
-            href={href}
-            aria-label={`在 GitHub 中打开 ${repo}`}
-            onClick={(e) => {
-              e.preventDefault();
-              void openExternal(href);
-            }}
-            className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground"
-          >
-            在 GitHub 中打开
-            <ExternalLink className="h-3 w-3 shrink-0" />
-          </a>
         </HoverCard.Content>
       </HoverCard.Portal>
     </HoverCard.Root>
