@@ -750,16 +750,26 @@ export function createRegistryController(
         if (cached && cached.skills.length > 0 && gen === generation) {
           store = cached.skills;
           servedGeneratedAt = cached.generatedAt;
-          // The cached skills are already decorated with the profiles they
-          // were saved with; the stamp/tag below is what the revalidation's
-          // profiles probe is compared against, and what per-skill profile
-          // fetches pin to until a newer snapshot lands. The map behind that
-          // decoration is recovered here, so a body downloaded below can be
-          // re-decorated even when the refresh never answers.
-          servedProfilesAt = cached.profilesAt;
-          servedProfilesTag = cached.profilesTag;
-          profilesMap = profilesOf(cached.skills);
-          profilesAnsweredFor = new Set(cached.skills.map(profileId));
+          // The map behind the cached decoration is recovered here, so a body
+          // downloaded below can be re-decorated even when the refresh never
+          // answers, and the stamp/tag it was decorated from is what the
+          // revalidation's profiles probe is compared against. Both ride on
+          // that decoration actually being there: a record whose skills carry
+          // no profile at all while still claiming a profiles snapshot cannot
+          // vouch for it, and trusting the claim short-circuits the refresh for
+          // good — every card left without its classification chip and the
+          // category filter without a choice, for as long as the record lives.
+          // Such a record was written by a build that replaced the cached
+          // skills with a fresh body and never re-applied the profiles; reading
+          // the dataset again is what repairs it.
+          const recovered = profilesOf(cached.skills);
+          const decorated = recovered.size > 0;
+          profilesMap = decorated ? recovered : null;
+          profilesAnsweredFor = decorated
+            ? new Set(cached.skills.map(profileId))
+            : null;
+          servedProfilesAt = decorated ? cached.profilesAt : undefined;
+          servedProfilesTag = decorated ? cached.profilesTag : undefined;
           complete = true;
           announcedCount = cached.skills.length;
           emitProgress();
@@ -769,8 +779,8 @@ export function createRegistryController(
             tag: cached.tag,
             generatedAt: cached.generatedAt,
             total: cached.skills.length,
-            profilesAt: cached.profilesAt,
-            profilesTag: cached.profilesTag,
+            profilesAt: servedProfilesAt,
+            profilesTag: servedProfilesTag,
             origin: "cache",
           });
         }
