@@ -43,10 +43,7 @@ import { SKILL_LIST_CLASS } from "../../lib/skill-list-layout";
 import { useClampedPage } from "../../hooks/use-clamped-page";
 import { SearchInput } from "../../components/search-input";
 import { OwnerAvatar } from "../../components/owner-avatar";
-import {
-  LinkSuggestionButton,
-  LinkSuggestionDialog,
-} from "./link-suggestion-dialog";
+import { LinkSuggestionBadge } from "./link-suggestion-badge";
 import type { LinkCandidate } from "../../lib/link-suggestions";
 
 /** Enablement filter offered by the toolbar dropdown. */
@@ -116,7 +113,6 @@ function InstalledSkillRow({
   /** Opens the shared skill detail panel. */
   onOpen: () => void;
 }) {
-  const [linkOpen, setLinkOpen] = useState(false);
   return (
     <li className="flex flex-col">
       <Card
@@ -168,24 +164,21 @@ function InstalledSkillRow({
           </CardTitle>
           <CardDescription
             className={cn(
-              "truncate",
+              "flex items-center gap-1.5 truncate",
               !enabled && "text-muted-foreground/70",
             )}
           >
-            {source ?? "本地安装"}
+            <span className="truncate">{source ?? "本地安装"}</span>
+            {/* The migration affordance: hover floats a popover that lists
+                the candidates; clicking one confirms right there. */}
+            {!source && suggestion && suggestion.length > 0 && (
+              <LinkSuggestionBadge name={skill.name} candidates={suggestion} />
+            )}
           </CardDescription>
           {/* The card's own control, in the same corner the store card puts its
               install action. Clicks stay here: the card body opens the detail
               panel, this must not. */}
           <CardAction onClick={(e) => e.stopPropagation()}>
-            {/* A tool-installed skill with plausible namesakes offers the
-                confirmable association; a linked one needs no affordance. */}
-            {!source && suggestion && suggestion.length > 0 && (
-              <LinkSuggestionButton
-                name={skill.name}
-                onClick={() => setLinkOpen(true)}
-              />
-            )}
             <Switch
               checked={enabled}
               onCheckedChange={onToggle}
@@ -199,17 +192,6 @@ function InstalledSkillRow({
           {description || "暂无描述"}
         </CardContent>
       </Card>
-
-      {/* Confirmable association with a store entry, for tool-installed
-          skills; confirming writes the provenance ledger. */}
-      {suggestion && suggestion.length > 0 && (
-        <LinkSuggestionDialog
-          skillName={skill.name}
-          candidates={suggestion}
-          open={linkOpen}
-          onOpenChange={setLinkOpen}
-        />
-      )}
     </li>
   );
 }

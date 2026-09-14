@@ -332,25 +332,27 @@ describe("MySkillsPage", () => {
     });
     renderWithRouter(<MySkillsPage />);
 
-    const linkButton = await screen.findByRole("button", {
-      name: "关联 pdf 的商店条目",
+    const badge = await screen.findByRole("button", {
+      name: "将 pdf 迁移至商店版",
     });
-    await user.click(linkButton);
+    await user.click(badge);
 
-    const dialog = await screen.findByRole("dialog");
-    expect(
-      within(dialog).getByText("anthropics/skills"),
-    ).toBeInTheDocument();
-    expect(within(dialog).getByText("100%")).toBeInTheDocument();
+    // The popover lists the namesake candidates; clicking one confirms the
+    // migration right there — no second dialog.
+    const candidate = await screen.findByRole("button", {
+      name: /anthropics\/skills/,
+    });
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    await user.click(candidate);
 
-    // Confirming writes the provenance ledger: the association becomes
-    // indistinguishable from a native install.
-    await user.click(
-      within(dialog).getByRole("button", { name: /anthropics\/skills/ }),
+    // The association becomes indistinguishable from a native install: the
+    // card now speaks for the repo and the affordance is gone.
+    const card = screen.getByRole("button", { name: "查看 pdf 详情" });
+    await waitFor(() =>
+      expect(within(card).getByText("anthropics/skills")).toBeInTheDocument(),
     );
-    expect(await screen.findByText("anthropics/skills")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "关联 pdf 的商店条目" }),
+      screen.queryByRole("button", { name: "将 pdf 迁移至商店版" }),
     ).not.toBeInTheDocument();
     // And the persisted ledger carries the pick.
     expect(
