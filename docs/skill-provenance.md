@@ -90,10 +90,11 @@ no caller-controlled paths are accepted.
   `repo` matches the store entry's (or when there is no ledger entry — unknown
   source falls back to name-only). A same-named skill from a different repo
   stays installable.
-- **My-skills page** (`my-skills-page.tsx`): cards with a ledger entry show
-  the source repo and the owner's GitHub avatar (the author chip on the card's
-  metadata rail, and the repo line in the drawer); the detail drawer links to
-  the source repo instead of reading as 本地安装. The recorded source is also
+- **My-skills page** (`my-skills-page.tsx`): cards with a ledger entry carry
+  the owner's GitHub avatar (the author chip on the card's metadata rail, whose
+  hover card names the repo the card itself no longer prints) and the drawer's
+  repo line; the detail drawer links to the source repo instead of reading as
+  本地安装. The recorded source is also
   resolved back to its registry entry (`use-installed-store-entries.ts`, over
   the worker's `lookupSkills`), which is where the store's classification and
   popularity figure come from — an on-disk record carries neither, so without

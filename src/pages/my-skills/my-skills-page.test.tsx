@@ -315,7 +315,13 @@ describe("MySkillsPage", () => {
     // a tool-installed skill with no entry.
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
 
-    expect(await screen.findByText("anthropics/skills")).toBeInTheDocument();
+    // The sourced card names its repo through the author chip alone: the chip
+    // is on the metadata rail, and its hover card states what it stands for —
+    // which is why the source line under the name is gone.
+    const chip = await screen.findByRole("button", {
+      name: "仓库 anthropics/skills",
+    });
+    expect(chip.closest('[data-slot="card-footer"]')).not.toBeNull();
     // docx keeps the local-install presentation.
     expect(screen.getAllByText("本地安装")).toHaveLength(5);
     // The cover degrades to its author's initial — the owner for the sourced
@@ -329,8 +335,6 @@ describe("MySkillsPage", () => {
     // Only the sourced card can name an author, so only its metadata rail
     // carries an author chip — and the rail exists for that chip alone, since
     // the registry holds no entry to classify or rank the skill by.
-    const chip = screen.getByRole("button", { name: "仓库 anthropics/skills" });
-    expect(chip.closest('[data-slot="card-footer"]')).not.toBeNull();
     expect(container.querySelectorAll('ul [data-slot="avatar"]')).toHaveLength(
       1,
     );
@@ -426,11 +430,13 @@ describe("MySkillsPage", () => {
   it("shows no store facts for a source the registry no longer lists", async () => {
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
     // The lookup answers nothing for the ref (a fork the index dropped, say):
-    // the card keeps the recorded source and shows no chip and no figure — an
-    // absent figure is not a zero one.
+    // the card keeps the recorded source — the author chip is what names it —
+    // and shows no chip and no figure: an absent figure is not a zero one.
     renderWithRouter(<MySkillsPage />);
 
-    expect(await screen.findByText("anthropics/skills")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "仓库 anthropics/skills" }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /^热度 / }),
     ).not.toBeInTheDocument();
@@ -473,10 +479,13 @@ describe("MySkillsPage", () => {
     await user.click(candidate);
 
     // The association becomes indistinguishable from a native install: the
-    // card now speaks for the repo and the affordance is gone.
+    // card now speaks for the repo through its author chip, and the
+    // affordance is gone.
     const card = screen.getByRole("button", { name: "查看 pdf 详情" });
     await waitFor(() =>
-      expect(within(card).getByText("anthropics/skills")).toBeInTheDocument(),
+      expect(
+        within(card).getByRole("button", { name: "仓库 anthropics/skills" }),
+      ).toBeInTheDocument(),
     );
     expect(
       screen.queryByRole("button", { name: "将 pdf 迁移至商店版" }),
