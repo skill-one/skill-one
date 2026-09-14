@@ -62,14 +62,14 @@ describe("App routing", () => {
     expect(persisterWiring.calls).toBe(1);
 
     // Default route is /my-skills; wait for its content to settle.
-    await screen.findByText("共 6 个");
+    await screen.findByText("pdf");
   });
 
   it("redirects the root route to /my-skills", async () => {
     render(<App />);
 
     // MySkillsPage renders mock skill rows synchronously.
-    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
+    expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
 
   it("navigates between routes via the sidebar", async () => {
@@ -84,13 +84,13 @@ describe("App routing", () => {
     // Navigate back to the 我的 skills page.
     await user.click(screen.getByRole("link", { name: /我的 skills/ }));
 
-    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
+    expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
 
   it("redirects unknown routes back to /my-skills", async () => {
     window.location.hash = "#/does-not-exist";
     render(<App />);
 
-    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
+    expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
 });

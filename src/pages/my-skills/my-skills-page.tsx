@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
-import { Ban, Boxes, Check, LayoutGrid, Users } from "lucide-react";
+import {
+  Boxes,
+  FolderGit2,
+  LayoutGrid,
+  ToggleLeft,
+  Users,
+} from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
@@ -12,33 +18,115 @@ import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-dr
 import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { FilterDropdown, type FilterOption } from "../../components/filter-dropdown";
 import { Placeholder } from "../../components/placeholder";
-import { ListPager } from "../../components/list-pager";
 import { errorMessage } from "../../lib/utils";
-import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
+import { SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
 import { buildSearchIndex } from "../../lib/search-index";
 import {
   SKILL_CARD_SKELETON_CLASS,
   SKILL_LIST_CLASS,
 } from "../../lib/skill-list-layout";
-import { useClampedPage } from "../../hooks/use-clamped-page";
 import { SearchInput } from "../../components/search-input";
 import { SkillCard, type SkillMatched } from "../../components/skill-card";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { SkeletonList } from "../../components/skeleton-list";
 import { LinkSuggestionBadge } from "./link-suggestion-badge";
 import type { LinkCandidate } from "../../lib/link-suggestions";
+import { GroupSection, type GroupMeta } from "../explore/group-section";
 
-/** Enablement filter offered by the toolbar dropdown. */
-type EnabledFilter = "all" | "enabled" | "disabled";
+/**
+ * The grouping modes the toolbar offers. Each mode buckets the installed
+ * list and orders the groups itself, so one choice replaces the old
+ * grouping-plus-filter pair:
+ *
+ * - `repo`: one group per source repository (from the provenance ledger);
+ *   skills installed by other tools pool into 未关联仓库.
+ * - `status`: the enablement split — 已启用 / 已禁用 — the old toolbar
+ *   filter, promoted to a grouping.
+ * - `domain`: the store's classification; skills the registry cannot
+ *   classify pool into 未分类.
+ */
+type MyGroupBy = "repo" | "status" | "domain";
 
-const ENABLE_OPTIONS: FilterOption<EnabledFilter>[] = [
-  { value: "all", label: "全部", icon: LayoutGrid, neutral: true },
-  { value: "enabled", label: "已启用", icon: Check },
-  { value: "disabled", label: "已禁用", icon: Ban },
+const GROUP_OPTIONS: Array<FilterOption<MyGroupBy>> = [
+  { value: "repo", label: "按仓库", icon: FolderGit2 },
+  { value: "status", label: "按状态", icon: ToggleLeft },
+  { value: "domain", label: "按类型", icon: LayoutGrid },
 ];
+
+/** How many groups mount with the page, and how many more mount each time
+ * the reader scrolls the list's sentinel into view — the same progressive
+ * pacing the store's grouped list uses. */
+const INITIAL_GROUPS = 6;
+const GROUP_CHUNK = 6;
 
 /** Placeholder cards while the on-disk list is first read. */
 const SKELETON_ROWS = 12;
+
+/**
+ * One row of the grouped list: everything rendering an installed skill's
+ * card needs, precomputed where the grouping pass runs.
+ */
+interface Row {
+  view: SkillView;
+  enabled: boolean;
+  suggestion?: LinkCandidate[];
+}
+
+/** The grouped answer for one mode: identity metadata plus its rows. */
+interface MyGroup {
+  meta: GroupMeta;
+  items: Row[];
+}
+
+/** A group that pools the rows no mode-specific key names. */
+const POOL_TITLE_BY_MODE = {
+  repo: "未关联仓库",
+  domain: "未分类",
+} as const;
+
+/**
+ * Bucket the rows by the requested mode. Every mode starts from the rows in
+ * list order (a search has already reordered them by relevance) and keeps
+ * that order inside each bucket; the groups themselves lead with the
+ * most-populated bucket, ties resolved by title.
+ */
+function buildGroups(rows: Row[], groupBy: MyGroupBy): MyGroup[] {
+  if (groupBy === "status") {
+    // The enablement split has a natural order — running skills first — and
+    // empty halves are simply not shown.
+    const enabled = rows.filter((row) => row.enabled);
+    const disabled = rows.filter((row) => !row.enabled);
+    return [
+      { meta: { key: "status-enabled", title: "已启用" }, items: enabled },
+      { meta: { key: "status-disabled", title: "已禁用" }, items: disabled },
+    ].filter((group) => group.items.length > 0);
+  }
+
+  const poolTitle = POOL_TITLE_BY_MODE[groupBy];
+  const buckets = new Map<string, Row[]>();
+  for (const row of rows) {
+    const key = groupBy === "repo" ? row.view.repo || poolTitle : row.view.profile?.domain ?? poolTitle;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(row);
+    else buckets.set(key, [row]);
+  }
+  return Array.from(buckets, ([key, items]) => {
+    if (groupBy === "repo" && key !== poolTitle) {
+      return {
+        meta: {
+          key: `repo-${key}`,
+          title: key,
+          avatarOwner: key.split("/")[0],
+        },
+        items,
+      };
+    }
+    return { meta: { key, title: key }, items };
+  }).toSorted(
+    (a, b) =>
+      b.items.length - a.items.length || a.meta.title.localeCompare(b.meta.title),
+  );
+}
 
 /** Stable identity for a row: a skill's name is unique in the global directory. */
 function rowId(skill: InstalledSkill): string {
@@ -116,33 +204,38 @@ export function MySkillsPage() {
   // the store facts an on-disk record never carries (classification, the
   // popularity figure), so the installed list can show the store's card for
   // the skills the ledger placed. Empty for tool installs — nothing to resolve.
-  const entries = useInstalledStoreEntries(linked);
+  const storeEntries = useInstalledStoreEntries(linked);
 
   const list = useMemo(() => skills ?? [], [skills]);
 
-  // 1-based current page; the toolbar (search + enablement filter) is local
-  // state — the full installed list is already in memory, so everything below
-  // filters and slices on the main thread.
-  const [page, setPage] = useState(1);
+  // Search and grouping mode are local state — the full installed list is
+  // already in memory, so everything below filters and groups on the main
+  // thread.
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<EnabledFilter>("all");
-  // Open skill in the shared detail drawer: an index into `filtered` (the
-  // whole result set, across pages), null keeps the drawer closed. Toolbar
-  // changes rebuild `filtered`, so they close the drawer to avoid walking a
-  // shifted or vanished selection.
-  const [selected, setSelected] = useState<number | null>(null);
+  const [groupBy, setGroupBy] = useState<MyGroupBy>("repo");
+  // Open skill in the shared detail drawer, tracked by NAME rather than by
+  // index: the provenance and store-entry queries land asynchronously and
+  // regroup the list under the reader's pointer, so an index captured at
+  // click time could point at a different skill a moment later. The drawer's
+  // index is derived from the name at render time, and a not-yet-resolved
+  // name keeps the drawer closed until the groups settle.
+  const [selectedName, setSelectedName] = useState<string | null>(null);
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
+  // Progressive rendering: only the first `visibleCount` groups are mounted;
+  // an IntersectionObserver on the sentinel below the list extends the count
+  // while the reader scrolls.
+  const [visibleCount, setVisibleCount] = useState(INITIAL_GROUPS);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Any toolbar control changes the result set, so they reset to page 1.
   const handleSearch = (q: string) => {
-    setPage(1);
     setSearch(q);
-    setSelected(null);
+    setSelectedName(null);
+    setVisibleCount(INITIAL_GROUPS);
   };
-  const handleFilter = (next: EnabledFilter) => {
-    setPage(1);
-    setFilter(next);
-    setSelected(null);
+  const handleGroupBy = (mode: MyGroupBy) => {
+    setGroupBy(mode);
+    setSelectedName(null);
+    setVisibleCount(INITIAL_GROUPS);
   };
 
   // Deep link from the menu bar popover: `/my-skills?skill=<name>` pre-fills
@@ -154,9 +247,9 @@ export function MySkillsPage() {
   useEffect(() => {
     const target = searchParams.get("skill");
     if (!target) return;
-    setPage(1);
     setSearch(target);
-    setSelected(null);
+    setSelectedName(null);
+    setVisibleCount(INITIAL_GROUPS);
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -176,8 +269,8 @@ export function MySkillsPage() {
   );
 
   // The hits of the current query, or null when browsing. A query orders its
-  // own results by relevance; the enablement filter then narrows that list
-  // without reordering it.
+  // own results by relevance; the enablement state then only decides which
+  // group a skill lands in.
   const hits = useMemo(
     () => (query ? searchInstalled(query) : null),
     [query, searchInstalled],
@@ -191,40 +284,89 @@ export function MySkillsPage() {
 
   const filtered = useMemo(() => {
     const docs = hits ? hits.map((hit) => hit.doc) : list;
-    return docs.filter((skill) => {
-      if (filter === "enabled") return skill.enabled;
-      if (filter === "disabled") return !skill.enabled;
-      return true;
-    });
-  }, [hits, list, filter]);
+    return docs;
+  }, [hits, list]);
 
   // One view per listed skill: the on-disk record merged with the store entry
   // its recorded source resolved to. Both the card and the drawer read these
   // objects, so the two can never disagree about what a skill looks like, and
   // the store's facts are present exactly when the registry holds an entry.
-  const rows = useMemo(
+  const rows = useMemo<Row[]>(
     () =>
       filtered.map((skill) => ({
-        view: installedSkillView(skill, linked, entries[skill.name]),
+        view: installedSkillView(skill, linked, storeEntries[skill.name]),
         enabled: skill.enabled,
+        suggestion: suggestions?.[skill.name],
       })),
-    [filtered, linked, entries],
+    [filtered, linked, storeEntries, suggestions],
   );
 
-  const total = rows.length;
-  const totalPages = useClampedPage(page, total, PAGE_SIZE, setPage);
+  // The groups of every mode, so the grouping dropdown can annotate its
+  // options with what each choice would produce. Installed lists are short —
+  // three passes over them cost nothing.
+  const groupsByMode = useMemo(
+    () => ({
+      repo: buildGroups(rows, "repo"),
+      status: buildGroups(rows, "status"),
+      domain: buildGroups(rows, "domain"),
+    }),
+    [rows],
+  );
+  const groups = groupsByMode[groupBy];
+  const groupOptions = useMemo(
+    () =>
+      GROUP_OPTIONS.map((option) => ({
+        ...option,
+        count: groupsByMode[option.value].length,
+      })),
+    [groupsByMode],
+  );
 
-  const visible = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const pageOffset = (page - 1) * PAGE_SIZE;
+  const renderedGroups = groups.slice(0, visibleCount);
+  const allRendered = renderedGroups.length >= groups.length;
 
-  // The drawer walks the whole filtered result set, not just the current
-  // page, so ←/→ keeps going across page boundaries.
-  const detailSkills = useMemo(() => rows.map((row) => row.view), [rows]);
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || allRendered) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisibleCount((c) => Math.min(c + GROUP_CHUNK, groups.length));
+      }
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [allRendered, groups.length]);
+
+  // The drawer walks the flat grouped list, unwrapped — the same coordinates
+  // the groups hand their rows.
+  const detailSkills = useMemo(
+    () => groups.flatMap((group) => group.items.map((row) => row.view)),
+    [groups],
+  );
+  const groupOffsets = useMemo(() => {
+    const offsets: number[] = [];
+    let next = 0;
+    for (const group of groups) {
+      offsets.push(next);
+      next += group.items.length;
+    }
+    return offsets;
+  }, [groups]);
+
+  // The drawer's index, derived from the selected name at render time so a
+  // regrouping can never leave it pointing at the wrong skill. -1 (the named
+  // skill is not in the current answer — removed, or filtered by its own
+  // search) reads as closed.
+  const selectedIndex = useMemo(() => {
+    if (!selectedName) return null;
+    const index = detailSkills.findIndex((view) => view.name === selectedName);
+    return index === -1 ? null : index;
+  }, [selectedName, detailSkills]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-0">
-      {/* Toolbar, styled like the store's full list: search first, controls
-          clustered on the right. */}
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-5">
+      {/* Toolbar, styled like the store's grouped list: search first, the
+          grouping mode and the agent strip clustered on the right. */}
       <div className="mb-4 flex items-center gap-3">
         <SearchInput value={search} onChange={handleSearch} label="搜索 Skill" />
 
@@ -232,18 +374,17 @@ export function MySkillsPage() {
           <AgentAvatarMenu />
 
           <FilterDropdown
-            label="筛选"
-            value={filter}
-            options={ENABLE_OPTIONS}
-            onChange={handleFilter}
+            value={groupBy}
+            options={groupOptions}
+            onChange={handleGroupBy}
           />
         </div>
       </div>
 
-      {/* The skill list, in the store's row shape, with the pager row pinned to
-          the bottom. */}
+      {/* The grouped skill list; the modal detail drawer overlays it without
+          reflowing it or moving its scroll position. */}
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 -mx-3 -mt-1 overflow-y-auto px-3 pb-0 pt-1">
+        <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5">
           {isError ? (
             <Placeholder
               icon={Users}
@@ -259,54 +400,66 @@ export function MySkillsPage() {
             />
           ) : list.length === 0 ? (
             <Placeholder icon={Boxes} message="还没有安装任何技能" />
-          ) : visible.length === 0 ? (
+          ) : groups.length === 0 ? (
             <Placeholder
               message={
                 query ? `未找到匹配“${query}”的 Skill` : "没有符合条件的 Skill"
               }
             />
           ) : (
-            <ul className={SKILL_LIST_CLASS}>
-              {visible.map((row, i) => {
-                const index = pageOffset + i;
-                const id = row.view.name;
-                return (
-                  <InstalledSkillRow
-                    key={id}
-                    view={row.view}
-                    enabled={row.enabled}
-                    selected={selected === index}
-                    matched={matchedById[id]}
-                    suggestion={suggestions?.[id]}
-                    onOpen={() => setSelected(index)}
-                  />
-                );
-              })}
-            </ul>
+            <div
+              key={`${query}\u0000${groupBy}\u0000${list.length}`}
+              className="flex flex-col gap-3"
+            >
+              {/* Keyed by the answer's definition, so stale fold states and
+                  scroll depth never survive into a differently-shaped list;
+                  the skill count rides along because uninstalling reshapes
+                  the groups too. */}
+              {renderedGroups.map((group, gi) => (
+                <GroupSection
+                  key={group.meta.key}
+                  group={group.meta}
+                  index={gi}
+                  items={group.items}
+                  offset={groupOffsets[gi]}
+                  selected={selectedIndex}
+                  rowKey={(row) => row.view.name}
+                  renderItem={(row, _flatIndex, isSelected) => (
+                    <InstalledSkillRow
+                      view={row.view}
+                      enabled={row.enabled}
+                      selected={isSelected}
+                      matched={matchedById[row.view.name]}
+                      suggestion={row.suggestion}
+                      onOpen={() => setSelectedName(row.view.name)}
+                    />
+                  )}
+                />
+              ))}
+              {/* The sentinel ends the rendered run: while it is on screen
+                  the observer above extends the run, so scrolling down keeps
+                  revealing groups until the answer is fully mounted. */}
+              {!allRendered && <div ref={sentinelRef} aria-hidden="true" />}
+            </div>
           )}
         </div>
-
-        {!isLoading && !isError && list.length > 0 && (
-          <ListPager
-            page={page}
-            totalPages={totalPages}
-            onPage={setPage}
-            count={`共 ${total} 个`}
-          />
-        )}
       </div>
 
       {/* Same right-side detail drawer the store pages use, told which list
           owns it: the installed surface replaces the store's install CTA with
           the enable switch and shows no registry-only figures. ←/→ walks the
-          whole filtered result set, across page boundaries. Uninstalling from
-          it closes it: this list shrinks with the skill, so the same index
-          would land on a different one — a swap the reader never asked for. */}
+          whole grouped list. Uninstalling from it closes it: this list
+          shrinks with the skill, so the same index would land on a different
+          one — a swap the reader never asked for. */}
       <SkillDetailDrawer
         skills={detailSkills}
-        selected={selected}
-        onSelect={setSelected}
-        onRemoved={() => setSelected(null)}
+        selected={selectedIndex}
+        onSelect={(index) =>
+          setSelectedName(
+            index == null ? null : detailSkills[index]?.name ?? null,
+          )
+        }
+        onRemoved={() => setSelectedName(null)}
         surface="installed"
       />
     </div>

@@ -13,7 +13,6 @@ import { getExcludedAgents } from "../../lib/agent-link-preferences";
 
 import { MySkillsPage } from "./my-skills-page";
 import { renderWithRouter } from "../../test/test-utils";
-import { PAGE_SIZE } from "../../lib/pagination";
 import {
   addMockLocalSkill,
   installMockSkill,
@@ -70,6 +69,16 @@ async function openAgentMenu(user: ReturnType<typeof userEvent.setup>) {
 const menuItem = (display: string, state: string) =>
   screen.findByRole("menuitem", { name: new RegExp(`${display}.*${state}`) });
 
+/**
+ * The group header trigger of one group, addressed by its aria-label —
+ * titles stay intact there even when the figures beside them are long.
+ */
+function groupHeader(title: string, count: number) {
+  return screen.getByRole("button", {
+    name: `分组 ${title}，${count} 个 skill`,
+  });
+}
+
 describe("MySkillsPage", () => {
   afterEach(() => {
     resetMockInstalledSkills();
@@ -80,18 +89,17 @@ describe("MySkillsPage", () => {
     window.localStorage.clear();
   });
 
-  it("shows the installed count in the bottom pager row", async () => {
+  it("groups the ungrouped default into a single 未关联仓库 group", async () => {
     renderWithRouter(<MySkillsPage />);
 
-    // Wait for the (mock) query to land: 6 skills installed globally.
-    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
-    // A single-page list still shows the pager controls, both ends clamped.
+    // Wait for the (mock) query to land: 6 skills installed globally, none
+    // with a recorded source — they pool into one group.
     expect(
-      screen.getByRole("link", { name: "上一页" }),
-    ).toHaveAttribute("aria-disabled", "true");
-    expect(
-      screen.getByRole("link", { name: "下一页" }),
-    ).toHaveAttribute("aria-disabled", "true");
+      await screen.findByRole("button", {
+        name: "分组 未关联仓库，6 个 skill",
+      }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
 
   it("renders each installed skill", async () => {
@@ -111,7 +119,7 @@ describe("MySkillsPage", () => {
 
     // No card carries an uninstall control: the whole card body is a click
     // target and removal is irreversible, so the action lives one step away.
-    await screen.findByText("共 6 个");
+    await screen.findByText("pdf");
     expect(screen.queryByTitle("移除")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "查看 pdf 详情" }));
@@ -127,8 +135,6 @@ describe("MySkillsPage", () => {
         screen.queryByRole("button", { name: "查看 pdf 详情" }),
       ).not.toBeInTheDocument();
     });
-    // The bottom pager count follows the (filtered) list size.
-    expect(await screen.findByText("共 5 个")).toBeInTheDocument();
   });
 
   it("shows the empty state after removing every skill", async () => {
@@ -281,7 +287,7 @@ describe("MySkillsPage", () => {
   it("does not open the drawer from the card's switch", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
-    await screen.findByText("共 6 个");
+    await screen.findByText("pdf");
 
     await user.click(await screen.findByRole("switch", { name: "关闭 pdf" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -347,6 +353,11 @@ describe("MySkillsPage", () => {
     const user = userEvent.setup();
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
     renderWithRouter(<MySkillsPage />);
+    await screen.findByText("pdf");
+    // The provenance query lands asynchronously and moves pdf into its own
+    // repository group; wait for that reshuffle to settle before clicking,
+    // so the card is not detached mid-press.
+    await screen.findByRole("button", { name: "仓库 anthropics/skills" });
 
     await user.click(
       await screen.findByRole("button", { name: "查看 pdf 详情" }),
@@ -365,6 +376,9 @@ describe("MySkillsPage", () => {
     const user = userEvent.setup();
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
     renderWithRouter(<MySkillsPage />);
+    // Same wait: the provenance-driven regroup settles before the click.
+    await screen.findByText("pdf");
+    await screen.findByRole("button", { name: "仓库 anthropics/skills" });
 
     await user.click(
       await screen.findByRole("button", { name: "查看 pdf 详情" }),
@@ -508,41 +522,47 @@ describe("MySkillsPage", () => {
     expect(
       await screen.findByLabelText("搜索 Skill"),
     ).toHaveValue("pdf");
-    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
-    expect(screen.queryByText("docx")).not.toBeInTheDocument();
+    expect(await screen.findByText("pdf")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText("docx")).not.toBeInTheDocument(),
+    );
   });
 
-  it("filters skills by search text and updates the count", async () => {
+  it("filters skills by search text", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
-    await screen.findByText("共 6 个");
+    await screen.findByText("pdf");
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
-    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
-    expect(
-      screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-    ).toHaveLength(1);
+    // The debounce settles before the answer narrows.
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+      ).toHaveLength(1),
+    );
     expect(screen.queryByText("docx")).not.toBeInTheDocument();
 
     await user.clear(screen.getByLabelText("搜索 Skill"));
-    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
-    expect(
-      screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-    ).toHaveLength(6);
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+      ).toHaveLength(6),
+    );
   });
 
   it("highlights matched terms on a searched card, like the store's list", async () => {
     const user = userEvent.setup();
     const { container } = renderWithRouter(<MySkillsPage />);
-    await screen.findByText("共 6 个");
+    await screen.findByText("pdf");
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
-    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
     // The installed list's index reports matched terms per field exactly as
     // the registry's worker does, so the shared card marks them the same way.
-    expect(container.querySelector("mark")).toHaveTextContent("pdf");
+    await waitFor(() =>
+      expect(container.querySelector("mark")).toHaveTextContent("pdf"),
+    );
   });
 
   it("renders no marks outside a search", async () => {
@@ -555,89 +575,66 @@ describe("MySkillsPage", () => {
   it("searches Chinese text but not a fragment inside a word", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
-    await screen.findByText("共 6 个");
+    await screen.findByText("pdf");
 
     // The descriptions here are Chinese and carry no word separators; the
     // shared index splits Han text into character bigrams, so a phrase still
     // answers — pdf (「PDF 文档读取…」) and docx (「…Word 文档。」).
     await user.type(screen.getByLabelText("搜索 Skill"), "文档");
-    expect(await screen.findByText("共 2 个")).toBeInTheDocument();
-    expect(screen.getByText("pdf")).toBeInTheDocument();
+    expect(await screen.findByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("docx")).toBeInTheDocument();
 
     // "df" sits inside the term "pdf": the substring filter used to answer it,
     // a term index does not.
     await user.clear(screen.getByLabelText("搜索 Skill"));
     await user.type(screen.getByLabelText("搜索 Skill"), "df");
-    expect(await screen.findByText("共 0 个")).toBeInTheDocument();
+    expect(await screen.findByText(/未找到匹配/)).toBeInTheDocument();
   });
 
   it("shows a no-match empty state for a search with no results", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
-    await screen.findByText("共 6 个");
+    await screen.findByText("pdf");
 
     await user.type(screen.getByLabelText("搜索 Skill"), "zzz");
 
     expect(await screen.findByText(/未找到匹配/)).toBeInTheDocument();
-    expect(screen.getByText("共 0 个")).toBeInTheDocument();
   });
 
-  it("filters by enablement state from the toolbar dropdown", async () => {
+  it("groups by enablement state from the toolbar dropdown", async () => {
     const user = userEvent.setup();
     setMockSkillEnabled("pdf", false);
     renderWithRouter(<MySkillsPage />);
-    await screen.findByText("共 6 个");
+    await screen.findByText("pdf");
 
-    await user.click(screen.getByRole("button", { name: "筛选" }));
+    await user.click(screen.getByRole("button", { name: "按仓库" }));
     await user.click(
-      await screen.findByRole("menuitemradio", { name: "已禁用" }),
+      await screen.findByRole("menuitemradio", { name: /^按状态/ }),
     );
 
-    // Only the disabled skill survives; the trigger now shows the selection.
-    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
+    // The enablement split takes over: two groups, running skills first,
+    // with the disabled skill dimmed inside its own group.
+    expect(await screen.findByText("已启用")).toBeInTheDocument();
+    expect(groupHeader("已启用", 5)).toBeInTheDocument();
+    expect(groupHeader("已禁用", 1)).toBeInTheDocument();
     expect(
       screen.getByRole("switch", { name: "开启 pdf" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("docx")).not.toBeInTheDocument();
-    // The trigger now spells out the active filter.
-    expect(
-      await screen.findByRole("button", { name: /已禁用/ }),
-    ).toBeInTheDocument();
   });
 
-  it("pages through the list and clamps back when the last page empties", async () => {
+  it("annotates the grouping options with the group counts", async () => {
     const user = userEvent.setup();
-    // installMockSkill prepends, so page 1 holds extra-44..extra-0 plus the
-    // first five base skills and the tail base skill lands on page 2.
-    for (let i = 0; i < PAGE_SIZE - 5; i++) {
-      installMockSkill(`extra-${i}`);
-    }
+    setMockSkillEnabled("pptx", false);
     renderWithRouter(<MySkillsPage />);
+    await screen.findByText("pdf");
 
-    expect(await screen.findByText(`共 ${PAGE_SIZE + 1} 个`)).toBeInTheDocument();
-    expect(screen.getByText(`extra-${PAGE_SIZE - 6}`)).toBeInTheDocument();
-    expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
-
-    await user.click(screen.getByLabelText("下一页"));
-
-    expect(await screen.findByText("frontend-design")).toBeInTheDocument();
-    expect(
-      screen.queryByText(`extra-${PAGE_SIZE - 6}`),
-    ).not.toBeInTheDocument();
-
-    // Removing the only skill on the last page clamps back to page 1.
-    await user.click(
-      screen.getByRole("button", { name: "查看 frontend-design 详情" }),
-    );
-    await user.click(await screen.findByRole("button", { name: "移除" }));
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("button", { name: "查看 frontend-design 详情" }),
-      ).not.toBeInTheDocument();
-    });
-    expect(await screen.findByText(`共 ${PAGE_SIZE} 个`)).toBeInTheDocument();
-    expect(screen.getByText(`extra-${PAGE_SIZE - 6}`)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "按仓库" }));
+    const rows = screen
+      .getAllByRole("menuitemradio")
+      .map((m) => m.textContent);
+    // All six skills share one repo-less pool; disabling pptx splits the
+    // status mode into two groups; nothing is classified.
+    expect(rows).toEqual(["按仓库1 组", "按状态2 组", "按类型1 组"]);
   });
 
   it("lists every detected agent in the strip's dropdown menu", async () => {

@@ -2,6 +2,8 @@ import { createRegistryController } from "../lib/registry/worker-controller";
 import type {
   DomainInfo,
   FeaturedData,
+  GroupsData,
+  GroupsRequest,
   PageData,
   PageRequest,
   RankingData,
@@ -53,6 +55,7 @@ export interface RegistryHarness {
   /** Make every RPC reject (worker crash stand-in) until cleared. */
   setRpcError(err: Error | null): void;
   getPage(req: PageRequest): Promise<PageData>;
+  getGroups(req: GroupsRequest): Promise<GroupsData>;
   getFeatured(): Promise<FeaturedData>;
   getRanking(req: RankingRequest): Promise<RankingData>;
   lookupSkills(refs: SkillRef[]): Promise<{ entries: Array<Skill | null> }>;
@@ -194,6 +197,7 @@ export function createRegistryHarness(): RegistryHarness {
   async function request<T>(
     type:
       | "getPage"
+      | "getGroups"
       | "getFeatured"
       | "getRanking"
       | "lookupSkills"
@@ -262,6 +266,9 @@ export function createRegistryHarness(): RegistryHarness {
     getPage(req) {
       return request<PageData>("getPage", req);
     },
+    getGroups(req) {
+      return request<GroupsData>("getGroups", req);
+    },
     getFeatured() {
       return request<FeaturedData>("getFeatured");
     },
@@ -308,6 +315,7 @@ export function createRegistryClientMock(harness: RegistryHarness) {
     initRegistry: () => harness.init(),
     reloadRegistry: () => harness.reload(),
     getPage: (req: PageRequest) => harness.getPage(req),
+    getGroups: (req: GroupsRequest) => harness.getGroups(req),
     getFeatured: () => harness.getFeatured(),
     getRanking: (req: RankingRequest) => harness.getRanking(req),
     lookupSkills: (refs: SkillRef[]) => harness.lookupSkills(refs),

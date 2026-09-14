@@ -1,10 +1,15 @@
 import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
+import { domainMeta } from "../../data/domains";
 import { popularity } from "../popularity";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
 import type {
   DomainInfo,
   FeaturedSectionData,
+  Group,
+  GroupCounts,
+  GroupsData,
+  GroupsRequest,
   IndexInfo,
   PageData,
   PageRequest,
@@ -575,6 +580,131 @@ export function createRegistryController(
     };
   };
 
+  /** Skills per popularity bucket in the `TOP 1-50` grouping. */
+  const GROUP_BUCKET_SIZE = 50;
+
+  /**
+   * How many groups each offered mode would produce over the same hits —
+   * the grouping dropdown annotates its options with these so the reader can
+   * compare the modes before committing to one. Every figure is a cheap set
+   * or arithmetic pass: unique repos, the bucket math, unique domains (with
+   * the unprofiled pool counting as one).
+   */
+  const countGroups = (hits: SearchHit[]): GroupCounts => {
+    const repos = new Set<string>();
+    const domains = new Set<string>();
+    for (const hit of hits) {
+      repos.add(hit.skill.repo);
+      domains.add(hit.skill.profile?.domain ?? "未分类");
+    }
+    return {
+      repo: repos.size,
+      popularity: Math.ceil(hits.length / GROUP_BUCKET_SIZE),
+      domain: domains.size,
+    };
+  };
+
+  /**
+   * The explore list grouped by the requested mode. Each mode implies its own
+   * ordering — the toolbar offers one grouping choice instead of a grouping
+   * plus a sort — and every mode starts from the same ordered hits: a search
+   * stays in relevance order, the browsed list follows the popularity blend.
+   * Bucketing those hits via `Map` insertion order puts each group's skills
+   * in hit order and the groups themselves in first-appearance order (i.e.
+   * best-hit-first under a search); the browse path re-orders the groups
+   * per mode afterwards.
+   *
+   * - `repo`: one group per repository, most-starred first.
+   * - `popularity`: fixed-size rank buckets over the ordered hits, in rank
+   *   order by construction (`TOP 1-50`, `TOP 51-100`, …).
+   * - `domain`: one group per profile domain, most-populated first, with
+   *   unprofiled skills pooled into 未分类 so nothing disappears.
+   * - `recency`: reserved — the mirror does not publish an update time yet,
+   *   so the mode is not offered (see `GroupBy`).
+   *
+   * Unlike `getPage` there is no slicing: the full filtered answer crosses the
+   * boundary and the page folds groups away instead of paging them. Closed
+   * groups render no cards, so the DOM stays at the expanded groups only —
+   * the payload, not the render, is the price of dropping the pager.
+   */
+  const getGroups = ({
+    query,
+    groupBy,
+  }: GroupsRequest): GroupsData => {
+    const q = query.trim();
+    let hits: SearchHit[];
+    if (q) {
+      if (!search) {
+        return {
+          groups: [],
+          total: 0,
+          groupCounts: { repo: 0, popularity: 0, domain: 0 },
+        };
+      }
+      hits = search(q);
+    } else {
+      hits = orderFor("popularity").map((id) => ({
+        skill: store[id],
+        matched: {},
+      }));
+    }
+
+    let groups: Group[];
+    if (groupBy === "popularity") {
+      // Fixed-size rank buckets over the ordered hits; the title is the rank
+      // range the bucket covers and rank order is the group order.
+      groups = [];
+      for (let start = 0; start < hits.length; start += GROUP_BUCKET_SIZE) {
+        const bucket = hits.slice(start, start + GROUP_BUCKET_SIZE);
+        groups.push({
+          key: `pop-${start}`,
+          title: `TOP ${start + 1}-${start + bucket.length}`,
+          skills: bucket,
+        });
+      }
+    } else if (groupBy === "domain") {
+      const buckets = new Map<string, SearchHit[]>();
+      for (const hit of hits) {
+        const domain = hit.skill.profile?.domain ?? "未分类";
+        const bucket = buckets.get(domain);
+        if (bucket) bucket.push(hit);
+        else buckets.set(domain, [hit]);
+      }
+      groups = Array.from(buckets, ([domain, skills]) => ({
+        key: `domain-${domain}`,
+        title: domain,
+        emoji: domainMeta(domain)?.emoji,
+        skills,
+      })).toSorted(
+        (a, b) =>
+          b.skills.length - a.skills.length || a.title.localeCompare(b.title),
+      );
+    } else {
+      const buckets = new Map<string, SearchHit[]>();
+      for (const hit of hits) {
+        const bucket = buckets.get(hit.skill.repo);
+        if (bucket) bucket.push(hit);
+        else buckets.set(hit.skill.repo, [hit]);
+      }
+      groups = Array.from(buckets, ([repo, skills]) => ({
+        key: `repo-${repo}`,
+        title: repo,
+        avatarOwner: repo.split("/")[0],
+        stars: Math.max(...skills.map(({ skill }) => skill.stars)),
+        skills,
+      }));
+      if (!q) {
+        groups.sort(
+          (a, b) =>
+            (b.stars ?? 0) - (a.stars ?? 0) ||
+            b.skills.length - a.skills.length ||
+            a.title.localeCompare(b.title),
+        );
+      }
+    }
+    return { groups, total: hits.length, groupCounts: countGroups(hits) };
+  };
+
   /**
    * The distinct profile domains with their skill counts, most-used first.
    * Only profiled skills contribute — the list (and every count) shrinks to
@@ -863,6 +993,9 @@ export function createRegistryController(
         switch (message.type) {
           case "getPage":
             data = getPage(message.payload);
+            break;
+          case "getGroups":
+            data = getGroups(message.payload);
             break;
           case "getFeatured":
             data = getFeatured();
