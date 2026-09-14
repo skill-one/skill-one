@@ -47,6 +47,52 @@ describe("SkillListRow", () => {
     expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
   });
 
+  it("leads with the skill's own image and opens the rail with the author chip", () => {
+    const { container } = renderWithRouter(<SkillListRow skill={skill} />);
+
+    // The skill's image is the card's leading element, named for assistive
+    // tech; nothing loads here, so it shows the author's initial.
+    const cover = container.querySelector('[data-slot="skill-cover"]');
+    expect(cover).toHaveAttribute("aria-label", "pdf 封面图");
+
+    // The source line now carries the repo alone: the author moved down into
+    // the metadata rail, where the classification and the figure live.
+    const sourceLine = container.querySelector(
+      '[data-slot="card-description"]',
+    );
+    expect(sourceLine).toHaveTextContent("anthropics/skills");
+    expect(sourceLine?.querySelector('[data-slot="avatar"]')).toBeNull();
+
+    // The chip leads that rail, and names the repository it stands for.
+    const chip = screen.getByRole("button", { name: "仓库 anthropics/skills" });
+    expect(chip.querySelector('[data-slot="avatar"]')).not.toBeNull();
+    expect(chip.closest('[data-slot="card-footer"]')).not.toBeNull();
+  });
+
+  it("names the repository from the author chip's hover card", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<SkillListRow skill={skill} />);
+
+    await user.hover(
+      screen.getByRole("button", { name: "仓库 anthropics/skills" }),
+    );
+    // The card only mounts once the rail's chip is hovered; its action is the
+    // unique handle on it.
+    const openLink = await screen.findByRole("link", {
+      name: "在 GitHub 中打开 anthropics/skills",
+    });
+
+    // The avatar's own words: which repo it is, how big it is, and the one
+    // action that belongs to a repository.
+    const card = openLink.parentElement!;
+    expect(card).toHaveTextContent("anthropics/skills");
+    expect(card).toHaveTextContent("169.6K Star");
+    expect(openLink).toHaveAttribute(
+      "href",
+      "https://github.com/anthropics/skills",
+    );
+  });
+
   it("breaks the figure down into installs and stars on hover", async () => {
     const user = userEvent.setup();
     renderWithRouter(<SkillListRow skill={skill} />);
@@ -75,14 +121,19 @@ describe("SkillListRow", () => {
     ).toBeInTheDocument();
   });
 
-  it("takes the card's controls in card order: install, then the figure", async () => {
+  it("takes the card's controls in card order: install, the author chip, then the figure", async () => {
     const user = userEvent.setup();
     renderWithRouter(<SkillListRow skill={skill} />);
 
-    // The install action lives in the header now, above the figure that used
-    // to sit beside it at the bottom, and the tab order follows the card.
+    // The install action lives in the header, above the rail the card is read
+    // left to right along, and the tab order follows the card.
     await user.tab();
     expect(screen.getByRole("button", { name: "安装" })).toHaveFocus();
+
+    await user.tab();
+    expect(
+      screen.getByRole("button", { name: "仓库 anthropics/skills" }),
+    ).toHaveFocus();
 
     await user.tab();
     expect(

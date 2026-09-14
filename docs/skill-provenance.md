@@ -91,9 +91,11 @@ no caller-controlled paths are accepted.
   source falls back to name-only). A same-named skill from a different repo
   stays installable.
 - **My-skills page** (`my-skills-page.tsx`): cards with a ledger entry show
-  the source repo and the owner's GitHub avatar; the detail drawer links to
-  the source repo instead of reading as 本地安装. Entries are absent for
-  tool-installed skills, which keep the local-install presentation.
+  the source repo, carry the owner's GitHub avatar as the author chip on their
+  metadata rail, and can address the skill's cover in the registry; the detail
+  drawer links to the source repo instead of reading as 本地安装. Entries are
+  absent for tool-installed skills, which keep the local-install presentation
+  (no author chip, and the image slot falls back to the skill's own initial).
 
 ## Associating skills installed by other tools
 

@@ -47,6 +47,7 @@ export function SkillListRow({
       name={skill.name}
       matched={matched}
       description={skill.description}
+      stars={skill.stars}
       selected={selected}
       onSelect={onSelect}
       action={<SkillInstallButton skill={skill} onError={setInstallError} />}

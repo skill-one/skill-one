@@ -256,22 +256,24 @@ describe("MySkillsPage", () => {
     expect(screen.getByText("暂无描述")).toBeInTheDocument();
   });
 
-  it("labels every card 本地安装 with the placeholder avatar", async () => {
+  it("labels every card 本地安装 and still leads it with the skill's image", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
 
     await screen.findByText("pdf");
-    // Skills installed by other tools (no ledger entry) still read as a
-    // local install and carry the Puzzle placeholder avatar.
+    // Skills installed by other tools (no ledger entry) read as a local
+    // install; every card still leads with its skill's image. Nothing loads
+    // in this env and no source can be named, so the slot shows the skill's
+    // own initial — and no owner avatar joins it.
     expect(screen.getAllByText("本地安装")).toHaveLength(6);
-    expect(
-      container.querySelectorAll('[aria-label="skill 头像"]'),
-    ).toHaveLength(6);
-    expect(
-      container.querySelectorAll('ul [data-slot="avatar-fallback"]'),
-    ).toHaveLength(0);
+    const covers = container.querySelectorAll('ul [data-slot="skill-cover"]');
+    expect(covers).toHaveLength(6);
+    expect(covers[0]).toHaveTextContent("p");
+    expect(container.querySelectorAll('ul [data-slot="avatar"]')).toHaveLength(
+      0,
+    );
   });
 
-  it("shows the recorded source repo and owner avatar on sourced cards", async () => {
+  it("shows the recorded source repo with the owner's avatar on its line", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
     // The ledger has a source for pdf (installed through this app); docx is
     // a tool-installed skill with no entry.
@@ -280,15 +282,19 @@ describe("MySkillsPage", () => {
     expect(await screen.findByText("anthropics/skills")).toBeInTheDocument();
     // docx keeps the local-install presentation.
     expect(screen.getAllByText("本地安装")).toHaveLength(5);
+    // The cover degrades to its author's initial — the owner for the sourced
+    // card, the skill's own name for the ones the ledger cannot name.
     expect(
-      container.querySelectorAll('[aria-label="skill 头像"]'),
-    ).toHaveLength(5);
-    // The sourced card's avatar degrades to the owner's initial.
-    const fallbacks = container.querySelectorAll(
-      'ul [data-slot="avatar-fallback"]',
+      container.querySelector('[aria-label="pdf 封面图"]'),
+    ).toHaveTextContent("a");
+    expect(
+      container.querySelector('[aria-label="docx 封面图"]'),
+    ).toHaveTextContent("d");
+    // Only the sourced card can name an author, so only its source line
+    // carries an owner avatar.
+    expect(container.querySelectorAll('ul [data-slot="avatar"]')).toHaveLength(
+      1,
     );
-    expect(fallbacks).toHaveLength(1);
-    expect(fallbacks[0]).toHaveTextContent("a");
   });
 
   it("links a sourced skill's detail drawer to its repo instead of 本地安装", async () => {

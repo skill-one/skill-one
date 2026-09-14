@@ -27,7 +27,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
-import { SkillAvatar } from "../skill-avatar";
+import { OwnerAvatar } from "../owner-avatar";
+import { SkillCover } from "../skill-cover";
 import { SkillEnableSwitch } from "../skill-enable-switch";
 import { SkillInstallButton } from "../skill-install-button";
 import { SkillRemoveButton } from "../skill-remove-button";
@@ -257,6 +258,9 @@ export function SkillDetailPanel({
   // the link lands on the repo root.
   const sourceHref =
     !shown || !shown.repo ? "" : `https://github.com/${shown.repo}`;
+  // The owner segment of that repo — the author's face, which the mirror
+  // hosts an avatar for and which leads the repo name.
+  const [owner] = (shown?.repo ?? "").split("/");
   // The skill's page on skills.sh, when the index carries one — the deepest
   // upstream link that survives without the repo-internal path.
   const skillsShHref = shown?.url ?? "";
@@ -294,12 +298,13 @@ export function SkillDetailPanel({
     <DrawerContent>
       <DrawerHeader className="gap-2 px-6 pt-5">
         <div className="flex items-start gap-3">
-          {/* The same avatar the row shows, at the drawer's size: the owner's,
-              or the placeholder when the source is unknown. */}
-          <SkillAvatar
-            source={shown?.repo}
-            className="h-12 w-12 text-xl"
-            iconClassName="h-5 w-5"
+          {/* The same image the row leads with, at the drawer's size: the
+              skill's own cover, `SkillCover`'s letter fallback standing in
+              when the dataset has not illustrated it. */}
+          <SkillCover
+            repo={shown?.repo}
+            name={shown?.name}
+            className="h-14 w-14 shrink-0 text-2xl"
           />
           <div className="min-w-0 flex-1">
             <DrawerTitle className="truncate text-lg font-bold tracking-tight">
@@ -316,6 +321,14 @@ export function SkillDetailPanel({
                   title="在 GitHub 中打开源仓库"
                   className="inline-flex min-w-0 items-center gap-1"
                 >
+                  {/* The repo's owner avatar leads the repo it belongs to:
+                      who published the skill, next to where it lives. */}
+                  {owner && (
+                    <OwnerAvatar
+                      owner={owner}
+                      className="h-3.5 w-3.5 text-[8px]"
+                    />
+                  )}
                   <span className="truncate">{shown?.repo}</span>
                   <ExternalLink className="h-3 w-3 shrink-0" />
                 </a>

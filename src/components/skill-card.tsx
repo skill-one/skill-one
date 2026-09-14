@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { LOCAL_SOURCE_LABEL } from "../lib/skill-view";
 import { cn } from "../lib/utils";
 import { HighlightedText, type SkillMatched } from "./highlighted-text";
-import { SkillAvatar } from "./skill-avatar";
+import { RepoHoverCard } from "./repo-hover-card";
+import { SkillCover } from "./skill-cover";
 import {
   Card,
   CardAction,
@@ -28,22 +29,24 @@ const INTERACTIVE_CLASS =
  * lists, a repo's skills, a leaderboard, and the installed list.
  *
  * The card is built on the shadcn Card so it is laid out by the component's own
- * slots rather than by hand: the header holds the avatar, name and source with
- * the surface's action in the corner slot `CardAction` exists for, the content
- * holds the description, and the footer holds whatever figures the surface
- * shows — classification on the left rail under the source it belongs to, the
- * figure on the right rail under the action.
+ * slots rather than by hand: the header leads with the skill's cover, stacks
+ * the name and source beside it, and keeps the surface's action in the corner
+ * slot `CardAction` exists for; the content holds the description, and the rail
+ * under it carries the metadata — the author chip on the left, then whatever
+ * classification and figure the surface shows.
  *
  * The card owns no surface-specific facts. Everything that genuinely differs
  * between the store and the installed list arrives as a slot: the corner action
  * (`action` — an install button there, an enable switch here), a badge trailing
- * the source line (`sourceExtra` — the migration affordance), the bottom rail
- * (`footer` — domain chip and popularity, which only a registry entry has), and
- * anything below the card (`below` — an install failure). What is genuinely the
- * same is derived here: the avatar (owner, or the placeholder when the source
- * is unknown, through `SkillAvatar`) and the source label (the repo, or the
- * local-install label). A surface that has nothing to put in a slot omits it,
- * and the card closes up around the gap.
+ * the source line (`sourceExtra` — the migration affordance), the rail's own
+ * content (`footer` — domain chip and popularity, which only a registry entry
+ * has), and anything below the card (`below` — an install failure). What is
+ * genuinely the same is derived here: the leading image (the skill's cover,
+ * with the author's initial as its fallback, through `SkillCover`), the author
+ * chip (the owner's avatar and its repository hover card, through
+ * `RepoHoverCard`, rendered only when the source names an owner) and the
+ * source label (the repo, or the local-install label). A surface that has
+ * nothing to put in a slot omits it, and the card closes up around the gap.
  *
  * The card body opens the detail panel (`onSelect`) when the surface passes
  * one; without it the card is not a button at all. The action sits in the top
@@ -58,6 +61,7 @@ export function SkillCard({
   name,
   matched,
   description,
+  stars,
   muted = false,
   selected = false,
   onSelect,
@@ -67,12 +71,17 @@ export function SkillCard({
   below,
   "data-skill": dataSkill,
 }: {
-  /** `owner/repo` the skill came from; absent renders the local placeholder. */
+  /**
+   * `owner/repo` the skill came from; absent drops the author chip and
+   * renders the local-install label (and the cover's letter fallback).
+   */
   source?: string;
   name: string;
   /** Search-hit highlights; absent outside a search (nothing highlighted). */
   matched?: SkillMatched;
   description: string;
+  /** The source repo's GitHub stars, shown in the author chip's hover card. */
+  stars?: number;
   /** Dimmed presentation: a skill that is installed but disabled. */
   muted?: boolean;
   /** Whether this card is the one shown in the detail panel. */
@@ -83,13 +92,19 @@ export function SkillCard({
   action?: ReactNode;
   /** Trails the source line: the migration badge on an unlinked install. */
   sourceExtra?: ReactNode;
-  /** The bottom rail: domain chip and popularity, when the surface has them. */
+  /**
+   * The bottom rail's own content — classification and figure, on the
+   * surfaces that have them. The author chip leads it either way.
+   */
   footer?: ReactNode;
   /** Rendered under the card: an install failure, a dialog trigger. */
   below?: ReactNode;
   /** Test hook on the card element. */
   "data-skill"?: string;
 }) {
+  // The owner segment of the source — what the mirror hosts an avatar for. A
+  // bare owner (no slash) counts as none, exactly as it does for the cover.
+  const [owner] = (source ?? "").split("/");
   return (
     <li className="flex flex-col">
       {/* `flex-1` is the one thing the card cannot know: it fills the grid cell
@@ -114,36 +129,45 @@ export function SkillCard({
         )}
       >
         <CardHeader>
-          {/* The name is the card's heading, so it stays an `h3` inside the
-              title slot rather than losing its meaning to a styled `div`. */}
-          <CardTitle className="flex items-center gap-2">
-            <SkillAvatar
-              source={source}
-              className="h-6 w-6 text-[11px]"
-              iconClassName="h-3.5 w-3.5"
+          {/* The card leads with the skill's own image, with its name and
+              source stacked beside it — the one shape that gives the cover
+              enough room to be recognisable. */}
+          <div className="flex items-start gap-3">
+            <SkillCover
+              repo={source}
+              name={name}
+              className="h-10 w-10 shrink-0 text-base"
             />
-            <h3 className={cn("truncate", muted && "text-muted-foreground")}>
-              <HighlightedText text={name} terms={matched?.name} />
-            </h3>
-          </CardTitle>
-          {/* The description slot carries the source alone. The domain chip
-              used to share it, which cost the source the chip's width (and let
-              the chip's position drift with the length of the repo name);
-              it reads better in the footer next to the figure. */}
-          <CardDescription
-            className={cn(
-              "flex items-center gap-1.5 truncate",
-              muted && "text-muted-foreground/70",
-            )}
-          >
-            <span className="truncate">
-              <HighlightedText
-                text={source ?? LOCAL_SOURCE_LABEL}
-                terms={matched?.repo}
-              />
-            </span>
-            {sourceExtra}
-          </CardDescription>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              {/* The name is the card's heading, so it stays an `h3` inside
+                  the title slot rather than losing its meaning to a styled
+                  `div`. */}
+              <CardTitle>
+                <h3 className={cn("truncate", muted && "text-muted-foreground")}>
+                  <HighlightedText text={name} terms={matched?.name} />
+                </h3>
+              </CardTitle>
+              {/* The description slot carries the source alone. The domain
+                  chip used to share it, which cost the source the chip's
+                  width (and let the chip's position drift with the length of
+                  the repo name); it reads better in the rail below next to
+                  the figure. */}
+              <CardDescription
+                className={cn(
+                  "flex items-center gap-1.5 truncate",
+                  muted && "text-muted-foreground/70",
+                )}
+              >
+                <span className="truncate">
+                  <HighlightedText
+                    text={source ?? LOCAL_SOURCE_LABEL}
+                    terms={matched?.repo}
+                  />
+                </span>
+                {sourceExtra}
+              </CardDescription>
+            </div>
+          </div>
           {/* The corner control. Clicks on the slot stop here: the card body
               opens the detail panel, the action must not. */}
           {action && (
@@ -161,11 +185,25 @@ export function SkillCard({
         </CardContent>
 
         {/* Pinned to the card's bottom edge: descriptions differ in length, and
-            the two ends should still line up across a row. Classification on
-            the left under the source it belongs to, the figure on the right
-            under the corner action — the two rails the card is already read
-            in, and the reason neither end is left floating in the middle. */}
-        {footer && <CardFooter className="mt-auto">{footer}</CardFooter>}
+            the two ends should still line up across a row. The author chip
+            opens the rail — *who* published it before *what* it is classified
+            as and *how popular* it is — with classification on the left and
+            the figure on the right under the corner action: the two rails the
+            card is already read in, and the reason neither end is left
+            floating in the middle. A surface with no rail content of its own
+            (the installed list) still gets the rail for the author chip. */}
+        {(owner || footer) && (
+          <CardFooter className="mt-auto gap-1.5">
+            {owner && source && (
+              <RepoHoverCard
+                repo={source}
+                stars={stars}
+                className="h-4 w-4 text-[9px]"
+              />
+            )}
+            {footer}
+          </CardFooter>
+        )}
       </Card>
 
       {below}

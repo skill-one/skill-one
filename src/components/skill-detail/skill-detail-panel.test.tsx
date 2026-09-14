@@ -27,6 +27,9 @@ vi.mock("../../lib/skill-detail-api", () => ({
 
 vi.mock("../../lib/skill-profile-api", () => ({
   fetchSkillProfile: vi.fn(),
+  // The cover is a pure URL builder; the header uses it to address the
+  // skill's image. Nothing loads in this env, so the slot shows its fallback.
+  skillCoverCandidates: (id: string) => [`https://cdn.test/${id}/cover.png`],
 }));
 
 vi.mock("../../lib/local-skills", () => ({
@@ -171,7 +174,19 @@ describe("SkillDetailPanel", () => {
       await screen.findByText("Use this skill for PDFs."),
     ).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    // The header leads with the skill's own image, not the author's avatar.
+    expect(screen.getByRole("img", { name: "pdf 封面图" })).toHaveAttribute(
+      "data-slot",
+      "skill-cover",
+    );
     expect(screen.getByText("pdf")).toBeInTheDocument();
+    // The author's avatar rides the repo line: who published the skill, next
+    // to where it lives. It is decoration, so it never joins the link's name.
+    expect(
+      screen
+        .getByRole("link", { name: "anthropics/skills" })
+        .querySelector('[data-slot="avatar"]'),
+    ).not.toBeNull();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
     expect(screen.getByText("MIT")).toBeInTheDocument();
     expect(screen.getByText("Anthropic")).toBeInTheDocument();
@@ -265,11 +280,14 @@ describe("SkillDetailPanel", () => {
     expect(await screen.findByText("Local skill body.")).toBeInTheDocument();
     expect(mockFetchLocalSkillDetail).toHaveBeenCalledWith("my-tool");
     expect(mockFetchSkillDetail).not.toHaveBeenCalled();
-    // No repo → no links at all, a 本地安装 caption and the Puzzle
-    // placeholder avatar; the disk path sits behind 本地文件, and no stats.
+    // No repo → no links at all, a 本地安装 caption and a cover slot with no
+    // id to address a real image with (the skill's initial stands in); the
+    // disk path sits behind 本地文件, and no stats.
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("本地安装")).toBeInTheDocument();
-    expect(screen.getByLabelText("skill 头像")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "my-tool 封面图" })).toHaveTextContent(
+      "m",
+    );
     expect(screen.queryByText(localDetail.path)).not.toBeInTheDocument();
     await user.hover(screen.getByText("本地文件"));
     const tip = await screen.findByRole("tooltip");

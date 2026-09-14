@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
-import { fetchSkillProfile } from "./skill-profile-api";
+import { fetchSkillProfile, skillCoverCandidates } from "./skill-profile-api";
 import { setProfilesTag } from "./cdn-config";
 
 const PATH = "skills/vercel-labs/skills/find-skills";
@@ -128,5 +128,30 @@ describe("fetchSkillProfile", () => {
     await expect(fetchSkillProfile("my-tool", undefined)).rejects.toThrow(
       /no mirror path/,
     );
+  });
+});
+
+describe("skillCoverCandidates", () => {
+  const ID = "vercel-labs/skills/find-skills";
+
+  it("addresses the image published beside the skill's profile files", () => {
+    const urls = skillCoverCandidates(ID);
+
+    // Origin first, then the CDN mirror — the chain every registry file rides.
+    expect(urls[0]).toBe(
+      `https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills/${ID}/cover.png`,
+    );
+    expect(urls.at(-1)).toContain(
+      `skill-one/skills-profiles@dist/skills/${ID}/cover.png`,
+    );
+  });
+
+  it("pins the cover to the recorded profiles tag like the angle files", () => {
+    setProfilesTag("dist-2026-09-10-2");
+
+    for (const url of skillCoverCandidates(ID)) {
+      expect(url).toContain("dist-2026-09-10-2");
+      expect(url).toContain(`/skills/${ID}/cover.png`);
+    }
   });
 });

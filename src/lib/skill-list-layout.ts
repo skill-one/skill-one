@@ -20,5 +20,9 @@ export const SKILL_LIST_CLASS =
  * Placeholder standing in for one card while a list loads: the height of the
  * card it replaces, so the skeleton never changes size when the real cards
  * arrive.
+ *
+ * Measured off a rendered store card at the app's default window: 32px of
+ * card padding, a 50px header (the 40px cover row plus the header grid's own
+ * row gap), 12px gaps, a 40px description, an 18px footer and the 2px border.
  */
-export const SKILL_CARD_SKELETON_CLASS = "h-[168px] rounded-xl";
+export const SKILL_CARD_SKELETON_CLASS = "h-[166px] rounded-xl";

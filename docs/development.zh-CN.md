@@ -56,7 +56,9 @@ skill-one/
 │   │   ├── ui/             # shadcn/ui 组件
 │   │   ├── app-sidebar.tsx # 侧边栏导航（路由 + 标题栏共用）
 │   │   ├── agent-icon.tsx  # agent 品牌图标
-│   │   ├── owner-avatar.tsx# 仓库头像
+│   │   ├── owner-avatar.tsx# owner 头像（元信息行的作者头像）
+│   │   ├── repo-hover-card.tsx # 作者头像 + 其仓库信息浮窗
+│   │   ├── skill-cover.tsx # skill 自身的封面图（skills-profiles）
 │   │   ├── skill-detail/    # 共享的 skill 详情面板与模态抽屉
 │   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
@@ -140,7 +142,7 @@ pnpm dlx shadcn@latest add <component>
 | `default-src` | `'self'` | 未在下面列出的资源都来自打包产物。 |
 | `script-src` | `'self'` | 不允许 inline 与 `eval` —— Tauri 会对打包脚本做 nonce 匹配。 |
 | `style-src` | `'self' 'unsafe-inline'` | Tailwind 产出独立样式表，但 React 会写内联 `style` 属性。 |
-| `img-src` | `'self' https: data: blob:` | 仓库头像与 `SKILL.md` 里的图片天然是远程的。 |
+| `img-src` | `'self' https: data: blob:` | skill 封面、owner 头像与 `SKILL.md` 里的图片天然是远程的。 |
 | `font-src` | `'self' data:` | 内联的字体子集。 |
 | `worker-src` | `'self' blob:` | registry worker 是打包出的 ES module；`blob:` 兼容被内联的情况。 |
 | `connect-src` | `'self' ipc: http://ipc.localhost https: http://localhost:* http://127.0.0.1:*` | `ipc:` 是 Tauri 的命令通道；`https:` 用于 registry、`SKILL.md` 与头像；环回地址允许自建镜像走明文 HTTP。 |

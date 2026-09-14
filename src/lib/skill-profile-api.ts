@@ -5,7 +5,9 @@ import { text, textList } from "./value";
 /**
  * Per-skill profile reader for the skills-profiles dataset: the five angle
  * files the detail drawer's 概述 tab renders (domain and persona already
- * ride along on the registry index entry, so they are not re-fetched).
+ * ride along on the registry index entry, so they are not re-fetched), plus
+ * the skill's cover image — the illustration the dataset renders per skill,
+ * which is every skill surface's leading image.
  *
  * Fetches are pinned to the profiles tag recorded by the registry client
  * (`getProfilesTag`) — an immutable address, so a lagging CDN can only
@@ -26,6 +28,26 @@ export const PROFILES = {
 /** The ref profile fetches are pinned to: the recorded tag, or `dist`. */
 function profilesRef(): string {
   return getProfilesTag() || PROFILES.ref;
+}
+
+/**
+ * Candidate URLs for one skill's cover image: the illustration the dataset
+ * renders per skill, published next to its profile files as
+ * `skills/{id}/cover.png`. `id` is the canonical skills.sh id
+ * (`{owner}/{repo}/{slug}`) — for a registry skill that is exactly
+ * `repo/name`, so no index field beyond the ones already on screen is needed.
+ *
+ * It is an image, so there is nothing to parse and no cheaper fallback: the
+ * caller walks the candidates (see `SkillCover`) and keeps its own placeholder
+ * for the skills the dataset has not illustrated. Pinned to the profiles tag
+ * like the angle files, over the same download-source chain.
+ */
+export function skillCoverCandidates(id: string): string[] {
+  return fileCandidates({
+    repo: PROFILES.repo,
+    ref: profilesRef(),
+    path: `skills/${id}/cover.png`,
+  });
 }
 
 /** Fetch and validate one angle file; null when unreachable or malformed. */

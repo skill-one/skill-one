@@ -94,4 +94,6 @@ GitHub star 数**不在**技能行里：它存放在下文的 `repos.jsonl` 附�
 
 技能详情 `SKILL.md` 从镜像快照按 `skills/{id}/SKILL.md` 拉取，存在已记录标签时定址到该快照（否则用可变的 `dist` 分支），见 [../src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。
 
-Owner 头像（仓库列表页与详情抽屉里的仓库所有者头像）从镜像快照按 `avatars/{owner}.png` 拉取，走同一条下载源回退链，存在已记录标签时定址到该快照，见 [../src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx)。
+技能**自身的图片**——[skill-one/skills-profiles](https://github.com/skill-one/skills-profiles) 数据集为每个技能渲染的方形封面——从该数据集按 `skills/{id}/cover.png` 拉取（`id` 即规范 id `{owner}/{repo}/{slug}`，也就是 `repo/name`），走同一条下载源回退链并定址到其已记录的 profiles 标签。它作为每张卡片与详情抽屉的主图；数据集未收录封面的技能回退到作者首字母，占位永不塌陷。见 [../src/components/skill-cover.tsx](../src/components/skill-cover.tsx)。
+
+Owner 头像——skill 卡片元信息行上的作者头像，以及仓库列表页的仓库头像——从镜像快照按 `avatars/{owner}.png` 拉取，走同一条下载源回退链，存在已记录标签时定址到该快照，见 [../src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx)。头像本身只是装饰：仓库名以文本形式紧邻显示（在元信息行上则由头像自带的浮窗报出仓库名，见 [../src/components/repo-hover-card.tsx](../src/components/repo-hover-card.tsx)），因此对辅助技术隐藏。

@@ -19,6 +19,12 @@ const MIRROR_REPO = "skill-one/skills-sh-mirror";
  * Round owner avatar loaded from the mirror, degrading through GitHub's
  * avatar endpoint and finally to the owner's initial. Candidate URLs are
  * walked in order via Radix's loading status, one step per failure.
+ *
+ * Decoration: every call site prints the owner or the repo it belongs to as
+ * text right beside it, so the avatar is marked aria-hidden and its image
+ * carries an empty alt — otherwise the face (or worse, the fallback's initial)
+ * would leak into the accessible name of whatever it sits in, e.g. the detail
+ * drawer's repo link.
  */
 export function OwnerAvatar({
   owner,
@@ -41,11 +47,14 @@ export function OwnerAvatar({
   const src = candidates[Math.min(step, candidates.length - 1)];
 
   return (
-    <Avatar className={cn("border border-border/60 bg-muted", className)}>
+    <Avatar
+      aria-hidden="true"
+      className={cn("border border-border/60 bg-muted", className)}
+    >
       <AvatarImage
         key={src}
         src={src}
-        alt={`${owner} 的头像`}
+        alt=""
         loading="lazy"
         referrerPolicy="no-referrer"
         onLoadingStatusChange={(status) => {

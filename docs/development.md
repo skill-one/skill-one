@@ -56,7 +56,9 @@ skill-one/
 │   │   ├── ui/             # shadcn/ui components
 │   │   ├── app-sidebar.tsx # Sidebar navigation (shared by routes + title bar)
 │   │   ├── agent-icon.tsx  # Agent brand icons
-│   │   ├── owner-avatar.tsx# Repository avatar
+│   │   ├── owner-avatar.tsx# Owner avatar (the metadata rail's author chip)
+│   │   ├── repo-hover-card.tsx # Author chip + its repository hover card
+│   │   ├── skill-cover.tsx # Skill's own cover image (skills-profiles)
 │   │   ├── skill-detail/    # Shared skill detail panel + modal drawer
 │   │   └── placeholder.tsx # Shared "nothing to show" empty state for list pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)
@@ -140,7 +142,7 @@ Component tests and unit tests under `src/lib` follow the "one file, one `*.test
 | `default-src` | `'self'` | Everything not named below comes from the bundle. |
 | `script-src` | `'self'` | No inline and no `eval` — Tauri nonce-matches the bundled scripts. |
 | `style-src` | `'self' 'unsafe-inline'` | Tailwind emits a stylesheet, but React sets inline `style` attributes. |
-| `img-src` | `'self' https: data: blob:` | Owner avatars and images inside `SKILL.md` are remote by nature. |
+| `img-src` | `'self' https: data: blob:` | Skill covers, owner avatars and images inside `SKILL.md` are remote by nature. |
 | `font-src` | `'self' data:` | Inlined font subsets. |
 | `worker-src` | `'self' blob:` | The registry worker is a bundled ES module; `blob:` covers an inlined one. |
 | `connect-src` | `'self' ipc: http://ipc.localhost https: http://localhost:* http://127.0.0.1:*` | `ipc:` is Tauri's command channel; `https:` is the registry, `SKILL.md` fetches and avatars; the loopback entries let a self-hosted mirror sit on plain HTTP. |

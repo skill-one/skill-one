@@ -8,7 +8,7 @@ import { recordSkillProvenance } from "../../lib/provenance";
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { cn, errorMessage } from "../../lib/utils";
 import type { LinkCandidate } from "../../lib/link-suggestions";
-import { SkillAvatar } from "../../components/skill-avatar";
+import { OwnerAvatar } from "../../components/owner-avatar";
 
 /**
  * Confirmable migration of a tool-installed skill to its store entry.
@@ -113,10 +113,9 @@ export function LinkSuggestionBadge({
                     "disabled:cursor-wait disabled:opacity-60",
                   )}
                 >
-                  <SkillAvatar
-                    source={skill.repo}
+                  <OwnerAvatar
+                    owner={skill.repo.split("/")[0]}
                     className="h-5 w-5 text-[10px]"
-                    iconClassName="h-3 w-3"
                   />
                   <span className="min-w-0 flex-1 truncate text-[12px] font-medium">
                     {skill.repo}
