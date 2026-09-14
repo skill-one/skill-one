@@ -147,7 +147,7 @@ export async function removeInstalledSkill(name: string): Promise<void> {
  * For each unlinked agent the backend classifies the contents of its own
  * skills directory (`internalSkills` / `internalOthers`) and reports any
  * backup slot parked by a previous link (`pendingBackup`), so the UI can
- * preview them and offer 导入并链接 / 直接链接 instead of a bare 链接.
+ * preview what a link will adopt and what it will park into the backup slot.
  */
 export async function fetchAgentStatus(): Promise<AgentStatus[]> {
   if (!isTauri()) {
@@ -202,11 +202,11 @@ export async function linkAgent(
 }
 
 /**
- * Link several agents in one go (一键链接). Reuses the backend's batch link
- * with `migrate`, mirroring the single-agent confirm flow: each agent's skills
- * move into the canonical dir, other files park into its backup slot. Reruns
- * are safe — already linked agents come back as `alreadyLinked` and are left
- * untouched.
+ * Link several agents in one go. Reuses the backend's batch link with
+ * `migrate`: each agent's skills move into the canonical dir, other files park
+ * into its backup slot. Reruns are safe — already linked agents come back as
+ * `alreadyLinked` and are left untouched. This is the auto-link pass's entry
+ * point (`useAutoLinkAgents`).
  */
 export async function linkAllAgents(
   names: string[],

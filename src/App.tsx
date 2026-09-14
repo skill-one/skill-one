@@ -8,6 +8,7 @@ import { AppSidebar } from "./components/app-sidebar";
 import { UpdateDialog } from "./components/update-dialog";
 import { Toaster } from "./components/ui/sonner";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
+import { useAutoLinkAgents } from "./hooks/use-auto-link-agents";
 import { useRegistryRefresh } from "./hooks/use-registry-refresh";
 import { useScheduledCheck } from "./hooks/use-scheduled-check";
 import { createQueryClient } from "./lib/query-client";
@@ -107,6 +108,7 @@ export default function App() {
         <PopoverNavigation />
         <AppUpdateWatcher />
         <RegistryAutoRefresh />
+        <AgentAutoLink />
         <UpdateDialog />
         <Toaster />
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
@@ -189,5 +191,16 @@ function AppUpdateWatcher() {
  */
 function RegistryAutoRefresh() {
   useRegistryRefresh();
+  return null;
+}
+
+/**
+ * Agent links manage themselves: every agent scan links the detected agents
+ * that are not excluded in the agent link settings (each agent is attempted
+ * once per session). Nothing renders and a successful pass says nothing — see
+ * `useAutoLinkAgents`.
+ */
+function AgentAutoLink() {
+  useAutoLinkAgents();
   return null;
 }

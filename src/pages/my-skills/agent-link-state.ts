@@ -10,8 +10,8 @@ export type AgentLinkState = "linked" | "warning" | "unlinked";
 /**
  * Classify an agent for display. The canonical dir reports linked=false, but
  * to users it is effectively linked; unlinked agents whose own directory
- * already holds skills or other files surface the warning state (a confirm
- * dialog follows on click in the expanded grid).
+ * already holds skills or other files surface the warning state (their
+ * pending counts appear in the menu rows and the settings dialog).
  */
 export function agentLinkState(agent: AgentStatus): AgentLinkState {
   if (agent.linked || agent.canonical) return "linked";

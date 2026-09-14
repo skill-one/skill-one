@@ -7,6 +7,9 @@ import {
   configure,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
+
+import { getExcludedAgents } from "../../lib/agent-link-preferences";
 
 import { MySkillsPage } from "./my-skills-page";
 import { renderWithRouter } from "../../test/test-utils";
@@ -72,6 +75,9 @@ describe("MySkillsPage", () => {
     resetMockInstalledSkills();
     resetMockAgentStatus();
     resetMockProvenance();
+    // Agent link exclusions live in localStorage; one test's opt-out must
+    // not leak into the next.
+    window.localStorage.clear();
   });
 
   it("shows the installed count in the bottom pager row", async () => {
@@ -650,61 +656,69 @@ describe("MySkillsPage", () => {
     expect(await menuItem("Windsurf", "原生")).toBeInTheDocument();
   });
 
-  it("explains why a canonical agent cannot be unlinked", async () => {
+  it("keeps the menu rows inert — linking is automatic", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
     await openAgentMenu(user);
 
+    // Selecting a row changes nothing: the menu is a status view, and the
+    // settings dialog is the only place links are made or broken.
+    await user.click(await menuItem("Gemini CLI", "未链接"));
     await user.click(await menuItem("Windsurf", "原生"));
 
-    expect(
-      await screen.findByText("Windsurf 使用原生 skills 目录，无法取消链接"),
-    ).toBeInTheDocument();
+    expect(await menuItem("Gemini CLI", "未链接")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(getExcludedAgents()).toEqual([]);
   });
 
-  it("links an unlinked agent from the menu and shows a notice", async () => {
+  it("unlinks a linked agent from the settings dialog and remembers it", async () => {
     const user = userEvent.setup();
+    const successSpy = vi.spyOn(toast, "success");
     renderWithRouter(<MySkillsPage />);
     await openAgentMenu(user);
-
-    await user.click(await menuItem("Gemini CLI", "未链接"));
-
-    expect(await screen.findByText("Gemini CLI 已链接")).toBeInTheDocument();
-  });
-
-  it("unlinks a linked agent from the menu and shows a notice", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
-    await openAgentMenu(user);
-
-    await user.click(await menuItem("Claude Code", "已链接"));
-
-    expect(
-      await screen.findByText("Claude Code 已取消链接"),
-    ).toBeInTheDocument();
-  });
-
-  it("spells out what linking will do for a dir that already holds content", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
-    await openAgentMenu(user);
-
-    // Cursor carries 2 skills and 1 stray file in its own dir in the mock:
-    // the confirm dialog is the single place those details are spelled out.
-    await user.click(await menuItem("Cursor", "未链接"));
+    await user.click(screen.getByRole("button", { name: "Agent 链接设置" }));
 
     const dialog = await screen.findByRole("dialog");
-    expect(
-      within(dialog).getByText("以下 skill 将导入（2）"),
-    ).toBeInTheDocument();
-    expect(
-      within(dialog).getByText("以下文件将备份（1）"),
-    ).toBeInTheDocument();
+    await user.click(
+      await within(dialog).findByRole("switch", {
+        name: "Claude Code 链接开关",
+      }),
+    );
 
-    await user.click(within(dialog).getByRole("button", { name: "确认" }));
+    expect(successSpy).toHaveBeenCalledWith("Claude Code 已取消链接");
+    expect(getExcludedAgents()).toEqual(["claude-code"]);
+  });
 
-    expect(await screen.findByText("Cursor 已链接")).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  it("re-links an unlinked agent from the settings dialog", async () => {
+    const user = userEvent.setup();
+    const successSpy = vi.spyOn(toast, "success");
+    renderWithRouter(<MySkillsPage />);
+    await openAgentMenu(user);
+    await user.click(screen.getByRole("button", { name: "Agent 链接设置" }));
+
+    const dialog = await screen.findByRole("dialog");
+    await user.click(
+      await within(dialog).findByRole("switch", {
+        name: "Gemini CLI 链接开关",
+      }),
+    );
+
+    expect(successSpy).toHaveBeenCalledWith("Gemini CLI 已链接");
+    expect(getExcludedAgents()).toEqual([]);
+  });
+
+  it("pins a canonical agent's switch in the settings dialog", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await openAgentMenu(user);
+    await user.click(screen.getByRole("button", { name: "Agent 链接设置" }));
+
+    const dialog = await screen.findByRole("dialog");
+    const switchEl = await within(dialog).findByRole("switch", {
+      name: "Windsurf 链接开关",
+    });
+    expect(switchEl).toBeDisabled();
+    expect(switchEl).toHaveAttribute("aria-checked", "true");
   });
 
 });

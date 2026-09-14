@@ -144,8 +144,8 @@ const mockAgentRows: Array<{
     display: "Cursor",
     linked: false,
     canonical: false,
-    // Carries skills and non-skill files in its own dir → clicking the row
-    // opens the decision dialog offering 导入并链接 / 直接链接.
+    // Carries skills and non-skill files in its own dir → the menu row shows
+    // the pending counts a link would adopt / park.
     internalSkills: ["pdf", "docx"],
     internalOthers: ["README.md"],
   },
@@ -154,7 +154,7 @@ const mockAgentRows: Array<{
     display: "Gemini CLI",
     linked: false,
     canonical: false,
-    // Empty dir → clicking links directly, no preview dialog.
+    // Empty dir → linking moves nothing.
     internalSkills: [],
   },
   {

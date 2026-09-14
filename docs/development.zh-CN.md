@@ -64,7 +64,7 @@ skill-one/
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
 │   │   ├── explore/        # 商店探索相关页面（skill-list-row / skill-install-button）
 │   │   │   └── featured/   # 精选页（hero 榜单轮播 + 分类区块）
-│   │   ├── my-skills/      # 我的 Skills 页（agent-icon-grid / agent-icon-button / link-confirm-dialog 等）
+│   │   ├── my-skills/      # 我的 Skills 页（agent 头像菜单 / agent-link-settings-dialog 等）
 │   │   └── settings/       # 设置页
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层

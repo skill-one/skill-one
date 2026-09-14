@@ -64,7 +64,7 @@ skill-one/
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)
 │   │   ├── explore/        # Store explore pages (skill-list-row / skill-install-button)
 │   │   │   └── featured/   # Curated featured page (hero leaderboards + category sections)
-│   │   ├── my-skills/      # My Skills page (agent-icon-grid / agent-icon-button / link-confirm-dialog, etc.)
+│   │   ├── my-skills/      # My Skills page (agent avatar menu / agent-link-settings-dialog, etc.)
 │   │   └── settings/       # Settings page
 │   ├── hooks/              # Custom hooks
 │   ├── lib/                # API / business logic layer
