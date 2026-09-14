@@ -251,6 +251,99 @@ describe("createRegistryController — boot", () => {
     expect(t.recorded.indexes.at(-1)?.info).toMatchObject({ origin: "updated" });
   });
 
+  it("keeps the profiles a cold start was serving when a newer registry lands", async () => {
+    // A launch with a warm cache and a registry that has moved on: the fresh
+    // body replaces the cached skills, while the profiles dataset itself has
+    // not moved since — so nothing re-reads it. The decoration the cached
+    // skills carried has to survive that, or every skill in the store loses
+    // its domain for the session (the popularity figure, which comes from the
+    // index, stays: exactly a card with a figure and no classification chip).
+    const decorated = { ...skill(0), profile: { domain: "开发编程" } };
+    const t = setup({
+      cache: {
+        load: async () => ({
+          skills: [decorated],
+          generatedAt: "2026-09-01T14:25:32Z",
+          fetchedAt: 1,
+          profilesAt: "2026-09-01T10:00:00Z",
+        }),
+        save: async () => {},
+        clear: async () => {},
+      },
+      published: {
+        tag: "dist-2026-09-02",
+        generatedAt: "2026-09-02T14:25:32Z",
+        total: 1,
+      },
+      // The probe advertises the very snapshot the cache was decorated from,
+      // and the file itself is unreachable: there is nothing to re-read.
+      profilesMeta: { generatedAt: "2026-09-01T10:00:00Z" },
+      profiles: null,
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.push(skill(0));
+    t.complete();
+    await t.flush();
+
+    t.controller.handle({
+      type: "lookupSkills",
+      id: 1,
+      payload: { refs: [{ repo: "owner-0/repo-0", name: "skill-0" }] },
+    });
+    const entries = resultData<{ entries: Array<Skill | null> }>(
+      t.recorded.results[0],
+    ).entries;
+    expect(entries[0]?.profile).toEqual({ domain: "开发编程" });
+  });
+
+  it("reads the profiles again when the fresh body brings ids the cache never had", async () => {
+    const decorated = { ...skill(0), profile: { domain: "开发编程" } };
+    const t = setup({
+      cache: {
+        load: async () => ({
+          skills: [decorated],
+          generatedAt: "2026-09-01T14:25:32Z",
+          fetchedAt: 1,
+          profilesAt: "2026-09-01T10:00:00Z",
+        }),
+        save: async () => {},
+        clear: async () => {},
+      },
+      published: {
+        tag: "dist-2026-09-02",
+        generatedAt: "2026-09-02T14:25:32Z",
+        total: 1,
+      },
+      // The probe still advertises the snapshot the cache was decorated from,
+      // so the stamp alone reads as "already served" — but the map recovered
+      // from the cache cannot speak for the skill the newer body adds, and only
+      // the file can say what it was profiled as.
+      profilesMeta: { generatedAt: "2026-09-01T10:00:00Z" },
+      profiles: new Map([
+        ["owner-0/repo-0/skill-0", { domain: "开发编程" }],
+        ["owner-1/repo-1/skill-1", { domain: "内容创作" }],
+      ]),
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.push(skill(1));
+    t.complete();
+    await t.flush();
+
+    t.controller.handle({
+      type: "lookupSkills",
+      id: 1,
+      payload: { refs: [{ repo: "owner-1/repo-1", name: "skill-1" }] },
+    });
+    const entries = resultData<{ entries: Array<Skill | null> }>(
+      t.recorded.results[0],
+    ).entries;
+    expect(entries[0]?.profile).toEqual({ domain: "内容创作" });
+  });
+
   it("skips the body download when the published run is unchanged", async () => {
     const generatedAt = "2026-09-01T14:25:32Z";
     const saved: Array<[Skill[], unknown]> = [];

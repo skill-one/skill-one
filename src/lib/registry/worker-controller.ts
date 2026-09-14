@@ -142,6 +142,12 @@ export function createRegistryController(
   // no profile. Held across downloads so a fresh store can be decorated
   // from the previous snapshot's map before the refresh resolves.
   let profilesMap: Map<string, SkillProfile> | null = null;
+  // Which ids that map can answer for. Null once the published snapshot itself
+  // has been read (it answers for every id); a set when the map was recovered
+  // from the cold-start cache, which stores decorated skills rather than the
+  // dataset behind them — it can only speak for the ids it carried, so a body
+  // bringing new ones still has to read the file.
+  let profilesAnsweredFor: Set<string> | null = null;
   // The profiles snapshot stamp (`publishedAt`) the decorated skills were
   // built from; undefined until one is served. An equal probed stamp means
   // equal bytes, so the profiles download is skipped.
@@ -228,6 +234,39 @@ export function createRegistryController(
     post({ type: "ready" });
   };
 
+  /** The canonical id a skill is profiled under: `{owner}/{repo}/{slug}`. */
+  const profileId = (skill: Pick<Skill, "repo" | "name">): string =>
+    `${skill.repo}/${skill.name}`;
+
+  /**
+   * Recover a profiles map from skills that already carry them. The cold-start
+   * cache stores decorated skills, not the dataset that decorated them, so
+   * without this the held map is empty on a launch that then downloads a newer
+   * body: `decorate` has nothing to re-apply, and every skill comes back with
+   * the stars and downloads that ride on the index but with no domain — a card
+   * with a popularity figure and no classification chip.
+   */
+  const profilesOf = (skills: readonly Skill[]): Map<string, SkillProfile> => {
+    const map = new Map<string, SkillProfile>();
+    for (const skill of skills) {
+      if (skill.profile) map.set(profileId(skill), skill.profile);
+    }
+    return map;
+  };
+
+  /**
+   * Whether the held map can answer for every skill being served. The guard
+   * behind "the published snapshot is already served": a probed stamp that
+   * matches only means the bytes are the ones we once read — not that we still
+   * hold them, nor that they cover a body that has since grown.
+   */
+  const profilesAnswerEvery = (): boolean => {
+    if (!profilesMap) return false;
+    const answered = profilesAnsweredFor;
+    if (answered == null) return true;
+    return store.every((skill) => answered.has(profileId(skill)));
+  };
+
   /**
    * Merge the held profiles map into the served skills. The canonical id is
    * `{owner}/{repo}/{slug}`, i.e. exactly `repo/name` — a plain map read per
@@ -263,10 +302,15 @@ export function createRegistryController(
     if (gen !== generation) return false;
     if (
       !force &&
+      profilesAnswerEvery() &&
       meta?.generatedAt !== undefined &&
       meta.generatedAt === servedProfilesAt
     ) {
-      // The published profiles snapshot is the one already served.
+      // The published snapshot is the one already served *and* the held map
+      // still answers for every skill being served: nothing to re-read. A
+      // recovered map that no longer covers the store — a newer registry body
+      // brought ids the cache never had — falls through to the download, which
+      // is the only way to learn what those new skills were profiled as.
       return false;
     }
     let map: Map<string, SkillProfile>;
@@ -278,6 +322,9 @@ export function createRegistryController(
     }
     if (gen !== generation) return false;
     profilesMap = map;
+    // The whole published snapshot: it answers for every id, so the check above
+    // no longer has to compare against a recovered subset.
+    profilesAnsweredFor = null;
     servedProfilesAt = meta?.generatedAt;
     servedProfilesTag = meta?.tag;
     decorate();
@@ -706,9 +753,13 @@ export function createRegistryController(
           // The cached skills are already decorated with the profiles they
           // were saved with; the stamp/tag below is what the revalidation's
           // profiles probe is compared against, and what per-skill profile
-          // fetches pin to until a newer snapshot lands.
+          // fetches pin to until a newer snapshot lands. The map behind that
+          // decoration is recovered here, so a body downloaded below can be
+          // re-decorated even when the refresh never answers.
           servedProfilesAt = cached.profilesAt;
           servedProfilesTag = cached.profilesTag;
+          profilesMap = profilesOf(cached.skills);
+          profilesAnsweredFor = new Set(cached.skills.map(profileId));
           complete = true;
           announcedCount = cached.skills.length;
           emitProgress();
