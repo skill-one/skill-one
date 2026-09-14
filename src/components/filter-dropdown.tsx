@@ -21,6 +21,11 @@ export interface FilterOption<T extends string> {
    * reads as inactive rather than as a choice of that option.
    */
   neutral?: boolean;
+  /**
+   * A figure annotated at the option's far edge — how many groups the choice
+   * would produce, for the grouping modes. Absent means nothing to show.
+   */
+  count?: number;
 }
 
 /**
@@ -75,6 +80,11 @@ export function FilterDropdown<T extends string>({
                 )}
               />
               {option.label}
+              {option.count !== undefined && (
+                <span className="ml-auto pl-4 text-xs text-muted-foreground tabular-nums">
+                  {option.count} 组
+                </span>
+              )}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

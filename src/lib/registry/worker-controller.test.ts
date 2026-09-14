@@ -858,6 +858,199 @@ describe("createRegistryController — getPage", () => {
   });
 });
 
+describe("createRegistryController — getGroups", () => {
+  it("groups the browse list by repository, ordered by stars", async () => {
+    const t = setup({
+      skills: [
+        skill(0, { repo: "o/big", stars: 500, name: "big-b" }),
+        skill(1, { repo: "o/big", stars: 500, name: "big-a" }),
+        skill(2, { repo: "o/none", stars: 0, name: "none" }),
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "getGroups",
+      id: 1,
+      payload: { query: "", groupBy: "repo" },
+    });
+    const data = resultData<{
+      groups: Array<{
+        key: string;
+        title: string;
+        avatarOwner?: string;
+        stars?: number;
+        skills: Array<{ skill: Skill }>;
+      }>;
+      total: number;
+      groupCounts: { repo: number; popularity: number; domain: number };
+    }>(t.recorded.results[0]);
+
+    // The starred repository's group leads; the starless one follows — even
+    // though its lone skill is the most installed (its downloads ride the
+    // skill(2) factory). Group order reads the figure the header shows.
+    expect(data.groups.map((g) => g.title)).toEqual(["o/big", "o/none"]);
+    expect(data.total).toBe(3);
+    expect(data.groups[0].stars).toBe(500);
+    expect(data.groups[1].stars).toBe(0);
+    // The header's identity rides along: the owner for the avatar.
+    expect(data.groups[0].avatarOwner).toBe("o");
+    expect(data.groups[0].key).toBe("repo-o/big");
+    // Skills inside a group keep the popularity order.
+    expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
+      "big-b",
+      "big-a",
+    ]);
+    // The answer carries every mode's group count over the same hits, for
+    // the dropdown's annotations: two repos, one 50-sized bucket, one domain
+    // (nothing is profiled here, so all skills pool into 未分类).
+    expect(data.groupCounts).toEqual({ repo: 2, popularity: 1, domain: 1 });
+  });
+
+  it("chunks the popularity grouping into fixed-size rank buckets", async () => {
+    // 120 skills with strictly decreasing popularity (both counts slide down
+    // with the index), so the global rank r is exactly skill-r and the
+    // buckets tile the ranking 50/50/20.
+    const t = setup({
+      skills: Array.from({ length: 120 }, (_, i) =>
+        skill(i, { stars: 1000 - i, downloads: 1000 - i }),
+      ),
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "getGroups",
+      id: 1,
+      payload: { query: "", groupBy: "popularity" },
+    });
+    const data = resultData<{
+      groups: Array<{ key: string; title: string; skills: Array<{ skill: Skill }> }>;
+      total: number;
+    }>(t.recorded.results[0]);
+
+    expect(data.groups.map((g) => g.title)).toEqual([
+      "TOP 1-50",
+      "TOP 51-100",
+      "TOP 101-120",
+    ]);
+    expect(data.groups.map((g) => g.key)).toEqual(["pop-0", "pop-50", "pop-100"]);
+    // Bucket order is rank order: the first bucket holds the top of the list.
+    expect(data.groups[0].skills[0].skill.name).toBe("skill-0");
+    expect(data.groups[2].skills[0].skill.name).toBe("skill-100");
+    expect(data.total).toBe(120);
+  });
+
+  it("groups by profile domain, pooling the unprofiled into 未分类", async () => {
+    const t = setup({
+      skills: [skill(0), skill(1), skill(2), skill(3)],
+      profiles: new Map([
+        ["owner-0/repo-0/skill-0", { domain: "开发编程" }],
+        ["owner-1/repo-1/skill-1", { domain: "内容创作" }],
+        ["owner-2/repo-0/skill-2", { domain: "开发编程" }],
+      ]),
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "getGroups",
+      id: 1,
+      payload: { query: "", groupBy: "domain" },
+    });
+    const data = resultData<{
+      groups: Array<{
+        title: string;
+        emoji?: string;
+        skills: Array<{ skill: Skill }>;
+      }>;
+      total: number;
+    }>(t.recorded.results[0]);
+
+    // Most-populated domain first; skill-3 carries no profile and still
+    // shows up, pooled into its own group (the equal-sized tie resolves
+    // alphabetically).
+    expect(data.groups.map((g) => g.title)).toEqual([
+      "开发编程",
+      "内容创作",
+      "未分类",
+    ]);
+    // Skills inside a group keep the popularity order (skill-2 outranks
+    // skill-0 under the blend).
+    expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
+      "skill-2",
+      "skill-0",
+    ]);
+    expect(data.groups[1].skills.map((h) => h.skill.name)).toEqual([
+      "skill-1",
+    ]);
+    expect(data.groups[2].skills.map((h) => h.skill.name)).toEqual([
+      "skill-3",
+    ]);
+    expect(data.total).toBe(4);
+  });
+
+  it("groups search hits with the best match leading its group", async () => {
+    const t = setup({
+      skills: [
+        skill(0, {
+          name: "redis-clip",
+          repo: "o/clip",
+          stars: 1000,
+          downloads: 1000,
+        }),
+        skill(1, { name: "redis-tool", repo: "o/tool" }),
+        skill(2, { name: "redis-lab", repo: "o/clip" }),
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "getGroups",
+      id: 1,
+      payload: { query: "redis", groupBy: "repo" },
+    });
+    const data = resultData<{
+      groups: Array<{ title: string; skills: Array<{ skill: Skill }> }>;
+      total: number;
+    }>(t.recorded.results[0]);
+
+    // Group order follows the relevance order of the groups' best hits; the
+    // popular clip leads its group (the ranking's popularity boost) and the
+    // lesser lab trails it.
+    expect(data.groups.map((g) => g.title)).toEqual(["o/clip", "o/tool"]);
+    expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
+      "redis-clip",
+      "redis-lab",
+    ]);
+    expect(data.total).toBe(3);
+  });
+
+  it("answers an empty shape before the search index exists", async () => {
+    const t = setup({ skills: [skill(0)] });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "getGroups",
+      id: 1,
+      payload: { query: "anything", groupBy: "repo" },
+    });
+    const data = resultData<{
+      groups: unknown[];
+      total: number;
+      groupCounts: { repo: number; popularity: number; domain: number };
+    }>(t.recorded.results[0]);
+    expect(data).toEqual({
+      groups: [],
+      total: 0,
+      groupCounts: { repo: 0, popularity: 0, domain: 0 },
+    });
+  });
+});
+
 describe("createRegistryController — featured + lookup", () => {
   it("computes hero slides and resolves curated sections with global indexes", async () => {
     const t = setup({

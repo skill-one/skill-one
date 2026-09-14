@@ -10,7 +10,7 @@ import {
   fireEvent,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HashRouter, Route, Routes } from "react-router";
+import { HashRouter } from "react-router";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { PAGE_SIZE } from "../../lib/pagination";
@@ -18,6 +18,7 @@ import {
   SKILL_CARD_SKELETON_CLASS,
   SKILL_LIST_CLASS,
 } from "../../lib/skill-list-layout";
+import { formatCount } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import type { RegistryHarness } from "../../test/registry-harness";
 import { ExplorePage } from "./explore-page";
@@ -55,11 +56,14 @@ vi.mock("../../lib/skill-detail-api", () => ({
 
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 
+/** The one repository every `makeSkills` skill belongs to. */
+const BATCH_REPO = "acme/batch";
+
 /** Build a slice of `count` skills starting at global index `offset`. */
 function makeSkills(count: number, offset: number) {
   return Array.from({ length: count }, (_, i) => ({
     name: `skill-${offset + i}`,
-    repo: `repo-${offset + i}/skills`,
+    repo: BATCH_REPO,
     description: "",
     stars: 1000,
     downloads: 1000,
@@ -70,6 +74,8 @@ function makeSkills(count: number, offset: number) {
 /**
  * Load the harness with a complete registry of `total` skills before the
  * page mounts — the cold-start-cache path, where the page paints instantly.
+ * All skills share one repository, so the page is a single (expanded) group
+ * showing every card — the closest shape to the old flat grid.
  */
 function bootRegistry(total: number) {
   harness.reset();
@@ -81,8 +87,8 @@ function bootRegistry(total: number) {
 /**
  * A registry of one distinctive "gadget" skill among filler "tool" skills.
  * The names are mutually distant enough that the search stays deterministic:
- * "gadget" matches exactly one skill, never the fillers. The fillers spill
- * onto a second page, so a "reset to page 1" is observable.
+ * "gadget" matches exactly one skill, never the fillers. Every skill is its
+ * own repository, so the grouped list is one group per skill.
  */
 function gadgetRegistry(): Skill[] {
   return [
@@ -117,21 +123,12 @@ let queryClient: QueryClient;
 function renderExplorePage() {
   return render(
     <QueryClientProvider client={queryClient}>
-      {/* The real app mounts pages under a HashRouter; the page reads
-          `?repo=` (a repos-page card click) via useSearchParams. */}
+      {/* The real app mounts pages under a HashRouter. */}
       <HashRouter>
         <ExplorePage />
       </HashRouter>
     </QueryClientProvider>,
   );
-}
-
-/** Click through to a given numbered page by clicking its page link. */
-async function goToPage(
-  user: ReturnType<typeof userEvent.setup>,
-  page: number,
-) {
-  await user.click(screen.getByRole("link", { name: String(page) }));
 }
 
 /**
@@ -144,6 +141,22 @@ async function searchField(): Promise<HTMLElement> {
   await waitFor(() => expect(input).toBeEnabled());
   return input;
 }
+
+/**
+ * The group header trigger of one group, addressed by its aria-label —
+ * titles stay intact there even when the figures beside them are long.
+ */
+function groupHeader(title: string, count = 1) {
+  return screen.getByRole("button", {
+    name: `分组 ${title}，${count} 个 skill`,
+  });
+}
+
+/** Cards in DOM order, named by their stable aria-label. */
+const cardOrder = () =>
+  screen
+    .getAllByRole("button", { name: /查看 .+ 详情/ })
+    .map((el) => el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""));
 
 beforeEach(() => {
   // Fresh cache per test; retries are off so a rejected fetch surfaces an
@@ -164,352 +177,367 @@ beforeEach(() => {
 });
 
 describe("ExplorePage", () => {
-  it("renders the first page of skills with the total count", async () => {
-    bootRegistry(PAGE_SIZE * 2 + 2);
+  it("renders the grouped list", async () => {
+    bootRegistry(50);
     renderExplorePage();
 
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
-    expect(screen.getByText(`skill-${PAGE_SIZE - 1}`)).toBeInTheDocument();
-    // Page 1 holds exactly PAGE_SIZE skills; the next one belongs to page 2.
-    expect(screen.queryByText(`skill-${PAGE_SIZE}`)).not.toBeInTheDocument();
-    // The page answered one RPC; paging never re-downloads the registry.
-    expect(harness.downloads).toBe(1);
-    expect(screen.getByText(`共 ${PAGE_SIZE * 2 + 2} 个`)).toBeInTheDocument();
-  });
-
-  it("disables previous on the first page and enables next", async () => {
-    bootRegistry(PAGE_SIZE * 2 + 2);
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    expect(screen.getByRole("link", { name: "上一页" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
-    expect(screen.getByRole("link", { name: "下一页" })).toHaveAttribute(
-      "aria-disabled",
-      "false",
-    );
-  });
-
-  it("renders the next page via the next control without refetching", async () => {
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2);
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    await user.click(screen.getByRole("link", { name: "下一页" }));
-
-    expect(await screen.findByText(`skill-${PAGE_SIZE}`)).toBeInTheDocument();
-    expect(
-      screen.getByText(`skill-${2 * PAGE_SIZE - 1}`),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText(`skill-${2 * PAGE_SIZE}`),
-    ).not.toBeInTheDocument();
-    // The worker keeps the registry; page turns are pure RPCs.
+    // The group previews its first six skills; the rest wait behind the
+    // expander so one big repository doesn't dominate the page.
+    expect(screen.queryByText("skill-6")).not.toBeInTheDocument();
+    // The page answered one RPC; browsing never re-downloads the registry.
     expect(harness.downloads).toBe(1);
   });
 
-  it("jumps to a page by clicking its numbered button", async () => {
+  it("collapses a long group behind an expander", async () => {
     const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2);
+    // One repository with eight skills: six on the page, two behind it.
+    harness.init();
+    harness.pushAll(makeSkills(8, 0));
+    harness.complete();
     renderExplorePage();
-    await screen.findByText("skill-0");
 
-    await goToPage(user, 3);
+    expect(await screen.findByText("skill-0")).toBeInTheDocument();
+    expect(screen.getByText("skill-5")).toBeInTheDocument();
+    expect(screen.queryByText("skill-6")).not.toBeInTheDocument();
 
+    // The expander reveals the rest in place...
+    await user.click(
+      screen.getByRole("button", { name: "展开其余 2 个" }),
+    );
+    expect(await screen.findByText("skill-6")).toBeInTheDocument();
+    expect(screen.getByText("skill-7")).toBeInTheDocument();
+
+    // ...and flips into a collapse affordance.
+    await user.click(screen.getByRole("button", { name: "收起" }));
+    await waitFor(() =>
+      expect(screen.queryByText("skill-6")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("skill-5")).toBeInTheDocument();
+
+    // Exactly six cards mount while folded; the header keeps naming the
+    // group's full count.
     expect(
-      await screen.findByText(`skill-${2 * PAGE_SIZE}`),
-    ).toBeInTheDocument();
-    expect(screen.getByText(`skill-${2 * PAGE_SIZE + 1}`)).toBeInTheDocument();
-    expect(harness.downloads).toBe(1);
+      screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
+    ).toHaveLength(6);
+    expect(groupHeader(BATCH_REPO, 8)).toBeInTheDocument();
   });
 
-  it("disables next on the last page", async () => {
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2);
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    await goToPage(user, 3);
-    await screen.findByText(`skill-${2 * PAGE_SIZE}`);
-
-    expect(screen.getByRole("link", { name: "下一页" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
-    expect(screen.getByRole("link", { name: "上一页" })).toHaveAttribute(
-      "aria-disabled",
-      "false",
-    );
-  });
-
-  it("shows every page number directly when there are few pages", async () => {
-    bootRegistry(PAGE_SIZE * 9); // 9 pages — exactly the "show all" threshold
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    // All nine page numbers are rendered, with no ellipsis in the bar. The
-    // active page (1) is the editable jump box, not a link.
-    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
-    expect(jump).toHaveValue("1");
-    for (let p = 2; p <= 9; p++) {
-      expect(screen.getByRole("link", { name: String(p) })).toBeInTheDocument();
-    }
-    expect(screen.queryByText("More pages")).not.toBeInTheDocument();
-  });
-
-  it("collapses distant page numbers into an ellipsis window", async () => {
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 10); // 10 pages
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    // Page 1 keeps the first page, a window (1..3) and the last page,
-    // collapsing the gap 3..10 into a single ellipsis. Page 1 is the
-    // editable jump box rather than a link.
-    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
-    expect(jump).toHaveValue("1");
-    expect(screen.getByRole("link", { name: "3" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "10" })).toBeInTheDocument();
-    expect(screen.getByText("More pages")).toBeInTheDocument();
-
-    // Jump to a visible page (3); the window now stretches further and the
-    // ellipsis shrinks, proving the window follows the current page.
-    await user.clear(jump);
-    await user.type(jump, "3");
-    await user.keyboard("{Enter}");
-    await screen.findByText(`skill-${2 * PAGE_SIZE}`);
-    expect(screen.getByRole("link", { name: "4" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "5" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
-      "3",
-    );
-    expect(screen.getByText("More pages")).toBeInTheDocument();
-  });
-
-  it("replaces the standalone jump form with the editable current page box", async () => {
-    bootRegistry(50); // 3 pages
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    // The old "第 [input] / N 页" form is gone entirely; the only way to
-    // jump is the current page number box itself.
-    expect(screen.queryByText("第")).not.toBeInTheDocument();
-    expect(screen.queryByText("/ 3 页")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("textbox", { name: "跳转到第几页" }),
-    ).toBeInTheDocument();
-  });
-
-  it("shows the skill count on the pagination row instead of the toolbar", async () => {
-    bootRegistry(50); // 3 pages
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    // The count shares the bottom row with the pagination controls.
-    const count = screen.getByText("共 50 个");
-    expect(
-      count.closest("div")?.querySelector('nav[aria-label="pagination"]'),
-    ).not.toBeNull();
-  });
-
-  it("jumps directly to a typed page number", async () => {
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
-    await user.clear(jump);
-    await user.type(jump, "3");
-    await user.keyboard("{Enter}");
-
-    expect(
-      await screen.findByText(`skill-${2 * PAGE_SIZE}`),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
-      "3",
-    );
-  });
-
-  it("clamps an out-of-range jump to the last page", async () => {
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
-    await user.clear(jump);
-    await user.type(jump, "99");
-    await user.keyboard("{Enter}");
-
-    expect(
-      await screen.findByText(`skill-${2 * PAGE_SIZE}`),
-    ).toBeInTheDocument();
-  });
-
-  it("commits a typed jump on blur", async () => {
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
-    await user.clear(jump);
-    await user.type(jump, "2");
-    await user.tab(); // Move focus away → blur commits.
-
-    expect(await screen.findByText(`skill-${PAGE_SIZE}`)).toBeInTheDocument();
-  });
-
-  it("keeps the current page while a number is typed but not committed", async () => {
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
-    await user.clear(jump);
-    await user.type(jump, "2");
-
-    // Still on page 1 until the value is committed.
-    expect(screen.getByText(`skill-${PAGE_SIZE - 1}`)).toBeInTheDocument();
-    expect(screen.queryByText(`skill-${PAGE_SIZE}`)).not.toBeInTheDocument();
-    expect(jump).toHaveValue("2");
-  });
-
-  it("reverts to the current page on Escape", async () => {
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
-    await user.clear(jump);
-    await user.type(jump, "3");
-    await user.keyboard("{Escape}");
-
-    // Still on page 1, and the box shows the current page again — the
-    // discarded draft must not be committed by the blur that Escape causes.
-    expect(screen.getByText(`skill-${PAGE_SIZE - 1}`)).toBeInTheDocument();
-    expect(screen.queryByText(`skill-${PAGE_SIZE}`)).not.toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
-      "1",
-    );
-  });
-
-  it("reverts an empty commit to the current page", async () => {
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2); // 3 pages
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    const jump = screen.getByRole("textbox", { name: "跳转到第几页" });
-    await user.clear(jump);
-    await user.keyboard("{Enter}");
-
-    // An empty value means "no jump": page 1 stays, box restores "1".
-    expect(screen.getByText(`skill-${PAGE_SIZE - 1}`)).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "跳转到第几页" })).toHaveValue(
-      "1",
-    );
-  });
-
-  it("shows an error state and recovers via retry", async () => {
+  it("previews two rows of the current layout, not a fixed count", async () => {
     const user = userEvent.setup();
     harness.init();
-    harness.fail(new Error("network error"));
+    harness.pushAll(makeSkills(10, 0));
+    harness.complete();
+    const { container } = renderExplorePage();
+    await screen.findByText("skill-0");
+
+    // No layout in jsdom: the fixed fallback of six applies...
+    expect(screen.queryByText("skill-6")).not.toBeInTheDocument();
+
+    // ...until the grid reports a real layout. The component reads the
+    // resolved grid-template-columns (one track per column); four tracks
+    // make the preview two rows = eight cards. Setting it inline works for
+    // both jsdom's computed style and a real browser.
+    const grid = container.querySelector("ul.grid") as HTMLElement;
+    grid.style.gridTemplateColumns = "280px 280px 280px 280px";
+
+    // The measurement re-runs when the expander settles back down (the same
+    // re-run re-arms it after a fold/unfold cycle).
+    await user.click(screen.getByRole("button", { name: "展开其余 4 个" }));
+    await user.click(screen.getByRole("button", { name: "收起" }));
+
+    expect(await screen.findByText("skill-7")).toBeInTheDocument();
+    expect(screen.queryByText("skill-8")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "展开其余 2 个" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps a pinned header under the pointer when it is collapsed", async () => {
+    bootRegistry(50);
+    const { container } = renderExplorePage();
+    await screen.findByText("skill-0");
+
+    const header = groupHeader(BATCH_REPO, 50);
+    const scrollBox = container.querySelector(
+      ".overflow-y-auto",
+    ) as HTMLElement;
+    scrollBox.scrollTop = 500;
+
+    // While pinned, the header sits at the container's top edge (60px below
+    // the window top); once its cards are gone it snaps 200px up to its
+    // natural position. The page must compensate so the header — just
+    // clicked — stays where the pointer met it.
+    vi.spyOn(header, "getBoundingClientRect")
+      .mockReturnValueOnce({ top: 60 } as DOMRect)
+      .mockReturnValueOnce({ top: -140 } as DOMRect);
+    const raf = vi
+      .spyOn(globalThis, "requestAnimationFrame")
+      .mockImplementation((cb: FrameRequestCallback) => {
+        cb(0);
+        return 0;
+      });
+
+    fireEvent.click(header);
+    expect(screen.queryByText("skill-0")).not.toBeInTheDocument();
+    // 500 scrolled, minus the 200px upward snap = the header holds still.
+    expect(scrollBox.scrollTop).toBe(300);
+
+    raf.mockRestore();
+    vi.mocked(header.getBoundingClientRect).mockRestore();
+  });
+
+  it("renders the leading groups first and reveals more as the reader scrolls", async () => {
+    // Twelve one-skill repositories: twice the initial render chunk.
+    harness.init();
+    harness.pushAll(
+      Array.from({ length: 12 }, (_, i) => ({
+        name: `skill-${i}`,
+        repo: `repo-${String(i).padStart(2, "0")}/skills`,
+        description: "",
+        stars: 10,
+        downloads: 10,
+        path: `skills/skill-${i}`,
+      })),
+    );
+    harness.complete();
     renderExplorePage();
 
-    expect(
-      await screen.findByText("加载失败：network error"),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "重试" }));
-    // The retry re-downloads (download #2), the fresh stream lands and the
-    // ready epoch refetches the page out of the failure state.
-    harness.pushAll(makeSkills(50, 0));
-    harness.complete();
-    expect(await screen.findByText("skill-0")).toBeInTheDocument();
-    expect(harness.downloads).toBe(2);
-  });
-
-  it("does not navigate away under HashRouter when clicking a page link", async () => {
-    // Regression: the app runs under <HashRouter>, so a pagination anchor's
-    // default href="#" navigation would push a new hash route and remount the
-    // page. onClick must preventDefault to keep the hash (and the route) fixed.
-    const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2);
-    window.history.replaceState(null, "", "#/explore");
-    render(
-      <QueryClientProvider client={queryClient}>
-        <HashRouter>
-          <Routes>
-            <Route path="/explore" element={<ExplorePage />} />
-            <Route path="/" element={<div>landing</div>} />
-          </Routes>
-        </HashRouter>
-      </QueryClientProvider>,
-    );
-
     await screen.findByText("skill-0");
-    const hashBefore = window.location.hash;
 
-    await goToPage(user, 2);
-    await screen.findByText(`skill-${PAGE_SIZE}`);
+    // The first chunk is mounted (groups and their cards)...
+    // The header count must match the trigger's exact aria-label shape — a
+    // looser prefix would also catch the repo link button printed on each
+    // rendered card.
+    const renderedHeaders = () =>
+      screen
+        .getAllByRole("button", { name: /^分组 repo-\d+\/skills，/ }).length;
+    expect(renderedHeaders()).toBe(6);
+    expect(screen.getByText("skill-5")).toBeInTheDocument();
+    expect(screen.queryByText("skill-6")).not.toBeInTheDocument();
 
-    // The hash (and therefore the active route) must be unchanged.
-    expect(window.location.hash).toBe(hashBefore);
-    // Page 2 still loads its own data, proving the click handled the page turn
-    // without relying on a route change.
-    expect(screen.getByText(`skill-${2 * PAGE_SIZE - 1}`)).toBeInTheDocument();
+    // ...and scrolling the sentinel into view extends the run. The observer
+    // re-arms on every extension, so a sentinel that stays in view keeps
+    // revealing groups until the answer is fully mounted.
+    const lastObserver = () =>
+      (
+        globalThis.IntersectionObserver as unknown as {
+          instances: Array<{ trigger(intersecting?: boolean): void }>;
+        }
+      ).instances.at(-1)!;
+    lastObserver().trigger(true);
+    expect(await screen.findByText("skill-6")).toBeInTheDocument();
+    await waitFor(() => expect(renderedHeaders()).toBe(12));
+    expect(screen.getByText("skill-11")).toBeInTheDocument();
+
+    // Once everything is mounted the sentinel is gone; a late trigger is a
+    // no-op instead of an error.
+    lastObserver().trigger(true);
+    expect(renderedHeaders()).toBe(12);
   });
 
-  it("filters skills by search text and resets to the first page", async () => {
+  it("collapses a group on header click and expands it back", async () => {
+    const user = userEvent.setup();
+    harness.init();
+    harness.pushAll(
+      ["a", "b", "c", "d", "e"].map((r, i) => ({
+        name: `skill-${i}`,
+        repo: `repo-${r}/skills`,
+        description: "",
+        stars: 10,
+        downloads: 10,
+        path: `skills/skill-${i}`,
+      })),
+    );
+    harness.complete();
+    renderExplorePage();
+    // Every group starts expanded — the five cards are all on screen.
+    await screen.findByText("skill-4");
+
+    const header = groupHeader("repo-d/skills");
+    await user.click(header);
+    await waitFor(() =>
+      expect(screen.queryByText("skill-3")).not.toBeInTheDocument(),
+    );
+    // The header itself never folds away.
+    expect(groupHeader("repo-d/skills")).toBeInTheDocument();
+
+    await user.click(header);
+    expect(await screen.findByText("skill-3")).toBeInTheDocument();
+  });
+
+  it("shows the group header's stars and skill count", async () => {
+    harness.init();
+    harness.pushAll([
+      {
+        name: "widget-core",
+        repo: "acme/widgets",
+        description: "Core widget engine.",
+        stars: 12_300,
+        downloads: 500,
+        path: "skills/widget-core",
+      },
+      {
+        name: "widget-cli",
+        repo: "acme/widgets",
+        description: "CLI for widgets.",
+        stars: 12_300,
+        downloads: 100,
+        path: "skills/widget-cli",
+      },
+      {
+        name: "other",
+        repo: "acme/other",
+        description: "Unrelated.",
+        stars: 1,
+        downloads: 1,
+        path: "skills/other",
+      },
+    ]);
+    harness.complete();
+    renderExplorePage();
+
+    // The most-starred group leads the list and starts expanded.
+    expect(await screen.findByText("widget-core")).toBeInTheDocument();
+    const header = groupHeader("acme/widgets", 2);
+    expect(header).toBeInTheDocument();
+    expect(within(header).getByText("acme/widgets")).toBeInTheDocument();
+    // The leading group carries its ordinal under the current sort, as a
+    // gold medal circle (text-only in the DOM).
+    expect(within(header).getByText("1")).toBeInTheDocument();
+    // Stars render compactly, exactly as the card rail prints them. The
+    // figure shares its span with the leading separator dot, so match by
+    // fragment.
+    expect(
+      within(header).getByText(new RegExp(formatCount(12_300))),
+    ).toBeInTheDocument();
+    // The skill count sits at the row's far edge.
+    expect(within(header).getByText("2 个")).toBeInTheDocument();
+  });
+
+  it("orders groups by repo stars and skills within a group by popularity", async () => {
+    const user = userEvent.setup();
+    harness.init();
+    harness.pushAll([
+      {
+        name: "b2",
+        repo: "o/big",
+        description: "",
+        stars: 500,
+        downloads: 100,
+      },
+      {
+        name: "b1",
+        repo: "o/big",
+        description: "",
+        stars: 500,
+        downloads: 10,
+      },
+      {
+        name: "n1",
+        repo: "o/none",
+        description: "",
+        stars: 0,
+        downloads: 1_000_000,
+      },
+    ]);
+    harness.complete();
+    renderExplorePage();
+    await screen.findByText("b2");
+
+    // The repo grouping puts the starred repository's group first — even
+    // though its skills are far less installed — and orders the group's own
+    // cards by popularity (b2's installs beat b1's). A group's stars, not a
+    // lone skill's installs, decide the group's place.
+    expect(cardOrder()).toEqual(["b2", "b1", "n1"]);
+
+    // The grouping control offers the three modes — each annotated with the
+    // group count it would produce over this answer — and nothing else; the
+    // textContent concatenates label and count.
+    await user.click(screen.getByRole("button", { name: "按仓库" }));
+    const rows = screen
+      .getAllByRole("menuitemradio")
+      .map((m) => m.textContent);
+    expect(rows).toEqual([
+      "按仓库2 组",
+      "按热度1 组",
+      "按类型1 组",
+    ]);
+  });
+
+  it("filters skills by search text", async () => {
     const user = userEvent.setup();
     bootGadgetRegistry();
     renderExplorePage();
     await screen.findByText("gadget-master");
 
-    // Move to page 2 first so the reset is observable.
-    await goToPage(user, 2);
-    await screen.findByText(`tool-${PAGE_SIZE - 1}`);
-
     await user.type(await searchField(), "gadget");
 
     // Under a loaded runner one keystroke can outlast the 150 ms debounce, so
-    // an intermediate prefix query ("g", "ga", …) may briefly render the very
-    // row this test targets before the final "gadget" query swaps in a
-    // skeleton. Asserting element-by-element races that swap: `findByRole`
-    // resolves on the intermediate row and the follow-up assertion then sees
-    // it detached. One `waitFor` over the whole settled block re-runs on the
-    // swap's mutations and passes only once the final answer is on screen.
+    // an intermediate prefix query may briefly render other rows. One
+    // `waitFor` over the whole settled block re-runs on the swap's mutations
+    // and passes only once the final answer is on screen.
     await waitFor(() => {
       // Highlighting splits the name into <mark> segments, so match the row
       // via its aria-label, which stays intact.
       expect(
         screen.getByRole("button", { name: "查看 gadget-master 详情" }),
       ).toBeInTheDocument();
-      // The count names the ranking as well: relevance, not the toolbar's
-      // sort — and "共 1 个" is the final answer's total, never a prefix's.
-      expect(screen.getByText("共 1 个 · 按相关度")).toBeInTheDocument();
-      // The grid went back to its first page and shows only the match.
+      // No filler group survives the search.
       expect(
-        screen.queryByText(`tool-${PAGE_SIZE - 1}`),
+        screen.queryByRole("button", { name: /^分组 acme\/tool-/ }),
       ).not.toBeInTheDocument();
-      // A single result fits on one page: the pager controls stay visible but
-      // both ends are clamped (disabled). Its totals follow the search too,
-      // so the pager belongs inside the same settled block.
-      expect(
-        screen.getByRole("link", { name: "下一页" }),
-      ).toHaveAttribute("aria-disabled", "true");
-      expect(
-        screen.getByRole("link", { name: "上一页" }),
-      ).toHaveAttribute("aria-disabled", "true");
     });
   });
+
+  it("restarts progressive rendering when the answer's definition changes", async () => {
+    const user = userEvent.setup();
+    // Twelve one-skill "gadget" repositories: every one of them matches the
+    // search, so the search answer alone is bigger than one render chunk.
+    harness.init();
+    harness.pushAll(
+      Array.from({ length: 12 }, (_, i) => ({
+        name: `gadget-${String(i).padStart(2, "0")}`,
+        repo: `acme/gadget-${String(i).padStart(2, "0")}`,
+        description: "A gadget.",
+        stars: 10,
+        downloads: 10,
+      })),
+    );
+    harness.complete();
+    renderExplorePage();
+    await screen.findByText("gadget-00");
+
+    // The header count must match the trigger's exact aria-label shape — a
+    // looser prefix would also catch the repo link printed on each card.
+    const renderedGadgetHeaders = () =>
+      screen.getAllByRole("button", {
+        name: /^分组 acme\/gadget-\d+，/,
+      });
+
+    // The reader has scrolled: the browsed list is fully mounted.
+    const lastObserver = () =>
+      (
+        globalThis.IntersectionObserver as unknown as {
+          instances: Array<{ trigger(intersecting?: boolean): void }>;
+        }
+      ).instances.at(-1)!;
+    lastObserver().trigger(true);
+    await waitFor(() =>
+      expect(renderedGadgetHeaders()).toHaveLength(12),
+    );
+
+    // A new answer restarts the run at the first chunk — it must not inherit
+    // the scrolled depth of the list it replaces. The reset lands with the
+    // keystroke; the search answer lands one debounce later, so both halves
+    // wait.
+    await user.type(await searchField(), "gadget");
+    await waitFor(() => expect(renderedGadgetHeaders()).toHaveLength(6));
+
+    // And scrolling the new answer reveals the rest of it.
+    lastObserver().trigger(true);
+    await waitFor(() => expect(renderedGadgetHeaders()).toHaveLength(12));
+  }, 15000);
 
   it("restores the full registry when the search is cleared", async () => {
     const user = userEvent.setup();
@@ -519,13 +547,16 @@ describe("ExplorePage", () => {
 
     const input = await searchField();
     await user.type(input, "gadget");
-    expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: /^分组 acme\/tool-/ }),
+      ).not.toBeInTheDocument(),
+    );
 
     await user.clear(input);
 
     expect(await screen.findByText("tool-0")).toBeInTheDocument();
-    expect(screen.getByText(`共 ${PAGE_SIZE + 11} 个`)).toBeInTheDocument();
-  });
+  }, 15000);
 
   it("shows a no-match empty state for a search with no results", async () => {
     const user = userEvent.setup();
@@ -544,7 +575,8 @@ describe("ExplorePage", () => {
     const user = userEvent.setup();
     // "widget" appears verbatim in exactly one field of each skill — name,
     // repo and description respectively — so the ranking is decided by the
-    // field weights alone.
+    // field weights alone. One skill per repository: the group order under a
+    // search is the relevance order of the groups' first (best) hits.
     harness.init();
     harness.pushAll([
       {
@@ -575,22 +607,19 @@ describe("ExplorePage", () => {
 
     await user.type(await searchField(), "widget");
 
-    expect(await screen.findByText("docgen")).toBeInTheDocument();
     // Rows appear in DOM order; read each row's aria-label, which stays
     // intact even when highlighted names are split across <mark> segments.
-    const cardOrder = () =>
-      screen
-        .getAllByRole("button", { name: /查看 .+ 详情/ })
-        .map((el) =>
-          el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""),
-        );
-    expect(cardOrder()).toEqual(["widget-pack", "misc-tools", "docgen"]);
+    // The browsed list orders the same skills alphabetically by repo, so the
+    // assertion must wait out the swap rather than trust the first paint.
+    await waitFor(() =>
+      expect(cardOrder()).toEqual(["widget-pack", "misc-tools", "docgen"]),
+    );
   });
 
   it("ranks search results by popularity among equally relevant matches", async () => {
     const user = userEvent.setup();
-    // Registry order: ["alpha-redis-clip", "beta-redis-tool"] — the same
-    // sequence the name sort produces, and the opposite of the popularity one.
+    // Registry order: ["alpha-redis-clip", "beta-redis-tool"] — the opposite
+    // of the popularity order.
     harness.init();
     harness.pushAll([
       {
@@ -610,28 +639,14 @@ describe("ExplorePage", () => {
     ]);
     harness.complete();
     renderExplorePage();
-    await screen.findByText("beta-redis-tool");
-
-    // Rows appear in DOM order; read each row's aria-label, which stays
-    // intact even when highlighted names are split across <mark> segments.
-    const cardOrder = () =>
-      screen
-        .getAllByRole("button", { name: /查看 .+ 详情/ })
-        .map((el) =>
-          el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""),
-        );
-
-    // Start from the name order, so the page is knowingly un-popular first.
-    await user.click(screen.getByRole("button", { name: "按热度" }));
-    await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
-    expect(cardOrder()).toEqual(["alpha-redis-clip", "beta-redis-tool"]);
+    await screen.findByText("alpha-redis-clip");
 
     await user.type(await searchField(), "redis");
 
     // Both matches are equally relevant, so the search's install boost puts the
-    // popular one first — a reorder the name sort alone cannot explain, which is
-    // also the proof that a search answers in relevance order rather than in the
-    // sort chosen for the browsed list.
+    // popular one first — a reorder the browsed list's order alone cannot
+    // explain, which is also the proof that a search answers in relevance order
+    // rather than in the order the browsed list had.
     await waitFor(() =>
       expect(cardOrder()).toEqual(["beta-redis-tool", "alpha-redis-clip"]),
     );
@@ -659,129 +674,116 @@ describe("ExplorePage", () => {
     expect(heading?.textContent).toBe("gadget-master");
   });
 
-  it("opens in download order and re-sorts the browsed list", async () => {
-    const user = userEvent.setup();
-    harness.init();
-    harness.pushAll([
-      {
-        name: "alpha",
-        repo: "o/alpha",
-        description: "",
-        stars: 0,
-        downloads: 5,
-      },
-      {
-        name: "beta",
-        repo: "o/beta",
-        description: "",
-        stars: 0,
-        downloads: 300,
-      },
-      {
-        name: "gamma",
-        repo: "o/gamma",
-        description: "",
-        stars: 0,
-        downloads: 50,
-      },
-    ]);
-    harness.complete();
-    renderExplorePage();
-    await screen.findByText("alpha");
-
-    // Rows appear in DOM order; exact-match the names so the repo subtitles
-    // ("o/alpha") don't interfere.
-    const cardOrder = () =>
-      screen.getAllByText(/^(alpha|beta|gamma)$/).map((el) => el.textContent);
-
-    // The page starts on the popularity order, not on the registry order.
-    expect(cardOrder()).toEqual(["beta", "gamma", "alpha"]);
-
-    // The dropdown offers the two browsed-list orders and nothing else.
-    await user.click(screen.getByRole("button", { name: "按热度" }));
-    expect(
-      screen.queryByRole("menuitemradio", { name: "默认排序" }),
-    ).toBeNull();
-    await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
-    expect(cardOrder()).toEqual(["alpha", "beta", "gamma"]);
-
-    // The trigger label follows the active order, so it can be opened again.
-    await user.click(screen.getByRole("button", { name: "按名称" }));
-    await user.click(screen.getByRole("menuitemradio", { name: "按热度" }));
-    expect(cardOrder()).toEqual(["beta", "gamma", "alpha"]);
-  });
-
-  it("replaces the sort control with a read-only 相关度 while searching", async () => {
+  it("keeps the grouping control in charge while searching", async () => {
     const user = userEvent.setup();
     bootGadgetRegistry();
     renderExplorePage();
     await screen.findByText("gadget-master");
 
-    // Choose a browsed-list order first, so the control's return is
-    // distinguishable from a reset.
-    await user.click(screen.getByRole("button", { name: "按热度" }));
-    await user.click(screen.getByRole("menuitemradio", { name: "按名称" }));
-
     const input = await searchField();
     await user.type(input, "gadget");
-    expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
 
-    // The hits are not ordered by the user's choice, so the control stops
-    // pretending to be one: the dropdown is gone, the label states the ranking.
-    expect(screen.queryByRole("button", { name: "按名称" })).toBeNull();
-    expect(screen.getByRole("button", { name: "相关度" })).toBeDisabled();
+    // The search swap is done once every filler group is gone.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: /^分组 acme\/tool-/ }),
+      ).not.toBeInTheDocument(),
+    );
 
-    // Clearing the search gives the choice back, still on 按名称.
-    await user.clear(input);
-    expect(
-      await screen.findByText(`共 ${PAGE_SIZE + 11} 个`),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "按名称" })).toBeEnabled();
+    // A search narrows the answer but not the reader's questions: the
+    // grouping control stays live, and regrouping the matches works. The
+    // menu rows carry their group counts, so match by prefix.
+    await user.click(screen.getByRole("button", { name: "按仓库" }));
+    await user.click(screen.getByRole("menuitemradio", { name: /^按类型/ }));
+
+    // The gadget is unprofiled, so the answer pools into one group.
+    expect(groupHeader("未分类")).toBeInTheDocument();
   });
 
-  it("hides the category filter until the profile domains land", async () => {
-    bootRegistry(50);
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    // No profiles yet: the worker returns an empty domain list, so the whole
-    // category control is absent rather than a filter whose only choice is all.
-    expect(
-      screen.queryByRole("button", { name: "全部分类" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("filters the list by the selected profile domain", async () => {
+  it("groups the list by profile domain and back to repositories", async () => {
     const user = userEvent.setup();
     harness.reset();
     harness.init();
     harness.pushAll(makeSkills(6, 0));
     harness.complete();
-    // Profiles land with the same boot; the domain list settles once the
+    // Profiles land with the same boot; the grouping settles once the
     // index is rebuilt over the decorated skills.
     harness.publishProfiles({
-      "repo-0/skills/skill-0": { domain: "开发编程" },
-      "repo-1/skills/skill-1": { domain: "内容创作" },
+      "acme/batch/skill-0": { domain: "开发编程" },
+      "acme/batch/skill-1": { domain: "内容创作" },
     });
     renderExplorePage();
     await screen.findByText("skill-0");
 
-    // The category control is present once domains exist; open it and pick one.
-    await user.click(screen.getByRole("button", { name: "全部分类" }));
-    await user.click(screen.getByRole("menuitemradio", { name: /开发编程/ }));
+    // The grouping control is present from the start; open it and switch
+    // the mode.
+    await user.click(screen.getByRole("button", { name: "按仓库" }));
+    await user.click(screen.getByRole("menuitemradio", { name: /^按类型/ }));
 
-    // The worker filters by domain: one matching skill, one page.
-    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
-    expect(screen.getByText("skill-0")).toBeInTheDocument();
-    expect(screen.queryByText("skill-1")).not.toBeInTheDocument();
+    // The same six skills regroup: two profiled domains plus the 未分类
+    // pool for the other four — ordered by size.
+    expect(await screen.findByText("未分类")).toBeInTheDocument();
+    expect(groupHeader("开发编程", 1)).toBeInTheDocument();
+    expect(groupHeader("内容创作", 1)).toBeInTheDocument();
+    expect(groupHeader("未分类", 4)).toBeInTheDocument();
+    expect(screen.getByText("skill-5")).toBeInTheDocument();
 
-    // The trigger reflects the active filter; 全部分类 restores the registry.
-    await user.click(screen.getByRole("button", { name: "开发编程" }));
-    await user.click(
-      screen.getByRole("menuitemradio", { name: /全部分类/ }),
+    // Back to repositories: one group again, every skill of it visible.
+    await user.click(screen.getByRole("button", { name: "按类型" }));
+    await user.click(screen.getByRole("menuitemradio", { name: /^按仓库/ }));
+    expect(await screen.findByText("skill-5")).toBeInTheDocument();
+    expect(groupHeader("acme/batch", 6)).toBeInTheDocument();
+  });
+
+  it("chunks the popularity grouping into TOP buckets", async () => {
+    harness.init();
+    // 130 skills: three buckets of 50/50/30.
+    harness.pushAll(
+      Array.from({ length: 130 }, (_, i) => ({
+        name: `skill-${i}`,
+        repo: `acme/skill-${i}`,
+        description: "",
+        stars: 2000 - i,
+        downloads: 2000 - i,
+        path: `skills/skill-${i}`,
+      })),
     );
-    expect(await screen.findByText("共 6 个")).toBeInTheDocument();
-    expect(screen.getByText("skill-1")).toBeInTheDocument();
+    harness.complete();
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "按仓库" }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole("menuitemradio", { name: /^按热度/ }));
+
+    // Rank buckets in rank order.
+    expect(await screen.findByText("TOP 1-50")).toBeInTheDocument();
+    expect(groupHeader("TOP 51-100", 50)).toBeInTheDocument();
+    expect(groupHeader("TOP 101-130", 30)).toBeInTheDocument();
+    // The first bucket holds the top of the popularity order.
+    expect(screen.getByText("skill-0")).toBeInTheDocument();
+  });
+
+  it("shows an error state and recovers via retry", async () => {
+    const user = userEvent.setup();
+    harness.init();
+    harness.fail(new Error("network error"));
+    renderExplorePage();
+
+    expect(
+      await screen.findByText("加载失败：network error"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "重试" }));
+    // The retry re-downloads (download #2), the fresh stream lands and the
+    // ready epoch refetches the groups out of the failure state.
+    harness.pushAll(makeSkills(50, 0));
+    harness.complete();
+    expect(await screen.findByText("skill-0")).toBeInTheDocument();
+    expect(harness.downloads).toBe(2);
   });
 
   it("opens the detail panel when a row is clicked", async () => {
@@ -798,7 +800,7 @@ describe("ExplorePage", () => {
     ).toBeInTheDocument();
     const panel = screen.getByRole("dialog");
     expect(within(panel).getByText("skill-0")).toBeInTheDocument();
-    expect(within(panel).getByText("repo-0/skills")).toBeInTheDocument();
+    expect(within(panel).getByText(BATCH_REPO)).toBeInTheDocument();
   });
 
   it("switches skills inside the panel via the arrow keys", async () => {
@@ -845,29 +847,31 @@ describe("ExplorePage", () => {
     );
   });
 
-  it("opens the drawer without reflowing the list", async () => {
+  it("opens the drawer without reflowing the group list", async () => {
     const user = userEvent.setup();
-    bootRegistry(PAGE_SIZE * 2 + 2);
+    bootRegistry(50);
     const { container } = renderExplorePage();
     await screen.findByText("skill-0");
 
     const list = container.querySelector("ul.grid")!;
-    expect(list.className).toBe(SKILL_LIST_CLASS);
-    expect(list.querySelectorAll("li")).toHaveLength(PAGE_SIZE);
+    expect(list.className).toContain(SKILL_LIST_CLASS);
+    // The group previews six cards; the list run is the preview, not the
+    // full 50-skill group.
+    expect(list.querySelectorAll("li")).toHaveLength(6);
 
     // Opening the drawer overlays the list: its classes — and with them its
     // layout and scroll position — stay exactly the same while the drawer is
     // open and after it closes.
     await user.click(screen.getByText("skill-0"));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(list.className).toBe(SKILL_LIST_CLASS);
+    expect(list.className).toContain(SKILL_LIST_CLASS);
 
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    expect(list.className).toBe(SKILL_LIST_CLASS);
-    expect(list.querySelectorAll("li")).toHaveLength(PAGE_SIZE);
+    expect(list.className).toContain(SKILL_LIST_CLASS);
+    expect(list.querySelectorAll("li")).toHaveLength(6);
   });
 });
 
@@ -890,27 +894,25 @@ describe("ExplorePage streaming", () => {
     expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
   });
 
-  it("renders page one from progress snapshots while the index is still streaming", async () => {
+  it("renders groups from progress snapshots while the index is still streaming", async () => {
     harness.init();
     renderExplorePage();
     await act(async () => {});
 
     harness.pushAll(makeSkills(PAGE_SIZE + 5, 0));
 
-    // Page one paints from the partial data; the count reports what has
-    // loaded so far and says it is still loading.
+    // The group paints from the partial data (its first six as the preview)
+    // and grows in place as more of the stream lands, without disturbing the
+    // group the reader already has open.
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
-    expect(screen.getByText(`skill-${PAGE_SIZE - 1}`)).toBeInTheDocument();
-    expect(screen.queryByText(`skill-${PAGE_SIZE}`)).not.toBeInTheDocument();
-    expect(screen.getByText(new RegExp(`共 ${PAGE_SIZE + 5} 个`))).toBeInTheDocument();
-    expect(screen.getByText(/加载中/)).toBeInTheDocument();
+    expect(screen.getByText("skill-5")).toBeInTheDocument();
 
-    // A later snapshot grows the registry (and the count) in place.
     harness.pushAll(makeSkills(PAGE_SIZE + 20, 0).slice(PAGE_SIZE + 5));
-    expect(
-      await screen.findByText(new RegExp(`共 ${PAGE_SIZE + 20} 个`)),
-    ).toBeInTheDocument();
-    expect(screen.getByText(`共 ${PAGE_SIZE + 20} 个 · 加载中`)).toBeInTheDocument();
+    // The refetch over the grown prefix updates the group's card count in
+    // place; wait it out rather than racing the swap.
+    await waitFor(() =>
+      expect(groupHeader(BATCH_REPO, PAGE_SIZE + 20)).toBeInTheDocument(),
+    );
   });
 
   it("keeps search locked until the index over the registry is ready", async () => {
@@ -937,19 +939,19 @@ describe("ExplorePage streaming", () => {
     const user = userEvent.setup();
     // A half-typed word answers straight off the freshly built index.
     await user.type(input, "gadget-m");
-    expect(await screen.findByText("共 1 个 · 按相关度")).toBeInTheDocument();
     expect(
       await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/加载中/)).not.toBeInTheDocument();
 
-    // A mistyped word is no longer rescued into a hit.
+    // A mistyped word is no longer rescued into a hit: the answer is the
+    // no-match empty state, not a stale page one.
     await user.clear(input);
     await user.type(input, "gadgt");
-    expect(await screen.findByText("共 0 个 · 按相关度")).toBeInTheDocument();
+    expect(
+      await screen.findByText("未找到匹配“gadgt”的 Skill"),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "查看 gadget-master 详情" }),
     ).not.toBeInTheDocument();
   });
 });
-

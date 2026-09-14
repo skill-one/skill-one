@@ -1,105 +1,74 @@
-import { useMemo, useState } from "react";
-import {
-  ArrowDownAZ,
-  ChevronDown,
-  Flame,
-  LayoutGrid,
-  Sparkles,
-} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Flame, FolderGit2, LayoutGrid } from "lucide-react";
 
-import { useRegistryPage } from "../../hooks/use-registry-page";
+import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
-import { useRegistryDomains } from "../../hooks/use-registry-domains";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
-import { useClampedPage } from "../../hooks/use-clamped-page";
-import { PAGE_SIZE, SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
+import { SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
 import {
   SKILL_CARD_SKELETON_CLASS,
   SKILL_LIST_CLASS,
 } from "../../lib/skill-list-layout";
-import { domainMeta } from "../../data/domains";
-import { cn } from "../../lib/utils";
-import type { SearchHit, SortOrder } from "../../lib/registry/protocol";
+import type { GroupBy, GroupCounts } from "../../lib/registry/protocol";
 import { Button } from "../../components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../../components/ui/dropdown-menu";
-import { SkeletonList } from "../../components/skeleton-list";
 import {
   FilterDropdown,
   type FilterOption,
 } from "../../components/filter-dropdown";
-import { SkillListRow } from "./skill-list-row";
+import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
-import { ListPager } from "../../components/list-pager";
 import { Placeholder } from "../../components/placeholder";
 import { SearchInput } from "../../components/search-input";
+import { SkillListRow } from "./skill-list-row";
+import { GroupSection } from "./group-section";
 
 /**
- * The sort orders offered by the toolbar dropdown; both are applied inside the
- * worker and order the *browsed* list. Popularity is the entry order — "most
- * wanted first" is the reading a store visitor wants, the registry index order
- * was never a choice worth exposing, and a separate by-installs order would
- * only split one metric into two competing definitions. The two counts behind
- * the blend stay readable on every row's tooltip.
- *
- * A search is the exception: the worker answers it in relevance order, so the
- * dropdown is replaced by a read-only 相关度 pill rather than claiming an order
- * the results do not follow.
- *
- * Each option is led by a lucide glyph that mirrors the metric the row already
- * shows (the same Flame that stands for 热度), so "sort by popularity" and the
- * popularity figure read as one idea rather than two unrelated labels.
- *
- * The glyph stays neutral here even though the row's figure is tinted: the tint
- * marks the data, and repeating it in the control would either contradict the
- * list (a grey flame in the menu while the rows stay warm) or clone the whole
- * palette into the menu. Selection is the menu's job, and its radio dot plus
- * the foreground label already carry it, so the active option only steps up
- * from muted to foreground like every other shadcn menu item — no per-metric
- * color, and nothing that can drift away from the rows.
+ * How many groups mount with the page, and how many more mount each time the
+ * reader scrolls the list's sentinel into view. The page has no pagination
+ * and every group is expanded — a group's cards are the point of the group —
+ * so rendering, not folding, is what paces the list: the first chunk paints
+ * with the page, and each scroll-to-bottom extends the run until every group
+ * of the answer is on screen.
  */
-const SORT_OPTIONS: FilterOption<SortOrder>[] = [
+const INITIAL_GROUPS = 6;
+const GROUP_CHUNK = 6;
+
+/**
+ * The grouping modes the toolbar offers. Each mode implies its own ordering
+ * — groups and the skills inside them — so one choice replaces the old
+ * grouping-plus-sort pair. `recency` is reserved in the protocol until the
+ * mirror publishes an update time and stays out of the menu.
+ */
+const GROUP_OPTIONS: Array<FilterOption<GroupBy>> = [
+  { value: "repo", label: "按仓库", icon: FolderGit2 },
   { value: "popularity", label: "按热度", icon: Flame },
-  { value: "name", label: "按名称", icon: ArrowDownAZ },
+  { value: "domain", label: "按类型", icon: LayoutGrid },
 ];
 
 export function ExplorePage() {
-  // 1-based current page.
-  const [page, setPage] = useState(1);
-
-  // Search text and sort order; any change invalidates the page/selection
-  // because the result list (and the meaning of a row index) changes.
+  // Search text and grouping mode; any change re-groups the answer because
+  // both define what a group is.
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortOrder>("popularity");
-  // Selected profile domain ("开发编程", ...); undefined browses all.
-  const [domain, setDomain] = useState<string>();
+  const [groupBy, setGroupBy] = useState<GroupBy>("repo");
   const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
 
   // Worker progress: the climbing count, the streaming/indexing flags and
   // the retry action for a failed download.
   const stats = useRegistryStats();
 
-  // The category choices, computed inside the worker over the decorated
-  // registry; empty while the profiles dataset has not landed yet.
-  const { data: domains = [] } = useRegistryDomains();
-
-  // One page-sized answer from the registry worker; all filtering, sorting
-  // and slicing happen there — the main thread never touches the registry.
+  // The whole (filtered) registry grouped by the requested mode, from the
+  // registry worker — filtering, ordering and the bucketing all happen
+  // there. There is no pagination: the page folds groups instead, and a
+  // closed group renders no cards.
   const {
-    data: pageData,
+    data: groupsData,
     isLoading,
     isError,
     error,
     refetch: refetchPage,
-  } = useRegistryPage(query, sort, page - 1, PAGE_SIZE, domain);
+  } = useRegistryGroups(query, groupBy);
 
-  const hits: SearchHit[] = pageData?.hits ?? [];
+  const groups = groupsData?.groups ?? [];
 
   // A download failure only owns the screen while there is nothing to show;
   // with data on screen (cache / previous source) the error surfaces in the
@@ -113,53 +82,90 @@ export function ExplorePage() {
   // The skeleton stays up until the very first skill arrives; after that the
   // list paints from partial data and grows with the stream.
   const loading =
-    isLoading || (hits.length === 0 && stats.count === 0 && !failure);
+    isLoading || (groups.length === 0 && stats.count === 0 && !failure);
 
-  // Total of the (filtered) list, reported by the worker; before the first
-  // answer lands the progressive count stands in. Beyond a shrinking index the
-  // page is clamped, and while the registry streams in that also hides pages
-  // past the loaded prefix until more data arrives.
-  const total = pageData?.total ?? stats.count;
-  const totalPages = useClampedPage(page, total, PAGE_SIZE, setPage);
+  // Progressive rendering: only the first `visibleCount` groups are mounted;
+  // an IntersectionObserver on the sentinel below the list extends the count
+  // while the reader scrolls. It resets with the answer's definition — the
+  // handlers below — not with the data, so a streaming snapshot that grows
+  // the list never snaps the reader back to the top chunk.
+  const [visibleCount, setVisibleCount] = useState(INITIAL_GROUPS);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const renderedGroups = groups.slice(0, visibleCount);
+  const allRendered = renderedGroups.length >= groups.length;
 
-  // Index into `hits` of the skill shown in the detail panel; null keeps the
-  // panel closed. Clicking a row while the panel is open
-  // simply swaps the selection, so switching skills never replays the
+  // Re-observing on every extension is what keeps the reveal going while the
+  // sentinel still sits in view: observing fires the initial callback with
+  // the current intersection, so a bottom edge that stays visible loads the
+  // next chunk without a further scroll, until everything is mounted.
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || allRendered) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisibleCount((c) => Math.min(c + GROUP_CHUNK, groups.length));
+      }
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [allRendered, groups.length]);
+
+  // Index into the flattened group skills of the skill shown in the detail
+  // panel; null keeps the panel closed. Clicking a row while the panel is
+  // open simply swaps the selection, so switching skills never replays the
   // slide-in animation.
   const [selected, setSelected] = useState<number | null>(null);
-  // The sheet indexes a plain Skill list (the paged search hits, unwrapped).
-  // Depends on the query result, not the derived array: `hits` is a fresh
-  // identity whenever the page re-renders, which would recompute this every time.
-  const pageSkills = useMemo(
-    () => (pageData?.hits ?? []).map((hit) => hit.skill),
-    [pageData],
+  // The panel walks the flat skill list over all groups, unwrapped. Depends
+  // on the query result, not the derived array: `groups` is a fresh identity
+  // whenever the page re-renders, which would recompute this every time.
+  const flatSkills = useMemo(
+    () => (groupsData?.groups ?? []).flatMap((g) => g.skills.map((h) => h.skill)),
+    [groupsData],
   );
+  // Each group's first skill's index in that flat list, handed down so a
+  // group's rows speak the same coordinate system as `selected`. Depends on
+  // the query result, not the derived array, for the same reason.
+  const groupOffsets = useMemo(() => {
+    const offsets: number[] = [];
+    let next = 0;
+    for (const group of groupsData?.groups ?? []) {
+      offsets.push(next);
+      next += group.skills.length;
+    }
+    return offsets;
+  }, [groupsData]);
 
   const handleSearch = (q: string) => {
     setSelected(null);
-    setPage(1);
+    setVisibleCount(INITIAL_GROUPS);
     setSearch(q);
   };
-  const handleSort = (order: SortOrder) => {
+  const handleGroupBy = (mode: GroupBy) => {
     setSelected(null);
-    setPage(1);
-    setSort(order);
-  };
-  const handleDomain = (value: string) => {
-    setSelected(null);
-    setPage(1);
-    setDomain(value === "all" ? undefined : value);
+    setVisibleCount(INITIAL_GROUPS);
+    setGroupBy(mode);
   };
 
-  // Go to a numbered page and close any open detail panel.
-  const handlePage = (p: number) => {
-    setSelected(null);
-    setPage(p);
-  };
+  // Each mode's option, annotated with how many groups it would produce over
+  // the current answer — the figures ride in with the groups data itself, so
+  // a search narrows them in step with the list. Until the first answer
+  // lands there is nothing to annotate.
+  const groupOptions = useMemo(
+    () =>
+      GROUP_OPTIONS.map((option) => ({
+        ...option,
+        // The reserved `recency` mode is not offered, so the cast is safe
+        // for everything the menu actually shows.
+        count: groupsData?.groupCounts[option.value as keyof GroupCounts],
+      })),
+    [groupsData],
+  );
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-0">
-      {/* Toolbar: search on the left; category and sort on the right. */}
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-5">
+      {/* Toolbar: search on the left; the grouping mode on the right. One
+          choice replaces the old grouping-plus-sort pair — every mode implies
+          its own ordering, applied inside the worker. */}
       <div className="mb-4 flex items-center gap-3">
         {/* Search runs on the worker's MiniSearch index, which only exists
             once the whole registry has landed. Before that the field is
@@ -173,121 +179,28 @@ export function ExplorePage() {
         />
 
         <div className="ml-auto flex items-center gap-2">
-          {/* Category filter over the profiles dataset's domains. The worker
-              hands back an empty list until the profiles land, so the whole
-              control stays hidden then — a filter whose only choice is "all"
-              is noise, not a decision. */}
-          {domains.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant={domain ? "secondary" : "outline"}
-                  className="rounded-full px-4"
-                >
-                  {/* The trigger leads with the selected row's own glyph — the
-                      LayoutGrid of "全部分类" or the chosen domain's emoji — so
-                      the closed and open states of the same value agree. */}
-                  <span className="flex items-center gap-1.5">
-                    {domain ? (
-                      domainMeta(domain) && (
-                        <span aria-hidden="true">
-                          {domainMeta(domain)!.emoji}
-                        </span>
-                      )
-                    ) : (
-                      <LayoutGrid
-                        aria-hidden="true"
-                        className="h-4 w-4 text-foreground"
-                      />
-                    )}
-                    {domain ?? "全部分类"}
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuRadioGroup
-                  value={domain ?? "all"}
-                  onValueChange={handleDomain}
-                >
-                  {/* "全部分类" is the clear-filter default, set above the
-                      divider so it never reads as a peer of the misc "其他".
-                      LayoutGrid keeps its label aligned with the emoji rows and
-                      the figure is the full registry total, not a domain sum. */}
-                  <DropdownMenuRadioItem value="all">
-                    <LayoutGrid
-                      aria-hidden="true"
-                      className={cn(
-                        "h-4 w-4",
-                        !domain ? "text-foreground" : "text-muted-foreground",
-                      )}
-                    />
-                    全部分类
-                    <span className="ml-auto pl-4 text-xs text-muted-foreground tabular-nums">
-                      {stats.count}
-                    </span>
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuSeparator />
-                  {domains.map(({ domain: name, count }) => (
-                    <DropdownMenuRadioItem
-                      key={name}
-                      value={name}
-                      title={domainMeta(name)?.description}
-                    >
-                      {domainMeta(name) && (
-                        <span aria-hidden="true">
-                          {domainMeta(name)!.emoji}
-                        </span>
-                      )}
-                      {name}
-                      <span className="ml-auto pl-4 text-xs text-muted-foreground tabular-nums">
-                        {count}
-                      </span>
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
-          {/* A search is ordered by relevance — the ranking is what decided
-              these skills match — so the sort control is replaced by a static
-              label instead of claiming an order the results do not follow.
-              Clearing the search brings the choice back, still on whatever the
-              user last picked for the browsed list. */}
-          {query ? (
-            <Button variant="outline" className="rounded-full px-4" disabled>
-              <span className="flex items-center gap-1.5">
-                <Sparkles
-                  aria-hidden="true"
-                  className="h-4 w-4 text-muted-foreground"
-                />
-                相关度
-              </span>
-            </Button>
-          ) : (
-            <FilterDropdown
-              value={sort}
-              options={SORT_OPTIONS}
-              onChange={handleSort}
-            />
-          )}
+          <FilterDropdown
+            value={groupBy}
+            options={groupOptions}
+            onChange={handleGroupBy}
+          />
         </div>
       </div>
 
-      {/* The skill list; the modal detail drawer overlays it without reflowing
-          it or moving its scroll position. */}
+      {/* The group list; the modal detail drawer overlays it without
+          reflowing it or moving its scroll position. */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex h-full min-w-0 flex-1 flex-col">
           {/* Results. The horizontal padding is sized for the macOS-style
               overlay scrollbar: a hovered (transformed) row is painted over the
               thumb, so the rows need reserved space on the right instead of
-              sitting under it. Each padding is offset by a matching negative
+              sitting under it. The padding is offset by a matching negative
               margin, so content position and row widths are unchanged while the
               outside-painted ink — the selected ring and the focus outline —
-              stays unclipped; the 4px top pair does the same at the flush top
-              edge. */}
-          <div className="min-h-0 flex-1 -mx-3 -mt-1 overflow-y-auto px-3 pb-0 pt-1">
+              stays unclipped. The top edge stays flush on purpose: the sticky
+              group headers pin exactly there, and any top padding would let
+              scrolled cards peek out above them. */}
+          <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5">
             {failure ? (
               <Placeholder message={`加载失败：${failure}`}>
                 <Button
@@ -312,47 +225,56 @@ export function ExplorePage() {
                 listClassName={SKILL_LIST_CLASS}
                 itemClassName={SKILL_CARD_SKELETON_CLASS}
               />
-            ) : hits.length === 0 ? (
+            ) : groups.length === 0 ? (
               <Placeholder
                 message={query ? `未找到匹配“${query}”的 Skill` : "暂无技能"}
               />
             ) : (
-              <ul className={SKILL_LIST_CLASS}>
-                {hits.map((hit, i) => (
-                  <SkillListRow
-                    key={`${hit.skill.repo}/${hit.skill.name}`}
-                    skill={hit.skill}
-                    matched={hit.matched}
-                    selected={i === selected}
-                    onSelect={() => setSelected(i)}
+              <div
+                key={`${query}\u0000${groupBy}`}
+                className="flex flex-col gap-3"
+              >
+                {/* Keyed by the answer's definition, not its data: when the
+                    query or grouping mode changes the groups remount, so stale
+                    fold states never survive into a differently-shaped
+                    list. Streaming invalidations share the definition, so
+                    they update the groups in place without resetting what
+                    the reader has folded (or how far they have scrolled). */}
+                {renderedGroups.map((group, gi) => (
+                  <GroupSection
+                    key={group.key}
+                    group={group}
+                    index={gi}
+                    items={group.skills}
+                    offset={groupOffsets[gi]}
+                    selected={selected}
+                    rowKey={(hit) => `${hit.skill.repo}/${hit.skill.name}`}
+                    renderItem={(hit, flatIndex, isSelected) => (
+                      <SkillListRow
+                        skill={hit.skill}
+                        matched={hit.matched}
+                        selected={isSelected}
+                        onSelect={() => setSelected(flatIndex)}
+                      />
+                    )}
                   />
                 ))}
-              </ul>
+                {/* The sentinel ends the rendered run: while it is on screen
+                    the observer above extends the run, so scrolling down —
+                    or simply having a tall viewport — keeps revealing groups
+                    until the answer is fully mounted. */}
+                {!allRendered && <div ref={sentinelRef} aria-hidden="true" />}
+              </div>
             )}
           </div>
-
-          {/* Pagination row: previous / numbered pages (with ellipsis) / next
-              — the current page number doubles as an editable jump box — with
-              the skill count pinned to the right. While the index is streaming
-              in the count climbs, so say so, and a
-              search says what ordered the list. */}
-          {(stats.count > 0 || stats.complete) && (
-            <ListPager
-              page={page}
-              totalPages={totalPages}
-              onPage={handlePage}
-              count={`共 ${total} 个${stats.complete ? "" : " · 加载中"}${
-                stats.indexing ? " · 索引中" : ""
-              }${query ? " · 按相关度" : ""}`}
-            />
-          )}
         </div>
       </div>
 
       {/* Modal detail drawer; the wiring (open/close, prev/next bounds) is
-          shared with the featured page. */}
+          shared with the featured page. It walks the flat skill list over all
+          groups, rendered or not yet rendered. */}
       <SkillDetailDrawer
-        skills={pageSkills}
+        skills={flatSkills}
         selected={selected}
         onSelect={setSelected}
       />
