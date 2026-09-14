@@ -100,7 +100,11 @@ mod tests {
         let path = dir.path().join(LEDGER_FILE);
         write_ledger_at(&path, "content").expect("write");
         let tmp = path.with_extension("tmp");
-        assert!(!tmp.exists(), "temp file {} should be renamed away", tmp.display());
+        assert!(
+            !tmp.exists(),
+            "temp file {} should be renamed away",
+            tmp.display()
+        );
         assert!(path.exists());
     }
 
@@ -109,10 +113,7 @@ mod tests {
         let path = ledger_path().expect("home dir available in tests");
         assert!(path.starts_with(dirs::home_dir().unwrap()));
         assert_eq!(path.file_name().unwrap(), LEDGER_FILE);
-        assert_eq!(
-            path.parent().unwrap().file_name().unwrap(),
-            "skills"
-        );
+        assert_eq!(path.parent().unwrap().file_name().unwrap(), "skills");
     }
 
     #[test]

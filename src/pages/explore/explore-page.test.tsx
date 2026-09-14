@@ -284,7 +284,7 @@ describe("ExplorePage", () => {
     expect(scrollBox.scrollTop).toBe(300);
 
     raf.mockRestore();
-    vi.mocked(header.getBoundingClientRect).mockRestore();
+    vi.spyOn(header, "getBoundingClientRect").mockRestore();
   });
 
   it("keeps a pinned header under the pointer when the preview is collapsed", async () => {
@@ -321,7 +321,7 @@ describe("ExplorePage", () => {
     expect(scrollBox.scrollTop).toBe(300);
 
     raf.mockRestore();
-    vi.mocked(header.getBoundingClientRect).mockRestore();
+    vi.spyOn(header, "getBoundingClientRect").mockRestore();
   });
 
   it("renders the leading groups first and reveals more as the reader scrolls", async () => {

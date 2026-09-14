@@ -27,7 +27,9 @@ export function useScheduledCheck(
 ): void {
   // A ref keeps a re-render from tearing down and re-arming the timers.
   const checkRef = useRef(check);
-  checkRef.current = check;
+  useEffect(() => {
+    checkRef.current = check;
+  }, [check]);
   useEffect(() => {
     if (!enabled) return;
     if (immediate) checkRef.current();

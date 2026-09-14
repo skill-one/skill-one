@@ -5,11 +5,11 @@
 
 use serde::Serialize;
 
+use crate::skill_hash;
 use agents_skills::{
     AddRequest, AgentRequest, DisableRequest, EnableRequest, LinkOutcome, ListRequest, Manager,
     RemoveRequest,
 };
-use crate::skill_hash;
 
 /// Build a `Manager` targeting the user-level **global** skills directory
 /// (`~/.agents/skills`). Skills only live there; project-level support has

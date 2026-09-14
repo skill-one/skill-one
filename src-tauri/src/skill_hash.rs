@@ -62,8 +62,8 @@ fn collect_files(
         if file_type.is_dir() {
             collect_files(root, &rel, out)?;
         } else {
-            let bytes =
-                std::fs::read(entry.path()).map_err(|e| format!("read {}: {e}", entry.path().display()))?;
+            let bytes = std::fs::read(entry.path())
+                .map_err(|e| format!("read {}: {e}", entry.path().display()))?;
             out.push((rel, bytes));
         }
     }
@@ -77,9 +77,7 @@ pub fn hash_skill_dir(root: &Path) -> Result<String, String> {
     collect_files(root, "", &mut files)?;
     let collator = collator();
     files.sort_by(|a, b| {
-        collator
-            .compare(&a.0, &b.0)
-            .then_with(|| a.0.cmp(&b.0)) // stable tiebreak for collation-equal paths
+        collator.compare(&a.0, &b.0).then_with(|| a.0.cmp(&b.0)) // stable tiebreak for collation-equal paths
     });
     let mut hasher = Sha256::new();
     for (rel, bytes) in &files {
@@ -134,8 +132,7 @@ mod tests {
         // Renaming a file changes the hashed path bytes even with equal
         // content, so two differently-laid-out skills never collide.
         let dir = fixture();
-        fs::rename(dir.path().join("B.txt"), dir.path().join("Z.txt"))
-            .expect("rename");
+        fs::rename(dir.path().join("B.txt"), dir.path().join("Z.txt")).expect("rename");
         assert_ne!(hash_skill_dir(dir.path()).unwrap(), EXPECTED);
     }
 
@@ -144,8 +141,7 @@ mod tests {
         // `a.txt` → `A.txt` is a no-op for base collation *order*, but the
         // path bytes fed into the digest differ, so the hash must change.
         let dir = fixture();
-        fs::rename(dir.path().join("a.txt"), dir.path().join("A.txt"))
-            .expect("rename");
+        fs::rename(dir.path().join("a.txt"), dir.path().join("A.txt")).expect("rename");
         assert_ne!(hash_skill_dir(dir.path()).unwrap(), EXPECTED);
     }
 
