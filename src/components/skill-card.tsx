@@ -27,6 +27,16 @@ const INTERACTIVE_CLASS =
   "cursor-pointer transition-all duration-150 hover:-translate-y-px hover:border-border hover:bg-accent/40 hover:shadow-[0_8px_24px_-16px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /**
+ * A corner action that waits for attention: hidden until the reader reaches
+ * the card — by pointer, or by keyboard (focusing the card or the action
+ * itself counts) — while keeping its space, so the header never reflows and
+ * the action stays in the accessibility tree. Touch surfaces have no hover,
+ * so there the action simply stays visible.
+ */
+const ON_HOVER_ACTION_CLASS =
+  "opacity-0 pointer-events-none transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100";
+
+/**
  * One skill, as a card — the single shape every skill surface uses: the store's
  * lists, a leaderboard, and the installed list.
  *
@@ -61,6 +71,7 @@ export function SkillCard({
   selected = false,
   onSelect,
   action,
+  actionVisibility = "always",
   sourceExtra,
   below,
   "data-skill": dataSkill,
@@ -77,6 +88,13 @@ export function SkillCard({
   onSelect?: () => void;
   /** The corner control: an install button on the store, a switch on the list. */
   action?: ReactNode;
+  /**
+   * Whether the corner control is always shown, or only while the reader is
+   * on the card. "on-hover" is for the quiet default of a surface — an idle
+   * install button, a switch that is on; the states that need no attention.
+   * States that do — installed, disabled, installing, failed — stay "always".
+   */
+  actionVisibility?: "always" | "on-hover";
   /** Trails the source line: the migration badge on an unlinked install. */
   sourceExtra?: ReactNode;
   /** Rendered under the card: an install failure, a dialog trigger. */
@@ -108,7 +126,7 @@ export function SkillCard({
           }
         }}
         className={cn(
-          "flex-1",
+          "group flex-1",
           onSelect && INTERACTIVE_CLASS,
           muted && "opacity-60",
           selected && "border-primary ring-1 ring-primary",
@@ -156,7 +174,10 @@ export function SkillCard({
           {/* The corner control. Clicks on the slot stop here: the card body
               opens the detail panel, the action must not. */}
           {action && (
-            <CardAction onClick={(e) => e.stopPropagation()}>
+            <CardAction
+              onClick={(e) => e.stopPropagation()}
+              className={cn(actionVisibility === "on-hover" && ON_HOVER_ACTION_CLASS)}
+            >
               {action}
             </CardAction>
           )}

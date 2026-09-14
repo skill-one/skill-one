@@ -180,6 +180,49 @@ describe("SkillListRow", () => {
     expect(screen.getByText("暂无描述")).toBeInTheDocument();
   });
 
+  it("hides the idle install button until the card is reached", () => {
+    const { container } = renderWithRouter(<SkillListRow skill={skill} />);
+
+    // The idle download is the quiet default: hidden until the pointer or
+    // keyboard reaches the card, while keeping its space and its place in
+    // the accessibility tree.
+    const action = container.querySelector('[data-slot="card-action"]');
+    expect(action).toHaveClass("opacity-0", "pointer-events-none");
+    expect(action).toHaveClass("group-hover:opacity-100");
+    expect(action).toHaveClass("group-focus-within:opacity-100");
+  });
+
+  it("keeps the installed state visible without hover", async () => {
+    const user = userEvent.setup();
+    vi.mocked(installSkillFromSource).mockResolvedValue(undefined);
+    const { container } = renderWithRouter(<SkillListRow skill={skill} />);
+
+    await user.click(screen.getByRole("button", { name: "安装" }));
+
+    // Installed is a fact, not an action: it drops the reveal and stays, and
+    // it reads as a success badge — a tinted emerald surface, not the muted
+    // secondary chrome the other disabled states wear.
+    const installed = await screen.findByRole("button", { name: "已安装" });
+    expect(
+      container.querySelector('[data-slot="card-action"]'),
+    ).not.toHaveClass("opacity-0");
+    expect(installed).toHaveClass("bg-emerald-600/10", "text-emerald-600");
+  });
+
+  it("keeps a failed install's retry visible without hover", async () => {
+    const user = userEvent.setup();
+    vi.mocked(installSkillFromSource).mockRejectedValue(new Error("no"));
+    const { container } = renderWithRouter(<SkillListRow skill={skill} />);
+
+    await user.click(screen.getByRole("button", { name: "安装" }));
+
+    // The failure needs attention, so the retry does not wait for hover.
+    await screen.findByRole("alert");
+    expect(
+      container.querySelector('[data-slot="card-action"]'),
+    ).not.toHaveClass("opacity-0");
+  });
+
   it("opens the detail panel when the row is clicked", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();

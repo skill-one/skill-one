@@ -1,7 +1,10 @@
 import { useState } from "react";
 
 import { SkillCard, type SkillMatched } from "../../components/skill-card";
-import { SkillInstallButton } from "../../components/skill-install-button";
+import {
+  SkillInstallButton,
+  type InstallState,
+} from "../../components/skill-install-button";
 import type { Skill } from "../../types/skill";
 
 export type { SkillMatched };
@@ -36,6 +39,11 @@ export function SkillListRow({
 }) {
   // The failure message of the last install attempt, shown under the card.
   const [installError, setInstallError] = useState<string | null>(null);
+  // The install button's state, reported back by the button. Only the idle
+  // state waits for the reader's attention: hover reveals the download
+  // affordance, while installed, installing and retry persist — they are
+  // facts the reader should not have to hover for.
+  const [installState, setInstallState] = useState<InstallState>("idle");
 
   return (
     <SkillCard
@@ -43,7 +51,14 @@ export function SkillListRow({
       matched={matched}
       selected={selected}
       onSelect={onSelect}
-      action={<SkillInstallButton skill={skill} onError={setInstallError} />}
+      action={
+        <SkillInstallButton
+          skill={skill}
+          onError={setInstallError}
+          onStateChange={setInstallState}
+        />
+      }
+      actionVisibility={installState === "idle" ? "on-hover" : "always"}
       below={
         installError && (
           <p
