@@ -4,9 +4,10 @@ import { Ban, Boxes, Check, LayoutGrid, Users } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
+import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import type { InstalledSkill } from "../../lib/skills-manager";
-import { detailSkillFor } from "../../lib/skill-view";
+import { installedSkillView, type SkillView } from "../../lib/skill-view";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { FilterDropdown, type FilterOption } from "../../components/filter-dropdown";
@@ -60,20 +61,21 @@ function rowId(skill: InstalledSkill): string {
  * (whose whole body is a click target) never carries an irreversible action.
  */
 function InstalledSkillRow({
-  skill,
+  view,
+  enabled,
   selected,
   matched,
-  source,
   suggestion,
   onOpen,
 }: {
-  skill: InstalledSkill;
+  /** The on-disk record merged with the store entry it resolved to. */
+  view: SkillView;
+  /** Whether the skill is enabled on disk; a disabled row is dimmed. */
+  enabled: boolean;
   /** Whether this card is the one shown in the detail panel. */
   selected: boolean;
   /** Search-hit highlights, so a searched name reads like the store's. */
   matched?: SkillMatched;
-  /** The recorded install source (`owner/repo`), when the ledger has one. */
-  source?: string;
   /** Confirmable same-name store entries for a tool-installed skill. */
   suggestion?: LinkCandidate[];
   /** Opens the shared skill detail panel. */
@@ -81,20 +83,18 @@ function InstalledSkillRow({
 }) {
   return (
     <SkillCard
-      data-skill={skill.name}
-      source={source}
-      name={skill.name}
+      data-skill={view.name}
+      skill={view}
       matched={matched}
-      description={skill.description ?? ""}
-      muted={!skill.enabled}
+      muted={!enabled}
       selected={selected}
       onSelect={onOpen}
-      action={<SkillEnableSwitch skill={skill} />}
+      action={<SkillEnableSwitch skill={view} />}
       // The migration affordance is only meaningful while the source is
       // unknown; a recorded one needs no route to the store.
       sourceExtra={
-        !source && suggestion && suggestion.length > 0 ? (
-          <LinkSuggestionBadge name={skill.name} candidates={suggestion} />
+        !view.repo && suggestion && suggestion.length > 0 ? (
+          <LinkSuggestionBadge name={view.name} candidates={suggestion} />
         ) : undefined
       }
     />
@@ -111,6 +111,12 @@ export function MySkillsPage() {
   const { data: provenanceState } = useSkillProvenance();
   const linked = provenanceState?.linked;
   const suggestions = provenanceState?.suggestions;
+
+  // The registry entries behind those recorded sources, keyed by skill name:
+  // the store facts an on-disk record never carries (classification, the
+  // popularity figure), so the installed list can show the store's card for
+  // the skills the ledger placed. Empty for tool installs — nothing to resolve.
+  const entries = useInstalledStoreEntries(linked);
 
   const list = useMemo(() => skills ?? [], [skills]);
 
@@ -192,18 +198,28 @@ export function MySkillsPage() {
     });
   }, [hits, list, filter]);
 
-  const total = filtered.length;
+  // One view per listed skill: the on-disk record merged with the store entry
+  // its recorded source resolved to. Both the card and the drawer read these
+  // objects, so the two can never disagree about what a skill looks like, and
+  // the store's facts are present exactly when the registry holds an entry.
+  const rows = useMemo(
+    () =>
+      filtered.map((skill) => ({
+        view: installedSkillView(skill, linked, entries[skill.name]),
+        enabled: skill.enabled,
+      })),
+    [filtered, linked, entries],
+  );
+
+  const total = rows.length;
   const totalPages = useClampedPage(page, total, PAGE_SIZE, setPage);
 
-  const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visible = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const pageOffset = (page - 1) * PAGE_SIZE;
 
   // The drawer walks the whole filtered result set, not just the current
   // page, so ←/→ keeps going across page boundaries.
-  const detailSkills = useMemo(
-    () => filtered.map((skill) => detailSkillFor(skill, linked)),
-    [filtered, linked],
-  );
+  const detailSkills = useMemo(() => rows.map((row) => row.view), [rows]);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-0">
@@ -251,16 +267,16 @@ export function MySkillsPage() {
             />
           ) : (
             <ul className={SKILL_LIST_CLASS}>
-              {visible.map((skill, i) => {
-                const id = rowId(skill);
+              {visible.map((row, i) => {
                 const index = pageOffset + i;
+                const id = row.view.name;
                 return (
                   <InstalledSkillRow
                     key={id}
-                    skill={skill}
+                    view={row.view}
+                    enabled={row.enabled}
                     selected={selected === index}
                     matched={matchedById[id]}
-                    source={linked?.[id]?.repo}
                     suggestion={suggestions?.[id]}
                     onOpen={() => setSelected(index)}
                   />

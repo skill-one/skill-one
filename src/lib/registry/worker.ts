@@ -41,7 +41,6 @@ self.onmessage = (event: MessageEvent<RegistryWorkerMessage>) => {
     void controller.revalidate(message);
   } else if (
     message.type === "getPage" ||
-    message.type === "getRepos" ||
     message.type === "getFeatured" ||
     message.type === "getRanking" ||
     message.type === "lookupSkills" ||

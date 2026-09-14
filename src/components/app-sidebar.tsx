@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router";
-import { Settings, Sparkles, GitFork, LayoutGrid, Boxes } from "lucide-react";
+import { Settings, Sparkles, LayoutGrid, Boxes } from "lucide-react";
 
 import {
   Sidebar,
@@ -19,7 +19,6 @@ import { Badge } from "./ui/badge";
 import { isTauri } from "../lib/tauri";
 import { useAppUpdate } from "../hooks/use-app-update";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
-import { useRegistryRepos } from "../hooks/use-registry-repos";
 import { useRegistrySnapshot } from "../hooks/use-registry-snapshot";
 
 export interface NavItem {
@@ -42,7 +41,6 @@ export const shopItems: NavItem[] = [
     icon: Sparkles,
     match: "prefix",
   },
-  { path: "/explore/repos", label: "仓库", icon: GitFork },
   { path: "/explore", label: "全部", icon: LayoutGrid },
 ];
 
@@ -55,19 +53,14 @@ export const footerItems: NavItem[] = [
 ];
 
 /**
- * Real badge counts: Shop "全部" = registry total, "仓库" = aggregated repo
- * total, "My Skills → 全局" = installed skill count. Pages without a count
- * source (精选) show no badge. The badge is not rendered while its
- * data is loading, avoiding a flash of 0.
+ * Real badge counts: Shop "全部" = registry total, "My Skills → 全局" =
+ * installed skill count. Pages without a count source (精选) show no badge.
+ * The badge is not rendered while its data is loading, avoiding a flash of 0.
  *
  * The registry count is progressive: it mirrors the registry worker's
  * progress count, so it reports the skills parsed so far and climbs as the
  * ~12MB download proceeds, settling on the registry size once the stream
  * completes. It renders as a plain number — no progress decoration.
- *
- * The repos count is the opposite: it reuses the repos page's aggregation,
- * whose query only runs once the whole index has landed — a repo count
- * computed over a partial download is simply wrong.
  */
 function useNavCounts(): Partial<Record<string, number>> {
   // Progress flags and identity changes (index/epoch/ready transitions) never
@@ -75,14 +68,10 @@ function useNavCounts(): Partial<Record<string, number>> {
   const count = useRegistrySnapshot((s) => s.count);
   const error = useRegistrySnapshot((s) => s.error);
   const { data: installedSkills } = useInstalledSkills();
-  // A single-row page fetch: only `total` is of interest here.
-  const { data: reposPage } = useRegistryRepos("", "stars", 0, 1);
-  const repoTotal = reposPage?.total ?? 0;
   return {
     // Hidden while nothing has loaded yet and on a failed download: an empty
     // registry is not a meaningful count to advertise.
     "/explore": error == null && count > 0 ? count : undefined,
-    "/explore/repos": repoTotal > 0 ? repoTotal : undefined,
     "/my-skills": installedSkills?.length,
   };
 }

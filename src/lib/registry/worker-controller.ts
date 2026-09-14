@@ -2,7 +2,6 @@ import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
 import { popularity } from "../popularity";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
-import { buildSearchIndex, type Search } from "../search-index";
 import type {
   DomainInfo,
   FeaturedSectionData,
@@ -11,9 +10,6 @@ import type {
   PageRequest,
   RankingData,
   RankingRequest,
-  RepoInfo,
-  RepoPageData,
-  ReposRequest,
   RegistryQuery,
   RegistryWorkerMessage,
   RevalidateStatus,
@@ -54,10 +50,6 @@ const byName = (a: Skill, b: Skill): number => a.name.localeCompare(b.name);
 /** The comparator for one of the two non-default toolbar orders. */
 const skillComparator = (sort: "popularity" | "name") =>
   sort === "popularity" ? byPopularity : byName;
-
-/** Ascending repo-name order, the tiebreak of every repos sort. */
-const byRepoName = (a: RepoInfo, b: RepoInfo): number =>
-  a.repo.localeCompare(b.repo);
 
 export interface ControllerDeps {
   /**
@@ -150,6 +142,12 @@ export function createRegistryController(
   // no profile. Held across downloads so a fresh store can be decorated
   // from the previous snapshot's map before the refresh resolves.
   let profilesMap: Map<string, SkillProfile> | null = null;
+  // Which ids that map can answer for. Null once the published snapshot itself
+  // has been read (it answers for every id); a set when the map was recovered
+  // from the cold-start cache, which stores decorated skills rather than the
+  // dataset behind them — it can only speak for the ids it carried, so a body
+  // bringing new ones still has to read the file.
+  let profilesAnsweredFor: Set<string> | null = null;
   // The profiles snapshot stamp (`publishedAt`) the decorated skills were
   // built from; undefined until one is served. An equal probed stamp means
   // equal bytes, so the profiles download is skipped.
@@ -181,16 +179,6 @@ export function createRegistryController(
   let dataVersion = 0;
   let orderCache: { version: number; sort: SortOrder; ids: number[] } | null =
     null;
-  // Aggregated per-repo summaries, cached per data version like the sort
-  // order: grouping the registry is an O(n) pass, page requests only filter,
-  // sort and slice the (much smaller) repo list. The search index built over
-  // that list is cached in the same record, so it can never address a
-  // different dataset than the aggregation it indexes.
-  let repoCache: {
-    version: number;
-    repos: RepoInfo[];
-    search?: Search<RepoInfo>;
-  } | null = null;
   // Lookup index for `lookupSkills`, cached per data version: resolving each
   // ref by a `store.find` is O(n·m), so instead the earliest matching skill
   // per key is indexed once and every request is a pair of map reads.
@@ -206,7 +194,6 @@ export function createRegistryController(
   const invalidateDerived = () => {
     dataVersion++;
     orderCache = null;
-    repoCache = null;
     lookupCache = null;
     domainCache = null;
   };
@@ -247,6 +234,39 @@ export function createRegistryController(
     post({ type: "ready" });
   };
 
+  /** The canonical id a skill is profiled under: `{owner}/{repo}/{slug}`. */
+  const profileId = (skill: Pick<Skill, "repo" | "name">): string =>
+    `${skill.repo}/${skill.name}`;
+
+  /**
+   * Recover a profiles map from skills that already carry them. The cold-start
+   * cache stores decorated skills, not the dataset that decorated them, so
+   * without this the held map is empty on a launch that then downloads a newer
+   * body: `decorate` has nothing to re-apply, and every skill comes back with
+   * the stars and downloads that ride on the index but with no domain — a card
+   * with a popularity figure and no classification chip.
+   */
+  const profilesOf = (skills: readonly Skill[]): Map<string, SkillProfile> => {
+    const map = new Map<string, SkillProfile>();
+    for (const skill of skills) {
+      if (skill.profile) map.set(profileId(skill), skill.profile);
+    }
+    return map;
+  };
+
+  /**
+   * Whether the held map can answer for every skill being served. The guard
+   * behind "the published snapshot is already served": a probed stamp that
+   * matches only means the bytes are the ones we once read — not that we still
+   * hold them, nor that they cover a body that has since grown.
+   */
+  const profilesAnswerEvery = (): boolean => {
+    if (!profilesMap) return false;
+    const answered = profilesAnsweredFor;
+    if (answered == null) return true;
+    return store.every((skill) => answered.has(profileId(skill)));
+  };
+
   /**
    * Merge the held profiles map into the served skills. The canonical id is
    * `{owner}/{repo}/{slug}`, i.e. exactly `repo/name` — a plain map read per
@@ -282,10 +302,15 @@ export function createRegistryController(
     if (gen !== generation) return false;
     if (
       !force &&
+      profilesAnswerEvery() &&
       meta?.generatedAt !== undefined &&
       meta.generatedAt === servedProfilesAt
     ) {
-      // The published profiles snapshot is the one already served.
+      // The published snapshot is the one already served *and* the held map
+      // still answers for every skill being served: nothing to re-read. A
+      // recovered map that no longer covers the store — a newer registry body
+      // brought ids the cache never had — falls through to the download, which
+      // is the only way to learn what those new skills were profiled as.
       return false;
     }
     let map: Map<string, SkillProfile>;
@@ -297,6 +322,9 @@ export function createRegistryController(
     }
     if (gen !== generation) return false;
     profilesMap = map;
+    // The whole published snapshot: it answers for every id, so the check above
+    // no longer has to compare against a recovered subset.
+    profilesAnsweredFor = null;
     servedProfilesAt = meta?.generatedAt;
     servedProfilesTag = meta?.tag;
     decorate();
@@ -509,27 +537,12 @@ export function createRegistryController(
 
   const getPage = ({
     query,
-    repo,
     domain,
     sort,
     page,
     pageSize,
   }: PageRequest): PageData => {
     const start = page * pageSize;
-    if (repo !== undefined) {
-      // Repo detail page: an exact identity filter, not a search — every
-      // skill of the repo, in registry order (or the chosen sort). Recomputed
-      // per request so pages settle as the download streams in.
-      const hits: SearchHit[] = [];
-      for (const skill of store) {
-        if (skill.repo === repo) hits.push({ skill, matched: {} });
-      }
-      if (sort !== "default") {
-        const compare = skillComparator(sort);
-        hits.sort((a, b) => compare(a.skill, b.skill));
-      }
-      return { hits: hits.slice(start, start + pageSize), total: hits.length };
-    }
     const q = query.trim();
     if (q) {
       // A search owns the whole registry, so there is nothing to answer with
@@ -566,7 +579,7 @@ export function createRegistryController(
    * The distinct profile domains with their skill counts, most-used first.
    * Only profiled skills contribute — the list (and every count) shrinks to
    * zero-shaped answers when the profiles dataset is unavailable. Cached
-   * per data version like the repo aggregation; recomputed per request
+   * per data version like the sort order; recomputed per request
    * while the dataset streams in.
    */
   const getDomains = (): DomainInfo[] => {
@@ -585,83 +598,6 @@ export function createRegistryController(
       );
     if (complete) domainCache = { version: dataVersion, domains };
     return domains;
-  };
-
-  /**
-   * Aggregated per-repo summaries. While the download streams in the list
-   * keeps growing, so the aggregation is recomputed per request; once the
-   * dataset has landed it is cached per data version (see `repoCache`).
-   */
-  const reposFor = (): RepoInfo[] => {
-    if (complete && repoCache?.version === dataVersion) return repoCache.repos;
-    const byRepo = new Map<string, RepoInfo>();
-    for (const skill of store) {
-      const entry = byRepo.get(skill.repo);
-      if (entry) {
-        entry.skills++;
-        // Same repo, same star count; max() simply tolerates bad data.
-        entry.stars = Math.max(entry.stars, skill.stars);
-      } else {
-        byRepo.set(skill.repo, {
-          repo: skill.repo,
-          skills: 1,
-          stars: skill.stars,
-        });
-      }
-    }
-    const repos = Array.from(byRepo.values()).toSorted(
-      (a, b) => b.skills - a.skills || a.repo.localeCompare(b.repo),
-    );
-    if (complete) repoCache = { version: dataVersion, repos };
-    return repos;
-  };
-
-  /**
-   * The search index over the aggregated repo list, built on the first query
-   * for a data version and reused by every later page of the same search. An
-   * uncached list (still streaming in) is re-indexed per request, which is
-   * also what re-indexing a settled one would cost — a couple of milliseconds
-   * over ~1k entries.
-   */
-  const reposSearch = (): Search<RepoInfo> => {
-    // Asking for the aggregation first is what makes the cached index safe:
-    // afterwards repoCache is either null (a fresh download still streaming,
-    // so nothing is cached) or addressed to the current data version.
-    const repos = reposFor();
-    if (repoCache?.search) return repoCache.search;
-    const indexed = buildSearchIndex(repos, { fields: { repo: 1 } });
-    // Only a settled aggregation is worth an index of its own.
-    if (repoCache) repoCache.search = indexed;
-    return indexed;
-  };
-
-  const getRepos = ({
-    query,
-    sort,
-    page,
-    pageSize,
-  }: ReposRequest): RepoPageData => {
-    const start = page * pageSize;
-    const q = query.trim();
-    if (q) {
-      // A search orders its own results: the repos list answers in relevance
-      // order and ignores the order the browsed list uses, exactly as the
-      // explore page does (its toolbar swaps the sort dropdown for a
-      // read-only 相关度 label while a query is set).
-      const hits = reposSearch()(q);
-      return {
-        repos: hits.slice(start, start + pageSize).map(({ doc }) => doc),
-        total: hits.length,
-      };
-    }
-    const repos = reposFor().toSorted((a, b) =>
-      sort === "skills"
-        ? b.skills - a.skills || byRepoName(a, b)
-        : sort === "name"
-          ? byRepoName(a, b)
-          : b.stars - a.stars || byRepoName(a, b),
-    );
-    return { repos: repos.slice(start, start + pageSize), total: repos.length };
   };
 
   /** Sections shown on the featured page and skills per section. */
@@ -817,9 +753,13 @@ export function createRegistryController(
           // The cached skills are already decorated with the profiles they
           // were saved with; the stamp/tag below is what the revalidation's
           // profiles probe is compared against, and what per-skill profile
-          // fetches pin to until a newer snapshot lands.
+          // fetches pin to until a newer snapshot lands. The map behind that
+          // decoration is recovered here, so a body downloaded below can be
+          // re-decorated even when the refresh never answers.
           servedProfilesAt = cached.profilesAt;
           servedProfilesTag = cached.profilesTag;
+          profilesMap = profilesOf(cached.skills);
+          profilesAnsweredFor = new Set(cached.skills.map(profileId));
           complete = true;
           announcedCount = cached.skills.length;
           emitProgress();
@@ -913,9 +853,6 @@ export function createRegistryController(
         switch (message.type) {
           case "getPage":
             data = getPage(message.payload);
-            break;
-          case "getRepos":
-            data = getRepos(message.payload);
             break;
           case "getFeatured":
             data = getFeatured();

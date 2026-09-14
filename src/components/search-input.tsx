@@ -17,7 +17,7 @@ export function SearchInput({
   value: string;
   /** Receives the raw field value; debouncing is the caller's. */
   onChange: (value: string) => void;
-  /** e.g. "搜索 Skill" / "搜索仓库". */
+  /** e.g. "搜索 Skill". */
   label: string;
   /** Locks the field while what it searches is not available yet. */
   disabled?: boolean;

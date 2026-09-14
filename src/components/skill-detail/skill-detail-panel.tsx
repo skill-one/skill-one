@@ -6,9 +6,8 @@ import { fetchSkillDetail, MIRROR } from "../../lib/skill-detail-api";
 import { fetchLocalSkillDetail } from "../../lib/local-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
-import { LOCAL_SOURCE_LABEL } from "../../lib/skill-view";
+import { LOCAL_SOURCE_LABEL, type SkillView } from "../../lib/skill-view";
 import { errorMessage, formatDate } from "../../lib/utils";
-import type { Skill } from "../../types/skill";
 import { DomainBadge } from "../domain-badge";
 import { SkillPopularity } from "../skill-popularity";
 import { Badge } from "../ui/badge";
@@ -141,7 +140,7 @@ export type SkillDetailSurface = "store" | "installed";
 
 interface SkillDetailPanelProps {
   /** The skill to show; null renders nothing. */
-  skill: Skill | null;
+  skill: SkillView | null;
   onPrev: () => void;
   onNext: () => void;
   /** Called after this skill is uninstalled, for a caller that must react. */
@@ -184,7 +183,7 @@ export function SkillDetailPanel({
   // Keep the last selected skill while the drawer plays its exit
   // animation: `skill` is already null by the time Radix starts closing,
   // and an unmounting parent would cut the slide-out short.
-  const [lastSkill, setLastSkill] = useState<Skill | null>(skill);
+  const [lastSkill, setLastSkill] = useState<SkillView | null>(skill);
   useEffect(() => {
     if (skill) setLastSkill(skill);
   }, [skill]);
@@ -238,10 +237,16 @@ export function SkillDetailPanel({
   // global directory by hand, or installed by another tool): nothing to link
   // to, and the source line falls back to the local-install label.
   const hasSource = shown != null && shown.repo !== "";
-  // The store's registry-backed chrome — the install CTA and the popularity
-  // figure. The installed list has neither, and its cards show neither, so the
-  // two surfaces can never disagree about what a skill looks like.
+  // The store's install CTA is the one thing the surface itself decides: the
+  // installed list installs nothing (its skills are already on disk) and offers
+  // the enable switch in that slot instead.
   const isStore = surface === "store";
+  // Whether the registry actually backs this skill's figures and classification.
+  // The store's rows always are; an installed row only when the app resolved the
+  // store entry its recorded source points at — so a record the registry does
+  // not know shows no figure rather than a hardcoded zero, the same rule its
+  // card follows. An absent marker means backed (see `SkillView`).
+  const showStats = shown?.storeBacked !== false;
   // Profiled registry skills get the 概述 tab (the dataset's per-skill
   // files resolve through the mirror path); local installs and skills the
   // dataset has not profiled keep the plain SKILL.md body.
@@ -369,13 +374,14 @@ export function SkillDetailPanel({
             <Badge variant="secondary">{detail.license}</Badge>
           )}
           {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
+          {/* The same blended popularity figure the list rows show;
+              hover/focus breaks it into installs and stars. Shown for exactly
+              the skills whose card shows it — the registry-backed ones — so
+              the row the reader clicked and the drawer it opened can never
+              disagree about it. */}
+          {showStats && shown && <SkillPopularity skill={shown} />}
           {shown && !fromDisk && (
             <>
-              {/* The same blended popularity figure the list rows show;
-                  hover/focus breaks it into installs and stars. Registry-only:
-                  the installed list's cards carry no figure, so its drawer
-                  carries none either. */}
-              {isStore && <SkillPopularity skill={shown} />}
               {skillsShHref && (
                 <a
                   href={skillsShHref}
