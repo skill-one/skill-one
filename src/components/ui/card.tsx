@@ -10,6 +10,13 @@ import { cn } from "cn"
  * spacing is tightened once, in the component, so the app keeps using the slots
  * unchanged (`CardHeader`, `CardTitle`, `CardDescription`, `CardAction`,
  * `CardContent`, `CardFooter`) and no call site carries layout overrides.
+ *
+ * The registry's `[.border-b]:pb-6` / `[.border-t]:pt-6` conveniences went with
+ * the rest of that looser rhythm: they restate the same 6-unit spacing for a
+ * bordered slot, nothing here used them, and one of them did apply — the
+ * self-referential `[.border-t]:pt-6` beats a plain `pt-2.5` on the same
+ * element, which silently turned the card's hairline rail into a 24px band. A
+ * slot that draws a divider now states its own padding.
  */
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -29,7 +36,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-4 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
+        "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-4 has-data-[slot=card-action]:grid-cols-[1fr_auto]",
         className
       )}
       {...props}
@@ -84,7 +91,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      className={cn("flex items-center px-4 [.border-t]:pt-6", className)}
+      className={cn("flex items-center px-4", className)}
       {...props}
     />
   )

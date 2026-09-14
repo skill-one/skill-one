@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, Download, Loader2, RefreshCw } from "lucide-react";
 
@@ -40,7 +40,10 @@ const INSTALL_BUTTON: Record<
     className?: string;
   }
 > = {
-  idle: { label: "安装", icon: <Download />, variant: "default" },
+  // Idle is the resting state of every row in a grid, so it wears the muted
+  // secondary chrome and stays out of the name's way. The states that do need
+  // attention — installing, retry — keep the solid primary.
+  idle: { label: "安装", icon: <Download />, variant: "secondary" },
   installing: {
     label: "安装中",
     icon: <Loader2 className="animate-spin" />,
@@ -73,7 +76,6 @@ export function SkillInstallButton({
   className,
   onError,
   labeled = false,
-  onStateChange,
 }: {
   skill: Skill;
   /** Merged onto the button; callers size and place it. */
@@ -82,13 +84,6 @@ export function SkillInstallButton({
   onError?: (message: string | null) => void;
   /** Show the state label next to the icon (detail views). */
   labeled?: boolean;
-  /**
-   * Reports the button's current state on every change, so a caller that
-   * presents the button (e.g. hides it until hover) can react to a state it
-   * does not own — installed, installing, error — without duplicating the
-   * resolution logic. Not for driving the button itself.
-   */
-  onStateChange?: (state: InstallState) => void;
 }) {
   const [installState, setInstallState] = useState<InstallState>("idle");
 
@@ -126,12 +121,6 @@ export function SkillInstallButton({
       ? "installed"
       : installState;
   const installMeta = INSTALL_BUTTON[state];
-
-  // Report the resolved state after paint, so a caller presenting the button
-  // (e.g. hover-reveal on idle only) tracks it without owning the logic.
-  useEffect(() => {
-    onStateChange?.(state);
-  }, [state, onStateChange]);
 
   const handleInstall = async (e: React.MouseEvent) => {
     // Keep the click from opening the detail panel behind this button.
