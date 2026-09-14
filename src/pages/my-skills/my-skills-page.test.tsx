@@ -282,7 +282,7 @@ describe("MySkillsPage", () => {
     );
   });
 
-  it("shows the recorded source repo with the owner's avatar on its line", async () => {
+  it("shows the recorded source repo with the owner's author chip on the rail", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
     // The ledger has a source for pdf (installed through this app); docx is
     // a tool-installed skill with no entry.
@@ -299,8 +299,11 @@ describe("MySkillsPage", () => {
     expect(
       container.querySelector('[aria-label="docx 封面图"]'),
     ).toHaveTextContent("d");
-    // Only the sourced card can name an author, so only its source line
-    // carries an owner avatar.
+    // Only the sourced card can name an author, so only its metadata rail
+    // carries an author chip — and the rail exists for that chip alone, since
+    // the registry holds no entry to classify or rank the skill by.
+    const chip = screen.getByRole("button", { name: "仓库 anthropics/skills" });
+    expect(chip.closest('[data-slot="card-footer"]')).not.toBeNull();
     expect(container.querySelectorAll('ul [data-slot="avatar"]')).toHaveLength(
       1,
     );
