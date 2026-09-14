@@ -88,21 +88,24 @@ describe("SkillListRow", () => {
     await user.hover(
       screen.getByRole("button", { name: "仓库 anthropics/skills" }),
     );
-    // The card only mounts once the rail's chip is hovered; its action is the
-    // unique handle on it.
+    // The card only mounts once the rail's chip is hovered; the repo's name is
+    // its one link out — the whole row opens GitHub, no second line saying so.
     const openLink = await screen.findByRole("link", {
       name: "在 GitHub 中打开 anthropics/skills",
     });
 
     // The avatar's own words: which repo it is, how big it is, and the one
-    // action that belongs to a repository.
+    // action that belongs to a repository — carried by the name itself.
     const card = openLink.parentElement!;
-    expect(card).toHaveTextContent("anthropics/skills");
+    expect(openLink).toHaveTextContent("anthropics/skills");
     expect(card).toHaveTextContent("169.6K Star");
     expect(openLink).toHaveAttribute(
       "href",
       "https://github.com/anthropics/skills",
     );
+    // Nothing states the action in words any more: the external mark beside
+    // the name is what says the click leaves the app.
+    expect(card).not.toHaveTextContent("在 GitHub 中打开");
   });
 
   it("breaks the figure down into installs and stars on hover", async () => {
