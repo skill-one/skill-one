@@ -90,7 +90,9 @@ describe("fetchProvenanceState", () => {
     mockRegistry();
     computeSkillHash.mockResolvedValue("hash-other");
 
-    const state = await runQueryFn([installed("pdf", "Read PDF files.")]);
+    // A description below the 90% auto-link threshold keeps the skill in the
+    // confirmable pool.
+    const state = await runQueryFn([installed("pdf", "Convert PDF files.")]);
 
     expect(state.linked.pdf).toBeUndefined();
     expect(state.suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
@@ -100,7 +102,9 @@ describe("fetchProvenanceState", () => {
     isTauri.mockReturnValue(false);
     mockRegistry();
 
-    const state = await runQueryFn([installed("pdf", "Read PDF files.")]);
+    // Below the 90% auto-link threshold, so it stays a suggestion even without
+    // the hash tier.
+    const state = await runQueryFn([installed("pdf", "Convert PDF files.")]);
 
     expect(computeSkillHash).not.toHaveBeenCalled();
     // Suggestions still work — they are registry lookups only.

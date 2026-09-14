@@ -461,16 +461,17 @@ describe("MySkillsPage", () => {
 
   it("offers a confirmable store link for a tool-installed skill", async () => {
     const user = userEvent.setup();
-    // The registry carries a same-slug entry whose description matches the
-    // installed skill's: the card offers the association, nothing is linked
-    // before the user confirms.
+    // The registry carries a same-slug entry whose description is *different*
+    // enough (< 90%) from the installed skill's: because it is below the
+    // auto-link threshold, the card offers the association for the user to
+    // confirm instead of linking silently.
     getPage.mockResolvedValue({
       hits: [
         {
           skill: {
             name: "pdf",
             repo: "anthropics/skills",
-            description: "PDF 文档读取、生成、合并、拆分与标注。",
+            description: "Convert PDF files to images and text.",
             stars: 99,
             downloads: 99,
             path: "skills/anthropics/skills/pdf",
@@ -492,7 +493,7 @@ describe("MySkillsPage", () => {
     const candidate = await screen.findByRole("button", {
       name: /anthropics\/skills/,
     });
-    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getByText(/\d+%/)).toBeInTheDocument();
     await user.click(candidate);
 
     // The association becomes indistinguishable from a native install: the
@@ -512,6 +513,44 @@ describe("MySkillsPage", () => {
       JSON.parse(localStorage.getItem("skill-one.provenance") ?? "{}").skills
         .pdf?.repo,
     ).toBe("anthropics/skills");
+  });
+
+  it("auto-links a tool-installed skill whose description matches a namesake", async () => {
+    // Identical wording (≥ 90% similarity) is treated as the same skill and
+    // linked automatically — no 迁移 badge or confirm dialog ever appears.
+    getPage.mockResolvedValue({
+      hits: [
+        {
+          skill: {
+            name: "pdf",
+            repo: "anthropics/skills",
+            description: "PDF 文档读取、生成、合并、拆分与标注。",
+            stars: 99,
+            downloads: 99,
+            path: "skills/anthropics/skills/pdf",
+          },
+          matched: {},
+        },
+      ],
+      total: 1,
+    });
+    renderWithRouter(<MySkillsPage />);
+
+    // No migration affordance — it linked on its own.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "将 pdf 迁移至商店版" }),
+      ).not.toBeInTheDocument(),
+    );
+    // The persisted ledger already carries the source the auto-link wrote.
+    await waitFor(() =>
+      expect(
+        JSON.parse(localStorage.getItem("skill-one.provenance") ?? "{}").skills
+          .pdf?.repo,
+      ).toBe("anthropics/skills"),
+    );
+    // And pdf has left the unlinked group (6 → 5) on its own.
+    await screen.findByRole("button", { name: /未关联仓库.*5 个/ });
   });
 
   it("pre-fills the search box from the ?skill= deep link", async () => {
