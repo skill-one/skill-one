@@ -42,10 +42,11 @@ const ON_HOVER_ACTION_CLASS =
  *
  * The card is built on the shadcn Card so it is laid out by the component's own
  * slots rather than by hand: the header leads with the skill's own cover,
- * stacks the name and source beside it and keeps the surface's action in the
- * corner slot `CardAction` exists for; the content holds the description, and
- * the rail under it carries the metadata — the author chip on the left, then
- * the classification and the popularity figure.
+ * stacks the name — and the source, on a skill with no author chip to name it —
+ * beside it and keeps the surface's action in the corner slot `CardAction`
+ * exists for; the content holds the description, and the rail under it carries
+ * the metadata — the author chip on the left, then the classification and the
+ * popularity figure.
  *
  * Everything the card shows is read off the skill, so feeding it a store row and
  * feeding it an installed row produce the same card. The two are told apart by
@@ -151,24 +152,27 @@ export function SkillCard({
                   <HighlightedText text={skill.name} terms={matched?.name} />
                 </h3>
               </CardTitle>
-              {/* The description slot carries the source alone. The domain chip
-                  used to share it, which cost the source the chip's width (and
-                  let the chip's position drift with the length of the repo
-                  name); it reads better in the rail below next to the figure. */}
-              <CardDescription
-                className={cn(
-                  "flex items-center gap-1.5 truncate",
-                  muted && "text-muted-foreground/70",
-                )}
-              >
-                <span className="truncate">
-                  <HighlightedText
-                    text={skill.repo || LOCAL_SOURCE_LABEL}
-                    terms={matched?.repo}
-                  />
-                </span>
-                {sourceExtra}
-              </CardDescription>
+              {/* The description slot carries the source, and only when the
+                  card has no author chip to carry it: the rail's chip names
+                  the repository and opens it on hover, so for a sourced skill
+                  the line was the same fact twice. A skill with no recorded
+                  source has no chip at all — nothing to hover — so there the
+                  label, with the migration badge trailing it, is what explains
+                  the empty source. The domain chip used to share this slot
+                  too, which cost the source the chip's width (and let the chip
+                  drift with the length of the repo name); it reads better in
+                  the rail below next to the figure. */}
+              {!owner && (
+                <CardDescription
+                  className={cn(
+                    "flex items-center gap-1.5 truncate",
+                    muted && "text-muted-foreground/70",
+                  )}
+                >
+                  <span className="truncate">{LOCAL_SOURCE_LABEL}</span>
+                  {sourceExtra}
+                </CardDescription>
+              )}
             </div>
           </div>
           {/* The corner control. Clicks on the slot stop here: the card body

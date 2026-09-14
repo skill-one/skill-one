@@ -37,7 +37,10 @@ describe("SkillListRow", () => {
 
     expect(container.querySelector("li")).not.toBeNull();
     expect(screen.getByText("pdf")).toBeInTheDocument();
-    expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
+    // The repo is named by the author chip, not written out on the card.
+    expect(
+      screen.getByRole("button", { name: "仓库 anthropics/skills" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Read and merge PDF documents."),
     ).toBeInTheDocument();
@@ -55,18 +58,27 @@ describe("SkillListRow", () => {
     const cover = container.querySelector('[data-slot="skill-cover"]');
     expect(cover).toHaveAttribute("aria-label", "pdf 封面图");
 
-    // The source line now carries the repo alone: the author moved down into
-    // the metadata rail, where the classification and the figure live.
-    const sourceLine = container.querySelector(
-      '[data-slot="card-description"]',
-    );
-    expect(sourceLine).toHaveTextContent("anthropics/skills");
-    expect(sourceLine?.querySelector('[data-slot="avatar"]')).toBeNull();
-
-    // The chip leads that rail, and names the repository it stands for.
+    // The chip leads the metadata rail — where the classification and the
+    // figure live — and names the repository it stands for. It is the card's
+    // only source of that name, so the description slot stays empty: writing
+    // the repo out under the name too would state the same fact twice.
     const chip = screen.getByRole("button", { name: "仓库 anthropics/skills" });
     expect(chip.querySelector('[data-slot="avatar"]')).not.toBeNull();
     expect(chip.closest('[data-slot="card-footer"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-slot="card-description"]'),
+    ).toBeNull();
+  });
+
+  it("labels a skill with no source instead of naming a repo", () => {
+    renderWithRouter(<SkillListRow skill={{ ...skill, repo: "" }} />);
+
+    // No source, so no chip to hover: the label is what stands in for the
+    // repository the card cannot name.
+    expect(screen.getByText("本地安装")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^仓库 / }),
+    ).not.toBeInTheDocument();
   });
 
   it("names the repository from the author chip's hover card", async () => {
@@ -282,14 +294,12 @@ describe("SkillListRow", () => {
 
   it("wraps matched search tokens in <mark>", () => {
     renderWithRouter(
-      <SkillListRow
-        skill={skill}
-        matched={{ repo: ["anthropics"], description: ["pdf"] }}
-      />,
+      <SkillListRow skill={skill} matched={{ description: ["pdf"] }} />,
     );
 
-    // Whole tokens only, case-insensitive, with the original casing kept.
-    expect(screen.getByText("anthropics").tagName).toBe("MARK");
+    // Whole tokens only, case-insensitive, with the original casing kept. A
+    // repo match has nothing to mark: the repo is named by the author chip
+    // (its hover card), not written out on the card.
     expect(screen.getByText("PDF").tagName).toBe("MARK");
   });
 

@@ -298,6 +298,52 @@ describe("createRegistryController — boot", () => {
     expect(entries[0]?.profile).toEqual({ domain: "开发编程" });
   });
 
+  it("reads the profiles again when the cache claims a snapshot it never applied", async () => {
+    // A record left behind by a build that replaced the cached skills with a
+    // fresh body and never re-applied the profiles: it carries the stamp of a
+    // snapshot while every skill it stored has no profile at all. Trusting that
+    // claim — "the published snapshot is already served" — short-circuits the
+    // refresh for as long as the record lives, so the whole session serves
+    // cards with no classification chip and a category filter with no choices.
+    const t = setup({
+      cache: {
+        load: async () => ({
+          skills: [skill(0)],
+          generatedAt: "2026-09-01T14:25:32Z",
+          fetchedAt: 1,
+          profilesAt: "2026-09-01T10:00:00Z",
+        }),
+        save: async () => {},
+        clear: async () => {},
+      },
+      published: {
+        tag: "dist-2026-09-02",
+        generatedAt: "2026-09-02T14:25:32Z",
+        total: 1,
+      },
+      // The probe advertises the very snapshot the record claims, so only the
+      // decoration being absent keeps this from reading as "nothing to do".
+      profilesMeta: { generatedAt: "2026-09-01T10:00:00Z" },
+      profiles: new Map([["owner-0/repo-0/skill-0", { domain: "开发编程" }]]),
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.push(skill(0));
+    t.complete();
+    await t.flush();
+
+    t.controller.handle({
+      type: "lookupSkills",
+      id: 1,
+      payload: { refs: [{ repo: "owner-0/repo-0", name: "skill-0" }] },
+    });
+    const entries = resultData<{ entries: Array<Skill | null> }>(
+      t.recorded.results[0],
+    ).entries;
+    expect(entries[0]?.profile).toEqual({ domain: "开发编程" });
+  });
+
   it("reads the profiles again when the fresh body brings ids the cache never had", async () => {
     const decorated = { ...skill(0), profile: { domain: "开发编程" } };
     const t = setup({
