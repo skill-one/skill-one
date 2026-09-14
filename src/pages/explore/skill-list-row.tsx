@@ -1,10 +1,7 @@
 import { useState } from "react";
 
 import { SkillCard, type SkillMatched } from "../../components/skill-card";
-import {
-  SkillInstallButton,
-  type InstallState,
-} from "../../components/skill-install-button";
+import { SkillInstallButton } from "../../components/skill-install-button";
 import type { Skill } from "../../types/skill";
 
 export type { SkillMatched };
@@ -15,8 +12,8 @@ export type { SkillMatched };
  * The card renders the skill; what the store adds is the only thing a registry
  * row does that an installed row does not: installing. The corner action is the
  * install button (idle → installing → installed | retry, through the skills
- * backend or the mock store), and a failed install reports its message under
- * the card.
+ * backend or the mock store), always visible and quiet while idle; a failed
+ * install reports its message under the card.
  *
  * The card carries no surface-specific extras — no rank chip, no alternative
  * metric — so the store list, a repo's skills, a leaderboard and the installed
@@ -39,11 +36,6 @@ export function SkillListRow({
 }) {
   // The failure message of the last install attempt, shown under the card.
   const [installError, setInstallError] = useState<string | null>(null);
-  // The install button's state, reported back by the button. Only the idle
-  // state waits for the reader's attention: hover reveals the download
-  // affordance, while installed, installing and retry persist — they are
-  // facts the reader should not have to hover for.
-  const [installState, setInstallState] = useState<InstallState>("idle");
 
   return (
     <SkillCard
@@ -52,13 +44,8 @@ export function SkillListRow({
       selected={selected}
       onSelect={onSelect}
       action={
-        <SkillInstallButton
-          skill={skill}
-          onError={setInstallError}
-          onStateChange={setInstallState}
-        />
+        <SkillInstallButton skill={skill} onError={setInstallError} />
       }
-      actionVisibility={installState === "idle" ? "on-hover" : "always"}
       below={
         installError && (
           <p

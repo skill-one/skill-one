@@ -27,35 +27,44 @@ const INTERACTIVE_CLASS =
   "cursor-pointer transition-all duration-150 hover:-translate-y-px hover:border-border hover:bg-accent/40 hover:shadow-[0_8px_24px_-16px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /**
- * A corner action that waits for attention: hidden until the reader reaches
- * the card — by pointer, or by keyboard (focusing the card or the action
- * itself counts) — while keeping its space, so the header never reflows and
- * the action stays in the accessibility tree. Touch surfaces have no hover,
- * so there the action simply stays visible.
- */
-const ON_HOVER_ACTION_CLASS =
-  "opacity-0 pointer-events-none transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100";
-
-/**
  * One skill, as a card — the single shape every skill surface uses: the store's
  * lists, a leaderboard, and the installed list.
  *
- * The card is built on the shadcn Card so it is laid out by the component's own
- * slots rather than by hand: the header leads with the skill's own cover,
- * stacks the name — and the source, on a skill with no author chip to name it —
- * beside it and keeps the surface's action in the corner slot `CardAction`
- * exists for; the content holds the description, and the rail under it carries
- * the metadata — the author chip on the left, then the classification and the
- * popularity figure.
+ * The card is read top to bottom in the order a reader actually decides in:
+ * *what is it* (the name), *who published it* (the source line), *what does it
+ * do* (the description), and only then *how popular is it* (the rail). Each of
+ * One skill, as a card — the single shape every skill surface uses: the store's
+ * lists, a leaderboard, and the installed list.
  *
- * Everything the card shows is read off the skill, so feeding it a store row and
- * feeding it an installed row produce the same card. The two are told apart by
- * data, not by a flag: a skill whose registry entry is unknown (`storeBacked`)
- * has no classification and no figure to show, and the rail closes up rather
- * than rendering a fabricated zero — which is exactly what an installed skill
- * with no recorded source is. The author chip survives that closure on its own:
- * it belongs to the source, which is a fact the ledger can vouch for even when
- * the registry holds no entry.
+ * The card is read top to bottom in the order a reader actually decides in:
+ * *what is it* (the name), *who published it* (the source line), *what does it
+ * do* (the description), and only then *how popular is it* (the rail). Each of
+ * those three blocks has exactly one job:
+ *
+ * - **Header** — the skill's own cover, then the name with the source line
+ *   pinned under it. The source is *always* drawn, which is what makes the
+ *   block read as two lines instead of a name floating in whitespace: it is the
+ *   one fact that tells `anthropics/skills` apart from an unknown repository,
+ *   and it is a fact the ledger can vouch for even when the registry holds no
+ *   entry for the skill. A skill with no recorded source has no repository to
+ *   name, so the line says 本地安装 instead, with the migration badge trailing
+ *   it.
+ * - **Content** — the description: the only thing on the card that explains
+ *   what the skill is *for*, so it is the widest text block, kept at two lines
+ *   so cards in a row stay the same height.
+ * - **Footer** — one quiet rail under a hairline: the classification on the
+ *   left, the popularity figure on the right, both set in the same voice. A
+ *   skill with neither (an install the registry cannot back) gets no rail at
+ *   all: an empty hairline reads as a rendering bug, not as "no data".
+ *
+ * The cover is decoration and is sized like it: 48px, enough to give the grid
+ * colour and a per-skill anchor, not enough to pretend the dataset's
+ * illustration can be read at card size. Everything the card shows is read off
+ * the skill, so feeding it a store row and feeding it an installed row produce
+ * the same card. The two are told apart by data, not by a flag: a skill whose
+ * registry entry is unknown (`storeBacked`) has no classification and no figure
+ * to show rather than a fabricated zero — which is exactly what an installed
+ * skill with no recorded source is.
  *
  * Only what a surface *does* arrives as a slot, because only the surface knows
  * it: the corner action (an install button on the store, an enable switch on the
@@ -72,7 +81,6 @@ export function SkillCard({
   selected = false,
   onSelect,
   action,
-  actionVisibility = "always",
   sourceExtra,
   below,
   "data-skill": dataSkill,
@@ -89,13 +97,6 @@ export function SkillCard({
   onSelect?: () => void;
   /** The corner control: an install button on the store, a switch on the list. */
   action?: ReactNode;
-  /**
-   * Whether the corner control is always shown, or only while the reader is
-   * on the card. "on-hover" is for the quiet default of a surface — an idle
-   * install button, a switch that is on; the states that need no attention.
-   * States that do — installed, disabled, installing, failed — stay "always".
-   */
-  actionVisibility?: "always" | "on-hover";
   /** Trails the source line: the migration badge on an unlinked install. */
   sourceExtra?: ReactNode;
   /** Rendered under the card: an install failure, a dialog trigger. */
@@ -109,6 +110,9 @@ export function SkillCard({
   // The owner segment of the source — what the mirror hosts an avatar for. A
   // bare owner (no slash) counts as none, exactly as it does for the cover.
   const [owner] = skill.repo.split("/");
+  // Classification and figure are both registry facts; the profiles dataset
+  // simply has not profiled every skill, so the classification is optional.
+  const domain = skill.profile?.domain;
 
   return (
     <li className="flex flex-col">
@@ -134,66 +138,83 @@ export function SkillCard({
         )}
       >
         <CardHeader>
-          {/* The card leads with the skill's own image, with its name and
-              source stacked beside it — the one shape that gives the cover
-              enough room to be recognisable. `min-w-0` is what lets that stack
-              shrink: the header is a grid and a `1fr` track keeps a
-              content-based minimum, so a long name widened the track past the
-              card and pushed the corner action out of it — the action hanging
-              outside the border, the name untruncated, on any card whose name
-              did not fit. Shrinking lets the name truncate instead, which is
-              what the `truncate` on it is there for. */}
+          {/* Cover, then the name over its source — the one shape that gives
+              the cover its place without letting it push the title around.
+              `min-w-0` is what lets the stack shrink: the header is a grid and
+              a `1fr` track keeps a content-based minimum, so a long name
+              widened the track past the card and pushed the corner action out
+              of it — the action hanging outside the border, the name
+              untruncated, on any card whose name did not fit. Shrinking lets
+              the name truncate instead, which is what the `truncate` on it is
+              there for. */}
           <div className="flex min-w-0 items-start gap-3">
             <SkillCover
               repo={skill.repo}
               name={skill.name}
-              className="h-10 w-10 shrink-0 text-base"
+              className="size-12 shrink-0 text-lg"
             />
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
               {/* The name is the card's heading, so it stays an `h3` inside
                   the title slot rather than losing its meaning to a styled
-                  `div`. */}
+                  `div`. 15px against the description's 13px is what makes the
+                  two read as a title and a body at this size — at the app's
+                  default 16px the hierarchy was thin enough that the block
+                  read as one paragraph. */}
               <CardTitle>
-                <h3 className={cn("truncate", muted && "text-muted-foreground")}>
+                <h3
+                  className={cn(
+                    "truncate text-[15px] leading-tight",
+                    muted && "text-muted-foreground",
+                  )}
+                >
                   <HighlightedText text={skill.name} terms={matched?.name} />
                 </h3>
               </CardTitle>
-              {/* The description slot carries the source, and only when the
-                  card has no author chip to carry it: the rail's chip names
-                  the repository and opens it on hover, so for a sourced skill
-                  the line was the same fact twice. A skill with no recorded
-                  source has no chip at all — nothing to hover — so there the
-                  label, with the migration badge trailing it, is what explains
-                  the empty source. The domain chip used to share this slot
-                  too, which cost the source the chip's width (and let the chip
-                  drift with the length of the repo name); it reads better in
-                  the rail below next to the figure. */}
-              {!owner && (
-                <CardDescription
-                  className={cn(
-                    "flex items-center gap-1.5 truncate",
-                    muted && "text-muted-foreground/70",
-                  )}
-                >
-                  <span className="truncate">{LOCAL_SOURCE_LABEL}</span>
-                  {sourceExtra}
-                </CardDescription>
-              )}
+              {/* The source, always present. On a sourced skill it is the
+                  repository the rail's chip used to answer for on hover, and
+                  the avatar rides it as the visual mark of *who* — the chip's
+                  old home, the footer, was the least legible place on the card
+                  for the second-most important fact on it, and it also left
+                  the title block looking like a name with nothing under it. A
+                  skill with no recorded source has nothing to hover, so there
+                  the label, with the migration badge trailing it, is what
+                  explains the empty source. */}
+              <CardDescription
+                className={cn(
+                  "flex min-w-0 items-center gap-1.5 text-[11px]",
+                  muted && "text-muted-foreground/70",
+                )}
+              >
+                {owner ? (
+                  <>
+                    <RepoHoverCard
+                      repo={skill.repo}
+                      // A backless row carries 0 stars because there is no
+                      // store entry to ask, not because the repo has none.
+                      stars={storeBacked ? skill.stars : undefined}
+                      className="size-4 text-[9px]"
+                    />
+                    <span className="truncate">{skill.repo}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="truncate">{LOCAL_SOURCE_LABEL}</span>
+                    {sourceExtra}
+                  </>
+                )}
+              </CardDescription>
             </div>
           </div>
           {/* The corner control. Clicks on the slot stop here: the card body
               opens the detail panel, the action must not. */}
           {action && (
-            <CardAction
-              onClick={(e) => e.stopPropagation()}
-              className={cn(actionVisibility === "on-hover" && ON_HOVER_ACTION_CLASS)}
-            >
+            <CardAction onClick={(e) => e.stopPropagation()}>
               {action}
             </CardAction>
           )}
         </CardHeader>
 
-        <CardContent className="line-clamp-2 text-sm text-muted-foreground">
+        <CardContent className="line-clamp-2 text-[13px] text-muted-foreground">
           <HighlightedText
             text={skill.description || "暂无描述"}
             terms={matched?.description}
@@ -201,43 +222,34 @@ export function SkillCard({
         </CardContent>
 
         {/* Pinned to the card's bottom edge: descriptions differ in length, and
-            the two ends should still line up across a row. The author chip
-            opens the rail — *who* published it before *what* it is classified
-            as and *how popular* it is — with classification on the left and
-            the figure on the right under the corner action: the two rails the
-            card is already read in, and the reason neither end is left
-            floating in the middle. The chip keeps the rail alive on its own
-            for a sourced install the registry no longer lists. */}
-        {(storeBacked || owner) && (
-          <CardFooter className="mt-auto gap-1.5">
-            {owner && (
-              <RepoHoverCard
-                repo={skill.repo}
-                // A backless row carries 0 stars because there is no store
-                // entry to ask, not because the repo has none.
-                stars={storeBacked ? skill.stars : undefined}
-                className="h-4 w-4 text-[9px]"
+            the two ends should still line up across a row. One rail, one voice:
+            the classification on the left, the figure on the right, both plain
+            text under a hairline — the bordered chip and the gradient flame
+            that used to share it were the two loudest pieces of chrome on the
+            card, and the figure they framed is the least important fact on it.
+            A backless skill has neither to show, and closing the rail up is
+            what keeps *that* readable: an empty rail under a hairline reads as
+            a rendering bug. */}
+        {(storeBacked || domain) && (
+          <CardFooter className="mt-auto gap-2 border-t border-border/60 pt-2.5 text-xs text-muted-foreground">
+            {domain && (
+              <DomainBadge
+                domain={domain}
+                reason={skill.profile?.reason}
+                // Flattened to plain text: the rail is a line of facts, not a
+                // row of badges, so the chip keeps only its emoji, its name and
+                // its tooltip.
+                variant="ghost"
+                className="px-0 py-0 font-normal"
               />
             )}
             {storeBacked && (
-              <>
-                {/* Domain from the profiles dataset; absent for skills it has
-                    not profiled, so the figure simply keeps the right edge
-                    alone. */}
-                {skill.profile?.domain && (
-                  <DomainBadge
-                    domain={skill.profile.domain}
-                    reason={skill.profile.reason}
-                    className="shrink-0 rounded-full px-2 py-0 text-[10px] font-normal text-muted-foreground"
-                  />
-                )}
-                <SkillPopularity
-                  skill={skill}
-                  side="top"
-                  align="end"
-                  className="ml-auto"
-                />
-              </>
+              <SkillPopularity
+                skill={skill}
+                side="top"
+                align="end"
+                className="ml-auto"
+              />
             )}
           </CardFooter>
         )}

@@ -183,24 +183,21 @@ describe("MySkillsPage", () => {
     expect(pdf).toHaveAttribute("aria-checked", "false");
   });
 
-  it("hides an enabled skill's switch until the card is reached", async () => {
+  it("shows an enabled skill's switch without hover", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
 
     await screen.findByRole("switch", { name: "关闭 pdf" });
 
-    // Enabled is the quiet default: the switch waits for the pointer or
-    // keyboard, keeping its space and its place in the accessibility tree.
+    // Like the store's install button, the corner control is always shown: a
+    // grid whose controls appear only under the pointer reads as unstable.
     const action = container.querySelector(
       '[data-skill="pdf"] [data-slot="card-action"]',
     );
-    expect(action).toHaveClass("opacity-0", "pointer-events-none");
-    expect(action).toHaveClass("group-hover:opacity-100");
-    expect(action).toHaveClass("group-focus-within:opacity-100");
+    expect(action).not.toHaveClass("opacity-0", "pointer-events-none");
   });
 
   it("keeps a disabled skill's switch visible without hover", async () => {
-    // The off switch is the fact that explains the dimmed card, so unlike
-    // an enabled skill's switch it does not wait for hover.
+    // The off switch is the fact that explains the dimmed card.
     setMockSkillEnabled("pdf", false);
     const { container } = renderWithRouter(<MySkillsPage />);
 
@@ -309,19 +306,19 @@ describe("MySkillsPage", () => {
     );
   });
 
-  it("shows the recorded source repo with the owner's author chip on the rail", async () => {
+  it("shows the recorded source repo with the owner's author chip under the name", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
     // The ledger has a source for pdf (installed through this app); docx is
     // a tool-installed skill with no entry.
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
 
-    // The sourced card names its repo through the author chip alone: the chip
-    // is on the metadata rail, and its hover card states what it stands for —
-    // which is why the source line under the name is gone.
+    // The sourced card names its repo on the source line under the name: the
+    // author chip rides it, and the chip's hover card states what it stands
+    // for.
     const chip = await screen.findByRole("button", {
       name: "仓库 anthropics/skills",
     });
-    expect(chip.closest('[data-slot="card-footer"]')).not.toBeNull();
+    expect(chip.closest('[data-slot="card-description"]')).not.toBeNull();
     // docx keeps the local-install presentation.
     expect(screen.getAllByText("本地安装")).toHaveLength(5);
     // The cover degrades to its author's initial — the owner for the sourced

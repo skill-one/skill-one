@@ -1,5 +1,5 @@
 import { Download, Flame, Star } from "lucide-react";
-import { useId, type ComponentProps } from "react";
+import type { ComponentProps } from "react";
 
 import { popularity } from "../lib/popularity";
 import { cn, formatCount } from "../lib/utils";
@@ -16,11 +16,18 @@ import {
  * rows and the detail drawer header) so the number on a row and the number
  * in the detail can never disagree.
  *
- * The trigger shows the blended `popularity(skill)` with a flame; hovering or
- * focusing breaks it back down into the installs and stars it blends, each
- * icon standing in for its label. The figure is not a count of anything, so
- * it carries no unit and its accessible name always spells the breakdown out:
- * `热度 …：安装 … · Star …`.
+ * The trigger shows the blended `popularity(skill)` next to a flame, and
+ * hovering or focusing breaks it back down into the installs and stars it
+ * blends, each icon standing in for its label. The figure is not a count of
+ * anything, so it carries no unit and its accessible name always spells the
+ * breakdown out: `热度 …：安装 … · Star …`.
+ *
+ * The flame is deliberately quiet — the surface's own muted ink, plus a wash of
+ * the same ink as fill so it stays a readable mark rather than a hairline at
+ * 14px. It marks the metric; it does not advertise it. The gradient-filled
+ * flame it used to be was the most saturated thing on a card, which pulled the
+ * eye to the *derived* number ahead of the skill's name and description — the
+ * two things the reader is actually choosing between.
  */
 export function SkillPopularity({
   skill,
@@ -40,13 +47,6 @@ export function SkillPopularity({
   const starred = formatCount(skill.stars);
   const blended = formatCount(popularity(skill));
 
-  // A flame reads warm, so the metric's icon is a solid flame in an
-  // orange→amber gradient (rather than the neutral grey of the rest of the
-  // card). The id is scoped per instance via useId (sanitized: ':' is unstable
-  // inside url(#..)) so the many cards on a list can each carry their own defs
-  // without clashing.
-  const gradientId = useId().replace(/[^a-zA-Z0-9]/g, "");
-
   return (
     <TooltipProvider delayDuration={0}>
       <Tooltip>
@@ -60,25 +60,7 @@ export function SkillPopularity({
             className,
           )}
         >
-          <span className="relative inline-flex h-3.5 w-3.5 items-center justify-center">
-            <svg aria-hidden="true" focusable="false" className="absolute h-0 w-0">
-              <defs>
-                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  {/* tip amber → base orange, so the flame reads as fire */}
-                  <stop offset="0%" stopColor="#fbbf24" />
-                  <stop offset="100%" stopColor="#f97316" />
-                </linearGradient>
-              </defs>
-            </svg>
-            {/* Filled and stroked with the same gradient: at 14px the outline
-                alone was a hairline, and the figure is the one number the card
-                leads with. */}
-            <Flame
-              className="h-3.5 w-3.5"
-              color={`url(#${gradientId})`}
-              fill={`url(#${gradientId})`}
-            />
-          </span>
+          <Flame aria-hidden className="h-3.5 w-3.5 fill-muted-foreground/25" />
           <span className="font-medium tabular-nums">{blended}</span>
         </TooltipTrigger>
         <TooltipContent side={side} align={align}>

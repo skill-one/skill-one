@@ -50,7 +50,7 @@ describe("SkillListRow", () => {
     expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
   });
 
-  it("leads with the skill's own image and opens the rail with the author chip", () => {
+  it("leads with the skill's own image and pins the author chip under the name", () => {
     const { container } = renderWithRouter(<SkillListRow skill={skill} />);
 
     // The skill's image is the card's leading element, named for assistive
@@ -58,16 +58,13 @@ describe("SkillListRow", () => {
     const cover = container.querySelector('[data-slot="skill-cover"]');
     expect(cover).toHaveAttribute("aria-label", "pdf 封面图");
 
-    // The chip leads the metadata rail — where the classification and the
-    // figure live — and names the repository it stands for. It is the card's
-    // only source of that name, so the description slot stays empty: writing
-    // the repo out under the name too would state the same fact twice.
-    const chip = screen.getByRole("button", { name: "仓库 anthropics/skills" });
+    // The chip rides the source line under the name and names the repository
+    // it stands for, with the source written out beside it.
+    const chip = screen.getByRole("button", {
+      name: "仓库 anthropics/skills",
+    });
     expect(chip.querySelector('[data-slot="avatar"]')).not.toBeNull();
-    expect(chip.closest('[data-slot="card-footer"]')).not.toBeNull();
-    expect(
-      container.querySelector('[data-slot="card-description"]'),
-    ).toBeNull();
+    expect(chip.closest('[data-slot="card-description"]')).not.toBeNull();
   });
 
   it("lets the header shrink so a long name cannot push the action out of the card", () => {
@@ -151,18 +148,20 @@ describe("SkillListRow", () => {
     ).toBeInTheDocument();
   });
 
-  it("takes the card's controls in card order: install, the author chip, then the figure", async () => {
+  it("takes the card's controls in card order: chip, install, then figure", async () => {
     const user = userEvent.setup();
     renderWithRouter(<SkillListRow skill={skill} />);
 
-    // The install action lives in the header, above the rail the card is read
-    // left to right along, and the tab order follows the card.
-    await user.tab();
-    expect(screen.getByRole("button", { name: "安装" })).toHaveFocus();
-
+    // The tab order follows the card top to bottom: the source line under the
+    // name, then the corner action, then the rail's figure.
     await user.tab();
     expect(
       screen.getByRole("button", { name: "仓库 anthropics/skills" }),
+    ).toHaveFocus();
+
+    await user.tab();
+    expect(
+      screen.getByRole("button", { name: "安装" }),
     ).toHaveFocus();
 
     await user.tab();
@@ -210,16 +209,19 @@ describe("SkillListRow", () => {
     expect(screen.getByText("暂无描述")).toBeInTheDocument();
   });
 
-  it("hides the idle install button until the card is reached", () => {
+  it("shows the idle install button without hover, quietly", () => {
     const { container } = renderWithRouter(<SkillListRow skill={skill} />);
 
-    // The idle download is the quiet default: hidden until the pointer or
-    // keyboard reaches the card, while keeping its space and its place in
-    // the accessibility tree.
+    // Idle is the resting state of every row in a grid, so the download stays
+    // visible but wears the muted secondary chrome — there to be found, not
+    // competing with the name. No state waits for hover any more, so the
+    // reveal classes are gone from the corner slot entirely.
     const action = container.querySelector('[data-slot="card-action"]');
-    expect(action).toHaveClass("opacity-0", "pointer-events-none");
-    expect(action).toHaveClass("group-hover:opacity-100");
-    expect(action).toHaveClass("group-focus-within:opacity-100");
+    expect(action).not.toHaveClass("opacity-0", "pointer-events-none");
+    const button = within(action as HTMLElement).getByRole("button", {
+      name: "安装",
+    });
+    expect(button).toHaveClass("bg-secondary");
   });
 
   it("keeps the installed state visible without hover", async () => {

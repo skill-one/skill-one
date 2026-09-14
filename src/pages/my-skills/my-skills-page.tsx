@@ -90,10 +90,6 @@ function InstalledSkillRow({
       selected={selected}
       onSelect={onOpen}
       action={<SkillEnableSwitch skill={view} />}
-      // A switch that is on is the quiet default and waits for hover; a
-      // disabled skill's off switch persists, matching the dimmed card —
-      // the reader should see why without reaching for it.
-      actionVisibility={enabled ? "on-hover" : "always"}
       // The migration affordance is only meaningful while the source is
       // unknown; a recorded one needs no route to the store.
       sourceExtra={

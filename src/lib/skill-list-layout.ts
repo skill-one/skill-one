@@ -22,7 +22,7 @@ export const SKILL_LIST_CLASS =
  * arrive.
  *
  * Measured off a rendered store card at the app's default window: 32px of
- * card padding, a 48px header (the 40px cover row plus the header grid's own
- * row gap), 12px gaps, a 40px description, an 18px footer and the 2px border.
+ * card padding, a 56px header (the 48px cover row plus the source line), 24px
+ * of gaps, a 40px two-line description, a 28px footer rail and the 2px border.
  */
-export const SKILL_CARD_SKELETON_CLASS = "h-[164px] rounded-xl";
+export const SKILL_CARD_SKELETON_CLASS = "h-[180px] rounded-xl";
