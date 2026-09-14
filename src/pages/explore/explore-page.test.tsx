@@ -569,7 +569,16 @@ describe("ExplorePage", () => {
     // keystroke; the search answer lands one debounce later, so both halves
     // wait.
     await user.type(await searchField(), "gadget");
-    await waitFor(() => expect(renderedGadgetHeaders()).toHaveLength(6));
+    // The search answer is the same twelve gadgets, so six visible headers alone
+    // cannot tell pre- from post-search: the pre-search list also shows six. Wait
+    // for the highlight the applied query paints on every match, then for the six
+    // headers, so the scroll below fires the observer the *new* answer mounted —
+    // not a stale one left over from before the keystroke (which the transient
+    // empty answer had already disconnected).
+    await waitFor(() => {
+      expect(renderedGadgetHeaders()).toHaveLength(6);
+      expect(document.querySelector("mark")).toBeInTheDocument();
+    });
 
     // And scrolling the new answer reveals the rest of it.
     lastObserver().trigger(true);
