@@ -97,7 +97,7 @@ export function ExplorePage() {
     isError,
     error,
     refetch: refetchPage,
-  } = useRegistryPage(query, sort, page - 1, PAGE_SIZE, undefined, domain);
+  } = useRegistryPage(query, sort, page - 1, PAGE_SIZE, domain);
 
   const hits: SearchHit[] = pageData?.hits ?? [];
 
@@ -333,8 +333,8 @@ export function ExplorePage() {
 
           {/* Pagination row: previous / numbered pages (with ellipsis) / next
               — the current page number doubles as an editable jump box — with
-              the skill count pinned to the right (shared with the repos page).
-              While the index is streaming in the count climbs, so say so, and a
+              the skill count pinned to the right. While the index is streaming
+              in the count climbs, so say so, and a
               search says what ordered the list. */}
           {(stats.count > 0 || stats.complete) && (
             <ListPager

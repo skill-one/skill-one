@@ -94,4 +94,4 @@ The run stats published beside the index are what make caching possible:
 
 A skill's `SKILL.md` is fetched from the mirror snapshot at `skills/{id}/SKILL.md`, pinned to the recorded snapshot tag when one exists (the mutable `dist` branch otherwise); see [src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts).
 
-Owner avatars (the 仓库 owner images on the repos pages and detail drawer) are fetched from the mirror snapshot at `avatars/{owner}.png` through the same download source chain, pinned to the recorded snapshot tag; see [src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx).
+Owner avatars (the repo owner images on the store rows and detail drawer) are fetched from the mirror snapshot at `avatars/{owner}.png` through the same download source chain, pinned to the recorded snapshot tag; see [src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx).

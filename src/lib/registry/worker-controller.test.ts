@@ -26,8 +26,6 @@ import type { PublishedIndex } from "./index-stream";
 import type { ProfilesMeta } from "./profiles";
 import type {
   RegistryWorkerMessage,
-  RepoSortOrder,
-  ReposRequest,
   RevalidateResult,
   SortOrder,
 } from "./protocol";
@@ -665,39 +663,6 @@ describe("createRegistryController — getPage", () => {
     ).toEqual(["alpha-redis", "zeta-redis"]);
   });
 
-  it("filters exactly by repo for the repo detail page", async () => {
-    const t = setup({
-      skills: [
-        skill(0), // owner-0/repo-0
-        skill(1), // owner-1/repo-1
-        skill(3), // owner-0/repo-1
-        skill(6), // owner-0/repo-0
-      ],
-    });
-    t.controller.init({ cdnBase: "test" });
-    t.complete();
-    await t.flush();
-
-    t.controller.handle({
-      type: "getPage",
-      id: 1,
-      payload: {
-        query: "no-match-on-purpose",
-        repo: "owner-0/repo-0",
-        sort: "default",
-        page: 0,
-        pageSize: 10,
-      },
-    });
-    const data = resultData<{ hits: Array<{ skill: Skill }>; total: number }>(
-      t.recorded.results[0],
-    );
-    // An exact identity filter, not a search: only that repo's skills, the
-    // query text ignored.
-    expect(data.total).toBe(2);
-    expect(data.hits.map((h) => h.skill.name)).toEqual(["skill-0", "skill-6"]);
-  });
-
   it("answers no search until the index over the registry is built", async () => {
     const t = setup();
     t.controller.init({ cdnBase: "test" });
@@ -1020,132 +985,6 @@ describe("createRegistryController — getRanking", () => {
       ok: false,
       id: 1,
       error: "未知榜单：nope",
-    });
-  });
-});
-
-describe("createRegistryController — getRepos", () => {
-  // Four skills across three repos: alpha has 2 skills (10 stars),
-  // beta 1 skill (5 stars), git/x 1 skill (1 star).
-  const reposSkills: Skill[] = [
-    { ...skill(0), name: "a1", repo: "acme/alpha", downloads: 50, stars: 10 },
-    { ...skill(1), name: "a2", repo: "acme/alpha", downloads: 30, stars: 10 },
-    { ...skill(2), name: "b1", repo: "acme/beta", downloads: 100, stars: 5 },
-    { ...skill(3), name: "g1", repo: "git/x", downloads: 1, stars: 1 },
-  ];
-
-  async function reposSetup(skills: Skill[]) {
-    const t = setup({ skills });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-    return t;
-  }
-
-  function requestRepos(t: ReturnType<typeof setup>, payload: ReposRequest) {
-    const before = t.recorded.results.length;
-    t.controller.handle({ type: "getRepos", id: before + 1, payload });
-    return resultData<{ repos: Array<{ repo: string }>; total: number }>(
-      t.recorded.results[before],
-    );
-  }
-
-  it("aggregates per-repo skill counts and stars", async () => {
-    const t = await reposSetup(reposSkills);
-    const data = requestRepos(t, {
-      query: "",
-      sort: "stars",
-      page: 0,
-      pageSize: 10,
-    });
-    expect(data.total).toBe(3);
-    // Star order: most stars first, repo name as the tie-break.
-    expect(data.repos).toEqual([
-      { repo: "acme/alpha", skills: 2, stars: 10 },
-      { repo: "acme/beta", skills: 1, stars: 5 },
-      { repo: "git/x", skills: 1, stars: 1 },
-    ]);
-  });
-
-  it("searches repos by term, ignoring case, without forgiving typos", async () => {
-    const t = await reposSetup(reposSkills);
-    const repos = (query: string) =>
-      requestRepos(t, {
-        query,
-        sort: "stars",
-        page: 0,
-        pageSize: 10,
-      }).repos.map((r) => r.repo);
-
-    // One term of both acme repos, whatever case it was typed in.
-    expect(repos("ACME")).toEqual(["acme/alpha", "acme/beta"]);
-    // A half-typed word answers: terms match from their start.
-    expect(repos("acme/alp")).toEqual(["acme/alpha"]);
-    // What the substring filter used to answer no longer does: a fragment from
-    // the middle of a word, or a mistyped letter, matches nothing.
-    expect(repos("lpha")).toEqual([]);
-    expect(repos("aqlpha")).toEqual([]);
-  });
-
-  it("sorts by stars, skills and name", async () => {
-    const t = await reposSetup(reposSkills);
-    const names = (sort: RepoSortOrder) =>
-      requestRepos(t, { query: "", sort, page: 0, pageSize: 10 }).repos.map(
-        (r) => r.repo,
-      );
-    expect(names("stars")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
-    expect(names("skills")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
-    expect(names("name")).toEqual(["acme/alpha", "acme/beta", "git/x"]);
-  });
-
-  it("pages the repo list", async () => {
-    const t = await reposSetup(reposSkills);
-    const page0 = requestRepos(t, {
-      query: "",
-      sort: "stars",
-      page: 0,
-      pageSize: 2,
-    });
-    const page1 = requestRepos(t, {
-      query: "",
-      sort: "stars",
-      page: 1,
-      pageSize: 2,
-    });
-    expect(page0.repos.map((r) => r.repo)).toEqual(["acme/alpha", "acme/beta"]);
-    expect(page1.repos.map((r) => r.repo)).toEqual(["git/x"]);
-    expect(page1.total).toBe(3);
-  });
-
-  it("tracks the loaded prefix while streaming and caches once complete", async () => {
-    const t = setup();
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    // Mid-stream: answers reflect the loaded prefix and keep growing (no
-    // caching over partial data).
-    t.push(reposSkills[0]);
-    expect(
-      requestRepos(t, { query: "", sort: "stars", page: 0, pageSize: 10 })
-        .total,
-    ).toBe(1);
-    t.push(reposSkills[2]);
-    expect(
-      requestRepos(t, { query: "", sort: "stars", page: 0, pageSize: 10 })
-        .total,
-    ).toBe(2);
-
-    t.complete();
-    await t.flush();
-
-    // Landed: the settled aggregation answers from the per-version cache.
-    expect(
-      requestRepos(t, { query: "", sort: "stars", page: 0, pageSize: 10 }),
-    ).toMatchObject({
-      total: 2,
-      repos: [
-        { repo: "acme/alpha", skills: 1 },
-        { repo: "acme/beta", skills: 1 },
-      ],
     });
   });
 });

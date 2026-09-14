@@ -2,7 +2,6 @@ import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
 import { popularity } from "../popularity";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
-import { buildSearchIndex, type Search } from "../search-index";
 import type {
   DomainInfo,
   FeaturedSectionData,
@@ -11,9 +10,6 @@ import type {
   PageRequest,
   RankingData,
   RankingRequest,
-  RepoInfo,
-  RepoPageData,
-  ReposRequest,
   RegistryQuery,
   RegistryWorkerMessage,
   RevalidateStatus,
@@ -54,10 +50,6 @@ const byName = (a: Skill, b: Skill): number => a.name.localeCompare(b.name);
 /** The comparator for one of the two non-default toolbar orders. */
 const skillComparator = (sort: "popularity" | "name") =>
   sort === "popularity" ? byPopularity : byName;
-
-/** Ascending repo-name order, the tiebreak of every repos sort. */
-const byRepoName = (a: RepoInfo, b: RepoInfo): number =>
-  a.repo.localeCompare(b.repo);
 
 export interface ControllerDeps {
   /**
@@ -181,16 +173,6 @@ export function createRegistryController(
   let dataVersion = 0;
   let orderCache: { version: number; sort: SortOrder; ids: number[] } | null =
     null;
-  // Aggregated per-repo summaries, cached per data version like the sort
-  // order: grouping the registry is an O(n) pass, page requests only filter,
-  // sort and slice the (much smaller) repo list. The search index built over
-  // that list is cached in the same record, so it can never address a
-  // different dataset than the aggregation it indexes.
-  let repoCache: {
-    version: number;
-    repos: RepoInfo[];
-    search?: Search<RepoInfo>;
-  } | null = null;
   // Lookup index for `lookupSkills`, cached per data version: resolving each
   // ref by a `store.find` is O(n·m), so instead the earliest matching skill
   // per key is indexed once and every request is a pair of map reads.
@@ -206,7 +188,6 @@ export function createRegistryController(
   const invalidateDerived = () => {
     dataVersion++;
     orderCache = null;
-    repoCache = null;
     lookupCache = null;
     domainCache = null;
   };
@@ -509,27 +490,12 @@ export function createRegistryController(
 
   const getPage = ({
     query,
-    repo,
     domain,
     sort,
     page,
     pageSize,
   }: PageRequest): PageData => {
     const start = page * pageSize;
-    if (repo !== undefined) {
-      // Repo detail page: an exact identity filter, not a search — every
-      // skill of the repo, in registry order (or the chosen sort). Recomputed
-      // per request so pages settle as the download streams in.
-      const hits: SearchHit[] = [];
-      for (const skill of store) {
-        if (skill.repo === repo) hits.push({ skill, matched: {} });
-      }
-      if (sort !== "default") {
-        const compare = skillComparator(sort);
-        hits.sort((a, b) => compare(a.skill, b.skill));
-      }
-      return { hits: hits.slice(start, start + pageSize), total: hits.length };
-    }
     const q = query.trim();
     if (q) {
       // A search owns the whole registry, so there is nothing to answer with
@@ -566,7 +532,7 @@ export function createRegistryController(
    * The distinct profile domains with their skill counts, most-used first.
    * Only profiled skills contribute — the list (and every count) shrinks to
    * zero-shaped answers when the profiles dataset is unavailable. Cached
-   * per data version like the repo aggregation; recomputed per request
+   * per data version like the sort order; recomputed per request
    * while the dataset streams in.
    */
   const getDomains = (): DomainInfo[] => {
@@ -585,83 +551,6 @@ export function createRegistryController(
       );
     if (complete) domainCache = { version: dataVersion, domains };
     return domains;
-  };
-
-  /**
-   * Aggregated per-repo summaries. While the download streams in the list
-   * keeps growing, so the aggregation is recomputed per request; once the
-   * dataset has landed it is cached per data version (see `repoCache`).
-   */
-  const reposFor = (): RepoInfo[] => {
-    if (complete && repoCache?.version === dataVersion) return repoCache.repos;
-    const byRepo = new Map<string, RepoInfo>();
-    for (const skill of store) {
-      const entry = byRepo.get(skill.repo);
-      if (entry) {
-        entry.skills++;
-        // Same repo, same star count; max() simply tolerates bad data.
-        entry.stars = Math.max(entry.stars, skill.stars);
-      } else {
-        byRepo.set(skill.repo, {
-          repo: skill.repo,
-          skills: 1,
-          stars: skill.stars,
-        });
-      }
-    }
-    const repos = Array.from(byRepo.values()).toSorted(
-      (a, b) => b.skills - a.skills || a.repo.localeCompare(b.repo),
-    );
-    if (complete) repoCache = { version: dataVersion, repos };
-    return repos;
-  };
-
-  /**
-   * The search index over the aggregated repo list, built on the first query
-   * for a data version and reused by every later page of the same search. An
-   * uncached list (still streaming in) is re-indexed per request, which is
-   * also what re-indexing a settled one would cost — a couple of milliseconds
-   * over ~1k entries.
-   */
-  const reposSearch = (): Search<RepoInfo> => {
-    // Asking for the aggregation first is what makes the cached index safe:
-    // afterwards repoCache is either null (a fresh download still streaming,
-    // so nothing is cached) or addressed to the current data version.
-    const repos = reposFor();
-    if (repoCache?.search) return repoCache.search;
-    const indexed = buildSearchIndex(repos, { fields: { repo: 1 } });
-    // Only a settled aggregation is worth an index of its own.
-    if (repoCache) repoCache.search = indexed;
-    return indexed;
-  };
-
-  const getRepos = ({
-    query,
-    sort,
-    page,
-    pageSize,
-  }: ReposRequest): RepoPageData => {
-    const start = page * pageSize;
-    const q = query.trim();
-    if (q) {
-      // A search orders its own results: the repos list answers in relevance
-      // order and ignores the order the browsed list uses, exactly as the
-      // explore page does (its toolbar swaps the sort dropdown for a
-      // read-only 相关度 label while a query is set).
-      const hits = reposSearch()(q);
-      return {
-        repos: hits.slice(start, start + pageSize).map(({ doc }) => doc),
-        total: hits.length,
-      };
-    }
-    const repos = reposFor().toSorted((a, b) =>
-      sort === "skills"
-        ? b.skills - a.skills || byRepoName(a, b)
-        : sort === "name"
-          ? byRepoName(a, b)
-          : b.stars - a.stars || byRepoName(a, b),
-    );
-    return { repos: repos.slice(start, start + pageSize), total: repos.length };
   };
 
   /** Sections shown on the featured page and skills per section. */
@@ -913,9 +802,6 @@ export function createRegistryController(
         switch (message.type) {
           case "getPage":
             data = getPage(message.payload);
-            break;
-          case "getRepos":
-            data = getRepos(message.payload);
             break;
           case "getFeatured":
             data = getFeatured();

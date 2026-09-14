@@ -89,8 +89,8 @@ describe("AppSidebar update badge", () => {
     expect(badge.closest("li")).toContainElement(
       screen.getByRole("link", { name: "设置" }),
     );
-    // 精选 · 仓库 · 全部 · 我的 skills · 设置 — and nothing else.
-    expect(screen.getAllByRole("link")).toHaveLength(5);
+    // 精选 · 全部 · 我的 skills · 设置 — and nothing else.
+    expect(screen.getAllByRole("link")).toHaveLength(4);
   });
 
   it("opens the confirmation dialog from wherever the user is", async () => {

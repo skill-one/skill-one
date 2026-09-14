@@ -94,4 +94,4 @@ GitHub star 数**不在**技能行里：它存放在下文的 `repos.jsonl` 附�
 
 技能详情 `SKILL.md` 从镜像快照按 `skills/{id}/SKILL.md` 拉取，存在已记录标签时定址到该快照（否则用可变的 `dist` 分支），见 [../src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。
 
-Owner 头像（仓库列表页与详情抽屉里的仓库所有者头像）从镜像快照按 `avatars/{owner}.png` 拉取，走同一条下载源回退链，存在已记录标签时定址到该快照，见 [../src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx)。
+Owner 头像（商店列表行与详情抽屉里的仓库所有者头像）从镜像快照按 `avatars/{owner}.png` 拉取，走同一条下载源回退链，存在已记录标签时定址到该快照，见 [../src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx)。

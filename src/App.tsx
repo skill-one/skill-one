@@ -36,16 +36,6 @@ const RankingPage = lazy(() =>
     default: m.RankingPage,
   })),
 );
-const ReposPage = lazy(() =>
-  import("./pages/explore/repos/repos-page").then((m) => ({
-    default: m.ReposPage,
-  })),
-);
-const RepoDetailPage = lazy(() =>
-  import("./pages/explore/repos/repo-detail-page").then((m) => ({
-    default: m.RepoDetailPage,
-  })),
-);
 const SettingsPage = lazy(() =>
   import("./pages/settings/settings-page").then((m) => ({
     default: m.SettingsPage,
@@ -141,11 +131,6 @@ export default function App() {
                   <Route
                     path="/explore/featured/ranking/:rankingId"
                     element={<RankingPage />}
-                  />
-                  <Route path="/explore/repos" element={<ReposPage />} />
-                  <Route
-                    path="/explore/repos/:owner/:repo"
-                    element={<RepoDetailPage />}
                   />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route

@@ -25,11 +25,12 @@ export interface SearchHit {
 
 /**
  * Explore page sort orders (mirrored by the worker's cached sort). "default"
- * keeps the registry index order — the explore toolbar no longer offers it, but
- * the repo detail page still asks for it. "popularity" orders by the blended
- * installs-and-stars figure the rows display (`lib/popularity.ts`), so the
- * order and the number beside it can never disagree. A non-empty query ignores
- * `sort` entirely and answers in relevance order.
+ * keeps the registry index order — the explore toolbar no longer offers it,
+ * but internal registry lookups (e.g. link suggestions) still ask for it.
+ * "popularity" orders by the blended installs-and-stars figure the rows
+ * display (`lib/popularity.ts`), so the order and the number beside it can
+ * never disagree. A non-empty query ignores `sort` entirely and answers in
+ * relevance order.
  */
 export type SortOrder = "default" | "popularity" | "name";
 
@@ -41,12 +42,6 @@ export interface PageRequest {
   /** 0-based page index. */
   page: number;
   pageSize: number;
-  /**
-   * Exact repo filter ("owner/repo") for the repo detail page. When set the
-   * query is ignored: skills are filtered by repo identity instead of being
-   * run through the shared search index.
-   */
-  repo?: string;
   /**
    * Exact domain filter from the profiles dataset ("开发编程", ...).
    * Undefined browses all; a skill without a profile falls outside every
@@ -88,42 +83,6 @@ export interface RankingData {
   /** Top entries of the leaderboard, at most `RANKING_SIZE`. */
   entries: RankEntry[];
   /** Skills that cleared the ranking floor, ignoring the truncation. */
-  total: number;
-}
-
-/**
- * Repos-page sort orders (mirrored by the worker's cached aggregation). A
- * non-empty query ignores them entirely and answers in relevance order, as the
- * explore page does.
- */
-export type RepoSortOrder = "stars" | "skills" | "name";
-
-/** One aggregated source repository, for the repos page. */
-export interface RepoInfo {
-  /** Source repository in "owner/repo" form. */
-  repo: string;
-  /** Number of registry skills that live in this repository. */
-  skills: number;
-  /** GitHub star count of the repository (identical across its skills). */
-  stars: number;
-}
-
-/** Parameters of a paged repos request. */
-export interface ReposRequest {
-  /**
-   * Trimmed search text, answered by the shared search index over the repo
-   * name (see `lib/search-index.ts`); empty browses all.
-   */
-  query: string;
-  sort: RepoSortOrder;
-  /** 0-based page index. */
-  page: number;
-  pageSize: number;
-}
-
-/** One page of repos results. `total` covers the whole (filtered) list. */
-export interface RepoPageData {
-  repos: RepoInfo[];
   total: number;
 }
 
@@ -203,7 +162,6 @@ export type RegistryCommand =
 /** Main-thread → worker queries answered synchronously by `handle`. */
 export type RegistryQuery =
   | { type: "getPage"; id: number; payload: PageRequest }
-  | { type: "getRepos"; id: number; payload: ReposRequest }
   | { type: "getFeatured"; id: number }
   | { type: "getRanking"; id: number; payload: RankingRequest }
   | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } }

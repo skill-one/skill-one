@@ -4,7 +4,7 @@ import { SkillDetailPanel, type SkillDetailSurface } from "./skill-detail-panel"
 
 /**
  * The skill detail drawer shared by the store pages (explore, featured,
- * ranking, repo detail) and the my-skills page: a modal right-side Drawer
+ * ranking) and the my-skills page: a modal right-side Drawer
  * (dimmed overlay; opening or closing never reflows the grid) with prev/next
  * walking the caller's list.
  *
