@@ -3,7 +3,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type MouseEvent,
   type ReactNode,
 } from "react";
 import { ChevronDown, Star } from "lucide-react";
@@ -61,25 +60,28 @@ function getScrollParent(node: HTMLElement): HTMLElement | null {
 }
 
 /**
- * Keep a sticky header under the pointer across its own collapse.
+ * Keep the sticky header under the pointer across a height change it caused.
  *
  * While the header is pinned, its natural position is somewhere above the
- * viewport; collapsing removes the group's cards, the header snaps back up
- * to that natural position, and the page appears to scroll sideways out from
- * under the click. Measuring the header's viewport offset before the toggle
- * lands and again after the DOM settles, then shifting the scroll container
- * by the difference, pins the header to wherever the pointer met it.
+ * viewport; any toggle that shrinks the group — the header's own fold, or
+ * the preview expander snapping from every card back to a few — removes cards
+ * below it, the header's containing block stops being tall enough to hold it
+ * pinned, and it snaps up out of view so the next group's header takes the
+ * top. Measuring the header's viewport offset before the toggle lands and
+ * again after the DOM settles, then shifting the scroll container by the
+ * difference, pins the header where the pointer met it.
  *
  * For a header that was not pinned the drift rounds to zero and the
- * adjustment is a no-op, so expanding and mid-page collapses are untouched.
+ * adjustment is a no-op, so expanding the preview and mid-page folds are
+ * untouched. The measurement always reads the *header* (not the control that
+ * was clicked) so the same routine serves both the header and the expander.
  */
-function keepHeaderUnderPointer(event: MouseEvent<HTMLButtonElement>) {
-  const header = event.currentTarget;
+function keepHeaderUnderPointer(header: HTMLElement) {
   const container = getScrollParent(header);
   if (!container) return;
   const topBefore = header.getBoundingClientRect().top;
-  // The toggle itself is applied by Radix right after this handler; the
-  // frame boundary guarantees the new layout (and the header's post-collapse
+  // The toggle itself is applied by React right after this handler; the frame
+  // boundary guarantees the new layout (and the header's post-shrink
   // position) is measurable.
   requestAnimationFrame(() => {
     const drift = header.getBoundingClientRect().top - topBefore;
@@ -154,6 +156,7 @@ export function GroupSection<T>({
   // state: they are not rendered until the expander opens.
   const [showAll, setShowAll] = useState(false);
   const gridRef = useRef<HTMLUListElement | null>(null);
+  const headerRef = useRef<HTMLButtonElement | null>(null);
   // The preview holds PREVIEW_ROWS of the current grid, not a fixed count:
   // the auto-fill grid lays out more columns on a wide window than a narrow
   // one, so the row capacity is measured from the resolved grid tracks.
@@ -191,9 +194,12 @@ export function GroupSection<T>({
     <Collapsible defaultOpen className="group/repo">
       <CollapsibleTrigger asChild>
         <button
+          ref={headerRef}
           type="button"
           aria-label={`分组 ${group.title}，${items.length} 个 skill`}
-          onClick={keepHeaderUnderPointer}
+          onClick={() => {
+            if (headerRef.current) keepHeaderUnderPointer(headerRef.current);
+          }}
           className="group/head sticky top-0 z-10 flex w-full items-center gap-1.5 rounded-md bg-background px-1 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           {/* The leading slot reads as the group's ordinal while the header
@@ -288,7 +294,13 @@ export function GroupSection<T>({
           {hiddenCount > 0 && (
             <button
               type="button"
-              onClick={() => setShowAll((v) => !v)}
+              onClick={() => {
+                // Snapping the preview back to a few cards shrinks the group
+                // the same way a fold does, so the sticky header needs the
+                // same scroll compensation to stay put.
+                if (headerRef.current) keepHeaderUnderPointer(headerRef.current);
+                setShowAll((v) => !v);
+              }}
               aria-expanded={showAll}
               className="mt-1 flex items-center gap-1 rounded-md px-1 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >

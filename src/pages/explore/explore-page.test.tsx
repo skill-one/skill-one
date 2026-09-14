@@ -287,6 +287,43 @@ describe("ExplorePage", () => {
     vi.mocked(header.getBoundingClientRect).mockRestore();
   });
 
+  it("keeps a pinned header under the pointer when the preview is collapsed", async () => {
+    const user = userEvent.setup();
+    bootRegistry(50);
+    const { container } = renderExplorePage();
+    await screen.findByText("skill-0");
+
+    const header = groupHeader(BATCH_REPO, 50);
+    const scrollBox = container.querySelector(
+      ".overflow-y-auto",
+    ) as HTMLElement;
+    scrollBox.scrollTop = 500;
+
+    // Expand the rest so the preview affordance reads "收起" — the very
+    // button the reader clicks after opening every skill of a big group.
+    await user.click(screen.getByRole("button", { name: /^展开其余/ }));
+    const expander = screen.getByRole("button", { name: "收起" });
+
+    // While pinned the header sits at the container's top; snapping the
+    // preview back to a few cards un-pins it and must be compensated.
+    vi.spyOn(header, "getBoundingClientRect")
+      .mockReturnValueOnce({ top: 60 } as DOMRect)
+      .mockReturnValueOnce({ top: -140 } as DOMRect);
+    const raf = vi
+      .spyOn(globalThis, "requestAnimationFrame")
+      .mockImplementation((cb: FrameRequestCallback) => {
+        cb(0);
+        return 0;
+      });
+
+    fireEvent.click(expander);
+    // 500 scrolled, minus the 200px upward snap = the header holds still.
+    expect(scrollBox.scrollTop).toBe(300);
+
+    raf.mockRestore();
+    vi.mocked(header.getBoundingClientRect).mockRestore();
+  });
+
   it("renders the leading groups first and reveals more as the reader scrolls", async () => {
     // Twelve one-skill repositories: twice the initial render chunk.
     harness.init();
