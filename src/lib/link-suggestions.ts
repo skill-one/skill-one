@@ -13,10 +13,12 @@
  *    ledger exactly like a native install. Computed-but-unmatched hashes
  *    are memoized per registry epoch, so repeated reconcile passes never
  *    re-walk the same directories for nothing.
- * 3. **Candidate suggestions** — the same namesakes ranked by description
- *    similarity and surfaced for the user to confirm. A description alone
- *    cannot prove identity (forks share wording), so nothing is written
- *    until the user picks one.
+ * 3. **Description auto-link or candidate suggestions** — the namesakes are
+ *    ranked by description similarity. At/above `SIMILARITY_AUTO_LINK_THRESHOLD`
+ *    the wording is close enough to call it the same skill, so the association
+ *    is written automatically (no prompt). Below the threshold the decision is
+ *    left to the user: the ranked candidates are surfaced for confirmation and
+ *    nothing is written until they pick one.
  *
  * Namesake lookup goes through the registry worker's search (`getPage` with
  * the skill name, filtered to exact slug equality client-side). When the
@@ -70,6 +72,14 @@ async function findNamesakes(name: string): Promise<Skill[]> {
 export const MAX_CANDIDATES = 5;
 
 /**
+ * Below this description-similarity score (0–1, Jaccard) a namesake is only a
+ * *candidate* the user confirms. At or above it the wording is close enough to
+ * two skills being the same one — forks rarely keep 90%+ identical
+ * descriptions — so the association is written automatically, no prompt.
+ */
+export const SIMILARITY_AUTO_LINK_THRESHOLD = 0.9;
+
+/**
  * Rank prepared namesakes by description similarity, most similar first,
  * capped. No similarity floor: a low score hides nothing — candidates sort
  * to the bottom of the list, and dropping them could hide the one correct
@@ -102,7 +112,7 @@ export async function resolveAssociations(
   unlinked: Array<{ name: string; description?: string }>,
 ): Promise<{ linked: string[]; suggestions: LinkSuggestions }> {
   const linked: string[] = [];
-  const matched: Array<{ repo: string; slug: string; hash: string }> = [];
+  const matched: Array<{ repo: string; slug: string; hash?: string }> = [];
 
   // Namesake lookups run in parallel; per-skill outcomes are memoized for
   // the session (`resolved`), so repeated reconcile passes neither re-query
@@ -138,12 +148,21 @@ export async function resolveAssociations(
         return;
       }
 
-      // Step 3 — ranked candidates for the user to confirm, cached so the
-      // next pass reuses them without another worker round-trip.
-      resolved.set(
-        skill.name,
-        rankNamesakes(namesakes, skill.description ?? ""),
-      );
+      // Step 3 — ranked candidates. A near-identical description (≥ threshold)
+      // is treated as the same skill and linked without asking; only below the
+      // threshold is the decision left to the user, with the candidates cached
+      // so the next pass reuses them without another worker round-trip.
+      const ranked = rankNamesakes(namesakes, skill.description ?? "");
+      const top = ranked[0];
+      if (top && top.similarity >= SIMILARITY_AUTO_LINK_THRESHOLD) {
+        // No content hash is verified by a description match, so the version
+        // marker stays unset — same as a user-confirmed link.
+        matched.push({ repo: top.skill.repo, slug: skill.name });
+        linked.push(skill.name);
+        resolved.set(skill.name, []);
+        return;
+      }
+      resolved.set(skill.name, ranked);
     }),
   );
 

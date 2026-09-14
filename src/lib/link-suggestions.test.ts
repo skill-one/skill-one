@@ -6,7 +6,9 @@ import {
   rankNamesakes,
   resetLinkSuggestions,
   resolveAssociations,
+  SIMILARITY_AUTO_LINK_THRESHOLD,
 } from "./link-suggestions";
+import { descriptionSimilarity } from "./description-similarity";
 import type { Skill } from "../types/skill";
 
 const {
@@ -99,6 +101,55 @@ describe("rankNamesakes", () => {
 });
 
 describe("resolveAssociations", () => {
+  it("auto-links a near-identical description at/above the threshold", async () => {
+    // Hash tier misses, but the wording matches the namesake 100% — close
+    // enough to be the same skill, so it links without a prompt.
+    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+    computeSkillHash.mockResolvedValue("hash-other");
+
+    const { linked, suggestions } = await resolveAssociations([
+      { name: "pdf", description: "Read and manipulate PDF files." },
+    ]);
+
+    expect(linked).toEqual(["pdf"]);
+    expect(suggestions).toEqual({});
+    // A description match does not verify content, so no version marker.
+    expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
+      { repo: "anthropics/skills", slug: "pdf" },
+    ]);
+  });
+
+  it("auto-links by similarity even outside Tauri (no real files needed)", async () => {
+    isTauri.mockReturnValue(false);
+    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+
+    const { linked, suggestions } = await resolveAssociations([
+      { name: "pdf", description: "Read and manipulate PDF files." },
+    ]);
+
+    expect(computeSkillHash).not.toHaveBeenCalled();
+    expect(linked).toEqual(["pdf"]);
+    expect(suggestions).toEqual({});
+  });
+
+  it("does not auto-link a below-threshold description, still suggests", async () => {
+    // "convert" vs "manipulate" drops similarity below the 0.9 threshold, so
+    // the decision is left to the user.
+    expect(
+      descriptionSimilarity("Read and convert PDF files.", namesake("a").description),
+    ).toBeLessThan(SIMILARITY_AUTO_LINK_THRESHOLD);
+
+    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+    computeSkillHash.mockResolvedValue("hash-other");
+
+    const { linked, suggestions } = await resolveAssociations([
+      { name: "pdf", description: "Read and convert PDF files." },
+    ]);
+
+    expect(linked).toEqual([]);
+    expect(suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
+  });
+
   it("auto-links a hash-identical namesake via one batched ledger write", async () => {
     mockReady([
       namesake("anthropics/skills", { rev: "hash-a" }),
@@ -123,7 +174,7 @@ describe("resolveAssociations", () => {
     computeSkillHash.mockResolvedValue("hash-other");
 
     const { linked, suggestions } = await resolveAssociations([
-      { name: "pdf", description: "Read and manipulate PDF files." },
+      { name: "pdf", description: "Read and convert PDF files." },
     ]);
 
     expect(linked).toEqual([]);
@@ -136,13 +187,13 @@ describe("resolveAssociations", () => {
     computeSkillHash.mockResolvedValue("hash-other");
 
     const first = await resolveAssociations([
-      { name: "pdf", description: "Read and manipulate PDF files." },
+      { name: "pdf", description: "Read and convert PDF files." },
     ]);
     expect(first.suggestions.pdf).toHaveLength(1);
 
     // Second pass: no re-hash, but the candidates are still offered.
     const second = await resolveAssociations([
-      { name: "pdf", description: "Read and manipulate PDF files." },
+      { name: "pdf", description: "Read and convert PDF files." },
     ]);
     expect(second.suggestions.pdf).toHaveLength(1);
     expect(computeSkillHash).toHaveBeenCalledTimes(1);
@@ -166,7 +217,7 @@ describe("resolveAssociations", () => {
     computeSkillHash.mockRejectedValue(new Error("disk gone"));
 
     const { linked, suggestions } = await resolveAssociations([
-      { name: "pdf", description: "Read and manipulate PDF files." },
+      { name: "pdf", description: "Read and convert PDF files." },
     ]);
 
     expect(linked).toEqual([]);
@@ -197,7 +248,7 @@ describe("resolveAssociations", () => {
     mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
 
     const { linked, suggestions } = await resolveAssociations([
-      { name: "pdf", description: "Read and manipulate PDF files." },
+      { name: "pdf", description: "Read and convert PDF files." },
     ]);
 
     expect(computeSkillHash).not.toHaveBeenCalled();

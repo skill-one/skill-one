@@ -135,29 +135,36 @@ exotic path characters, and the local copy may simply be a different version
 than the indexed one. Misses are memoized per registry epoch so the
 reconcile query never re-hashes known dead ends.
 
-### Tier 2 — ranked candidates + user confirmation (heuristic)
+### Tier 2 — description auto-link, then ranked candidates (heuristic)
 
 For whatever remains, same-slug registry entries are ranked by description
 similarity (token Jaccard; Han text is compared as character bigrams, the
-same trick the shared search index uses) and surfaced on the card as a
-确认关联 affordance. The dialog lists the top 5 candidates by similarity
-with their percentage, explicitly labeled as a reference, not proof — forks
-share descriptions, so 100% similarity still does not *identify* a skill.
-There is no similarity floor: a low score only sinks a candidate to the
-bottom of the list, because hiding it could hide the one correct repo
-(e.g. when the local description is missing or worded differently). Nothing
-is written until the user picks one; the confirmed pick lands in the ledger
-indistinguishable from a native install.
+same trick the shared search index uses).
 
-Why not auto-link at 100% similarity? Measured against the published
-snapshot (8,993 skills): 549 slugs are published by ≥2 repos, and 171 of
-those (31%) have ≥2 *different* repos carrying byte-identical descriptions
-— 525 skills. Every identical-description cluster spans multiple repos
-(forks copy the frontmatter verbatim), so a perfect description match is
-ambiguous by construction: it selects a fork as readily as the origin, and
-the mistake is silent (wrong source link, wrong update stream) with no
-corrective signal to the user.
+**Auto-link at ≥ 90%.** When the best namesake's similarity reaches
+`SIMILARITY_AUTO_LINK_THRESHOLD` (0.9), the wording is close enough to call
+the two skills the same, so the association is written into the ledger
+automatically — no prompt. A description match verifies no content, so the
+version marker (`hash`) is left unset, exactly like a user-confirmed link; the
+card shows the source repo the same way a native install does.
 
-Deliberate non-goals: no silent auto-association from similarity (a wrong
-"installed" badge is worse than none), and no threshold at which the heuristic
-writes without the user.
+**Below 90% — surfaced for confirmation.** The remaining candidates are shown
+on the card as a 确认关联 affordance. The dialog lists the top 5 candidates by
+similarity with their percentage, explicitly labeled as a reference, not proof
+— forks share descriptions, so a high score still does not *identify* a skill.
+There is no lower floor: a low score only sinks a candidate to the bottom of
+the list, because hiding it could hide the one correct repo (e.g. when the
+local description is missing or worded differently). Nothing is written until
+the user picks one; the confirmed pick lands in the ledger indistinguishable
+from a native install.
+
+Why 90% and not a stricter floor? Measured against the published snapshot
+(8,993 skills): 549 slugs are published by ≥2 repos, and 171 of those (31%)
+have ≥2 *different* repos carrying byte-identical descriptions — 525 skills.
+Every identical-description cluster spans multiple repos (forks copy the
+frontmatter verbatim), so a perfect description match is ambiguous by
+construction: it can select a fork as readily as the origin. The 90% threshold
+deliberately trades the rare silent mislink (wrong source link, wrong update
+stream) for far fewer prompts on genuinely identical skills — the one case
+where the user would confirm the obvious anyway — while still leaving anything
+below 90% to the user's judgement.
