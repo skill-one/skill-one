@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 
-import { LOCAL_SOURCE_LABEL } from "../lib/skill-view";
+import { LOCAL_SOURCE_LABEL, type SkillView } from "../lib/skill-view";
 import { cn } from "../lib/utils";
+import { DomainBadge } from "./domain-badge";
 import { HighlightedText, type SkillMatched } from "./highlighted-text";
 import { SkillAvatar } from "./skill-avatar";
+import { SkillPopularity } from "./skill-popularity";
 import {
   Card,
   CardAction,
@@ -30,49 +32,40 @@ const INTERACTIVE_CLASS =
  * The card is built on the shadcn Card so it is laid out by the component's own
  * slots rather than by hand: the header holds the avatar, name and source with
  * the surface's action in the corner slot `CardAction` exists for, the content
- * holds the description, and the footer holds whatever figures the surface
- * shows — classification on the left rail under the source it belongs to, the
- * figure on the right rail under the action.
+ * holds the description, and the footer holds the classification on the left
+ * rail under the source it belongs to and the popularity figure on the right
+ * rail under the action.
  *
- * The card owns no surface-specific facts. Everything that genuinely differs
- * between the store and the installed list arrives as a slot: the corner action
- * (`action` — an install button there, an enable switch here), a badge trailing
- * the source line (`sourceExtra` — the migration affordance), the bottom rail
- * (`footer` — domain chip and popularity, which only a registry entry has), and
- * anything below the card (`below` — an install failure). What is genuinely the
- * same is derived here: the avatar (owner, or the placeholder when the source
- * is unknown, through `SkillAvatar`) and the source label (the repo, or the
- * local-install label). A surface that has nothing to put in a slot omits it,
- * and the card closes up around the gap.
+ * Everything the card shows is read off the skill, so feeding it a store row and
+ * feeding it an installed row produce the same card. The two are told apart by
+ * data, not by a flag: a skill whose registry entry is unknown (`storeBacked`)
+ * has no classification and no figure to show, and the footer closes up rather
+ * than rendering a fabricated zero — which is exactly what an installed skill
+ * with no recorded source is.
  *
- * The card body opens the detail panel (`onSelect`) when the surface passes
- * one; without it the card is not a button at all. The action sits in the top
- * right corner, where the detail drawer keeps it too — and because the install
- * button carries state (安装 / 安装中 / 已安装 / 重试), a fixed corner turns the
- * grid's right edge into one column a reader can scan to see what they already
- * have. Clicks inside that corner stay there (the card body opens the panel,
- * the action must not).
+ * Only what a surface *does* arrives as a slot, because only the surface knows
+ * it: the corner action (an install button on the store, an enable switch on the
+ * installed list), a badge trailing the source line (the migration affordance),
+ * and anything below the card (an install failure). The card body opens the
+ * detail panel (`onSelect`) when the surface passes one; without it the card is
+ * not a button at all. Clicks inside the corner stop there — the card body opens
+ * the panel, the action must not.
  */
 export function SkillCard({
-  source,
-  name,
+  skill,
   matched,
-  description,
   muted = false,
   selected = false,
   onSelect,
   action,
   sourceExtra,
-  footer,
   below,
   "data-skill": dataSkill,
 }: {
-  /** `owner/repo` the skill came from; absent renders the local placeholder. */
-  source?: string;
-  name: string;
+  /** The skill to render, from the registry or from the installed list. */
+  skill: SkillView;
   /** Search-hit highlights; absent outside a search (nothing highlighted). */
   matched?: SkillMatched;
-  description: string;
   /** Dimmed presentation: a skill that is installed but disabled. */
   muted?: boolean;
   /** Whether this card is the one shown in the detail panel. */
@@ -83,13 +76,15 @@ export function SkillCard({
   action?: ReactNode;
   /** Trails the source line: the migration badge on an unlinked install. */
   sourceExtra?: ReactNode;
-  /** The bottom rail: domain chip and popularity, when the surface has them. */
-  footer?: ReactNode;
   /** Rendered under the card: an install failure, a dialog trigger. */
   below?: ReactNode;
   /** Test hook on the card element. */
   "data-skill"?: string;
 }) {
+  // Absent means backed: every `Skill` the registry handed over is. Only the
+  // installed list sets it, for a record no store entry was resolved for.
+  const storeBacked = skill.storeBacked !== false;
+
   return (
     <li className="flex flex-col">
       {/* `flex-1` is the one thing the card cannot know: it fills the grid cell
@@ -98,7 +93,7 @@ export function SkillCard({
         data-skill={dataSkill}
         role={onSelect ? "button" : undefined}
         tabIndex={onSelect ? 0 : undefined}
-        aria-label={onSelect ? `查看 ${name} 详情` : undefined}
+        aria-label={onSelect ? `查看 ${skill.name} 详情` : undefined}
         onClick={onSelect}
         onKeyDown={(e) => {
           if (onSelect && (e.key === "Enter" || e.key === " ")) {
@@ -118,12 +113,12 @@ export function SkillCard({
               title slot rather than losing its meaning to a styled `div`. */}
           <CardTitle className="flex items-center gap-2">
             <SkillAvatar
-              source={source}
+              source={skill.repo}
               className="h-6 w-6 text-[11px]"
               iconClassName="h-3.5 w-3.5"
             />
             <h3 className={cn("truncate", muted && "text-muted-foreground")}>
-              <HighlightedText text={name} terms={matched?.name} />
+              <HighlightedText text={skill.name} terms={matched?.name} />
             </h3>
           </CardTitle>
           {/* The description slot carries the source alone. The domain chip
@@ -138,7 +133,7 @@ export function SkillCard({
           >
             <span className="truncate">
               <HighlightedText
-                text={source ?? LOCAL_SOURCE_LABEL}
+                text={skill.repo || LOCAL_SOURCE_LABEL}
                 terms={matched?.repo}
               />
             </span>
@@ -155,7 +150,7 @@ export function SkillCard({
 
         <CardContent className="line-clamp-2 text-sm text-muted-foreground">
           <HighlightedText
-            text={description || "暂无描述"}
+            text={skill.description || "暂无描述"}
             terms={matched?.description}
           />
         </CardContent>
@@ -165,7 +160,25 @@ export function SkillCard({
             the left under the source it belongs to, the figure on the right
             under the corner action — the two rails the card is already read
             in, and the reason neither end is left floating in the middle. */}
-        {footer && <CardFooter className="mt-auto">{footer}</CardFooter>}
+        {storeBacked && (
+          <CardFooter className="mt-auto">
+            {/* Domain from the profiles dataset; absent for skills it has not
+                profiled, so the figure simply keeps the right edge alone. */}
+            {skill.profile?.domain && (
+              <DomainBadge
+                domain={skill.profile.domain}
+                reason={skill.profile.reason}
+                className="shrink-0 rounded-full px-2 py-0 text-[10px] font-normal text-muted-foreground"
+              />
+            )}
+            <SkillPopularity
+              skill={skill}
+              side="top"
+              align="end"
+              className="ml-auto"
+            />
+          </CardFooter>
+        )}
       </Card>
 
       {below}

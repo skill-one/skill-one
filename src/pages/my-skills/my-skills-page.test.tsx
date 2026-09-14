@@ -24,18 +24,27 @@ import { resetLinkSuggestions } from "../../lib/link-suggestions";
 /** The page's search box debounces for real; 1 s is a contention flake. */
 configure({ asyncUtilTimeout: 5000 });
 
-// The provenance hook consults the registry for namesake candidates; the
-// default mock answers "no candidates" so the worker-less test env stays
-// silent, and the link-suggestion test below overrides it.
-const { getPage } = vi.hoisted(() => ({ getPage: vi.fn() }));
+// The provenance hook consults the registry for namesake candidates and the
+// page looks up the store entries behind recorded sources; both mocks answer
+// "nothing found" by default so the worker-less test env stays silent, and the
+// link-suggestion / store-stats tests below override them.
+const { getPage, lookupSkills, registrySnapshot } = vi.hoisted(() => ({
+  getPage: vi.fn(),
+  lookupSkills: vi.fn(),
+  // One stable object: the page reads it through useSyncExternalStore, which
+  // treats a fresh snapshot on every call as an infinite render loop.
+  registrySnapshot: { ready: true, epoch: 1 },
+}));
 vi.mock("../../lib/registry/client", () => ({
   getPage,
-  getRegistrySnapshot: () => ({ ready: true, epoch: 1 }),
+  lookupSkills,
+  getRegistrySnapshot: () => registrySnapshot,
   subscribeRegistry: () => () => {},
 }));
 
 beforeEach(() => {
   getPage.mockResolvedValue({ hits: [], total: 0 });
+  lookupSkills.mockResolvedValue({ entries: [] });
   resetLinkSuggestions();
 });
 
@@ -340,6 +349,55 @@ describe("MySkillsPage", () => {
     expect(
       await within(dialog).findByRole("switch", { name: "开启 pdf" }),
     ).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("shows the store's classification and popularity for a resolved source", async () => {
+    const user = userEvent.setup();
+    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    // The registry still lists the source the ledger recorded, so the installed
+    // list has the store facts an on-disk record never carries. Blended figure:
+    // √((2991984 + 1) × (169600 + 1)) − 1 = 712350.
+    const figure = "热度 712.4K：安装 3M · Star 169.6K";
+    lookupSkills.mockResolvedValue({
+      entries: [
+        {
+          name: "pdf",
+          repo: "anthropics/skills",
+          description: "PDF 文档读取、生成、合并、拆分与标注。",
+          stars: 169600,
+          downloads: 2991984,
+          path: "skills/anthropics/skills/pdf",
+          profile: { domain: "内容创作" },
+        },
+      ],
+    });
+    renderWithRouter(<MySkillsPage />);
+
+    // The card is the store's card: the profiles dataset's chip and the same
+    // blended figure the store's own rows show.
+    expect(await screen.findByText("内容创作")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: figure })).toBeInTheDocument();
+
+    // And the drawer agrees with the row that opened it, figure included.
+    await user.click(screen.getByRole("button", { name: "查看 pdf 详情" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("button", { name: figure }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("内容创作")).toBeInTheDocument();
+  });
+
+  it("shows no store facts for a source the registry no longer lists", async () => {
+    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    // The lookup answers nothing for the ref (a fork the index dropped, say):
+    // the card keeps the recorded source and shows no chip and no figure — an
+    // absent figure is not a zero one.
+    renderWithRouter(<MySkillsPage />);
+
+    expect(await screen.findByText("anthropics/skills")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^热度 / }),
+    ).not.toBeInTheDocument();
   });
 
   it("offers a confirmable store link for a tool-installed skill", async () => {

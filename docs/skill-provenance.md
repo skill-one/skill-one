@@ -92,8 +92,16 @@ no caller-controlled paths are accepted.
   stays installable.
 - **My-skills page** (`my-skills-page.tsx`): cards with a ledger entry show
   the source repo and the owner's GitHub avatar; the detail drawer links to
-  the source repo instead of reading as 本地安装. Entries are absent for
-  tool-installed skills, which keep the local-install presentation.
+  the source repo instead of reading as 本地安装. The recorded source is also
+  resolved back to its registry entry (`use-installed-store-entries.ts`, over
+  the worker's `lookupSkills`), which is where the store's classification and
+  popularity figure come from — an on-disk record carries neither, so without
+  the lookup the installed list could only ever render the store's card with
+  those two slots empty. A source that resolves to nothing (tool installs, or
+  an entry the index no longer lists) keeps the local-install presentation and
+  shows no figure rather than a fabricated zero; `SkillView.storeBacked` is
+  what records that difference, and both the card and the detail drawer read
+  it the same way.
 
 ## Associating skills installed by other tools
 

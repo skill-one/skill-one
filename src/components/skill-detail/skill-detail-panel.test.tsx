@@ -13,7 +13,7 @@ import {
   setSkillEnabled,
 } from "../../lib/local-skills";
 import { openExternal } from "../../lib/open-external";
-import type { Skill } from "../../types/skill";
+import type { SkillView } from "../../lib/skill-view";
 import { Drawer } from "../ui/drawer";
 import {
   SkillDetailPanel,
@@ -54,7 +54,7 @@ const installedPdf = {
   enabled: true,
 };
 
-const skill: Skill = {
+const skill: SkillView = {
   name: "pdf",
   repo: "anthropics/skills",
   description: "Read and merge PDF documents.",
@@ -64,17 +64,22 @@ const skill: Skill = {
   url: "https://www.skills.sh/anthropics/skills/pdf",
 };
 
-/** A skill placed manually into the global directory: no repo, disk read. */
-const localSkill: Skill = {
+/**
+ * A skill placed manually into the global directory: no repo, disk read, and —
+ * because no source resolved to a store entry — nothing the registry can vouch
+ * for, which is what `storeBacked: false` records.
+ */
+const localSkill: SkillView = {
   name: "my-tool",
   repo: "",
   description: "",
   stars: 0,
   downloads: 0,
+  storeBacked: false,
 };
 
 /** A registry entry that carries its version identity (the indexed majority). */
-const versionedSkill: Skill = {
+const versionedSkill: SkillView = {
   ...skill,
   rev: "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
   firstSeenAt: "2026-08-12T04:34:54Z",
@@ -113,7 +118,7 @@ function DetailDrawer({
   onPrev,
   onNext,
 }: {
-  skill: Skill | null;
+  skill: SkillView | null;
   surface?: SkillDetailSurface;
   onPrev?: () => void;
   onNext?: () => void;
@@ -134,7 +139,9 @@ function DetailDrawer({
 }
 
 function renderDrawer(
-  props: Partial<Parameters<typeof DetailDrawer>[0]> & { skill?: Skill | null },
+  props: Partial<Parameters<typeof DetailDrawer>[0]> & {
+    skill?: SkillView | null;
+  },
 ) {
   return render(<DetailDrawer skill={skill} {...props} />);
 }
@@ -368,8 +375,9 @@ describe("SkillDetailPanel", () => {
   it("swaps the install CTA for the enable switch on the installed surface", async () => {
     vi.mocked(fetchInstalledSkills).mockResolvedValue([installedPdf]);
     mockFetchLocalSkillDetail.mockResolvedValue(detail);
-    // Exactly what the installed list hands the drawer (`detailSkillFor`): the
-    // recorded repo, but no mirror path — the body is read off disk.
+    // What the installed list hands the drawer for a resolved store entry
+    // (`installedSkillView`): the recorded repo and the registry's figures, but
+    // no mirror path — the body is read off disk.
     renderDrawer({ skill: { ...skill, path: undefined }, surface: "installed" });
 
     // The switch the row carries, in the slot the store puts its CTA in.
@@ -379,12 +387,33 @@ describe("SkillDetailPanel", () => {
     expect(
       screen.queryByRole("button", { name: "安装" }),
     ).not.toBeInTheDocument();
-    // No registry figures: the record has none to report, and claiming a 0
-    // would contradict the card, which shows no figure at all.
+    // The registry backs this skill, so its figure is real and shown — the same
+    // one its card shows.
+    expect(
+      screen.getByRole("button", { name: /^热度 / }),
+    ).toBeInTheDocument();
+    // The recorded repo still drives everything it can: the source link.
+    expect(
+      screen.getByRole("link", { name: "anthropics/skills" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no store facts for an installed skill the registry does not know", async () => {
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([installedPdf]);
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    // `installedSkillView` marks an unresolved entry explicitly: the absence has
+    // to stay readable, or the drawer would report a popularity of 0.
+    renderDrawer({
+      skill: { ...skill, path: undefined, storeBacked: false },
+      surface: "installed",
+    });
+
+    expect(
+      await screen.findByRole("switch", { name: "关闭 pdf" }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /^热度 / }),
     ).not.toBeInTheDocument();
-    // The recorded repo still drives everything it can: the source link.
     expect(
       screen.getByRole("link", { name: "anthropics/skills" }),
     ).toBeInTheDocument();
