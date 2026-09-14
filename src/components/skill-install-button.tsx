@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, Download, Loader2, RefreshCw } from "lucide-react";
 
@@ -19,16 +19,26 @@ import {
 } from "./ui/tooltip";
 
 /** Install button state machine: idle → installing → installed | error. */
-type InstallState = "idle" | "installing" | "installed" | "error";
+export type InstallState = "idle" | "installing" | "installed" | "error";
 
 /**
  * Icon-only install button content per state. The label doubles as the
  * sr-only accessible name and the hover tooltip text, since the button
  * itself renders no visible text.
+ *
+ * The installed state is a status badge rather than a control: a tinted
+ * emerald surface the check inherits its color from — louder than the muted
+ * secondary chrome, quieter than a solid green button a disabled control
+ * has no business wearing. `cn` merges these over the variant's classes.
  */
 const INSTALL_BUTTON: Record<
   InstallState,
-  { label: string; icon: ReactElement; variant: "default" | "secondary" }
+  {
+    label: string;
+    icon: ReactElement;
+    variant: "default" | "secondary";
+    className?: string;
+  }
 > = {
   idle: { label: "安装", icon: <Download />, variant: "default" },
   installing: {
@@ -36,7 +46,13 @@ const INSTALL_BUTTON: Record<
     icon: <Loader2 className="animate-spin" />,
     variant: "default",
   },
-  installed: { label: "已安装", icon: <Check />, variant: "secondary" },
+  installed: {
+    label: "已安装",
+    icon: <Check />,
+    variant: "secondary",
+    className:
+      "border-transparent bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600/15 dark:bg-emerald-500/15 dark:text-emerald-400 dark:hover:bg-emerald-500/20",
+  },
   error: { label: "重试", icon: <RefreshCw />, variant: "default" },
 };
 
@@ -57,6 +73,7 @@ export function SkillInstallButton({
   className,
   onError,
   labeled = false,
+  onStateChange,
 }: {
   skill: Skill;
   /** Merged onto the button; callers size and place it. */
@@ -65,6 +82,13 @@ export function SkillInstallButton({
   onError?: (message: string | null) => void;
   /** Show the state label next to the icon (detail views). */
   labeled?: boolean;
+  /**
+   * Reports the button's current state on every change, so a caller that
+   * presents the button (e.g. hides it until hover) can react to a state it
+   * does not own — installed, installing, error — without duplicating the
+   * resolution logic. Not for driving the button itself.
+   */
+  onStateChange?: (state: InstallState) => void;
 }) {
   const [installState, setInstallState] = useState<InstallState>("idle");
 
@@ -103,6 +127,12 @@ export function SkillInstallButton({
       : installState;
   const installMeta = INSTALL_BUTTON[state];
 
+  // Report the resolved state after paint, so a caller presenting the button
+  // (e.g. hover-reveal on idle only) tracks it without owning the logic.
+  useEffect(() => {
+    onStateChange?.(state);
+  }, [state, onStateChange]);
+
   const handleInstall = async (e: React.MouseEvent) => {
     // Keep the click from opening the detail panel behind this button.
     e.stopPropagation();
@@ -135,7 +165,7 @@ export function SkillInstallButton({
         size="sm"
         disabled={installing || isInstalled}
         onClick={(e) => void handleInstall(e)}
-        className={cn("h-8 shrink-0 gap-1.5 px-3", className)}
+        className={cn("h-8 shrink-0 gap-1.5 px-3", installMeta.className, className)}
       >
         {installMeta.icon}
         {installMeta.label}
@@ -152,7 +182,7 @@ export function SkillInstallButton({
             variant={installMeta.variant}
             disabled={installing || isInstalled}
             onClick={(e) => void handleInstall(e)}
-            className={cn("h-7 w-7 shrink-0", className)}
+            className={cn("h-7 w-7 shrink-0", installMeta.className, className)}
           >
             {installMeta.icon}
             <span className="sr-only">{installMeta.label}</span>

@@ -183,6 +183,33 @@ describe("MySkillsPage", () => {
     expect(pdf).toHaveAttribute("aria-checked", "false");
   });
 
+  it("hides an enabled skill's switch until the card is reached", async () => {
+    const { container } = renderWithRouter(<MySkillsPage />);
+
+    await screen.findByRole("switch", { name: "关闭 pdf" });
+
+    // Enabled is the quiet default: the switch waits for the pointer or
+    // keyboard, keeping its space and its place in the accessibility tree.
+    const action = container.querySelector(
+      '[data-skill="pdf"] [data-slot="card-action"]',
+    );
+    expect(action).toHaveClass("opacity-0", "pointer-events-none");
+    expect(action).toHaveClass("group-hover:opacity-100");
+    expect(action).toHaveClass("group-focus-within:opacity-100");
+  });
+
+  it("keeps a disabled skill's switch visible without hover", async () => {
+    // The off switch is the fact that explains the dimmed card, so unlike
+    // an enabled skill's switch it does not wait for hover.
+    setMockSkillEnabled("pdf", false);
+    const { container } = renderWithRouter(<MySkillsPage />);
+
+    await screen.findByRole("switch", { name: "开启 pdf" });
+    expect(
+      container.querySelector('[data-skill="pdf"] [data-slot="card-action"]'),
+    ).not.toHaveClass("opacity-0");
+  });
+
   it("shows each skill's description", async () => {
     renderWithRouter(<MySkillsPage />);
 
