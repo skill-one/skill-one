@@ -70,6 +70,21 @@ describe("SkillListRow", () => {
     ).toBeNull();
   });
 
+  it("lets the header shrink so a long name cannot push the action out of the card", () => {
+    const { container } = renderWithRouter(
+      <SkillListRow skill={{ ...skill, name: "improve-codebase-architecture" }} />,
+    );
+
+    // jsdom lays nothing out, so what is pinned here is the guard itself: the
+    // header is a grid whose `1fr` track keeps a content-based minimum, and
+    // without `min-w-0` on the leading block a name that does not fit widens
+    // that track past the card and carries the corner action out of the
+    // border with it.
+    const header = container.querySelector('[data-slot="card-header"]');
+    expect(header?.firstElementChild).toHaveClass("min-w-0");
+    expect(container.querySelector('[data-slot="card-action"]')).not.toBeNull();
+  });
+
   it("labels a skill with no source instead of naming a repo", () => {
     renderWithRouter(<SkillListRow skill={{ ...skill, repo: "" }} />);
 

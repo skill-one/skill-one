@@ -136,8 +136,14 @@ export function SkillCard({
         <CardHeader>
           {/* The card leads with the skill's own image, with its name and
               source stacked beside it — the one shape that gives the cover
-              enough room to be recognisable. */}
-          <div className="flex items-start gap-3">
+              enough room to be recognisable. `min-w-0` is what lets that stack
+              shrink: the header is a grid and a `1fr` track keeps a
+              content-based minimum, so a long name widened the track past the
+              card and pushed the corner action out of it — the action hanging
+              outside the border, the name untruncated, on any card whose name
+              did not fit. Shrinking lets the name truncate instead, which is
+              what the `truncate` on it is there for. */}
+          <div className="flex min-w-0 items-start gap-3">
             <SkillCover
               repo={skill.repo}
               name={skill.name}
