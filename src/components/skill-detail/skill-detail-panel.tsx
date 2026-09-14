@@ -1,11 +1,12 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Globe, Loader2, Puzzle } from "lucide-react";
+import { ExternalLink, Globe, Loader2 } from "lucide-react";
 
 import { fetchSkillDetail, MIRROR } from "../../lib/skill-detail-api";
 import { fetchLocalSkillDetail } from "../../lib/local-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
+import { LOCAL_SOURCE_LABEL } from "../../lib/skill-view";
 import { errorMessage, formatDate } from "../../lib/utils";
 import type { Skill } from "../../types/skill";
 import { DomainBadge } from "../domain-badge";
@@ -26,7 +27,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
-import { OwnerAvatar } from "../owner-avatar";
+import { SkillAvatar } from "../skill-avatar";
+import { SkillEnableSwitch } from "../skill-enable-switch";
 import { SkillInstallButton } from "../skill-install-button";
 import { SkillRemoveButton } from "../skill-remove-button";
 import { ExpandableDescription } from "./expandable-description";
@@ -127,6 +129,15 @@ function ProvenanceTip({
   );
 }
 
+/**
+ * The listing that owns the open drawer. Both surfaces show the same panel fed
+ * the same `Skill`; what the surface decides is the chrome only one of them
+ * has — the install CTA and the registry-only figures on the store, and the
+ * enable switch the store cannot offer. Everything else is read off the skill
+ * itself, so a surface never has to describe its own skill twice.
+ */
+export type SkillDetailSurface = "store" | "installed";
+
 interface SkillDetailPanelProps {
   /** The skill to show; null renders nothing. */
   skill: Skill | null;
@@ -134,6 +145,8 @@ interface SkillDetailPanelProps {
   onNext: () => void;
   /** Called after this skill is uninstalled, for a caller that must react. */
   onRemoved?: () => void;
+  /** Which listing owns the drawer; defaults to the store. */
+  surface?: SkillDetailSurface;
 }
 
 /**
@@ -154,12 +167,18 @@ interface SkillDetailPanelProps {
  * the exact SKILL.md path — comes from the index entry rather than the
  * SKILL.md body, and hides behind the header's 源 tooltip so it costs no
  * permanent rows; unhashed entries and local installs simply show less.
+ *
+ * `surface` is the only thing the panel cannot read off the skill: which
+ * listing opened it. The store's chrome — the install CTA and the popularity
+ * figure — is shown there and nowhere else, so the drawer and the card of the
+ * listing it was opened from always present the same skill the same way.
  */
 export function SkillDetailPanel({
   skill,
   onPrev,
   onNext,
   onRemoved,
+  surface = "store",
 }: SkillDetailPanelProps) {
   // Keep the last selected skill while the drawer plays its exit
   // animation: `skill` is already null by the time Radix starts closing,
@@ -213,19 +232,27 @@ export function SkillDetailPanel({
   // Drawer's open state, keeping the drawer alive through the close
   // animation. With no skill (and no latch yet) the drawer is empty, which
   // only happens before the first selection.
-  const owner = shown?.repo.split("/")[0] ?? "";
-  // No repo at all → a skill placed manually into the global directory:
-  // nothing to link to, and the stats it cannot have stay hidden (the same
-  // Puzzle placeholder the my-skills row uses).
-  const isLocalSkill = shown != null && !shown.repo;
+
+  // No repo at all → a skill whose source the app cannot name (placed into the
+  // global directory by hand, or installed by another tool): nothing to link
+  // to, and the source line falls back to the local-install label.
+  const hasSource = shown != null && shown.repo !== "";
+  // The store's registry-backed chrome — the install CTA and the popularity
+  // figure. The installed list has neither, and its cards show neither, so the
+  // two surfaces can never disagree about what a skill looks like.
+  const isStore = surface === "store";
   // Profiled registry skills get the 概述 tab (the dataset's per-skill
   // files resolve through the mirror path); local installs and skills the
   // dataset has not profiled keep the plain SKILL.md body.
   const hasProfile = shown?.profile != null && shown.path != null;
   const description = detail?.description || shown?.description;
   // The mirror-relative SKILL.md path, reused for the mirror's GitHub file
-  // link and to resolve relative URLs inside the markdown body.
-  const filePath = detail?.path.replace(/^\/+|\/+$/g, "") ?? "";
+  // link and to resolve relative URLs inside the markdown body. Only a mirror
+  // read has one — a local read's path is absolute and must never be resolved
+  // against GitHub — so a disk read renders the body with no base at all.
+  const filePath = fromDisk
+    ? ""
+    : (detail?.path.replace(/^\/+|\/+$/g, "") ?? "");
   // The upstream repo the skill ships in; without a known path inside it,
   // the link lands on the repo root.
   const sourceHref =
@@ -243,14 +270,14 @@ export function SkillDetailPanel({
 
   // The canonical SKILL.md body, shared by the profiled-skill tab and the
   // plain view. Registry skills resolve relative links against the mirror
-  // snapshot the index was built from (a profiled skill is always one);
-  // local installs read their own repo without a git ref.
+  // snapshot the index was built from (a profiled skill is always one); a body
+  // read off disk has no repo view to resolve against, so it goes without one.
   const skillMdBody = detail ? (
     detail.instructions ? (
       <Suspense fallback={<MarkdownSkeleton />}>
         <LazyMarkdown
-          repo={isLocalSkill ? (shown?.repo ?? "") : MIRROR.repo}
-          gitRef={isLocalSkill ? undefined : MIRROR.ref}
+          repo={fromDisk ? "" : MIRROR.repo}
+          gitRef={fromDisk ? undefined : MIRROR.ref}
           filePath={filePath}
         >
           {detail.instructions}
@@ -267,23 +294,18 @@ export function SkillDetailPanel({
     <DrawerContent>
       <DrawerHeader className="gap-2 px-6 pt-5">
         <div className="flex items-start gap-3">
-          {isLocalSkill ? (
-            <div
-              aria-label="skill 头像"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-muted-foreground"
-            >
-              <Puzzle className="h-5 w-5" />
-            </div>
-          ) : (
-            <OwnerAvatar owner={owner} className="h-12 w-12 shrink-0 text-xl" />
-          )}
+          {/* The same avatar the row shows, at the drawer's size: the owner's,
+              or the placeholder when the source is unknown. */}
+          <SkillAvatar
+            source={shown?.repo}
+            className="h-12 w-12 text-xl"
+            iconClassName="h-5 w-5"
+          />
           <div className="min-w-0 flex-1">
             <DrawerTitle className="truncate text-lg font-bold tracking-tight">
               {shown?.name}
             </DrawerTitle>
-            {isLocalSkill ? (
-              <DrawerDescription>本地安装</DrawerDescription>
-            ) : (
+            {hasSource ? (
               <DrawerDescription asChild>
                 <a
                   href={sourceHref}
@@ -298,17 +320,23 @@ export function SkillDetailPanel({
                   <ExternalLink className="h-3 w-3 shrink-0" />
                 </a>
               </DrawerDescription>
+            ) : (
+              <DrawerDescription>{LOCAL_SOURCE_LABEL}</DrawerDescription>
             )}
           </div>
           {/* The primary action lives in the header, like every store's
-              detail view: labeled, and visible while the content scrolls. */}
-          {!isLocalSkill && (
+              detail view: labeled, and visible while the content scrolls.
+              The installed list installs nothing — its skills are already on
+              disk — so it carries its own action instead: the enable switch
+              that the store's drawer cannot offer. */}
+          {isStore && (
             <SkillInstallButton
               skill={shown!}
               labeled
               onError={setInstallError}
             />
           )}
+          {!isStore && shown && <SkillEnableSwitch skill={shown} />}
           {/* Uninstalling shares that slot, and hides itself unless the skill
               is on disk — so the same drawer serves the store, a repo's list
               and the installed list without any of them passing a flag. */}
@@ -328,11 +356,13 @@ export function SkillDetailPanel({
             <Badge variant="secondary">{detail.license}</Badge>
           )}
           {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
-          {!isLocalSkill && shown && (
+          {shown && !fromDisk && (
             <>
               {/* The same blended popularity figure the list rows show;
-                  hover/focus breaks it into installs and stars. */}
-              <SkillPopularity skill={shown} />
+                  hover/focus breaks it into installs and stars. Registry-only:
+                  the installed list's cards carry no figure, so its drawer
+                  carries none either. */}
+              {isStore && <SkillPopularity skill={shown} />}
               {skillsShHref && (
                 <a
                   href={skillsShHref}
@@ -356,7 +386,7 @@ export function SkillDetailPanel({
               )}
             </>
           )}
-          {isLocalSkill && detail && <ProvenanceTip path={detail.path} />}
+          {fromDisk && detail && <ProvenanceTip path={detail.path} />}
           {shown?.profile && (
             <span className="flex items-center gap-1.5">
               <DomainBadge

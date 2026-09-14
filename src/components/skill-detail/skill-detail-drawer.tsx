@@ -1,6 +1,6 @@
 import type { Skill } from "../../types/skill";
 import { Drawer } from "../ui/drawer";
-import { SkillDetailPanel } from "./skill-detail-panel";
+import { SkillDetailPanel, type SkillDetailSurface } from "./skill-detail-panel";
 
 /**
  * The skill detail drawer shared by the store pages (explore, featured,
@@ -10,13 +10,16 @@ import { SkillDetailPanel } from "./skill-detail-panel";
  *
  * The selection index stays in the caller so its rows can highlight the
  * open skill; a stale index (e.g. after a shrinking refetch) resolves to a
- * closed panel.
+ * closed panel. `surface` is the one thing the caller has to say about itself:
+ * the panel shows the store's install CTA and popularity figure only for the
+ * store, so the drawer matches the card the reader opened it from.
  */
 export function SkillDetailDrawer({
   skills,
   selected,
   onSelect,
   onRemoved,
+  surface,
 }: {
   /** Flat list that `selected` indexes into. */
   skills: Skill[];
@@ -26,6 +29,8 @@ export function SkillDetailDrawer({
   onSelect: (index: number | null) => void;
   /** Called after the open skill is uninstalled; see `SkillRemoveButton`. */
   onRemoved?: () => void;
+  /** Which listing owns the drawer; see `SkillDetailPanel`. */
+  surface?: SkillDetailSurface;
 }) {
   const selectedSkill = selected != null ? (skills[selected] ?? null) : null;
 
@@ -47,6 +52,7 @@ export function SkillDetailDrawer({
     >
       <SkillDetailPanel
         skill={selectedSkill}
+        surface={surface}
         onPrev={handlePrev}
         onNext={handleNext}
         onRemoved={onRemoved}

@@ -309,6 +309,39 @@ describe("MySkillsPage", () => {
     expect(within(dialog).queryByText("本地安装")).not.toBeInTheDocument();
   });
 
+  it("carries the enable switch, and no registry figures, into the drawer", async () => {
+    const user = userEvent.setup();
+    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    renderWithRouter(<MySkillsPage />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "查看 pdf 详情" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    // The same switch the row carries takes the slot the store's drawer puts
+    // its install CTA in — this list installs nothing, its skills are already
+    // on disk.
+    expect(
+      within(dialog).getByRole("switch", { name: "关闭 pdf" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: "安装" }),
+    ).not.toBeInTheDocument();
+    // A recorded repo does not turn the drawer into the store's: there are no
+    // registry figures to show, and the popularity figure that used to render
+    // as a 0 here would contradict the card, which shows none.
+    expect(
+      within(dialog).queryByRole("button", { name: /^热度 / }),
+    ).not.toBeInTheDocument();
+
+    // The drawer's switch writes the same backend state the card's does.
+    await user.click(within(dialog).getByRole("switch", { name: "关闭 pdf" }));
+    expect(
+      await within(dialog).findByRole("switch", { name: "开启 pdf" }),
+    ).toHaveAttribute("aria-checked", "false");
+  });
+
   it("offers a confirmable store link for a tool-installed skill", async () => {
     const user = userEvent.setup();
     // The registry carries a same-slug entry whose description matches the
@@ -391,6 +424,26 @@ describe("MySkillsPage", () => {
     expect(
       screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
     ).toHaveLength(6);
+  });
+
+  it("highlights matched terms on a searched card, like the store's list", async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithRouter(<MySkillsPage />);
+    await screen.findByText("共 6 个");
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+    expect(await screen.findByText("共 1 个")).toBeInTheDocument();
+    // The installed list's index reports matched terms per field exactly as
+    // the registry's worker does, so the shared card marks them the same way.
+    expect(container.querySelector("mark")).toHaveTextContent("pdf");
+  });
+
+  it("renders no marks outside a search", async () => {
+    const { container } = renderWithRouter(<MySkillsPage />);
+
+    await screen.findByText("pdf");
+    expect(container.querySelector("mark")).toBeNull();
   });
 
   it("searches Chinese text but not a fragment inside a word", async () => {

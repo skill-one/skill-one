@@ -1,99 +1,28 @@
 import { useState } from "react";
 
-import type { SearchField } from "../../lib/registry/protocol";
-import { cn } from "../../lib/utils";
-import type { Skill } from "../../types/skill";
-import { OwnerAvatar } from "../../components/owner-avatar";
 import { DomainBadge } from "../../components/domain-badge";
+import { SkillCard, type SkillMatched } from "../../components/skill-card";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillPopularity } from "../../components/skill-popularity";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card";
+import type { Skill } from "../../types/skill";
 
-/** Matched indexed terms per field, from the search that produced this hit. */
-export type SkillMatched = Partial<Record<SearchField, readonly string[]>>;
-
-/** Terms come from user-visible text, so they are escaped before use in a RegExp. */
-function escapeForRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+export type { SkillMatched };
 
 /**
- * Text with search-match highlighting: matched terms are wrapped in `<mark>`.
- * Without terms the text renders as a single node, keeping the non-search DOM
- * identical to an unhighlighted one.
+ * One skill in a store listing — the store's binding of the shared `SkillCard`.
  *
- * The terms are whole indexed tokens, so splitting the text on the terms
- * themselves marks exactly what the index matched — for Latin text the same
- * whole words the old token split produced, and for Han text the characters and
- * bigrams that sit *inside* an unsegmented run and no whole-token comparison
- * could ever reach. The one difference is that a term is also marked where a
- * longer word contains it.
- */
-function HighlightedText({
-  text,
-  terms,
-}: {
-  text: string;
-  terms?: readonly string[];
-}) {
-  if (!terms?.length) return text;
-  // Longest first: an overlapping longer term wins over a shorter one.
-  const pattern = [...new Set(terms)]
-    .toSorted((a, b) => b.length - a.length)
-    .map(escapeForRegExp)
-    .join("|");
-  const splitter = new RegExp(`(${pattern})`, "iu");
-  return (
-    <>
-      {text.split(splitter).map((part, i) =>
-        i % 2 === 1 ? (
-          <mark
-            key={i}
-            className="rounded-[2px] bg-primary/15 text-inherit dark:bg-primary/25"
-          >
-            {part}
-          </mark>
-        ) : (
-          part
-        ),
-      )}
-    </>
-  );
-}
-
-/**
- * One skill in the store's list — the shape every skill surface uses, built on
- * the shadcn Card so it is laid out by the component's own slots rather than by
- * hand: the header holds the avatar, name and source with the install action in
- * the corner slot that `CardAction` exists for, the content holds the
- * description, and the footer holds the domain chip and the popularity figure —
- * classification on the left rail under the source it belongs to, the figure on
- * the right rail under the action. Hovering or focusing the figure breaks it
- * back down into the installs and stars it blends.
+ * Everything the card is made of is the card's; what the store adds is the two
+ * facts only a registry entry has. The corner action is the install button
+ * (idle → installing → installed | retry, through the skills backend or the
+ * mock store), and a failed install reports its message under the card. The
+ * bottom rail carries the profile domain chip and the popularity figure — the
+ * same blended number every surface shows, so the store list, a repo's skills
+ * and a leaderboard can never disagree about it.
  *
  * The card carries no surface-specific extras — no rank chip, no alternative
  * metric — so the store list, a repo's skills, a leaderboard and the installed
- * list are one card in one layout, and the only thing that differs between
- * them is the order their data arrives in.
- *
- * The action sits in the card's top-right corner, not by the popularity figure,
- * because that is where the detail drawer keeps it too ("the primary action
- * lives in the header") — and because the button carries state (安装 / 安装中 /
- * 已安装 / 重试), a fixed corner turns the grid's right edge into one column a
- * reader can scan to see what they already have.
- *
- * The card body opens the detail panel (`onSelect`); the install action goes
- * through the skills backend (Tauri) or the mock store (browser), reflects
- * loading / success / failure, and stops its own click so it never opens the
- * panel behind it. A failed install reports its message under the card.
+ * list are one card in one layout, and the only thing that differs between them
+ * is the order their data arrives in.
  */
 export function SkillListRow({
   skill,
@@ -112,64 +41,17 @@ export function SkillListRow({
   // The failure message of the last install attempt, shown under the card.
   const [installError, setInstallError] = useState<string | null>(null);
 
-  const owner = skill.repo.split("/")[0];
-
   return (
-    <li className="flex flex-col">
-      {/* `flex-1` is the one thing the card cannot know: it fills the grid cell
-          so a short card's border still lines up with its taller neighbours. */}
-      <Card
-        role={onSelect ? "button" : undefined}
-        tabIndex={onSelect ? 0 : undefined}
-        aria-label={onSelect ? `查看 ${skill.name} 详情` : undefined}
-        onClick={onSelect}
-        onKeyDown={(e) => {
-          if (onSelect && (e.key === "Enter" || e.key === " ")) {
-            e.preventDefault();
-            onSelect();
-          }
-        }}
-        className={cn(
-          "flex-1",
-          onSelect &&
-            "cursor-pointer transition-all duration-150 hover:-translate-y-px hover:border-border hover:bg-accent/40 hover:shadow-[0_8px_24px_-16px_rgba(15,23,42,0.25)]",
-          selected && "border-primary ring-1 ring-primary",
-        )}
-      >
-        <CardHeader>
-          {/* The name is the card's heading, so it stays an `h3` inside the
-              title slot rather than losing its meaning to a styled `div`. */}
-          <CardTitle className="flex items-center gap-2">
-            <OwnerAvatar owner={owner} className="h-6 w-6 shrink-0 text-[11px]" />
-            <h3 className="truncate">
-              <HighlightedText text={skill.name} terms={matched?.name} />
-            </h3>
-          </CardTitle>
-          {/* The description slot carries the source alone. The domain chip
-              used to share it, which cost the source the chip's width (and let
-              the chip's position drift with the length of the repo name);
-              it reads better in the footer next to the figure. */}
-          <CardDescription className="truncate">
-            <HighlightedText text={skill.repo} terms={matched?.repo} />
-          </CardDescription>
-          <CardAction>
-            <SkillInstallButton skill={skill} onError={setInstallError} />
-          </CardAction>
-        </CardHeader>
-
-        <CardContent className="line-clamp-2 text-sm text-muted-foreground">
-          <HighlightedText
-            text={skill.description || "暂无描述"}
-            terms={matched?.description}
-          />
-        </CardContent>
-
-        {/* Pinned to the card's bottom edge: descriptions differ in length, and
-            the two ends should still line up across a row. Classification on
-            the left under the source it belongs to, the figure on the right
-            under the install action — the two rails the card is already read
-            in, and the reason neither end is left floating in the middle. */}
-        <CardFooter className="mt-auto">
+    <SkillCard
+      source={skill.repo}
+      name={skill.name}
+      matched={matched}
+      description={skill.description}
+      selected={selected}
+      onSelect={onSelect}
+      action={<SkillInstallButton skill={skill} onError={setInstallError} />}
+      footer={
+        <>
           {/* Domain from the profiles dataset; absent for skills it has not
               profiled, so the figure simply keeps the right edge alone. */}
           {skill.profile?.domain && (
@@ -185,17 +67,18 @@ export function SkillListRow({
             align="end"
             className="ml-auto"
           />
-        </CardFooter>
-      </Card>
-
-      {installError && (
-        <p
-          role="alert"
-          className="mt-1 line-clamp-2 px-4 text-[12px] leading-relaxed text-destructive"
-        >
-          {installError}
-        </p>
-      )}
-    </li>
+        </>
+      }
+      below={
+        installError && (
+          <p
+            role="alert"
+            className="mt-1 line-clamp-2 px-4 text-[12px] leading-relaxed text-destructive"
+          >
+            {installError}
+          </p>
+        )
+      }
+    />
   );
 }

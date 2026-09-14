@@ -10,11 +10,15 @@ import {
   fetchInstalledSkills,
   fetchLocalSkillDetail,
   removeInstalledSkill,
+  setSkillEnabled,
 } from "../../lib/local-skills";
 import { openExternal } from "../../lib/open-external";
 import type { Skill } from "../../types/skill";
 import { Drawer } from "../ui/drawer";
-import { SkillDetailPanel } from "./skill-detail-panel";
+import {
+  SkillDetailPanel,
+  type SkillDetailSurface,
+} from "./skill-detail-panel";
 
 vi.mock("../../lib/skill-detail-api", () => ({
   MIRROR: { repo: "skill-one/skills-sh-mirror", ref: "dist" },
@@ -29,6 +33,7 @@ vi.mock("../../lib/local-skills", () => ({
   fetchLocalSkillDetail: vi.fn(),
   fetchInstalledSkills: vi.fn(),
   removeInstalledSkill: vi.fn(),
+  setSkillEnabled: vi.fn(),
 }));
 
 vi.mock("../../lib/open-external", () => ({
@@ -39,6 +44,7 @@ const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 const mockFetchSkillProfile = vi.mocked(fetchSkillProfile);
 const mockFetchLocalSkillDetail = vi.mocked(fetchLocalSkillDetail);
 const mockRemoveInstalledSkill = vi.mocked(removeInstalledSkill);
+const mockSetSkillEnabled = vi.mocked(setSkillEnabled);
 const mockOpenExternal = vi.mocked(openExternal);
 
 /** One entry of the installed list, as the backend reports it. */
@@ -103,10 +109,12 @@ let queryClient: QueryClient;
  */
 function DetailDrawer({
   skill: currentSkill,
+  surface,
   onPrev,
   onNext,
 }: {
   skill: Skill | null;
+  surface?: SkillDetailSurface;
   onPrev?: () => void;
   onNext?: () => void;
 }) {
@@ -116,6 +124,7 @@ function DetailDrawer({
       <Drawer direction="right" open={open} onOpenChange={setOpen}>
         <SkillDetailPanel
           skill={currentSkill}
+          surface={surface}
           onPrev={onPrev ?? (() => {})}
           onNext={onNext ?? (() => {})}
         />
@@ -137,6 +146,7 @@ beforeEach(() => {
   mockFetchSkillDetail.mockReset();
   mockFetchSkillProfile.mockReset();
   mockFetchLocalSkillDetail.mockReset();
+  mockSetSkillEnabled.mockReset();
   mockOpenExternal.mockReset();
   mockFetchSkillDetail.mockResolvedValue(detail);
   // The header install button reads the installed list; nothing is
@@ -350,6 +360,46 @@ describe("SkillDetailPanel", () => {
     expect(
       screen.queryByRole("button", { name: "移除" }),
     ).not.toBeInTheDocument();
+    // Enablement belongs to the installed list: the store's card, and so its
+    // drawer, has no switch to offer.
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  });
+
+  it("swaps the install CTA for the enable switch on the installed surface", async () => {
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([installedPdf]);
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    // Exactly what the installed list hands the drawer (`detailSkillFor`): the
+    // recorded repo, but no mirror path — the body is read off disk.
+    renderDrawer({ skill: { ...skill, path: undefined }, surface: "installed" });
+
+    // The switch the row carries, in the slot the store puts its CTA in.
+    expect(
+      await screen.findByRole("switch", { name: "关闭 pdf" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "安装" }),
+    ).not.toBeInTheDocument();
+    // No registry figures: the record has none to report, and claiming a 0
+    // would contradict the card, which shows no figure at all.
+    expect(
+      screen.queryByRole("button", { name: /^热度 / }),
+    ).not.toBeInTheDocument();
+    // The recorded repo still drives everything it can: the source link.
+    expect(
+      screen.getByRole("link", { name: "anthropics/skills" }),
+    ).toBeInTheDocument();
+  });
+
+  it("disables an installed skill from the drawer's switch", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([installedPdf]);
+    mockSetSkillEnabled.mockResolvedValue(undefined);
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({ skill: { ...skill, path: undefined }, surface: "installed" });
+
+    await user.click(await screen.findByRole("switch", { name: "关闭 pdf" }));
+
+    expect(mockSetSkillEnabled).toHaveBeenCalledWith("pdf", false);
   });
 
   it("uninstalls an installed skill from the header", async () => {

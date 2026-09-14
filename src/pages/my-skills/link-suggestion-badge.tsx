@@ -8,7 +8,7 @@ import { recordSkillProvenance } from "../../lib/provenance";
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { cn, errorMessage } from "../../lib/utils";
 import type { LinkCandidate } from "../../lib/link-suggestions";
-import { OwnerAvatar } from "../../components/owner-avatar";
+import { SkillAvatar } from "../../components/skill-avatar";
 
 /**
  * Confirmable migration of a tool-installed skill to its store entry.
@@ -58,10 +58,8 @@ export function LinkSuggestionBadge({
     <HoverCard.Root
       open={open}
       onOpenChange={setOpen}
-      // Generous delays: the popover is a preview, not a trigger — a cursor
-      // merely passing over the card must not pop it open.
-      openDelay={300}
-      closeDelay={150}
+      openDelay={150}
+      closeDelay={100}
     >
       <HoverCard.Trigger asChild>
         <button
@@ -107,13 +105,7 @@ export function LinkSuggestionBadge({
                   type="button"
                   title={skill.description || undefined}
                   disabled={pendingRepo != null}
-                  onClick={(e) => {
-                    // The popover is portaled to body, but React events
-                    // bubble through the component tree — without this the
-                    // click would reach the card and open the detail drawer.
-                    e.stopPropagation();
-                    void pick({ skill, similarity });
-                  }}
+                  onClick={() => void pick({ skill, similarity })}
                   className={cn(
                     "flex w-full items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left",
                     "transition-colors hover:bg-accent/40",
@@ -121,9 +113,10 @@ export function LinkSuggestionBadge({
                     "disabled:cursor-wait disabled:opacity-60",
                   )}
                 >
-                  <OwnerAvatar
-                    owner={skill.repo.split("/")[0]}
-                    className="h-5 w-5 shrink-0 rounded text-[10px]"
+                  <SkillAvatar
+                    source={skill.repo}
+                    className="h-5 w-5 text-[10px]"
+                    iconClassName="h-3 w-3"
                   />
                   <span className="min-w-0 flex-1 truncate text-[12px] font-medium">
                     {skill.repo}
