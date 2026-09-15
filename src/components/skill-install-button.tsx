@@ -14,7 +14,6 @@ import { Button } from "./ui/button";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
 
@@ -163,22 +162,26 @@ export function SkillInstallButton({
   }
 
   return (
-    <TooltipProvider delayDuration={300}>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size="icon"
-            variant={installMeta.variant}
-            disabled={installing || isInstalled}
-            onClick={(e) => void handleInstall(e)}
-            className={cn("h-7 w-7 shrink-0", installMeta.className, className)}
-          >
-            {installMeta.icon}
-            <span className="sr-only">{installMeta.label}</span>
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button
+              size="icon"
+              variant={installMeta.variant}
+              disabled={installing || isInstalled}
+              onClick={(e) => void handleInstall(e)}
+              className={cn(
+                "h-7 w-7 shrink-0",
+                installMeta.className,
+                className,
+              )}
+            >
+              {installMeta.icon}
+              <span className="sr-only">{installMeta.label}</span>
+            </Button>
+          }
+        />
         <TooltipContent>{installMeta.label}</TooltipContent>
       </Tooltip>
-    </TooltipProvider>
   );
 }

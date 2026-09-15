@@ -5,7 +5,6 @@ import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import {
   Collapsible,
-  CollapsibleContent,
   CollapsibleTrigger,
 } from "../ui/collapsible";
 
@@ -46,22 +45,25 @@ export function ExpandableDescription({ text }: { text: string }) {
       open={open}
       onOpenChange={(next) => setExpandedText(next ? text : null)}
     >
-      <CollapsibleContent forceMount asChild>
-        <p
-          ref={ref}
-          className={cn(
-            // `relative` is the containing block the collapsed trigger is
-            // pinned to; it sits inside the paragraph's own box, so the
-            // clamp's `overflow: hidden` has nothing to clip.
-            "relative whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground",
-            !open && "line-clamp-3",
-          )}
-        >
-          {text}
-          {/* While expanded the box fits its content, so `overflowing` has
-              gone false and the expanded flag is what keeps 收起 on screen. */}
-          {(overflowing || open) && (
-            <CollapsibleTrigger asChild>
+      {/* The paragraph itself is always visible — closed state only swaps the
+          trigger's label and the clamp, so no panel is needed: Base UI keeps
+          a closed panel hidden, which would hide the preview with it. */}
+      <p
+        ref={ref}
+        className={cn(
+          // `relative` is the containing block the collapsed trigger is
+          // pinned to; it sits inside the paragraph's own box, so the
+          // clamp's `overflow: hidden` has nothing to clip.
+          "relative whitespace-pre-line text-[13px] leading-relaxed text-muted-foreground",
+          !open && "line-clamp-3",
+        )}
+      >
+        {text}
+        {/* While expanded the box fits its content, so `overflowing` has
+            gone false and the expanded flag is what keeps 收起 on screen. */}
+        {(overflowing || open) && (
+          <CollapsibleTrigger
+            render={
               <Button
                 type="button"
                 variant="link"
@@ -79,10 +81,10 @@ export function ExpandableDescription({ text }: { text: string }) {
               >
                 {open ? "收起" : "展开"}
               </Button>
-            </CollapsibleTrigger>
-          )}
-        </p>
-      </CollapsibleContent>
+            }
+          />
+        )}
+      </p>
     </Collapsible>
   );
 }

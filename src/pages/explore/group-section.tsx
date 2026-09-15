@@ -192,16 +192,17 @@ export function GroupSection<T>({
 
   return (
     <Collapsible defaultOpen className="group/repo">
-      <CollapsibleTrigger asChild>
-        <button
-          ref={headerRef}
-          type="button"
-          aria-label={`分组 ${group.title}，${items.length} 个 skill`}
-          onClick={() => {
-            if (headerRef.current) keepHeaderUnderPointer(headerRef.current);
-          }}
-          className="group/head sticky top-0 z-10 flex w-full items-center gap-1.5 rounded-md bg-background px-1 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
+      <CollapsibleTrigger
+        render={
+          <button
+            ref={headerRef}
+            type="button"
+            aria-label={`分组 ${group.title}，${items.length} 个 skill`}
+            onClick={() => {
+              if (headerRef.current) keepHeaderUnderPointer(headerRef.current);
+            }}
+            className="group/head sticky top-0 z-10 flex w-full items-center gap-1.5 rounded-md bg-background px-1 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
           {/* The leading slot reads as the group's ordinal while the header
               is at rest and becomes the fold chevron on hover — Notion's
               toggle reveal. One fixed-width box hosts both, so every name
@@ -211,7 +212,7 @@ export function GroupSection<T>({
           <span className="flex h-5 w-5 shrink-0 items-center justify-center">
             <ChevronDown
               aria-hidden
-              className="hidden h-4 w-4 text-muted-foreground transition-transform duration-150 group-hover/head:block group-data-[state=closed]/repo:-rotate-90"
+              className="hidden h-4 w-4 text-muted-foreground transition-transform duration-150 group-hover/head:block group-data-closed/repo:-rotate-90"
             />
             {index < 3 ? (
               <span
@@ -249,24 +250,25 @@ export function GroupSection<T>({
           {/* The figures the group is weighed by, pinned to the row's far
               edge as one quiet cluster: the stars the ordering used, then
               the item count. */}
-          <span className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
-            {group.stars !== undefined && (
-              <span
-                className="flex items-center gap-1"
-                title={`${group.stars} stars`}
-              >
-                <Star
-                  className="h-3 w-3 fill-amber-400 text-amber-400"
-                  aria-hidden
-                />
-                {formatCount(group.stars)}
-                <span aria-hidden="true">·</span>
-              </span>
-            )}
-            <span>{items.length} 个</span>
-          </span>
-        </button>
-      </CollapsibleTrigger>
+            <span className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
+              {group.stars !== undefined && (
+                <span
+                  className="flex items-center gap-1"
+                  title={`${group.stars} stars`}
+                >
+                  <Star
+                    className="h-3 w-3 fill-amber-400 text-amber-400"
+                    aria-hidden
+                  />
+                  {formatCount(group.stars)}
+                  <span aria-hidden="true">·</span>
+                </span>
+              )}
+              <span>{items.length} 个</span>
+            </span>
+          </button>
+        }
+      />
       <CollapsibleContent>
         {/* A little indent under the header's chevron, and bottom spacing
             before the next group; no divider — the whitespace is the
@@ -281,6 +283,14 @@ export function GroupSection<T>({
             className={cn(
               SKILL_LIST_CLASS,
               "[content-visibility:auto] [contain-intrinsic-size:auto_380px]",
+              // content-visibility implies paint containment: descendants are
+              // clipped to this element's border-box. The Card draws its
+              // border as an outer box-shadow ring, which protrudes 1px past
+              // the grid on all four sides — the edge rows' and columns'
+              // borders would be sheared off (top edge reads as if the
+              // sticky header covered it). p-1 opens a bleed gutter inside
+              // the containment boundary; -m-1 cancels the layout shift.
+              "p-1 -m-1",
             )}
           >
             {/* renderItem hands back the row's own <li> (the shared card

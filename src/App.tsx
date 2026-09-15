@@ -6,7 +6,8 @@ import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppSidebar } from "./components/app-sidebar";
 import { UpdateDialog } from "./components/update-dialog";
-import { Toaster } from "./components/ui/sonner";
+import { Toaster } from "./components/ui/toast";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 import { useAutoLinkAgents } from "./hooks/use-auto-link-agents";
 import { useRegistryRefresh } from "./hooks/use-registry-refresh";
@@ -104,7 +105,11 @@ export default function App() {
       client={queryClient}
       persistOptions={persistOptions}
     >
-      <HashRouter>
+      {/* One app-level tooltip delay group: Base UI's provider backs a
+          floating-ui FloatingDelayGroup, and more than one of them in a tree
+          breaks hover-open for every tooltip but the group's own. */}
+      <TooltipProvider delay={300}>
+        <HashRouter>
         <PopoverNavigation />
         <AppUpdateWatcher />
         <RegistryAutoRefresh />
@@ -145,6 +150,7 @@ export default function App() {
           </SidebarProvider>
         </div>
       </HashRouter>
+      </TooltipProvider>
     </PersistQueryClientProvider>
   );
 }

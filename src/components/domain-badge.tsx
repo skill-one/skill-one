@@ -5,7 +5,6 @@ import { Badge } from "./ui/badge";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
 
@@ -44,16 +43,16 @@ export function DomainBadge({
       ? `${meta.emoji} ${meta.description}`
       : domain;
   return (
-    <TooltipProvider delayDuration={300}>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Badge variant={variant} className={className}>
-            {meta && <span aria-hidden="true">{meta.emoji}</span>}
-            {domain}
-          </Badge>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Badge variant={variant} className={className}>
+              {meta && <span aria-hidden="true">{meta.emoji}</span>}
+              {domain}
+            </Badge>
+          }
+        />
         <TooltipContent>{tooltip}</TooltipContent>
       </Tooltip>
-    </TooltipProvider>
   );
 }

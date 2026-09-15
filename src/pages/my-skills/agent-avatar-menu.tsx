@@ -12,7 +12,6 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
@@ -70,44 +69,50 @@ export function AgentAvatarMenu() {
         />
       ) : (
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label={`管理 agent 链接（共 ${list.length} 个）`}
-              className="rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <AgentAvatarGroup agents={list} />
-            </button>
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                aria-label={`管理 agent 链接（共 ${list.length} 个）`}
+                className="rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <AgentAvatarGroup agents={list} />
+              </button>
+            }
+          />
 
           {/* The menu lists every agent, including the ones the strip folds
               into its +N count, so all of them are visible the same way. */}
           <DropdownMenuContent align="start" className="min-w-64">
-            <DropdownMenuLabel className="flex items-center justify-between gap-3">
-              <span className="text-[11px] font-normal text-muted-foreground">
-                Agents · 共 {list.length} 个
-              </span>
-              {/* The single control: opens the per-agent settings dialog.
-                  The menu closes first so the modal dialog does not sit on
-                      top of it. */}
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Agent 链接设置"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen(false);
-                  // Radix hands focus back to the trigger as the menu
-                  // closes; opening the dialog one frame later keeps the
-                  // two from fighting over it.
-                  requestAnimationFrame(() => setSettingsOpen(true));
-                }}
-              >
-                <Settings2 />
-              </Button>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            {/* Base UI's GroupLabel must live inside a Group, so the header
+                label and the agent rows share one. */}
             <DropdownMenuGroup>
+              {/* A plain div, not GroupLabel: Base UI hides group labels from
+                  the accessibility tree, which would hide the gear below. */}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-normal text-muted-foreground">
+                  Agents · 共 {list.length} 个
+                </span>
+                {/* The single control: opens the per-agent settings dialog.
+                    The menu closes first so the modal dialog does not sit on
+                        top of it. */}
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Agent 链接设置"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    // The menu hands focus back to the trigger as it
+                    // closes; opening the dialog one frame later keeps the
+                    // two from fighting over it.
+                    requestAnimationFrame(() => setSettingsOpen(true));
+                  }}
+                >
+                  <Settings2 />
+                </Button>
+              </div>
+              <DropdownMenuSeparator />
               {list.map((agent) => {
                 const skillsCount = agent.internalSkills?.length ?? 0;
                 const othersCount = agent.internalOthers?.length ?? 0;
@@ -116,8 +121,9 @@ export function AgentAvatarMenu() {
                     key={agent.name}
                     className="gap-2.5"
                     // Status rows only: linking and unlinking live in the
-                    // settings dialog, so selecting a row does nothing.
-                    onSelect={(e) => e.preventDefault()}
+                    // settings dialog, so selecting a row does nothing (and
+                    // must not close the menu).
+                    closeOnClick={false}
                   >
                     <AgentIcon agentName={agent.name} size="sm" />
                     <div className="min-w-0 flex-1">

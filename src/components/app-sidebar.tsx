@@ -98,12 +98,16 @@ function NavMenuItem({
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
-        <NavLink to={item.path}>
-          <Icon className="h-4 w-4" />
-          <span>{item.label}</span>
-        </NavLink>
-      </SidebarMenuButton>
+      <SidebarMenuButton
+        isActive={isActive}
+        tooltip={item.label}
+        render={
+          <NavLink to={item.path}>
+            <Icon className="h-4 w-4" />
+            <span>{item.label}</span>
+          </NavLink>
+        }
+      />
       {count !== undefined && (
         <SidebarMenuBadge className="tabular-nums">{count}</SidebarMenuBadge>
       )}
@@ -135,17 +139,20 @@ function NavMenuItem({
 function UpdateBadge() {
   const { open } = useAppUpdate();
   return (
-    <Badge asChild variant="success">
-      <button
-        type="button"
-        onClick={() => open()}
-        // The badge slot is `pointer-events-none` so it never swallows clicks
-        // meant for the row; this one is a button and wants them.
-        className="pointer-events-auto cursor-pointer"
-      >
-        有新版本
-      </button>
-    </Badge>
+    <Badge
+      variant="success"
+      render={
+        <button
+          type="button"
+          onClick={() => open()}
+          // The badge slot is `pointer-events-none` so it never swallows clicks
+          // meant for the row; this one is a button and wants them.
+          className="pointer-events-auto cursor-pointer"
+        >
+          有新版本
+        </button>
+      }
+    />
   );
 }
 

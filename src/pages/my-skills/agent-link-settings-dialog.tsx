@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "../../components/ui/toast";
 
 import { INSTALLED_SKILLS_QUERY_KEY } from "../../hooks/use-installed-skills";
 import {
@@ -35,7 +35,7 @@ import { formatLinkMessage } from "./link-notice";
  * clears the exclusion. Canonical agents use their native skills directory,
  * so their switch is pinned on and disabled.
  *
- * Every action writes through the backend and lands as a sonner toast, like
+ * Every action writes through the backend and lands as a toast, like
  * `SkillEnableSwitch` — no confirm step, since unlink is fully reversible.
  */
 export function AgentLinkSettingsDialog({
@@ -80,12 +80,17 @@ export function AgentLinkSettingsDialog({
       });
       const notice = formatLinkMessage(results[0]);
       if (notice) {
-        if (notice.kind === "error") toast.error(notice.text);
-        else if (notice.kind === "warning") toast.warning(notice.text);
-        else toast.success(notice.text);
+        const type =
+          notice.kind === "error"
+            ? "error"
+            : notice.kind === "warning"
+              ? "warning"
+              : "success";
+        toast.add({ title: notice.text, type });
       }
     },
-    onError: (err) => toast.error(errorMessage(err, "操作失败")),
+    onError: (err) =>
+      toast.add({ title: errorMessage(err, "操作失败"), type: "error" }),
   });
 
   const busyFor = (name: string) =>

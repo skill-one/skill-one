@@ -7,10 +7,10 @@ vi.mock("../lib/registry/refresh", () => ({
   checkForRegistryUpdate: refresh.check,
 }));
 
-/** Sonner's surface, so the "a newer snapshot landed" notice is assertable. */
-const toasts = vi.hoisted(() => ({ toast: vi.fn() }));
+/** The toast surface, so the "a newer snapshot landed" notice is assertable. */
+const toasts = vi.hoisted(() => ({ add: vi.fn() }));
 
-vi.mock("sonner", () => ({ toast: toasts.toast }));
+vi.mock("../components/ui/toast", () => ({ toast: { add: toasts.add } }));
 
 import { useRegistryRefresh } from "./use-registry-refresh";
 
@@ -78,7 +78,9 @@ describe("useRegistryRefresh", () => {
     vi.advanceTimersByTime(TICK_MS);
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(toasts.toast).toHaveBeenCalledWith("技能数据已更新到最新快照");
+    expect(toasts.add).toHaveBeenCalledWith({
+      title: "技能数据已更新到最新快照",
+    });
   });
 
   it("stays quiet when the check found nothing new", async () => {
@@ -88,6 +90,6 @@ describe("useRegistryRefresh", () => {
     vi.advanceTimersByTime(TICK_MS);
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(toasts.toast).not.toHaveBeenCalled();
+    expect(toasts.add).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,13 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Store } from "lucide-react";
-import { HoverCard } from "radix-ui";
-import { toast } from "sonner";
+
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "../../components/ui/hover-card";
+import { toast } from "../../components/ui/toast";
 
 import { recordSkillProvenance } from "../../lib/provenance";
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
@@ -45,56 +50,57 @@ export function LinkSuggestionBadge({
       // the ledger — the user's pick is the same act of identification.
       await recordSkillProvenance(candidate.skill.repo, name);
       await markSkillsChanged(queryClient);
-      toast.success(`已迁移至商店版：${candidate.skill.repo}`);
+      toast.add({
+        title: `已迁移至商店版：${candidate.skill.repo}`,
+        type: "success",
+      });
       setOpen(false);
     } catch (e) {
-      toast.error(errorMessage(e, "迁移失败"));
+      toast.add({ title: errorMessage(e, "迁移失败"), type: "error" });
     } finally {
       setPendingRepo(null);
     }
   };
 
   return (
-    <HoverCard.Root
-      open={open}
-      onOpenChange={setOpen}
-      openDelay={150}
-      closeDelay={100}
-    >
-      <HoverCard.Trigger asChild>
-        <button
-          type="button"
-          aria-label={`将 ${name} 迁移至商店版`}
-          onClick={(e) => {
-            e.stopPropagation();
-            // Hover/focus already opens the popover; the click only makes
-            // sure it is open (touch, and the keyboard path in tests).
-            setOpen(true);
-          }}
-          className={cn(
-            "inline-flex shrink-0 cursor-pointer items-center gap-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[10px] font-medium text-amber-600 dark:text-amber-400",
-            "transition-colors hover:bg-amber-500/20",
-            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-          )}
-        >
-          <Store className="h-2.5 w-2.5" aria-hidden />
-          可迁移
-        </button>
-      </HoverCard.Trigger>
-      <HoverCard.Portal>
-        <HoverCard.Content
-          side="bottom"
-          align="start"
-          sideOffset={6}
-          // The popover is portaled, but React still bubbles its events up the
-          // component tree — through the badge into the card, whose whole body
-          // opens the detail drawer. Picking a candidate must not do that.
-          onClick={(e) => e.stopPropagation()}
-          className={cn(
-            "z-50 w-72 rounded-lg border bg-background p-2.5 shadow-md",
-            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-          )}
-        >
+    <HoverCard open={open} onOpenChange={setOpen}>
+      <HoverCardTrigger
+        delay={150}
+        closeDelay={100}
+        render={
+          <button
+            type="button"
+            aria-label={`将 ${name} 迁移至商店版`}
+            onClick={(e) => {
+              e.stopPropagation();
+              // Hover/focus already opens the popover; the click only makes
+              // sure it is open (touch, and the keyboard path in tests).
+              setOpen(true);
+            }}
+            className={cn(
+              "inline-flex shrink-0 cursor-pointer items-center gap-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[10px] font-medium text-amber-600 dark:text-amber-400",
+              "transition-colors hover:bg-amber-500/20",
+              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            )}
+          >
+            <Store className="h-2.5 w-2.5" aria-hidden />
+            可迁移
+          </button>
+        }
+      />
+      <HoverCardContent
+        side="bottom"
+        align="start"
+        sideOffset={6}
+        // The popover is portaled, but React still bubbles its events up the
+        // component tree — through the badge into the card, whose whole body
+        // opens the detail drawer. Picking a candidate must not do that.
+        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          "z-50 w-72 rounded-lg border bg-background p-2.5 shadow-md",
+          "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
+        )}
+      >
           <p className="px-1.5 pb-1 text-[12px] font-medium">
             发现同名商店条目
           </p>
@@ -133,8 +139,7 @@ export function LinkSuggestionBadge({
           <p className="px-1.5 pt-1.5 text-[10px] leading-snug text-muted-foreground">
             点击条目即完成迁移并永久记录来源，本地文件不会移动；相似度仅供参考。
           </p>
-        </HoverCard.Content>
-      </HoverCard.Portal>
-    </HoverCard.Root>
+      </HoverCardContent>
+    </HoverCard>
   );
 }

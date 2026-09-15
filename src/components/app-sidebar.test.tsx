@@ -94,7 +94,8 @@ describe("AppSidebar", () => {
     renderSidebar("/my-skills");
 
     const link = screen.getByRole("link", { name: /我的 skills/ });
-    expect(link).toHaveAttribute("data-active", "true");
+    // Base UI renders boolean data attributes as an empty value.
+    expect(link).toHaveAttribute("data-active");
     expect(link).toHaveAttribute("aria-current", "page");
   });
 });

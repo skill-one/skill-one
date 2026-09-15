@@ -184,7 +184,9 @@ describe("AgentAvatarMenu settings entry", () => {
     expect(unlinkAgentMock).not.toHaveBeenCalled();
 
     // The gear is the single control: it opens the per-agent settings dialog.
-    await user.click(screen.getByRole("button", { name: "Agent 链接设置" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Agent 链接设置" }),
+    );
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Agent 链接设置")).toBeInTheDocument();
     expect(
@@ -200,13 +202,15 @@ describe("AgentAvatarMenu settings entry", () => {
     renderWithRouter(<AgentAvatarMenu />);
 
     await openMenu(user);
-    await user.click(screen.getByRole("button", { name: "Agent 链接设置" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Agent 链接设置" }),
+    );
 
     const dialog = await screen.findByRole("dialog");
     const switchEl = within(dialog).getByRole("switch", {
       name: "Windsurf 链接开关",
     });
     expect(switchEl).toHaveAttribute("aria-checked", "true");
-    expect(switchEl).toBeDisabled();
+    expect(switchEl).toHaveAttribute("aria-disabled", "true");
   });
 });

@@ -13,7 +13,7 @@ const OPTIONS = [
  * Three-way appearance picker. `system` resolves via `prefers-color-scheme`
  * and keeps reacting to OS appearance changes.
  *
- * Radix deselects a `type="single"` item when it is clicked again, which would
+ * Base UI toggles the active item off when it is clicked again, which would
  * leave no theme selected — the guard keeps the control radio-like.
  */
 export function ThemeModeToggle() {
@@ -21,12 +21,12 @@ export function ThemeModeToggle() {
 
   return (
     <ToggleGroup
-      type="single"
       variant="outline"
       spacing={0}
-      value={theme}
+      value={theme ? [theme] : []}
       onValueChange={(value) => {
-        if (value) setTheme(value);
+        const next = value[0];
+        if (next) setTheme(next);
       }}
       aria-label="外观"
     >

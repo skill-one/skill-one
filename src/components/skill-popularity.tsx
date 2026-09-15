@@ -7,7 +7,6 @@ import type { Skill } from "../types/skill";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
 
@@ -48,8 +47,8 @@ export function SkillPopularity({
   const blended = formatCount(popularity(skill));
 
   return (
-    <TooltipProvider delayDuration={0}>
-      <Tooltip>
+    // The app-level TooltipProvider (App.tsx) owns the delay group.
+    <Tooltip>
         <TooltipTrigger
           aria-label={`热度 ${blended}：安装 ${installed} · Star ${starred}`}
           // The metric is commonly embedded in a clickable surface (a list
@@ -77,6 +76,5 @@ export function SkillPopularity({
           </div>
         </TooltipContent>
       </Tooltip>
-    </TooltipProvider>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "../components/ui/toast";
 
 import {
   fetchAgentStatus,
@@ -54,10 +54,17 @@ export function useAutoLinkAgents() {
         const detail = failures
           .map((r) => formatLinkMessage(r)?.text ?? `${r.display} 失败`)
           .join("；");
-        toast.error(`自动链接部分 agent 失败：${detail}`);
+        toast.add({
+          title: `自动链接部分 agent 失败：${detail}`,
+          type: "error",
+        });
       }
     },
-    onError: (err) => toast.error(`自动链接 agent 失败：${errorMessage(err)}`),
+    onError: (err) =>
+      toast.add({
+        title: `自动链接 agent 失败：${errorMessage(err)}`,
+        type: "error",
+      }),
   });
 
   useEffect(() => {

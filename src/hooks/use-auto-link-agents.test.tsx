@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { waitFor } from "@testing-library/react";
-import { toast } from "sonner";
+import { toast } from "../components/ui/toast";
 
 import { renderWithRouter } from "../test/test-utils";
 import { fetchAgentStatus, linkAllAgents } from "../lib/local-skills";
@@ -78,14 +78,14 @@ describe("useAutoLinkAgents", () => {
       }),
       result("linked", { agent: "gemini", display: "Gemini CLI" }),
     ]);
-    const toastErrorSpy = vi.spyOn(toast, "error");
+    const toastSpy = vi.spyOn(toast, "add");
     renderWithRouter(<Probe />);
 
     // One call carries every actionable agent, migrating their content.
     await waitFor(() =>
       expect(linkAllAgentsMock).toHaveBeenCalledWith(["cursor", "gemini"]),
     );
-    expect(toastErrorSpy).not.toHaveBeenCalled();
+    expect(toastSpy).not.toHaveBeenCalled();
 
     // The success invalidation refetches the status; the pass must not run
     // again on the fresh scan.
@@ -136,13 +136,14 @@ describe("useAutoLinkAgents", () => {
       agent({}),
       agent({ name: "gemini", display: "Gemini CLI" }),
     ]);
-    const toastErrorSpy = vi.spyOn(toast, "error");
+    const toastSpy = vi.spyOn(toast, "add");
     renderWithRouter(<Probe />);
 
     await waitFor(() =>
-      expect(toastErrorSpy).toHaveBeenCalledWith(
-        "自动链接部分 agent 失败：Gemini CLI 失败：permission denied",
-      ),
+      expect(toastSpy).toHaveBeenCalledWith({
+        title: "自动链接部分 agent 失败：Gemini CLI 失败：permission denied",
+        type: "error",
+      }),
     );
   });
 
@@ -180,11 +181,14 @@ describe("useAutoLinkAgents", () => {
 
   it("surfaces a hard failure of the batch call", async () => {
     linkAllAgentsMock.mockRejectedValue(new Error("boom"));
-    const toastErrorSpy = vi.spyOn(toast, "error");
+    const toastSpy = vi.spyOn(toast, "add");
     renderWithRouter(<Probe />);
 
     await waitFor(() =>
-      expect(toastErrorSpy).toHaveBeenCalledWith("自动链接 agent 失败：boom"),
+      expect(toastSpy).toHaveBeenCalledWith({
+        title: "自动链接 agent 失败：boom",
+        type: "error",
+      }),
     );
   });
 });

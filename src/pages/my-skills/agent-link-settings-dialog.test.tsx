@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { toast } from "sonner";
+import { toast } from "../../components/ui/toast";
 
 import { renderWithRouter } from "../../test/test-utils";
 import {
@@ -101,7 +101,7 @@ describe("AgentLinkSettingsDialog", () => {
     unlinkAgentMock.mockResolvedValue([
       result("unlinked", { restored: ["README.md"] }),
     ]);
-    const successSpy = vi.spyOn(toast, "success");
+    const successSpy = vi.spyOn(toast, "add");
     renderDialog();
 
     const dialog = await screen.findByRole("dialog");
@@ -114,9 +114,10 @@ describe("AgentLinkSettingsDialog", () => {
     await waitFor(() =>
       expect(getExcludedAgents()).toEqual(["cursor"]),
     );
-    expect(successSpy).toHaveBeenCalledWith(
-      "Cursor 已取消链接（已恢复 1 项备份内容）",
-    );
+    expect(successSpy).toHaveBeenCalledWith({
+      title: "Cursor 已取消链接（已恢复 1 项备份内容）",
+      type: "success",
+    });
   });
 
   it("links on switch-on with migrate and clears the exclusion", async () => {
@@ -128,7 +129,7 @@ describe("AgentLinkSettingsDialog", () => {
     linkAgentMock.mockResolvedValue([
       result("migrated", { moved: ["pdf"], parkedOthers: ["README.md"] }),
     ]);
-    const successSpy = vi.spyOn(toast, "success");
+    const successSpy = vi.spyOn(toast, "add");
     renderDialog();
 
     const dialog = await screen.findByRole("dialog");
@@ -140,16 +141,17 @@ describe("AgentLinkSettingsDialog", () => {
     // else parks into the backup slot.
     expect(linkAgentMock).toHaveBeenCalledWith("cursor", { migrate: true });
     await waitFor(() => expect(getExcludedAgents()).toEqual([]));
-    expect(successSpy).toHaveBeenCalledWith(
-      "Cursor 已导入（移动 1 个 skills，其余文件已备份）",
-    );
+    expect(successSpy).toHaveBeenCalledWith({
+      title: "Cursor 已导入（移动 1 个 skills，其余文件已备份）",
+      type: "success",
+    });
   });
 
   it("surfaces a hard failure as an error toast", async () => {
     const user = userEvent.setup();
     fetchAgentStatusMock.mockResolvedValue([agent({ linked: true })]);
     unlinkAgentMock.mockRejectedValue(new Error("boom"));
-    const errorSpy = vi.spyOn(toast, "error");
+    const errorSpy = vi.spyOn(toast, "add");
     renderDialog();
 
     const dialog = await screen.findByRole("dialog");
@@ -157,6 +159,8 @@ describe("AgentLinkSettingsDialog", () => {
       await within(dialog).findByRole("switch", { name: "Cursor 链接开关" }),
     );
 
-    await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("boom"));
+    await waitFor(() =>
+      expect(errorSpy).toHaveBeenCalledWith({ title: "boom", type: "error" }),
+    );
   });
 });

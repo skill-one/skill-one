@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "./ui/toast";
 
 import { setSkillEnabled } from "../lib/local-skills";
 import {
@@ -51,7 +51,7 @@ export function SkillEnableSwitch({
     },
     onError: (e) => {
       setPending(null);
-      toast.error(errorMessage(e, "切换失败"));
+      toast.add({ title: errorMessage(e, "切换失败"), type: "error" });
       // Best-effort refresh: the error is already shown, so keep the promise
       // from turning into an unhandled rejection.
       void markSkillsChanged(queryClient);

@@ -13,17 +13,16 @@ import { SkillPopularity } from "../skill-popularity";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "../ui/drawer";
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "../ui/sheet";
 import { Skeleton } from "../ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
 import { OwnerAvatar } from "../owner-avatar";
@@ -101,31 +100,31 @@ function ProvenanceTip({
     </TooltipContent>
   );
   return (
-    <TooltipProvider delayDuration={200}>
       <Tooltip>
-        <TooltipTrigger asChild>
-          {href ? (
-            <a
-              href={href}
-              title="查看版本与来源信息"
-              onClick={(e) => {
-                e.preventDefault();
-                void openExternal(href);
-              }}
-              className={className}
-            >
-              源
-              <ExternalLink className="h-3 w-3 shrink-0" />
-            </a>
-          ) : (
-            <span title="查看来源信息" className={className}>
-              本地文件
-            </span>
-          )}
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            href ? (
+              <a
+                href={href}
+                title="查看版本与来源信息"
+                onClick={(e) => {
+                  e.preventDefault();
+                  void openExternal(href);
+                }}
+                className={className}
+              >
+                源
+                <ExternalLink className="h-3 w-3 shrink-0" />
+              </a>
+            ) : (
+              <span title="查看来源信息" className={className}>
+                本地文件
+              </span>
+            )
+          }
+        />
         {body}
       </Tooltip>
-    </TooltipProvider>
   );
 }
 
@@ -150,11 +149,11 @@ interface SkillDetailPanelProps {
 }
 
 /**
- * Detail drawer for one skill, shown as a standard shadcn Drawer sliding
+ * Detail sheet for one skill, shown as a standard shadcn Sheet sliding
  * in from the right edge of the window. The grid itself never reflows —
- * opening or closing the drawer leaves its layout and scroll position
- * untouched. The drawer is modal (dimmed overlay, focus trap, scroll lock); Escape,
- * clicking the overlay, or dragging the drawer sideways closes it, and ←/→
+ * opening or closing the sheet leaves its layout and scroll position
+ * untouched. The sheet is modal (dimmed overlay, focus trap, scroll lock); Escape,
+ * clicking the overlay closes it, and ←/→
  * switch skills. Each skill's SKILL.md is fetched through TanStack Query and
  * cached independently, so revisits are instant. The source is picked per
  * skill: a registry-known `path` reads from the skills-sh-mirror mirror
@@ -228,10 +227,10 @@ export function SkillDetailPanel({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [skill, onPrev, onNext]);
 
-  // Always render the DrawerContent — Radix mounts and unmounts it with the
-  // Drawer's open state, keeping the drawer alive through the close
-  // animation. With no skill (and no latch yet) the drawer is empty, which
-  // only happens before the first selection.
+  // Always render the SheetContent — Base UI unmounts it with the sheet's
+  // open state, keeping it alive through the close animation. With no skill
+  // (and no latch yet) the sheet is empty, which only happens before the
+  // first selection.
 
   // No repo at all → a skill whose source the app cannot name (placed into the
   // global directory by hand, or installed by another tool): nothing to link
@@ -300,8 +299,8 @@ export function SkillDetailPanel({
   ) : null;
 
   return (
-    <DrawerContent>
-      <DrawerHeader className="gap-2 px-6 pt-5">
+    <SheetContent>
+      <SheetHeader className="gap-2 px-6 pt-5">
         <div className="flex items-start gap-3">
           {/* The same image the row leads with, at the drawer's size: the
               skill's own cover, `SkillCover`'s letter fallback standing in
@@ -312,34 +311,36 @@ export function SkillDetailPanel({
             className="h-14 w-14 shrink-0 text-2xl"
           />
           <div className="min-w-0 flex-1">
-            <DrawerTitle className="truncate text-lg font-bold tracking-tight">
+            <SheetTitle className="truncate text-lg font-bold tracking-tight">
               {shown?.name}
-            </DrawerTitle>
+            </SheetTitle>
             {hasSource ? (
-              <DrawerDescription asChild>
-                <a
-                  href={sourceHref}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void openExternal(sourceHref);
-                  }}
-                  title="在 GitHub 中打开源仓库"
-                  className="inline-flex min-w-0 items-center gap-1"
-                >
-                  {/* The repo's owner avatar leads the repo it belongs to:
-                      who published the skill, next to where it lives. */}
-                  {owner && (
-                    <OwnerAvatar
-                      owner={owner}
-                      className="h-3.5 w-3.5 text-[8px]"
-                    />
-                  )}
-                  <span className="truncate">{shown?.repo}</span>
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                </a>
-              </DrawerDescription>
+              <SheetDescription
+                render={
+                  <a
+                    href={sourceHref}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void openExternal(sourceHref);
+                    }}
+                    title="在 GitHub 中打开源仓库"
+                    className="inline-flex min-w-0 items-center gap-1"
+                  >
+                    {/* The repo's owner avatar leads the repo it belongs to:
+                        who published the skill, next to where it lives. */}
+                    {owner && (
+                      <OwnerAvatar
+                        owner={owner}
+                        className="h-3.5 w-3.5 text-[8px]"
+                      />
+                    )}
+                    <span className="truncate">{shown?.repo}</span>
+                    <ExternalLink className="h-3 w-3 shrink-0" />
+                  </a>
+                }
+              />
             ) : (
-              <DrawerDescription>{LOCAL_SOURCE_LABEL}</DrawerDescription>
+              <SheetDescription>{LOCAL_SOURCE_LABEL}</SheetDescription>
             )}
           </div>
           {/* The primary action lives in the header, like every store's
@@ -420,7 +421,7 @@ export function SkillDetailPanel({
             </span>
           )}
         </div>
-      </DrawerHeader>
+      </SheetHeader>
       {installError && (
         <p
           role="alert"
@@ -488,6 +489,6 @@ export function SkillDetailPanel({
           )
         ) : null}
       </div>
-    </DrawerContent>
+    </SheetContent>
   );
 }

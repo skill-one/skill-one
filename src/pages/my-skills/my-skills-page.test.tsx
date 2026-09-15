@@ -7,7 +7,7 @@ import {
   configure,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { toast } from "sonner";
+import { toast } from "../../components/ui/toast";
 
 import { getExcludedAgents } from "../../lib/agent-link-preferences";
 
@@ -668,9 +668,10 @@ describe("MySkillsPage", () => {
     await screen.findByText("pdf");
 
     await user.click(screen.getByRole("button", { name: "按仓库" }));
-    const rows = screen
-      .getAllByRole("menuitemradio")
-      .map((m) => m.textContent);
+    // The menu's portal mounts asynchronously under Base UI.
+    const rows = (await screen.findAllByRole("menuitemradio")).map(
+      (m) => m.textContent,
+    );
     // All six skills share one repo-less pool; disabling pptx splits the
     // status mode into two groups; nothing is classified.
     expect(rows).toEqual(["按仓库1 组", "按状态2 组", "按类型1 组"]);
@@ -709,10 +710,12 @@ describe("MySkillsPage", () => {
 
   it("unlinks a linked agent from the settings dialog and remembers it", async () => {
     const user = userEvent.setup();
-    const successSpy = vi.spyOn(toast, "success");
+    const successSpy = vi.spyOn(toast, "add");
     renderWithRouter(<MySkillsPage />);
     await openAgentMenu(user);
-    await user.click(screen.getByRole("button", { name: "Agent 链接设置" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Agent 链接设置" }),
+    );
 
     const dialog = await screen.findByRole("dialog");
     await user.click(
@@ -721,16 +724,21 @@ describe("MySkillsPage", () => {
       }),
     );
 
-    expect(successSpy).toHaveBeenCalledWith("Claude Code 已取消链接");
+    expect(successSpy).toHaveBeenCalledWith({
+      title: "Claude Code 已取消链接",
+      type: "success",
+    });
     expect(getExcludedAgents()).toEqual(["claude-code"]);
   });
 
   it("re-links an unlinked agent from the settings dialog", async () => {
     const user = userEvent.setup();
-    const successSpy = vi.spyOn(toast, "success");
+    const successSpy = vi.spyOn(toast, "add");
     renderWithRouter(<MySkillsPage />);
     await openAgentMenu(user);
-    await user.click(screen.getByRole("button", { name: "Agent 链接设置" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Agent 链接设置" }),
+    );
 
     const dialog = await screen.findByRole("dialog");
     await user.click(
@@ -739,7 +747,10 @@ describe("MySkillsPage", () => {
       }),
     );
 
-    expect(successSpy).toHaveBeenCalledWith("Gemini CLI 已链接");
+    expect(successSpy).toHaveBeenCalledWith({
+      title: "Gemini CLI 已链接",
+      type: "success",
+    });
     expect(getExcludedAgents()).toEqual([]);
   });
 
@@ -747,13 +758,15 @@ describe("MySkillsPage", () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
     await openAgentMenu(user);
-    await user.click(screen.getByRole("button", { name: "Agent 链接设置" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Agent 链接设置" }),
+    );
 
     const dialog = await screen.findByRole("dialog");
     const switchEl = await within(dialog).findByRole("switch", {
       name: "Windsurf 链接开关",
     });
-    expect(switchEl).toBeDisabled();
+    expect(switchEl).toHaveAttribute("aria-disabled", "true");
     expect(switchEl).toHaveAttribute("aria-checked", "true");
   });
 

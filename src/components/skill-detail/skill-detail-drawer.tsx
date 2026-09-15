@@ -1,10 +1,10 @@
 import type { SkillView } from "../../lib/skill-view";
-import { Drawer } from "../ui/drawer";
+import { Sheet } from "../ui/sheet";
 import { SkillDetailPanel, type SkillDetailSurface } from "./skill-detail-panel";
 
 /**
- * The skill detail drawer shared by the store pages (explore, featured,
- * ranking) and the my-skills page: a modal right-side Drawer
+ * The skill detail sheet shared by the store pages (explore, featured,
+ * ranking) and the my-skills page: a modal right-side Sheet
  * (dimmed overlay; opening or closing never reflows the grid) with prev/next
  * walking the caller's list.
  *
@@ -44,8 +44,7 @@ export function SkillDetailDrawer({
   };
 
   return (
-    <Drawer
-      direction="right"
+    <Sheet
       open={selectedSkill != null}
       onOpenChange={(open) => {
         if (!open) onSelect(null);
@@ -58,6 +57,6 @@ export function SkillDetailDrawer({
         onNext={handleNext}
         onRemoved={onRemoved}
       />
-    </Drawer>
+    </Sheet>
   );
 }

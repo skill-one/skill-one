@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { ExternalLink, Star } from "lucide-react";
-import { HoverCard } from "radix-ui";
+
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "./ui/hover-card";
 
 import { openExternal } from "../lib/open-external";
 import { cn, formatCount } from "../lib/utils";
@@ -37,76 +42,73 @@ export function RepoHoverCard({
   const href = `https://github.com/${repo}`;
 
   return (
-    <HoverCard.Root
-      open={open}
-      onOpenChange={setOpen}
-      openDelay={150}
-      closeDelay={100}
-    >
-      <HoverCard.Trigger asChild>
-        <button
-          type="button"
-          aria-label={`仓库 ${repo}`}
-          onClick={(e) => {
-            // Hover/focus already open the card; the click only makes sure it
-            // is open (touch). It must not reach the card body behind it.
-            e.stopPropagation();
-            setOpen(true);
-          }}
-          className="shrink-0 cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <OwnerAvatar owner={owner} className={className} />
-        </button>
-      </HoverCard.Trigger>
-      <HoverCard.Portal>
-        <HoverCard.Content
-          side="top"
-          align="start"
-          sideOffset={6}
-          // Portaled, but React still bubbles the events up the component
-          // tree — through the rail into the card, whose body opens the
-          // detail panel. Reading the card must not do that.
-          onClick={(e) => e.stopPropagation()}
-          className={cn(
-            "z-50 w-64 rounded-lg border bg-background p-2.5 shadow-md",
-            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-          )}
-        >
-          {/* The repository names itself and opens itself: the name *is* the
-              link, with the mark that says it leaves the app right behind it.
-              Who hovers an author chip wants the repo, not a menu of things to
-              do with it, so the separate "在 GitHub 中打开" line — a second row
-              of the same card, stating what the name already offers — is gone;
-              the icon brightens instead, which is where the pointer is. */}
-          <a
-            href={href}
-            aria-label={`在 GitHub 中打开 ${repo}`}
+    <HoverCard open={open} onOpenChange={setOpen}>
+      <HoverCardTrigger
+        delay={150}
+        closeDelay={100}
+        render={
+          <button
+            type="button"
+            aria-label={`仓库 ${repo}`}
             onClick={(e) => {
-              e.preventDefault();
-              void openExternal(href);
+              // Hover/focus already open the card; the click only makes sure it
+              // is open (touch). It must not reach the card body behind it.
+              e.stopPropagation();
+              setOpen(true);
             }}
-            className="group flex min-w-0 items-center gap-1 text-[12px] font-medium"
+            className="shrink-0 cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            <span className="truncate">{repo}</span>
-            <ExternalLink
-              className="h-3 w-3 shrink-0 text-muted-foreground/70 transition-colors group-hover:text-foreground"
+            <OwnerAvatar owner={owner} className={className} />
+          </button>
+        }
+      />
+      <HoverCardContent
+        side="top"
+        align="start"
+        sideOffset={6}
+        // Portaled, but React still bubbles the events up the component
+        // tree — through the rail into the card, whose body opens the
+        // detail panel. Reading the card must not do that.
+        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          "z-50 w-64 rounded-lg border bg-background p-2.5 shadow-md",
+          "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
+        )}
+      >
+        {/* The repository names itself and opens itself: the name *is* the
+            link, with the mark that says it leaves the app right behind it.
+            Who hovers an author chip wants the repo, not a menu of things to
+            do with it, so the separate "在 GitHub 中打开" line — a second row
+            of the same card, stating what the name already offers — is gone;
+            the icon brightens instead, which is where the pointer is. */}
+        <a
+          href={href}
+          aria-label={`在 GitHub 中打开 ${repo}`}
+          onClick={(e) => {
+            e.preventDefault();
+            void openExternal(href);
+          }}
+          className="group flex min-w-0 items-center gap-1 text-[12px] font-medium"
+        >
+          <span className="truncate">{repo}</span>
+          <ExternalLink
+            className="h-3 w-3 shrink-0 text-muted-foreground/70 transition-colors group-hover:text-foreground"
+            aria-hidden
+          />
+        </a>
+        {stars != null && (
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+            <Star
+              className="h-3 w-3 fill-amber-400 text-amber-400"
               aria-hidden
             />
-          </a>
-          {stars != null && (
-            <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Star
-                className="h-3 w-3 fill-amber-400 text-amber-400"
-                aria-hidden
-              />
-              {/* One text run: the unit belongs to the number, not beside it. */}
-              <span className="font-medium tabular-nums">
-                {formatCount(stars)} Star
-              </span>
-            </p>
-          )}
-        </HoverCard.Content>
-      </HoverCard.Portal>
-    </HoverCard.Root>
+            {/* One text run: the unit belongs to the number, not beside it. */}
+            <span className="font-medium tabular-nums">
+              {formatCount(stars)} Star
+            </span>
+          </p>
+        )}
+      </HoverCardContent>
+    </HoverCard>
   );
 }

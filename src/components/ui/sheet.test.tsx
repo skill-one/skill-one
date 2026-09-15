@@ -4,13 +4,13 @@ import { render } from "@testing-library/react";
 import { Sheet, SheetContent, SheetTitle } from "./sheet";
 
 /**
- * The Sheet overlay must use the app-wide modal overlay treatment shared
- * with Dialog and AlertDialog: bg-black/50 with no backdrop blur. That is
- * also the latest upstream shadcn default; the pre-v4 new-york registry
- * this component used to ship with was bg-black/80, which reads darker.
+ * The overlay uses the upstream shadcn Base UI default as-is: a light
+ * bg-black/10 dim with a backdrop blur where supported. The pre-migration
+ * app carried a customized bg-black/50 no-blur treatment; per the "prefer
+ * upstream defaults" policy that customization was dropped.
  */
 describe("Sheet", () => {
-  it("dims the overlay with the shared bg-black/50 treatment and no blur", () => {
+  it("renders the default Base UI overlay treatment", () => {
     render(
       <Sheet open>
         <SheetContent>
@@ -19,9 +19,9 @@ describe("Sheet", () => {
       </Sheet>,
     );
 
-    const overlay = document.querySelector('[class*="bg-black/50"]');
+    const overlay = document.querySelector('[data-slot="sheet-overlay"]');
     expect(overlay).not.toBeNull();
-    expect(overlay).not.toHaveClass("backdrop-blur-sm");
-    expect(document.querySelector('[class*="bg-black/80"]')).toBeNull();
+    expect(overlay).toHaveClass("bg-black/10");
+    expect(overlay).toHaveClass("supports-backdrop-filter:backdrop-blur-xs");
   });
 });

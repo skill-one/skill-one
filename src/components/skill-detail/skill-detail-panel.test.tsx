@@ -129,7 +129,7 @@ function DetailDrawer({
   const [open, setOpen] = useState(currentSkill != null);
   return (
     <QueryClientProvider client={queryClient}>
-      <Drawer direction="right" open={open} onOpenChange={setOpen}>
+      <Drawer swipeDirection="right" open={open} onOpenChange={setOpen}>
         <SkillDetailPanel
           skill={currentSkill}
           surface={surface}
@@ -172,7 +172,6 @@ describe("SkillDetailPanel", () => {
   });
 
   it("shows skill info and the fetched SKILL.md", async () => {
-    const user = userEvent.setup();
     mockFetchSkillDetail.mockResolvedValue(detail);
     renderDrawer({});
 
@@ -213,12 +212,21 @@ describe("SkillDetailPanel", () => {
     const heatTip = await screen.findByRole("tooltip");
     expect(heatTip.textContent).toMatch(/3M\s*·\s*169\.6K/);
     heat.blur();
+    // Wait out the closing tooltip before opening the next one, or the
+    // query below may catch the leaving one instead.
+    await vi.waitFor(() =>
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(),
+    );
     // The exact path is provenance detail: hidden behind the 源 tip by
     // default, and an unhashed entry's tip carries no version lines at all.
     expect(screen.queryByText(detail.path)).not.toBeInTheDocument();
-    await user.hover(screen.getByRole("link", { name: "源" }));
+    // Focus (the a11y path) instead of hover: hover-open inside the modal
+    // drawer is unreliable under jsdom; real-browser hover is covered by the
+    // list-row tooltip tests outside a modal layer.
+    screen.getByRole("link", { name: "源" }).focus();
     const tip = await screen.findByRole("tooltip");
     expect(within(tip).getByText(detail.path)).toBeInTheDocument();
+    tip.blur();
     expect(tip).not.toHaveTextContent("版本");
     expect(tip).not.toHaveTextContent("收录时间");
     expect(mockFetchSkillDetail).toHaveBeenCalledWith(
@@ -229,16 +237,18 @@ describe("SkillDetailPanel", () => {
   });
 
   it("shows the registry version fingerprint and when that version was recorded", async () => {
-    const user = userEvent.setup();
     mockFetchSkillDetail.mockResolvedValue(detail);
     renderDrawer({ skill: versionedSkill });
 
     await screen.findByText("Use this skill for PDFs.");
     // All provenance is collapsed into the 源 tip: hover reveals the full
     // hash, the first-seen date and the exact SKILL.md path.
-    await user.hover(screen.getByRole("link", { name: "源" }));
+    // Focus path, as above: hover-open inside the modal drawer is flaky
+    // under jsdom.
+    screen.getByRole("link", { name: "源" }).focus();
     const tip = await screen.findByRole("tooltip");
     expect(within(tip).getByText(versionedSkill.rev!)).toBeInTheDocument();
+    tip.blur();
     expect(tip).toHaveTextContent(SEEN_AT_LOCALE);
     expect(within(tip).getByText(detail.path)).toBeInTheDocument();
   });
@@ -355,7 +365,7 @@ describe("SkillDetailPanel", () => {
     renderDrawer({});
 
     await screen.findByText("Use this skill for PDFs.");
-    const overlay = document.querySelector('[data-slot="drawer-overlay"]');
+    const overlay = document.querySelector('[data-slot="sheet-overlay"]');
     expect(overlay).not.toBeNull();
     await user.click(overlay!);
     await vi.waitFor(() =>

@@ -51,18 +51,20 @@ export function FilterDropdown<T extends string>({
     options.find((option) => option.value === value) ?? options[0];
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="rounded-full px-4">
-          <span className="flex items-center gap-1.5">
-            <current.icon
-              aria-hidden="true"
-              className="h-4 w-4 text-foreground"
-            />
-            {current.neutral ? label : current.label}
-          </span>
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        </Button>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="outline" className="rounded-full px-4">
+            <span className="flex items-center gap-1.5">
+              <current.icon
+                aria-hidden="true"
+                className="h-4 w-4 text-foreground"
+              />
+              {current.neutral ? label : current.label}
+            </span>
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        }
+      />
       <DropdownMenuContent align="end">
         <DropdownMenuRadioGroup
           value={value}

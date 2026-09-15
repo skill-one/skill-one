@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "../components/ui/toast";
 
 import { checkForRegistryUpdate } from "../lib/registry/refresh";
 
@@ -21,7 +21,7 @@ export function useRegistryRefresh() {
     void checkForRegistryUpdate()
       .then((result) => {
         if (result?.status === "updated") {
-          toast("技能数据已更新到最新快照");
+          toast.add({ title: "技能数据已更新到最新快照" });
         }
       })
       .catch(() => {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "./ui/toast";
 
 import { removeInstalledSkill } from "../lib/local-skills";
 import {
@@ -54,10 +54,10 @@ export function SkillRemoveButton({
       // Same broadcast the install button makes: the my-skills list, the
       // sidebar count and the menu bar popover all read this one signal.
       await markSkillsChanged(queryClient);
-      toast.success(`已移除 ${skill.name}`);
+      toast.add({ title: `已移除 ${skill.name}`, type: "success" });
       onRemoved?.();
     } catch (err) {
-      toast.error(errorMessage(err, "移除失败"));
+      toast.add({ title: errorMessage(err, "移除失败"), type: "error" });
     } finally {
       setRemoving(false);
     }
