@@ -10,17 +10,14 @@ export type { SkillRef };
  * objects and highlight terms only, never the full registry array.
  */
 
-/** Registry fields a search covers (also the highlight keys). */
-export type SearchField = "name" | "repo" | "description";
-
 /** One search/browse result: the skill plus what matched, for highlighting. */
 export interface SearchHit {
   skill: Skill;
   /**
-   * Matched indexed terms per field. Empty outside a search — only search
+   * Matched indexed terms in the name. Empty outside a search — only search
    * results carry highlight terms.
    */
-  matched: Partial<Record<SearchField, readonly string[]>>;
+  matched: { name?: readonly string[] };
 }
 
 /**

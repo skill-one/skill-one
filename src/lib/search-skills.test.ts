@@ -3,9 +3,9 @@ import { describe, it, expect } from "vitest";
 import { buildSkillSearch } from "./search-skills";
 import type { Skill } from "../types/skill";
 
-// "redis" appears verbatim in exactly one field of each skill — name, repo
-// and description respectively — so the ranking between them is decided by
-// the field boosts alone.
+// Only the name is searched: "redis" sits in deploy-scripts' repo
+// (acme/redis-toolkit) and in doc-writer's description, and neither is a hit —
+// the one skill named for it is.
 const skills: Skill[] = [
   {
     name: "redis-cache-helper",
@@ -31,13 +31,11 @@ const skills: Skill[] = [
 ];
 
 describe("buildSkillSearch", () => {
-  it("ranks matches by field priority: name above repo above description", () => {
+  it("searches the name only: a repo or description mention is not a hit", () => {
     const results = buildSkillSearch(skills)("redis");
 
     expect(results.map(({ skill }) => skill.name)).toEqual([
       "redis-cache-helper",
-      "deploy-scripts",
-      "doc-writer",
     ]);
   });
 
@@ -67,49 +65,13 @@ describe("buildSkillSearch", () => {
     ]);
   });
 
-  it("keeps match quality ahead of popularity across field tiers", () => {
-    // A name hit outranks a description hit whatever the install counts: the
-    // field ratio (8×) is wider than the popularity boost can close (max
-    // ~2.2×), and the name tier orders it first regardless.
-    const results = buildSkillSearch([
-      {
-        name: "redis-cache-helper",
-        repo: "acme/other-tools",
-        description: "Keeps your cache warm.",
-        stars: 0,
-        downloads: 0,
-      },
-      {
-        name: "doc-writer",
-        repo: "acme/docs",
-        description: "Generates docs that mention redis.",
-        stars: 5_000_000,
-        downloads: 5_000_000,
-      },
-    ])("redis");
-
-    expect(results[0].skill.name).toBe("redis-cache-helper");
-  });
-
-  it("reports the expanded matched terms per field for highlighting", () => {
+  it("reports the expanded name terms for highlighting", () => {
     const [hit] = buildSkillSearch(skills)("redi");
 
-    // The prefix query "redi" reports the full indexed term "redis".
+    // The prefix query "redi" reports the full indexed term "redis", and the
+    // name is the only key a hit carries.
     expect(hit.skill.name).toBe("redis-cache-helper");
-    expect(hit.matched.name).toEqual(["redis"]);
-    expect(hit.matched.repo).toBeUndefined();
-    expect(hit.matched.description).toBeUndefined();
-  });
-
-  it("reports matches from every field the term appears in", () => {
-    const hit = buildSkillSearch(skills)("cache").find(
-      ({ skill }) => skill.name === "redis-cache-helper",
-    );
-
-    // "cache" appears in both the name and the description.
-    expect(hit?.matched.name).toEqual(["cache"]);
-    expect(hit?.matched.description).toEqual(["cache"]);
-    expect(hit?.matched.repo).toBeUndefined();
+    expect(hit.matched).toEqual({ name: ["redis"] });
   });
 
   it("answers a half-typed word but not a mistyped one", () => {
@@ -128,8 +90,8 @@ describe("buildSkillSearch", () => {
   });
 
   it("does not search a skill's profile domain", () => {
-    // The profile domain is a filter, not a search field: only name, repo and
-    // description are indexed.
+    // The profile domain is a filter, not a search field: only the name is
+    // indexed.
     const profiled: Skill[] = [
       {
         name: "pdf-exporter",
@@ -146,7 +108,7 @@ describe("buildSkillSearch", () => {
 });
 
 describe("buildSkillSearch — query-level rules", () => {
-  it("floats an exact name match above a far more popular mention", () => {
+  it("floats an exact name match above a far more popular longer name", () => {
     const results = buildSkillSearch([
       {
         name: "pdf",
@@ -164,15 +126,14 @@ describe("buildSkillSearch — query-level rules", () => {
       },
     ])("pdf");
 
-    // Field stacking plus popularity would put the exporter first; the name
-    // tier overrides both.
+    // Popularity would put the exporter first; the name tier overrides it.
     expect(results.map(({ skill }) => skill.name)).toEqual([
       "pdf",
       "pdf-exporter",
     ]);
   });
 
-  it("floats a name prefix above a non-prefix match, popularity aside", () => {
+  it("floats a name prefix above a non-prefix name match, popularity aside", () => {
     const results = buildSkillSearch([
       {
         name: "pdf-tools",
@@ -182,9 +143,9 @@ describe("buildSkillSearch — query-level rules", () => {
         downloads: 0,
       },
       {
-        name: "mypdf",
-        repo: "acme/mypdf",
-        description: "A pdf suite with pdf helpers.",
+        name: "suite-pdf",
+        repo: "acme/suite",
+        description: "A suite.",
         stars: 5_000_000,
         downloads: 5_000_000,
       },
@@ -192,7 +153,7 @@ describe("buildSkillSearch — query-level rules", () => {
 
     expect(results.map(({ skill }) => skill.name)).toEqual([
       "pdf-tools",
-      "mypdf",
+      "suite-pdf",
     ]);
   });
 
@@ -222,7 +183,7 @@ describe("buildSkillSearch — query-level rules", () => {
     ]);
   });
 
-  it("requires every term before falling back to any of them", () => {
+  it("requires every query term to match", () => {
     const search = buildSkillSearch([
       {
         name: "redis-cache",
@@ -246,18 +207,14 @@ describe("buildSkillSearch — query-level rules", () => {
       "redis-cache",
     ]);
 
-    // No document carries both, so the query falls back to "any word" instead
-    // of coming back empty.
-    expect(search("redis kubernetes").map(({ skill }) => skill.name)).toContain(
-      "redis-tool",
-    );
+    // No document carries both, and there is no OR fallback, so the query is
+    // empty rather than returning the redis-only match.
+    expect(search("redis kubernetes")).toEqual([]);
   });
 
-  it("lets popularity decide between namesakes despite a description mention", () => {
-    // The reported case: several skills are all called "grill-me", some of them
-    // repeat the word in their trigger-phrase description, and the by-far most
-    // installed one does not. The description mention used to outweigh a 100×
-    // install gap; the name tier plus the half-weighted description fix that.
+  it("lets popularity decide between namesakes", () => {
+    // Several skills are all called "grill-me"; the by-far most installed one
+    // wins.
     const results = buildSkillSearch([
       {
         name: "grill-me",
@@ -282,10 +239,9 @@ describe("buildSkillSearch — query-level rules", () => {
     ]);
   });
 
-  it("keeps a second matching field as a tie-break, not a penalty", () => {
-    // Two namesakes of equal popularity: the one whose description also carries
-    // the term wins on relevance. A field-shadowing rule ("the name matched, so
-    // drop the description score") would tie them instead.
+  it("keeps the registry order between otherwise identical hits", () => {
+    // Two namesakes of equal popularity with no other difference: the search
+    // adds no tie-break of its own, so their registry order stands.
     const results = buildSkillSearch([
       {
         name: "grill-me",

@@ -623,12 +623,11 @@ describe("ExplorePage", () => {
     ).toBeInTheDocument();
   });
 
-  it("orders search results by field weight (name > repo > description)", async () => {
+  it("searches the name only: repo and description mentions are not hits", async () => {
     const user = userEvent.setup();
-    // "widget" appears verbatim in exactly one field of each skill — name,
-    // repo and description respectively — so the ranking is decided by the
-    // field weights alone. One skill per repository: the group order under a
-    // search is the relevance order of the groups' first (best) hits.
+    // Only the first skill is named for "widget"; the second carries it in its
+    // repository (acme/widget-lab) and the third in its description, and
+    // neither is searched.
     harness.init();
     harness.pushAll([
       {
@@ -659,13 +658,11 @@ describe("ExplorePage", () => {
 
     await user.type(await searchField(), "widget");
 
-    // Rows appear in DOM order; read each row's aria-label, which stays
-    // intact even when highlighted names are split across <mark> segments.
-    // The browsed list orders the same skills alphabetically by repo, so the
-    // assertion must wait out the swap rather than trust the first paint.
-    await waitFor(() =>
-      expect(cardOrder()).toEqual(["widget-pack", "misc-tools", "docgen"]),
-    );
+    // Rows appear in DOM order; read each row's aria-label, which stays intact
+    // even when a highlighted name is split across <mark> segments. The
+    // browsed list also shows all three, so the assertion must wait out the
+    // swap rather than trust the first paint.
+    await waitFor(() => expect(cardOrder()).toEqual(["widget-pack"]));
   });
 
   it("ranks search results by popularity among equally relevant matches", async () => {
@@ -695,10 +692,10 @@ describe("ExplorePage", () => {
 
     await user.type(await searchField(), "redis");
 
-    // Both matches are equally relevant, so the search's install boost puts the
-    // popular one first — a reorder the browsed list's order alone cannot
-    // explain, which is also the proof that a search answers in relevance order
-    // rather than in the order the browsed list had.
+    // Both matches are equally relevant, so popularity puts the more installed
+    // one first — a reorder the browsed list's order alone cannot explain,
+    // which is also the proof that a search answers in relevance order rather
+    // than in the order the browsed list had.
     await waitFor(() =>
       expect(cardOrder()).toEqual(["beta-redis-tool", "alpha-redis-clip"]),
     );

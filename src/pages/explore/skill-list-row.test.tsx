@@ -314,13 +314,12 @@ describe("SkillListRow", () => {
 
   it("wraps matched search tokens in <mark>", () => {
     renderWithRouter(
-      <SkillListRow skill={skill} matched={{ description: ["pdf"] }} />,
+      <SkillListRow skill={skill} matched={{ name: ["pdf"] }} />,
     );
 
-    // Whole tokens only, case-insensitive, with the original casing kept. A
-    // repo match has nothing to mark: the repo is named by the author chip
-    // (its hover card), not written out on the card.
-    expect(screen.getByText("PDF").tagName).toBe("MARK");
+    // Whole tokens only, case-insensitive against the index, with the original
+    // casing kept.
+    expect(screen.getByText("pdf").tagName).toBe("MARK");
   });
 
   it("splits a matched name across marks without losing the name", () => {
@@ -336,24 +335,24 @@ describe("SkillListRow", () => {
     expect(container.querySelector("h3")).toHaveTextContent("pdf-tools");
   });
 
-  it("marks a CJK term inside an unsegmented run", () => {
+  it("marks a CJK bigram inside an unsegmented run", () => {
     const { container } = renderWithRouter(
       <SkillListRow
-        skill={{ ...skill, description: "PDF 文档读取与拆分" }}
-        matched={{ description: ["文档"] }}
+        skill={{ ...skill, name: "PDF文档读取" }}
+        matched={{ name: ["文档"] }}
       />,
     );
 
-    // The index stores Han text as characters and bigrams, all shorter than the
-    // run they came from, so this is what whole-token comparison could not mark.
+    // The index stores Han text as bigrams, shorter than the run they came
+    // from, so this is what whole-token comparison could not mark.
     expect(container.querySelector("mark")).toHaveTextContent("文档");
   });
 
   it("marks a term inside a longer word", () => {
     const { container } = renderWithRouter(
       <SkillListRow
-        skill={{ ...skill, description: "Handles PDFs end to end" }}
-        matched={{ description: ["pdf"] }}
+        skill={{ ...skill, name: "PDFs-splitter" }}
+        matched={{ name: ["pdf"] }}
       />,
     );
 

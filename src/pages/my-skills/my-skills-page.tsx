@@ -328,20 +328,13 @@ export function MySkillsPage() {
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // The store's single search entry point, over the installed list: a term or
-  // the start of one matches, a mistyped word does not. Installed lists are
-  // short, so the index is cheap to build here and rebuild when the list
-  // changes — unlike the registry, which builds the same index in the worker.
-  // The field boosts mirror the registry's priority: what a skill is called
-  // beats a description that repeats a trigger phrase. The matched terms the
-  // index reports ride along to the cards, exactly as the store's hits do.
-  const searchInstalled = useMemo(
-    () =>
-      buildSearchIndex(list, {
-        fields: { name: 4, description: 0.5 },
-      }),
-    [list],
-  );
+  // The store's single search entry point, over the installed list: a skill is
+  // found by name, every query term must match, a mistyped word does not.
+  // Installed lists are short, so the index is cheap to build here and rebuild
+  // when the list changes — unlike the registry, which builds the same index in
+  // the worker. The matched terms the index reports ride along to the cards,
+  // exactly as the store's hits do.
+  const searchInstalled = useMemo(() => buildSearchIndex(list), [list]);
 
   // The hits of the current query, or null when browsing. A query orders its
   // own results by relevance; the enablement state then only decides which

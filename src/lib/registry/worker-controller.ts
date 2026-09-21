@@ -403,8 +403,8 @@ export function createRegistryController(
       if (!search) return { hits: [], total: 0 };
       // Always in relevance order: `sort` orders the browsed list, and
       // re-ranking search hits by download count or name would throw away the
-      // ranking (all terms matched, exact/prefix name first, then name > repo
-      // > description, popularity as a nudge) that made them hits.
+      // ranking (all terms matched, exact/prefix name first, then popularity)
+      // that made them hits.
       let hits: SearchHit[] = search(q);
       // A category filter narrows the search results; skills the dataset has
       // not classified simply fall outside every category. A skill classified
