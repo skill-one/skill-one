@@ -1,14 +1,20 @@
 import type { Skill } from "../../types/skill";
+import { text, textList } from "../value";
 
 /**
- * Pure parsing of the skills-sh-mirror index's JSONL lines into the app's
+ * Pure parsing of the skills-profiles index's JSONL lines into the app's
  * Skill model. Runs inside the registry worker, one line at a time while the
  * download streams in.
  *
- * Star counts are not carried by the index rows themselves: upstream keeps
- * them in a separate `repos.jsonl` (one row per GitHub repo), which is
- * joined in at parse time through the `starsFor` callback — see
- * `readRepos` in `index-stream.ts`.
+ * The upstream index is self-contained: a row carries the skill's own fields
+ * plus the profile classification (`domain`/`reason`) the dataset generated
+ * for it, so one parsed line yields the fully decorated skill — nothing is
+ * merged in afterwards.
+ *
+ * Star counts are the one exception: they are not carried by the index rows
+ * themselves but kept in a separate `upstream/repos.jsonl` (one row per
+ * GitHub repo), which is joined in at parse time through the `starsFor`
+ * callback — see `readRepos` in `index-stream.ts`.
  */
 
 /** Raw skill shape as stored in one JSONL index line. */
@@ -28,12 +34,19 @@ interface RawSkill {
   hash?: string | null;
   /** When the current content version was first fetched (ISO, UTC). */
   fetchedAt?: string | null;
+  /**
+   * The dataset's classification: 1–3 domain keys, best fit first. Absent
+   * for skills the generator has not reached yet.
+   */
+  domain?: unknown;
+  /** The generator's one-line justification for the classification. */
+  reason?: unknown;
 }
 
 /**
  * Whether an id is a canonical skills.sh id for a GitHub repo.
  *
- * The mirror only lists GitHub-sourced skills, but a defensive shape check
+ * The dataset only lists GitHub-sourced skills, but a defensive shape check
  * keeps a malformed line from interpolating junk into download URLs and
  * avatar paths: exactly three non-empty segments, and a dot-free owner (a
  * dotted first segment would be a domain, not a GitHub user).
@@ -57,12 +70,17 @@ export type StarsFor = (repo: string) => number | undefined;
 function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
   const [owner, repo, slug] = raw.id.split("/");
   const repoId = `${owner}/${repo}`;
+  // Classification is optional garnish: a skill the generator has not reached
+  // simply carries no profile, and every consumer already treats it that way.
+  // A row whose `domain` is missing, empty or wrong-shaped lands on the same
+  // "no profile" shape rather than a half-filled one.
+  const domains = textList(raw.domain) ?? [];
   return {
     // The slug is the skill's name: the directory the skill ships in, and
     // what a locally installed copy of it is called.
     name: slug,
     repo: repoId,
-    // The mirror exposes descriptions; fall back to an empty placeholder
+    // Upstream exposes descriptions; fall back to an empty placeholder
     // when an entry lacks one so the row layout stays stable.
     description: raw.description ?? "",
     // GitHub stars come from the joined repos.jsonl rows, not the skill row
@@ -71,13 +89,16 @@ function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
     // Install counts are separate metrics; an entry missing one normalizes
     // to 0.
     downloads: raw.installs ?? 0,
-    // The skill's files live in the mirror snapshot at this directory; the
-    // basename equals the skill name, so a locally installed copy still
-    // matches its registry entry.
+    // The skill's files live in the snapshot at this directory; the basename
+    // equals the skill name, so a locally installed copy still matches its
+    // registry entry.
     path: `skills/${raw.id}`,
     rev: raw.hash ?? undefined,
     firstSeenAt: raw.fetchedAt ?? undefined,
     url: raw.url ?? undefined,
+    ...(domains.length > 0
+      ? { profile: { domain: domains, reason: text(raw.reason) } }
+      : {}),
   };
 }
 

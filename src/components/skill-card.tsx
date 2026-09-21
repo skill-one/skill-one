@@ -107,11 +107,12 @@ export function SkillCard({
   // Absent means backed: every `Skill` the registry handed over is. Only the
   // installed list sets it, for a record no store entry was resolved for.
   const storeBacked = skill.storeBacked !== false;
-  // The owner segment of the source — what the mirror hosts an avatar for. A
+  // The owner segment of the source — what the dataset hosts an avatar for. A
   // bare owner (no slash) counts as none, exactly as it does for the cover.
   const [owner] = skill.repo.split("/");
-  // Classification and figure are both registry facts; the profiles dataset
-  // simply has not profiled every skill, so the classification is optional.
+  // Classification and figure are both registry facts; the dataset simply has
+  // not classified every skill, so the classification is optional. A skill may
+  // belong to several domains — the badge leads with the best-fitting one.
   const domain = skill.profile?.domain;
 
   return (
@@ -230,9 +231,9 @@ export function SkillCard({
             A backless skill has neither to show, and closing the rail up is
             what keeps *that* readable: an empty rail under a hairline reads as
             a rendering bug. */}
-        {(storeBacked || domain) && (
+        {(storeBacked || domain?.length) && (
           <CardFooter className="mt-auto gap-2 border-t border-border/60 pt-2.5 text-xs text-muted-foreground">
-            {domain && (
+            {domain && domain.length > 0 && (
               <DomainBadge
                 domain={domain}
                 reason={skill.profile?.reason}

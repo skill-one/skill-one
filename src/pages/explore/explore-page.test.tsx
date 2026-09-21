@@ -50,7 +50,7 @@ const harness = (
 ).__harness;
 
 vi.mock("../../lib/skill-detail-api", () => ({
-  MIRROR: { repo: "skill-one/skills-sh-mirror", ref: "dist" },
+  MIRROR: { repo: "skill-one/skills-profiles", ref: "dist" },
   fetchSkillDetail: vi.fn(),
 }));
 
@@ -794,14 +794,18 @@ describe("ExplorePage", () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     harness.reset();
     harness.init();
-    harness.pushAll(makeSkills(6, 0));
+    // The classification rides the index rows: two skills carry one, the
+    // other four stay unclassified.
+    harness.pushAll(
+      makeSkills(6, 0).map((s, i) =>
+        i === 0
+          ? { ...s, profile: { domain: ["development"] } }
+          : i === 1
+            ? { ...s, profile: { domain: ["content-creation"] } }
+            : s,
+      ),
+    );
     harness.complete();
-    // Profiles land with the same boot; the grouping settles once the
-    // index is rebuilt over the decorated skills.
-    harness.publishProfiles({
-      "acme/batch/skill-0": { domain: "开发编程" },
-      "acme/batch/skill-1": { domain: "内容创作" },
-    });
     renderExplorePage();
     await screen.findByText("skill-0");
 
@@ -810,8 +814,8 @@ describe("ExplorePage", () => {
     await user.click(screen.getByRole("button", { name: "按仓库" }));
     await activateMenuOption(await liveMenuOption(/^按类型/));
 
-    // The same six skills regroup: two profiled domains plus the 未分类
-    // pool for the other four — ordered by size.
+    // The same six skills regroup: two domains plus the 未分类 pool for the
+    // other four — ordered by size.
     expect(await screen.findByText("未分类")).toBeInTheDocument();
     expect(groupHeader("开发编程", 1)).toBeInTheDocument();
     expect(groupHeader("内容创作", 1)).toBeInTheDocument();

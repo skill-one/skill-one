@@ -12,7 +12,6 @@ import {
   DEFAULT_CDN_BASE,
   getCdnBase,
   getIndexTag,
-  getProfilesTag,
   setCdnBase,
 } from "../../lib/cdn-config";
 import { reloadRegistry } from "../../lib/registry/client";
@@ -53,10 +52,9 @@ const CHECK_LABEL: Record<RevalidateStatus, string> = {
  * passed in).
  *
  * The data-source card is the read-out for run-based caching: it names the
- * snapshot each source (registry index, profiles dataset) is serving and
- * whether this launch re-downloaded or reused the local copy. Its button is
- * the manual escape hatch — a reload always re-downloads, even when the
- * published runs have not moved.
+ * snapshot the dataset is serving and whether this launch re-downloaded or
+ * reused the local copy. Its button is the manual escape hatch — a reload
+ * always re-downloads, even when the published run has not moved.
  */
 export function SettingsPage() {
   const [value, setValue] = useState(getCdnBase());
@@ -86,11 +84,11 @@ export function SettingsPage() {
     setCheck(result?.status ?? "unknown");
   };
 
-  // Facts about the snapshots the store is actually serving, one group per
-  // GitHub source. The `dist-<date>` tag is short enough to display whole
-  // and to diff against a release. A recorded tag (persisted by the
-  // registry client) stands in until the live snapshot identity arrives,
-  // so a fresh session still names its snapshots.
+  // Facts about the snapshot the store is actually serving. The
+  // `dist-<date>[-N]` tag is short enough to display whole and to diff
+  // against a release. A recorded tag (persisted by the registry client)
+  // stands in until the live snapshot identity arrives, so a fresh session
+  // still names its snapshot.
   const indexRows = [
     {
       term: "快照",
@@ -99,14 +97,6 @@ export function SettingsPage() {
     { term: "发布于", value: formatIndexTime(index?.generatedAt) },
     { term: "条目数", value: formatTotal(index?.total) },
   ];
-  const profileRows = [
-    {
-      term: "快照",
-      value: index?.profilesTag ?? (getProfilesTag() || "未知"),
-    },
-    { term: "发布于", value: formatIndexTime(index?.profilesAt) },
-  ];
-
   return (
     <div className="mx-auto flex h-full w-full max-w-[680px] flex-col px-8 py-5">
       <h2 className="text-[18px] font-semibold tracking-tight text-foreground">
@@ -302,9 +292,9 @@ export function SettingsPage() {
             <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
               <div className="contents">
                 <dt className="pt-1 font-medium text-foreground">
-                  技能索引
+                  技能数据源
                   <span className="ml-1 font-normal text-muted-foreground">
-                    （skills-sh-mirror）
+                    （skills-profiles）
                   </span>
                 </dt>
                 <dd className="pt-1" />
@@ -317,25 +307,6 @@ export function SettingsPage() {
                   </dd>
                 </div>
               ))}
-              <div className="contents">
-                <dt className="pt-2 font-medium text-foreground">
-                  画像数据集
-                  <span className="ml-1 font-normal text-muted-foreground">
-                    （skills-profiles）
-                  </span>
-                </dt>
-                <dd className="pt-2" />
-              </div>
-              {profileRows.map(({ term, value: detail }) => (
-                <div key={term} className="contents">
-                  <dt className="text-muted-foreground">{term}</dt>
-                  <dd className="min-w-0 break-all text-foreground">
-                    {detail}
-                  </dd>
-                </div>
-              ))}
-              {/* One check covers both sources, so it reads outside the two
-                  per-source groups. */}
               <div className="contents">
                 <dt className="pt-2 text-muted-foreground">上次校验</dt>
                 <dd className="pt-2 text-foreground">

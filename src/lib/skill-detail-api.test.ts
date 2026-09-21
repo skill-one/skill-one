@@ -128,7 +128,7 @@ describe("fetchSkillDetail", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills/pdf/SKILL.md",
       { signal: expect.anything() },
     );
   });
@@ -148,7 +148,7 @@ describe("fetchSkillDetail", () => {
 
     expect(detail.path).toBe("skills/pdf/SKILL.md");
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills/pdf/SKILL.md",
       { signal: expect.anything() },
     );
   });
@@ -166,7 +166,7 @@ describe("fetchSkillDetail", () => {
     // The recorded tag is the snapshot the served index was built from, so
     // the SKILL.md body must come from exactly that snapshot.
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist-2026-09-06/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/skill-one/skills-profiles/dist-2026-09-06/skills/pdf/SKILL.md",
       { signal: expect.anything() },
     );
   });
@@ -185,7 +185,7 @@ describe("fetchSkillDetail", () => {
       fetchSkillDetail("owner/repo", "pdf", "skills/pdf"),
     ).rejects.toThrow("SKILL.md for pdf not found in owner/repo");
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills/pdf/SKILL.md",
       { signal: expect.anything() },
     );
   });

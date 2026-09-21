@@ -5,7 +5,6 @@ import { render, screen, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
-import { fetchSkillProfile } from "../../lib/skill-profile-api";
 import {
   fetchInstalledSkills,
   fetchLocalSkillDetail,
@@ -21,15 +20,8 @@ import {
 } from "./skill-detail-panel";
 
 vi.mock("../../lib/skill-detail-api", () => ({
-  MIRROR: { repo: "skill-one/skills-sh-mirror", ref: "dist" },
+  MIRROR: { repo: "skill-one/skills-profiles", ref: "dist" },
   fetchSkillDetail: vi.fn(),
-}));
-
-vi.mock("../../lib/skill-profile-api", () => ({
-  fetchSkillProfile: vi.fn(),
-  // The cover is a pure URL builder; the header uses it to address the
-  // skill's image. Nothing loads in this env, so the slot shows its fallback.
-  skillCoverCandidates: (id: string) => [`https://cdn.test/${id}/cover.png`],
 }));
 
 vi.mock("../../lib/local-skills", () => ({
@@ -44,7 +36,6 @@ vi.mock("../../lib/open-external", () => ({
 }));
 
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
-const mockFetchSkillProfile = vi.mocked(fetchSkillProfile);
 const mockFetchLocalSkillDetail = vi.mocked(fetchLocalSkillDetail);
 const mockRemoveInstalledSkill = vi.mocked(removeInstalledSkill);
 const mockSetSkillEnabled = vi.mocked(setSkillEnabled);
@@ -154,7 +145,6 @@ beforeEach(() => {
     defaultOptions: { queries: { retry: false } },
   });
   mockFetchSkillDetail.mockReset();
-  mockFetchSkillProfile.mockReset();
   mockFetchLocalSkillDetail.mockReset();
   mockSetSkillEnabled.mockReset();
   mockOpenExternal.mockReset();
@@ -273,7 +263,7 @@ describe("SkillDetailPanel", () => {
     // the link's tooltip.
     expect(screen.getByRole("link", { name: "源" })).toHaveAttribute(
       "href",
-      "https://github.com/skill-one/skills-sh-mirror/blob/dist/skills/anthropics/skills/pdf/SKILL.md",
+      "https://github.com/skill-one/skills-profiles/blob/dist/skills/anthropics/skills/pdf/SKILL.md",
     );
   });
 
@@ -485,86 +475,16 @@ describe("SkillDetailPanel", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("lands on the 概述 tab and keeps SKILL.md one click away for a profiled skill", async () => {
-    const user = userEvent.setup();
-    mockFetchSkillProfile.mockResolvedValue({
-      scenario: "找不到现成 skill？它替你搜。",
-      taglines: ["一搜即装", "只荐对的"],
-      blackbox: {
-        function: "把一句话需求变成装好的 skill。",
-        inputOutput: [{ input: "我想做 X", output: "推荐的 skill" }],
-      },
-      comments: [
-        {
-          user: "后端老兵",
-          category: "妙用",
-          comment: "用 --owner 锁定官方源。",
-        },
-      ],
-    });
-    // A profiled skill carries both the index profile and a mirror path.
-    renderDrawer({
-      skill: {
-        ...skill,
-        profile: {
-          domain: "开发编程",
-          reason: "dev tooling",
-          persona: {
-            tool: "npx skills",
-            role: "技能猎头",
-            scene: "需要找 skill 时",
-          },
-        },
-      },
-    });
-
-    // 概述 is the default landing tab (tabs mount once the detail fetch
-    // resolves), and the inactive SKILL.md body is not even mounted yet.
-    expect(
-      await screen.findByRole("tab", { name: "概述" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText("Use this skill for PDFs."),
-    ).not.toBeInTheDocument();
-
-    // Structured layout: lead quote + tool, slogans, pitch, input/output,
-    // and categorized user comments.
-    // The scene renders as a curly-quoted lead paragraph.
-    expect(await screen.findByText(/需要找 skill 时/)).toBeInTheDocument();
-    expect(screen.getByText("谋生工具：")).toBeInTheDocument();
-    expect(screen.getByText("一搜即装")).toBeInTheDocument();
-    expect(
-      screen.getByText("找不到现成 skill？它替你搜。"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/把一句话需求变成装好的 skill。/),
-    ).toBeInTheDocument();
-    expect(screen.getByText("我想做 X")).toBeInTheDocument();
-    expect(screen.getByText("推荐的 skill")).toBeInTheDocument();
-    // User comments render as an avatar-less stream: section heading,
-    // category badge + nickname attribution above the body, each note
-    // hanging off a category-colored left rail.
-    expect(screen.getByText("用户评论")).toBeInTheDocument();
-    expect(screen.getByText("后端老兵")).toBeInTheDocument();
-    expect(screen.getByText("妙用")).toBeInTheDocument();
-    expect(screen.getByText("用 --owner 锁定官方源。")).toBeInTheDocument();
-    expect(screen.queryByText("用户笔记")).not.toBeInTheDocument();
-
-    // The canonical source is one click away.
-    await user.click(screen.getByRole("tab", { name: "SKILL.md" }));
-    expect(
-      await screen.findByText("Use this skill for PDFs."),
-    ).toBeInTheDocument();
-  });
-
-  it("keeps the plain SKILL.md body for an unprofiled skill", async () => {
+  it("renders the SKILL.md body with no tabs, keeping the classification in the header", async () => {
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderDrawer({ skill });
+    renderDrawer({
+      skill: { ...skill, profile: { domain: ["development"] } },
+    });
 
     await screen.findByText("Use this skill for PDFs.");
-    // No tabs at all when the dataset has not profiled the skill.
+    // The classification is a header chip; the body is the canonical source.
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
-    expect(mockFetchSkillProfile).not.toHaveBeenCalled();
+    expect(screen.getByText("开发编程")).toBeInTheDocument();
   });
 
   it("clamps a long header summary so it cannot push the body out of the drawer", async () => {

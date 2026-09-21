@@ -9,27 +9,29 @@ describe("domainMeta", () => {
   it("covers the dataset's fixed 13-domain taxonomy", () => {
     expect(DOMAINS).toHaveLength(13);
     for (const domain of DOMAINS) {
+      expect(domain.key).toMatch(/^[a-z][a-z-]*$/);
       expect(domain.emoji).toMatch(/\p{Extended_Pictographic}/u);
       expect(domain.description.length).toBeGreaterThan(4);
     }
   });
 
-  it("resolves a known name and returns undefined for an unknown one", () => {
-    expect(domainMeta("开发编程")?.emoji).toBe("💻");
+  it("resolves a key or a label, and returns undefined for an unknown one", () => {
+    expect(domainMeta("development")?.emoji).toBe("💻");
+    expect(domainMeta("开发编程")?.key).toBe("development");
     expect(domainMeta("不存在的分类")).toBeUndefined();
   });
 });
 
 describe("DomainBadge", () => {
-  it("renders the canonical emoji next to the domain name", () => {
-    renderWithRouter(<DomainBadge domain="设计多媒体" />);
+  it("renders the canonical emoji next to the domain label", () => {
+    renderWithRouter(<DomainBadge domain={["design-media"]} />);
     expect(screen.getByText("设计多媒体")).toBeInTheDocument();
     expect(screen.getByText("🎨")).toBeInTheDocument();
   });
 
-  it("renders no emoji for a domain outside the taxonomy", () => {
-    renderWithRouter(<DomainBadge domain="未来新分类" />);
-    expect(screen.getByText("未来新分类")).toBeInTheDocument();
+  it("renders the raw key and no emoji for a domain outside the taxonomy", () => {
+    renderWithRouter(<DomainBadge domain={["future-domain"]} />);
+    expect(screen.getByText("future-domain")).toBeInTheDocument();
     expect(screen.queryByText("❓")).not.toBeInTheDocument();
   });
 });

@@ -424,7 +424,7 @@ describe("MySkillsPage", () => {
           stars: 169600,
           downloads: 2991984,
           path: "skills/anthropics/skills/pdf",
-          profile: { domain: "内容创作" },
+          profile: { domain: ["content-creation"] },
         },
       ],
     });

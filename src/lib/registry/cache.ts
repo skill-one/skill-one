@@ -15,13 +15,15 @@ const KEY = "skills";
 /**
  * Bump when the stored Skill shape changes so stale records are dropped.
  *
- * Version 3 flushes records written by builds whose repos.jsonl stars join
+ * Version 4 flushes records written before the dataset consolidated: those
+ * carry a second source's stamps (`profilesAt`/`profilesTag`) and skills whose
+ * `profile.domain` is a single string, which the new grouping and badge code
+ * cannot read.
+ * Version 3 flushed records written by builds whose repos.jsonl stars join
  * could fail silently: those hold 0 stars yet carry a current run stamp, so
  * the "unchanged" short-circuit would keep serving them for up to a day.
- * The join now gates the write (see the registry controller), and the bump
- * drops whatever was written before that rule existed.
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 /**
  * The same database and object store this module used before it delegated to
@@ -32,18 +34,10 @@ const store = createStore("skill-one-registry", "index");
 
 /** Identity of the published snapshot a record was built from. */
 export interface CacheIdentity {
-  /** `dist-<date>` tag the index was fetched at; absent when unpinned. */
+  /** `dist-<date>[-N]` tag the index was fetched at; absent when unpinned. */
   tag?: string;
   /** The producing run's `finishedAt`, the snapshot's freshness identity. */
   generatedAt?: string;
-  /**
-   * The profiles dataset's stamp (`publishedAt`) the stored skills were
-   * decorated from, so a profiles-only refresh can be detected without a
-   * registry re-download. Absent when profiles were unavailable.
-   */
-  profilesAt?: string;
-  /** The profiles dataset's tag the stored skills were decorated from. */
-  profilesTag?: string;
 }
 
 /** A single cached record. */
@@ -90,9 +84,8 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
         return null;
       }
       if (!record || record.schemaVersion !== SCHEMA_VERSION) return null;
-      const { skills, tag, generatedAt, profilesAt, profilesTag, fetchedAt } =
-        record;
-      return { skills, tag, generatedAt, profilesAt, profilesTag, fetchedAt };
+      const { skills, tag, generatedAt, fetchedAt } = record;
+      return { skills, tag, generatedAt, fetchedAt };
     },
 
     /** Persist the parsed registry with its snapshot identity (overwrites). */
@@ -102,8 +95,6 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
         fetchedAt: Date.now(),
         tag: identity.tag,
         generatedAt: identity.generatedAt,
-        profilesAt: identity.profilesAt,
-        profilesTag: identity.profilesTag,
         skills,
       };
       try {

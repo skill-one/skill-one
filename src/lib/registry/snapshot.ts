@@ -1,18 +1,18 @@
 import { cacheBusted, fetchFirstText, fileCandidates } from "../cdn-config";
 
 /**
- * Reading a snapshot repo's `latest` pointer — the one contract both upstream
- * dataset repos publish identically.
+ * Reading a snapshot repo's `latest` pointer — the contract the dataset repo
+ * publishes.
  *
- * `skill-one/skills-sh-mirror` (the skills index) and `skill-one/skills-profiles`
- * (the per-skill profiles) each publish a complete snapshot to a rolling branch
- * on a schedule, and write a `latest` file beside it: one line of plain text
- * holding the tag of the snapshot the branch currently points at. The tag is
- * what makes a download cache-safe — a tag-addressed URL is immutable, whereas
- * the branch is a mutable pointer an edge cache may answer with a day-old copy.
+ * `skill-one/skills-profiles` publishes a complete dataset snapshot to its
+ * `dist` branch on a schedule, and writes a `latest` file beside it: one line
+ * of plain text holding the tag of the snapshot the branch currently points
+ * at. The tag is what makes a download cache-safe — a tag-addressed URL is
+ * immutable, whereas the branch is a mutable pointer an edge cache may answer
+ * with a day-old copy.
  *
  * So version resolution is a two-step read, and this module owns the first step
- * for every dataset: read `latest`, then address everything through the tag it
+ * for the dataset: read `latest`, then address everything through the tag it
  * names. Upstream states the tag outright, so nothing here derives or sorts tag
  * names — the pointer is the authority.
  */

@@ -66,7 +66,7 @@ describe("SkillCard", () => {
   it("puts the classification and the figure on the same rail", () => {
     const { container } = renderWithRouter(
       <SkillCard
-        skill={{ ...sourced, profile: { domain: "办公效率" } }}
+        skill={{ ...sourced, profile: { domain: ["office-productivity"] } }}
       />,
     );
 

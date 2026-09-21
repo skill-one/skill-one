@@ -35,36 +35,39 @@ import type { SnapshotSource } from "./snapshot";
  */
 
 /**
- * The skills-sh-mirror repo publishes the full index (JSONL) to its `dist`
- * branch as a daily snapshot.
+ * The skills-profiles repo publishes the whole dataset (JSONL) to its `dist`
+ * branch as a snapshot. Each row already carries the profile classification
+ * (`domain`/`reason`), so this single file *is* the dataset — there is no
+ * second source decoration step.
  */
 const INDEX_SPEC = {
-  repo: "skill-one/skills-sh-mirror",
+  repo: "skill-one/skills-profiles",
   path: "skills.jsonl",
   ref: "dist",
 } as const;
 
-/** Sidecar run stats published next to the index. */
-const META_SPEC = { ...INDEX_SPEC, path: "stats.json" } as const;
+/** Sidecar run stats published beside the index (under `upstream/`). */
+const META_SPEC = { ...INDEX_SPEC, path: "upstream/stats.json" } as const;
 
 /** The trending view's top ids, re-fetched from upstream on every run. */
-const TRENDING_SPEC = { ...INDEX_SPEC, path: "trending.json" } as const;
+const TRENDING_SPEC = { ...INDEX_SPEC, path: "upstream/trending.json" } as const;
 
 /**
  * Per-repo metadata sidecar (GitHub stars; one row per repo). Star counts
  * left the skill rows themselves — this file is their join table, keyed by
  * `{owner}/{repo}`, the first two segments of every index id.
  */
-const REPOS_SPEC = { ...INDEX_SPEC, path: "repos.jsonl" } as const;
+const REPOS_SPEC = { ...INDEX_SPEC, path: "upstream/repos.jsonl" } as const;
 
 /**
- * The mirror's pointer contract: the `latest` file at the `dist` root names a
- * `dist-` tag with a UTC calendar date.
+ * The dataset repo's pointer contract: the `latest` file at the `dist` root
+ * names a `dist-` tag — a day's baseline (`dist-<date>`) or one of the
+ * batches generated on top of it (`dist-<date>-N`).
  */
 const INDEX_SOURCE: SnapshotSource = {
   repo: INDEX_SPEC.repo,
   branch: INDEX_SPEC.ref,
-  tag: /^dist-\d{4}-\d{2}-\d{2}$/,
+  tag: /^dist-\d{4}-\d{2}-\d{2}(?:-\d+)?$/,
 };
 
 /**

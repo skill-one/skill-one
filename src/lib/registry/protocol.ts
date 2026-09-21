@@ -176,7 +176,7 @@ export type IndexOrigin =
 /** Published metadata describing the dataset currently served by the worker. */
 export interface IndexInfo {
   /**
-   * The `dist-<date>` tag the served snapshot was fetched at; absent when
+   * The `dist-<date>[-N]` tag the served snapshot was fetched at; absent when
    * the probe could not derive one and the mutable branch was used.
    */
   tag?: string;
@@ -184,13 +184,6 @@ export interface IndexInfo {
   generatedAt?: string;
   /** Published row count (`indexedRows`), before any consumer-side filtering. */
   total?: number;
-  /**
-   * The profiles dataset tag the served skills were decorated from, when
-   * known. Immutable address: per-skill profile fetches pin to it.
-   */
-  profilesTag?: string;
-  /** The profiles snapshot's `publishedAt` stamp (UTC), when known. */
-  profilesAt?: string;
   /** Origin of the served dataset for this run. */
   origin: IndexOrigin;
   /**

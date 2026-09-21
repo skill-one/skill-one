@@ -5,15 +5,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "../lib/utils";
 
 /**
- * The mirror hosts every owner's avatar as a regular repo file (copied from
- * GitHub at snapshot time), so avatars ride the same download source and CDN
- * fallback chain as SKILL.md and the index — `avatars/{owner}.png` at the
- * recorded snapshot tag (immutable, cache-safe), the mutable `dist` branch
- * before any tag has been recorded. GitHub's own avatar endpoint stays at
- * the end of the chain as a fallback for owners whose copy the mirror
+ * The dataset repo hosts every owner's avatar as a regular repo file (copied
+ * from GitHub at snapshot time), so avatars ride the same download source and
+ * CDN fallback chain as SKILL.md and the index — `upstream/avatars/{owner}.png`
+ * at the recorded snapshot tag (immutable, cache-safe), the mutable `dist`
+ * branch before any tag has been recorded. GitHub's own avatar endpoint stays
+ * at the end of the chain as a fallback for owners whose copy the dataset
  * missed (a failed download run leaves a hole until the next one).
  */
-const MIRROR_REPO = "skill-one/skills-sh-mirror";
+const MIRROR_REPO = "skill-one/skills-profiles";
 
 /**
  * Round owner avatar loaded from the mirror, degrading through GitHub's
@@ -36,7 +36,7 @@ export function OwnerAvatar({
   const candidates = useMemo(() => {
     const spec = {
       repo: MIRROR_REPO,
-      path: `avatars/${encodeURIComponent(owner)}.png`,
+      path: `upstream/avatars/${encodeURIComponent(owner)}.png`,
       ref: getIndexTag() || "dist",
     };
     return [...fileCandidates(spec), `https://github.com/${owner}.png`];

@@ -137,7 +137,7 @@ describe("buildSkillSearch", () => {
         description: "Turns pages into PDFs.",
         stars: 10,
         downloads: 10,
-        profile: { domain: "内容创作" },
+        profile: { domain: ["content-creation"] },
       },
     ];
 

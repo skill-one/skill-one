@@ -60,10 +60,10 @@ describe("readLines", () => {
   });
 });
 
-/** The mirror's `latest` pointer, as `fileCandidates` builds it. */
+/** The dataset's `latest` pointer, as `fileCandidates` builds it. */
 const POINTER_ORIGIN =
-  "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/latest";
-const POINTER_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-mirror@dist/latest`;
+  "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/latest";
+const POINTER_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@dist/latest`;
 
 /** A 200 response serving a plain-text body (the pointer file). */
 function textResponse(body: string): Response {
@@ -77,11 +77,11 @@ function textResponse(body: string): Response {
 describe("readLatestTag", () => {
   const fetchMock = vi.fn();
 
-  /** The mirror's pointer contract, as `index-stream.ts` declares it. */
+  /** The dataset's pointer contract, as `index-stream.ts` declares it. */
   const SOURCE = {
-    repo: "skill-one/skills-sh-mirror",
+    repo: "skill-one/skills-profiles",
     branch: "dist",
-    tag: /^dist-\d{4}-\d{2}-\d{2}$/,
+    tag: /^dist-\d{4}-\d{2}-\d{2}(?:-\d+)?$/,
   };
 
   beforeEach(() => {
@@ -143,13 +143,13 @@ describe("probeIndexMeta", () => {
   // Candidate URLs as produced by `fileCandidates(META_SPEC, "")`: the direct
   // GitHub origin first, the default CDN mirror second.
   const ORIGIN_STATS =
-    "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/stats.json";
-  const CDN_STATS = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-mirror@dist/stats.json`;
+    "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/upstream/stats.json";
+  const CDN_STATS = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@dist/upstream/stats.json`;
 
   const TAG = "dist-2026-09-06";
   // Tag-pinned stats candidates: immutable, so no busting is needed.
-  const PINNED_STATS_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-sh-mirror/${TAG}/stats.json`;
-  const PINNED_STATS_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-mirror@${TAG}/stats.json`;
+  const PINNED_STATS_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-profiles/${TAG}/upstream/stats.json`;
+  const PINNED_STATS_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@${TAG}/upstream/stats.json`;
 
   const fetchMock = vi.fn();
 
@@ -325,9 +325,9 @@ describe("probeIndexMeta", () => {
 
 describe("readTrending", () => {
   const ORIGIN_TRENDING =
-    "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/trending.json";
+    "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/upstream/trending.json";
   const TAG = "dist-2026-09-06";
-  const PINNED_TRENDING = `https://raw.githubusercontent.com/skill-one/skills-sh-mirror/${TAG}/trending.json`;
+  const PINNED_TRENDING = `https://raw.githubusercontent.com/skill-one/skills-profiles/${TAG}/upstream/trending.json`;
 
   const fetchMock = vi.fn();
 
@@ -388,11 +388,11 @@ describe("readTrending", () => {
 describe("readIndex", () => {
   const TAG = "dist-2026-09-06";
   // Tag-addressed candidates: immutable, so no busting is needed.
-  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-sh-mirror/${TAG}/skills.jsonl`;
-  const PINNED_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-sh-mirror@${TAG}/skills.jsonl`;
+  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-profiles/${TAG}/skills.jsonl`;
+  const PINNED_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@${TAG}/skills.jsonl`;
   // Branch candidates, used only when no tag is known.
   const BRANCH_ORIGIN =
-    "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/skills.jsonl";
+    "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills.jsonl";
 
   const fetchMock = vi.fn();
 
@@ -595,9 +595,9 @@ describe("readIndex", () => {
 
 describe("readRepos", () => {
   const TAG = "dist-2026-09-06";
-  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-sh-mirror/${TAG}/repos.jsonl`;
+  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-profiles/${TAG}/upstream/repos.jsonl`;
   const BRANCH_ORIGIN =
-    "https://raw.githubusercontent.com/skill-one/skills-sh-mirror/dist/repos.jsonl";
+    "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/upstream/repos.jsonl";
 
   const fetchMock = vi.fn();
 

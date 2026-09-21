@@ -21,11 +21,8 @@ export const DEFAULT_CDN_BASE = "https://cdn.jsdmirror.com";
 
 const SETTINGS_KEY = "skill-one.cdn";
 
-/** localStorage key for the served registry snapshot tag (`dist-<date>`). */
+/** localStorage key for the served snapshot tag (`dist-<date>[-N]`). */
 const INDEX_TAG_KEY = "skill-one.indexTag";
-
-/** localStorage key for the served profiles dataset tag (`dist-<date>[-N]`). */
-const PROFILES_TAG_KEY = "skill-one.profilesTag";
 
 // Persist via `window.localStorage` where available, with an in-memory fallback
 // so reads still work in environments without a storage backend (e.g. Vitest's
@@ -86,21 +83,6 @@ export function setIndexTag(value: string): void {
   writeStored(INDEX_TAG_KEY, value.trim());
 }
 
-/**
- * The profiles dataset tag (`dist-<date>[-N]`) currently recorded, or ""
- * before any profiles snapshot has been served. Used to pin per-skill
- * profile fetches (the detail drawer's 概述 tab) to the same immutable
- * snapshot the served registry was decorated from.
- */
-export function getProfilesTag(): string {
-  return readStored(PROFILES_TAG_KEY);
-}
-
-/** Record the served profiles dataset tag (empty = clear). */
-export function setProfilesTag(value: string): void {
-  writeStored(PROFILES_TAG_KEY, value.trim());
-}
-
 /** Direct GitHub raw URL. No ref → default branch (`HEAD`). */
 function originUrl({ repo, path, ref }: FileSpec): string {
   return `https://raw.githubusercontent.com/${repo}/${ref ?? "HEAD"}/${path}`;
@@ -152,7 +134,7 @@ export function githubBlobUrl(
  * the way (WebView HTTP cache, CDN edge).
  *
  * Only for tiny *mutable* pointers whose job is to report freshness — the
- * registry's `index-meta.json`, at ~300 B. Verified against the default CDN,
+ * dataset repo's `latest` pointer, at ~20 B. Verified against the default CDN,
  * which serves branch files with `stale-while-revalidate` and would otherwise
  * answer with a day-old body straight from the edge. Never apply it to a
  * commit-pinned URL (content-addressed, so already cache-safe) or to any

@@ -5,7 +5,6 @@ import {
   readRepos,
   readTrending,
 } from "./index-stream";
-import { probeProfilesMeta, readProfiles } from "./profiles";
 import { createRegistryController } from "./worker-controller";
 import type { RegistryRequest } from "./protocol";
 
@@ -28,8 +27,6 @@ const controller = createRegistryController(
     readIndex,
     readTrending,
     readRepos,
-    readProfilesMeta: probeProfilesMeta,
-    readProfiles,
     cache: createRegistryCache(),
     now: () => Date.now(),
   },

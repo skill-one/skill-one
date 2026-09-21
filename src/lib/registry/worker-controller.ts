@@ -1,6 +1,6 @@
 import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
-import { domainMeta } from "../../data/domains";
+import { domainLabel, domainMeta } from "../../data/domains";
 import { popularity } from "../popularity";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
 import type {
@@ -23,8 +23,6 @@ import type {
 } from "./protocol";
 import type { RegistryCache } from "./cache";
 import type { PublishedIndex } from "./index-stream";
-import type { ProfilesMeta } from "./profiles";
-import type { SkillProfile } from "../../types/skill";
 import {
   buildHeroSlides,
   RANKING_SIZE,
@@ -40,6 +38,10 @@ import {
  * it, and every request the main thread can ask: paged browse/search,
  * featured-page computation, and installed-skill metadata lookups. All
  * answers are page-sized or smaller — the full registry never leaves here.
+ *
+ * The dataset arrives fully decorated: every row carries its own
+ * classification, so one download yields servable skills and there is no
+ * second source to merge in afterwards.
  */
 
 /** How often partial counts are pushed while the download streams in. */
@@ -55,6 +57,15 @@ const byName = (a: Skill, b: Skill): number => a.name.localeCompare(b.name);
 /** The comparator for one of the two non-default toolbar orders. */
 const skillComparator = (sort: "popularity" | "name") =>
   sort === "popularity" ? byPopularity : byName;
+
+/** The pool label the `domain` grouping collects unclassified skills under. */
+const UNCLASSIFIED_DOMAIN = "未分类";
+
+/**
+ * The dataset's catch-all domain key. It carries no meaning of its own, so
+ * the featured sections skip it instead of leading with a "其他" shelf.
+ */
+const OTHER_DOMAIN = "other";
 
 export interface ControllerDeps {
   /**
@@ -94,21 +105,6 @@ export interface ControllerDeps {
     cdnBase: string,
     tag?: string,
   ): Promise<Map<string, number> | null>;
-  /**
-   * Probe the skills-profiles dataset's published snapshot (its freshness
-   * identity). Null when no source answered — the caller then skips the
-   * profiles refresh rather than guessing.
-   */
-  readProfilesMeta(cdnBase: string): Promise<ProfilesMeta | null>;
-  /**
-   * Fetch the whole profiles index (~100 KB) parsed into a map keyed by the
-   * canonical skills.sh id. Throws when no candidate could serve the file;
-   * like trending, a failure trims the garnish, never the dataset.
-   */
-  readProfiles(
-    cdnBase: string,
-    tag: string | undefined,
-  ): Promise<Map<string, SkillProfile>>;
   /** Cold-start cache; every method may silently no-op. */
   cache: RegistryCache;
   /** Clock for progress throttling, injectable for tests. */
@@ -142,25 +138,6 @@ export function createRegistryController(
   // skills.sh's trending rank, as an id list fetched alongside the index.
   // Null while unavailable; superseded downloads never write it (gen guard).
   let trendingIds: string[] | null = null;
-  // The profiles dataset (skills-profiles), as a map keyed by the canonical
-  // skills.sh id. Null while unavailable — every skill then simply carries
-  // no profile. Held across downloads so a fresh store can be decorated
-  // from the previous snapshot's map before the refresh resolves.
-  let profilesMap: Map<string, SkillProfile> | null = null;
-  // Which ids that map can answer for. Null once the published snapshot itself
-  // has been read (it answers for every id); a set when the map was recovered
-  // from the cold-start cache, which stores decorated skills rather than the
-  // dataset behind them — it can only speak for the ids it carried, so a body
-  // bringing new ones still has to read the file.
-  let profilesAnsweredFor: Set<string> | null = null;
-  // The profiles snapshot stamp (`publishedAt`) the decorated skills were
-  // built from; undefined until one is served. An equal probed stamp means
-  // equal bytes, so the profiles download is skipped.
-  let servedProfilesAt: string | undefined;
-  // The immutable tag the profiles files were fetched at, surfaced through
-  // the index event so per-skill profile fetches can pin to the same
-  // snapshot. Undefined when the fetch was not pinned.
-  let servedProfilesTag: string | undefined;
   // Last announced snapshot identity, kept for `stats()` and for tests.
   let indexInfo: IndexInfo | null = null;
 
@@ -239,105 +216,6 @@ export function createRegistryController(
     post({ type: "ready" });
   };
 
-  /** The canonical id a skill is profiled under: `{owner}/{repo}/{slug}`. */
-  const profileId = (skill: Pick<Skill, "repo" | "name">): string =>
-    `${skill.repo}/${skill.name}`;
-
-  /**
-   * Recover a profiles map from skills that already carry them. The cold-start
-   * cache stores decorated skills, not the dataset that decorated them, so
-   * without this the held map is empty on a launch that then downloads a newer
-   * body: `decorate` has nothing to re-apply, and every skill comes back with
-   * the stars and downloads that ride on the index but with no domain — a card
-   * with a popularity figure and no classification chip.
-   */
-  const profilesOf = (skills: readonly Skill[]): Map<string, SkillProfile> => {
-    const map = new Map<string, SkillProfile>();
-    for (const skill of skills) {
-      if (skill.profile) map.set(profileId(skill), skill.profile);
-    }
-    return map;
-  };
-
-  /**
-   * Whether the held map can answer for every skill being served. The guard
-   * behind "the published snapshot is already served": a probed stamp that
-   * matches only means the bytes are the ones we once read — not that we still
-   * hold them, nor that they cover a body that has since grown.
-   */
-  const profilesAnswerEvery = (): boolean => {
-    if (!profilesMap) return false;
-    const answered = profilesAnsweredFor;
-    if (answered == null) return true;
-    return store.every((skill) => answered.has(profileId(skill)));
-  };
-
-  /**
-   * Merge the held profiles map into the served skills. The canonical id is
-   * `{owner}/{repo}/{slug}`, i.e. exactly `repo/name` — a plain map read per
-   * skill, so re-decorating the whole registry costs one O(n) pass. Skills
-   * without a profile are stripped of any stale one (a re-decorate after a
-   * dataset change must not leave ghosts behind).
-   */
-  const decorate = () => {
-    if (!profilesMap) return;
-    for (const skill of store) {
-      const profile = profilesMap.get(`${skill.repo}/${skill.name}`);
-      if (profile) skill.profile = profile;
-      else delete skill.profile;
-    }
-  };
-
-  /**
-   * Bring the served profiles up to date. The published snapshot is probed
-   * for its stamp; only a differing one downloads the ~100 KB index, which
-   * is then merged into the served skills. Runs after every dataset landing
-   * *and* on the "unchanged" short-circuit — the profiles dataset moves on
-   * its own schedule, independent of the registry index it decorates.
-   *
-   * Like trending, this is garnish: a probe or download failure keeps
-   * whatever is being served (nothing, on a fresh boot) and never fails the
-   * registry download itself. A successful refresh bumps the data version
-   * and rebuilds the search index so the new domains are searchable — the
-   * re-posted `ready` bumps the main thread's epoch, which invalidates its
-   * cached pages.
-   */
-  const loadProfiles = async (gen: number, force: boolean): Promise<boolean> => {
-    const meta = await deps.readProfilesMeta(cdnBase).catch(() => null);
-    if (gen !== generation) return false;
-    if (
-      !force &&
-      profilesAnswerEvery() &&
-      meta?.generatedAt !== undefined &&
-      meta.generatedAt === servedProfilesAt
-    ) {
-      // The published snapshot is the one already served *and* the held map
-      // still answers for every skill being served: nothing to re-read. A
-      // recovered map that no longer covers the store — a newer registry body
-      // brought ids the cache never had — falls through to the download, which
-      // is the only way to learn what those new skills were profiled as.
-      return false;
-    }
-    let map: Map<string, SkillProfile>;
-    try {
-      map = await deps.readProfiles(cdnBase, meta?.tag);
-    } catch {
-      // Unreachable or malformed: keep serving what is already decorated.
-      return false;
-    }
-    if (gen !== generation) return false;
-    profilesMap = map;
-    // The whole published snapshot: it answers for every id, so the check above
-    // no longer has to compare against a recovered subset.
-    profilesAnsweredFor = null;
-    servedProfilesAt = meta?.generatedAt;
-    servedProfilesTag = meta?.tag;
-    decorate();
-    invalidateDerived();
-    if (ready) buildIndex();
-    return true;
-  };
-
   /**
    * Bring the served dataset up to date. The published snapshot is probed
    * first (its tag listed, then the ~300 B stats read pinned to that tag);
@@ -385,33 +263,10 @@ export function createRegistryController(
       emitIndex({
         ...identity,
         total,
-        profilesAt: servedProfilesAt,
-        profilesTag: servedProfilesTag,
         origin: "unchanged",
         checkedAt: deps.now(),
       });
       trendingIds = (await trending) ?? trendingIds;
-      // The profiles dataset moves on its own schedule — an unchanged
-      // registry index says nothing about it, so revalidate it here too.
-      // A refresh re-decorates the cached skills in place, so the record is
-      // re-saved with the new stamp (still no registry body download), and
-      // the re-announced index carries the new profiles tag so per-skill
-      // profile fetches pin to the snapshot now being served.
-      if (await loadProfiles(gen, force)) {
-        void deps.cache.save(store, {
-          ...identity,
-          profilesAt: servedProfilesAt,
-          profilesTag: servedProfilesTag,
-        });
-        emitIndex({
-          ...identity,
-          total,
-          profilesAt: servedProfilesAt,
-          profilesTag: servedProfilesTag,
-          origin: "unchanged",
-          checkedAt: deps.now(),
-        });
-      }
       return;
     }
 
@@ -487,12 +342,6 @@ export function createRegistryController(
     // keeps whatever was served before (null on a fresh boot) rather than
     // dropping the board outright.
     trendingIds = (await trending) ?? trendingIds;
-    // Decorate the fresh store from the held profiles map right away so the
-    // landed pages carry profiles even if the refresh below never answers;
-    // then revalidate the profiles dataset itself before the search index is
-    // built, so the index covers the domains it lands with.
-    decorate();
-    await loadProfiles(gen, force);
     // No separate "landed" event: buildIndex immediately emits the settled
     // count and posts ready — the index build is synchronous from here.
     // The stars join is settled by now (readIndex awaited it); a failed one
@@ -502,18 +351,10 @@ export function createRegistryController(
     // re-download on the next launch, which retries the join.
     const starsJoined = (await stars) !== null;
     servedGeneratedAt = identity.generatedAt;
-    if (starsJoined) {
-      void deps.cache.save(store, {
-        ...identity,
-        profilesAt: servedProfilesAt,
-        profilesTag: servedProfilesTag,
-      });
-    }
+    if (starsJoined) void deps.cache.save(store, identity);
     emitIndex({
       ...identity,
       total,
-      profilesAt: servedProfilesAt,
-      profilesTag: servedProfilesTag,
       origin: "updated",
       checkedAt: deps.now(),
     });
@@ -540,6 +381,10 @@ export function createRegistryController(
     return ids;
   };
 
+  /** Whether one skill belongs to the requested domain key. */
+  const inDomain = (skill: Skill, domain: string): boolean =>
+    skill.profile?.domain.includes(domain) ?? false;
+
   const getPage = ({
     query,
     domain,
@@ -561,16 +406,17 @@ export function createRegistryController(
       // ranking (all terms matched, exact/prefix name first, then name > repo
       // > description, popularity as a nudge) that made them hits.
       let hits: SearchHit[] = search(q);
-      // A category filter narrows the search results; skills the profiles
-      // dataset has not reached simply fall outside every category.
+      // A category filter narrows the search results; skills the dataset has
+      // not classified simply fall outside every category. A skill classified
+      // under several domains matches each of them.
       if (domain) {
-        hits = hits.filter((hit) => hit.skill.profile?.domain === domain);
+        hits = hits.filter((hit) => inDomain(hit.skill, domain));
       }
       return { hits: hits.slice(start, start + pageSize), total: hits.length };
     }
     let ids = orderFor(sort);
     if (domain) {
-      ids = ids.filter((id) => store[id].profile?.domain === domain);
+      ids = ids.filter((id) => inDomain(store[id], domain));
     }
     return {
       hits: ids
@@ -588,14 +434,16 @@ export function createRegistryController(
    * the grouping dropdown annotates its options with these so the reader can
    * compare the modes before committing to one. Every figure is a cheap set
    * or arithmetic pass: unique repos, the bucket math, unique domains (with
-   * the unprofiled pool counting as one).
+   * the unclassified pool counting as one).
    */
   const countGroups = (hits: SearchHit[]): GroupCounts => {
     const repos = new Set<string>();
     const domains = new Set<string>();
     for (const hit of hits) {
       repos.add(hit.skill.repo);
-      domains.add(hit.skill.profile?.domain ?? "未分类");
+      const list = hit.skill.profile?.domain;
+      if (!list || list.length === 0) domains.add(UNCLASSIFIED_DOMAIN);
+      else for (const domain of list) domains.add(domain);
     }
     return {
       repo: repos.size,
@@ -618,8 +466,9 @@ export function createRegistryController(
    * - `popularity`: fixed-size rank buckets over the ordered hits, in rank
    *   order by construction (`TOP 1-50`, `TOP 51-100`, …).
    * - `domain`: one group per profile domain, most-populated first, with
-   *   unprofiled skills pooled into 未分类 so nothing disappears.
-   * - `recency`: reserved — the mirror does not publish an update time yet,
+   *   unclassified skills pooled into 未分类 so nothing disappears. A skill
+   *   classified under several domains appears in each of its groups.
+   * - `recency`: reserved — the dataset does not publish an update time yet,
    *   so the mode is not offered (see `GroupBy`).
    *
    * Unlike `getPage` there is no slicing: the full filtered answer crosses the
@@ -665,14 +514,20 @@ export function createRegistryController(
     } else if (groupBy === "domain") {
       const buckets = new Map<string, SearchHit[]>();
       for (const hit of hits) {
-        const domain = hit.skill.profile?.domain ?? "未分类";
-        const bucket = buckets.get(domain);
-        if (bucket) bucket.push(hit);
-        else buckets.set(domain, [hit]);
+        // A skill may be classified under several domains, so it lands in
+        // each of its groups; everything unclassified pools together.
+        const keys = hit.skill.profile?.domain.length
+          ? hit.skill.profile.domain
+          : [UNCLASSIFIED_DOMAIN];
+        for (const key of keys) {
+          const bucket = buckets.get(key);
+          if (bucket) bucket.push(hit);
+          else buckets.set(key, [hit]);
+        }
       }
       groups = Array.from(buckets, ([domain, skills]) => ({
         key: `domain-${domain}`,
-        title: domain,
+        title: domain === UNCLASSIFIED_DOMAIN ? domain : domainLabel(domain),
         emoji: domainMeta(domain)?.emoji,
         skills,
       })).toSorted(
@@ -707,10 +562,11 @@ export function createRegistryController(
 
   /**
    * The distinct profile domains with their skill counts, most-used first.
-   * Only profiled skills contribute — the list (and every count) shrinks to
-   * zero-shaped answers when the profiles dataset is unavailable. Cached
-   * per data version like the sort order; recomputed per request
-   * while the dataset streams in.
+   * Only classified skills contribute — the list (and every count) shrinks to
+   * zero-shaped answers when the dataset carries no classification. A skill
+   * classified under several domains counts once per domain. Cached per data
+   * version like the sort order; recomputed per request while the dataset
+   * streams in.
    */
   const getDomains = (): DomainInfo[] => {
     if (complete && domainCache?.version === dataVersion) {
@@ -718,9 +574,9 @@ export function createRegistryController(
     }
     const counts = new Map<string, number>();
     for (const skill of store) {
-      const domain = skill.profile?.domain;
-      if (!domain) continue;
-      counts.set(domain, (counts.get(domain) ?? 0) + 1);
+      for (const domain of skill.profile?.domain ?? []) {
+        counts.set(domain, (counts.get(domain) ?? 0) + 1);
+      }
     }
     const domains = Array.from(counts, ([domain, count]) => ({ domain, count }))
       .toSorted(
@@ -736,18 +592,20 @@ export function createRegistryController(
 
   /**
    * Real-domain featured sections: the most-populated profile domains (the
-   * catch-all "其他" excluded), each led by its most-installed profiled
-   * skills. Null when no profiles are being served — the page then falls
-   * back to the hand-curated sections instead of going empty.
+   * catch-all "其他" excluded), each led by its most-installed classified
+   * skills. Null when nothing is classified — the page then falls back to the
+   * hand-curated sections instead of going empty. A skill classified under
+   * several domains may lead more than one section.
    */
   const domainSections = (): FeaturedSectionData[] | null => {
     const byDomain = new Map<string, Skill[]>();
     for (const skill of store) {
-      const domain = skill.profile?.domain;
-      if (!domain || domain === "其他") continue;
-      const bucket = byDomain.get(domain);
-      if (bucket) bucket.push(skill);
-      else byDomain.set(domain, [skill]);
+      for (const domain of skill.profile?.domain ?? []) {
+        if (domain === OTHER_DOMAIN) continue;
+        const bucket = byDomain.get(domain);
+        if (bucket) bucket.push(skill);
+        else byDomain.set(domain, [skill]);
+      }
     }
     if (byDomain.size === 0) return null;
     return Array.from(byDomain, ([domain, skills]) => ({ domain, skills }))
@@ -758,7 +616,7 @@ export function createRegistryController(
       .slice(0, FEATURED_DOMAIN_SECTIONS)
       .map(({ domain, skills }) => ({
         id: domain,
-        title: domain,
+        title: domainLabel(domain),
         skills: skills
           .toSorted((a, b) => b.downloads - a.downloads)
           .slice(0, FEATURED_DOMAIN_SECTION_SIZE)
@@ -880,26 +738,6 @@ export function createRegistryController(
         if (cached && cached.skills.length > 0 && gen === generation) {
           store = cached.skills;
           servedGeneratedAt = cached.generatedAt;
-          // The map behind the cached decoration is recovered here, so a body
-          // downloaded below can be re-decorated even when the refresh never
-          // answers, and the stamp/tag it was decorated from is what the
-          // revalidation's profiles probe is compared against. Both ride on
-          // that decoration actually being there: a record whose skills carry
-          // no profile at all while still claiming a profiles snapshot cannot
-          // vouch for it, and trusting the claim short-circuits the refresh for
-          // good — every card left without its classification chip and the
-          // category filter without a choice, for as long as the record lives.
-          // Such a record was written by a build that replaced the cached
-          // skills with a fresh body and never re-applied the profiles; reading
-          // the dataset again is what repairs it.
-          const recovered = profilesOf(cached.skills);
-          const decorated = recovered.size > 0;
-          profilesMap = decorated ? recovered : null;
-          profilesAnsweredFor = decorated
-            ? new Set(cached.skills.map(profileId))
-            : null;
-          servedProfilesAt = decorated ? cached.profilesAt : undefined;
-          servedProfilesTag = decorated ? cached.profilesTag : undefined;
           complete = true;
           announcedCount = cached.skills.length;
           emitProgress();
@@ -909,8 +747,6 @@ export function createRegistryController(
             tag: cached.tag,
             generatedAt: cached.generatedAt,
             total: cached.skills.length,
-            profilesAt: servedProfilesAt,
-            profilesTag: servedProfilesTag,
             origin: "cache",
           });
         }
@@ -958,22 +794,16 @@ export function createRegistryController(
       }
       let status: RevalidateStatus;
       if (published.generatedAt === servedGeneratedAt) {
-        // The published run is the one already being served. The profiles
-        // dataset moves on its own schedule, so it is still revalidated; the
-        // (unchanged) identity is re-announced either way, which is what
-        // dates the check and re-pins per-skill profile fetches to a
-        // refreshed profiles tag.
-        const profilesRefreshed = await loadProfiles(gen, false);
+        // The published run is the one already being served. The identity is
+        // re-announced, which is what dates the check.
         emitIndex({
           tag: published.tag,
           generatedAt: published.generatedAt,
           total: published.total,
-          profilesAt: servedProfilesAt,
-          profilesTag: servedProfilesTag,
           origin: "unchanged",
           checkedAt: deps.now(),
         });
-        status = profilesRefreshed ? "updated" : "current";
+        status = "current";
       } else {
         // A newer run is published: the ordinary non-blanking download path,
         // pinned to the tag the probe just resolved.

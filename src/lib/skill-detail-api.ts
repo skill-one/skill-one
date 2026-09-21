@@ -10,9 +10,9 @@ import {
 } from "./cdn-config";
 
 /**
- * The skills-sh-mirror repo mirrors every indexed skill's full files on its
- * `dist` branch — the same snapshot the registry index was built from. The
- * index and the mirror are guaranteed to match (a row exists if and only if
+ * The skills-profiles repo ships every indexed skill's full files on its
+ * `dist` branch — the same snapshot the index was built from. The index and
+ * the skill directories are guaranteed to match (a row exists if and only if
  * its directory exists), so a registry-known path resolves in one request.
  *
  * Detail fetches are pinned to the snapshot tag recorded by the registry
@@ -21,7 +21,7 @@ import {
  * the mutable `dist` branch is used.
  */
 export const MIRROR = {
-  repo: "skill-one/skills-sh-mirror",
+  repo: "skill-one/skills-profiles",
   /** Fallback ref when no snapshot tag has been recorded yet. */
   ref: "dist",
 } as const;
@@ -44,7 +44,7 @@ type FrontmatterField = (typeof FRONTMATTER_FIELDS)[number];
 type Frontmatter = Partial<Record<FrontmatterField, string>>;
 
 /**
- * Fetch a skill's SKILL.md from the skills-sh-mirror mirror snapshot.
+ * Fetch a skill's SKILL.md from the skills-profiles snapshot.
  *
  * The file is fetched through the configurable download source (direct GitHub
  * raw by default, with a jsDelivr-mirror CDN fallback), which works identically

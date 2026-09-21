@@ -379,14 +379,14 @@ describe("SkillListRow", () => {
   it("shows the profile domain as a badge when the skill has one", () => {
     renderWithRouter(
       <SkillListRow
-        skill={{ ...skill, profile: { domain: "内容创作" } }}
+        skill={{ ...skill, profile: { domain: ["content-creation"] } }}
       />,
     );
 
     expect(screen.getByText("内容创作")).toBeInTheDocument();
   });
 
-  it("shows no domain badge for an unprofiled skill", () => {
+  it("shows no domain badge for an unclassified skill", () => {
     renderWithRouter(<SkillListRow skill={skill} />);
 
     expect(screen.queryByText("内容创作")).not.toBeInTheDocument();

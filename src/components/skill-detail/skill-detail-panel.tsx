@@ -19,7 +19,6 @@ import {
   SheetTitle,
 } from "../ui/sheet";
 import { Skeleton } from "../ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
   Tooltip,
   TooltipContent,
@@ -31,7 +30,6 @@ import { SkillEnableSwitch } from "../skill-enable-switch";
 import { SkillInstallButton } from "../skill-install-button";
 import { SkillRemoveButton } from "../skill-remove-button";
 import { ExpandableDescription } from "./expandable-description";
-import { SkillProfileView } from "./skill-profile-view";
 
 /**
  * The markdown body is the heaviest subtree the drawer shows: react-markdown
@@ -156,8 +154,8 @@ interface SkillDetailPanelProps {
  * clicking the overlay closes it, and ←/→
  * switch skills. Each skill's SKILL.md is fetched through TanStack Query and
  * cached independently, so revisits are instant. The source is picked per
- * skill: a registry-known `path` reads from the skills-sh-mirror mirror
- * snapshot (the same content the registry indexed), while an installed skill
+ * skill: a registry-known `path` reads from the skills-profiles snapshot
+ * (the same content the registry indexed), while an installed skill
  * without one — local skills included — is read from the local skills
  * directory instead, so the view always shows the copy the user actually
  * installed.
@@ -246,10 +244,6 @@ export function SkillDetailPanel({
   // not know shows no figure rather than a hardcoded zero, the same rule its
   // card follows. An absent marker means backed (see `SkillView`).
   const showStats = shown?.storeBacked !== false;
-  // Profiled registry skills get the 概述 tab (the dataset's per-skill
-  // files resolve through the mirror path); local installs and skills the
-  // dataset has not profiled keep the plain SKILL.md body.
-  const hasProfile = shown?.profile != null && shown.path != null;
   const description = detail?.description || shown?.description;
   // The mirror-relative SKILL.md path, reused for the mirror's GitHub file
   // link and to resolve relative URLs inside the markdown body. Only a mirror
@@ -276,10 +270,9 @@ export function SkillDetailPanel({
   const rev = shown?.rev ?? null;
   const seenAt = shown?.firstSeenAt ? formatDate(shown.firstSeenAt) : null;
 
-  // The canonical SKILL.md body, shared by the profiled-skill tab and the
-  // plain view. Registry skills resolve relative links against the mirror
-  // snapshot the index was built from (a profiled skill is always one); a body
-  // read off disk has no repo view to resolve against, so it goes without one.
+  // The canonical SKILL.md body. Registry skills resolve relative links
+  // against the snapshot the index was built from; a body read off disk has
+  // no repo view to resolve against, so it goes without one.
   const skillMdBody = detail ? (
     detail.instructions ? (
       <Suspense fallback={<MarkdownSkeleton />}>
@@ -303,8 +296,7 @@ export function SkillDetailPanel({
       <SheetHeader className="gap-2 px-6 pt-5">
         <div className="flex items-start gap-3">
           {/* The same image the row leads with, at the drawer's size: the
-              skill's own cover, `SkillCover`'s letter fallback standing in
-              when the dataset has not illustrated it. */}
+              skill's own slot, `SkillCover`'s letter standing in. */}
           <SkillCover
             repo={shown?.repo}
             name={shown?.name}
@@ -408,17 +400,10 @@ export function SkillDetailPanel({
           )}
           {fromDisk && detail && <ProvenanceTip path={detail.path} />}
           {shown?.profile && (
-            <span className="flex items-center gap-1.5">
-              <DomainBadge
-                domain={shown.profile.domain}
-                reason={shown.profile.reason}
-              />
-              {shown.profile.persona?.role && (
-                <span title="skills-profiles 为该技能生成的职业画像">
-                  {shown.profile.persona.role}
-                </span>
-              )}
-            </span>
+            <DomainBadge
+              domain={shown.profile.domain}
+              reason={shown.profile.reason}
+            />
           )}
         </div>
       </SheetHeader>
@@ -454,39 +439,7 @@ export function SkillDetailPanel({
             </Button>
           </div>
         ) : detail ? (
-          hasProfile ? (
-            // A profiled skill: the generated overview and SKILL.md live in
-            // separate tabs. 概述 is the default — its structured pitch,
-            // I/O and user comments answer "what is this and is it worth it" faster
-            // than the raw (sometimes one-line) SKILL.md, which stays one
-            // click away as the canonical source. The tab bar is a
-            // GitHub-style underlined row that sticks below the header while
-            // long content scrolls underneath it.
-            <Tabs defaultValue="overview" className="flex flex-col gap-4">
-              <TabsList
-                variant="line"
-                className="sticky top-0 z-10 h-8 w-full justify-start rounded-none border-b bg-background"
-              >
-                <TabsTrigger value="overview" className="flex-none text-[13px]">
-                  概述
-                </TabsTrigger>
-                <TabsTrigger value="skill-md" className="flex-none text-[13px]">
-                  SKILL.md
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="overview">
-                <SkillProfileView
-                  skillId={shown!.name}
-                  knownPath={shown!.path}
-                  scene={shown!.profile?.persona?.scene}
-                  tool={shown!.profile?.persona?.tool}
-                />
-              </TabsContent>
-              <TabsContent value="skill-md">{skillMdBody}</TabsContent>
-            </Tabs>
-          ) : (
-            <div className="pt-3">{skillMdBody}</div>
-          )
+          <div className="pt-3">{skillMdBody}</div>
         ) : null}
       </div>
     </SheetContent>

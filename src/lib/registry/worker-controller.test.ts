@@ -23,13 +23,12 @@ vi.mock("../../data/featured-content", () => ({
 import { createRegistryController } from "./worker-controller";
 import type { CachedIndex, RegistryCache } from "./cache";
 import type { PublishedIndex } from "./index-stream";
-import type { ProfilesMeta } from "./profiles";
 import type {
   RegistryWorkerMessage,
   RevalidateResult,
   SortOrder,
 } from "./protocol";
-import type { Skill, SkillProfile } from "../../types/skill";
+import type { Skill } from "../../types/skill";
 import { popularity } from "../popularity";
 import { formatCount } from "../utils";
 
@@ -81,13 +80,6 @@ function setup(options?: {
    * sidecar unavailable.
    */
   stars?: Map<string, number> | null;
-  /**
-   * What the profiles source serves; null (default) = file unreachable.
-   * Its stamp is advertised through `profilesMeta` when set.
-   */
-  profiles?: Map<string, SkillProfile> | null;
-  /** What the profiles probe advertises; null (default) = probe failed. */
-  profilesMeta?: ProfilesMeta | null;
 }) {
   const messages: RegistryWorkerMessage[] = [];
   const recorded: Recorded = {
@@ -143,11 +135,6 @@ function setup(options?: {
         options && options.stars !== undefined
           ? options.stars
           : new Map<string, number>(),
-      readProfilesMeta: async () => options?.profilesMeta ?? null,
-      readProfiles: async () => {
-        if (!options?.profiles) throw new Error("profiles unavailable");
-        return options.profiles;
-      },
       cache: options?.cache ?? {
         load: async () => null,
         save: async () => {},
@@ -249,145 +236,6 @@ describe("createRegistryController — boot", () => {
     expect(t.controller.stats()).toMatchObject({ count: 3, ready: true });
     expect(saved).toEqual([[skill(0), skill(1), skill(2)]]);
     expect(t.recorded.indexes.at(-1)?.info).toMatchObject({ origin: "updated" });
-  });
-
-  it("keeps the profiles a cold start was serving when a newer registry lands", async () => {
-    // A launch with a warm cache and a registry that has moved on: the fresh
-    // body replaces the cached skills, while the profiles dataset itself has
-    // not moved since — so nothing re-reads it. The decoration the cached
-    // skills carried has to survive that, or every skill in the store loses
-    // its domain for the session (the popularity figure, which comes from the
-    // index, stays: exactly a card with a figure and no classification chip).
-    const decorated = { ...skill(0), profile: { domain: "开发编程" } };
-    const t = setup({
-      cache: {
-        load: async () => ({
-          skills: [decorated],
-          generatedAt: "2026-09-01T14:25:32Z",
-          fetchedAt: 1,
-          profilesAt: "2026-09-01T10:00:00Z",
-        }),
-        save: async () => {},
-        clear: async () => {},
-      },
-      published: {
-        tag: "dist-2026-09-02",
-        generatedAt: "2026-09-02T14:25:32Z",
-        total: 1,
-      },
-      // The probe advertises the very snapshot the cache was decorated from,
-      // and the file itself is unreachable: there is nothing to re-read.
-      profilesMeta: { generatedAt: "2026-09-01T10:00:00Z" },
-      profiles: null,
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.push(skill(0));
-    t.complete();
-    await t.flush();
-
-    t.controller.handle({
-      type: "lookupSkills",
-      id: 1,
-      payload: { refs: [{ repo: "owner-0/repo-0", name: "skill-0" }] },
-    });
-    const entries = resultData<{ entries: Array<Skill | null> }>(
-      t.recorded.results[0],
-    ).entries;
-    expect(entries[0]?.profile).toEqual({ domain: "开发编程" });
-  });
-
-  it("reads the profiles again when the cache claims a snapshot it never applied", async () => {
-    // A record left behind by a build that replaced the cached skills with a
-    // fresh body and never re-applied the profiles: it carries the stamp of a
-    // snapshot while every skill it stored has no profile at all. Trusting that
-    // claim — "the published snapshot is already served" — short-circuits the
-    // refresh for as long as the record lives, so the whole session serves
-    // cards with no classification chip and a category filter with no choices.
-    const t = setup({
-      cache: {
-        load: async () => ({
-          skills: [skill(0)],
-          generatedAt: "2026-09-01T14:25:32Z",
-          fetchedAt: 1,
-          profilesAt: "2026-09-01T10:00:00Z",
-        }),
-        save: async () => {},
-        clear: async () => {},
-      },
-      published: {
-        tag: "dist-2026-09-02",
-        generatedAt: "2026-09-02T14:25:32Z",
-        total: 1,
-      },
-      // The probe advertises the very snapshot the record claims, so only the
-      // decoration being absent keeps this from reading as "nothing to do".
-      profilesMeta: { generatedAt: "2026-09-01T10:00:00Z" },
-      profiles: new Map([["owner-0/repo-0/skill-0", { domain: "开发编程" }]]),
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.push(skill(0));
-    t.complete();
-    await t.flush();
-
-    t.controller.handle({
-      type: "lookupSkills",
-      id: 1,
-      payload: { refs: [{ repo: "owner-0/repo-0", name: "skill-0" }] },
-    });
-    const entries = resultData<{ entries: Array<Skill | null> }>(
-      t.recorded.results[0],
-    ).entries;
-    expect(entries[0]?.profile).toEqual({ domain: "开发编程" });
-  });
-
-  it("reads the profiles again when the fresh body brings ids the cache never had", async () => {
-    const decorated = { ...skill(0), profile: { domain: "开发编程" } };
-    const t = setup({
-      cache: {
-        load: async () => ({
-          skills: [decorated],
-          generatedAt: "2026-09-01T14:25:32Z",
-          fetchedAt: 1,
-          profilesAt: "2026-09-01T10:00:00Z",
-        }),
-        save: async () => {},
-        clear: async () => {},
-      },
-      published: {
-        tag: "dist-2026-09-02",
-        generatedAt: "2026-09-02T14:25:32Z",
-        total: 1,
-      },
-      // The probe still advertises the snapshot the cache was decorated from,
-      // so the stamp alone reads as "already served" — but the map recovered
-      // from the cache cannot speak for the skill the newer body adds, and only
-      // the file can say what it was profiled as.
-      profilesMeta: { generatedAt: "2026-09-01T10:00:00Z" },
-      profiles: new Map([
-        ["owner-0/repo-0/skill-0", { domain: "开发编程" }],
-        ["owner-1/repo-1/skill-1", { domain: "内容创作" }],
-      ]),
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.push(skill(1));
-    t.complete();
-    await t.flush();
-
-    t.controller.handle({
-      type: "lookupSkills",
-      id: 1,
-      payload: { refs: [{ repo: "owner-1/repo-1", name: "skill-1" }] },
-    });
-    const entries = resultData<{ entries: Array<Skill | null> }>(
-      t.recorded.results[0],
-    ).entries;
-    expect(entries[0]?.profile).toEqual({ domain: "内容创作" });
   });
 
   it("skips the body download when the published run is unchanged", async () => {
@@ -659,42 +507,6 @@ describe("createRegistryController — revalidate", () => {
       status: "unknown",
     });
   });
-
-  it("reports updated when only the profiles dataset moved", async () => {
-    const generatedAt = "2026-09-01T14:25:32Z";
-    const before = "2026-09-10T07:22:00Z";
-    const after = "2026-09-11T07:22:00Z";
-    const options: SourceOptions = {
-      published: { tag: "dist-2026-09-01", generatedAt, total: 1 },
-      profilesMeta: { generatedAt: before },
-      profiles: new Map([["owner-0/repo-0/skill-0", { domain: "开发编程" }]]),
-      cache: {
-        load: async () => ({
-          ...record([skill(0)], generatedAt),
-          profilesAt: before,
-        }),
-        save: async () => {},
-        clear: async () => {},
-      },
-    };
-    const t = setup(options);
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-    // Both snapshots are the ones already served: nothing was fetched.
-    expect(t.pins).toEqual([]);
-
-    // The profiles dataset moves on its own schedule, independent of the
-    // registry index it decorates.
-    options.profilesMeta = { generatedAt: after };
-    void t.controller.revalidate({ id: 1 });
-    await t.flush();
-
-    expect(t.pins).toEqual([]);
-    expect(resultData<RevalidateResult>(t.recorded.results.at(-1)!)).toEqual({
-      status: "updated",
-    });
-    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({ profilesAt: after });
-  });
 });
 
 describe("createRegistryController — getPage", () => {
@@ -942,14 +754,14 @@ describe("createRegistryController — getGroups", () => {
     expect(data.total).toBe(120);
   });
 
-  it("groups by profile domain, pooling the unprofiled into 未分类", async () => {
+  it("groups by domain, pooling the unclassified into 未分类", async () => {
     const t = setup({
-      skills: [skill(0), skill(1), skill(2), skill(3)],
-      profiles: new Map([
-        ["owner-0/repo-0/skill-0", { domain: "开发编程" }],
-        ["owner-1/repo-1/skill-1", { domain: "内容创作" }],
-        ["owner-2/repo-0/skill-2", { domain: "开发编程" }],
-      ]),
+      skills: [
+        { ...skill(0), profile: { domain: ["development"] } },
+        { ...skill(1), profile: { domain: ["content-creation"] } },
+        { ...skill(2), profile: { domain: ["development"] } },
+        skill(3),
+      ],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
@@ -989,6 +801,41 @@ describe("createRegistryController — getGroups", () => {
       "skill-3",
     ]);
     expect(data.total).toBe(4);
+  });
+
+  it("places a multi-domain skill in each of its domain groups", async () => {
+    const t = setup({
+      skills: [
+        {
+          ...skill(0),
+          profile: { domain: ["development", "content-creation"] },
+        },
+        { ...skill(1), profile: { domain: ["development"] } },
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "getGroups",
+      id: 1,
+      payload: { query: "", groupBy: "domain" },
+    });
+    const data = resultData<{
+      groups: Array<{ title: string; skills: Array<{ skill: Skill }> }>;
+    }>(t.recorded.results[0]);
+
+    // One skill, two groups — the multi-domain case a single-domain model
+    // could not express.
+    expect(data.groups.map((g) => g.title)).toEqual([
+      "开发编程",
+      "内容创作",
+    ]);
+    // Within-group order is the popularity blend, so compare as a set.
+    expect(
+      data.groups[0].skills.map((h) => h.skill.name).toSorted(),
+    ).toEqual(["skill-0", "skill-1"]);
+    expect(data.groups[1].skills.map((h) => h.skill.name)).toEqual(["skill-0"]);
   });
 
   it("groups search hits with the best match leading its group", async () => {
@@ -1385,22 +1232,20 @@ describe("createRegistryController — failures", () => {
   });
 });
 
-describe("createRegistryController — profiles", () => {
-  const PROFILES = new Map<string, SkillProfile>([
-    ["owner-0/repo-0/skill-0", { domain: "开发编程", reason: "dev tools" }],
-    ["owner-1/repo-1/skill-1", { domain: "内容创作" }],
-  ]);
+describe("createRegistryController — classification", () => {
+  /** A skill carrying the classification its index row shipped. */
+  const classified = (i: number, domain: string[], reason?: string): Skill =>
+    skill(i, reason ? { profile: { domain, reason } } : { profile: { domain } });
 
-  it("decorates the served skills and reports the domain list", async () => {
+  it("reports the domain list from the served rows", async () => {
     // Two skills share one domain so the count ordering is unambiguous
     // (locale-aware tie-breaks are not asserted).
     const t = setup({
-      skills: [skill(0), skill(1), skill(2)],
-      profiles: new Map<string, SkillProfile>([
-        ["owner-0/repo-0/skill-0", { domain: "开发编程" }],
-        ["owner-1/repo-1/skill-1", { domain: "内容创作" }],
-        ["owner-2/repo-0/skill-2", { domain: "开发编程" }],
-      ]),
+      skills: [
+        classified(0, ["development"]),
+        classified(1, ["content-creation"]),
+        classified(2, ["development"]),
+      ],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
@@ -1410,8 +1255,8 @@ describe("createRegistryController — profiles", () => {
       t.recorded.results[0],
     );
     expect(domains).toEqual([
-      { domain: "开发编程", count: 2 },
-      { domain: "内容创作", count: 1 },
+      { domain: "development", count: 2 },
+      { domain: "content-creation", count: 1 },
     ]);
 
     t.controller.handle({
@@ -1422,14 +1267,19 @@ describe("createRegistryController — profiles", () => {
     const hits = resultData<{ hits: Array<{ skill: Skill }> }>(
       t.recorded.results[1],
     );
-    expect(hits.hits[0].skill.profile).toEqual({ domain: "开发编程" });
-    expect(hits.hits[2].skill.profile).toEqual({ domain: "开发编程" });
+    expect(hits.hits[0].skill.profile).toEqual({ domain: ["development"] });
+    expect(hits.hits[2].skill.profile).toEqual({ domain: ["development"] });
   });
 
   it("filters both the browse list and search results by domain", async () => {
+    // skill-2 belongs to both domains, so a single-key filter has to match by
+    // membership rather than by an exact classification.
     const t = setup({
-      skills: [skill(0), skill(1), skill(2)],
-      profiles: PROFILES,
+      skills: [
+        classified(0, ["development"]),
+        classified(1, ["content-creation"]),
+        classified(2, ["development", "content-creation"]),
+      ],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
@@ -1442,15 +1292,18 @@ describe("createRegistryController — profiles", () => {
         sort: "default",
         page: 0,
         pageSize: 10,
-        domain: "内容创作",
+        domain: "content-creation",
       },
     });
     const browsed = resultData<{
       hits: Array<{ skill: Skill }>;
       total: number;
     }>(t.recorded.results[0]);
-    expect(browsed.total).toBe(1);
-    expect(browsed.hits[0].skill.name).toBe("skill-1");
+    expect(browsed.total).toBe(2);
+    expect(browsed.hits.map((h) => h.skill.name)).toEqual([
+      "skill-1",
+      "skill-2",
+    ]);
 
     t.controller.handle({
       type: "getPage",
@@ -1460,84 +1313,39 @@ describe("createRegistryController — profiles", () => {
         sort: "popularity",
         page: 0,
         pageSize: 10,
-        domain: "开发编程",
+        domain: "development",
       },
     });
     const searched = resultData<{
       hits: Array<{ skill: Skill }>;
       total: number;
     }>(t.recorded.results[1]);
-    expect(searched.total).toBe(1);
-    expect(searched.hits[0].skill.name).toBe("skill-0");
+    expect(searched.total).toBe(2);
+    expect(searched.hits.map((h) => h.skill.name).toSorted()).toEqual([
+      "skill-0",
+      "skill-2",
+    ]);
   });
 
-  it("keeps the registry usable when the profiles source is unreachable", async () => {
-    const t = setup({
-      skills: [skill(0), skill(1)],
-      profiles: null, // every candidate fails
-    });
+  it("keeps the registry usable when nothing is classified", async () => {
+    const t = setup({ skills: [skill(0), skill(1)] });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    // Ready fired exactly once (no profiles rebuild) and no skill carries a
-    // profile; the domain list is empty but not an error.
+    // Ready fired exactly once and no skill carries a profile; the domain
+    // list is empty but not an error.
     expect(t.recorded.readyCount).toBe(1);
     t.controller.handle({ type: "getDomains", id: 1 });
     expect(resultData(t.recorded.results[0])).toEqual([]);
   });
 
-  it("revalidates profiles even when the registry index is unchanged", async () => {
-    const generatedAt = "2026-09-01T14:25:32Z";
-    const saved: Array<[Skill[], Record<string, unknown>]> = [];
+  it("builds featured sections from the real domains", async () => {
     const t = setup({
-      cache: {
-        load: async () => record([skill(0), skill(1)], generatedAt),
-        save: async (skills, identity) => {
-          saved.push([skills, identity as Record<string, unknown>]);
-        },
-        clear: async () => {},
-      },
-      published: { tag: "dist-2026-09-01", generatedAt, total: 2 },
-      profiles: PROFILES,
-      profilesMeta: { generatedAt: "2026-09-10T07:22:00Z" },
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    // The registry body was skipped, but the profiles still landed: the
-    // cached skills are decorated in place and the re-posted ready reflects
-    // the refreshed index.
-    expect(t.pins).toEqual([]);
-    expect(t.recorded.readyCount).toBe(2);
-    t.controller.handle({ type: "getDomains", id: 1 });
-    // Both domains made it; the tie-break order is locale-dependent.
-    const domains = resultData<Array<{ domain: string; count: number }>>(
-      t.recorded.results[0],
-    );
-    expect(domains).toHaveLength(2);
-    expect(domains).toEqual(
-      expect.arrayContaining([
-        { domain: "开发编程", count: 1 },
-        { domain: "内容创作", count: 1 },
-      ]),
-    );
-    // The re-save (profiles refresh without a re-download) records the
-    // profiles stamp so the next revalidation can skip again.
-    expect(saved[0]?.[1]).toMatchObject({
-      generatedAt,
-      profilesAt: "2026-09-10T07:22:00Z",
-    });
-  });
-
-  it("builds featured sections from the real domains with curated fallback", async () => {
-    const t = setup({
-      skills: [skill(0), skill(1), skill(2)],
-      profiles: new Map<string, SkillProfile>([
-        // skill-0 and skill-1 share a domain; downloads (100-i) order them.
-        ["owner-0/repo-0/skill-0", { domain: "开发编程" }],
-        ["owner-1/repo-1/skill-1", { domain: "开发编程" }],
-        ["owner-2/repo-0/skill-2", { domain: "内容创作" }],
-      ]),
+      skills: [
+        classified(0, ["development"]),
+        classified(1, ["development"]),
+        classified(2, ["content-creation"]),
+      ],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
@@ -1550,8 +1358,8 @@ describe("createRegistryController — profiles", () => {
     // Sections are the real domains, most-populated first, skills within a
     // section led by the most installed.
     expect(featured.sections.map((s) => s.id)).toEqual([
-      "开发编程",
-      "内容创作",
+      "development",
+      "content-creation",
     ]);
     expect(featured.sections[0].skills.map((s) => s.skill.name)).toEqual([
       "skill-0",
@@ -1562,9 +1370,29 @@ describe("createRegistryController — profiles", () => {
     ]);
   });
 
-  it("falls back to curated featured sections when no profiles are served", async () => {
-    // Skills shaped to match the mocked FEATURED_CATEGORIES refs, but with
-    // no profiles: the domain sections cannot be built, so the hand-curated
+  it("skips the catch-all domain when leading the featured sections", async () => {
+    const t = setup({
+      skills: [
+        classified(0, ["development"]),
+        classified(1, ["other"]),
+        skill(2),
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({ type: "getFeatured", id: 1 });
+    const featured = resultData<{
+      sections: Array<{ id: string; skills: Array<{ skill: Skill }> }>;
+    }>(t.recorded.results[0]);
+
+    // "other" classifies nothing on its own, so it never leads a section.
+    expect(featured.sections.map((s) => s.id)).toEqual(["development"]);
+  });
+
+  it("falls back to curated featured sections when nothing is classified", async () => {
+    // Skills shaped to match the mocked FEATURED_CATEGORIES refs, but with no
+    // classification: the domain sections cannot be built, so the hand-curated
     // ones answer instead.
     const t = setup({
       skills: [
@@ -1588,48 +1416,5 @@ describe("createRegistryController — profiles", () => {
       "alpha",
       "beta",
     ]);
-  });
-
-  it("skips the profiles download when the published stamp is unchanged", async () => {
-    // The cold cache was decorated from the same profiles snapshot the probe
-    // advertises: no re-fetch happens, so the index is never rebuilt and
-    // ready is posted exactly once.
-    const cachedSkill: Skill = {
-      ...skill(0),
-      profile: { domain: "开发编程", reason: "dev tools" },
-    };
-    const t = setup({
-      cache: {
-        load: async () => ({
-          ...record([cachedSkill], "2026-09-01T14:25:32Z"),
-          profilesAt: "2026-09-10T07:22:00Z",
-        }),
-        save: async () => {},
-        clear: async () => {},
-      },
-      published: {
-        tag: "dist-2026-09-01",
-        generatedAt: "2026-09-01T14:25:32Z",
-        total: 1,
-      },
-      profilesMeta: { generatedAt: "2026-09-10T07:22:00Z" },
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    expect(t.recorded.readyCount).toBe(1);
-    t.controller.handle({
-      type: "getPage",
-      id: 1,
-      payload: { query: "", sort: "default", page: 0, pageSize: 10 },
-    });
-    const hits = resultData<{ hits: Array<{ skill: Skill }> }>(
-      t.recorded.results[0],
-    );
-    // The cached skill keeps the profile it was saved with.
-    expect(hits.hits[0].skill.profile).toEqual({
-      domain: "开发编程",
-      reason: "dev tools",
-    });
   });
 });

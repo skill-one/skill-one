@@ -19,6 +19,7 @@ import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { FilterDropdown, type FilterOption } from "../../components/filter-dropdown";
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage } from "../../lib/utils";
+import { domainLabel, domainMeta } from "../../data/domains";
 import { SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
 import { buildSearchIndex } from "../../lib/search-index";
 import {
@@ -105,10 +106,20 @@ function buildGroups(rows: Row[], groupBy: MyGroupBy): MyGroup[] {
   const poolTitle = POOL_TITLE_BY_MODE[groupBy];
   const buckets = new Map<string, Row[]>();
   for (const row of rows) {
-    const key = groupBy === "repo" ? row.view.repo || poolTitle : row.view.profile?.domain ?? poolTitle;
-    const bucket = buckets.get(key);
-    if (bucket) bucket.push(row);
-    else buckets.set(key, [row]);
+    // A skill may be classified under several domains, so it lands in every
+    // domain group it belongs to. Everything the mode cannot key — an
+    // unrecorded source, an unclassified skill — pools under one title.
+    const keys =
+      groupBy === "repo"
+        ? [row.view.repo || poolTitle]
+        : row.view.profile?.domain.length
+          ? row.view.profile.domain
+          : [poolTitle];
+    for (const key of keys) {
+      const bucket = buckets.get(key);
+      if (bucket) bucket.push(row);
+      else buckets.set(key, [row]);
+    }
   }
   return Array.from(buckets, ([key, items]) => {
     if (groupBy === "repo" && key !== poolTitle) {
@@ -117,6 +128,16 @@ function buildGroups(rows: Row[], groupBy: MyGroupBy): MyGroup[] {
           key: `repo-${key}`,
           title: key,
           avatarOwner: key.split("/")[0],
+        },
+        items,
+      };
+    }
+    if (groupBy === "domain" && key !== poolTitle) {
+      return {
+        meta: {
+          key: `domain-${key}`,
+          title: domainLabel(key),
+          emoji: domainMeta(key)?.emoji,
         },
         items,
       };

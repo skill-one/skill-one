@@ -1,21 +1,21 @@
 /**
- * Extra metadata for one skill, merged in from the skill-one/skills-profiles
- * dataset (its `dist` branch ships one JSONL line per profiled skill).
- * Coverage is partial — only skills the profile generator has processed
- * carry a profile — so every consumer must treat the whole field as
- * optional garnish, never as a fact every skill has.
+ * Extra metadata for one skill, carried by the index row itself (the
+ * skill-one/skills-profiles dataset publishes it inline, `domain`/`reason` on
+ * every classified skill). Coverage is partial — only skills the profile
+ * generator has processed carry a profile — so every consumer must treat the
+ * whole field as optional garnish, never as a fact every skill has.
  */
 export interface SkillProfile {
-  /** One of the dataset's fixed domain categories, e.g. "开发编程". */
-  domain: string;
-  /** One-line justification the generator gave for the domain. */
+  /**
+   * The dataset's classification: 1–3 domain keys, best fit first. The keys
+   * are the generator's English enum (`development`, `data-analysis`, …);
+   * `data/domains.ts` maps a key to its display label and emoji. A skill may
+   * legitimately belong to several, so grouping and filtering match by
+   * membership.
+   */
+  domain: string[];
+  /** One-line justification the generator gave for the classification. */
   reason?: string;
-  /** The skill's anthropomorphic "job persona", written for fun. */
-  persona?: {
-    tool?: string;
-    role?: string;
-    scene?: string;
-  };
 }
 
 export interface Skill {
@@ -32,10 +32,10 @@ export interface Skill {
   /** Lifetime install count recorded by skills.sh; 0 when absent. */
   downloads: number;
   /**
-   * Directory the skill's files live in, relative to the skills-sh-mirror
-   * mirror snapshot ("skills/{owner}/{repo}/{slug}"). Used to fetch the
-   * SKILL.md directly from the mirror without path probing; absent for
-   * installed skills that the mirror does not list.
+   * Directory the skill's files live in, relative to the skills-profiles
+   * snapshot ("skills/{owner}/{repo}/{slug}"). Used to fetch the SKILL.md
+   * directly from the snapshot without path probing; absent for installed
+   * skills that the dataset does not list.
    */
   path?: string;
   /**
@@ -54,42 +54,16 @@ export interface Skill {
   /** The skill's page on skills.sh, when the index carries one. */
   url?: string;
   /**
-   * Classification and persona metadata from skills-profiles, merged in by
-   * the registry worker. Absent for skills the dataset has not profiled
-   * (and whenever that source is unreachable) — the skill still works.
+   * Classification metadata, carried by the index row. Absent for skills the
+   * dataset has not classified (and for locally installed skills) — the skill
+   * still works.
    */
   profile?: SkillProfile;
 }
 
 /**
- * The full per-skill profile, assembled from the five angle files the
- * profiles dataset ships per skill (skills/<id>/<angle>.json) on demand
- * when the detail drawer's 概述 tab opens. `domain` and `persona` are not
- * re-fetched — they already ride along on the index entry (`Skill.profile`)
- * and the dataset guarantees the files never contradict the index.
- *
- * Every angle is optional: one file being unreachable hides its section
- * without breaking the others.
- */
-export interface SkillProfileDetail {
-  /** One ≤100-character pitch built around the user's pain point. */
-  scenario?: string;
-  /** Three ≤20-character slogans. */
-  taglines?: string[];
-  /** Outside view: what you hand it → what you get back. */
-  blackbox?: {
-    function: string;
-    inputOutput: Array<{ input: string; output: string }>;
-  };
-  /** Inside view: the happy path plus the key mechanisms behind it. */
-  whitebox?: { executionFlow: string[]; mechanisms: string[] };
-  /** First-person user notes, categorized 妙用/坑/注意/启发. */
-  comments?: Array<{ user: string; category: string; comment: string }>;
-}
-
-/**
- * A single skill's SKILL.md content, fetched from the skills-sh-mirror
- * mirror on demand when the detail sheet is opened.
+ * A single skill's SKILL.md content, fetched from the skills-profiles
+ * snapshot on demand when the detail sheet is opened.
  */
 export interface SkillDetail {
   /** Frontmatter `name`, falling back to the registry skill id. */

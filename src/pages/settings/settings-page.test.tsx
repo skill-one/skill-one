@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "../../components/theme-provider";
 import { SettingsPage } from "./settings-page";
 import type { IndexInfo } from "../../lib/registry/protocol";
-import { setIndexTag, setProfilesTag } from "../../lib/cdn-config";
+import { setIndexTag } from "../../lib/cdn-config";
 import { getUpdateStatus, resetUpdateState } from "../../lib/update-store";
 import { resetUpdateChannel } from "../../lib/update-channel";
 
@@ -57,11 +57,9 @@ vi.mock("../../lib/registry/refresh", () => ({
 const CHECKED_AT_ISO = "2026-09-11T08:00:00Z";
 
 const SERVED: IndexInfo = {
-  tag: "dist-2026-09-06",
+  tag: "dist-2026-09-06-2",
   generatedAt: "2026-01-01T00:00:00Z",
   total: 23734,
-  profilesTag: "dist-2026-09-10-2",
-  profilesAt: "2026-09-10T07:22:00Z",
   origin: "unchanged",
   checkedAt: Date.parse(CHECKED_AT_ISO),
 };
@@ -69,7 +67,6 @@ const SERVED: IndexInfo = {
 /** How the card renders a snapshot stamp in the host's local time zone. */
 const localeStamp = (iso: string) => new Date(iso).toLocaleString();
 const GENERATED_AT_LOCALE = localeStamp("2026-01-01T00:00:00Z");
-const PROFILES_AT_LOCALE = localeStamp("2026-09-10T07:22:00Z");
 const CHECKED_AT_LOCALE = localeStamp(CHECKED_AT_ISO);
 
 function renderSettings() {
@@ -97,7 +94,6 @@ describe("SettingsPage", () => {
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
     setIndexTag("");
-    setProfilesTag("");
   });
 
   it("hosts the appearance picker alongside the CDN settings", () => {
@@ -108,18 +104,16 @@ describe("SettingsPage", () => {
     expect(screen.getByText("跟随系统")).toBeInTheDocument();
   });
 
-  it("names the served snapshots of both sources and that they were reused, not downloaded", () => {
+  it("names the served snapshot and that it was reused, not downloaded", () => {
     stats.current = SERVED;
     renderSettings();
 
     expect(screen.getByText("数据源")).toBeInTheDocument();
-    // The tags name the snapshot days; displayed whole.
-    expect(screen.getByText("dist-2026-09-06")).toBeInTheDocument();
-    expect(screen.getByText("dist-2026-09-10-2")).toBeInTheDocument();
+    // The tag names the snapshot batch; displayed whole.
+    expect(screen.getByText("dist-2026-09-06-2")).toBeInTheDocument();
     expect(screen.getByText("23,734")).toBeInTheDocument();
     expect(screen.getByText(GENERATED_AT_LOCALE)).toBeInTheDocument();
-    expect(screen.getByText(PROFILES_AT_LOCALE)).toBeInTheDocument();
-    // The last completed check is dated too — it covers both sources.
+    // The last completed check is dated too.
     expect(screen.getByText(CHECKED_AT_LOCALE)).toBeInTheDocument();
     expect(
       screen.getByText("索引未更新，已复用本地缓存"),
@@ -132,20 +126,18 @@ describe("SettingsPage", () => {
   it("holds placeholders until a snapshot is being served", () => {
     renderSettings();
 
-    // Two snapshot tags + two stamps + the index row count + last check.
-    expect(screen.getAllByText("未知")).toHaveLength(6);
+    // The snapshot tag, its stamp, the row count, and the last check.
+    expect(screen.getAllByText("未知")).toHaveLength(4);
     expect(screen.getByText("数据尚未就绪")).toBeInTheDocument();
   });
 
-  it("shows the recorded snapshot tags when the live identity has not arrived", () => {
-    // The registry client persists the served tags; a fresh session reads
-    // them back before the first index event lands.
-    setIndexTag("dist-2026-09-06");
-    setProfilesTag("dist-2026-09-10-2");
+  it("shows the recorded snapshot tag when the live identity has not arrived", () => {
+    // The registry client persists the served tag; a fresh session reads it
+    // back before the first index event lands.
+    setIndexTag("dist-2026-09-06-2");
     renderSettings();
 
-    expect(screen.getByText("dist-2026-09-06")).toBeInTheDocument();
-    expect(screen.getByText("dist-2026-09-10-2")).toBeInTheDocument();
+    expect(screen.getByText("dist-2026-09-06-2")).toBeInTheDocument();
   });
 
   it("shows the 软件更新 card with a manual check control", () => {
