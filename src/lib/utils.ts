@@ -33,3 +33,62 @@ export function formatDate(iso?: string): string | null {
   const ms = Date.parse(iso);
   return Number.isNaN(ms) ? null : new Date(ms).toLocaleDateString();
 }
+
+/**
+ * Date part of a Unix timestamp in **seconds**, as the backend reports a skill
+ * directory's creation time (`installedAt`), in the user's locale and time
+ * zone. Returns null when there is nothing displayable (absent, or a value the
+ * platform could not record), so callers can skip the field entirely.
+ */
+export function formatUnixDate(seconds?: number | null): string | null {
+  if (seconds == null || !Number.isFinite(seconds)) return null;
+  return new Date(seconds * 1000).toLocaleDateString();
+}
+
+/**
+ * Largest unit first: the first one at least a whole unit has elapsed in wins.
+ * A table instead of a ladder of `if`s, so adding `week` or `quarter` is one
+ * row. Seconds are the fallback below this table, not a row in it.
+ */
+const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ["year", 365 * 24 * 60 * 60],
+  ["month", 30 * 24 * 60 * 60],
+  ["day", 24 * 60 * 60],
+  ["hour", 60 * 60],
+  ["minute", 60],
+];
+
+/**
+ * How long ago a Unix timestamp in seconds was, e.g. `3天前` / `1个月前` /
+ * `2年前` — the readable form of the backend's `installedAt`.
+ *
+ * `Intl.RelativeTimeFormat` is the platform's own formatter (no dependency to
+ * add for one label), pinned to `zh-CN` like the rest of the chrome: the host
+ * locale would otherwise drop English words into Chinese UI. `numeric:
+ * "always"` keeps every bucket uniform and exact — `"auto"` only rewrites the
+ * ±1 buckets and would turn a fact ("1年前") into a vague idiom ("去年").
+ *
+ * Whole units only, so 47 hours reads `1天前` rather than `2` — the count of
+ * units that have *passed*, not a rounding-up. Anything under a minute reads
+ * `刚刚` instead of a nonsensical `0分钟前`. A stamp ahead of the clock (only
+ * clock skew or a hand-made directory can produce one) reads `2小时后`, and is
+ * deliberately not clamped: it is honest about what the filesystem reported.
+ *
+ * `now` is injectable purely so the bucketing can be tested without freezing
+ * the clock; every caller omits it.
+ */
+export function formatRelativeTime(
+  seconds?: number | null,
+  now: number = Date.now(),
+): string | null {
+  if (seconds == null || !Number.isFinite(seconds)) return null;
+  const delta = seconds - now / 1000;
+  const magnitude = Math.abs(delta);
+  const unit = RELATIVE_UNITS.find(([, size]) => magnitude >= size);
+  if (!unit) return "刚刚";
+  // A formatter per call mirrors `formatCount`; there is one call per drawer.
+  return new Intl.RelativeTimeFormat("zh-CN", { numeric: "always" }).format(
+    Math.trunc(delta / unit[1]),
+    unit[0],
+  );
+}

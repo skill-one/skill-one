@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 
-import { cn, errorMessage, formatCount, formatDate } from "./utils";
+import {
+  cn,
+  errorMessage,
+  formatCount,
+  formatDate,
+  formatRelativeTime,
+} from "./utils";
 
 describe("cn", () => {
   // Joining truthy values, skipping falsy ones and flattening arrays is clsx's
@@ -27,6 +33,44 @@ describe("formatDate", () => {
   it("returns null for a missing or unparseable stamp", () => {
     expect(formatDate(undefined)).toBeNull();
     expect(formatDate("not a date")).toBeNull();
+  });
+});
+
+describe("formatRelativeTime", () => {
+  // A fixed clock, so the bucketing is provable without freezing global time.
+  const NOW = Date.parse("2026-09-19T12:00:00Z");
+  const ago = (seconds: number) => Math.floor(NOW / 1000) - seconds;
+
+  it("returns null for a missing or unusable stamp", () => {
+    expect(formatRelativeTime(undefined)).toBeNull();
+    expect(formatRelativeTime(null)).toBeNull();
+    expect(formatRelativeTime(Number.NaN)).toBeNull();
+  });
+
+  it("counts the whole units that have passed", () => {
+    // 47 hours is one day that has passed, not two rounded up.
+    expect(formatRelativeTime(ago(47 * 3600), NOW)).toBe("1天前");
+    expect(formatRelativeTime(ago(3 * 86400), NOW)).toBe("3天前");
+    expect(formatRelativeTime(ago(45 * 86400), NOW)).toBe("1个月前");
+    expect(formatRelativeTime(ago(800 * 86400), NOW)).toBe("2年前");
+  });
+
+  it("keeps every bucket uniform rather than idiomatic per bucket", () => {
+    // `numeric: "auto"` would say 昨天 / 上个月 / 去年 here. A fact is more
+    // useful than an idiom, and the exact date is one hover away.
+    expect(formatRelativeTime(ago(86400), NOW)).toBe("1天前");
+    expect(formatRelativeTime(ago(40 * 86400), NOW)).toBe("1个月前");
+    expect(formatRelativeTime(ago(400 * 86400), NOW)).toBe("1年前");
+  });
+
+  it("reads the last minute as 刚刚", () => {
+    expect(formatRelativeTime(ago(30), NOW)).toBe("刚刚");
+  });
+
+  it("reports a stamp ahead of the clock as such, not as the past", () => {
+    // Only clock skew or a hand-made directory produces one; saying 2小时后
+    // is honest about what the filesystem reported.
+    expect(formatRelativeTime(ago(-2 * 3600), NOW)).toBe("2小时后");
   });
 });
 

@@ -41,6 +41,33 @@ export interface GroupMeta {
   emoji?: string;
   /** The stars the ordering used, when the mode orders by them. */
   stars?: number;
+  /**
+   * How the leading ordinal reads. `rank` (the default) medals the top three
+   * sections, which fits a mode whose groups are ordered by a figure. A mode
+   * that only sequences its groups opts into `plain`: in the installed list's
+   * time view the first section is merely the most recent, and a medal on
+   * 今天 would imply it won something.
+   */
+  ordinal?: "rank" | "plain";
+}
+
+/** The podium, for the first three sections of a ranked mode. */
+const MEDAL_CLASSES = [
+  "text-amber-500 dark:text-amber-400",
+  "text-slate-400 dark:text-slate-500",
+  "text-orange-600 dark:text-orange-400",
+];
+
+/**
+ * Ink for one section's ordinal, replacing the two near-identical spans the
+ * podium used to need: gold/silver/bronze for a ranked mode's top three, and
+ * the same quiet muted ink everywhere else.
+ */
+function ordinalClass(index: number, ranked: boolean): string {
+  const medal = ranked ? MEDAL_CLASSES[index] : undefined;
+  return medal
+    ? cn("text-xs font-bold tabular-nums", medal)
+    : "text-xs text-muted-foreground tabular-nums";
 }
 
 /** The nearest ancestor that actually scrolls, if any — the sticky header's
@@ -214,22 +241,14 @@ export function GroupSection<T>({
               aria-hidden
               className="hidden h-4 w-4 text-muted-foreground transition-transform duration-150 group-hover/head:block group-data-closed/repo:-rotate-90"
             />
-            {index < 3 ? (
-              <span
-                className={cn(
-                  "text-xs font-bold tabular-nums group-hover/head:hidden",
-                  index === 0 && "text-amber-500 dark:text-amber-400",
-                  index === 1 && "text-slate-400 dark:text-slate-500",
-                  index === 2 && "text-orange-600 dark:text-orange-400",
-                )}
-              >
-                {index + 1}
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground tabular-nums group-hover/head:hidden">
-                {index + 1}
-              </span>
-            )}
+            <span
+              className={cn(
+                "group-hover/head:hidden",
+                ordinalClass(index, group.ordinal !== "plain"),
+              )}
+            >
+              {index + 1}
+            </span>
           </span>
           {/* The identity slot: the owner's avatar for repository groups,
               the category's emoji for domain groups, nothing otherwise. */}

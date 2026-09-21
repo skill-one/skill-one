@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
   Boxes,
+  CalendarDays,
   FolderGit2,
   LayoutGrid,
   ToggleLeft,
@@ -14,6 +15,7 @@ import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entrie
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import type { InstalledSkill } from "../../lib/skills-manager";
 import { installedSkillView, type SkillView } from "../../lib/skill-view";
+import { TIME_BUCKETS, timeBucketOf } from "../../lib/time-buckets";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { FilterDropdown, type FilterOption } from "../../components/filter-dropdown";
@@ -41,15 +43,20 @@ import { GroupSection, type GroupMeta } from "../explore/group-section";
  *
  * - `repo`: one group per source repository (from the provenance ledger);
  *   skills installed by other tools pool into 未关联仓库.
+ * - `time`: the install timeline — 今天 / 近 7 天 / … / 更早
+ *   (`lib/time-buckets`). The one mode whose sections are ordered *by the
+ *   data* rather than by size, which is what makes it read as a chronology;
+ *   its ordinals are consequently un-medalled.
  * - `status`: the enablement split — 已启用 / 已禁用 — the old toolbar
  *   filter, promoted to a grouping.
  * - `domain`: the store's classification; skills the registry cannot
  *   classify pool into 未分类.
  */
-type MyGroupBy = "repo" | "status" | "domain";
+type MyGroupBy = "repo" | "time" | "status" | "domain";
 
 const GROUP_OPTIONS: Array<FilterOption<MyGroupBy>> = [
   { value: "repo", label: "按仓库", icon: FolderGit2 },
+  { value: "time", label: "按时间", icon: CalendarDays },
   { value: "status", label: "按状态", icon: ToggleLeft },
   { value: "domain", label: "按类型", icon: LayoutGrid },
 ];
@@ -88,10 +95,57 @@ const POOL_TITLE_BY_MODE = {
 /**
  * Bucket the rows by the requested mode. Every mode starts from the rows in
  * list order (a search has already reordered them by relevance) and keeps
- * that order inside each bucket; the groups themselves lead with the
- * most-populated bucket, ties resolved by title.
+ * that order inside each bucket.
+ *
+ * The groups themselves follow their mode. The pooling modes (`repo`,
+ * `domain`) lead with the most-populated bucket, ties resolved by title; the
+ * modes that carry a reading order of their own emit their sections in it and
+ * simply drop the empty ones — `time` newest first, `status` running skills
+ * first.
+ *
+ * `time` also reorders *within* its sections, the one place a mode overrides
+ * the incoming list order: a timeline whose contents ran alphabetically would
+ * not be a timeline. Relevance is then only what *selects* the rows of a
+ * search, never how they are laid out.
  */
 function buildGroups(rows: Row[], groupBy: MyGroupBy): MyGroup[] {
+  if (groupBy === "time") {
+    // The timeline. Sections are positional (newest first) rather than
+    // weighed, so this must never reach the size ordering at the tail below;
+    // an empty stretch is simply absent, and a skill whose install time was
+    // never recorded keeps a section of its own instead of being filed under
+    // 更早, which would claim more than the record does.
+    const buckets = new Map<string, Row[]>();
+    for (const row of rows) {
+      const key = timeBucketOf(row.view.installedAt);
+      const bucket = buckets.get(key);
+      if (bucket) bucket.push(row);
+      else buckets.set(key, [row]);
+    }
+    // Chronological inside a section too, not just between them — otherwise a
+    // timeline's contents read alphabetically. This is what makes a batch
+    // legible: one `add owner/repo` gives every skill it installs the same
+    // second, so the run of cards it produced stays together instead of being
+    // scattered through the section by name. A skill with no recorded time
+    // sorts last, which `?? 0` gives for free.
+    for (const items of buckets.values()) {
+      items.sort(
+        (a, b) => (b.view.installedAt ?? 0) - (a.view.installedAt ?? 0),
+      );
+    }
+    const groups: MyGroup[] = [];
+    for (const bucket of TIME_BUCKETS) {
+      const items = buckets.get(bucket.key);
+      if (items) {
+        groups.push({
+          meta: { key: bucket.key, title: bucket.title, ordinal: "plain" },
+          items,
+        });
+      }
+    }
+    return groups;
+  }
+
   if (groupBy === "status") {
     // The enablement split has a natural order — running skills first — and
     // empty halves are simply not shown.
@@ -328,6 +382,7 @@ export function MySkillsPage() {
   const groupsByMode = useMemo(
     () => ({
       repo: buildGroups(rows, "repo"),
+      time: buildGroups(rows, "time"),
       status: buildGroups(rows, "status"),
       domain: buildGroups(rows, "domain"),
     }),

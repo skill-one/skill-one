@@ -1,13 +1,23 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Globe, Loader2 } from "lucide-react";
+import {
+  CalendarDays,
+  ExternalLink,
+  Globe,
+  Loader2,
+} from "lucide-react";
 
 import { fetchSkillDetail, MIRROR } from "../../lib/skill-detail-api";
 import { fetchLocalSkillDetail } from "../../lib/local-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
 import { LOCAL_SOURCE_LABEL, type SkillView } from "../../lib/skill-view";
-import { errorMessage, formatDate } from "../../lib/utils";
+import {
+  errorMessage,
+  formatDate,
+  formatRelativeTime,
+  formatUnixDate,
+} from "../../lib/utils";
 import { DomainBadge } from "../domain-badge";
 import { SkillPopularity } from "../skill-popularity";
 import { Badge } from "../ui/badge";
@@ -123,6 +133,53 @@ function ProvenanceTip({
         />
         {body}
       </Tooltip>
+  );
+}
+
+/**
+ * When a locally installed skill landed on disk — the one fact only an on-disk
+ * record carries, reported by `Manager::list` since agents-skills 0.16 and
+ * available nowhere else in the app.
+ *
+ * It lives in the drawer rather than on the card: the card is for *finding* a
+ * skill, while this answers a question about the copy the reader actually has.
+ * An unrecorded time (some Linux filesystems report none) renders nothing at
+ * all, which is also exactly what the store's registry-only rows provide.
+ */
+function InstalledAt({ installedAt }: { installedAt?: number | null }) {
+  // Relative on the row — "3天前" answers "recently?" — with the exact date on
+  // hover answering "exactly when". The same split as the popularity figure,
+  // and the tooltip already existed, so it costs no new UI element. Both
+  // renderings share one guard, so `installedExact` is present whenever
+  // `installedOn` is.
+  const installedOn = formatRelativeTime(installedAt);
+  if (!installedOn) return null;
+  const installedExact = formatUnixDate(installedAt);
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            data-slot="installed-at"
+            className="flex items-center gap-1 whitespace-nowrap text-muted-foreground/70"
+          >
+            <CalendarDays aria-hidden className="h-3.5 w-3.5 shrink-0" />
+            {installedOn}
+          </span>
+        }
+      />
+      <TooltipContent className="max-w-[260px] text-left normal-case">
+        <div className="flex flex-col gap-1">
+          <p>
+            <span className="text-background/55">安装于 </span>
+            {installedExact}
+          </p>
+          <p className="text-background/55">
+            技能目录的创建时间；从 agent 目录收编的技能保留其原始时间。
+          </p>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -405,6 +462,9 @@ export function SkillDetailPanel({
               reason={shown.profile.reason}
             />
           )}
+          {/* Installed skills only — the on-disk fact the registry cannot
+              report. A store row has no local install, so nothing renders. */}
+          <InstalledAt installedAt={shown?.installedAt} />
         </div>
       </SheetHeader>
       {installError && (

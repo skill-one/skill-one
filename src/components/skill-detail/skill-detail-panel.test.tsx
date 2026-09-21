@@ -46,6 +46,8 @@ const installedPdf = {
   name: "pdf",
   path: "/Users/me/.agents/skills/pdf",
   enabled: true,
+  description: "Read and merge PDF documents.",
+  installedAt: 1_760_000_000,
 };
 
 const skill: SkillView = {
@@ -414,6 +416,35 @@ describe("SkillDetailPanel", () => {
     expect(
       screen.getByRole("link", { name: "anthropics/skills" }),
     ).toBeInTheDocument();
+  });
+
+  it("reports how long ago an installed skill landed on disk", async () => {
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([installedPdf]);
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    // Three days ago: far from any bucket boundary, so the relative label is
+    // deterministic without freezing the clock. The bucketing itself is
+    // proven against a fixed clock in `utils.test.ts`.
+    const installedAt = Math.floor(Date.now() / 1000) - 3 * 24 * 60 * 60;
+    // What the installed list hands the drawer: the on-disk fact the registry
+    // cannot know — when the skill landed (agents-skills 0.16).
+    renderDrawer({
+      skill: { ...skill, path: undefined, installedAt },
+      surface: "installed",
+    });
+
+    expect(await screen.findByText("3天前")).toHaveAttribute(
+      "data-slot",
+      "installed-at",
+    );
+  });
+
+  it("shows no install date for a registry row", async () => {
+    renderDrawer({});
+    await screen.findByText("Use this skill for PDFs.");
+
+    // A store row describes a skill the reader does not have on disk, so there
+    // is no install to date.
+    expect(document.querySelector('[data-slot="installed-at"]')).toBeNull();
   });
 
   it("shows no store facts for an installed skill the registry does not know", async () => {

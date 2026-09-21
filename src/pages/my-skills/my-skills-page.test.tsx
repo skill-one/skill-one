@@ -661,6 +661,79 @@ describe("MySkillsPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("groups by install age into a chronological timeline", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await screen.findByText("pdf");
+
+    await user.click(screen.getByRole("button", { name: "按仓库" }));
+    await user.click(
+      await screen.findByRole("menuitemradio", { name: /^按时间/ }),
+    );
+
+    // Newest first, and never the size ordering the pooling modes use: 近一年
+    // holds two skills yet sits fourth, because it is younger than 更早.
+    const headers = screen
+      .getAllByRole("button", { name: /^分组 / })
+      .map((header) => header.getAttribute("aria-label"));
+    expect(headers).toEqual([
+      "分组 今天，1 个 skill",
+      "分组 近 7 天，1 个 skill",
+      "分组 近 30 天，1 个 skill",
+      "分组 近一年，2 个 skill",
+      "分组 更早，1 个 skill",
+    ]);
+  });
+
+  it("orders the timeline chronologically inside a section too", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await screen.findByText("pdf");
+
+    await user.click(screen.getByRole("button", { name: "按仓库" }));
+    await user.click(
+      await screen.findByRole("menuitemradio", { name: /^按时间/ }),
+    );
+
+    // Not just "newest section first": 近一年 holds two skills and the younger
+    // one leads. Left in the list's alphabetical order it would be code-review
+    // before mcp-builder.
+    const cards = screen
+      .getAllByRole("button", { name: /^查看 .* 详情$/ })
+      .map((card) => card.getAttribute("aria-label"));
+    expect(cards).toEqual([
+      "查看 pdf 详情",
+      "查看 docx 详情",
+      "查看 pptx 详情",
+      "查看 mcp-builder 详情",
+      "查看 code-review 详情",
+      "查看 frontend-design 详情",
+    ]);
+  });
+
+  it("medals a ranked mode's ordinals and leaves the timeline's plain", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await screen.findByText("pdf");
+
+    // The default mode weighs its groups by size, so the top one takes the
+    // podium's gold…
+    const rankedOrdinal = within(
+      screen.getByRole("button", { name: /^分组 未关联仓库/ }),
+    ).getByText("1");
+    expect(rankedOrdinal.className).toContain("text-amber-500");
+
+    await user.click(screen.getByRole("button", { name: "按仓库" }));
+    await user.click(
+      await screen.findByRole("menuitemradio", { name: /^按时间/ }),
+    );
+
+    // …while the timeline's first section is merely the most recent, not the
+    // winner, so it prints in the row's ordinary muted ink.
+    const plainOrdinal = within(groupHeader("今天", 1)).getByText("1");
+    expect(plainOrdinal.className).not.toContain("text-amber-500");
+  });
+
   it("annotates the grouping options with the group counts", async () => {
     const user = userEvent.setup();
     setMockSkillEnabled("pptx", false);
@@ -672,9 +745,15 @@ describe("MySkillsPage", () => {
     const rows = (await screen.findAllByRole("menuitemradio")).map(
       (m) => m.textContent,
     );
-    // All six skills share one repo-less pool; disabling pptx splits the
-    // status mode into two groups; nothing is classified.
-    expect(rows).toEqual(["按仓库1 组", "按状态2 组", "按类型1 组"]);
+    // All six skills share one repo-less pool; their install ages spread over
+    // five stretches; disabling pptx splits the status mode into two groups;
+    // nothing is classified.
+    expect(rows).toEqual([
+      "按仓库1 组",
+      "按时间5 组",
+      "按状态2 组",
+      "按类型1 组",
+    ]);
   });
 
   it("lists every detected agent in the strip's dropdown menu", async () => {
