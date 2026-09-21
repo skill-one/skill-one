@@ -216,10 +216,7 @@ export function SkillCard({
         </CardHeader>
 
         <CardContent className="line-clamp-2 text-[13px] text-muted-foreground">
-          <HighlightedText
-            text={skill.description || "暂无描述"}
-            terms={matched?.description}
-          />
+          {skill.description || "暂无描述"}
         </CardContent>
 
         {/* Pinned to the card's bottom edge: descriptions differ in length, and

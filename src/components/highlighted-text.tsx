@@ -1,9 +1,9 @@
 /**
- * Matched indexed terms per field, from the search that produced this hit.
+ * Matched terms in a skill's name, from the search that produced this hit.
  * Both indexes that feed a skill card — the registry's, built in the worker,
  * and the installed list's, built in memory — hand over this shape.
  */
-export type SkillMatched = Partial<Record<string, readonly string[]>>;
+export type SkillMatched = { name?: readonly string[] };
 
 /** Terms come from user-visible text, so they are escaped before use in a RegExp. */
 function escapeForRegExp(value: string): string {
@@ -16,11 +16,9 @@ function escapeForRegExp(value: string): string {
  * identical to an unhighlighted one.
  *
  * The terms are whole indexed tokens, so splitting the text on the terms
- * themselves marks exactly what the index matched — for Latin text the same
- * whole words the old token split produced, and for Han text the characters and
- * bigrams that sit *inside* an unsegmented run and no whole-token comparison
- * could ever reach. The one difference is that a term is also marked where a
- * longer word contains it.
+ * themselves marks exactly what the index matched. A term is also marked where
+ * a longer word merely contains it — the text is split on the term itself, so
+ * "pdf" is marked inside "pdfs" even though the index holds whole tokens.
  */
 export function HighlightedText({
   text,
