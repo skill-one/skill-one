@@ -40,8 +40,13 @@ import type { InstalledSkill } from "../lib/skills-manager";
 
 const runQueryFn = fetchProvenanceState;
 
-function installed(name: string, description?: string): InstalledSkill {
-  return { name, path: `~/.agents/skills/${name}`, enabled: true, description };
+function installed(name: string, description = ""): InstalledSkill {
+  return {
+    name,
+    path: `~/.agents/skills/${name}`,
+    enabled: true,
+    description,
+  };
 }
 
 const NAMESAKE = {

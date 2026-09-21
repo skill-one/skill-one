@@ -131,14 +131,15 @@ export function AgentAvatarMenu() {
                         {agent.display}
                       </div>
                       {/* Pending-action counts, shown only when there is
-                          something a link would do to this agent's dir. */}
+                          something a link would do to this agent's dir:
+                          adopt its skills, quarantine the rest. */}
                       {(skillsCount > 0 || othersCount > 0) && (
                         <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                           {skillsCount > 0 && (
-                            <span>{skillsCount} 个 skill 待导入</span>
+                            <span>{skillsCount} 个 skill 待收编</span>
                           )}
                           {othersCount > 0 && (
-                            <span>{othersCount} 个文件待备份</span>
+                            <span>{othersCount} 项文件待隔离</span>
                           )}
                         </div>
                       )}

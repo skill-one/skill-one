@@ -31,17 +31,13 @@ tauri-plugin-opener = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 # Skills install / agent management backed by the agents-skills library.
-agents-skills = "0.14"
+# Since 0.16 `Manager::list` reports a skill's `description` and
+# `installed_at` itself, so the app no longer parses SKILL.md frontmatter;
+# 0.19 reverted the token estimate 0.18 had briefly added.
+agents-skills = "0.19"
 serde = { version = "1", features = ["derive"] }
 # Required directly by the `tauri::generate_context!` macro (updater config).
 serde_json = "1"
-# Frontmatter parsing for description extraction. agents-skills 0.13 still keeps
-# its own parser behind a private `core` module (only `Skill` is re-exported),
-# and the facade's `ListedSkill` from `Manager::list` carries no `description`,
-# so reading SKILL.md here remains the only way to get one.
-# `yaml_serde` is the actively maintained `serde_yaml` fork, adopted by the
-# official YAML organization after upstream was deprecated (0.9.34+deprecated).
-yaml_serde = "0.10"
 # Home directory resolution for the provenance ledger path
 # (`<home>/.agents/skills/.skill-one.json`).
 dirs = "6"

@@ -31,9 +31,10 @@ import {
   getMockAgentStatus,
   getMockInstalledSkills,
   installMockSkill,
+  linkMockAgent,
   removeMockSkill,
-  setMockAgentLinked,
   setMockSkillEnabled,
+  unlinkMockAgent,
 } from "./mock-local";
 import {
   recordSkillProvenance,
@@ -71,7 +72,7 @@ export async function fetchLocalSkillDetail(name: string): Promise<SkillDetail> 
   if (!skill) {
     throw new Error(`本地未安装技能 ${name}`);
   }
-  const description = skill.description ?? "";
+  const description = skill.description;
   return {
     name: skill.name,
     description,
@@ -88,11 +89,13 @@ export async function fetchLocalSkillDetail(name: string): Promise<SkillDetail> 
  * In Tauri the `owner/repo` source is handed straight to the backend, which
  * uses agents-skills' GitHub install (clones the repo, pulling the skill's
  * supporting files along) rather than downloading a single SKILL.md. The
- * backend reports the outcome via `installed`/`failed` — an Ok response alone
- * does not mean anything was installed (the name may fail to match, or the
- * clone/install can fail), so failures are surfaced here instead of being
- * silently swallowed. In the browser this records the install in the mock
- * store instead.
+ * backend reports the outcome via `installed`/`skipped`/`failed` — an Ok
+ * response alone does not mean anything was installed (the name may fail to
+ * match, or the clone/install can fail), so failures are surfaced here instead
+ * of being silently swallowed. Since agents-skills 0.17 a skill that is already
+ * installed comes back in `skipped` rather than being overwritten; that is a
+ * no-op, not a failure, so it is not reported as one. In the browser this
+ * records the install in the mock store instead.
  *
  * `options.rev` is the store entry's content hash at install time (from the
  * registry index). It is recorded in the provenance ledger as the version
@@ -114,7 +117,9 @@ export async function installSkillFromSource(
       const f = result.failed[0];
       throw new Error(f.error || `安装失败：${f.skill}`);
     }
-    if (result.installed.length === 0) {
+    // Already installed → the library left it untouched and reported it as
+    // skipped. Nothing to do, and nothing went wrong.
+    if (result.installed.length === 0 && !result.skipped.includes(name)) {
       throw new Error(`未在 ${repo} 中找到可安装的技能 ${name}`);
     }
   } else {
@@ -145,9 +150,9 @@ export async function removeInstalledSkill(name: string): Promise<void> {
  * Per-agent link status for the global skills directory.
  *
  * For each unlinked agent the backend classifies the contents of its own
- * skills directory (`internalSkills` / `internalOthers`) and reports any
- * backup slot parked by a previous link (`pendingBackup`), so the UI can
- * preview what a link will adopt and what it will park into the backup slot.
+ * skills directory (`internalSkills` / `internalOthers`), so the UI can preview
+ * what a link would adopt into the canonical dir and what it would quarantine.
+ * Since agents-skills 0.15 there is no backup slot to report.
  */
 export async function fetchAgentStatus(): Promise<AgentStatus[]> {
   if (!isTauri()) {
@@ -156,23 +161,33 @@ export async function fetchAgentStatus(): Promise<AgentStatus[]> {
   return getLinkStatus();
 }
 
+/** What a mock link adopted / quarantined / dropped. */
+interface MockLinkOutcome {
+  adopted: string[];
+  quarantined: string[];
+  conflicts: string[];
+}
+
+const NO_MOCK_OUTCOME: MockLinkOutcome = {
+  adopted: [],
+  quarantined: [],
+  conflicts: [],
+};
+
 /** Mock-store stand-in result for linking/unlinking one agent. */
 function mockLinkResult(
   name: string,
   status: "linked" | "unlinked",
+  outcome: MockLinkOutcome = NO_MOCK_OUTCOME,
 ): AgentLinkResult[] {
   return [
     {
       agent: name,
       display: mockDisplayOf(name),
       status,
-      moved: [],
-      skipped: [],
-      parkedSkills: [],
-      parkedOthers: [],
-      backupDir: null,
-      restored: [],
-      restoredFrom: null,
+      adopted: outcome.adopted,
+      quarantined: outcome.quarantined,
+      conflicts: outcome.conflicts,
       message: null,
     },
   ];
@@ -181,30 +196,23 @@ function mockLinkResult(
 /**
  * Link one agent's skills dir (backend in Tauri, mock store in the browser).
  *
- * Pre-existing content is never destroyed: without `migrate` everything parks
- * into the agent's backup slot; with `migrate` the skills move into the
- * canonical dir first (name clashes keep the canonical copy) and only the
- * non-skill entries park. Rerunning with `migrate` on an already linked agent
- * adopts skills parked by an earlier link.
+ * Linking is one-way since agents-skills 0.15: the agent's own skills are
+ * adopted into the canonical dir (a name clash keeps the canonical copy) and
+ * its non-skill files are quarantined into `.misc/<agent>/`. Unlink only breaks
+ * the symlink — nothing moves back; adopted skills are managed by
+ * `remove`/`disable` from then on.
  */
-export async function linkAgent(
-  name: string,
-  options: { migrate?: boolean } = {},
-): Promise<AgentLinkResult[]> {
+export async function linkAgent(name: string): Promise<AgentLinkResult[]> {
   if (isTauri()) {
-    const result = await linkAgents([name], {
-      migrate: options.migrate,
-    });
+    const result = await linkAgents([name]);
     return result.results;
   }
-  setMockAgentLinked(name, true);
-  return mockLinkResult(name, "linked");
+  return mockLinkResult(name, "linked", linkMockAgent(name));
 }
 
 /**
- * Link several agents in one go. Reuses the backend's batch link with
- * `migrate`: each agent's skills move into the canonical dir, other files park
- * into its backup slot. Reruns are safe — already linked agents come back as
+ * Link several agents in one go. Same one-way adoption as `linkAgent`, applied
+ * to a batch; reruns are safe — already linked agents come back as
  * `alreadyLinked` and are left untouched. This is the auto-link pass's entry
  * point (`useAutoLinkAgents`).
  */
@@ -213,11 +221,12 @@ export async function linkAllAgents(
 ): Promise<AgentLinkResult[]> {
   if (names.length === 0) return [];
   if (isTauri()) {
-    const result = await linkAgents(names, { migrate: true });
+    const result = await linkAgents(names);
     return result.results;
   }
-  names.forEach((name) => setMockAgentLinked(name, true));
-  return names.flatMap((name) => mockLinkResult(name, "linked"));
+  return names.flatMap((name) =>
+    mockLinkResult(name, "linked", linkMockAgent(name)),
+  );
 }
 
 /** Unlink one agent's skills dir (backend in Tauri, mock store in the browser). */
@@ -226,7 +235,7 @@ export async function unlinkAgent(name: string): Promise<AgentLinkResult[]> {
     const result = await unlinkAgents([name]);
     return result.results;
   }
-  setMockAgentLinked(name, false);
+  unlinkMockAgent(name);
   return mockLinkResult(name, "unlinked");
 }
 

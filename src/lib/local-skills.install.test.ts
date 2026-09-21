@@ -32,6 +32,7 @@ describe("installSkillFromSource", () => {
     installSkill.mockResolvedValue({
       listOnly: false,
       installed: [{ name: "pdf", canonicalPath: "~/.agents/skills/pdf" }],
+      skipped: [],
       failed: [],
       discovered: ["pdf"],
     });
@@ -57,6 +58,7 @@ describe("installSkillFromSource", () => {
     installSkill.mockResolvedValue({
       listOnly: false,
       installed: [{ name: "pdf", canonicalPath: "~/.agents/skills/pdf" }],
+      skipped: [],
       failed: [],
       discovered: ["pdf"],
     });
@@ -75,6 +77,7 @@ describe("installSkillFromSource", () => {
     installSkill.mockResolvedValue({
       listOnly: false,
       installed: [],
+      skipped: [],
       failed: [{ skill: "pdf", error: "clone failed: network unreachable" }],
       discovered: ["pdf"],
     });
@@ -89,6 +92,7 @@ describe("installSkillFromSource", () => {
     installSkill.mockResolvedValue({
       listOnly: false,
       installed: [],
+      skipped: [],
       failed: [],
       discovered: [],
     });
@@ -96,6 +100,28 @@ describe("installSkillFromSource", () => {
     await expect(
       installSkillFromSource("anthropics/skills", "missing"),
     ).rejects.toThrow("未在 anthropics/skills 中找到可安装的技能 missing");
+  });
+
+  it("treats an already-installed skill as a no-op, not a failure", async () => {
+    // Since agents-skills 0.17 `add` never overwrites: a same-named skill comes
+    // back in `skipped`, which must not read as "not found in the repo".
+    isTauri.mockReturnValue(true);
+    installSkill.mockResolvedValue({
+      listOnly: false,
+      installed: [],
+      skipped: ["pdf"],
+      failed: [],
+      discovered: ["pdf"],
+    });
+
+    await installSkillFromSource("anthropics/skills", "pdf", { rev: "rev-1" });
+
+    // The skill is on disk, so its install source is still worth recording.
+    expect(recordSkillProvenance).toHaveBeenCalledWith(
+      "anthropics/skills",
+      "pdf",
+      "rev-1",
+    );
   });
 
   it("records the install in the mock store outside Tauri", async () => {
@@ -122,6 +148,7 @@ describe("installSkillFromSource", () => {
     installSkill.mockResolvedValue({
       listOnly: false,
       installed: [],
+      skipped: [],
       failed: [{ skill: "pdf", error: "clone failed: network unreachable" }],
       discovered: ["pdf"],
     });

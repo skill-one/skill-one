@@ -37,6 +37,12 @@ export const LOCAL_SOURCE_LABEL = "本地安装";
 export interface SkillView extends Skill {
   /** False for an installed skill the registry holds no entry for. */
   storeBacked?: boolean;
+  /**
+   * Installed skills only: when the skill's directory landed on disk, as Unix
+   * seconds (UTC) — absent for registry-only rows and for filesystems that
+   * record no creation time (agents-skills 0.16).
+   */
+  installedAt?: number | null;
 }
 
 /**
@@ -65,9 +71,13 @@ export function installedSkillView(
   return {
     name: skill.name,
     repo: provenance?.[skill.name]?.repo ?? "",
-    description: skill.description ?? "",
+    description: skill.description,
     stars: entry?.stars ?? 0,
     downloads: entry?.downloads ?? 0,
+    // The one fact only the on-disk record carries (agents-skills 0.16): when
+    // the skill landed. A store row has no local install to read it from, so
+    // the drawer shows it for installed skills only.
+    installedAt: skill.installedAt ?? null,
     ...(entry?.profile ? { profile: entry.profile } : {}),
     storeBacked: entry != null,
   };

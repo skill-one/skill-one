@@ -86,7 +86,7 @@ skill-one/
 The app follows a layered split: "frontend reads, backend writes":
 
 - **Reads**: The skills registry index and each skill's `SKILL.md` are fetched directly by the frontend through the configurable download source (direct GitHub or a CDN mirror) and cached in TanStack Query.
-- **Writes**: Skill installation and uninstallation, as well as agent-directory linking/migration, are all delegated through Tauri commands to the `agents-skills` library on the Rust side.
+- **Writes**: Skill installation and uninstallation, as well as agent-directory linking, are all delegated through Tauri commands to the `agents-skills` library on the Rust side.
 - **Browser fallback**: In a pure browser environment (dev server / tests), write operations fall back to in-memory mocks so the UI remains fully explorable.
 
 For details see [`architecture.md`](architecture.md); for the `agents-skills` API used by the backend see [`agents-skills-api.md`](agents-skills-api.md); for the format and usage of the store registry index see [`index-format.md`](index-format.md).

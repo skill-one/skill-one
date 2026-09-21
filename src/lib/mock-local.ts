@@ -14,40 +14,69 @@ function mockPathFor(name: string): string {
   return `~/.agents/skills/${name}`;
 }
 
+/**
+ * Ages spread across every relative-time bucket (刚刚 / 3天前 / … / 1年前), so
+ * the browser demo exercises the whole ladder. Ages are offsets rather than
+ * fixed epochs: a pinned timestamp would drift into reading "3年前" for every
+ * row over time instead of showing the spread.
+ */
 const mockGlobalRows = [
   {
     name: "pdf",
     description: "PDF 文档读取、生成、合并、拆分与标注。",
+    installedDaysAgo: 0,
   },
   {
     name: "docx",
     description: "以编程方式创建和编辑 Word 文档。",
+    installedDaysAgo: 3,
   },
   {
     name: "pptx",
     description: "创建包含布局、演讲者备注和图表的演示文稿。",
+    installedDaysAgo: 12,
   },
   {
     name: "mcp-builder",
     description: "脚手架 MCP 服务器，支持工具、资源和提示词。",
+    installedDaysAgo: 45,
   },
   {
     name: "code-review",
     description: "运行结构化代码审查，包含严重级别和建议。",
+    installedDaysAgo: 200,
   },
   {
     name: "frontend-design",
     description: "使用 React + Tailwind 构建可访问的响应式 UI。",
+    installedDaysAgo: 400,
   },
 ];
 
-function buildMockSkills(): InstalledSkill[] {
-  return mockGlobalRows.map((row) => ({
-    name: row.name,
-    path: mockPathFor(row.name),
-    description: row.description,
+/** Unix seconds `days` ago, standing in for a directory's creation time. */
+function mockInstalledAt(days: number): number {
+  return Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
+}
+
+/** One mock skill record with the derived facts `list` reports since 0.16. */
+function mockSkill(
+  name: string,
+  description: string,
+  installedAt: number | null,
+): InstalledSkill {
+  return {
+    name,
+    path: mockPathFor(name),
+    description,
     enabled: true,
-  }));
+    installedAt,
+  };
+}
+
+function buildMockSkills(): InstalledSkill[] {
+  return mockGlobalRows.map((row) =>
+    mockSkill(row.name, row.description, mockInstalledAt(row.installedDaysAgo)),
+  );
 }
 
 let mockSkills = buildMockSkills();
@@ -65,33 +94,24 @@ export function removeMockSkill(name: string): void {
 /**
  * Record a mock install of a single skill. Mirrors a successful install in
  * the browser without cloning a repo; a skill of the same name is left
- * untouched. No source is kept — agents-skills 0.13 records none either.
+ * untouched (since agents-skills 0.17 `add` never overwrites). No source is
+ * kept — agents-skills 0.13 records none either — and the description is empty
+ * because the mock has no SKILL.md to read it from.
  */
 export function installMockSkill(name: string): void {
   if (mockSkills.some((s) => s.name === name)) return;
-  mockSkills = [
-    {
-      name,
-      path: mockPathFor(name),
-      enabled: true,
-    },
-    ...mockSkills,
-  ];
+  // A freshly installed directory: the creation time is the install time.
+  mockSkills = [mockSkill(name, "", Date.now() / 1000), ...mockSkills];
 }
 
 /**
- * Record a mock install of a skill with no description, mirroring a skill
- * whose SKILL.md frontmatter carries none.
+ * Record a mock install of a skill that does carry a description, standing in
+ * for a real SKILL.md the mock cannot read.
  */
 export function addMockLocalSkill(name: string): void {
   if (mockSkills.some((s) => s.name === name)) return;
   mockSkills = [
-    {
-      name,
-      path: mockPathFor(name),
-      description: "本地 skill 的描述。",
-      enabled: true,
-    },
+    mockSkill(name, "本地 skill 的描述。", Date.now() / 1000),
     ...mockSkills,
   ];
 }
@@ -117,7 +137,6 @@ const mockAgentRows: Array<{
   canonical: boolean;
   internalSkills?: string[];
   internalOthers?: string[];
-  pendingBackup?: { path: string; items: string[] } | null;
 }> = [
   {
     name: "claude-code",
@@ -132,12 +151,6 @@ const mockAgentRows: Array<{
     linked: true,
     canonical: false,
     internalSkills: [],
-    // Linked without importing: its original content sits in the backup slot
-    // until a migrate adopts the skills or an unlink restores them.
-    pendingBackup: {
-      path: "/Users/me/.agents/backup-skills/codex",
-      items: ["old-pdf", "notes.md"],
-    },
   },
   {
     name: "cursor",
@@ -145,7 +158,7 @@ const mockAgentRows: Array<{
     linked: false,
     canonical: false,
     // Carries skills and non-skill files in its own dir → the menu row shows
-    // the pending counts a link would adopt / park.
+    // the pending counts a link would adopt / quarantine.
     internalSkills: ["pdf", "docx"],
     internalOthers: ["README.md"],
   },
@@ -174,7 +187,6 @@ function buildMockAgentStatus(): AgentStatus[] {
     canonical: a.canonical,
     internalSkills: a.internalSkills,
     internalOthers: a.internalOthers,
-    pendingBackup: a.pendingBackup,
   }));
 }
 
@@ -184,9 +196,36 @@ export function getMockAgentStatus(): AgentStatus[] {
   return mockAgentStatus;
 }
 
-export function setMockAgentLinked(name: string, linked: boolean): void {
+/**
+ * Mock link: adopt the agent's private content into the mock canonical dir.
+ *
+ * Mirrors the library's one-way link — skills move in unless the canonical dir
+ * already holds that name (the existing copy wins), and non-skill entries are
+ * quarantined. Returns what the backend would report in its `linked` outcome.
+ */
+export function linkMockAgent(name: string): {
+  adopted: string[];
+  quarantined: string[];
+  conflicts: string[];
+} {
+  const agent = mockAgentStatus.find((a) => a.name === name);
+  const skills = agent?.internalSkills ?? [];
+  const quarantined = agent?.internalOthers ?? [];
+  const conflicts = skills.filter((s) => mockSkills.some((m) => m.name === s));
+  const adopted = skills.filter((s) => !conflicts.includes(s));
+  for (const skill of adopted) installMockSkill(skill);
   mockAgentStatus = mockAgentStatus.map((a) =>
-    a.name === name ? { ...a, linked } : a,
+    a.name === name
+      ? { ...a, linked: true, internalSkills: [], internalOthers: [] }
+      : a,
+  );
+  return { adopted, quarantined, conflicts };
+}
+
+/** Mock unlink: break the link. Nothing is restored — adopted content stays. */
+export function unlinkMockAgent(name: string): void {
+  mockAgentStatus = mockAgentStatus.map((a) =>
+    a.name === name ? { ...a, linked: false } : a,
   );
 }
 

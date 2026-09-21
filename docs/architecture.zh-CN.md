@@ -38,7 +38,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 ### 后端（写入）
 
 - **`src-tauri/src/skills.rs`**：暴露 7 个 Tauri 命令（`install_skill`、`list_installed_skills`、`remove_skills`、`set_skills_enabled`、`link_agents`、`link_status`、`read_skill_md`），全部经由共享的 `spawn_blocking` 辅助函数把阻塞操作（git clone、install、link 等）移出异步运行时。
-- 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。链接不会因目录已有内容而拒绝：agent 既有内容会被移入备份槽（带 migrate 时采纳进全局目录），取消链接时恢复。
+- 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。自 agents-skills 0.15 起链接是单向的：agent 自带的 skills 被收编进规范目录（同名冲突保留规范目录副本），其余文件被隔离到 `.misc/<agent>/`，取消链接只断开符号链接。`list` 还会报告每个技能的描述、安装时间与描述 token 估算，应用原样透传。
 
 ### 前端写入封装
 

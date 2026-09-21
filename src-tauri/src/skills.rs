@@ -7,13 +7,14 @@ use serde::Serialize;
 
 use crate::skill_hash;
 use agents_skills::{
-    AddRequest, AgentRequest, DisableRequest, EnableRequest, LinkOutcome, ListRequest, Manager,
-    RemoveRequest,
+    AddRequest, AgentRequest, DisableRequest, EnableRequest, LinkOutcome, Manager, RemoveRequest,
 };
 
-/// Build a `Manager` targeting the user-level **global** skills directory
-/// (`~/.agents/skills`). Skills only live there; project-level support has
-/// been removed.
+/// The skills directory is the user-level **global** one (`~/.agents/skills`).
+///
+/// Since agents-skills 0.17 project-level scope is gone entirely: the library
+/// no longer takes a `global` flag (every operation targets the canonical dir),
+/// so neither does this app.
 fn manager() -> Manager {
     Manager::new()
 }
@@ -53,6 +54,10 @@ pub struct InstallFailureDto {
 pub struct InstallResult {
     pub list_only: bool,
     pub installed: Vec<InstalledSkillDto>,
+    /// Selected skills left untouched because a skill of the same name is
+    /// already installed (enabled or disabled): since 0.17 `add` never
+    /// overwrites, so a repeat install is a no-op reported here.
+    pub skipped: Vec<String>,
     pub failed: Vec<InstallFailureDto>,
     pub discovered: Vec<String>,
 }
@@ -84,23 +89,14 @@ pub struct AgentLinkResultDto {
     pub agent: String,
     pub display: String,
     pub status: String,
-    /// Skills moved into the canonical dir (`migrated`).
-    pub moved: Vec<String>,
-    /// Skills left parked because the canonical dir already has them — the
-    /// canonical copy wins (`migrated`); the agent-side copy stays in backup.
-    pub skipped: Vec<String>,
-    /// Skills parked in the backup slot (`linked`/`migrated`); a later migrate
-    /// adopts them into the canonical dir, unlink restores them.
-    pub parked_skills: Vec<String>,
-    /// Non-skill entries parked in the backup slot (`linked`/`migrated`); a
-    /// migrate never adopts these.
-    pub parked_others: Vec<String>,
-    /// Backup slot dir holding the parked content (`linked`/`migrated`), if any.
-    pub backup_dir: Option<String>,
-    /// Entries restored from the backup slot (`unlinked`).
-    pub restored: Vec<String>,
-    /// The backup slot dir the restored content came from (`unlinked`).
-    pub restored_from: Option<String>,
+    /// Skills moved into the canonical dir (`linked`).
+    pub adopted: Vec<String>,
+    /// Non-skill entries moved into `.misc/<agent>/` inside the canonical dir
+    /// (`linked`); they stay there for good — unlink does not move them back.
+    pub quarantined: Vec<String>,
+    /// Entries dropped because the canonical dir (or `disabled-skills`) already
+    /// holds that name — the existing copy wins (`linked`).
+    pub conflicts: Vec<String>,
     /// Refusal reason or error message (`refused`/`failed`).
     pub message: Option<String>,
 }
@@ -108,17 +104,7 @@ pub struct AgentLinkResultDto {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkResult {
-    pub global: bool,
     pub results: Vec<AgentLinkResultDto>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PendingBackupDto {
-    /// The backup slot dir (`.agents/backup-skills/<agent>`).
-    pub path: String,
-    /// Names of the entries parked in the slot.
-    pub items: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -129,29 +115,32 @@ pub struct AgentStatusDto {
     pub linked: bool,
     pub canonical: bool,
     /// Skills inside the agent's own skills dir. Only populated for unlinked,
-    /// non-canonical agents: it surfaces what a migrate would move into the
+    /// non-canonical agents: it surfaces what a link would adopt into the
     /// canonical dir. Empty for linked/canonical agents (they share the
     /// canonical dir, shown by `list`).
     pub internal_skills: Vec<String>,
     /// Non-skill entries (files, symlinks to non-directories) inside the
     /// agent's own skills dir. Same population rules as `internal_skills`; a
-    /// link parks them into the backup slot, a migrate never adopts them.
+    /// link quarantines them into the canonical dir's `.misc/<agent>/`.
     pub internal_others: Vec<String>,
-    /// Backup slot with content parked by a previous link, waiting to be
-    /// restored by unlink (or adopted by a later migrate). `None` when no
-    /// backup is pending.
-    pub pending_backup: Option<PendingBackupDto>,
 }
 
+/// A listed skill, as the library reports it since 0.16.
+///
+/// `description` (single-line) and `installed_at` come straight from
+/// `Manager::list` — the app no longer parses SKILL.md itself.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListedSkillDto {
     pub name: String,
+    /// Single-line description from the on-disk SKILL.md frontmatter.
+    pub description: String,
+    /// Directory the skill currently lives in (canonical, or `disabled-skills`).
     pub path: String,
-    /// Short human-readable description extracted from the on-disk SKILL.md
-    /// frontmatter; `None` when the file is missing or has no description.
-    pub description: Option<String>,
     pub enabled: bool,
+    /// The skill directory's creation time as Unix seconds (UTC), when the
+    /// platform/filesystem records one; `None` otherwise.
+    pub installed_at: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -165,39 +154,17 @@ pub struct SkillMdDto {
 
 // ============================ Conversion helpers ============================
 
-#[derive(serde::Deserialize)]
-struct Frontmatter {
-    name: Option<String>,
-    description: Option<String>,
-}
-
-/// Read a SKILL.md frontmatter and return its `name` and `description`.
-///
-/// `agents-skills` still keeps its frontmatter parser inside the private `core`
-/// module as of 0.14 (only the `Skill` type is re-exported, so the crate's own
-/// `parse_skill_md` is unreachable, and `ListedSkill` from `Manager::list`
-/// carries no description), so the same shape is parsed here: a `---`-fenced
-/// YAML block, with both `name` and `description` mandatory in the skill
-/// format. Returns `None` on any deviation — unreadable file, missing fence,
-/// invalid YAML, missing fields, or a UTF-8 BOM before the fence (the YAML
-/// parser rejects one).
-fn parse_skill_md(skill_md: &std::path::Path) -> Option<(String, String)> {
-    let content = std::fs::read_to_string(skill_md).ok()?;
-    let rest = content
-        .strip_prefix("---\r\n")
-        .or_else(|| content.strip_prefix("---\n"))?;
-    let end = rest.find("\n---")?;
-    let fm: Frontmatter = yaml_serde::from_str(&rest[..end]).ok()?;
-    Some((fm.name?, fm.description?))
-}
-
-/// Extract a skill's `description` for the UI (the backend's `list` does not
-/// expose one). Block scalars are folded to a single line (the UI contract),
-/// and the result is `None` when the folded text is empty.
-fn extract_description(skill_dir: &std::path::Path) -> Option<String> {
-    let (_, description) = parse_skill_md(&skill_dir.join("SKILL.md"))?;
-    let folded = description.split_whitespace().collect::<Vec<_>>().join(" ");
-    (!folded.is_empty()).then_some(folded)
+/// Map a listed skill to the frontend DTO. A thin pass-through: since 0.16 the
+/// library's `ListedSkill` carries the description itself, already folded onto
+/// a single line, so there is nothing left to extract here.
+fn listed_skill_dto(skill: agents_skills::ListedSkill) -> ListedSkillDto {
+    ListedSkillDto {
+        name: skill.name,
+        description: skill.description,
+        path: skill.path.display().to_string(),
+        enabled: skill.enabled,
+        installed_at: skill.installed_at,
+    }
 }
 
 /// Read an installed skill's `SKILL.md` from its directory on disk.
@@ -218,44 +185,32 @@ fn read_skill_md_file(skill_dir: &std::path::Path) -> Result<SkillMdDto, String>
 /// Map a library link outcome to the flat DTO the frontend consumes. Every
 /// variant starts from the same empty base and fills only the fields it
 /// carries, so per-status field sets stay aligned with the DTO docs.
+///
+/// Since 0.15 linking is one-way: `Linked` adopts the agent's skills into the
+/// canonical dir and quarantines the rest, and `Unlinked` carries no payload
+/// because nothing is restored any more.
 fn agent_link_result(result: agents_skills::AgentLinkResult) -> AgentLinkResultDto {
     let mut dto = AgentLinkResultDto {
         agent: result.agent,
         display: result.display,
         status: String::new(),
-        moved: vec![],
-        skipped: vec![],
-        parked_skills: vec![],
-        parked_others: vec![],
-        backup_dir: None,
-        restored: vec![],
-        restored_from: None,
+        adopted: vec![],
+        quarantined: vec![],
+        conflicts: vec![],
         message: None,
     };
     match result.outcome {
         LinkOutcome::Linked {
-            parked_skills,
-            parked_others,
-            backup_dir,
+            adopted,
+            quarantined,
+            conflicts,
         } => {
             dto.status = "linked".into();
-            dto.parked_skills = parked_skills;
-            dto.parked_others = parked_others;
-            dto.backup_dir = backup_dir.map(|p| p.display().to_string());
+            dto.adopted = adopted;
+            dto.quarantined = quarantined;
+            dto.conflicts = conflicts;
         }
         LinkOutcome::AlreadyLinked => dto.status = "alreadyLinked".into(),
-        LinkOutcome::Migrated {
-            moved,
-            skipped,
-            parked_others,
-            backup_dir,
-        } => {
-            dto.status = "migrated".into();
-            dto.moved = moved;
-            dto.skipped = skipped;
-            dto.parked_others = parked_others;
-            dto.backup_dir = backup_dir.map(|p| p.display().to_string());
-        }
         LinkOutcome::Refused { reason } => {
             dto.status = "refused".into();
             dto.message = Some(reason);
@@ -265,14 +220,7 @@ fn agent_link_result(result: agents_skills::AgentLinkResult) -> AgentLinkResultD
             dto.status = "failed".into();
             dto.message = Some(error);
         }
-        LinkOutcome::Unlinked {
-            restored,
-            restored_from,
-        } => {
-            dto.status = "unlinked".into();
-            dto.restored = restored;
-            dto.restored_from = restored_from.map(|p| p.display().to_string());
-        }
+        LinkOutcome::Unlinked => dto.status = "unlinked".into(),
         LinkOutcome::NotLinked => dto.status = "notLinked".into(),
     }
     dto
@@ -293,46 +241,33 @@ mod tests {
     }
 
     #[test]
-    fn extracts_single_line_description() {
-        let dir = skill_dir_with("---\nname: pdf\ndescription: 读取 PDF 文件。\n---\n正文");
-        assert_eq!(
-            extract_description(dir.path()).as_deref(),
-            Some("读取 PDF 文件。")
-        );
+    fn listed_skill_dto_passes_the_library_facts_through() {
+        let dto = listed_skill_dto(agents_skills::ListedSkill {
+            name: "pdf".into(),
+            description: "读取 PDF 文件。".into(),
+            path: std::path::PathBuf::from("/skills/pdf"),
+            enabled: true,
+            installed_at: Some(1_760_000_000),
+        });
+        assert_eq!(dto.name, "pdf");
+        assert_eq!(dto.description, "读取 PDF 文件。");
+        assert_eq!(dto.path, "/skills/pdf");
+        assert!(dto.enabled);
+        assert_eq!(dto.installed_at, Some(1_760_000_000));
     }
 
     #[test]
-    fn extracts_quoted_description() {
-        let dir = skill_dir_with("---\nname: pdf\ndescription: \"a quoted description\"\n---\n");
-        assert_eq!(
-            extract_description(dir.path()).as_deref(),
-            Some("a quoted description")
-        );
-    }
-
-    #[test]
-    fn folds_block_scalar_description() {
-        let dir =
-            skill_dir_with("---\nname: pdf\ndescription: |\n  第一行描述\n  第二行描述\n---\n");
-        assert_eq!(
-            extract_description(dir.path()).as_deref(),
-            Some("第一行描述 第二行描述")
-        );
-    }
-
-    #[test]
-    fn missing_name_field_yields_none() {
-        // Both `name` and `description` are mandatory in the agents skill
-        // format, so a frontmatter with only a description shows no
-        // description in the UI.
-        let dir = skill_dir_with("---\ndescription: \"no name here\"\n---\n");
-        assert_eq!(extract_description(dir.path()), None);
-    }
-
-    #[test]
-    fn tolerates_bom_and_missing_description() {
-        let dir = skill_dir_with("\u{feff}---\nname: x\n---\n正文");
-        assert_eq!(extract_description(dir.path()), None);
+    fn listed_skill_dto_keeps_a_missing_install_time() {
+        // Some Linux filesystems record no directory creation time.
+        let dto = listed_skill_dto(agents_skills::ListedSkill {
+            name: "pdf".into(),
+            description: "d".into(),
+            path: std::path::PathBuf::from("/skills/disabled/pdf"),
+            enabled: false,
+            installed_at: None,
+        });
+        assert!(!dto.enabled);
+        assert_eq!(dto.installed_at, None);
     }
 
     #[test]
@@ -351,21 +286,20 @@ mod tests {
     }
 
     #[test]
-    fn link_outcome_parked_content_maps_to_flat_fields() {
+    fn link_outcome_linked_maps_the_adoption_triple() {
         let dto = agent_link_result(agents_skills::AgentLinkResult {
             agent: "cursor".into(),
             display: "Cursor".into(),
             outcome: LinkOutcome::Linked {
-                parked_skills: vec!["pdf".into()],
-                parked_others: vec!["README.md".into()],
-                backup_dir: Some(std::path::PathBuf::from("/backup/cursor")),
+                adopted: vec!["pdf".into()],
+                quarantined: vec!["README.md".into()],
+                conflicts: vec!["docx".into()],
             },
         });
         assert_eq!(dto.status, "linked");
-        assert_eq!(dto.parked_skills, vec!["pdf"]);
-        assert_eq!(dto.parked_others, vec!["README.md"]);
-        assert_eq!(dto.backup_dir.as_deref(), Some("/backup/cursor"));
-        assert!(dto.restored.is_empty());
+        assert_eq!(dto.adopted, vec!["pdf"]);
+        assert_eq!(dto.quarantined, vec!["README.md"]);
+        assert_eq!(dto.conflicts, vec!["docx"]);
         assert!(dto.message.is_none());
     }
 
@@ -375,31 +309,49 @@ mod tests {
             agent: "cursor".into(),
             display: "Cursor".into(),
             outcome: LinkOutcome::Refused {
-                reason: "a previous backup is still parked".into(),
+                reason: "the agent dir is a foreign symlink".into(),
             },
         });
         assert_eq!(dto.status, "refused");
         assert_eq!(
             dto.message.as_deref(),
-            Some("a previous backup is still parked")
+            Some("the agent dir is a foreign symlink")
         );
-        assert!(dto.parked_skills.is_empty());
-        assert!(dto.backup_dir.is_none());
+        assert!(dto.adopted.is_empty());
+        assert!(dto.quarantined.is_empty());
+        assert!(dto.conflicts.is_empty());
     }
 
     #[test]
-    fn link_outcome_unlinked_reports_the_restored_content() {
+    fn link_outcome_unlinked_has_no_payload() {
+        // Since 0.15 unlink restores nothing: adopted skills stay canonical.
         let dto = agent_link_result(agents_skills::AgentLinkResult {
             agent: "cursor".into(),
             display: "Cursor".into(),
-            outcome: LinkOutcome::Unlinked {
-                restored: vec!["pdf".into()],
-                restored_from: Some(std::path::PathBuf::from("/backup/cursor/skills")),
-            },
+            outcome: LinkOutcome::Unlinked,
         });
         assert_eq!(dto.status, "unlinked");
-        assert_eq!(dto.restored, vec!["pdf"]);
-        assert_eq!(dto.restored_from.as_deref(), Some("/backup/cursor/skills"));
+        assert!(dto.adopted.is_empty());
+        assert!(dto.quarantined.is_empty());
+        assert!(dto.conflicts.is_empty());
+        assert!(dto.message.is_none());
+    }
+
+    #[test]
+    fn link_outcome_not_linked_and_skipped_are_status_only() {
+        for (outcome, expected) in [
+            (LinkOutcome::NotLinked, "notLinked"),
+            (LinkOutcome::Skipped, "skipped"),
+            (LinkOutcome::AlreadyLinked, "alreadyLinked"),
+        ] {
+            let dto = agent_link_result(agents_skills::AgentLinkResult {
+                agent: "cursor".into(),
+                display: "Cursor".into(),
+                outcome,
+            });
+            assert_eq!(dto.status, expected);
+            assert!(dto.message.is_none());
+        }
     }
 }
 
@@ -407,6 +359,9 @@ mod tests {
 
 /// Install skills from a source (git repo, GitHub `owner/repo`, local path or
 /// download URL). Set `list_only` to preview what would be installed.
+///
+/// Since 0.17 `add` never overwrites: a skill whose name is already installed
+/// comes back in `skipped` untouched.
 #[tauri::command]
 pub async fn install_skill(
     source: String,
@@ -416,7 +371,6 @@ pub async fn install_skill(
     run_blocking("install", move |manager| {
         let req = AddRequest {
             source,
-            global: true,
             skills: skills.unwrap_or_default(),
             list_only: list_only.unwrap_or(false),
         };
@@ -431,6 +385,7 @@ pub async fn install_skill(
                     canonical_path: s.canonical_path.display().to_string(),
                 })
                 .collect(),
+            skipped: outcome.skipped,
             failed: outcome
                 .failed
                 .into_iter()
@@ -446,22 +401,13 @@ pub async fn install_skill(
 }
 
 /// List installed skills in the global skills directory. Returns the same
-/// camelCase shape as `list --json`, plus a `description` extracted from each
-/// skill's on-disk SKILL.md.
+/// camelCase shape as `list --json`: name, single-line description, path,
+/// enablement and install time.
 #[tauri::command]
 pub async fn list_installed_skills() -> Result<Vec<ListedSkillDto>, String> {
     run_blocking("list", move |manager| {
-        let req = ListRequest { global: true };
-        let listed = manager.list(&req).map_err(|e| e.to_string())?;
-        Ok(listed
-            .into_iter()
-            .map(|s| ListedSkillDto {
-                name: s.name,
-                path: s.path.display().to_string(),
-                description: extract_description(&s.path),
-                enabled: s.enabled,
-            })
-            .collect())
+        let listed = manager.list().map_err(|e| e.to_string())?;
+        Ok(listed.into_iter().map(listed_skill_dto).collect())
     })
     .await
 }
@@ -476,7 +422,6 @@ pub async fn remove_skills(
     run_blocking("remove", move |manager| {
         let req = RemoveRequest {
             skills: skills.unwrap_or_default(),
-            global: true,
             all: all.unwrap_or(false),
         };
         let outcome = manager.remove(&req).map_err(|e| e.to_string())?;
@@ -504,7 +449,6 @@ pub async fn set_skills_enabled(
             let outcome = manager
                 .enable(&EnableRequest {
                     skills: names,
-                    global: true,
                     all: every,
                 })
                 .map_err(|e| e.to_string())?;
@@ -519,7 +463,6 @@ pub async fn set_skills_enabled(
             let outcome = manager
                 .disable(&DisableRequest {
                     skills: names,
-                    global: true,
                     all: every,
                 })
                 .map_err(|e| e.to_string())?;
@@ -535,25 +478,24 @@ pub async fn set_skills_enabled(
     .await
 }
 
-/// Link/unlink agents' skills directories to the canonical dir. With `migrate`,
-/// skills already inside the agent's dir (or parked in its backup slot) move
-/// into the canonical dir; everything else is parked and restorable by unlink.
+/// Link/unlink agents' skills directories to the canonical dir.
+///
+/// Linking is one-way since 0.15: an agent's own skills are adopted into the
+/// canonical dir (name clashes keep the canonical copy), its non-skill files
+/// are quarantined into `.misc/<agent>/`, and unlink only breaks the symlink —
+/// nothing is moved back.
 #[tauri::command]
 pub async fn link_agents(
     agents: Option<Vec<String>>,
     unlink: Option<bool>,
-    migrate: Option<bool>,
 ) -> Result<LinkResult, String> {
     run_blocking("link", move |manager| {
         let req = AgentRequest {
             agents: agents.unwrap_or_default(),
-            global: true,
             unlink: unlink.unwrap_or(false),
-            migrate: migrate.unwrap_or(false),
         };
         let outcome = manager.agent(&req).map_err(|e| e.to_string())?;
         Ok(LinkResult {
-            global: outcome.global,
             results: outcome.results.into_iter().map(agent_link_result).collect(),
         })
     })
@@ -561,12 +503,13 @@ pub async fn link_agents(
 }
 
 /// Report per-agent link status (linked / canonical / not linked), including
-/// each unlinked agent's private content and any backup waiting to be restored.
+/// each unlinked agent's private content — what a link would adopt and what it
+/// would quarantine.
 #[tauri::command]
 pub async fn link_status() -> Result<Vec<AgentStatusDto>, String> {
     run_blocking("link status", move |manager| {
         Ok(manager
-            .agent_status(true)
+            .agent_status()
             .into_iter()
             .map(|s| AgentStatusDto {
                 name: s.name,
@@ -575,10 +518,6 @@ pub async fn link_status() -> Result<Vec<AgentStatusDto>, String> {
                 canonical: s.canonical,
                 internal_skills: s.internal_skills,
                 internal_others: s.internal_others,
-                pending_backup: s.pending_backup.map(|b| PendingBackupDto {
-                    path: b.path.display().to_string(),
-                    items: b.items,
-                }),
             })
             .collect())
     })
@@ -593,8 +532,7 @@ pub async fn link_status() -> Result<Vec<AgentStatusDto>, String> {
 #[tauri::command]
 pub async fn read_skill_md(name: String) -> Result<SkillMdDto, String> {
     run_blocking("read skill md", move |manager| {
-        let req = ListRequest { global: true };
-        let listed = manager.list(&req).map_err(|e| e.to_string())?;
+        let listed = manager.list().map_err(|e| e.to_string())?;
         let skill = listed
             .into_iter()
             .find(|s| s.name == name)
@@ -613,8 +551,7 @@ pub async fn read_skill_md(name: String) -> Result<SkillMdDto, String> {
 #[tauri::command]
 pub async fn compute_skill_hash(name: String) -> Result<Option<String>, String> {
     run_blocking("compute skill hash", move |manager| {
-        let req = ListRequest { global: true };
-        let listed = manager.list(&req).map_err(|e| e.to_string())?;
+        let listed = manager.list().map_err(|e| e.to_string())?;
         match listed.into_iter().find(|s| s.name == name) {
             None => Ok(None),
             Some(skill) => skill_hash::hash_skill_dir(&skill.path).map(Some),

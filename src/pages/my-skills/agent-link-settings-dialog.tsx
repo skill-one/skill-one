@@ -29,14 +29,17 @@ import { formatLinkMessage } from "./link-notice";
  * Per-agent link control, opened from the avatar menu's settings gear.
  *
  * Linking is automatic everywhere else — this dialog is the one place a user
- * can opt an agent out. A switch off unlinks the agent (the backend restores
- * its parked content) and records the exclusion so the auto-link pass never
- * touches it again; a switch back on re-links (importing its own skills) and
- * clears the exclusion. Canonical agents use their native skills directory,
- * so their switch is pinned on and disabled.
+ * can opt an agent out. A switch off unlinks the agent and records the
+ * exclusion so the auto-link pass never touches it again; a switch back on
+ * re-links it (adopting whatever its own skills dir still holds) and clears the
+ * exclusion. Canonical agents use their native skills directory, so their
+ * switch is pinned on and disabled.
  *
- * Every action writes through the backend and lands as a toast, like
- * `SkillEnableSwitch` — no confirm step, since unlink is fully reversible.
+ * Linking is one-way since agents-skills 0.15, and the description says so:
+ * adopted skills stay in the canonical directory after an unlink, so the dialog
+ * never implies a restore. Every action writes through the backend and lands as
+ * a toast, like `SkillEnableSwitch` — no confirm step, since re-linking is one
+ * click away.
  */
 export function AgentLinkSettingsDialog({
   open,
@@ -62,7 +65,7 @@ export function AgentLinkSettingsDialog({
 
   const toggle = useMutation({
     mutationFn: ({ name, link }: { name: string; link: boolean }) =>
-      link ? linkAgent(name, { migrate: true }) : unlinkAgent(name),
+      link ? linkAgent(name) : unlinkAgent(name),
     onMutate: ({ name, link }) => {
       // The switch is the user's intent: record the exclusion before the
       // disk action so the auto-link pass honors it regardless of the
@@ -103,7 +106,9 @@ export function AgentLinkSettingsDialog({
           <DialogTitle>Agent 链接设置</DialogTitle>
           <DialogDescription>
             已检测到的 agent 会自动链接到统一的 skills
-            目录，无需手动操作。在此可对个别 agent 取消链接，取消后不会再被自动链接。
+            目录，无需手动操作。链接时 agent 自带的内容会被收编进统一目录、其余文件隔离到
+            .misc，取消链接不会移回。在此可对个别 agent
+            取消链接，取消后不会再被自动链接。
           </DialogDescription>
         </DialogHeader>
 
@@ -132,10 +137,10 @@ export function AgentLinkSettingsDialog({
                     {(skillsCount > 0 || othersCount > 0) && (
                       <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                         {skillsCount > 0 && (
-                          <span>{skillsCount} 个 skill 待导入</span>
+                          <span>{skillsCount} 个 skill 待收编</span>
                         )}
                         {othersCount > 0 && (
-                          <span>{othersCount} 个文件待备份</span>
+                          <span>{othersCount} 项文件待隔离</span>
                         )}
                       </div>
                     )}

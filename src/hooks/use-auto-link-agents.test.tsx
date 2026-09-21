@@ -38,13 +38,9 @@ function result(
     agent: "cursor",
     display: "Cursor",
     status,
-    moved: [],
-    skipped: [],
-    parkedSkills: [],
-    parkedOthers: [],
-    backupDir: null,
-    restored: [],
-    restoredFrom: null,
+    adopted: [],
+    quarantined: [],
+    conflicts: [],
     message: null,
     ...overrides,
   };
@@ -71,17 +67,17 @@ describe("useAutoLinkAgents", () => {
       agent({ name: "gemini", display: "Gemini CLI" }),
     ]);
     linkAllAgentsMock.mockResolvedValue([
-      result("migrated", {
+      result("linked", {
         agent: "cursor",
         display: "Cursor",
-        moved: ["pdf"],
+        adopted: ["pdf"],
       }),
       result("linked", { agent: "gemini", display: "Gemini CLI" }),
     ]);
     const toastSpy = vi.spyOn(toast, "add");
     renderWithRouter(<Probe />);
 
-    // One call carries every actionable agent, migrating their content.
+    // One call carries every actionable agent, adopting their content.
     await waitFor(() =>
       expect(linkAllAgentsMock).toHaveBeenCalledWith(["cursor", "gemini"]),
     );

@@ -48,13 +48,9 @@ function result(
     agent: "cursor",
     display: "Cursor",
     status,
-    moved: [],
-    skipped: [],
-    parkedSkills: [],
-    parkedOthers: [],
-    backupDir: null,
-    restored: [],
-    restoredFrom: null,
+    adopted: [],
+    quarantined: [],
+    conflicts: [],
     message: null,
     ...overrides,
   };
@@ -92,15 +88,8 @@ describe("AgentLinkSettingsDialog", () => {
 
   it("unlinks on switch-off and records the exclusion", async () => {
     const user = userEvent.setup();
-    fetchAgentStatusMock.mockResolvedValue([
-      agent({
-        linked: true,
-        pendingBackup: { path: "/backup/cursor", items: ["README.md"] },
-      }),
-    ]);
-    unlinkAgentMock.mockResolvedValue([
-      result("unlinked", { restored: ["README.md"] }),
-    ]);
+    fetchAgentStatusMock.mockResolvedValue([agent({ linked: true })]);
+    unlinkAgentMock.mockResolvedValue([result("unlinked")]);
     const successSpy = vi.spyOn(toast, "add");
     renderDialog();
 
@@ -114,20 +103,22 @@ describe("AgentLinkSettingsDialog", () => {
     await waitFor(() =>
       expect(getExcludedAgents()).toEqual(["cursor"]),
     );
+    // Nothing to restore since agents-skills 0.15: the toast only reports the
+    // unlink itself.
     expect(successSpy).toHaveBeenCalledWith({
-      title: "Cursor 已取消链接（已恢复 1 项备份内容）",
+      title: "Cursor 已取消链接",
       type: "success",
     });
   });
 
-  it("links on switch-on with migrate and clears the exclusion", async () => {
+  it("links on switch-on, reporting adopted and quarantined content", async () => {
     const user = userEvent.setup();
     excludeAgent("cursor");
     fetchAgentStatusMock.mockResolvedValue([
       agent({ internalSkills: ["pdf"], internalOthers: ["README.md"] }),
     ]);
     linkAgentMock.mockResolvedValue([
-      result("migrated", { moved: ["pdf"], parkedOthers: ["README.md"] }),
+      result("linked", { adopted: ["pdf"], quarantined: ["README.md"] }),
     ]);
     const successSpy = vi.spyOn(toast, "add");
     renderDialog();
@@ -137,12 +128,12 @@ describe("AgentLinkSettingsDialog", () => {
       await within(dialog).findByRole("switch", { name: "Cursor 链接开关" }),
     );
 
-    // One call does it all: skills move into the canonical dir, everything
-    // else parks into the backup slot.
-    expect(linkAgentMock).toHaveBeenCalledWith("cursor", { migrate: true });
+    // One call does it all: skills are adopted into the canonical dir, other
+    // files are quarantined under .misc.
+    expect(linkAgentMock).toHaveBeenCalledWith("cursor");
     await waitFor(() => expect(getExcludedAgents()).toEqual([]));
     expect(successSpy).toHaveBeenCalledWith({
-      title: "Cursor 已导入（移动 1 个 skills，其余文件已备份）",
+      title: "Cursor 已链接（收编 1 个 skill，隔离 1 项文件）",
       type: "success",
     });
   });

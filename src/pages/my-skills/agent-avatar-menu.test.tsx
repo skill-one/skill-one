@@ -139,7 +139,7 @@ describe("AgentAvatarMenu header and pending counts", () => {
     expect(await screen.findByText(/共 3 个/)).toBeInTheDocument();
   });
 
-  it("surfaces each agent's pending import / backup counts", async () => {
+  it("surfaces each agent's pending adopt / quarantine counts", async () => {
     const user = userEvent.setup();
     fetchAgentStatusMock.mockResolvedValue([
       agent({
@@ -154,8 +154,8 @@ describe("AgentAvatarMenu header and pending counts", () => {
     await openMenu(user);
 
     const item = await menuItem("Cursor", "未链接");
-    expect(within(item).getByText("2 个 skill 待导入")).toBeInTheDocument();
-    expect(within(item).getByText("1 个文件待备份")).toBeInTheDocument();
+    expect(within(item).getByText("2 个 skill 待收编")).toBeInTheDocument();
+    expect(within(item).getByText("1 项文件待隔离")).toBeInTheDocument();
   });
 
   it("keeps the item clean when the agent's dir holds nothing", async () => {
@@ -166,8 +166,8 @@ describe("AgentAvatarMenu header and pending counts", () => {
     await openMenu(user);
 
     const item = await menuItem("Cursor", "未链接");
-    expect(within(item).queryByText(/待导入/)).not.toBeInTheDocument();
-    expect(within(item).queryByText(/待备份/)).not.toBeInTheDocument();
+    expect(within(item).queryByText(/待收编/)).not.toBeInTheDocument();
+    expect(within(item).queryByText(/待隔离/)).not.toBeInTheDocument();
   });
 });
 

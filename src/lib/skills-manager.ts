@@ -24,8 +24,19 @@ export interface InstalledSkill {
    * (`false`). Set by the backend from the on-disk state, not a UI preference.
    */
   enabled: boolean;
-  /** Short human-readable description; absent when the skill has no metadata. */
-  description?: string;
+  /**
+   * Single-line description, straight from the on-disk `SKILL.md` frontmatter.
+   * Since agents-skills 0.16 the library reports it from `list` itself — the
+   * app used to parse the file.
+   */
+  description: string;
+  /**
+   * The skill directory's creation time as Unix seconds (UTC) — approximately
+   * when it landed on disk. Exact for `add` installs, but a skill adopted from
+   * an agent directory keeps that directory's original time. `null`/absent when
+   * the platform records no creation time (some Linux filesystems).
+   */
+  installedAt?: number | null;
 }
 
 export interface InstalledSkillDto {
@@ -49,6 +60,12 @@ export interface InstallFailureDto {
 export interface InstallResult {
   listOnly: boolean;
   installed: InstalledSkillDto[];
+  /**
+   * Selected skills left untouched because a skill of the same name is already
+   * installed (enabled or disabled). Since agents-skills 0.17 `add` never
+   * overwrites — replacing means `remove` then `add`.
+   */
+  skipped: string[];
   failed: InstallFailureDto[];
   /** Every skill discovered in the source (whether installed or not). */
   discovered: string[];
@@ -72,49 +89,40 @@ export interface ToggleResult {
 export type AgentLinkStatus =
   | "linked"
   | "alreadyLinked"
-  | "migrated"
   | "refused"
   | "skipped"
   | "failed"
   | "unlinked"
   | "notLinked";
 
+/**
+ * One agent's link/unlink result. Since agents-skills 0.15 linking is one-way:
+ * the agent's own skills are adopted into the canonical dir, its non-skill
+ * files are quarantined, name clashes are dropped, and `unlinked` restores
+ * nothing — so no variant carries a "restored" payload any more.
+ */
 export interface AgentLinkResult {
   agent: string;
   display: string;
   status: AgentLinkStatus;
-  /** Skills moved into the canonical dir (`migrated`). */
-  moved: string[];
-  /** Skills left parked because the canonical dir already has them (`migrated`). */
-  skipped: string[];
+  /** Skills moved into the canonical dir (`linked`). */
+  adopted: string[];
   /**
-   * Skills parked in the backup slot (`linked`/`migrated`): a later migrate
-   * adopts them into the canonical dir, unlink restores them.
+   * Non-skill entries moved into `.misc/<agent>/` inside the canonical dir
+   * (`linked`). They stay there for good — unlink does not move them back.
    */
-  parkedSkills: string[];
-  /** Non-skill entries parked in the backup slot (`linked`/`migrated`). */
-  parkedOthers: string[];
-  /** Backup slot dir holding the parked content (`linked`/`migrated`), if any. */
-  backupDir: string | null;
-  /** Entries restored from the backup slot (`unlinked`). */
-  restored: string[];
-  /** Backup slot dir the restored content came from (`unlinked`). */
-  restoredFrom: string | null;
+  quarantined: string[];
+  /**
+   * Entries dropped because the canonical dir (or `disabled-skills`) already
+   * holds that name — the existing copy wins (`linked`).
+   */
+  conflicts: string[];
   /** Refusal reason or error message (`refused`/`failed`). */
   message: string | null;
 }
 
 export interface LinkResult {
-  global: boolean;
   results: AgentLinkResult[];
-}
-
-/** Content parked by a previous link, waiting for unlink to restore. */
-export interface PendingBackup {
-  /** Backup slot dir (`.agents/backup-skills/<agent>`). */
-  path: string;
-  /** Names of the entries parked in the slot. */
-  items: string[];
 }
 
 /** Per-agent link status (from `agent --status`). */
@@ -125,22 +133,16 @@ export interface AgentStatus {
   canonical: boolean;
   /**
    * Skills already living inside the agent's own directory. Only populated for
-   * unlinked, non-canonical agents: it surfaces what a migrate would move into
+   * unlinked, non-canonical agents: it surfaces what a link would adopt into
    * the canonical dir, so the UI can preview them on the row.
    */
   internalSkills?: string[];
   /**
    * Non-skill entries (files, symlinks to non-directories) inside the agent's
-   * own skills dir. Same population rules as `internalSkills`; a link parks
-   * them into the backup slot, a migrate never adopts them.
+   * own skills dir. Same population rules as `internalSkills`; a link
+   * quarantines them into the canonical dir's `.misc/<agent>/`.
    */
   internalOthers?: string[];
-  /**
-   * Backup slot with content parked by a previous link; unlink restores it,
-   * a migrate adopts the skills. Only populated for unlinked, non-canonical
-   * agents.
-   */
-  pendingBackup?: PendingBackup | null;
 }
 
 function requireTauri(): void {
@@ -220,13 +222,12 @@ export async function setSkillsEnabled(
  */
 export async function linkAgents(
   agents: string[] = [],
-  options: { unlink?: boolean; migrate?: boolean } = {},
+  options: { unlink?: boolean } = {},
 ): Promise<LinkResult> {
   requireTauri();
   return invoke<LinkResult>("link_agents", {
     agents,
     unlink: options.unlink,
-    migrate: options.migrate,
   });
 }
 

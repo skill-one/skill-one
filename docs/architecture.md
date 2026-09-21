@@ -38,7 +38,7 @@ Read data is cached through TanStack Query (`staleTime` 10 minutes, `gcTime` inf
 ### Backend (writes)
 
 - **`src-tauri/src/skills.rs`**: Exposes 7 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `set_skills_enabled`, `link_agents`, `link_status`, `read_skill_md`), all of which route their blocking work (git clone, install, link, etc.) through a shared `spawn_blocking` helper to keep it off the async runtime.
-- Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Linking never refuses because of existing content: pre-existing agent content is parked into a backup slot (adopted into the canonical dir with migrate) and restored on unlink.
+- Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Since agents-skills 0.15 linking is one-way: an agent's own skills are adopted into the canonical dir (a name clash keeps the canonical copy), its other files are quarantined into `.misc/<agent>/`, and unlink only breaks the symlink. `list` also reports each skill's description, install time and description token estimate, which the app passes straight through.
 
 ### Frontend write wrapper
 

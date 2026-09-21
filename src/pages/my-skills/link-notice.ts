@@ -1,4 +1,4 @@
-import type { AgentLinkResult } from "../../lib/skills-manager";
+import type { AgentLinkResult, AgentLinkStatus } from "../../lib/skills-manager";
 
 export type NoticeKind = "success" | "warning" | "error";
 
@@ -11,35 +11,31 @@ export interface Notice {
  * Link outcome → toast: semantic color + message template in one table, so a
  * new backend status only needs one entry instead of parallel switch arms in
  * a color mapper and a text formatter.
+ *
+ * Since agents-skills 0.15 linking is one-way, so the table describes adoption
+ * rather than backup: a link reports what it took over (adopted), what it
+ * quarantined, and what it dropped as a name clash — and an unlink reports
+ * nothing, because nothing comes back.
  */
 const STATUS_NOTICES: Record<
-  AgentLinkResult["status"],
+  AgentLinkStatus,
   { kind: NoticeKind; text: (result: AgentLinkResult) => string }
 > = {
   linked: {
     kind: "success",
-    text: (r) =>
-      r.parkedSkills.length + r.parkedOthers.length > 0
-        ? `${r.display} 已链接（原有内容已备份，取消链接可恢复）`
-        : `${r.display} 已链接`,
-  },
-  alreadyLinked: { kind: "success", text: (r) => `${r.display} 已链接过` },
-  migrated: {
-    kind: "success",
     text: (r) => {
-      // The common confirm flow adopts skills and parks the rest; with no
-      // skills to adopt the outcome is effectively a backed-up link.
-      if (r.moved.length === 0) {
-        return r.parkedOthers.length > 0
-          ? `${r.display} 已链接（原有文件已备份，取消链接可恢复）`
-          : `${r.display} 已链接`;
+      const parts: string[] = [];
+      if (r.adopted.length > 0) parts.push(`收编 ${r.adopted.length} 个 skill`);
+      if (r.quarantined.length > 0) {
+        parts.push(`隔离 ${r.quarantined.length} 项文件`);
       }
-      const parts = [`移动 ${r.moved.length} 个 skills`];
-      if (r.skipped.length > 0) parts.push(`同名跳过 ${r.skipped.length} 个`);
-      if (r.parkedOthers.length > 0) parts.push("其余文件已备份");
-      return `${r.display} 已导入（${parts.join("，")}）`;
+      if (r.conflicts.length > 0) parts.push(`同名跳过 ${r.conflicts.length} 个`);
+      return parts.length > 0
+        ? `${r.display} 已链接（${parts.join("，")}）`
+        : `${r.display} 已链接`;
     },
   },
+  alreadyLinked: { kind: "success", text: (r) => `${r.display} 已链接过` },
   refused: {
     kind: "warning",
     text: (r) => `${r.display} 拒绝链接：${r.message ?? "未提供原因"}`,
@@ -51,10 +47,9 @@ const STATUS_NOTICES: Record<
   },
   unlinked: {
     kind: "success",
-    text: (r) =>
-      r.restored.length > 0
-        ? `${r.display} 已取消链接（已恢复 ${r.restored.length} 项备份内容）`
-        : `${r.display} 已取消链接`,
+    // Nothing is restored: skills adopted at link time stay in the canonical
+    // dir (the settings dialog spells that out before the user commits).
+    text: (r) => `${r.display} 已取消链接`,
   },
   notLinked: { kind: "warning", text: (r) => `${r.display} 未链接` },
 };
