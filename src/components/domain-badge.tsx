@@ -11,10 +11,9 @@ import {
 /**
  * A skill's profile-domain chip: the canonical emoji next to the domain's
  * label. Hovering answers the question a reader actually has — *why is this
- * skill in that category* — so the per-skill `reason` is the tooltip content
- * whenever the index carries one; the taxonomy's scope description only
- * stands in for skills that lack a reason (or a reason for a key the taxonomy
- * no longer knows).
+ * skill in that category* — so the tooltip carries the taxonomy's scope
+ * description (falling back to the raw label for a key the taxonomy no
+ * longer knows).
  *
  * A skill may be classified under several domains, best fit first: the chip
  * shows the leading one and the tooltip names the rest, so the rail stays one
@@ -29,14 +28,11 @@ import {
  */
 export function DomainBadge({
   domain,
-  reason,
   className,
   variant = "outline",
 }: {
   /** The classification, best fit first. Empty renders nothing. */
   domain: string[];
-  /** The generator's per-skill justification, if the index carries one. */
-  reason?: string;
   className?: string;
   /** Badge chrome; `outline` by default, `ghost` for a flattened rail. */
   variant?: ComponentProps<typeof Badge>["variant"];
@@ -46,11 +42,7 @@ export function DomainBadge({
   const meta = domainMeta(key);
   const label = domainLabel(key);
   const others = domain.slice(1).map(domainLabel);
-  const base = reason
-    ? `${meta ? `${meta.emoji} ` : ""}${reason}`
-    : meta
-      ? `${meta.emoji} ${meta.description}`
-      : label;
+  const base = meta ? `${meta.emoji} ${meta.description}` : label;
   const tooltip =
     others.length > 0 ? `${base}（同时属于：${others.join("、")}）` : base;
   return (

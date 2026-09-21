@@ -16,8 +16,7 @@
   "description": "Helps users discover and install agent skills …",
   "hash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
   "fetchedAt": "2026-09-06T07:57:37.803Z",
-  "domain": ["development"],
-  "reason": "CLI package-manager workflow for discovering and installing agent skill dependencies."
+  "domain": ["development"]
 }
 ```
 
@@ -30,7 +29,6 @@
 | `hash` | `string \| null` | 技能文件的 SHA-256。上游任何文件变化都会使其改变，即**快照所描述的那个版本**。 |
 | `fetchedAt` | `string` | 抓取器首次取到当前内容版本的时间（ISO，UTC）：说的是*当前内容*发布了多久，不是技能最早何时出现 |
 | `domain` | `string[]` | 分类：1–3 个分类键，最贴合的在前，取自固定的英文枚举（`development`、`data-analysis`、…、`other`）。[data/domains.ts](../src/data/domains.ts) 负责把键映射为展示名与 emoji。生成器尚未处理到的技能不含该字段。 |
-| `reason` | `string \| null` | 生成器对该分类给出的一行理由 |
 
 分类随索引行一起下发，因此一行解析完就是一个装饰完整的技能——不存在需要事后合并的第二数据源。一个技能可以合法地属于多个分类，这也是分组与筛选按「包含」匹配、而不是按精确值匹配的原因。
 
@@ -59,7 +57,7 @@ GitHub star 数**不在**技能行里：它存放在下文的 `upstream/repos.js
 
 每个已分类的技能还会发布 `profiles/{id}/domain.json`——载荷与索引行里的分类完全一致——以及供人阅读的 `md/domain.md`。应用只读索引行、从不拉取这两个文件，它们作为数据集自己的可浏览副本存在。快照不再发布逐技能封面插图：应用的图片位显示作者首字母（见 [../src/components/skill-cover.tsx](../src/components/skill-cover.tsx)）。
 
-索引行与 `skills/` 目录按 id 一一对应：`skills/{owner}/{repo}/{slug}/` 内正是上游技能自带的全部文件。应用把每行映射为 `Skill` 模型：`name = slug`、`repo = {owner}/{repo}`、`path = skills/{id}`（快照内目录，用于详情拉取与按目录名匹配）、`rev = hash`、`firstSeenAt = fetchedAt`、`profile = { domain, reason }`——`stars` 则来自 join 到的 `repos.jsonl` 行（未 join 到时为 0）。
+索引行与 `skills/` 目录按 id 一一对应：`skills/{owner}/{repo}/{slug}/` 内正是上游技能自带的全部文件。应用把每行映射为 `Skill` 模型：`name = slug`、`repo = {owner}/{repo}`、`path = skills/{id}`（快照内目录，用于详情拉取与按目录名匹配）、`rev = hash`、`firstSeenAt = fetchedAt`、`profile = { domain }`——`stars` 则来自 join 到的 `repos.jsonl` 行（未 join 到时为 0）。
 
 技能详情抽屉将 `hash` 以「版本」呈现（`#b1460085`，完整值放 tooltip），`fetchedAt` 以「收录时间」呈现，分类则以分类标签呈现。作者自己在 frontmatter 写的 `version` 刻意不再并列展示：它是对另一件事的声明。
 

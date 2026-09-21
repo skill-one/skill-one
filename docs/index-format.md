@@ -16,8 +16,7 @@ One JSON object per line, sorted by installs descending:
   "description": "Helps users discover and install agent skills …",
   "hash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
   "fetchedAt": "2026-09-06T07:57:37.803Z",
-  "domain": ["development"],
-  "reason": "CLI package-manager workflow for discovering and installing agent skill dependencies."
+  "domain": ["development"]
 }
 ```
 
@@ -30,7 +29,6 @@ One JSON object per line, sorted by installs descending:
 | `hash` | `string \| null` | SHA-256 of the skill's files. Changes when any upstream file changes — i.e. **which version of the skill the snapshot describes**. |
 | `fetchedAt` | `string` | When the scraper first fetched this content version (ISO, UTC): how long the *current* content has been published, not when the skill first appeared |
 | `domain` | `string[]` | The classification: 1–3 domain keys, best fit first, drawn from a fixed English enum (`development`, `data-analysis`, …, `other`). [data/domains.ts](../src/data/domains.ts) maps a key to its display label and emoji. Absent for skills the generator has not reached. |
-| `reason` | `string \| null` | The generator's one-line justification for the classification |
 
 The classification rides the index row, so one parsed line yields a fully decorated skill — there is no second source to merge in afterwards. A skill may legitimately belong to several domains, which is why grouping and filtering match by membership rather than by an exact value.
 
@@ -59,7 +57,7 @@ The dataset copies every owner's GitHub avatar into the snapshot as a regular fi
 
 Each classified skill also publishes `profiles/{id}/domain.json` — the same payload the index row carries — beside its human-readable `md/domain.md`. The app reads the index row and never fetches these; they exist as the dataset's own browsable copy. There is no per-skill cover illustration: the app's image slot shows the author's initial (see [src/components/skill-cover.tsx](../src/components/skill-cover.tsx)).
 
-The index rows are joined with the `skills/` directory by id: `skills/{owner}/{repo}/{slug}/` holds exactly the files the upstream skill ships. The app maps each row to the `Skill` model as `name = slug`, `repo = {owner}/{repo}`, `path = skills/{id}` (the snapshot directory, used for detail fetches and basename matching), `rev = hash`, `firstSeenAt = fetchedAt`, `profile = { domain, reason }` — with `stars` supplied by the joined `repos.jsonl` row (0 when unjoined).
+The index rows are joined with the `skills/` directory by id: `skills/{owner}/{repo}/{slug}/` holds exactly the files the upstream skill ships. The app maps each row to the `Skill` model as `name = slug`, `repo = {owner}/{repo}`, `path = skills/{id}` (the snapshot directory, used for detail fetches and basename matching), `rev = hash`, `firstSeenAt = fetchedAt`, `profile = { domain }` — with `stars` supplied by the joined `repos.jsonl` row (0 when unjoined).
 
 The detail drawer shows `hash` as 版本 (`#b1460085`, full value in the tooltip) and `fetchedAt` as 收录时间, and the classification as the domain chip. An author-declared frontmatter `version` is deliberately not displayed next to it: it is a different kind of claim about a different thing.
 

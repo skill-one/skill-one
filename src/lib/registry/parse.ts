@@ -1,5 +1,5 @@
 import type { Skill } from "../../types/skill";
-import { text, textList } from "../value";
+import { textList } from "../value";
 
 /**
  * Pure parsing of the skills-profiles index's JSONL lines into the app's
@@ -7,9 +7,9 @@ import { text, textList } from "../value";
  * download streams in.
  *
  * The upstream index is self-contained: a row carries the skill's own fields
- * plus the profile classification (`domain`/`reason`) the dataset generated
- * for it, so one parsed line yields the fully decorated skill — nothing is
- * merged in afterwards.
+ * plus the profile classification (`domain`) the dataset generated for it, so
+ * one parsed line yields the fully decorated skill — nothing is merged in
+ * afterwards.
  *
  * Star counts are the one exception: they are not carried by the index rows
  * themselves but kept in a separate `upstream/repos.jsonl` (one row per
@@ -39,8 +39,6 @@ interface RawSkill {
    * for skills the generator has not reached yet.
    */
   domain?: unknown;
-  /** The generator's one-line justification for the classification. */
-  reason?: unknown;
 }
 
 /**
@@ -96,9 +94,7 @@ function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
     rev: raw.hash ?? undefined,
     firstSeenAt: raw.fetchedAt ?? undefined,
     url: raw.url ?? undefined,
-    ...(domains.length > 0
-      ? { profile: { domain: domains, reason: text(raw.reason) } }
-      : {}),
+    ...(domains.length > 0 ? { profile: { domain: domains } } : {}),
   };
 }
 

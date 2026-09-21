@@ -457,10 +457,7 @@ export function SkillDetailPanel({
           )}
           {fromDisk && detail && <ProvenanceTip path={detail.path} />}
           {shown?.profile && (
-            <DomainBadge
-              domain={shown.profile.domain}
-              reason={shown.profile.reason}
-            />
+            <DomainBadge domain={shown.profile.domain} />
           )}
           {/* Installed skills only — the on-disk fact the registry cannot
               report. A store row has no local install, so nothing renders. */}

@@ -37,7 +37,7 @@ import type { SnapshotSource } from "./snapshot";
 /**
  * The skills-profiles repo publishes the whole dataset (JSONL) to its `dist`
  * branch as a snapshot. Each row already carries the profile classification
- * (`domain`/`reason`), so this single file *is* the dataset — there is no
+ * (`domain`), so this single file *is* the dataset — there is no
  * second source decoration step.
  */
 const INDEX_SPEC = {

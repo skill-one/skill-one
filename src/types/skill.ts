@@ -1,7 +1,7 @@
 /**
  * Extra metadata for one skill, carried by the index row itself (the
- * skill-one/skills-profiles dataset publishes it inline, `domain`/`reason` on
- * every classified skill). Coverage is partial — only skills the profile
+ * skill-one/skills-profiles dataset publishes `domain` inline on every
+ * classified skill). Coverage is partial — only skills the profile
  * generator has processed carry a profile — so every consumer must treat the
  * whole field as optional garnish, never as a fact every skill has.
  */
@@ -14,8 +14,6 @@ export interface SkillProfile {
    * membership.
    */
   domain: string[];
-  /** One-line justification the generator gave for the classification. */
-  reason?: string;
 }
 
 export interface Skill {

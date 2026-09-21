@@ -5,7 +5,7 @@
  * label and emoji the app shows instead.
  *
  * A key missing here (a future rename upstream) simply renders as its raw key
- * without an emoji and falls back to the per-skill reason in the tooltip.
+ * without an emoji, and the tooltip falls back to that label.
  */
 
 export interface DomainMeta {

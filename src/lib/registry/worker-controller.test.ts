@@ -1234,8 +1234,8 @@ describe("createRegistryController — failures", () => {
 
 describe("createRegistryController — classification", () => {
   /** A skill carrying the classification its index row shipped. */
-  const classified = (i: number, domain: string[], reason?: string): Skill =>
-    skill(i, reason ? { profile: { domain, reason } } : { profile: { domain } });
+  const classified = (i: number, domain: string[]): Skill =>
+    skill(i, { profile: { domain } });
 
   it("reports the domain list from the served rows", async () => {
     // Two skills share one domain so the count ordering is unambiguous

@@ -233,7 +233,6 @@ export function SkillCard({
             {domain && domain.length > 0 && (
               <DomainBadge
                 domain={domain}
-                reason={skill.profile?.reason}
                 // Flattened to plain text: the rail is a line of facts, not a
                 // row of badges, so the chip keeps only its emoji, its name and
                 // its tooltip.
