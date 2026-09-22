@@ -38,15 +38,17 @@ function hit(name: string, extras: Partial<Skill> = {}): SearchHit {
   };
 }
 
-/** Six skills, most installed first — one more than the card's cap, so the
+/** Eight skills, most installed first — one more than the card's cap, so the
  *  tail has something to account for. */
 const skills: SearchHit[] = [
   hit("pdf", { downloads: 3_000, profile: { domain: ["office-productivity"] } }),
   hit("docx", { downloads: 2_000 }),
   hit("pptx", { downloads: 1_000 }),
   hit("xlsx", { downloads: 500 }),
-  hit("slides", { downloads: 100 }),
-  hit("canvas", { downloads: 10 }),
+  hit("slides", { downloads: 400 }),
+  hit("canvas", { downloads: 300 }),
+  hit("figma", { downloads: 200 }),
+  hit("notion", { downloads: 100 }),
 ];
 
 /** The card as a list item, the way every surface mounts it. */
@@ -85,7 +87,7 @@ describe("RepoCard", () => {
 
     // The one bar carries what the repository is and the way into its page.
     const bar = screen.getByRole("link", {
-      name: `查看仓库 ${REPO}，6 个 skill`,
+      name: `查看仓库 ${REPO}，8 个 skill`,
     });
     expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
     expect(within(bar).getByText(REPO)).toBeInTheDocument();
@@ -93,8 +95,8 @@ describe("RepoCard", () => {
     // The count is the door's *object*, not a second figure standing beside it
     // with a separator between them: one phrase, in one element, carrying the
     // noun the app uses for it everywhere else — so nothing has to disambiguate
-    // 「6 个」 from the rows on screen.
-    const door = within(bar).getByText("6 个 skill");
+    // 「8 个」 from the rows on screen.
+    const door = within(bar).getByText("8 个 skill");
     expect(door.tagName).toBe("SPAN");
     // ...and the repository's own figure rides the repository's own name, at
     // the front of the bar, rather than out in the door's cluster — where it
@@ -117,7 +119,15 @@ describe("RepoCard", () => {
   it("lists the repository's skills in order, under a glyph and a description", () => {
     renderCard();
 
-    expect(rowNames()).toEqual(["pdf", "docx", "pptx", "xlsx"]);
+    expect(rowNames()).toEqual([
+      "pdf",
+      "docx",
+      "pptx",
+      "xlsx",
+      "slides",
+      "canvas",
+      "figma",
+    ]);
     const pdf = screen.getByRole("button", { name: "查看 pdf 详情" });
     // The classification rides the row as its glyph, the name is the row's own
     // strong element, and the description follows it on the same line.
@@ -125,19 +135,18 @@ describe("RepoCard", () => {
     expect(pdf).toHaveTextContent("pdf does something useful.");
   });
 
-  it("caps the list at four rows and states the repository's total", () => {
+  it("caps the list at seven rows and states the repository's total", () => {
     renderCard();
 
     // Past the cap a skill is not rendered as a row...
-    expect(screen.queryByText("slides")).not.toBeInTheDocument();
-    expect(screen.queryByText("canvas")).not.toBeInTheDocument();
-    // ...and the bar's figure is the repository's total, not the four on
+    expect(screen.queryByText("notion")).not.toBeInTheDocument();
+    // ...and the bar's figure is the repository's total, not the seven on
     // screen: that is what makes a capped list read as "these of them", with
     // 全部 beside it as the way to the rest.
     const bar = screen.getByRole("link", {
-      name: `查看仓库 ${REPO}，6 个 skill`,
+      name: `查看仓库 ${REPO}，8 个 skill`,
     });
-    expect(within(bar).getByText("6 个 skill")).toBeInTheDocument();
+    expect(within(bar).getByText("8 个 skill")).toBeInTheDocument();
     expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
   });
 
@@ -166,6 +175,8 @@ describe("RepoCard", () => {
       "xlsx",
       "slides",
       "canvas",
+      "figma",
+      "notion",
     ]);
   });
 
@@ -208,7 +219,7 @@ describe("RepoCard", () => {
   it("keeps the install button out of the way until the row is pointed at", () => {
     renderCard();
 
-    // Four always-on buttons would be the loudest thing on the card, so the
+    // Seven always-on buttons would be the loudest thing on the card, so the
     // action waits for the row to be hovered or focused — but it stays in the
     // layout rather than being `hidden`, so the row keeps its height and
     // nothing shifts under the pointer.
@@ -219,6 +230,9 @@ describe("RepoCard", () => {
     const reveal = install.parentElement as HTMLElement;
     expect(reveal).toHaveClass("opacity-0");
     expect(reveal).toHaveClass("group-hover/row:opacity-100");
+    // An installed badge is a state rather than an invitation, so the wrapper
+    // also reveals from the button's own `data-state` — the row below covers it.
+    expect(reveal).toHaveClass("has-data-[state=installed]:opacity-100");
     // Focus, either on the row or on the button inside it, reveals it too — so
     // a keyboard walk still sees the action of the row it stands on.
     expect(reveal).toHaveClass("group-focus-within/row:opacity-100");
@@ -231,6 +245,22 @@ describe("RepoCard", () => {
     expect(screen.getAllByRole("button", { name: "查看 pdf 详情" })[0]).toHaveClass(
       "flex-1",
     );
+  });
+
+  it("keeps an installed skill's badge on screen without a hover", async () => {
+    const user = userEvent.setup();
+    vi.mocked(installSkillFromSource).mockResolvedValue(undefined);
+    renderCard();
+
+    await user.click(screen.getAllByRole("button", { name: "安装" })[0]);
+
+    // Unlike the idle download, 已安装 is a fact rather than an invitation: the
+    // wrapper reveals whenever the button carries a state, reading the button's
+    // own `data-state` instead of waiting for the pointer.
+    const installed = await screen.findByRole("button", { name: "已安装" });
+    expect(installed).toHaveAttribute("data-state", "installed");
+    const reveal = installed.parentElement as HTMLElement;
+    expect(reveal).toHaveClass("has-data-[state=installed]:opacity-100");
   });
 
   it("keeps the card's single door: the bar, and nothing beside it", () => {

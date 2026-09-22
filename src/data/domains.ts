@@ -121,3 +121,20 @@ export function domainMeta(nameOrKey: string): DomainMeta | undefined {
 export function domainLabel(key: string): string {
   return BY_KEY.get(key)?.name ?? key;
 }
+
+/**
+ * The metadata for a domain key as a *view* names it: `domainMeta` is undefined
+ * for a key the taxonomy no longer knows, but a card or a page still has to put
+ * something in its glyph slot and its title, so this always yields a label and
+ * a glyph — the raw key, led by the catch-all's question mark.
+ */
+export function domainDisplay(nameOrKey: string): DomainMeta {
+  return (
+    domainMeta(nameOrKey) ?? {
+      key: nameOrKey,
+      name: nameOrKey,
+      emoji: "❓",
+      description: "",
+    }
+  );
+}

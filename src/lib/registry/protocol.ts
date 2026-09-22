@@ -33,21 +33,31 @@ export interface SearchData {
 export interface GroupsRequest {
   /** Trimmed search text; empty means "browse the registry in order". */
   query: string;
+  /**
+   * The dimension the browse list is bucketed by: the repository that
+   * publishes each skill, or its profile classification. Defaults to `repo`.
+   */
+  by?: GroupBy;
 }
 
+/** The dimensions the explore list can bucket the registry by. */
+export type GroupBy = "repo" | "domain";
+
 /**
- * One group of the grouped answer: a repository and the skills it publishes,
- * with the display facts its card shows.
+ * One group of the grouped answer: a bucket of the selected dimension and the
+ * skills inside it, with the display facts its card shows.
  */
 export interface Group {
   /** Stable identity for folding state and React keys. */
   key: string;
-  /** The repository, as `owner/repo`. */
+  /**
+   * The group's own name in its mode's vocabulary: `owner/repo` for repository
+   * groups, the domain key (see `data/domains`) for category groups.
+   */
   title: string;
   /**
-   * The repository's GitHub stars. Every skill of a repo is joined against the
-   * same `repos.jsonl` row, so the figures agree; the max merely makes that
-   * expectation explicit instead of trusting it.
+   * The repository's GitHub stars. Repository groups only — a category spans
+   * many repositories, so there is no single figure to weigh.
    */
   stars?: number;
   /** The group's skills, in the order the browse ordering produced. */

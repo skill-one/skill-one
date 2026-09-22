@@ -34,6 +34,11 @@ const RepoPage = lazy(() =>
     default: m.RepoPage,
   })),
 );
+const CategoryPage = lazy(() =>
+  import("./pages/explore/category-page").then((m) => ({
+    default: m.CategoryPage,
+  })),
+);
 const FeaturedPage = lazy(() =>
   import("./pages/explore/featured/featured-page").then((m) => ({
     default: m.FeaturedPage,
@@ -111,6 +116,12 @@ export default function App() {
                   {/* One repository, every skill it publishes. The splat is
                       `owner/repo` itself, which carries a slash. */}
                   <Route path="/repo/*" element={<RepoPage />} />
+                  {/* One category, every skill classified under it; the domain
+                      key is a single segment, so a plain param matches it. */}
+                  <Route
+                    path="/explore/category/:domain"
+                    element={<CategoryPage />}
+                  />
                   <Route path="/my-skills" element={<MySkillsPage />} />
                   <Route
                     path="/explore/featured"

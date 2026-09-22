@@ -1,15 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getGroups } from "../lib/registry/client";
+import type { GroupBy } from "../lib/registry/protocol";
 import { useInvalidateOnRegistryEpoch } from "./use-invalidate-on-registry-epoch";
 
 /** Query-key prefix shared by every grouped registry query. */
 const REGISTRY_GROUPS_QUERY_PREFIX = "registry-groups";
 
 /**
- * The explore list: one group per repository, fetched from the worker as a
- * whole (no paging — the page reveals it in chunks instead). The main thread
- * holds the answer; the page renders only the chunk it has revealed.
+ * The explore list: one group per bucket of the chosen dimension, fetched from
+ * the worker as a whole (no paging — the page reveals it in chunks instead).
+ * The main thread holds the answer; the page renders only the chunk it has
+ * revealed.
  *
  * While the download streams in, an answer is computed over the loaded prefix
  * (a search stays disabled until the index exists); when the worker's index
@@ -17,11 +19,11 @@ const REGISTRY_GROUPS_QUERY_PREFIX = "registry-groups";
  * over the full dataset and revalidated data replaces the snapshot in place.
  * That is the epoch rule plus the streaming repaint — see the shared hook.
  */
-export function useRegistryGroups(query: string) {
+export function useRegistryGroups(query: string, by: GroupBy = "repo") {
   useInvalidateOnRegistryEpoch([REGISTRY_GROUPS_QUERY_PREFIX], true);
 
   return useQuery({
-    queryKey: [REGISTRY_GROUPS_QUERY_PREFIX, query],
-    queryFn: () => getGroups({ query }),
+    queryKey: [REGISTRY_GROUPS_QUERY_PREFIX, by, query],
+    queryFn: () => getGroups({ query, by }),
   });
 }

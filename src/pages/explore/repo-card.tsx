@@ -19,11 +19,11 @@ import { Card, CardContent, CardFooter } from "../../components/ui/card";
  * grows with the repository only up to a point and then stops — the footer
  * always states how many skills the repository has in total, so a capped list
  * reads as "these of them" rather than as "all of them".
- * Four measures 98px for a one-skill repository and 177px at the cap, so the
- * two extremes stay within a 1.8:1 band — which is what a lane of cards remains
+ * Seven measures 98px for a one-skill repository and 257px at the cap, so the
+ * two extremes stay within a 2.6:1 band — which is what a lane of cards remains
  * scannable at.
  */
-const PREVIEWED_SKILLS = 4;
+const PREVIEWED_SKILLS = 7;
 
 /**
  * One repository, as one card — the store's repository view.
@@ -67,14 +67,17 @@ const PREVIEWED_SKILLS = 4;
  * The row's **install button** is the third: it installs without either. It is
  * a sibling of the row button rather than a child, so the two never nest and
  * the button stops its own clicks from reaching the row; and it is *revealed* on
- * hover (or when the row is focused) rather than always drawn. Four always-on
+ * hover (or when the row is focused) rather than always drawn. Seven always-on
  * buttons per card would be the loudest thing in the grid — the repository view
  * exists to compare skills, and the action is one hover away from the skill it
- * applies to. This is where the card deliberately parts with the standalone
- * skill card, whose idle install button stays visible: there, one card carries
- * one skill, so the button is that card's own action rather than a repeated
- * glyph. A pointer that never hovers (a touch surface) still reaches the same
- * install through the detail panel, which the row opens.
+ * applies to. The one state that ignores that rule is 已安装: an installed badge
+ * is a fact rather than an invitation, so it stays drawn without the pointer and
+ * a reader scanning a lane sees at a glance which skills they already have.
+ * This is where the card deliberately parts with the standalone skill card,
+ * whose idle install button stays visible: there, one card carries one skill, so
+ * the button is that card's own action rather than a repeated glyph. A pointer
+ * that never hovers (a touch surface) still reaches the same install through the
+ * detail panel, which the row opens.
  *
  * Because the button is only ever *shown* on intent, it does not take part in
  * the row's layout: it floats over the row's right edge, so a name and a
@@ -200,8 +203,12 @@ export function RepoCard({
                       because the button already owns `opacity` for its own
                       states: `disabled:opacity-50` on an installed or installing
                       button is more specific than a bare `opacity-0` and would
-                      win, drawing the button the reader did not ask for. */}
-                  <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
+                      win, drawing the button the reader did not ask for. A
+                      button that carries a state instead of an invitation —
+                      installed above all — is what the `has-data` rule keeps on
+                      screen; it reads the button's own `data-state`, so this
+                      wrapper never has to know the state itself. */}
+                  <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100">
                     <SkillInstallButton skill={skill} className="h-7 w-7" />
                   </span>
                 </li>
@@ -261,7 +268,7 @@ export function RepoCard({
                 every other count. The chevron carries the "go" the way every
                 other deeper affordance in the app does, and the total is always
                 the repository's own — which is what lets a capped list read as
-                "these of them": the reader counts the four rows and compares. */}
+                "these of them": the reader counts the seven rows and compares. */}
             <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
               {skills.length} 个 skill
               <ChevronRight

@@ -704,6 +704,102 @@ describe("createRegistryController — getGroups", () => {
   });
 });
 
+describe("createRegistryController — getGroups (category)", () => {
+  /** A skill carrying the classification its index row shipped. */
+  const classified = (i: number, domain: string[], over: Partial<Skill> = {}) =>
+    skill(i, { profile: { domain }, ...over });
+
+  it("buckets the browse list by category, biggest first", async () => {
+    const t = setup({
+      skills: [
+        classified(0, ["development"]),
+        classified(1, ["development", "testing"]),
+        classified(2, ["testing"]),
+        // No profile at all: the dataset never classified it, so it pools into
+        // the catch-all beside the skills the dataset itself filed there.
+        skill(3),
+        classified(4, ["other"]),
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "getGroups",
+      id: 1,
+      payload: { query: "", by: "domain" },
+    });
+    const data = resultData<{
+      groups: Array<{ key: string; skills: Array<{ skill: Skill }> }>;
+      total: number;
+    }>(t.recorded.results[0]);
+
+    // Three categories of two skills each — ties break by title, the raw key —
+    // and the unclassified skill shares 其他 with the dataset's own catch-all.
+    expect(data.groups.map((g) => g.key)).toEqual([
+      "domain-development",
+      "domain-other",
+      "domain-testing",
+    ]);
+    // A skill classified under several domains rides every one of them.
+    expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
+      "skill-0",
+      "skill-1",
+    ]);
+    expect(data.groups[1].skills.map((h) => h.skill.name)).toEqual([
+      "skill-3",
+      "skill-4",
+    ]);
+    expect(data.groups[2].skills.map((h) => h.skill.name)).toEqual([
+      "skill-1",
+      "skill-2",
+    ]);
+    // The total is the pre-grouping hit count, so the multi-domain skill is
+    // counted once even though it rides two cards.
+    expect(data.total).toBe(5);
+  });
+
+  it("answers a search's categories in best-hit order", async () => {
+    const t = setup({
+      skills: [
+        classified(0, ["development"], {
+          name: "redis-clip",
+          repo: "o/clip",
+          stars: 1000,
+          downloads: 1000,
+        }),
+        classified(1, ["testing"], { name: "redis-tool", repo: "o/tool" }),
+        classified(2, ["development"], { name: "redis-lab", repo: "o/clip" }),
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "getGroups",
+      id: 1,
+      payload: { query: "redis", by: "domain" },
+    });
+    const data = resultData<{
+      groups: Array<{ key: string; skills: Array<{ skill: Skill }> }>;
+      total: number;
+    }>(t.recorded.results[0]);
+
+    // Relevance, not size, orders a search's categories: the group whose best
+    // hit leads the whole search comes first, and each group keeps the hits in
+    // the order the index returned them.
+    expect(data.groups.map((g) => g.key)).toEqual([
+      "domain-development",
+      "domain-testing",
+    ]);
+    expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
+      "redis-clip",
+      "redis-lab",
+    ]);
+    expect(data.total).toBe(3);
+  });
+});
+
 describe("createRegistryController — featured + lookup", () => {
   it("computes hero slides and resolves the curated sections", async () => {
     const t = setup({

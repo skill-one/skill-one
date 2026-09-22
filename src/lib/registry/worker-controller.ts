@@ -381,19 +381,19 @@ export function createRegistryController(
   };
 
   /**
-   * The explore list: one group per repository, and every group's skills in
-   * the order of the hits it was built from. A search stays in relevance
-   * order; the browsed list follows install count. Bucketing those hits
-   * via `Map` insertion order puts each group's skills in hit order and the
-   * groups themselves in first-appearance order, which under a search is
-   * best-hit-first; the browsed list re-orders the groups by stars afterwards,
-   * so the largest repositories lead.
+   * The explore list: one group per bucket of the requested dimension, and
+   * every group's skills in the order of the hits it was built from. A search
+   * stays in relevance order; the browsed list follows install count.
+   * Bucketing hits via `Map` insertion order puts each group's skills in hit
+   * order and the groups themselves in first-appearance order, which under a
+   * search is best-hit-first; browsing re-orders the groups afterwards (by
+   * stars, or by size for categories), so the largest buckets lead.
    *
    * Unlike a search reply there is no slicing: the answer crosses the boundary
    * whole and the page reveals it in chunks instead of paging it. The payload,
    * not the render, is the price of dropping the pager.
    */
-  const getGroups = ({ query }: GroupsRequest): GroupsData => {
+  const getGroups = ({ query, by = "repo" }: GroupsRequest): GroupsData => {
     const q = query.trim();
     let hits: SearchHit[];
     if (q) {
@@ -406,27 +406,60 @@ export function createRegistryController(
       }));
     }
 
+    const groups = by === "domain" ? domainGroups(hits) : repoGroups(hits);
+    if (!q) {
+      // Browsing leads with the biggest bucket. A repository group is weighed
+      // by its stars (the figure its card's bar carries); a category, which
+      // spans many repositories, by how many skills it pools.
+      groups.sort((a, b) =>
+        by === "domain"
+          ? b.skills.length - a.skills.length || a.title.localeCompare(b.title)
+          : (b.stars ?? 0) - (a.stars ?? 0) ||
+            b.skills.length - a.skills.length ||
+            a.title.localeCompare(b.title),
+      );
+    }
+    return { groups, total: hits.length };
+  };
+
+  /** Bucket hits by the repository that publishes each skill (its only one). */
+  const repoGroups = (hits: SearchHit[]): Group[] => {
     const buckets = new Map<string, SearchHit[]>();
     for (const hit of hits) {
       const bucket = buckets.get(hit.skill.repo);
       if (bucket) bucket.push(hit);
       else buckets.set(hit.skill.repo, [hit]);
     }
-    const groups: Group[] = Array.from(buckets, ([repo, skills]) => ({
+    return Array.from(buckets, ([repo, skills]) => ({
       key: `repo-${repo}`,
       title: repo,
       stars: Math.max(...skills.map(({ skill }) => skill.stars)),
       skills,
     }));
-    if (!q) {
-      groups.sort(
-        (a, b) =>
-          (b.stars ?? 0) - (a.stars ?? 0) ||
-          b.skills.length - a.skills.length ||
-          a.title.localeCompare(b.title),
-      );
+  };
+
+  /**
+   * Bucket hits by the profile classification. A skill may belong to several
+   * domains, so it lands in every group it belongs to; a skill the dataset has
+   * not classified at all pools into the catch-all 其他, so the category view
+   * still partitions the whole registry rather than only its classified part.
+   */
+  const domainGroups = (hits: SearchHit[]): Group[] => {
+    const buckets = new Map<string, SearchHit[]>();
+    for (const hit of hits) {
+      const domains = hit.skill.profile?.domain;
+      const keys = domains && domains.length > 0 ? domains : [OTHER_DOMAIN];
+      for (const domain of keys) {
+        const bucket = buckets.get(domain);
+        if (bucket) bucket.push(hit);
+        else buckets.set(domain, [hit]);
+      }
     }
-    return { groups, total: hits.length };
+    return Array.from(buckets, ([domain, skills]) => ({
+      key: `domain-${domain}`,
+      title: domain,
+      skills,
+    }));
   };
 
   /** Sections shown on the featured page and skills per section. */

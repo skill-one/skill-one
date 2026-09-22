@@ -159,6 +159,9 @@ export function SkillInstallButton({
     );
   }
 
+  // `data-state` puts the resolved state on the DOM button so a caller can
+  // style around it: the store's repository card keeps an installed badge on
+  // screen from this attribute without knowing the state itself (see `RepoCard`).
   return (
       <Tooltip>
         <TooltipTrigger
@@ -167,6 +170,7 @@ export function SkillInstallButton({
               size="icon"
               variant={installMeta.variant}
               disabled={installing || isInstalled}
+              data-state={state}
               onClick={(e) => void handleInstall(e)}
               className={cn(
                 "h-7 w-7 shrink-0",

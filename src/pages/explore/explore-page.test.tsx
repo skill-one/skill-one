@@ -275,7 +275,7 @@ describe("ExplorePage", () => {
   });
 
   it("caps a repository's rows and hands the rest to its page", async () => {
-    // One repository with eight skills: four on the card, four behind it.
+    // One repository with eight skills: seven on the card, one behind it.
     harness.init();
     harness.pushAll(makeSkills(8, 0));
     harness.complete();
@@ -284,15 +284,66 @@ describe("ExplorePage", () => {
     // The cap is what keeps one big repository from pushing every other card
     // off the screen; the bar carries the repository's *total*, so a capped list
     // reads as "these of them" and its door leads to all of them.
-    expect(await screen.findByText("skill-3")).toBeInTheDocument();
-    expect(screen.queryByText("skill-4")).not.toBeInTheDocument();
+    expect(await screen.findByText("skill-6")).toBeInTheDocument();
+    expect(screen.queryByText("skill-7")).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: `查看仓库 ${BATCH_REPO}，8 个 skill` }),
       // The app is a hash router, so the rendered href carries the hash.
     ).toHaveAttribute("href", `#/repo/${BATCH_REPO}`);
     expect(
       screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
-    ).toHaveLength(4);
+    ).toHaveLength(7);
+  });
+
+  it("switches to the category view, bucketing by classification", async () => {
+    const user = userEvent.setup();
+    const classify = (name: string, domain: string[], repo: string): Skill => ({
+      name,
+      repo,
+      description: "",
+      stars: 1_000,
+      downloads: 1_000,
+      path: `skills/${name}`,
+      profile: { domain },
+    });
+    harness.init();
+    harness.pushAll([
+      classify("redis-clip", ["development"], "acme/a"),
+      classify("redis-lab", ["development"], "acme/b"),
+      classify("lint-fix", ["testing"], "acme/c"),
+      // No profile: the dataset never classified it.
+      {
+        name: "orphan",
+        repo: "acme/d",
+        description: "",
+        stars: 1,
+        downloads: 1,
+        path: "skills/orphan",
+      },
+    ]);
+    harness.complete();
+    renderExplorePage();
+
+    // The browse list starts on the repository view: one card per repository.
+    expect(
+      await screen.findByRole("link", { name: "查看仓库 acme/a，1 个 skill" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "按分类" }));
+
+    // The category view: one card per domain, its door leading to its page.
+    expect(
+      await screen.findByRole("link", { name: "查看分类 开发编程，2 个 skill" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "查看分类 测试与质量，1 个 skill" }),
+    ).toBeInTheDocument();
+    // The unclassified skill pools into the catch-all rather than vanishing.
+    expect(
+      screen.getByRole("link", { name: "查看分类 其他，1 个 skill" }),
+    ).toBeInTheDocument();
+    // The repository cards are gone: the two views are alternatives.
+    expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
   });
 
   it("renders the leading cards first and reveals more as the reader scrolls", async () => {
@@ -887,10 +938,10 @@ describe("ExplorePage", () => {
 
     const list = container.querySelector("ul.grid")!;
     expect(list.className).toContain(REPO_LIST_CLASS);
-    // One repository card in the list, four rows in the card: the list run is
+    // One repository card in the list, seven rows in the card: the list run is
     // the cap, not the full 50-skill repository.
     expect(list.children).toHaveLength(1);
-    expect(list.querySelectorAll("li li")).toHaveLength(4);
+    expect(list.querySelectorAll("li li")).toHaveLength(7);
 
     // Opening the drawer overlays the list: its classes — and with them its
     // layout and scroll position — stay exactly the same while the drawer is
@@ -905,7 +956,7 @@ describe("ExplorePage", () => {
     );
     expect(list.className).toContain(REPO_LIST_CLASS);
     expect(list.children).toHaveLength(1);
-    expect(list.querySelectorAll("li li")).toHaveLength(4);
+    expect(list.querySelectorAll("li li")).toHaveLength(7);
   });
 });
 
@@ -935,7 +986,7 @@ describe("ExplorePage streaming", () => {
 
     harness.pushAll(makeSkills(STREAM_BATCH + 5, 0));
 
-    // The card paints from the partial data (its four rows, then the tail) and
+    // The card paints from the partial data (its seven rows, then the tail) and
     // grows in place as more of the stream lands, without disturbing the card
     // the reader already has open.
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
