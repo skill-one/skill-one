@@ -56,6 +56,7 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 | `src/App.tsx` | Routing, layout, TanStack Query provider, and cache persistence |
 | `src/components/app-sidebar.tsx` | Sidebar navigation (routes and titles share one config) plus the nav badges: 全部 counts the skills streamed in so far, 仓库 the aggregated repo total once the index is ready |
 | `src/pages/explore/repo-card.tsx` / `repo-page.tsx` | The store's repository view: one card per repository, led by its most-installed skills in a capped list and signed off by a single bottom bar that names the repository and opens its page — plus that page, which lists every skill the repository publishes, uncapped |
+| `src/lib/owner-tint.ts` / `avatar-source.ts` | An owner's colour, averaged off their avatar and cached per owner — the one colour in the app that is read from data rather than taken from the theme. `avatar-source.ts` is the single answer to where an avatar lives, shared by the image a card draws and the image sampled for its tint |
 | `src/pages/explore/featured/` | Curated landing page: computed leaderboard hero carousel plus curated category sections |
 | `src/data/featured-content.ts` | Hand-picked category → skill references for the featured page (the registry index carries no categories) |
 | `src/lib/tauri.ts` | Detects whether the app runs inside the Tauri WebView |

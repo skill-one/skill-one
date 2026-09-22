@@ -36,6 +36,7 @@
     "cn": "^0.3.0",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
+    "fast-average-color": "^9.6.0",
     "idb-keyval": "^6.3.0",
     "lucide-react": "^1.45.0",
     "minisearch": "^7.2.0",

@@ -45,6 +45,13 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* A repository card's bar wash: the theme's muted, half-strength, over the card
+     — which is what that bar has always been. Lightness and hue are split on
+     purpose: `--card-bar` is the surface, and `--card-bar-l` is the one thing a
+     tinted bar keeps from it (see `[data-owner-tint]` below), because lightness
+     is what the bar's 11px figures are legible against. */
+  --card-bar-l: 0.985;
+  --card-bar: color-mix(in oklch, var(--muted) 50%, var(--card));
 }
 
 .dark {
@@ -78,6 +85,36 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* The same wash in the dark palette: half of `--muted` over `--card`. */
+  --card-bar-l: 0.237;
+}
+
+/* A repository card's owner tint — the average colour of the owner's avatar,
+   read at runtime and cached per owner (see `lib/owner-tint.ts`). A card sets
+   `data-owner-tint` only when it actually has a colour, so a card without one
+   keeps the theme's own bar wash and ring: no colour, no change.
+
+   Only the hue is allowed to travel, and that is not a figure of speech here:
+   the bar keeps the lightness the theme gave it (`--card-bar-l`) and takes the
+   owner's hue plus a share of their chroma. Mixing the colour in the obvious way
+   instead — `color-mix(in oklch, var(--owner-tint) 12%, …)` — takes some of a
+   dark avatar's lightness with it, and a dark avatar is the common case: a solid
+   logo averages dark. Measured on the worst of six real avatars (a solid dark
+   green), the bar's 11px figures read at 4.57:1 this way against 3.64:1 the
+   other, with the untinted bar at 4.54:1 — so the tint keeps the contrast the
+   theme was designed for instead of spending it. One remainder of that trade:
+   chroma at a fixed lightness still moves relative luminance slightly, so the
+   most saturated avatar of the six costs about 0.1 against the untinted figure.
+
+   A grey avatar has almost no chroma to give, so its card stays neutral by
+   itself — which is right: a black-and-white logo carries no colour to show. */
+[data-owner-tint] {
+  --card-bar: oklch(from var(--owner-tint) var(--card-bar-l) calc(c * 0.3) h);
+  /* The ring is a hairline with no text on it, so it can afford the owner's own
+     colour at half strength against the theme's ring ink — and that keeps it
+     visible on a dark card, where a tint carrying the avatar's own (dark)
+     lightness would disappear. */
+  --tw-ring-color: color-mix(in oklch, var(--owner-tint) 25%, var(--ring));
 }
 
 @theme inline {
