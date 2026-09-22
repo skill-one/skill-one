@@ -62,7 +62,7 @@ skill-one/
 │   │   ├── skill-detail/    # Shared skill detail panel + modal drawer
 │   │   └── placeholder.tsx # Shared "nothing to show" empty state for list pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)
-│   │   ├── explore/        # Store explore pages (skill-list-row / skill-install-button)
+│   │   ├── explore/        # Store explore pages (skill-list-row / repo-card + repo-page / group-section)
 │   │   │   └── featured/   # Curated featured page (hero leaderboards + category sections)
 │   │   ├── my-skills/      # My Skills page (agent avatar menu / agent-link-settings-dialog, etc.)
 │   │   └── settings/       # Settings page

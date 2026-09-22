@@ -29,6 +29,11 @@ const ExplorePage = lazy(() =>
     default: m.ExplorePage,
   })),
 );
+const RepoPage = lazy(() =>
+  import("./pages/explore/repo-page").then((m) => ({
+    default: m.RepoPage,
+  })),
+);
 const FeaturedPage = lazy(() =>
   import("./pages/explore/featured/featured-page").then((m) => ({
     default: m.FeaturedPage,
@@ -103,6 +108,9 @@ export default function App() {
                     element={<Navigate to="/my-skills" replace />}
                   />
                   <Route path="/explore" element={<ExplorePage />} />
+                  {/* One repository, every skill it publishes. The splat is
+                      `owner/repo` itself, which carries a slash. */}
+                  <Route path="/repo/*" element={<RepoPage />} />
                   <Route path="/my-skills" element={<MySkillsPage />} />
                   <Route
                     path="/explore/featured"

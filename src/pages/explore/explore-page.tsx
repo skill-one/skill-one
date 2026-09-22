@@ -7,6 +7,8 @@ import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import {
+  REPO_CARD_SKELETON_CLASS,
+  REPO_LIST_CLASS,
   SKILL_CARD_SKELETON_CLASS,
   SKILL_LIST_CLASS,
 } from "../../lib/skill-list-layout";
@@ -22,6 +24,7 @@ import { Placeholder } from "../../components/placeholder";
 import { SearchInput } from "../../components/search-input";
 import { SkillListRow } from "./skill-list-row";
 import { GroupSection } from "./group-section";
+import { RepoCard } from "./repo-card";
 
 /**
  * How many groups mount with the page, and how many more mount each time the
@@ -73,6 +76,12 @@ export function ExplorePage() {
   } = useRegistryGroups(query, groupBy);
 
   const groups = groupsData?.groups ?? [];
+
+  // The repository view renders one card per group rather than a section
+  // header over a grid of cards: the group *is* the card, so there is nothing
+  // left for a header to say. The other modes keep the section shell — their
+  // groups are buckets of skills, not objects with a page of their own.
+  const repoMode = groupBy === "repo";
 
   // The live skills.sh answer for the same query — the store's second source.
   // It is fetched here rather than inside the registry worker: it is a plain
@@ -229,8 +238,10 @@ export function ExplorePage() {
               // an empty spin that reads as "the page never switched").
               <SkeletonList
                 rows={12}
-                listClassName={SKILL_LIST_CLASS}
-                itemClassName={SKILL_CARD_SKELETON_CLASS}
+                listClassName={repoMode ? REPO_LIST_CLASS : SKILL_LIST_CLASS}
+                itemClassName={
+                  repoMode ? REPO_CARD_SKELETON_CLASS : SKILL_CARD_SKELETON_CLASS
+                }
               />
             ) : groups.length === 0 && liveSkills.length === 0 ? (
               <Placeholder
@@ -247,24 +258,44 @@ export function ExplorePage() {
                     list. Streaming invalidations share the definition, so
                     they update the groups in place without resetting what
                     the reader has folded (or how far they have scrolled). */}
-                {renderedGroups.map((group, gi) => (
-                  <GroupSection
-                    key={group.key}
-                    group={group}
-                    index={gi}
-                    items={group.skills}
-                    selected={selected}
-                    rowKey={(hit) => skillKey(hit.skill)}
-                    renderItem={(hit, isSelected) => (
-                      <SkillListRow
-                        skill={hit.skill}
-                        matched={hit.matched}
-                        selected={isSelected}
-                        onSelect={() => setSelected(skillKey(hit.skill))}
+                {repoMode ? (
+                  /* One card per repository, in one lane grid: the card is the
+                     group, so the list is flat where the sectioned modes are
+                     nested, and the progressive reveal below hands it whole
+                     cards instead of whole sections. */
+                  <ul className={REPO_LIST_CLASS}>
+                    {renderedGroups.map((group) => (
+                      <RepoCard
+                        key={group.key}
+                        repo={group.title}
+                        stars={group.stars}
+                        skills={group.skills}
+                        hasQuery={query.length > 0}
+                        selected={selected}
+                        onOpenSkill={setSelected}
                       />
-                    )}
-                  />
-                ))}
+                    ))}
+                  </ul>
+                ) : (
+                  renderedGroups.map((group, gi) => (
+                    <GroupSection
+                      key={group.key}
+                      group={group}
+                      index={gi}
+                      items={group.skills}
+                      selected={selected}
+                      rowKey={(hit) => skillKey(hit.skill)}
+                      renderItem={(hit, isSelected) => (
+                        <SkillListRow
+                          skill={hit.skill}
+                          matched={hit.matched}
+                          selected={isSelected}
+                          onSelect={() => setSelected(skillKey(hit.skill))}
+                        />
+                      )}
+                    />
+                  ))
+                )}
                 {/* The sentinel ends the rendered run: while it is on screen
                     the observer above extends the run, so scrolling down —
                     or simply having a tall viewport — keeps revealing groups

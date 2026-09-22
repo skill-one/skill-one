@@ -130,11 +130,18 @@ function keepHeaderUnderPointer(header: HTMLElement) {
  * grid. All the visual weight lives in the cards; the group itself is just
  * typography and spacing.
  *
- * The shell is shared by every grouped surface (the store's explore list,
- * the installed list) and is mode-agnostic: whoever built the group attaches
+ * The shell is shared by every grouped surface — the store's category modes
+ * (popularity buckets, classification), the live skills.sh section and the
+ * installed list — and is mode-agnostic: whoever built the group attaches
  * the identity metadata ({@link GroupMeta}) and the items, and renders each
  * item's row through {@link GroupSectionProps.renderItem} — the shell knows
  * nothing about what a row looks like.
+ *
+ * The store's repository mode is deliberately not one of them: a repository is
+ * an object with a page of its own rather than a bucket of skills, so it is
+ * rendered as one card per repository (see `RepoCard`) — the header this shell
+ * would draw duplicates what that card's own head already says, and its preview
+ * expander is the card's cap.
  *
  * The leading header slot shows the group's ordinal — the place a fold
  * chevron would sit — and gives it up to the chevron only while the pointer

@@ -32,3 +32,34 @@ export const SKILL_LIST_CLASS =
  * case the skeleton is measuring.
  */
 export const SKILL_CARD_SKELETON_CLASS = "h-[143px] rounded-xl";
+
+/**
+ * The store's repository view: one card per repository, so a lane is sized for
+ * a repository rather than for a single skill. 440px is the narrowest lane that
+ * still prints a skill's name, its one-line description and its install button
+ * on one row — measured, not guessed: at 440px every row of `RepoCard` fits
+ * without overflowing, and a long name truncates rather than pushing the
+ * description out. Two 440px lanes plus their gap need 896px, and the page's
+ * content is at most 1336px (1400 minus its own padding), so the repository
+ * view is two lanes across the whole range the window can produce — one when
+ * the window is narrow enough to fall under 896px.
+ *
+ * On a browser with CSS Grid Lanes (Safari 26.4+, and therefore the WKWebView
+ * this app ships in) the same track definition becomes a masonry layout: every
+ * card takes its own height — a one-skill repository measures 92px, a
+ * repository at its cap 215px — instead of being stretched to its neighbour. A
+ * browser without it drops the unsupported `display` (the declaration sits
+ * behind `@supports`, so the plain `grid` above still applies) and the row is
+ * equal-height: the short card then wears its neighbour's height as space above
+ * its footer, which `mt-auto` is what keeps at the bottom edge.
+ */
+export const REPO_LIST_CLASS =
+  "grid gap-4 grid-cols-[repeat(auto-fill,minmax(440px,1fr))] supports-[display:grid-lanes]:[display:grid-lanes]";
+
+/**
+ * Placeholder standing in for one repository card while a list loads, at the
+ * same lane width the real cards get. Measured off a rendered card at its cap —
+ * 215px — because the cap, not a one-skill repository, is what a grid row is
+ * as tall as.
+ */
+export const REPO_CARD_SKELETON_CLASS = "h-[215px] rounded-xl";
