@@ -280,7 +280,7 @@ export function MySkillsPage() {
 
   // The registry entries behind those recorded sources, keyed by skill name:
   // the store facts an on-disk record never carries (classification, the
-  // popularity figure), so the installed list can show the store's card for
+  // install count), so the installed list can show the store's card for
   // the skills the ledger placed. Empty for tool installs — nothing to resolve.
   const storeEntries = useInstalledStoreEntries(linked);
 

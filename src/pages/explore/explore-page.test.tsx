@@ -451,7 +451,7 @@ describe("ExplorePage", () => {
     ).toBeInTheDocument();
   });
 
-  it("orders repositories by stars and a repository's skills by popularity", async () => {
+  it("orders repositories by stars and a repository's skills by installs", async () => {
     harness.init();
     harness.pushAll([
       {
@@ -482,7 +482,7 @@ describe("ExplorePage", () => {
 
     // The grouped list puts the starred repository first — even though its
     // skills are far less installed — and orders the group's own cards by
-    // popularity (b2's installs beat b1's). A group's stars, not a lone
+    // installs (b2's installs beat b1's). A group's stars, not a lone
     // skill's installs, decide the group's place.
     expect(cardOrder()).toEqual(["b2", "b1", "n1"]);
   });
@@ -645,13 +645,13 @@ describe("ExplorePage", () => {
     await user.type(await searchField(), "gadget");
     await screen.findByText("sprocket");
 
-    // The endpoint publishes no stars, so blending a real install count with an
-    // absent zero would report 199k installs as a few hundred: the row carries
-    // no figure. Its rail is not blank — it still names the source — the figure
-    // is simply the one fact the row has no index entry to fill in.
+    // The endpoint's rows carry no classification, so the card draws facts
+    // only for rows the store vouches for: a live row shows no figure even
+    // though the endpoint publishes an install count for it. Its rail is not
+    // blank — it still names the source.
     const live = cardOf("sprocket");
     expect(live).toHaveTextContent("acme/fresh");
-    expect(live.querySelector('[aria-label^="热度"]')).toBeNull();
+    expect(live.querySelector('[title$="次安装"]')).toBeNull();
     // The indexed skill is on the page beside it, as a repository card's row:
     // that surface prints no per-skill figure either (the figure belongs to the
     // standalone skill card — see skill-list-row.test.tsx), so what this test
@@ -742,10 +742,10 @@ describe("ExplorePage", () => {
     await waitFor(() => expect(cardOrder()).toEqual(["widget-pack"]));
   });
 
-  it("ranks search results by popularity among equally relevant matches", async () => {
+  it("ranks search results by install count among equally relevant matches", async () => {
     const user = userEvent.setup();
     // Registry order: ["alpha-redis-clip", "beta-redis-tool"] — the opposite
-    // of the popularity order.
+    // of the install order.
     harness.init();
     harness.pushAll([
       {
@@ -769,7 +769,7 @@ describe("ExplorePage", () => {
 
     await user.type(await searchField(), "redis");
 
-    // Both matches are equally relevant, so popularity puts the more installed
+    // Both matches are equally relevant, so installs put the more installed
     // one first — a reorder the browsed list's order alone cannot explain,
     // which is also the proof that a search answers in relevance order rather
     // than in the order the browsed list had.

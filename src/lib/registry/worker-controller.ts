@@ -1,7 +1,6 @@
 import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
 import { domainLabel } from "../../data/domains";
-import { popularity } from "../popularity";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
 import type {
   FeaturedSectionData,
@@ -44,8 +43,7 @@ import {
 const PROGRESS_INTERVAL_MS = 400;
 
 /** Descending order on the row metric, so list order and displayed figure agree. */
-const byPopularity = (a: Skill, b: Skill): number =>
-  popularity(b) - popularity(a);
+const byInstalls = (a: Skill, b: Skill): number => b.downloads - a.downloads;
 
 /**
  * Reply cap for one name search. A broad query over a multi-thousand-entry
@@ -350,16 +348,15 @@ export function createRegistryController(
   };
 
   /**
-   * The registry's own order: the whole dataset by the blended
-   * installs-and-stars figure the rows display (`lib/popularity.ts`), so the
-   * order and the number beside it can never disagree. Cached per data
-   * version — and only once the download has landed, since a list that is
-   * still growing would leave a cached order stale.
+   * The registry's own order: the whole dataset by install count — the figure
+   * the rows display — so the order and the number beside it can never
+   * disagree. Cached per data version, and only once the download has landed,
+   * since a list that is still growing would leave a cached order stale.
    */
-  const popularityOrder = (): number[] => {
+  const installsOrder = (): number[] => {
     if (complete && orderCache?.version === dataVersion) return orderCache.ids;
     const ids = store.map((_, id) => id);
-    ids.sort((a, b) => byPopularity(store[a], store[b]));
+    ids.sort((a, b) => byInstalls(store[a], store[b]));
     orderCache = { version: dataVersion, ids };
     return ids;
   };
@@ -374,9 +371,9 @@ export function createRegistryController(
    * The main thread keeps its search field disabled until `ready`, so this is
    * the contract's backstop.
    *
-   * Relevance is the only order it speaks: ranking the hits by download count
-   * or name instead would throw away the ranking (all terms matched, exact and
-   * prefix name hits first, then popularity) that made them hits.
+   * Relevance is the only order it speaks: ranking the hits by installs or by
+   * name instead would throw away the ranking (all terms matched, exact and
+   * prefix name hits first, then installs) that made them hits.
    */
   const searchSkills = (query: string): SearchData => {
     if (!search) return { hits: [] };
@@ -386,7 +383,7 @@ export function createRegistryController(
   /**
    * The explore list: one group per repository, and every group's skills in
    * the order of the hits it was built from. A search stays in relevance
-   * order; the browsed list follows the popularity blend. Bucketing those hits
+   * order; the browsed list follows install count. Bucketing those hits
    * via `Map` insertion order puts each group's skills in hit order and the
    * groups themselves in first-appearance order, which under a search is
    * best-hit-first; the browsed list re-orders the groups by stars afterwards,
@@ -403,7 +400,7 @@ export function createRegistryController(
       if (!search) return { groups: [], total: 0 };
       hits = search(q);
     } else {
-      hits = popularityOrder().map((id) => ({
+      hits = installsOrder().map((id) => ({
         skill: store[id],
         matched: {},
       }));

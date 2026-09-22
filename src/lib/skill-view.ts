@@ -74,7 +74,7 @@ export interface SkillView extends Skill {
  * record cannot vouch for.
  *
  * The store entry is what lets the installed list show the same card the store
- * does: the domain chip and the popularity figure are registry facts an on-disk
+ * does: the domain chip and the install count are registry facts an on-disk
  * record never carries. It is absent whenever the ledger has no source for the
  * skill or the registry no longer lists it, and `storeBacked` keeps that
  * absence readable rather than turning it into a zero.

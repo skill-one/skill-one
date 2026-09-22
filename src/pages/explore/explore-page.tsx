@@ -250,13 +250,13 @@ export function ExplorePage() {
                     answer for the same query, minus everything the local
                     answer already covers. It is a section rather than rows
                     mixed into the groups because it is a different kind of
-                    answer — live, upstream, and without the description and
-                    stars an indexed skill carries, which is also why its rows
-                    show no popularity figure: blending a real install count
-                    with absent stars would understate it. So it neither joins
-                    the grouping nor claims a place in the ranking. Its rows are
-                    install-only: with no snapshot path there is no SKILL.md to
-                    open, and the detail panel has nothing to show. */}
+                    answer — live, upstream, and without the classification an
+                    indexed skill carries, so its rows show no figure: the card
+                    draws facts only for rows the store vouches for. It neither
+                    joins the list's ordering nor claims a place in a ranking.
+                    Its rows are install-only: with no snapshot path there is no
+                    SKILL.md to open, and the detail panel has nothing to
+                    show. */}
                 {liveSkills.length > 0 && (
                   <GroupSection
                     group={{

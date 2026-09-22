@@ -187,27 +187,13 @@ describe("SkillDetailPanel", () => {
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
     expect(screen.getByText("MIT")).toBeInTheDocument();
     expect(screen.getByText("Anthropic")).toBeInTheDocument();
-    // One blended popularity figure, exactly like the list rows: the source
-    // counts stay hidden until the figure is hovered.
-    expect(
-      screen.getByRole("button", {
-        name: "热度 712.4K：安装 3M · Star 169.6K",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("712.4K")).toBeInTheDocument();
-    expect(screen.queryByText("3M")).not.toBeInTheDocument();
+    // One install figure, exactly like the list rows: the skill's own count,
+    // compacted, with the exact number on the title and the wording for
+    // assistive tech hidden inside it.
+    expect(screen.getByText("3M")).toBeInTheDocument();
+    expect(screen.getByText("安装量")).toHaveClass("sr-only");
+    expect(screen.getByTitle("2,991,984 次安装")).toBeInTheDocument();
     expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
-    // Keyboard focus opens the same breakdown (also the a11y path).
-    const heat = screen.getByRole("button", { name: /^热度 / });
-    heat.focus();
-    const heatTip = await screen.findByRole("tooltip");
-    expect(heatTip.textContent).toMatch(/3M\s*·\s*169\.6K/);
-    heat.blur();
-    // Wait out the closing tooltip before opening the next one, or the
-    // query below may catch the leaving one instead.
-    await vi.waitFor(() =>
-      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(),
-    );
     // The exact path is provenance detail: hidden behind the 源 tip by
     // default, and an unhashed entry's tip carries no version lines at all.
     expect(screen.queryByText(detail.path)).not.toBeInTheDocument();
@@ -300,11 +286,9 @@ describe("SkillDetailPanel", () => {
     await user.hover(screen.getByText("本地文件"));
     const tip = await screen.findByRole("tooltip");
     expect(within(tip).getByText(localDetail.path)).toBeInTheDocument();
-    // No registry stats for a pure local skill: no popularity figure at all.
-    expect(
-      screen.queryByRole("button", { name: /^热度 / }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText("3M")).not.toBeInTheDocument();
+    // No registry stats for a pure local skill: no install figure at all.
+    expect(screen.queryByText("安装量")).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/次安装/)).not.toBeInTheDocument();
   });
 
   it("opens the source link through the system browser on click", async () => {
@@ -408,9 +392,8 @@ describe("SkillDetailPanel", () => {
     ).not.toBeInTheDocument();
     // The registry backs this skill, so its figure is real and shown — the same
     // one its card shows.
-    expect(
-      screen.getByRole("button", { name: /^热度 / }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("安装量")).toBeInTheDocument();
+    expect(screen.getByText("3M")).toBeInTheDocument();
     // The recorded repo still drives everything it can: the source link.
     expect(
       screen.getByRole("link", { name: "anthropics/skills" }),
@@ -450,7 +433,7 @@ describe("SkillDetailPanel", () => {
     vi.mocked(fetchInstalledSkills).mockResolvedValue([installedPdf]);
     mockFetchLocalSkillDetail.mockResolvedValue(detail);
     // `installedSkillView` marks an unresolved entry explicitly: the absence has
-    // to stay readable, or the drawer would report a popularity of 0.
+    // to stay readable, or the drawer would report an install count of 0.
     renderDrawer({
       skill: { ...skill, path: undefined, storeBacked: false },
       surface: "installed",
@@ -459,9 +442,7 @@ describe("SkillDetailPanel", () => {
     expect(
       await screen.findByRole("switch", { name: "关闭 pdf" }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^热度 / }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("安装量")).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "anthropics/skills" }),
     ).toBeInTheDocument();

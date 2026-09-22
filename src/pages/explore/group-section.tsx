@@ -130,9 +130,9 @@ function keepHeaderUnderPointer(header: HTMLElement) {
  * grid. All the visual weight lives in the cards; the group itself is just
  * typography and spacing.
  *
- * The shell is shared by every grouped surface — the store's category modes
- * (popularity buckets, classification), the live skills.sh section and the
- * installed list — and is mode-agnostic: whoever built the group attaches
+ * The shell is shared by every grouped surface — the live skills.sh section and
+ * the installed list's groupings — and is mode-agnostic: whoever built the
+ * group attaches
  * the identity metadata ({@link GroupMeta}) and the items, and renders each
  * item's row through {@link GroupSectionProps.renderItem} — the shell knows
  * nothing about what a row looks like.

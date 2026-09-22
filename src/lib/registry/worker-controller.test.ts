@@ -25,7 +25,6 @@ import type { CachedIndex, RegistryCache } from "./cache";
 import type { PublishedIndex } from "./index-stream";
 import type { RegistryWorkerMessage, RevalidateResult } from "./protocol";
 import type { Skill } from "../../types/skill";
-import { popularity } from "../popularity";
 import { formatCount } from "../utils";
 
 /** Deterministic skill factory; `i` varies name, repo and metrics. */
@@ -522,7 +521,7 @@ describe("createRegistryController — searchSkills", () => {
       id: 1,
       payload: { query: "redis" },
     });
-    // Popularity is the ranking's own tie-break, so the more-installed namesake
+    // Installs are the ranking's own tie-break, so the more-installed namesake
     // leads: nothing about a search answer is configurable by the caller.
     const hits = resultData<{ hits: Array<{ skill: Skill }> }>(
       t.recorded.results[0],
@@ -644,7 +643,7 @@ describe("createRegistryController — getGroups", () => {
     expect(data.groups[0].stars).toBe(500);
     expect(data.groups[1].stars).toBe(0);
     expect(data.groups[0].key).toBe("repo-o/big");
-    // Skills inside a group keep the popularity order.
+    // Skills inside a group keep the install order.
     expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
       "big-b",
       "big-a",
@@ -678,7 +677,7 @@ describe("createRegistryController — getGroups", () => {
     }>(t.recorded.results[0]);
 
     // Group order follows the relevance order of the groups' best hits; the
-    // popular clip leads its group (the ranking's popularity boost) and the
+    // popular clip leads its group (the install boost) and the
     // lesser lab trails it.
     expect(data.groups.map((g) => g.title)).toEqual(["o/clip", "o/tool"]);
     expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
@@ -898,9 +897,8 @@ describe("createRegistryController — getRanking", () => {
       "skill-0",
     ]);
     expect(data.entries.map((e) => e.rank)).toEqual([1, 2]);
-    // Upstream decides the order; the number is the row metric (1000 installs
-    // against 2 stars scores 54), not the install count.
-    expect(data.entries[0].label).toBe("54");
+    // Upstream decides the order; the number is the row's own install count.
+    expect(data.entries[0].label).toBe("1K");
     expect(data.total).toBe(2);
   });
 
@@ -923,9 +921,9 @@ describe("createRegistryController — getRanking", () => {
     expect(data.entries).toHaveLength(100);
     expect(data.total).toBe(150);
     // Each label is the row metric, and the ranks follow it descending. Which
-    // skill leads is the metric's business (see popularity.test.ts), so this
-    // asserts the wiring rather than one tie-prone name.
-    const values = data.entries.map((e) => popularity(e.skill));
+    // skill leads is the metric's business, so this asserts the wiring rather
+    // than one tie-prone name.
+    const values = data.entries.map((e) => e.skill.downloads);
     expect(data.entries.map((e) => e.label)).toEqual(values.map(formatCount));
     expect(values).toEqual([...values].toSorted((a, b) => b - a));
     expect(data.entries[0]).toMatchObject({ rank: 1 });
@@ -944,7 +942,7 @@ describe("createRegistryController — getRanking", () => {
       t.recorded.results[0],
     );
 
-    expect(data.title).toBe("人气总榜");
+    expect(data.title).toBe("安装量总榜");
     expect(data.gradient).toContain("gradient");
   });
 

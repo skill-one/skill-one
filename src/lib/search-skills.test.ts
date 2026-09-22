@@ -41,7 +41,7 @@ describe("buildSkillSearch", () => {
 
   it("ranks equally relevant matches by install count", () => {
     // Both skills match "redis" in their name with the same token shape, so
-    // the relevance scores are identical and popularity decides the order.
+    // the relevance scores are identical and installs decide the order.
     const results = buildSkillSearch([
       {
         name: "alpha-redis-tool",
@@ -126,14 +126,14 @@ describe("buildSkillSearch — query-level rules", () => {
       },
     ])("pdf");
 
-    // Popularity would put the exporter first; the name tier overrides it.
+    // Installs would put the exporter first; the name tier overrides it.
     expect(results.map(({ skill }) => skill.name)).toEqual([
       "pdf",
       "pdf-exporter",
     ]);
   });
 
-  it("floats a name prefix above a non-prefix name match, popularity aside", () => {
+  it("floats a name prefix above a non-prefix name match, installs aside", () => {
     const results = buildSkillSearch([
       {
         name: "pdf-tools",
@@ -212,7 +212,7 @@ describe("buildSkillSearch — query-level rules", () => {
     expect(search("redis kubernetes")).toEqual([]);
   });
 
-  it("lets popularity decide between namesakes", () => {
+  it("lets install count decide between namesakes", () => {
     // Several skills are all called "grill-me"; the by-far most installed one
     // wins.
     const results = buildSkillSearch([
@@ -240,7 +240,7 @@ describe("buildSkillSearch — query-level rules", () => {
   });
 
   it("keeps the registry order between otherwise identical hits", () => {
-    // Two namesakes of equal popularity with no other difference: the search
+    // Two namesakes of equal install count with no other difference: the search
     // adds no tie-break of its own, so their registry order stands.
     const results = buildSkillSearch([
       {

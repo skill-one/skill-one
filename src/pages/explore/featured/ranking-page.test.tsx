@@ -110,10 +110,10 @@ describe("RankingPage", () => {
       "beta",
       "gamma",
     ]);
-    // The card is the store's own, figure included (delta: 5K installs against
-    // 600 stars scores 1.7K). The order is what makes this a leaderboard, so
-    // nothing rank-shaped is glued onto the card.
-    expect(within(rows[0]).getByText("1.7K")).toBeInTheDocument();
+    // The card is the store's own, figure included (delta: 5K installs). The
+    // order is what makes this a leaderboard, so nothing rank-shaped is glued
+    // onto the card.
+    expect(within(rows[0]).getByText("5K")).toBeInTheDocument();
     expect(within(rows[0]).queryByText("1")).not.toBeInTheDocument();
   });
 
@@ -124,9 +124,9 @@ describe("RankingPage", () => {
 
     expect(await screen.findByRole("heading", { name: "delta" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("link", { name: "人气总榜" }));
+    await user.click(screen.getByRole("link", { name: "安装量总榜" }));
 
-    // Ranking by the blended figure puts beta on top instead.
+    // Ranking by installs puts beta on top instead.
     await waitFor(() =>
       expect(screen.getByRole("list").firstChild).toHaveTextContent("beta"),
     );

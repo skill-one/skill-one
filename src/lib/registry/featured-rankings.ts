@@ -1,5 +1,4 @@
 import { formatCount } from "../utils";
-import { popularity } from "../popularity";
 import type { Skill } from "../../types/skill";
 
 /** Skills listed on each hero slide. */
@@ -66,12 +65,12 @@ interface RankingDef {
 }
 
 /** The figure every leaderboard reports, in the row's own compact form. */
-const popularityLabel = (skill: Skill) => formatCount(popularity(skill));
+const installsLabel = (skill: Skill) => formatCount(skill.downloads);
 
 /**
  * The leaderboards, in display order: the trending leaderboard (skills.sh's
  * own trending view, as an id list fetched alongside the index) and the
- * all-time popularity leaderboard (the blended installs-and-stars figure).
+ * all-time leaderboard by install count.
  *
  * Both show the same figure a row displays: the trending board cannot be
  * re-ordered by it — its sequence *is* the upstream ranking — but its numbers
@@ -84,15 +83,15 @@ export const RANKINGS: readonly RankingDef[] = [
     subtitle: "skills.sh 官方趋势榜，点击查看完整榜单",
     gradient: "bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400",
     order: "trending",
-    label: popularityLabel,
+    label: installsLabel,
   },
   {
     id: "popular",
-    title: "人气总榜",
-    subtitle: "热度最高的经典 Skill，点击查看完整榜单",
+    title: "安装量总榜",
+    subtitle: "安装量最高的经典 Skill，点击查看完整榜单",
     gradient: "bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500",
-    metric: popularity,
-    label: popularityLabel,
+    metric: (skill) => skill.downloads,
+    label: installsLabel,
   },
 ];
 

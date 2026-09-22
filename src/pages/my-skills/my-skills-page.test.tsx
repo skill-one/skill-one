@@ -389,10 +389,10 @@ describe("MySkillsPage", () => {
       within(dialog).queryByRole("button", { name: "安装" }),
     ).not.toBeInTheDocument();
     // A recorded repo does not turn the drawer into the store's: there are no
-    // registry figures to show, and the popularity figure that used to render
-    // as a 0 here would contradict the card, which shows none.
+    // registry figures to show, and an install figure rendering as a 0 here
+    // would contradict the card, which shows none.
     expect(
-      within(dialog).queryByRole("button", { name: /^热度 / }),
+      within(dialog).queryByText("安装量"),
     ).not.toBeInTheDocument();
 
     // The drawer's switch writes the same backend state the card's does.
@@ -402,13 +402,11 @@ describe("MySkillsPage", () => {
     ).toHaveAttribute("aria-checked", "false");
   });
 
-  it("shows the store's classification and popularity for a resolved source", async () => {
+  it("shows the store's classification and install count for a resolved source", async () => {
     const user = userEvent.setup();
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
     // The registry still lists the source the ledger recorded, so the installed
-    // list has the store facts an on-disk record never carries. Blended figure:
-    // √((2991984 + 1) × (169600 + 1)) − 1 = 712350.
-    const figure = "热度 712.4K：安装 3M · Star 169.6K";
+    // list has the store facts an on-disk record never carries.
     lookupSkills.mockResolvedValue({
       entries: [
         {
@@ -425,16 +423,14 @@ describe("MySkillsPage", () => {
     renderWithRouter(<MySkillsPage />);
 
     // The card is the store's card: the profiles dataset's chip and the same
-    // blended figure the store's own rows show.
+    // install figure the store's own rows show.
     expect(await screen.findByText("内容创作")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: figure })).toBeInTheDocument();
+    expect(screen.getByText("3M")).toBeInTheDocument();
 
     // And the drawer agrees with the row that opened it, figure included.
     await user.click(screen.getByRole("button", { name: "查看 pdf 详情" }));
     const dialog = await screen.findByRole("dialog");
-    expect(
-      within(dialog).getByRole("button", { name: figure }),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText("3M")).toBeInTheDocument();
     expect(within(dialog).getByText("内容创作")).toBeInTheDocument();
   });
 
@@ -448,9 +444,7 @@ describe("MySkillsPage", () => {
     expect(
       await screen.findByRole("button", { name: "仓库 anthropics/skills" }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^热度 / }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("安装量")).not.toBeInTheDocument();
   });
 
   it("offers a confirmable store link for a tool-installed skill", async () => {

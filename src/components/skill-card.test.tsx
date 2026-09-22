@@ -99,7 +99,7 @@ describe("SkillCard", () => {
 
     const footer = container.querySelector('[data-slot="card-footer"]');
     expect(footer).not.toBeNull();
-    expect(footer).toHaveTextContent("712.4K");
+    expect(footer).toHaveTextContent("3M");
     expect(screen.queryByText("开发编程")).not.toBeInTheDocument();
   });
 
@@ -112,7 +112,7 @@ describe("SkillCard", () => {
 
     const footer = container.querySelector('[data-slot="card-footer"]');
     expect(footer).toHaveTextContent("办公效率");
-    expect(footer).toHaveTextContent("712.4K");
+    expect(footer).toHaveTextContent("3M");
   });
 
   it("falls back to a placeholder for a missing description", () => {

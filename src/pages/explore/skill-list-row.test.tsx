@@ -24,16 +24,13 @@ const skill: Skill = {
   downloads: 2991984,
 };
 
-// √((2991984 + 1) × (169600 + 1)) − 1 = 712350, rendered compactly.
-const BLENDED = "712.4K";
-
 describe("SkillListRow", () => {
   beforeEach(() => {
     // No skills are installed unless a test says otherwise.
     vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
   });
 
-  it("renders as a list item with name, repo, description and popularity", () => {
+  it("renders as a list item with name, repo, description and install count", () => {
     const { container } = renderWithRouter(<SkillListRow skill={skill} />);
 
     expect(container.querySelector("li")).not.toBeNull();
@@ -45,9 +42,9 @@ describe("SkillListRow", () => {
     expect(
       screen.getByText("Read and merge PDF documents."),
     ).toBeInTheDocument();
-    // One blended figure inline; neither source count leaks into the row.
-    expect(screen.getByText(BLENDED)).toBeInTheDocument();
-    expect(screen.queryByText("3M")).not.toBeInTheDocument();
+    // One figure inline: the skill's own install count. The repository's
+    // stars belong to the repository and stay off the skill's card.
+    expect(screen.getByText("3M")).toBeInTheDocument();
     expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
   });
 
@@ -123,85 +120,39 @@ describe("SkillListRow", () => {
     expect(card).not.toHaveTextContent("在 GitHub 中打开");
   });
 
-  it("breaks the figure down into installs and stars on hover", async () => {
-    const user = userEvent.setup();
+  it("names the figure for assistive tech", () => {
     renderWithRouter(<SkillListRow skill={skill} />);
 
-    await user.hover(screen.getByRole("button", { name: /^热度 / }));
-    const tip = await screen.findByRole("tooltip");
-
-    // Minimal one-line form: the blend already sits on the trigger, so the
-    // tooltip is just icon + count for the two source figures, no labels
-    // and no formula line.
-    expect(within(tip).getByText("3M")).toBeInTheDocument();
-    expect(within(tip).getByText("169.6K")).toBeInTheDocument();
-    expect(tip.textContent).toMatch(/3M\s*·\s*169\.6K/);
-    expect(within(tip).queryByText("热度")).not.toBeInTheDocument();
-    expect(within(tip).queryByText("安装")).not.toBeInTheDocument();
-    expect(tip.textContent).not.toContain("√");
+    // The glyph is decoration and the number is compacted, so the wording —
+    // 安装量 — is visually hidden text inside the figure itself, and the exact
+    // count rides the title.
+    expect(screen.getByText("安装量")).toHaveClass("sr-only");
+    expect(screen.getByTitle("2,991,984 次安装")).toBeInTheDocument();
   });
 
-  it("labels the figure with its breakdown for assistive tech", () => {
-    renderWithRouter(<SkillListRow skill={skill} />);
-
-    expect(
-      screen.getByRole("button", {
-        name: "热度 712.4K：安装 3M · Star 169.6K",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("takes the card's controls in card order: install, chip, then figure", async () => {
+  it("takes the card's controls in card order: install, then chip", async () => {
     const user = userEvent.setup();
     renderWithRouter(<SkillListRow skill={skill} />);
 
     // The tab order follows the card top to bottom: the corner action, then
-    // the rail's source chip, then the figure beside it.
+    // the rail's source chip. The figure is text, not a control — there is
+    // nothing on it to activate.
     await user.tab();
-    expect(
-      screen.getByRole("button", { name: "安装" }),
-    ).toHaveFocus();
+    expect(screen.getByRole("button", { name: "安装" })).toHaveFocus();
 
     await user.tab();
     expect(
       screen.getByRole("button", { name: "仓库 anthropics/skills" }),
     ).toHaveFocus();
-
-    await user.tab();
-    expect(
-      screen.getByRole("button", {
-        name: "热度 712.4K：安装 3M · Star 169.6K",
-      }),
-    ).toHaveFocus();
   });
 
-  it("reaches the same breakdown from the keyboard", async () => {
-    renderWithRouter(<SkillListRow skill={skill} />);
-
-    // The figure is a control of its own — the card body opens the panel — and
-    // its tooltip carries no delay, so focusing it opens the same breakdown the
-    // pointer gets on hover.
-    screen
-      .getByRole("button", { name: "热度 712.4K：安装 3M · Star 169.6K" })
-      .focus();
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("169.6K");
-  });
-
-  it("lets a missing count pull the blend down instead of hiding it", () => {
+  it("renders the count as it is, zero included", () => {
     renderWithRouter(<SkillListRow skill={{ ...skill, downloads: 0 }} />);
 
-    // √(1 × 169601) − 1 = 411: an equal weighting has to show the absent side,
-    // rather than quietly falling back to the star count.
-    expect(screen.getByText("411")).toBeInTheDocument();
-    expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
-  });
-
-  it("renders 0 when neither count exists", () => {
-    renderWithRouter(
-      <SkillListRow skill={{ ...skill, downloads: 0, stars: 0 }} />,
-    );
-
+    // The figure is the count, not a score: a skill with no recorded installs
+    // shows 0 rather than borrowing its repository's stars.
     expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
   });
 
   it("keeps a missing description readable", () => {

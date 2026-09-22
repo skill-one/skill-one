@@ -97,7 +97,7 @@ no caller-controlled paths are accepted.
   本地安装. The recorded source is also
   resolved back to its registry entry (`use-installed-store-entries.ts`, over
   the worker's `lookupSkills`), which is where the store's classification and
-  popularity figure come from — an on-disk record carries neither, so without
+  install count come from — an on-disk record carries neither, so without
   the lookup the installed list could only ever render the store's card with
   those two slots empty. A source that resolves to nothing (tool installs, or
   an entry the index no longer lists) keeps the local-install presentation and

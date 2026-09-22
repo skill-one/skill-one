@@ -56,10 +56,9 @@ const [efficiency, , development, writing] = FEATURED_CATEGORIES;
 
 /**
  * Build a registry fixture from the curated references: every skill gets
- * formulaic numbers — the same count for installs and stars, falling with
- * category and position — so the blended popularity figure equals the install
- * count and the hero leaderboards keep a deterministic ranking (the first
- * curated skill always tops trending and popularity).
+ * formulaic numbers — installs and stars falling with category and position —
+ * so the hero leaderboards keep a deterministic ranking (the first curated
+ * skill always tops trending and installs).
  */
 function curatedIndex(): Skill[] {
   return FEATURED_CATEGORIES.flatMap((category, ci) =>
@@ -162,8 +161,8 @@ describe("FeaturedPage", () => {
     // Hero: computed slides ranked from the registry fixture.
     const hero = await screen.findByRole("region", { name: "精选推荐" });
     expect(within(hero).getByText("趋势热榜")).toBeInTheDocument();
-    expect(within(hero).getByText("人气总榜")).toBeInTheDocument();
-    // The first curated skill tops both the trending and the popularity board.
+    expect(within(hero).getByText("安装量总榜")).toBeInTheDocument();
+    // The first curated skill tops both the trending and the installs board.
     expect(
       within(hero).getAllByText(efficiency.skills[0].name).length,
     ).toBeGreaterThanOrEqual(2);

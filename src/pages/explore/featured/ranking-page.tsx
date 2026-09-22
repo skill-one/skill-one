@@ -30,8 +30,8 @@ const SKELETON_ROWS = 10;
  *
  * The cards are the store's own (`SkillListRow`), unchanged: what makes this a
  * leaderboard is the order the worker put them in, not a rank chip or a
- * different metric glued on. The figure on each card is the same blended
- * popularity the store shows, so the two lists can never disagree about it.
+ * different metric glued on. The figure on each card is the same install count
+ * the store shows, so the two lists can never disagree about it.
  *
  * The leaderboard id lives in the URL, so the page is deep-linkable, the back
  * button returns to the featured page, and the tabs are plain links — cross

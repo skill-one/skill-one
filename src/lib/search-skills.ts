@@ -1,6 +1,5 @@
 import type { Skill } from "../types/skill";
 import { buildSearchIndex } from "./search-index";
-import { popularity } from "./popularity";
 import type { SearchHit } from "./registry/protocol";
 
 /**
@@ -15,7 +14,7 @@ import type { SearchHit } from "./registry/protocol";
  *
  * The ranking layered on top of the shared relevance order:
  * - an exact or prefix name hit ranks above everything else, whatever its BM25
- *   score, and those name hits are ordered by popularity among themselves: a
+ *   score, and those name hits are ordered by install count among themselves: a
  *   registry search is usually someone typing a name they already have in
  *   mind, so once the name matches the open question is which of the namesakes
  *   they meant.
@@ -27,7 +26,7 @@ export type SkillSearch = (query: string) => SearchHit[];
 // Name tiers, applied as an ordering key rather than a score multiplier: an
 // exact or prefix name hit is a far stronger signal than any BM25 combination
 // can express, so folding it into the score would only trade one fragile
-// constant for another. 0 sorts first, and within a tier popularity decides.
+// constant for another. 0 sorts first, and within a tier installs decide.
 const TIER = { exact: 0, prefix: 1, rest: 2 } as const;
 
 /**
@@ -53,10 +52,9 @@ function nameTier(normalizedName: string, normalizedQuery: string): number {
 export function buildSkillSearch(skills: Skill[]): SkillSearch {
   const search = buildSearchIndex(skills);
 
-  // Precomputed once rather than per query: both run on every hit, and
-  // popularity is the sort key inside each name tier.
+  // Precomputed once rather than per query: normalization runs on every hit,
+  // and the name tier is the first sort key.
   const normalizedNames = skills.map((skill) => normalizeName(skill.name));
-  const popularities = skills.map(popularity);
 
   // An empty query yields no results (and no fallback either); the caller
   // treats it as "no search" and shows the full registry instead.
@@ -69,18 +67,20 @@ export function buildSkillSearch(skills: Skill[]): SkillSearch {
         skill: skills[id],
         matched,
         score,
-        popularity: popularities[id],
         tier: nameTier(normalizedNames[id], normalizedQuery),
       }))
       // Name tier first (exact, then prefix, then the rest); within a tier
-      // popularity decides, with BM25 as the final tie-break. Inside the name
+      // installs decide, with BM25 as the final tie-break. Inside the name
       // tiers every hit is named by the query already, so the open question is
       // which of the namesakes was meant. The rest are names that carry the
-      // terms without starting with them, where a popular skill is the better
-      // answer than a more textually dense one — so popularity leads there too.
+      // terms without starting with them, where the more installed skill is the
+      // better answer than a more textually dense one — so installs lead there
+      // too.
       .toSorted(
         (a, b) =>
-          a.tier - b.tier || b.popularity - a.popularity || b.score - a.score,
+          a.tier - b.tier ||
+          b.skill.downloads - a.skill.downloads ||
+          b.score - a.score,
       )
       .map(({ skill, matched }) => ({ skill, matched }));
   };

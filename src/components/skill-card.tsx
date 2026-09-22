@@ -5,7 +5,7 @@ import { cn } from "../lib/utils";
 import { DomainBadge } from "./domain-badge";
 import { HighlightedText, type SkillMatched } from "./highlighted-text";
 import { RepoHoverCard } from "./repo-hover-card";
-import { SkillPopularity } from "./skill-popularity";
+import { SkillInstalls } from "./skill-installs";
 import {
   Card,
   CardAction,
@@ -30,8 +30,8 @@ const INTERACTIVE_CLASS =
  *
  * Three blocks, read top to bottom in the order a reader actually decides in:
  * *what is it* (the name), *what does it do* (the description), and *the facts
- * about it* (the rail: where it came from, how it is classified, how popular it
- * is). Each block has exactly one job:
+ * about it* (the rail: where it came from, how it is classified, how installed
+ * it is). Each block has exactly one job:
  *
  * - **Header** — the name alone, in the title slot, with the corner action
  *   beside it. It is the only block a reader scans across a row, so nothing
@@ -44,7 +44,7 @@ const INTERACTIVE_CLASS =
  *   height.
  * - **Footer** — one rail under a hairline, pinned to the card's bottom edge: the
  *   source on the left (the owner's avatar, then the repository it stands for),
- *   the classification after it, and the popularity figure pushed to the right.
+ *   the classification after it, and the install figure pushed to the right.
  *   One voice for all three — plain text at 11px — because the rail is a line of
  *   facts, not a row of badges. The source belongs here rather than under the
  *   name: it is a fact *about* the skill, like its classification and its
@@ -209,12 +209,7 @@ export function SkillCard({
             />
           )}
           {storeBacked && (
-            <SkillPopularity
-              skill={skill}
-              side="top"
-              align="end"
-              className="ml-auto text-[11px]"
-            />
+            <SkillInstalls skill={skill} className="ml-auto text-[11px]" />
           )}
         </CardFooter>
       </Card>

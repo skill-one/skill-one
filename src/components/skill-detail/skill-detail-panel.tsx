@@ -20,7 +20,7 @@ import {
   formatUnixDate,
 } from "../../lib/utils";
 import { DomainBadge } from "../domain-badge";
-import { SkillPopularity } from "../skill-popularity";
+import { SkillInstalls } from "../skill-installs";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
@@ -149,8 +149,7 @@ function ProvenanceTip({
  */
 function InstalledAt({ installedAt }: { installedAt?: number | null }) {
   // Relative on the row — "3天前" answers "recently?" — with the exact date on
-  // hover answering "exactly when". The same split as the popularity figure,
-  // and the tooltip already existed, so it costs no new UI element. Both
+  // hover answering "exactly when", so neither rendering has to be both. Both
   // renderings share one guard, so `installedExact` is present whenever
   // `installedOn` is.
   const installedOn = formatRelativeTime(installedAt);
@@ -224,7 +223,7 @@ interface SkillDetailPanelProps {
  * permanent rows; unhashed entries and local installs simply show less.
  *
  * `surface` is the only thing the panel cannot read off the skill: which
- * listing opened it. The store's chrome — the install CTA and the popularity
+ * listing opened it. The store's chrome — the install CTA and the install
  * figure — is shown there and nowhere else, so the drawer and the card of the
  * listing it was opened from always present the same skill the same way.
  */
@@ -417,12 +416,11 @@ export function SkillDetailPanel({
             <Badge variant="secondary">{detail.license}</Badge>
           )}
           {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
-          {/* The same blended popularity figure the list rows show;
-              hover/focus breaks it into installs and stars. Shown for exactly
+          {/* The same install figure the list rows show. Shown for exactly
               the skills whose card shows it — the registry-backed ones — so
               the row the reader clicked and the drawer it opened can never
               disagree about it. */}
-          {showStats && shown && <SkillPopularity skill={shown} />}
+          {showStats && shown && <SkillInstalls skill={shown} />}
           {shown && !fromDisk && (
             <>
               {skillsShHref && (

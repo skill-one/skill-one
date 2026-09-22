@@ -73,11 +73,10 @@ function isHit(value: unknown): value is SkillsShHit {
  *
  * `storeBacked: false` is what the thinness means on the card: this skill has
  * no entry in the index the app reads (that is why it is a live row at all), so
- * there are no figures to show — the endpoint publishes an install count but
- * neither the stars the card's popularity figure blends it with nor a
- * classification. Blending a real install count with an absent zero would
- * report the skill as far less used than it is, so the row shows no figure
- * rather than a made-up one.
+ * it carries no classification and no stars. It does publish an install count —
+ * a real one — but the card draws figures only for rows the store vouches for,
+ * so a live row stays figure-less rather than putting a second kind of figure
+ * beside the store's.
  */
 function toSkill(hit: SkillsShHit): SkillView {
   return {
