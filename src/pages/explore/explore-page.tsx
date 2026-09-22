@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Flame, FolderGit2, LayoutGrid } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
+import { skillKey } from "../../lib/skill-view";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
@@ -119,11 +120,10 @@ export function ExplorePage() {
     return () => observer.disconnect();
   }, [allRendered, groups.length]);
 
-  // Index into the flattened group skills of the skill shown in the detail
-  // panel; null keeps the panel closed. Clicking a row while the panel is
-  // open simply swaps the selection, so switching skills never replays the
-  // slide-in animation.
-  const [selected, setSelected] = useState<number | null>(null);
+  // The skill shown in the detail panel, by identity; null keeps the panel
+  // closed. Clicking a row while the panel is open simply swaps the selection,
+  // so switching skills never replays the slide-in animation.
+  const [selected, setSelected] = useState<string | null>(null);
   // The panel walks the flat skill list over all groups, unwrapped. Depends
   // on the query result, not the derived array: `groups` is a fresh identity
   // whenever the page re-renders, which would recompute this every time.
@@ -139,22 +139,9 @@ export function ExplorePage() {
   // search answer, not on the grouping: the same skills come back whichever
   // mode buckets them.
   const liveSkills = useMemo(() => {
-    const indexed = new Set(flatSkills.map((s) => `${s.repo}/${s.name}`));
-    return (liveData ?? []).filter((s) => !indexed.has(`${s.repo}/${s.name}`));
+    const indexed = new Set(flatSkills.map(skillKey));
+    return (liveData ?? []).filter((s) => !indexed.has(skillKey(s)));
   }, [liveData, flatSkills]);
-  // Each group's first skill's index in that flat list, handed down so a
-  // group's rows speak the same coordinate system as `selected`. Depends on
-  // the query result, not the derived array, for the same reason.
-  const groupOffsets = useMemo(() => {
-    const offsets: number[] = [];
-    let next = 0;
-    for (const group of groupsData?.groups ?? []) {
-      offsets.push(next);
-      next += group.skills.length;
-    }
-    return offsets;
-  }, [groupsData]);
-
   const handleSearch = (q: string) => {
     setSelected(null);
     setVisibleCount(INITIAL_GROUPS);
@@ -266,15 +253,14 @@ export function ExplorePage() {
                     group={group}
                     index={gi}
                     items={group.skills}
-                    offset={groupOffsets[gi]}
                     selected={selected}
-                    rowKey={(hit) => `${hit.skill.repo}/${hit.skill.name}`}
-                    renderItem={(hit, flatIndex, isSelected) => (
+                    rowKey={(hit) => skillKey(hit.skill)}
+                    renderItem={(hit, isSelected) => (
                       <SkillListRow
                         skill={hit.skill}
                         matched={hit.matched}
                         selected={isSelected}
-                        onSelect={() => setSelected(flatIndex)}
+                        onSelect={() => setSelected(skillKey(hit.skill))}
                       />
                     )}
                   />
@@ -305,9 +291,8 @@ export function ExplorePage() {
                     }}
                     index={groups.length}
                     items={liveSkills}
-                    offset={flatSkills.length}
-                    selected={null}
-                    rowKey={(skill) => `${skill.repo}/${skill.name}`}
+                    selected={selected}
+                    rowKey={skillKey}
                     renderItem={(skill) => <SkillListRow skill={skill} />}
                   />
                 )}

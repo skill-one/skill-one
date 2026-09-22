@@ -102,7 +102,8 @@ export interface GroupsData {
 export interface FeaturedSectionData {
   id: string;
   title: string;
-  skills: Array<{ skill: Skill; index: number }>;
+  /** The section's skills, most-installed first. */
+  skills: Skill[];
 }
 
 /** Featured page payload, fully computed inside the worker. */

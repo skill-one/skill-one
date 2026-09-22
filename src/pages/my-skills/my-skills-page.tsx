@@ -14,7 +14,11 @@ import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import type { InstalledSkill } from "../../lib/skills-manager";
-import { installedSkillView, type SkillView } from "../../lib/skill-view";
+import {
+  installedSkillView,
+  skillKey,
+  type SkillView,
+} from "../../lib/skill-view";
 import { TIME_BUCKETS, timeBucketOf } from "../../lib/time-buckets";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
@@ -287,13 +291,12 @@ export function MySkillsPage() {
   // thread.
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState<MyGroupBy>("repo");
-  // Open skill in the shared detail drawer, tracked by NAME rather than by
+  // Open skill in the shared detail drawer, tracked by identity rather than by
   // index: the provenance and store-entry queries land asynchronously and
-  // regroup the list under the reader's pointer, so an index captured at
-  // click time could point at a different skill a moment later. The drawer's
-  // index is derived from the name at render time, and a not-yet-resolved
-  // name keeps the drawer closed until the groups settle.
-  const [selectedName, setSelectedName] = useState<string | null>(null);
+  // regroup the list under the reader's pointer, so an index captured at click
+  // time could point at a different skill a moment later. The drawer resolves
+  // the key against its own list, and a key it cannot find keeps it closed.
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const query = useDebouncedValue(search).trim();
   // Progressive rendering: only the first `visibleCount` groups are mounted;
   // an IntersectionObserver on the sentinel below the list extends the count
@@ -303,12 +306,12 @@ export function MySkillsPage() {
 
   const handleSearch = (q: string) => {
     setSearch(q);
-    setSelectedName(null);
+    setSelectedKey(null);
     setVisibleCount(INITIAL_GROUPS);
   };
   const handleGroupBy = (mode: MyGroupBy) => {
     setGroupBy(mode);
-    setSelectedName(null);
+    setSelectedKey(null);
     setVisibleCount(INITIAL_GROUPS);
   };
 
@@ -322,7 +325,7 @@ export function MySkillsPage() {
     const target = searchParams.get("skill");
     if (!target) return;
     setSearch(target);
-    setSelectedName(null);
+    setSelectedKey(null);
     setVisibleCount(INITIAL_GROUPS);
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
@@ -411,26 +414,6 @@ export function MySkillsPage() {
     () => groups.flatMap((group) => group.items.map((row) => row.view)),
     [groups],
   );
-  const groupOffsets = useMemo(() => {
-    const offsets: number[] = [];
-    let next = 0;
-    for (const group of groups) {
-      offsets.push(next);
-      next += group.items.length;
-    }
-    return offsets;
-  }, [groups]);
-
-  // The drawer's index, derived from the selected name at render time so a
-  // regrouping can never leave it pointing at the wrong skill. -1 (the named
-  // skill is not in the current answer — removed, or filtered by its own
-  // search) reads as closed.
-  const selectedIndex = useMemo(() => {
-    if (!selectedName) return null;
-    const index = detailSkills.findIndex((view) => view.name === selectedName);
-    return index === -1 ? null : index;
-  }, [selectedName, detailSkills]);
-
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-5">
       {/* Toolbar, styled like the store's grouped list: search first, the
@@ -489,17 +472,16 @@ export function MySkillsPage() {
                   group={group.meta}
                   index={gi}
                   items={group.items}
-                  offset={groupOffsets[gi]}
-                  selected={selectedIndex}
-                  rowKey={(row) => row.view.name}
-                  renderItem={(row, _flatIndex, isSelected) => (
+                  selected={selectedKey}
+                  rowKey={(row) => skillKey(row.view)}
+                  renderItem={(row, isSelected) => (
                     <InstalledSkillRow
                       view={row.view}
                       enabled={row.enabled}
                       selected={isSelected}
                       matched={matchedById[row.view.name]}
                       suggestion={row.suggestion}
-                      onOpen={() => setSelectedName(row.view.name)}
+                      onOpen={() => setSelectedKey(skillKey(row.view))}
                     />
                   )}
                 />
@@ -517,17 +499,13 @@ export function MySkillsPage() {
           owns it: the installed surface replaces the store's install CTA with
           the enable switch and shows no registry-only figures. ←/→ walks the
           whole grouped list. Uninstalling from it closes it: this list
-          shrinks with the skill, so the same index would land on a different
-          one — a swap the reader never asked for. */}
+          shrinks with the skill. (Selection by identity is what makes that
+          swap impossible in the first place — see `SkillDetailDrawer`.) */}
       <SkillDetailDrawer
         skills={detailSkills}
-        selected={selectedIndex}
-        onSelect={(index) =>
-          setSelectedName(
-            index == null ? null : detailSkills[index]?.name ?? null,
-          )
-        }
-        onRemoved={() => setSelectedName(null)}
+        selected={selectedKey}
+        onSelect={setSelectedKey}
+        onRemoved={() => setSelectedKey(null)}
         surface="installed"
       />
     </div>

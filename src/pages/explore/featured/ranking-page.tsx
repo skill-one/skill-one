@@ -15,6 +15,7 @@ import type { Skill } from "../../../types/skill";
 import { Placeholder } from "../../../components/placeholder";
 import { SkillDetailDrawer } from "../../../components/skill-detail/skill-detail-drawer";
 import { SkillListRow } from "../skill-list-row";
+import { skillKey } from "../../../lib/skill-view";
 
 /** Where the back button points; the tabs live under the same route. */
 const FEATURED_PATH = "/explore/featured";
@@ -46,7 +47,7 @@ export function RankingPage() {
   const { data, isPending, isError, error, refetch } = useRanking(rankingId);
 
   const entries = data?.entries ?? [];
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const skills: Skill[] = entries.map((entry) => entry.skill);
 
   // Switching leaderboards replaces the whole list, so any open drawer would
@@ -153,12 +154,12 @@ export function RankingPage() {
         ) : (
           <>
             <ol className={SKILL_LIST_CLASS}>
-              {entries.map((entry, i) => (
+              {entries.map((entry) => (
                 <SkillListRow
-                  key={`${entry.skill.repo}/${entry.skill.name}`}
+                  key={skillKey(entry.skill)}
                   skill={entry.skill}
-                  selected={i === selected}
-                  onSelect={() => setSelected(i)}
+                  selected={skillKey(entry.skill) === selected}
+                  onSelect={() => setSelected(skillKey(entry.skill))}
                 />
               ))}
             </ol>

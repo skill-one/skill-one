@@ -554,8 +554,7 @@ export function createRegistryController(
         title: domainLabel(domain),
         skills: skills
           .toSorted((a, b) => b.downloads - a.downloads)
-          .slice(0, FEATURED_DOMAIN_SECTION_SIZE)
-          .map((skill) => ({ skill, index: 0 })),
+          .slice(0, FEATURED_DOMAIN_SECTION_SIZE),
       }));
   };
 
@@ -570,29 +569,14 @@ export function createRegistryController(
         )
         .filter((skill): skill is Skill => skill != null),
     }))
-      .filter((category) => category.skills.length > 0)
-      .map((category) => ({
-        ...category,
-        skills: category.skills.map((skill) => ({ skill, index: 0 })),
-      }));
+      .filter((category) => category.skills.length > 0);
   };
 
   /** Featured payload: hero slides plus domain (or curated) sections. */
-  const getFeatured = () => {
-    const slides = buildHeroSlides(store, trendingIds);
-    const resolved = domainSections() ?? curatedSections();
-    // Number the resolved skills across sections so the detail panel can
-    // walk the whole list with prev/next.
-    let next = 0;
-    const sections = resolved.map((category) => ({
-      ...category,
-      skills: category.skills.map(({ skill }) => ({
-        skill,
-        index: next++,
-      })),
-    }));
-    return { slides, sections };
-  };
+  const getFeatured = () => ({
+    slides: buildHeroSlides(store, trendingIds),
+    sections: domainSections() ?? curatedSections(),
+  });
 
   /**
    * One leaderboard, ranked here and truncated to `RANKING_SIZE` so the main

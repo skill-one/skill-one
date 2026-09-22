@@ -4,6 +4,7 @@ import { Skeleton } from "../../../components/ui/skeleton";
 import { SkeletonList } from "../../../components/skeleton-list";
 import { domainMeta } from "../../../data/domains";
 import { useFeaturedData } from "../../../hooks/use-featured-data";
+import { skillKey } from "../../../lib/skill-view";
 import { Button } from "../../../components/ui/button";
 import { Placeholder } from "../../../components/placeholder";
 import { SkillListRow } from "../skill-list-row";
@@ -57,17 +58,16 @@ export function FeaturedPage() {
   const slides = data?.slides ?? [];
   const sections = data?.sections ?? [];
 
-  // Depends on the query result, not the derived array: `sections` is a fresh
+  // The skill shown in the detail panel, by identity; null keeps the panel
+  // closed (its open/close and prev/next bounds live in `SkillDetailDrawer`).
+  const [selected, setSelected] = useState<string | null>(null);
+  // The whole featured answer as one flat walk, in section order. Built from
+  // the query result rather than the derived array: `sections` is a fresh
   // identity on every re-render, which would recompute this every time.
-  const flat = useMemo(
+  const flatSkills = useMemo(
     () => (data?.sections ?? []).flatMap((section) => section.skills),
     [data],
   );
-
-  // Index into `flat` of the skill shown in the detail panel; null keeps the
-  // panel closed (open/close, prev/next bounds live in `SkillDetailSheet`).
-  const [selected, setSelected] = useState<number | null>(null);
-  const flatSkills = useMemo(() => flat.map((s) => s.skill), [flat]);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 py-5">
@@ -109,12 +109,12 @@ export function FeaturedPage() {
                 {/* The detail drawer overlays the list; the layout never
                       changes when it opens or closes. */}
                 <ul className={SKILL_LIST_CLASS}>
-                  {section.skills.map(({ skill, index: i }) => (
+                  {section.skills.map((skill) => (
                     <SkillListRow
-                      key={`${skill.repo}/${skill.name}`}
+                      key={skillKey(skill)}
                       skill={skill}
-                      selected={i === selected}
-                      onSelect={() => setSelected(i)}
+                      selected={skillKey(skill) === selected}
+                      onSelect={() => setSelected(skillKey(skill))}
                     />
                   ))}
                 </ul>

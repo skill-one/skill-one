@@ -838,7 +838,7 @@ describe("createRegistryController — getGroups", () => {
 });
 
 describe("createRegistryController — featured + lookup", () => {
-  it("computes hero slides and resolves curated sections with global indexes", async () => {
+  it("computes hero slides and resolves the curated sections", async () => {
     const t = setup({
       skills: [
         { ...skill(0), name: "alpha", repo: "acme/alpha", downloads: 500 },
@@ -853,7 +853,7 @@ describe("createRegistryController — featured + lookup", () => {
     t.controller.handle({ type: "getFeatured", id: 1 });
     const data = resultData<{
       slides: Array<{ id: string; entries: Array<{ skill: Skill }> }>;
-      sections: Array<{ skills: Array<{ index: number }> }>;
+      sections: Array<{ id: string; skills: Skill[] }>;
     }>(t.recorded.results[0]);
     // The trending board exists and follows the upstream id order.
     const trending = data.slides.find((s) => s.id === "trending");
@@ -861,10 +861,17 @@ describe("createRegistryController — featured + lookup", () => {
       "beta",
       "alpha",
     ]);
-    // Curated sections number their rows globally for the detail panel.
-    const indexes = data.sections.flatMap((s) => s.skills.map((x) => x.index));
-    expect(indexes).toEqual(indexes.toSorted((a, b) => a - b));
-    expect(indexes[0]).toBe(0);
+    // Curated references resolve against the registry by identity, in
+    // curation order, and unresolved ones are dropped — the sections carry the
+    // skills themselves because the detail drawer walks them by identity.
+    expect(
+      data.sections.map((section) =>
+        section.skills.map((entry) => `${entry.repo}/${entry.name}`),
+      ),
+    ).toEqual([
+      ["acme/alpha/alpha", "acme/beta/beta"],
+      ["acme/alpha/alpha"],
+    ]);
   });
 
   it("omits the trending slide when no trending list was served", async () => {
@@ -1275,7 +1282,7 @@ describe("createRegistryController — classification", () => {
 
     t.controller.handle({ type: "getFeatured", id: 1 });
     const featured = resultData<{
-      sections: Array<{ id: string; skills: Array<{ skill: Skill }> }>;
+      sections: Array<{ id: string; skills: Skill[] }>;
     }>(t.recorded.results[0]);
 
     // Sections are the real domains, most-populated first, skills within a
@@ -1284,11 +1291,11 @@ describe("createRegistryController — classification", () => {
       "development",
       "content-creation",
     ]);
-    expect(featured.sections[0].skills.map((s) => s.skill.name)).toEqual([
+    expect(featured.sections[0].skills.map((s) => s.name)).toEqual([
       "skill-0",
       "skill-1",
     ]);
-    expect(featured.sections[1].skills.map((s) => s.skill.name)).toEqual([
+    expect(featured.sections[1].skills.map((s) => s.name)).toEqual([
       "skill-2",
     ]);
   });
@@ -1306,7 +1313,7 @@ describe("createRegistryController — classification", () => {
 
     t.controller.handle({ type: "getFeatured", id: 1 });
     const featured = resultData<{
-      sections: Array<{ id: string; skills: Array<{ skill: Skill }> }>;
+      sections: Array<{ id: string; skills: Skill[] }>;
     }>(t.recorded.results[0]);
 
     // "other" classifies nothing on its own, so it never leads a section.
@@ -1328,14 +1335,14 @@ describe("createRegistryController — classification", () => {
 
     t.controller.handle({ type: "getFeatured", id: 1 });
     const featured = resultData<{
-      sections: Array<{ id: string; skills: Array<{ skill: Skill }> }>;
+      sections: Array<{ id: string; skills: Skill[] }>;
     }>(t.recorded.results[0]);
 
     expect(featured.sections.map((s) => s.id)).toEqual([
       "curated",
       "curated-2",
     ]);
-    expect(featured.sections[0].skills.map((s) => s.skill.name)).toEqual([
+    expect(featured.sections[0].skills.map((s) => s.name)).toEqual([
       "alpha",
       "beta",
     ]);

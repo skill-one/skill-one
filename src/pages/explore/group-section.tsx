@@ -155,16 +155,15 @@ function keepHeaderUnderPointer(header: HTMLElement) {
  * current layout — measured from the mounted grid — and a longer group ends
  * with an expander ("展开其余 N 个") that reveals the rest in place.
  *
- * `offset` is the group's first item's index in the page-wide flat list the
- * detail panel walks; `selected` speaks in those flat indexes, and
- * `renderItem` receives each item's flat index so its row can report clicks
- * back in the same coordinates.
+ * `selected` is the identity (`skillKey`) of the item the detail drawer shows,
+ * in the same coordinates `rowKey` gives the group's rows — so `renderItem`
+ * only has to say whether its own row is the selected one, and a regrouping
+ * mid-open keeps the highlight on the same skill.
  */
 export function GroupSection<T>({
   group,
   index,
   items,
-  offset,
   selected,
   renderItem,
   rowKey,
@@ -175,13 +174,11 @@ export function GroupSection<T>({
   index: number;
   /** Every item of the group, in the order the mode's ordering produced. */
   items: T[];
-  /** Flat index of the group's first item (the detail panel's coordinate). */
-  offset: number;
-  /** Flat index of the item shown in the detail panel; null keeps it closed. */
-  selected: number | null;
-  /** Renders one row; `selected` dims/lights the row per the panel state. */
-  renderItem: (item: T, flatIndex: number, selected: boolean) => ReactNode;
-  /** Stable React key for one item. */
+  /** Identity of the item in the detail panel; null keeps the panel closed. */
+  selected: string | null;
+  /** Renders one row; `selected` lights the row per the panel state. */
+  renderItem: (item: T, selected: boolean) => ReactNode;
+  /** Stable key for one item: React's, and the selection's coordinate. */
   rowKey: (item: T) => string;
 }) {
   // Items beyond the preview stay mounted-but-hidden only in the sense of
@@ -324,9 +321,9 @@ export function GroupSection<T>({
           >
             {/* renderItem hands back the row's own <li> (the shared card
                 renders as one), so the key rides on a fragment. */}
-            {visibleItems.map((item, i) => (
+            {visibleItems.map((item) => (
               <Fragment key={rowKey(item)}>
-                {renderItem(item, offset + i, selected === offset + i)}
+                {renderItem(item, selected != null && rowKey(item) === selected)}
               </Fragment>
             ))}
           </ul>

@@ -36,6 +36,17 @@ export const LOCAL_SOURCE_LABEL = "本地安装";
  * So an absent `storeBacked` means "backed" (every plain `Skill` from the
  * registry), and only those two callers set it.
  */
+/**
+ * The identity a skill carries across every surface: store rows, the installed
+ * list and the detail drawer's prev/next walk all address a skill by its repo
+ * plus slug, which is unique on both sides of the index. Selecting by this
+ * rather than by a position in a list is what lets a drawer stay on the skill
+ * the reader opened while the list behind it regroups, streams in or shrinks.
+ */
+export function skillKey(skill: { repo: string; name: string }): string {
+  return `${skill.repo}/${skill.name}`;
+}
+
 export interface SkillView extends Skill {
   /**
    * False for a skill no store entry backs: an installed record the registry
