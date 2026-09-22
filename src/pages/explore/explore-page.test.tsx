@@ -240,10 +240,10 @@ describe("ExplorePage", () => {
 
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
     // One repository, one card: the group header the list used to lead with is
-    // gone, because the card *is* the group. Its head is the door to the
-    // repository's own page.
+    // gone, because the card *is* the group. Its bottom bar is what signs the
+    // card and what opens the repository's own page.
     expect(
-      screen.getByRole("link", { name: `打开仓库 ${BATCH_REPO}，50 个 skill` }),
+      screen.getByRole("link", { name: `查看仓库 ${BATCH_REPO}，50 个 skill` }),
     ).toBeInTheDocument();
     // The page answered one RPC; browsing never re-downloads the registry.
     expect(harness.downloads).toBe(1);
@@ -257,15 +257,12 @@ describe("ExplorePage", () => {
     renderExplorePage();
 
     // The cap is what keeps one big repository from pushing every other card
-    // off the screen; where the list stops, the tail says how much is left and
-    // offers the page that shows all of it.
+    // off the screen; the bar carries the repository's *total*, so a capped list
+    // reads as "these of them" and its door leads to all of them.
     expect(await screen.findByText("skill-3")).toBeInTheDocument();
     expect(screen.queryByText("skill-4")).not.toBeInTheDocument();
-    expect(screen.getByText("还有 4 个 skill")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", {
-        name: `查看仓库 ${BATCH_REPO} 的全部 8 个 skill`,
-      }),
+      screen.getByRole("link", { name: `查看仓库 ${BATCH_REPO}，8 个 skill` }),
       // The app is a hash router, so the rendered href carries the hash.
     ).toHaveAttribute("href", `#/repo/${BATCH_REPO}`);
     expect(
@@ -295,7 +292,7 @@ describe("ExplorePage", () => {
     // link's exact aria-label shape — one per rendered repository card.
     const renderedCards = () =>
       screen
-        .getAllByRole("link", { name: /^打开仓库 repo-\d+\/skills，/ }).length;
+        .getAllByRole("link", { name: /^查看仓库 repo-\d+\/skills，/ }).length;
     expect(renderedCards()).toBe(6);
     expect(screen.getByText("skill-5")).toBeInTheDocument();
     expect(screen.queryByText("skill-6")).not.toBeInTheDocument();
@@ -353,26 +350,25 @@ describe("ExplorePage", () => {
 
     // The most-starred repository leads the list.
     expect(await screen.findByText("widget-core")).toBeInTheDocument();
-    const head = screen.getByRole("link", {
-      name: "打开仓库 acme/widgets，2 个 skill",
+    const bar = screen.getByRole("link", {
+      name: "查看仓库 acme/widgets，2 个 skill",
     });
-    // The figures a group header used to carry now ride the card's head, at
-    // its far edge: the stars compactly — exactly as a skill card's rail
-    // prints them — then the skill count.
-    expect(within(head).getByText("acme/widgets")).toBeInTheDocument();
+    // The figures a group header used to carry now ride the card's bottom bar:
+    // the repository's name, the stars compactly — exactly as a skill card's
+    // rail prints them — and the skill count, which is the repository's total.
+    expect(within(bar).getByText("acme/widgets")).toBeInTheDocument();
     expect(
-      within(head).getByText(new RegExp(formatCount(12_300))),
+      within(bar).getByText(new RegExp(formatCount(12_300))),
     ).toBeInTheDocument();
-    expect(within(head).getByText("2 个")).toBeInTheDocument();
-    // Both of the repository's rows are inside the card, and it holds few
-    // enough skills that nothing is left over.
+    expect(within(bar).getByText("2 个")).toBeInTheDocument();
+    expect(within(bar).getByText("全部")).toBeInTheDocument();
+    // Both of the repository's rows are inside the card.
     expect(
       screen.getByRole("button", { name: "查看 widget-core 详情" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "查看 widget-cli 详情" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/^还有 /)).not.toBeInTheDocument();
   });
 
   it("orders repositories by stars and a repository's skills by popularity", async () => {
@@ -473,7 +469,7 @@ describe("ExplorePage", () => {
     // rendered repository card.
     const renderedGadgetCards = () =>
       screen.getAllByRole("link", {
-        name: /^打开仓库 acme\/gadget-\d+，/,
+        name: /^查看仓库 acme\/gadget-\d+，/,
       });
 
     // The reader has scrolled: the browsed list is fully mounted.
@@ -750,7 +746,7 @@ describe("ExplorePage", () => {
     // The search swap is done once every filler repository is gone.
     await waitFor(() =>
       expect(
-        screen.queryByRole("link", { name: /^打开仓库 acme\/tool-/ }),
+        screen.queryByRole("link", { name: /^查看仓库 acme\/tool-/ }),
       ).not.toBeInTheDocument(),
     );
 
@@ -1018,7 +1014,7 @@ describe("ExplorePage streaming", () => {
     expect(screen.getByText("skill-3")).toBeInTheDocument();
     expect(
       screen.getByRole("link", {
-        name: `打开仓库 ${BATCH_REPO}，${STREAM_BATCH + 5} 个 skill`,
+        name: `查看仓库 ${BATCH_REPO}，${STREAM_BATCH + 5} 个 skill`,
       }),
     ).toBeInTheDocument();
 
@@ -1028,7 +1024,7 @@ describe("ExplorePage streaming", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("link", {
-          name: `打开仓库 ${BATCH_REPO}，${STREAM_BATCH + 20} 个 skill`,
+          name: `查看仓库 ${BATCH_REPO}，${STREAM_BATCH + 20} 个 skill`,
         }),
       ).toBeInTheDocument(),
     );

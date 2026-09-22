@@ -77,17 +77,24 @@ describe("RepoCard", () => {
     vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
   });
 
-  it("leads with the repository, its figures and a link to its page", () => {
-    renderCard();
+  it("leads with the skills and signs off with the repository's own bar", () => {
+    const { container } = renderCard();
 
-    const head = screen.getByRole("link", {
-      name: `打开仓库 ${REPO}，6 个 skill`,
+    // The skills are the card's content: no header stands between the reader
+    // and the things they are comparing.
+    expect(container.querySelector('[data-slot="card-header"]')).toBeNull();
+    expect(container.querySelector('[data-slot="card-content"]')).not.toBeNull();
+
+    // The one bar carries what the repository is, how big it is, and the way
+    // into its page.
+    const bar = screen.getByRole("link", {
+      name: `查看仓库 ${REPO}，6 个 skill`,
     });
-    expect(head).toHaveAttribute("href", `/repo/${REPO}`);
-    expect(head).toHaveTextContent(REPO);
-    // The two figures a repository group's header used to carry, compactly.
-    expect(head).toHaveTextContent(formatCount(STARS));
-    expect(head).toHaveTextContent("6 个");
+    expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
+    expect(within(bar).getByText(REPO)).toBeInTheDocument();
+    expect(within(bar).getByText(formatCount(STARS))).toBeInTheDocument();
+    expect(within(bar).getByText("6 个")).toBeInTheDocument();
+    expect(within(bar).getByText("全部")).toBeInTheDocument();
   });
 
   it("lists the repository's skills in order, under a glyph and a description", () => {
@@ -95,36 +102,36 @@ describe("RepoCard", () => {
 
     expect(rowNames()).toEqual(["pdf", "docx", "pptx", "xlsx"]);
     const pdf = screen.getByRole("button", { name: "查看 pdf 详情" });
-    // The classification rides the row as its glyph, and the description
-    // follows the name on the same line.
+    // The classification rides the row as its glyph, the name is the row's own
+    // strong element, and the description follows it on the same line.
     expect(within(pdf).getByText("🗂️")).toBeInTheDocument();
     expect(pdf).toHaveTextContent("pdf does something useful.");
   });
 
-  it("caps the list and hands the rest to the repository's page", () => {
+  it("caps the list at four rows and states the repository's total", () => {
     renderCard();
 
     // Past the cap a skill is not rendered as a row...
     expect(screen.queryByText("slides")).not.toBeInTheDocument();
     expect(screen.queryByText("canvas")).not.toBeInTheDocument();
-    // ...the tail accounts for it, and the tail's own link is the same door as
-    // the head's.
-    expect(screen.getByText("还有 2 个 skill")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", {
-        name: `查看仓库 ${REPO} 的全部 6 个 skill`,
-      }),
-    ).toHaveAttribute("href", `/repo/${REPO}`);
+    // ...and the bar's figure is the repository's total, not the four on
+    // screen: that is what makes a capped list read as "these of them", with
+    // 全部 beside it as the way to the rest.
+    const bar = screen.getByRole("link", {
+      name: `查看仓库 ${REPO}，6 个 skill`,
+    });
+    expect(within(bar).getByText("6 个")).toBeInTheDocument();
+    expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
   });
 
-  it("renders a one-skill repository with the same body and no tail", () => {
+  it("renders a one-skill repository with the same body and the same bar", () => {
     renderCard({ skills: [skills[0]] });
 
     expect(rowNames()).toEqual(["pdf"]);
-    expect(screen.queryByText(/^还有 /)).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: `打开仓库 ${REPO}，1 个 skill` }),
-    ).toBeInTheDocument();
+    const bar = screen.getByRole("link", {
+      name: `查看仓库 ${REPO}，1 个 skill`,
+    });
+    expect(within(bar).getByText("1 个")).toBeInTheDocument();
   });
 
   it("lists every match while a search is live, uncapped", () => {
@@ -140,7 +147,6 @@ describe("RepoCard", () => {
       "slides",
       "canvas",
     ]);
-    expect(screen.queryByText(/^还有 /)).not.toBeInTheDocument();
   });
 
   it("opens one skill from its row and marks the row the panel shows", () => {
@@ -177,6 +183,26 @@ describe("RepoCard", () => {
       rev: undefined,
     });
     expect(onOpenSkill).not.toHaveBeenCalled();
+  });
+
+  it("keeps the install button out of the way until the row is pointed at", () => {
+    renderCard();
+
+    // Four always-on buttons would be the loudest thing on the card, so the
+    // action waits for the row to be hovered or focused — but it stays in the
+    // layout rather than being `hidden`, so the row keeps its height and
+    // nothing shifts under the pointer.
+    const install = screen.getAllByRole("button", { name: "安装" })[0];
+    // The reveal rides the button's wrapper: the button owns `opacity` for its
+    // own states (an installed one is `disabled:opacity-50`, which is more
+    // specific than a bare `opacity-0` and would otherwise win).
+    const reveal = install.parentElement as HTMLElement;
+    expect(reveal).toHaveClass("opacity-0");
+    expect(reveal).toHaveClass("group-hover/row:opacity-100");
+    // Focus, either on the row or on the button inside it, reveals it too — so
+    // a keyboard walk still sees the action of the row it stands on.
+    expect(reveal).toHaveClass("group-focus-within/row:opacity-100");
+    expect(install).not.toHaveClass("hidden");
   });
 
   it("leaves the app for the repository's own page on GitHub", async () => {

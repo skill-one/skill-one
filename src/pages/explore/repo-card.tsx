@@ -10,17 +10,19 @@ import { HighlightedText } from "../../components/highlighted-text";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "../../components/ui/card";
+import { Card, CardContent, CardFooter } from "../../components/ui/card";
 
 /**
- * How many of a repository's skills the card lists before the tail takes over.
+ * How many of a repository's skills the card lists before the footer's door is
+ * the only way to the rest.
  *
  * The card's height is what this number bounds: a repository with one skill and
  * a repository with fifty have to read as the same kind of object, so the list
- * grows with the repository only up to a point and then stops — past the cap the
- * tail states how much is left and hands the reader to the repository page.
- * Four measures 92px for a one-skill repository and 215px at the cap, so the
- * two extremes stay within a 2.4:1 band — which is what a lane of cards remains
+ * grows with the repository only up to a point and then stops — the footer
+ * always states how many skills the repository has in total, so a capped list
+ * reads as "these of them" rather than as "all of them".
+ * Four measures 103px for a one-skill repository and 187px at the cap, so the
+ * two extremes stay within a 1.8:1 band — which is what a lane of cards remains
  * scannable at.
  */
 const PREVIEWED_SKILLS = 4;
@@ -28,23 +30,38 @@ const PREVIEWED_SKILLS = 4;
 /**
  * One repository, as one card — the store's repository view.
  *
- * The card is a repository with its skills inside it, and it is read as one:
- * the head says *which repository* (owner avatar, `owner/repo`, the stars and
- * how many skills it holds), the body lists its skills — most-installed first,
- * the repository's own leaders — and the tail, when there are more than the cap,
- * says how many are left.
+ * The card is a repository with its skills inside it, and it is read skills
+ * first: the body lists them (most-installed first, the repository's own
+ * leaders), and the single bar along the bottom signs the card — owner avatar,
+ * `owner/repo`, the stars and the total skill count — while being the door to
+ * the repository's page. Keeping the identity at the *bottom* is what makes the
+ * skills the card's content instead of an attachment to a header: a card whose
+ * first line is a repository name reads as a repository with a list under it,
+ * and the reader who is comparing skills has to look past the name of every
+ * card to reach the thing they are choosing between. It also merges what used
+ * to be two bars — the header, and the tail whose only job was to lead to the
+ * page — into the one line that has to exist anyway.
  *
- * Three destinations, at the three granularities a reader chooses at:
+ * Two destinations, at the two granularities a reader chooses at:
  *
- * - the head (and the tail's 全部) opens the **repository page**, which lists
- *   every skill the repository publishes, uncapped;
  * - a **row** opens that skill's detail panel — the reader was pointing at one
  *   skill, and that is where its SKILL.md, its classification and its install
  *   state live;
- * - the row's own **install button** installs without either: the one action
- *   worth a click inside a list. It is a sibling of the row button rather than a
- *   child, so the two never nest and the button stops its own clicks from
- *   reaching the row.
+ * - the **bottom bar** opens the repository's page, which lists every skill the
+ *   repository publishes, uncapped. A card with skills left over says so by
+ *   carrying the repository's full count next to the door.
+ *
+ * The row's **install button** is the third: it installs without either. It is
+ * a sibling of the row button rather than a child, so the two never nest and
+ * the button stops its own clicks from reaching the row; and it is *revealed* on
+ * hover (or when the row is focused) rather than always drawn. Four always-on
+ * buttons per card would be the loudest thing in the grid — the repository view
+ * exists to compare skills, and the action is one hover away from the skill it
+ * applies to. This is where the card deliberately parts with the standalone
+ * skill card, whose idle install button stays visible: there, one card carries
+ * one skill, so the button is that card's own action rather than a repeated
+ * glyph. A pointer that never hovers (a touch surface) still reaches the same
+ * install through the detail panel, which the row opens.
  *
  * The body is the same for every repository, including the ones with a single
  * skill: one row per skill, never a promoted or specially-shaped first entry, so
@@ -88,9 +105,7 @@ export function RepoCard({
   // group always has one (a bare-host source is its own owner).
   const [owner] = repo.split("/");
   const shown = hasQuery ? skills : skills.slice(0, PREVIEWED_SKILLS);
-  const hidden = skills.length - shown.length;
   const href = `/repo/${repo}`;
-  const count = `${skills.length} 个 skill`;
 
   return (
     <li className="flex flex-col">
@@ -98,54 +113,6 @@ export function RepoCard({
           fallback the lane's items are stretched to the tallest card in the
           row, and the card is what fills that height. */}
       <Card size="sm" data-repo={repo} className="group flex-1">
-        <CardHeader>
-          {/* The head is the repository page's door: the owner's avatar, the
-              repository's name and its figures, one link. The count is spelled
-              into the link's own name so assistive tech hears what the row of
-              figures says without them being read as part of a repository
-              name. */}
-          <div className="flex min-w-0 items-center gap-1">
-            <Link
-              to={href}
-              aria-label={`打开仓库 ${repo}，${count}`}
-              className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <OwnerAvatar owner={owner} className="size-5 shrink-0 text-[10px]" />
-              <span className="truncate text-sm font-medium group-hover/head:underline">
-                {repo}
-              </span>
-              {/* The figures the ordering used, pinned to the head's far edge:
-                  the stars, then the skill count — the same pair a repository
-                  group's header used to carry. */}
-              <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums">
-                {stars !== undefined && (
-                  <span className="flex items-center gap-1">
-                    <Star
-                      className="h-3 w-3 fill-amber-400 text-amber-400"
-                      aria-hidden
-                    />
-                    {formatCount(stars)}
-                    <span aria-hidden="true">·</span>
-                  </span>
-                )}
-                <span>{skills.length} 个</span>
-              </span>
-            </Link>
-            {/* Leaving the app for the source is a repository-level action too,
-                but a different destination than the page, so it is its own
-                control rather than part of the link. */}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`在 GitHub 打开 ${repo}`}
-              onClick={() => void openExternal(`https://github.com/${repo}`)}
-              className="shrink-0 text-muted-foreground"
-            >
-              <ExternalLink />
-            </Button>
-          </div>
-        </CardHeader>
-
         <CardContent>
           {/* A row is the unit of the body, and it is deliberately not a card:
               the repository is the card, and a skill inside it is one line of
@@ -160,7 +127,7 @@ export function RepoCard({
               return (
                 <li
                   key={key}
-                  className="group/row flex items-center gap-1 rounded-md px-1.5 transition-colors hover:bg-accent/50 focus-within:bg-accent/50"
+                  className="group/row flex items-center gap-1 rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent"
                 >
                   {/* The row's clickable area is the skill itself; the install
                       button beside it is a sibling, so a row is never a button
@@ -171,7 +138,7 @@ export function RepoCard({
                     aria-label={`查看 ${skill.name} 详情`}
                     aria-current={isSelected ? "true" : undefined}
                     className={cn(
-                      "flex min-w-0 flex-1 items-center gap-2 py-0.5 text-left focus-visible:outline-none",
+                      "flex min-w-0 flex-1 items-center gap-2 py-1 text-left focus-visible:outline-none",
                       isSelected && "text-primary",
                     )}
                   >
@@ -179,44 +146,87 @@ export function RepoCard({
                         of classified and unclassified skills still line up. */}
                     <span
                       aria-hidden="true"
-                      className="w-4 shrink-0 text-center text-[12px]"
+                      className="w-4 shrink-0 text-center text-[13px]"
                     >
                       {emoji}
                     </span>
-                    {/* The name is the identifier — it may not be truncated
-                        into nothing by a long description, so it shrinks only up
-                        to half the row; the description takes what is left. */}
-                    <span className="max-w-[55%] shrink-0 truncate text-[13px] font-medium">
+                    {/* The name is the identifier and the row's one strong
+                        element — semibold where the description is plain — and
+                        it shrinks only up to half the row, so a long
+                        description can never truncate it away. */}
+                    <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
                       <HighlightedText text={skill.name} terms={matched?.name} />
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
                       {skill.description}
                     </span>
                   </button>
-                  <SkillInstallButton skill={skill} className="h-7 w-7" />
+                  {/* Revealed on hover and on focus, never removed from the
+                      layout: the row keeps its height and nothing shifts under
+                      the pointer. The reveal sits on this wrapper rather than on
+                      the button because the button already owns `opacity` for
+                      its own states — `disabled:opacity-50` on an installed or
+                      installing button is more specific than a bare `opacity-0`
+                      and would win, drawing the button the reader did not ask
+                      for. `:focus-within` covers the button itself being
+                      focused, so it needs no rule of its own. */}
+                  <span className="flex shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
+                    <SkillInstallButton skill={skill} className="h-7 w-7" />
+                  </span>
                 </li>
               );
             })}
           </ul>
         </CardContent>
 
-        {/* The cap's ledger, under a hairline like every card's rail, and
-            `mt-auto` like one: a card whose list is shorter than its
-            neighbour's still ends its rows at the same line on the card's
-            bottom edge. */}
-        {hidden > 0 && (
-          <CardFooter className="mt-auto border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
-            <span>还有 {hidden} 个 skill</span>
-            <Link
-              to={href}
-              aria-label={`查看仓库 ${repo} 的全部 ${skills.length} 个 skill`}
-              className="ml-auto flex items-center gap-0.5 font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
+        {/* The card's one bar: what this repository is, how big it is, and the
+            way in. `mt-auto` keeps it on the bottom edge when the plain-grid
+            fallback stretches a short card to its neighbour's height. */}
+        <CardFooter className="mt-auto min-w-0 gap-1 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
+          <Link
+            to={href}
+            aria-label={`查看仓库 ${repo}，${skills.length} 个 skill`}
+            className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <OwnerAvatar owner={owner} className="size-5 shrink-0 text-[10px]" />
+            <span className="truncate text-[12px] font-medium text-foreground group-hover/head:underline">
+              {repo}
+            </span>
+            {/* The repository's size and the figure it is ranked by, in the
+                voice the rest of the app uses for them. The count is the
+                repository's *total*: that is what tells a capped list apart
+                from a complete one. */}
+            <span className="ml-auto flex shrink-0 items-center gap-1.5 tabular-nums">
+              {stars !== undefined && (
+                <span className="flex items-center gap-1">
+                  <Star
+                    className="h-3 w-3 fill-amber-400 text-amber-400"
+                    aria-hidden
+                  />
+                  {formatCount(stars)}
+                  <span aria-hidden="true">·</span>
+                </span>
+              )}
+              <span>{skills.length} 个</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-0.5 font-medium text-foreground">
               全部
               <ChevronRight className="h-3 w-3" aria-hidden />
-            </Link>
-          </CardFooter>
-        )}
+            </span>
+          </Link>
+          {/* Leaving the app for the source is a repository-level action too,
+              but a different destination than the page, so it is its own
+              control rather than part of the link. */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`在 GitHub 打开 ${repo}`}
+            onClick={() => void openExternal(`https://github.com/${repo}`)}
+            className="shrink-0 text-muted-foreground"
+          >
+            <ExternalLink />
+          </Button>
+        </CardFooter>
       </Card>
     </li>
   );

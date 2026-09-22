@@ -55,7 +55,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 | --- | --- |
 | `src/App.tsx` | 路由、布局、TanStack Query Provider 与缓存持久化 |
 | `src/components/app-sidebar.tsx` | 侧边栏导航（路由与标题共用同一份配置），以及导航角标：「全部」显示已流式下载的 skill 数，「仓库」在索引就绪后显示聚合的仓库总数 |
-| `src/pages/explore/repo-card.tsx` / `repo-page.tsx` | 商店的仓库视图：一个仓库一张卡——卡内按安装量列出有上限的 skill，其余交给卡片尾部——以及该仓库自己的页面，列出它发布的全部 skill |
+| `src/pages/explore/repo-card.tsx` / `repo-page.tsx` | 商店的仓库视图：一个仓库一张卡——主体是按安装量排序、有上限的 skill 列表，底部一行同时署名该仓库并通往它的页面——以及该仓库自己的页面，不限量地列出它发布的全部 skill |
 | `src/pages/explore/featured/` | 精选页：计算生成的榜单 hero 轮播 + 本地策划的分类区块 |
 | `src/data/featured-content.ts` | 精选页的分类 → skill 策划引用（注册表索引不含分类字段） |
 | `src/lib/tauri.ts` | 判断是否运行在 Tauri WebView 中 |
