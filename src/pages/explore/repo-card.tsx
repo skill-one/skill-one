@@ -1,15 +1,13 @@
 import { Link } from "react-router";
-import { ChevronRight, ExternalLink, Star } from "lucide-react";
+import { ChevronRight, Star } from "lucide-react";
 
 import { domainMeta } from "../../data/domains";
-import { openExternal } from "../../lib/open-external";
 import type { SearchHit } from "../../lib/registry/protocol";
 import { skillKey } from "../../lib/skill-view";
 import { cn, formatCount } from "../../lib/utils";
 import { HighlightedText } from "../../components/highlighted-text";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { SkillInstallButton } from "../../components/skill-install-button";
-import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardFooter } from "../../components/ui/card";
 
 /**
@@ -21,8 +19,8 @@ import { Card, CardContent, CardFooter } from "../../components/ui/card";
  * grows with the repository only up to a point and then stops — the footer
  * always states how many skills the repository has in total, so a capped list
  * reads as "these of them" rather than as "all of them".
- * Four measures 103px for a one-skill repository and 187px at the cap, so the
- * two extremes stay within a 1.8:1 band — which is what a lane of cards remains
+ * Four measures 95px for a one-skill repository and 179px at the cap, so the
+ * two extremes stay within a 1.9:1 band — which is what a lane of cards remains
  * scannable at.
  */
 const PREVIEWED_SKILLS = 4;
@@ -50,6 +48,15 @@ const PREVIEWED_SKILLS = 4;
  * - the **bottom bar** opens the repository's page, which lists every skill the
  *   repository publishes, uncapped. A card with skills left over says so by
  *   carrying the repository's full count next to the door.
+ *
+ * The bar is the card's only repository-level control, and it deliberately does
+ * not carry an "open on GitHub" button. That button is a second link for the
+ * same granularity of choice, pointing somewhere the bar's own page already
+ * offers with a label ("在 GitHub 打开") — and it is 28px tall, which is what the
+ * whole bar was as tall as: removing it is what makes the bar a line of text
+ * rather than a line of text beside a button. The source is still two clicks
+ * away (a row's panel links to it, and the repository page has the labeled
+ * button), while the list itself stays one target per card.
  *
  * The row's **install button** is the third: it installs without either. It is
  * a sibling of the row button rather than a child, so the two never nest and
@@ -182,7 +189,7 @@ export function RepoCard({
         {/* The card's one bar: what this repository is, how big it is, and the
             way in. `mt-auto` keeps it on the bottom edge when the plain-grid
             fallback stretches a short card to its neighbour's height. */}
-        <CardFooter className="mt-auto min-w-0 gap-1 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
+        <CardFooter className="mt-auto min-w-0 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
           <Link
             to={href}
             aria-label={`查看仓库 ${repo}，${skills.length} 个 skill`}
@@ -195,10 +202,14 @@ export function RepoCard({
             {/* The repository's size and the figure it is ranked by, in the
                 voice the rest of the app uses for them. The count is the
                 repository's *total*: that is what tells a capped list apart
-                from a complete one. */}
+                from a complete one. The raw figure stays reachable as the
+                title, since the printed one is compacted. */}
             <span className="ml-auto flex shrink-0 items-center gap-1.5 tabular-nums">
               {stars !== undefined && (
-                <span className="flex items-center gap-1">
+                <span
+                  className="flex items-center gap-1"
+                  title={`${stars} stars`}
+                >
                   <Star
                     className="h-3 w-3 fill-amber-400 text-amber-400"
                     aria-hidden
@@ -209,23 +220,18 @@ export function RepoCard({
               )}
               <span>{skills.length} 个</span>
             </span>
+            {/* The door itself. The chevron leans into the hover the way every
+                other "go deeper" affordance in the app does, and 全部 stays a
+                word rather than becoming a bare arrow: it is the half of the
+                bar's sentence that says what the click gets you. */}
             <span className="flex shrink-0 items-center gap-0.5 font-medium text-foreground">
               全部
-              <ChevronRight className="h-3 w-3" aria-hidden />
+              <ChevronRight
+                className="h-3 w-3 transition-transform group-hover/head:translate-x-0.5"
+                aria-hidden
+              />
             </span>
           </Link>
-          {/* Leaving the app for the source is a repository-level action too,
-              but a different destination than the page, so it is its own
-              control rather than part of the link. */}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`在 GitHub 打开 ${repo}`}
-            onClick={() => void openExternal(`https://github.com/${repo}`)}
-            className="shrink-0 text-muted-foreground"
-          >
-            <ExternalLink />
-          </Button>
         </CardFooter>
       </Card>
     </li>

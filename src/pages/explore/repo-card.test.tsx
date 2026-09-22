@@ -18,8 +18,6 @@ vi.mock("../../lib/local-skills", () => ({
   installSkillFromSource: vi.fn(),
 }));
 
-vi.mock("../../lib/open-external", () => ({ openExternal: vi.fn() }));
-
 const REPO = "anthropics/skills";
 const STARS = 169_600;
 
@@ -95,6 +93,12 @@ describe("RepoCard", () => {
     expect(within(bar).getByText(formatCount(STARS))).toBeInTheDocument();
     expect(within(bar).getByText("6 个")).toBeInTheDocument();
     expect(within(bar).getByText("全部")).toBeInTheDocument();
+    // The printed star figure is compacted; the raw one stays reachable.
+    expect(within(bar).getByTitle(`${STARS} stars`)).toBeInTheDocument();
+    // The bar is the card's one repository-level control. A second link for the
+    // same kind of choice — an "open on GitHub" button — used to sit beside it;
+    // the repository page carries that action with a label instead.
+    expect(screen.getAllByRole("link")).toHaveLength(1);
   });
 
   it("lists the repository's skills in order, under a glyph and a description", () => {
@@ -205,15 +209,12 @@ describe("RepoCard", () => {
     expect(install).not.toHaveClass("hidden");
   });
 
-  it("leaves the app for the repository's own page on GitHub", async () => {
-    const user = userEvent.setup();
-    const { openExternal } = await import("../../lib/open-external");
+  it("keeps the card's single door: the bar, and nothing beside it", () => {
     renderCard();
 
-    await user.click(
-      screen.getByRole("button", { name: `在 GitHub 打开 ${REPO}` }),
-    );
-
-    expect(openExternal).toHaveBeenCalledWith(`https://github.com/${REPO}`);
+    // Every route out of the card is a row (a skill) or the bar (the
+    // repository): no control of the same granularity competes with either.
+    expect(screen.queryByRole("button", { name: /GitHub/ })).toBeNull();
+    expect(screen.getAllByRole("link")).toHaveLength(1);
   });
 });
