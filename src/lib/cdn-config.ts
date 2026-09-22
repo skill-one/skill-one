@@ -16,6 +16,8 @@
  * Settings — to the same snapshot the index was built from.
  */
 
+import { storage } from "./storage";
+
 /** Default CDN mirror of GitHub repo files (jsDelivr mirror, CORS-enabled). */
 export const DEFAULT_CDN_BASE = "https://cdn.jsdmirror.com";
 
@@ -24,31 +26,18 @@ const SETTINGS_KEY = "skill-one.cdn";
 /** localStorage key for the served snapshot tag (`dist-<date>[-N]`). */
 const INDEX_TAG_KEY = "skill-one.indexTag";
 
-// Persist via `window.localStorage` where available, with an in-memory fallback
-// so reads still work in environments without a storage backend (e.g. Vitest's
-// node runner). The fallback never throws.
-const memory = new Map<string, string>();
-
+/**
+ * Both keys are read through the shared storage guard (see `lib/storage`),
+ * where an unset, unreadable or blocked key answers "" — the value that means
+ * "direct GitHub first" and "no snapshot tag yet", so no caller has to
+ * distinguish the two.
+ */
 function readStored(key: string): string {
-  try {
-    if (typeof window !== "undefined" && window.localStorage) {
-      return window.localStorage.getItem(key) ?? "";
-    }
-  } catch {
-    // Fall through to the in-memory copy.
-  }
-  return memory.get(key) ?? "";
+  return storage.getItem(key) ?? "";
 }
 
 function writeStored(key: string, value: string): void {
-  memory.set(key, value);
-  try {
-    if (typeof window !== "undefined" && window.localStorage) {
-      window.localStorage.setItem(key, value);
-    }
-  } catch {
-    // In-memory copy remains the source of truth for this session.
-  }
+  storage.setItem(key, value);
 }
 
 /** A file in a GitHub repo: `owner/repo` + path, optionally pinned to a ref. */

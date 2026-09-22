@@ -16,6 +16,7 @@
  */
 
 import { isTauri } from "./tauri";
+import { storage } from "./storage";
 import { readProvenanceRaw, writeProvenanceRaw } from "./skills-manager";
 
 /** One installed skill's store identity: the canonical `{owner}/{repo}/{slug}` id. */
@@ -151,7 +152,7 @@ export function pruneProvenance(
 
 // ---------------------------------------------------------------- persistence
 
-/** localStorage key holding the ledger in the browser (dev server / tests). */
+/** Storage key holding the ledger in the browser (dev server / tests). */
 const BROWSER_STORAGE_KEY = "skill-one.provenance";
 
 async function saveProvenanceLedger(ledger: ProvenanceLedger): Promise<void> {
@@ -159,14 +160,14 @@ async function saveProvenanceLedger(ledger: ProvenanceLedger): Promise<void> {
     await writeProvenanceRaw(JSON.stringify(ledger, null, 2));
     return;
   }
-  localStorage.setItem(BROWSER_STORAGE_KEY, JSON.stringify(ledger));
+  storage.setItem(BROWSER_STORAGE_KEY, JSON.stringify(ledger));
 }
 
 async function loadProvenanceLedger(): Promise<ProvenanceLedger> {
   if (isTauri()) {
     return parseProvenanceLedger(await readProvenanceRaw());
   }
-  return parseProvenanceLedger(localStorage.getItem(BROWSER_STORAGE_KEY));
+  return parseProvenanceLedger(storage.getItem(BROWSER_STORAGE_KEY));
 }
 
 /**
@@ -252,11 +253,11 @@ export function seedMockProvenance(
   for (const [name, e] of Object.entries(entries)) {
     ledger.skills[name] = { ...e, installedAt: new Date().toISOString() };
   }
-  localStorage.setItem(BROWSER_STORAGE_KEY, JSON.stringify(ledger));
+  storage.setItem(BROWSER_STORAGE_KEY, JSON.stringify(ledger));
 }
 
 /** Clear the browser ledger (test reset). No-op inside Tauri. */
 export function resetMockProvenance(): void {
   if (isTauri()) return;
-  localStorage.removeItem(BROWSER_STORAGE_KEY);
+  storage.removeItem(BROWSER_STORAGE_KEY);
 }

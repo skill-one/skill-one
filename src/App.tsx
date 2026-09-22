@@ -15,6 +15,7 @@ import { useScheduledCheck } from "./hooks/use-scheduled-check";
 import { createQueryClient } from "./lib/query-client";
 import { checkForUpdate } from "./lib/update-store";
 import { isTauri } from "./lib/tauri";
+import { storage } from "./lib/storage";
 import { MySkillsPage } from "./pages/my-skills/my-skills-page";
 import { POPOVER_NAVIGATE_EVENT } from "./popover/popover-events";
 
@@ -56,43 +57,15 @@ const queryClient = createQueryClient();
  * never enters this persister — only the bounded queries — installed
  * skills, agent status — are persisted.
  *
- * The storage adapter accesses `window.localStorage` lazily (inside the
- * methods) so merely wiring up persistence never touches the getter — Node's
- * experimental global localStorage emits an ExperimentalWarning when read.
+ * Reads and writes go through the shared storage guard (see `lib/storage`),
+ * which also means the getter is only ever touched inside a method: Node's
+ * experimental global `localStorage` warns when read.
  *
- * This is the only localStorage reader/writer besides `lib/cdn-config`: user
- * settings belong to cdn-config, while this is React Query's cache journal
- * (keyed by the query client), so the two never hold the same fact.
+ * This is the only localStorage user besides the settings modules: those hold
+ * user configuration, this is React Query's cache journal (keyed by the query
+ * client), so the two never hold the same fact.
  */
-const persister = createSyncStoragePersister({
-  // Every access is guarded: the WebView's localStorage quota (~5-10 MB) is a
-  // hard limit, and a full or blocked storage (private browsing, disabled
-  // storage) throws on write and on read. Failing to persist must degrade to
-  // "no cache" — never take the app down with it.
-  storage: {
-    getItem: (key) => {
-      try {
-        return window.localStorage.getItem(key);
-      } catch {
-        return null;
-      }
-    },
-    setItem: (key, value) => {
-      try {
-        window.localStorage.setItem(key, value);
-      } catch {
-        // Out of quota or storage disabled: drop the write silently.
-      }
-    },
-    removeItem: (key) => {
-      try {
-        window.localStorage.removeItem(key);
-      } catch {
-        // Nothing to remove if storage is unavailable.
-      }
-    },
-  },
-});
+const persister = createSyncStoragePersister({ storage });
 
 const persistOptions = {
   persister,

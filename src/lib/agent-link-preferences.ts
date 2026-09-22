@@ -1,3 +1,5 @@
+import { storage } from "./storage";
+
 /**
  * User-level agent link preferences, persisted in localStorage.
  *
@@ -8,49 +10,38 @@
  * toggles membership — unlinking an agent records it here, re-linking clears
  * it.
  *
- * Storage access follows the app-wide defensive pattern (see `cdn-config`):
- * a missing, full, or disabled backend falls back to an in-memory copy so a
- * read returns "no exclusions" and a write never breaks the caller.
+ * The session keeps its own copy of the list on top of the persisted one,
+ * because the two failure modes of a shared store would otherwise undo the
+ * user's choice: a write the backend refuses (quota full, storage disabled)
+ * simply never reaches the next read, and a payload this version cannot parse
+ * would read back as "nothing excluded" and re-link what was just unlinked.
+ * Both are re-settled by the first good write.
  */
 
 const STORAGE_KEY = "skill-one.excludedAgents";
 
-// The in-memory fallback keeps a session's exclusions working even where
-// localStorage is unavailable (Vitest's node runner, private browsing).
-const memory = new Set<string>();
+/** What the last successful write said, for as long as this session runs. */
+let session: string[] = [];
 
 function readStored(): string[] {
+  const raw = storage.getItem(STORAGE_KEY);
+  if (!raw) return [];
   try {
-    if (typeof window !== "undefined" && window.localStorage) {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed: unknown = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((name): name is string => typeof name === "string");
-        }
-        // A well-formed but non-array payload is just as unreadable as
-        // broken JSON — fall through to the in-memory copy.
-      } else {
-        return [];
-      }
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((name): name is string => typeof name === "string");
     }
+    // A well-formed but non-array payload is just as unreadable as broken
+    // JSON: fall through to the session's copy.
   } catch {
-    // Unreadable or not JSON: fall through to the in-memory copy.
+    // Unreadable: fall through to the session's copy.
   }
-  return [...memory];
+  return [...session];
 }
 
 function writeStored(names: string[]): void {
-  memory.clear();
-  names.forEach((name) => memory.add(name));
-  try {
-    if (typeof window !== "undefined" && window.localStorage) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(names));
-    }
-  } catch {
-    // Out of quota or storage disabled: the in-memory copy stays the source
-    // of truth for this session.
-  }
+  session = [...names];
+  storage.setItem(STORAGE_KEY, JSON.stringify(names));
 }
 
 /** Names of agents the user explicitly unlinked; auto-link skips them. */
