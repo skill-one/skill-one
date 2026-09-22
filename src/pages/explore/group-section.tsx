@@ -7,6 +7,7 @@ import {
 } from "react";
 import { ChevronDown, Star } from "lucide-react";
 
+import { ordinalClass } from "../../lib/ordinal";
 import { SKILL_LIST_CLASS } from "../../lib/skill-list-layout";
 import { cn, formatCount } from "../../lib/utils";
 import { OwnerAvatar } from "../../components/owner-avatar";
@@ -54,25 +55,6 @@ export interface GroupMeta {
    * 今天 would imply it won something.
    */
   ordinal?: "rank" | "plain";
-}
-
-/** The podium, for the first three sections of a ranked mode. */
-const MEDAL_CLASSES = [
-  "text-amber-500 dark:text-amber-400",
-  "text-slate-400 dark:text-slate-500",
-  "text-orange-600 dark:text-orange-400",
-];
-
-/**
- * Ink for one section's ordinal, replacing the two near-identical spans the
- * podium used to need: gold/silver/bronze for a ranked mode's top three, and
- * the same quiet muted ink everywhere else.
- */
-function ordinalClass(index: number, ranked: boolean): string {
-  const medal = ranked ? MEDAL_CLASSES[index] : undefined;
-  return medal
-    ? cn("text-xs font-bold tabular-nums", medal)
-    : "text-xs text-muted-foreground tabular-nums";
 }
 
 /** The nearest ancestor that actually scrolls, if any — the sticky header's
@@ -252,7 +234,7 @@ export function GroupSection<T>({
             />
             <span
               className={cn(
-                "group-hover/head:hidden",
+                "text-xs group-hover/head:hidden",
                 ordinalClass(index, group.ordinal !== "plain"),
               )}
             >

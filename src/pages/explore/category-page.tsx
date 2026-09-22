@@ -2,23 +2,34 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 
+import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useReturn } from "../../hooks/use-return";
 import { domainDisplay } from "../../data/domains";
 import { skillKey } from "../../lib/skill-view";
 import {
-  SKILL_CARD_SKELETON_CLASS,
-  SKILL_LIST_CLASS,
+  SKILL_ROW_LIST_CLASS,
+  SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import { Placeholder } from "../../components/placeholder";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Button } from "../../components/ui/button";
-import { SkillListRow } from "./skill-list-row";
+import { SkillRow } from "./skill-row";
 
 /** How many card-shaped placeholders stand in while the index streams in. */
 const SKELETON_ROWS = 8;
+
+/**
+ * How many rows mount with the page, and how many more each scroll-to-bottom
+ * reveals. A category can gather hundreds of skills and has no pagination, so
+ * rendering — not folding — is what paces the list: the first chunk paints with
+ * the page, and each scroll extends the run until the whole category is
+ * mounted.
+ */
+const INITIAL_ROWS = 12;
+const ROW_CHUNK = 12;
 
 /**
  * One category's page: every skill classified under it, uncapped.
@@ -28,9 +39,9 @@ const SKELETON_ROWS = 8;
  * list of a category's leaders plus a count of what it left out — and it is the
  * wrong surface for "what else is in here?", which is a list of one category's
  * own skills and nothing else on screen. So the page is exactly that: the
- * category's emoji and name at the top, then the same per-skill cards the
- * store's lists use, one per skill, with the detail panel walking only this
- * category's skills.
+ * category's emoji and name at the top, then its skills as one numbered list —
+ * a row each, revealed a chunk at a time as the reader scrolls — with the
+ * detail panel walking only this category's skills.
  *
  * It reads its data out of the query the explore list already runs
  * (`useRegistryGroups("", "domain")`), which the query cache has therefore
@@ -59,6 +70,16 @@ export function CategoryPage() {
     () => (group?.skills ?? []).map((hit) => hit.skill),
     [group],
   );
+
+  // The list reveals itself a chunk at a time; `resetKey` re-seeds it when a
+  // different category's page takes over the route without remounting.
+  const { count, sentinelRef, done } = useProgressiveReveal({
+    total: skills.length,
+    initial: INITIAL_ROWS,
+    step: ROW_CHUNK,
+    resetKey: domain,
+  });
+  const shown = skills.slice(0, count);
 
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -126,20 +147,28 @@ export function CategoryPage() {
         ) : group == null ? (
           <SkeletonList
             rows={SKELETON_ROWS}
-            listClassName={SKILL_LIST_CLASS}
-            itemClassName={SKILL_CARD_SKELETON_CLASS}
+            listClassName={SKILL_ROW_LIST_CLASS}
+            itemClassName={SKILL_ROW_SKELETON_CLASS}
           />
         ) : (
-          <ul className={SKILL_LIST_CLASS}>
-            {skills.map((skill) => (
-              <SkillListRow
-                key={skillKey(skill)}
-                skill={skill}
-                selected={skillKey(skill) === selected}
-                onSelect={() => setSelected(skillKey(skill))}
-              />
-            ))}
-          </ul>
+          <>
+            <ul className={SKILL_ROW_LIST_CLASS}>
+              {shown.map((skill, index) => (
+                <SkillRow
+                  key={skillKey(skill)}
+                  skill={skill}
+                  index={index}
+                  selected={skillKey(skill) === selected}
+                  onSelect={() => setSelected(skillKey(skill))}
+                />
+              ))}
+            </ul>
+            {/* The sentinel ends the rendered run: while it is on screen the
+                observer extends the run, so scrolling down — or simply having
+                a tall viewport — keeps revealing rows until every skill of the
+                category is mounted. */}
+            {!done && <div ref={sentinelRef} aria-hidden="true" />}
+          </>
         )}
       </div>
 

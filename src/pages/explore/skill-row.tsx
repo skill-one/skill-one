@@ -1,0 +1,160 @@
+import { ordinalClass } from "../../lib/ordinal";
+import { LOCAL_SOURCE_LABEL, type SkillView } from "../../lib/skill-view";
+import { cn } from "../../lib/utils";
+import { DomainBadge } from "../../components/domain-badge";
+import {
+  HighlightedText,
+  type SkillMatched,
+} from "../../components/highlighted-text";
+import { RepoHoverCard } from "../../components/repo-hover-card";
+import { INTERACTIVE_CLASS } from "../../components/skill-card";
+import { SkillInstallButton } from "../../components/skill-install-button";
+import { SkillInstalls } from "../../components/skill-installs";
+import { Card } from "../../components/ui/card";
+
+export type { SkillMatched };
+
+/**
+ * One skill in a collection page's list — a repository's or a category's own
+ * skills, read as a list rather than as the store's multi-column grid.
+ *
+ * The row is the store card laid on its side, and it keeps the card's order of
+ * address: the ordinal first (the list's one addition — where this skill stands
+ * in the whole collection, top three medalled), then who published it (the
+ * owner's avatar), then *what is it* (the name) over *what does it do* (the
+ * description), and finally the facts as a quiet cluster on the far right:
+ * the source, the classification, the install figure, and the corner action.
+ * A row is read one at a time, top to bottom, which is exactly what a list is
+ * for — the ordinals give the eye a single column to run down, and the facts
+ * line up so two rows can be compared without re-reading them.
+ *
+ * It is bound to the store like `SkillListRow` is: the corner action is the
+ * install button. Unlike `SkillListRow` it is a full-width row with no grid
+ * cell to fill, so it is its own shape (as `RepoCard` and `CategoryCard` are),
+ * sharing only the interaction and the ordinal ink with the surfaces around it.
+ *
+ * Everything it shows is read off the skill, so it renders a registry row and
+ * an installed row the same way; a skill whose entry is unknown (`storeBacked`)
+ * states its source as 本地安装 and drops the figure rather than fabricating a
+ * zero, exactly as the card does.
+ */
+export function SkillRow({
+  skill,
+  matched,
+  index,
+  selected = false,
+  showSource = true,
+  onSelect,
+}: {
+  /** The skill to render, from the registry or from the installed list. */
+  skill: SkillView;
+  /** Search-hit highlights; absent outside a search (nothing highlighted). */
+  matched?: SkillMatched;
+  /** Zero-based position in the list; the row prints `index + 1`. */
+  index: number;
+  /** Whether this row is the one shown in the detail panel. */
+  selected?: boolean;
+  /**
+   * Whether to name the source. A repository's own page states it once in the
+   * head, so repeating it on every row is noise there; a category gathers
+   * skills from many repositories, so that page keeps it.
+   */
+  showSource?: boolean;
+  /** Opens the skill detail panel; without it the row is not a button. */
+  onSelect?: () => void;
+}) {
+  // Absent means backed: every row a collection page lists comes from the
+  // registry, and the flag only ever unsets a caller with no store entry.
+  const storeBacked = skill.storeBacked !== false;
+  // The owner segment is what the dataset hosts an avatar for; a bare-host
+  // source is its own owner, and an empty repo (an installed skill with no
+  // recorded source) has none.
+  const [owner] = skill.repo.split("/");
+  const domain = skill.profile?.domain;
+
+  return (
+    <li className="flex flex-col">
+      <Card
+        size="sm"
+        role={onSelect ? "button" : undefined}
+        tabIndex={onSelect ? 0 : undefined}
+        aria-label={onSelect ? `查看 ${skill.name} 详情` : undefined}
+        onClick={onSelect}
+        onKeyDown={(e) => {
+          if (onSelect && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            onSelect();
+          }
+        }}
+        className={cn(
+          "flex-row items-center px-3",
+          onSelect && INTERACTIVE_CLASS,
+          selected && "border-primary ring-1 ring-primary",
+        )}
+      >
+        {/* The list's one addition: where this skill stands in the collection,
+            top three medalled. A fixed-width, centred box keeps every name in
+            the list starting at the same offset whether the number is one or
+            four digits. */}
+        <span
+          className={cn(
+            "w-6 shrink-0 text-center text-sm",
+            ordinalClass(index),
+          )}
+        >
+          {index + 1}
+        </span>
+
+        {owner && (
+          <RepoHoverCard
+            repo={skill.repo}
+            // A backless row carries 0 stars because there is no store entry
+            // to ask, not because the repo has none.
+            stars={storeBacked ? skill.stars : undefined}
+            className="size-7 shrink-0 text-[11px]"
+          />
+        )}
+
+        {/* What is it, and what does it do: the two lines every row leads with,
+            both clamped to one line so the list stays a list. */}
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-[14px] font-medium leading-tight">
+            <HighlightedText text={skill.name} terms={matched?.name} />
+          </h3>
+          <p className="truncate text-[12px] leading-snug text-muted-foreground">
+            {skill.description || "暂无描述"}
+          </p>
+        </div>
+
+        {/* The facts cluster, pushed to the far end and kept whole: the source
+            is the one part that may truncate — the classification and the
+            figure are short and must stay readable. The source drops out on a
+            repository's own page (see `showSource`): the head already names it,
+            and 48 identical copies only crowd the names. */}
+        <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
+          {showSource && (
+            <span className="max-w-[16rem] truncate">
+              {owner ? skill.repo : LOCAL_SOURCE_LABEL}
+            </span>
+          )}
+          {domain && domain.length > 0 && (
+            <DomainBadge
+              domain={domain}
+              // Flattened to plain text, as the card's rail does: this is a
+              // line of facts, not a row of badges.
+              variant="ghost"
+              className="px-0 py-0 text-[11px] font-normal"
+            />
+          )}
+          {storeBacked && <SkillInstalls skill={skill} className="text-[11px]" />}
+        </div>
+
+        {/* The corner action. Clicks on the slot stop here: the row body opens
+            the detail panel, the action must not. */}
+        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+          <SkillInstallButton skill={skill} />
+        </div>
+      </Card>
+    </li>
+  );
+}

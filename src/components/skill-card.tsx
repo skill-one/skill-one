@@ -19,9 +19,11 @@ export type { SkillMatched };
 
 /**
  * The lift and ring an interactive card gets on hover and focus, shared so the
- * store and the installed list cannot animate differently.
+ * store and the installed list cannot animate differently — and so a
+ * collection page's list row (`SkillRow`) wears the same interaction as the
+ * cards it sits among.
  */
-const INTERACTIVE_CLASS =
+export const INTERACTIVE_CLASS =
   "cursor-pointer transition-all duration-150 hover:-translate-y-px hover:border-border hover:bg-accent/40 hover:shadow-[0_8px_24px_-16px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /**

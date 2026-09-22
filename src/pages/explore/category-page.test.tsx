@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router";
 
@@ -97,6 +97,48 @@ describe("CategoryPage", () => {
       await screen.findAllByRole("button", { name: /^查看 skill-\d+ 详情$/ }),
     ).toHaveLength(7);
     expect(harness.downloads).toBe(1);
+  });
+
+  it("numbers the list, medalling the top three", async () => {
+    bootRegistry(skillsOf(4));
+    renderCategoryPage();
+
+    // The list's one addition: where each skill stands. The first three wear
+    // the podium ink; the fourth is merely enumerated.
+    const first = await screen.findByRole("button", {
+      name: "查看 skill-0 详情",
+    });
+    expect(within(first).getByText("1").className).toContain("text-amber-500");
+    const fourth = screen.getByRole("button", { name: "查看 skill-3 详情" });
+    expect(within(fourth).getByText("4").className).not.toContain(
+      "text-amber-500",
+    );
+  });
+
+  it("reveals more rows as the reader scrolls", async () => {
+    // Twenty skills: more than one render chunk.
+    bootRegistry(skillsOf(20));
+    renderCategoryPage();
+
+    const rows = () =>
+      screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情$/ });
+    await screen.findByText("skill-0");
+
+    // The first chunk mounts with the page; the rest waits behind the sentinel.
+    expect(rows()).toHaveLength(12);
+    expect(screen.queryByText("skill-12")).not.toBeInTheDocument();
+
+    // Scrolling the sentinel into view extends the run until the category is
+    // fully mounted, and the sentinel is gone.
+    const lastObserver = () =>
+      (
+        globalThis.IntersectionObserver as unknown as {
+          instances: Array<{ trigger(intersecting?: boolean): void }>;
+        }
+      ).instances.at(-1)!;
+    act(() => lastObserver().trigger(true));
+    await waitFor(() => expect(rows()).toHaveLength(20));
+    expect(screen.getByText("skill-19")).toBeInTheDocument();
   });
 
   it("names the category with its glyph and count", async () => {

@@ -34,6 +34,23 @@ export const SKILL_LIST_CLASS =
 export const SKILL_CARD_SKELETON_CLASS = "h-[143px] rounded-xl";
 
 /**
+ * A collection page's list — a repository's or a category's own skills. One
+ * full-width row per skill rather than the store's multi-column grid, so a long
+ * list reads top to bottom and its ordinals form one column; the rows' gaps
+ * match the grid's own 16px so the two surfaces feel the same rhythm.
+ */
+export const SKILL_ROW_LIST_CLASS = "flex flex-col gap-4";
+
+/**
+ * Placeholder standing in for one list row while a collection page loads: the
+ * row's own height, so the skeleton never changes size when the real rows
+ * arrive. Measured off a rendered row at the app's default window — 12px of
+ * card padding above and below a 34px stack (a 14px name over a 12px
+ * description).
+ */
+export const SKILL_ROW_SKELETON_CLASS = "h-[58px] rounded-xl";
+
+/**
  * The store's repository view: one card per repository, so a lane is sized for
  * a repository rather than for a single skill. 440px is the narrowest lane that
  * still prints a skill's name, its one-line description and its install button
