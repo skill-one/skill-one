@@ -3,7 +3,7 @@
 // noUnusedParameters in tsconfig.app.json.
 //
 // Type-aware rules are a second pass, not a replacement: `pnpm lint` runs the
-// syntax-only set, `pnpm exec oxlint --type-aware` adds the rules that need a
+// syntax-only set, `pnpm lint:types` adds the rules that need a
 // type graph (no-floating-promises, await-thenable, unbound-method, ...). The
 // backend for that pass is oxlint-tsgolint (tsgolint), which is a native
 // implementation rather than typescript-eslint — so it does not inherit

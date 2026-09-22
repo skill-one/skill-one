@@ -48,7 +48,7 @@ jobs:
       # ...) need a type graph, so they run as a separate step: `pnpm lint`
       # above stays instant, and this one only pays for the program build.
       - name: Lint (type-aware)
-        run: pnpm exec oxlint --type-aware
+        run: pnpm lint:types
 
       - name: Test
         run: pnpm test:run

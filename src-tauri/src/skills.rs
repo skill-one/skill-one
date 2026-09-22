@@ -37,13 +37,6 @@ where
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct InstalledSkillDto {
-    pub name: String,
-    pub canonical_path: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct InstallFailureDto {
     pub skill: String,
     pub error: String,
@@ -52,35 +45,13 @@ pub struct InstallFailureDto {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallResult {
-    pub list_only: bool,
-    pub installed: Vec<InstalledSkillDto>,
+    /// Names this pass moved into the canonical dir.
+    pub installed: Vec<String>,
     /// Selected skills left untouched because a skill of the same name is
     /// already installed (enabled or disabled): since 0.17 `add` never
     /// overwrites, so a repeat install is a no-op reported here.
     pub skipped: Vec<String>,
     pub failed: Vec<InstallFailureDto>,
-    pub discovered: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoveResult {
-    pub installed: Vec<String>,
-    pub requested: Vec<String>,
-    pub removed: Vec<String>,
-}
-
-/// Outcome of one enable/disable pass. `changed` holds the skills moved in the
-/// requested direction; `inventory` is the set they were chosen from, so the
-/// no-argument call can report the current state without guessing.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ToggleResult {
-    pub changed: Vec<String>,
-    pub requested: Vec<String>,
-    pub already: Vec<String>,
-    pub missing: Vec<String>,
-    pub inventory: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -357,8 +328,8 @@ mod tests {
 
 // ============================ Tauri commands ============================
 
-/// Install skills from a source (git repo, GitHub `owner/repo`, local path or
-/// download URL). Set `list_only` to preview what would be installed.
+/// Install the named skills from a source (git repo, GitHub `owner/repo`,
+/// local path or download URL).
 ///
 /// Since 0.17 `add` never overwrites: a skill whose name is already installed
 /// comes back in `skipped` untouched.
@@ -366,25 +337,16 @@ mod tests {
 pub async fn install_skill(
     source: String,
     skills: Option<Vec<String>>,
-    list_only: Option<bool>,
 ) -> Result<InstallResult, String> {
     run_blocking("install", move |manager| {
         let req = AddRequest {
             source,
             skills: skills.unwrap_or_default(),
-            list_only: list_only.unwrap_or(false),
+            list_only: false,
         };
         let outcome = manager.add(&req).map_err(|e| e.to_string())?;
         Ok(InstallResult {
-            list_only: outcome.list_only,
-            installed: outcome
-                .installed
-                .into_iter()
-                .map(|s| InstalledSkillDto {
-                    name: s.name,
-                    canonical_path: s.canonical_path.display().to_string(),
-                })
-                .collect(),
+            installed: outcome.installed.into_iter().map(|s| s.name).collect(),
             skipped: outcome.skipped,
             failed: outcome
                 .failed
@@ -394,7 +356,6 @@ pub async fn install_skill(
                     error: f.error,
                 })
                 .collect(),
-            discovered: outcome.skills.into_iter().map(|s| s.name).collect(),
         })
     })
     .await
@@ -412,68 +373,47 @@ pub async fn list_installed_skills() -> Result<Vec<ListedSkillDto>, String> {
     .await
 }
 
-/// Remove installed skills. With no `skills` and no `all`, only reports what is
-/// currently installed.
+/// Remove the named installed skills, returning those actually gone.
 #[tauri::command]
-pub async fn remove_skills(
-    skills: Option<Vec<String>>,
-    all: Option<bool>,
-) -> Result<RemoveResult, String> {
+pub async fn remove_skills(skills: Option<Vec<String>>) -> Result<Vec<String>, String> {
     run_blocking("remove", move |manager| {
         let req = RemoveRequest {
             skills: skills.unwrap_or_default(),
-            all: all.unwrap_or(false),
+            all: false,
         };
-        let outcome = manager.remove(&req).map_err(|e| e.to_string())?;
-        Ok(RemoveResult {
-            installed: outcome.installed,
-            requested: outcome.requested,
-            removed: outcome.removed,
-        })
+        Ok(manager.remove(&req).map_err(|e| e.to_string())?.removed)
     })
     .await
 }
 
-/// Move skills between the canonical dir and the parked `disabled-skills`
-/// dir (`enabled` picks the direction). With no `skills` and no `all`, only
-/// reports the inventory they would have been chosen from.
+/// Move the named skills between the canonical dir and the parked
+/// `disabled-skills` dir (`enabled` picks the direction), returning the skills
+/// that moved.
 #[tauri::command]
 pub async fn set_skills_enabled(
     skills: Option<Vec<String>>,
-    all: Option<bool>,
     enabled: bool,
-) -> Result<ToggleResult, String> {
+) -> Result<Vec<String>, String> {
     run_blocking(if enabled { "enable" } else { "disable" }, move |manager| {
-        let (names, every) = (skills.unwrap_or_default(), all.unwrap_or(false));
-        if enabled {
-            let outcome = manager
+        let names = skills.unwrap_or_default();
+        let outcome = if enabled {
+            manager
                 .enable(&EnableRequest {
                     skills: names,
-                    all: every,
+                    all: false,
                 })
-                .map_err(|e| e.to_string())?;
-            Ok(ToggleResult {
-                changed: outcome.enabled,
-                requested: outcome.requested,
-                already: outcome.already,
-                missing: outcome.missing,
-                inventory: outcome.disabled,
-            })
+                .map_err(|e| e.to_string())?
+                .enabled
         } else {
-            let outcome = manager
+            manager
                 .disable(&DisableRequest {
                     skills: names,
-                    all: every,
+                    all: false,
                 })
-                .map_err(|e| e.to_string())?;
-            Ok(ToggleResult {
-                changed: outcome.disabled,
-                requested: outcome.requested,
-                already: outcome.already,
-                missing: outcome.missing,
-                inventory: outcome.installed,
-            })
-        }
+                .map_err(|e| e.to_string())?
+                .disabled
+        };
+        Ok(outcome)
     })
     .await
 }

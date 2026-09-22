@@ -30,20 +30,16 @@ describe("installSkillFromSource", () => {
   it("hands the owner/repo source to the backend's GitHub install (Tauri)", async () => {
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({
-      listOnly: false,
-      installed: [{ name: "pdf", canonicalPath: "~/.agents/skills/pdf" }],
+      installed: ["pdf"],
       skipped: [],
       failed: [],
-      discovered: ["pdf"],
     });
 
     await installSkillFromSource("anthropics/skills", "pdf", {
       rev: "rev-at-install",
     });
 
-    expect(installSkill).toHaveBeenCalledWith("anthropics/skills", {
-      skills: ["pdf"],
-    });
+    expect(installSkill).toHaveBeenCalledWith("anthropics/skills", ["pdf"]);
     // The install source lands in the provenance ledger (Tauri path) with
     // the store-side content hash as the installed version marker.
     expect(recordSkillProvenance).toHaveBeenCalledWith(
@@ -56,11 +52,9 @@ describe("installSkillFromSource", () => {
   it("records the install without a hash when the entry carries no rev", async () => {
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({
-      listOnly: false,
-      installed: [{ name: "pdf", canonicalPath: "~/.agents/skills/pdf" }],
+      installed: ["pdf"],
       skipped: [],
       failed: [],
-      discovered: ["pdf"],
     });
 
     await installSkillFromSource("anthropics/skills", "pdf");
@@ -75,11 +69,9 @@ describe("installSkillFromSource", () => {
   it("throws the backend failure when the install reports an error", async () => {
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({
-      listOnly: false,
       installed: [],
       skipped: [],
       failed: [{ skill: "pdf", error: "clone failed: network unreachable" }],
-      discovered: ["pdf"],
     });
 
     await expect(
@@ -90,11 +82,9 @@ describe("installSkillFromSource", () => {
   it("throws when the named skill is not found in the source repo", async () => {
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({
-      listOnly: false,
       installed: [],
       skipped: [],
       failed: [],
-      discovered: [],
     });
 
     await expect(
@@ -107,11 +97,9 @@ describe("installSkillFromSource", () => {
     // back in `skipped`, which must not read as "not found in the repo".
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({
-      listOnly: false,
       installed: [],
       skipped: ["pdf"],
       failed: [],
-      discovered: ["pdf"],
     });
 
     await installSkillFromSource("anthropics/skills", "pdf", { rev: "rev-1" });
@@ -146,11 +134,9 @@ describe("installSkillFromSource", () => {
   it("does not record provenance when the backend reports a failure", async () => {
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({
-      listOnly: false,
       installed: [],
       skipped: [],
       failed: [{ skill: "pdf", error: "clone failed: network unreachable" }],
-      discovered: ["pdf"],
     });
 
     await expect(

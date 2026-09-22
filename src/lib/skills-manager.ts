@@ -39,11 +39,6 @@ export interface InstalledSkill {
   installedAt?: number | null;
 }
 
-export interface InstalledSkillDto {
-  name: string;
-  canonicalPath: string;
-}
-
 /** A skill's SKILL.md read from the local skills directory. */
 export interface SkillMd {
   /** Absolute path of the file on disk. */
@@ -58,8 +53,8 @@ export interface InstallFailureDto {
 }
 
 export interface InstallResult {
-  listOnly: boolean;
-  installed: InstalledSkillDto[];
+  /** Names this pass moved into the canonical dir. */
+  installed: string[];
   /**
    * Selected skills left untouched because a skill of the same name is already
    * installed (enabled or disabled). Since agents-skills 0.17 `add` never
@@ -67,23 +62,6 @@ export interface InstallResult {
    */
   skipped: string[];
   failed: InstallFailureDto[];
-  /** Every skill discovered in the source (whether installed or not). */
-  discovered: string[];
-}
-
-export interface RemoveResult {
-  installed: string[];
-  requested: string[];
-  removed: string[];
-}
-
-/** Outcome of one enable/disable pass; `changed` moved in the asked direction. */
-export interface ToggleResult {
-  changed: string[];
-  requested: string[];
-  already: string[];
-  missing: string[];
-  inventory: string[];
 }
 
 export type AgentLinkStatus =
@@ -154,20 +132,15 @@ function requireTauri(): void {
 }
 
 /**
- * Install skills from a source: a git URL, GitHub `owner/repo`, local path or
- * download URL. With `listOnly`, nothing is installed — the discovery preview
- * is returned instead.
+ * Install `skills` from a source: a git URL, GitHub `owner/repo`, local path or
+ * download URL.
  */
 export async function installSkill(
   source: string,
-  options: { skills?: string[]; listOnly?: boolean } = {},
+  skills: string[],
 ): Promise<InstallResult> {
   requireTauri();
-  return invoke<InstallResult>("install_skill", {
-    source,
-    skills: options.skills,
-    listOnly: options.listOnly,
-  });
+  return invoke<InstallResult>("install_skill", { source, skills });
 }
 
 /** List installed skills in the global skills directory. */
@@ -186,57 +159,37 @@ export async function readSkillMd(name: string): Promise<SkillMd> {
   return invoke<SkillMd>("read_skill_md", { name });
 }
 
-/**
- * Remove installed skills. `all` removes everything; otherwise the listed
- * `skills` are removed.
- */
-export async function removeSkills(
-  skills: string[],
-  options: { all?: boolean } = {},
-): Promise<RemoveResult> {
+/** Remove installed skills; resolves with the names that actually went. */
+export async function removeSkills(skills: string[]): Promise<string[]> {
   requireTauri();
-  return invoke<RemoveResult>("remove_skills", {
-    skills,
-    all: options.all,
-  });
+  return invoke<string[]>("remove_skills", { skills });
 }
 
-/** Move skills between the canonical dir and the parked disabled dir. */
+/**
+ * Move skills between the canonical dir and the parked disabled dir; resolves
+ * with the names that moved.
+ */
 export async function setSkillsEnabled(
   enabled: boolean,
-  skills: string[] = [],
-  options: { all?: boolean } = {},
-): Promise<ToggleResult> {
+  skills: string[],
+): Promise<string[]> {
   requireTauri();
-  return invoke<ToggleResult>("set_skills_enabled", {
-    skills,
-    all: options.all,
-    enabled,
-  });
+  return invoke<string[]>("set_skills_enabled", { skills, enabled });
 }
 
 /**
- * Link (or with `unlink`, disconnect) agents' skills directories to the
- * canonical skills dir. `agents` empty = auto-detect installed agents; `"*"`
- * = all known agents.
+ * Link agents' skills directories to the canonical skills dir. `agents` empty
+ * = auto-detect installed agents; `"*"` = all known agents.
  */
-export async function linkAgents(
-  agents: string[] = [],
-  options: { unlink?: boolean } = {},
-): Promise<LinkResult> {
+export async function linkAgents(agents: string[]): Promise<LinkResult> {
   requireTauri();
-  return invoke<LinkResult>("link_agents", {
-    agents,
-    unlink: options.unlink,
-  });
+  return invoke<LinkResult>("link_agents", { agents });
 }
 
 /** Unlink agents from the canonical skills dir. */
-export function unlinkAgents(
-  agents: string[] = [],
-  options: Record<string, never> = {},
-): Promise<LinkResult> {
-  return linkAgents(agents, { ...options, unlink: true });
+export async function unlinkAgents(agents: string[]): Promise<LinkResult> {
+  requireTauri();
+  return invoke<LinkResult>("link_agents", { agents, unlink: true });
 }
 
 /**

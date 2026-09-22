@@ -14,10 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Same source of truth as ci.yml, local development and the `engines.node`
+      # floor: a release must never build on a Node the checks never ran on.
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: .nvmrc
 
       # No `version` input: pnpm/setup reads `packageManager` from
       # package.json, and passing a conflicting pin errors the workflow.

@@ -41,8 +41,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
-    // e2e/ is Playwright's: same *.spec.ts filenames, different runner.
-    exclude: [...configDefaults.exclude, worktreeGlob, "**/e2e/**"],
+    exclude: [...configDefaults.exclude, worktreeGlob],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

@@ -112,7 +112,7 @@ export async function installSkillFromSource(
   options: { rev?: string } = {},
 ): Promise<void> {
   if (isTauri()) {
-    const result = await installSkill(repo, { skills: [name] });
+    const result = await installSkill(repo, [name]);
     if (result.failed.length > 0) {
       const f = result.failed[0];
       throw new Error(f.error || `安装失败：${f.skill}`);
