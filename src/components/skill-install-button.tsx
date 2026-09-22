@@ -9,6 +9,7 @@ import {
 } from "../hooks/use-installed-skills";
 import { useSkillProvenance } from "../hooks/use-skill-provenance";
 import { cn, errorMessage } from "../lib/utils";
+import { toast } from "./ui/toast";
 import type { Skill } from "../types/skill";
 import { Button } from "./ui/button";
 import {
@@ -26,8 +27,8 @@ export type InstallState = "idle" | "installing" | "installed" | "error";
  * itself renders no visible text.
  *
  * The installed state is a status badge rather than a control: a tinted
- * emerald surface the check inherits its color from — louder than the muted
- * secondary chrome, quieter than a solid green button a disabled control
+ * `--success` surface the check inherits its color from — louder than the
+ * muted secondary chrome, quieter than a solid green button a disabled control
  * has no business wearing. `cn` merges these over the variant's classes.
  */
 const INSTALL_BUTTON: Record<
@@ -53,7 +54,7 @@ const INSTALL_BUTTON: Record<
     icon: <Check />,
     variant: "secondary",
     className:
-      "border-transparent bg-emerald-600/10 text-emerald-600 hover:bg-emerald-600/15 dark:bg-emerald-500/15 dark:text-emerald-400 dark:hover:bg-emerald-500/20",
+      "border-transparent bg-success/10 text-success hover:bg-success/15",
   },
   error: { label: "重试", icon: <RefreshCw />, variant: "default" },
 };
@@ -63,8 +64,9 @@ const INSTALL_BUTTON: Record<
  * rows): a real install through the skills backend (Tauri) or the mock store
  * (browser), reflected as idle → installing → installed | error.
  *
- * `onError` hands the failure message to the caller, which decides where to
- * show it; without one the failure still shows up as the button's 重试 state.
+ * A failure is reported twice and identically from here: the button's own 重试
+ * state, and the app-wide toast every other write path uses (see
+ * `SkillRemoveButton`). Nothing a row or a detail view carries.
  *
  * Two shapes: the default icon-only button for dense list rows, and a
  * `labeled` compact button with the state word visible — the primary action
@@ -73,14 +75,11 @@ const INSTALL_BUTTON: Record<
 export function SkillInstallButton({
   skill,
   className,
-  onError,
   labeled = false,
 }: {
   skill: Skill;
   /** Merged onto the button; callers size and place it. */
   className?: string;
-  /** Called with the failure message, or null once the install succeeds. */
-  onError?: (message: string | null) => void;
   /** Show the state label next to the icon (detail views). */
   labeled?: boolean;
 }) {
@@ -126,7 +125,6 @@ export function SkillInstallButton({
     e.stopPropagation();
     if (installState === "installing" || installState === "installed") return;
     setInstallState("installing");
-    onError?.(null);
     try {
       // The store entry's rev travels along as the installed version marker
       // (see installSkillFromSource): the future update check compares it
@@ -140,7 +138,7 @@ export function SkillInstallButton({
       setInstallState("installed");
     } catch (err) {
       setInstallState("error");
-      onError?.(errorMessage(err, "安装失败，请重试"));
+      toast.add({ title: errorMessage(err, "安装失败，请重试"), type: "error" });
     }
   };
 

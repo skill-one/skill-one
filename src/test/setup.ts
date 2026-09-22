@@ -1,8 +1,8 @@
 // Extend Vitest's `expect` with jest-dom matchers (toBeInTheDocument, etc.).
 import "@testing-library/jest-dom/vitest";
 
-// jsdom does not implement ResizeObserver, which Radix UI primitives
-// (Tabs, ScrollArea) depend on. Provide a minimal no-op implementation.
+// jsdom does not implement ResizeObserver, which some Base UI primitives
+// depend on. Provide a minimal no-op implementation.
 class ResizeObserverMock {
   observe() {}
   unobserve() {}
@@ -10,7 +10,7 @@ class ResizeObserverMock {
 }
 globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
 
-// Radix also queries matchMedia for responsive behavior. Return a static
+// Base UI also queries matchMedia for responsive behavior. Return a static
 // match object with the minimal surface it reads.
 if (typeof window !== "undefined" && !window.matchMedia) {
   window.matchMedia = ((query: string) => ({
@@ -71,7 +71,7 @@ if (typeof globalThis.requestIdleCallback !== "function") {
     clearTimeout(handle)) as typeof globalThis.cancelIdleCallback;
 }
 
-// jsdom lacks scrollIntoView and pointer-capture APIs used by Radix.
+// jsdom lacks scrollIntoView and pointer-capture APIs used by Base UI.
 // The lib.dom types declare every one of them as always present, so probing
 // `Element.prototype` with `in` narrows it to `never` in the "missing" branch
 // and the patch stops typechecking. Go through a widened handle instead: it

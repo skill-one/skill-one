@@ -16,12 +16,6 @@ export interface FilterOption<T extends string> {
   label: string;
   icon: LucideIcon;
   /**
-   * Marks the option that means "no filter applied": while it is selected the
-   * trigger shows `label` instead of this option's own text, so the control
-   * reads as inactive rather than as a choice of that option.
-   */
-  neutral?: boolean;
-  /**
    * A figure annotated at the option's far edge — how many groups the choice
    * would produce, for the grouping modes. Absent means nothing to show.
    */
@@ -34,13 +28,10 @@ export interface FilterOption<T extends string> {
  * own glyph, so the closed and open states of one value agree.
  */
 export function FilterDropdown<T extends string>({
-  label,
   value,
   options,
   onChange,
 }: {
-  /** The trigger's text while the neutral option (if any) is selected. */
-  label?: string;
   value: T;
   options: Array<FilterOption<T>>;
   onChange: (next: T) => void;
@@ -59,7 +50,7 @@ export function FilterDropdown<T extends string>({
                 aria-hidden="true"
                 className="h-4 w-4 text-foreground"
               />
-              {current.neutral ? label : current.label}
+              {current.label}
             </span>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </Button>

@@ -18,7 +18,7 @@ const MIRROR_REPO = "skill-one/skills-profiles";
 /**
  * Round owner avatar loaded from the mirror, degrading through GitHub's
  * avatar endpoint and finally to the owner's initial. Candidate URLs are
- * walked in order via Radix's loading status, one step per failure.
+ * walked in order via the avatar's loading status, one step per failure.
  *
  * Decoration: every call site prints the owner or the repo it belongs to as
  * text right beside it, so the avatar is marked aria-hidden and its image

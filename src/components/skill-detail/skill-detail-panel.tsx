@@ -243,10 +243,6 @@ export function SkillDetailPanel({
     if (skill) setLastSkill(skill);
   }, [skill]);
   const shown = skill ?? lastSkill;
-  // The failure message of the last install attempt (the header CTA),
-  // shown under the header.
-  const [installError, setInstallError] = useState<string | null>(null);
-
   // Remote when the registry knows the skill's repo directory, local disk
   // otherwise (local installs, or store installs whose index entry is gone
   // or not loaded yet). The source is part of the key so both variants of
@@ -399,11 +395,7 @@ export function SkillDetailPanel({
               disk — so it carries its own action instead: the enable switch
               that the store's drawer cannot offer. */}
           {isStore && (
-            <SkillInstallButton
-              skill={shown!}
-              labeled
-              onError={setInstallError}
-            />
+            <SkillInstallButton skill={shown!} labeled />
           )}
           {!isStore && shown && <SkillEnableSwitch skill={shown} />}
           {/* Uninstalling shares that slot, and hides itself unless the skill
@@ -465,15 +457,6 @@ export function SkillDetailPanel({
           <InstalledAt installedAt={shown?.installedAt} />
         </div>
       </SheetHeader>
-      {installError && (
-        <p
-          role="alert"
-          className="mx-6 line-clamp-2 text-[12px] leading-relaxed text-destructive"
-        >
-          {installError}
-        </p>
-      )}
-
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
         {isPending ? (
           <div className="flex h-40 items-center justify-center text-muted-foreground">

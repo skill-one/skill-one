@@ -33,12 +33,6 @@ const INTERACTIVE_CLASS =
  * The card is read top to bottom in the order a reader actually decides in:
  * *what is it* (the name), *who published it* (the source line), *what does it
  * do* (the description), and only then *how popular is it* (the rail). Each of
- * One skill, as a card — the single shape every skill surface uses: the store's
- * lists, a leaderboard, and the installed list.
- *
- * The card is read top to bottom in the order a reader actually decides in:
- * *what is it* (the name), *who published it* (the source line), *what does it
- * do* (the description), and only then *how popular is it* (the rail). Each of
  * those three blocks has exactly one job:
  *
  * - **Header** — the skill's own cover, then the name with the source line
@@ -68,9 +62,9 @@ const INTERACTIVE_CLASS =
  *
  * Only what a surface *does* arrives as a slot, because only the surface knows
  * it: the corner action (an install button on the store, an enable switch on the
- * installed list), a badge trailing the source line (the migration affordance),
- * and anything below the card (an install failure). The card body opens the
- * detail panel (`onSelect`) when the surface passes one; without it the card is
+ * installed list) and a badge trailing the source line (the migration
+ * affordance) — where a failure is reported is the button's own business. The
+ * card body opens the detail panel (`onSelect`) when the surface passes one; without it the card is
  * not a button at all. Clicks inside the corner stop there — the card body opens
  * the panel, the action must not.
  */
@@ -82,7 +76,6 @@ export function SkillCard({
   onSelect,
   action,
   sourceExtra,
-  below,
   "data-skill": dataSkill,
 }: {
   /** The skill to render, from the registry or from the installed list. */
@@ -99,8 +92,6 @@ export function SkillCard({
   action?: ReactNode;
   /** Trails the source line: the migration badge on an unlinked install. */
   sourceExtra?: ReactNode;
-  /** Rendered under the card: an install failure, a dialog trigger. */
-  below?: ReactNode;
   /** Test hook on the card element. */
   "data-skill"?: string;
 }) {
@@ -254,8 +245,6 @@ export function SkillCard({
           </CardFooter>
         )}
       </Card>
-
-      {below}
     </li>
   );
 }

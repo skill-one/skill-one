@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SkillListRow } from "./skill-list-row";
@@ -8,6 +8,7 @@ import {
   installSkillFromSource,
 } from "../../lib/local-skills";
 import { renderWithRouter } from "../../test/test-utils";
+import { toast } from "../../components/ui/toast";
 import type { Skill } from "../../types/skill";
 
 vi.mock("../../lib/local-skills", () => ({
@@ -232,13 +233,13 @@ describe("SkillListRow", () => {
     await user.click(screen.getByRole("button", { name: "安装" }));
 
     // Installed is a fact, not an action: it drops the reveal and stays, and
-    // it reads as a success badge — a tinted emerald surface, not the muted
+    // it reads as a success badge — a tinted `--success` surface, not the muted
     // secondary chrome the other disabled states wear.
     const installed = await screen.findByRole("button", { name: "已安装" });
     expect(
       container.querySelector('[data-slot="card-action"]'),
     ).not.toHaveClass("opacity-0");
-    expect(installed).toHaveClass("bg-emerald-600/10", "text-emerald-600");
+    expect(installed).toHaveClass("bg-success/10", "text-success");
   });
 
   it("keeps a failed install's retry visible without hover", async () => {
@@ -249,7 +250,7 @@ describe("SkillListRow", () => {
     await user.click(screen.getByRole("button", { name: "安装" }));
 
     // The failure needs attention, so the retry does not wait for hover.
-    await screen.findByRole("alert");
+    expect(await screen.findByRole("button", { name: "重试" })).toBeEnabled();
     expect(
       container.querySelector('[data-slot="card-action"]'),
     ).not.toHaveClass("opacity-0");
@@ -290,16 +291,24 @@ describe("SkillListRow", () => {
     ).toBeDisabled();
   });
 
-  it("reports a failed install under the row", async () => {
+  it("reports a failed install as an error toast", async () => {
     const user = userEvent.setup();
+    const toastSpy = vi.spyOn(toast, "add");
     vi.mocked(installSkillFromSource).mockRejectedValue(
       new Error("clone failed: network unreachable"),
     );
     renderWithRouter(<SkillListRow skill={skill} />);
 
     await user.click(screen.getByRole("button", { name: "安装" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "clone failed: network unreachable",
+
+    // Where a failure gets said out loud is the button's own business: the same
+    // app-wide error toast every other write path uses, rather than a message
+    // each row had to hold and lay out for itself.
+    await waitFor(() =>
+      expect(toastSpy).toHaveBeenCalledWith({
+        title: "clone failed: network unreachable",
+        type: "error",
+      }),
     );
   });
 

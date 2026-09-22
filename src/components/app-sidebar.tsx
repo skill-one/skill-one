@@ -21,7 +21,7 @@ import { useAppUpdate } from "../hooks/use-app-update";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
 import { useRegistrySnapshot } from "../hooks/use-registry-snapshot";
 
-export interface NavItem {
+interface NavItem {
   path: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -34,7 +34,7 @@ export interface NavItem {
   match?: "prefix";
 }
 
-export const shopItems: NavItem[] = [
+const shopItems: NavItem[] = [
   {
     path: "/explore/featured",
     label: "精选",
@@ -44,11 +44,11 @@ export const shopItems: NavItem[] = [
   { path: "/explore", label: "全部", icon: LayoutGrid },
 ];
 
-export const mySkillsItems: NavItem[] = [
+const mySkillsItems: NavItem[] = [
   { path: "/my-skills", label: "我的 skills", icon: Boxes },
 ];
 
-export const footerItems: NavItem[] = [
+const footerItems: NavItem[] = [
   { path: "/settings", label: "设置", icon: Settings },
 ];
 
@@ -183,7 +183,7 @@ export function AppSidebar() {
   // getting a row of its own.
   const hasUpdate = phase === "available" && version !== null;
   return (
-    <Sidebar collapsible="none">
+    <Sidebar>
       <BrandHeader />
       <SidebarContent>
         <SidebarGroup>

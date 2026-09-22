@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import { Bot } from "lucide-react";
 
 import { getAgentIconUrl, isMonochromeAgentIcon } from "../lib/agent-icons";
@@ -7,8 +7,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 /** Everything shadcn's `Avatar` accepts, plus the agent whose icon to show. */
 interface AgentIconProps extends ComponentProps<typeof Avatar> {
   agentName: string;
-  /** Rendered inside the avatar — e.g. an `AvatarBadge` status dot. */
-  children?: ReactNode;
 }
 
 /**
@@ -21,7 +19,6 @@ export function AgentIcon({
   agentName,
   size = "default",
   className,
-  children,
   ...props
 }: AgentIconProps) {
   const iconUrl = getAgentIconUrl(agentName);
@@ -37,7 +34,6 @@ export function AgentIcon({
       <AvatarFallback>
         <Bot aria-hidden="true" />
       </AvatarFallback>
-      {children}
     </Avatar>
   );
 }
