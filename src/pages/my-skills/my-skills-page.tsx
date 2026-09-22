@@ -22,7 +22,6 @@ import { FilterDropdown, type FilterOption } from "../../components/filter-dropd
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage } from "../../lib/utils";
 import { domainLabel, domainMeta } from "../../data/domains";
-import { SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
 import { buildSearchIndex } from "../../lib/search-index";
 import {
   SKILL_CARD_SKELETON_CLASS,
@@ -295,7 +294,7 @@ export function MySkillsPage() {
   // index is derived from the name at render time, and a not-yet-resolved
   // name keeps the drawer closed until the groups settle.
   const [selectedName, setSelectedName] = useState<string | null>(null);
-  const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
+  const query = useDebouncedValue(search).trim();
   // Progressive rendering: only the first `visibleCount` groups are mounted;
   // an IntersectionObserver on the sentinel below the list extends the count
   // while the reader scrolls.

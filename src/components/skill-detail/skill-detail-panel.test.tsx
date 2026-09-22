@@ -13,7 +13,7 @@ import {
 } from "../../lib/local-skills";
 import { openExternal } from "../../lib/open-external";
 import type { SkillView } from "../../lib/skill-view";
-import { Drawer } from "../ui/drawer";
+import { Sheet } from "../ui/sheet";
 import {
   SkillDetailPanel,
   type SkillDetailSurface,
@@ -103,10 +103,10 @@ const localDetail = {
 let queryClient: QueryClient;
 
 /**
- * The panel renders the content side of a modal Drawer, so the tests mount
- * it inside a stateful open Drawer exactly like the explore page does. The
- * drawer starts open only when a skill is present, mirroring the page's
- * `open = skill != null` wiring.
+ * The panel renders the content side of the modal detail Sheet (see
+ * `SkillDetailDrawer`), so the tests mount it inside a stateful open Sheet
+ * exactly like the pages do. It starts open only when a skill is present,
+ * mirroring the drawer's `open = skill != null` wiring.
  */
 function DetailDrawer({
   skill: currentSkill,
@@ -122,14 +122,14 @@ function DetailDrawer({
   const [open, setOpen] = useState(currentSkill != null);
   return (
     <QueryClientProvider client={queryClient}>
-      <Drawer swipeDirection="right" open={open} onOpenChange={setOpen}>
+      <Sheet open={open} onOpenChange={setOpen}>
         <SkillDetailPanel
           skill={currentSkill}
           surface={surface}
           onPrev={onPrev ?? (() => {})}
           onNext={onNext ?? (() => {})}
         />
-      </Drawer>
+      </Sheet>
     </QueryClientProvider>
   );
 }

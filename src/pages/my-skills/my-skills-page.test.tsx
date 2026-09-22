@@ -30,22 +30,22 @@ configure({ asyncUtilTimeout: 5000 });
 // page looks up the store entries behind recorded sources; both mocks answer
 // "nothing found" by default so the worker-less test env stays silent, and the
 // link-suggestion / store-stats tests below override them.
-const { getPage, lookupSkills, registrySnapshot } = vi.hoisted(() => ({
-  getPage: vi.fn(),
+const { searchSkills, lookupSkills, registrySnapshot } = vi.hoisted(() => ({
+  searchSkills: vi.fn(),
   lookupSkills: vi.fn(),
   // One stable object: the page reads it through useSyncExternalStore, which
   // treats a fresh snapshot on every call as an infinite render loop.
   registrySnapshot: { ready: true, epoch: 1 },
 }));
 vi.mock("../../lib/registry/client", () => ({
-  getPage,
+  searchSkills,
   lookupSkills,
   getRegistrySnapshot: () => registrySnapshot,
   subscribeRegistry: () => () => {},
 }));
 
 beforeEach(() => {
-  getPage.mockResolvedValue({ hits: [], total: 0 });
+  searchSkills.mockResolvedValue({ hits: [] });
   lookupSkills.mockResolvedValue({ entries: [] });
   resetLinkSuggestions();
 });
@@ -465,7 +465,7 @@ describe("MySkillsPage", () => {
     // enough (< 90%) from the installed skill's: because it is below the
     // auto-link threshold, the card offers the association for the user to
     // confirm instead of linking silently.
-    getPage.mockResolvedValue({
+    searchSkills.mockResolvedValue({
       hits: [
         {
           skill: {
@@ -518,7 +518,7 @@ describe("MySkillsPage", () => {
   it("auto-links a tool-installed skill whose description matches a namesake", async () => {
     // Identical wording (≥ 90% similarity) is treated as the same skill and
     // linked automatically — no 迁移 badge or confirm dialog ever appears.
-    getPage.mockResolvedValue({
+    searchSkills.mockResolvedValue({
       hits: [
         {
           skill: {

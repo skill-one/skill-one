@@ -14,7 +14,6 @@ import { HashRouter } from "react-router";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { searchSkillsSh } from "../../lib/skills-sh";
-import { PAGE_SIZE } from "../../lib/pagination";
 import {
   SKILL_CARD_SKELETON_CLASS,
   SKILL_LIST_CLASS,
@@ -74,6 +73,10 @@ const mockSearchSkillsSh = vi.mocked(searchSkillsSh);
 /** The one repository every `makeSkills` skill belongs to. */
 const BATCH_REPO = "acme/batch";
 
+/** A skill count past the page's first group chunk and past a card preview,
+ * so tests can say "more than the page mounts at once". */
+const STREAM_BATCH = 60;
+
 /** Build a slice of `count` skills starting at global index `offset`. */
 function makeSkills(count: number, offset: number) {
   return Array.from({ length: count }, (_, i) => ({
@@ -115,7 +118,7 @@ function gadgetRegistry(): Skill[] {
       downloads: 99,
       path: "skills/gadget-master",
     },
-    ...Array.from({ length: PAGE_SIZE + 10 }, (_, i) => ({
+    ...Array.from({ length: STREAM_BATCH + 10 }, (_, i) => ({
       name: `tool-${i}`,
       repo: `acme/tool-${i}`,
       description: "A general purpose utility.",
@@ -1136,7 +1139,7 @@ describe("ExplorePage streaming", () => {
     renderExplorePage();
     await act(async () => {});
 
-    harness.pushAll(makeSkills(PAGE_SIZE + 5, 0));
+    harness.pushAll(makeSkills(STREAM_BATCH + 5, 0));
 
     // The group paints from the partial data (its first six as the preview)
     // and grows in place as more of the stream lands, without disturbing the
@@ -1144,11 +1147,11 @@ describe("ExplorePage streaming", () => {
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
     expect(screen.getByText("skill-5")).toBeInTheDocument();
 
-    harness.pushAll(makeSkills(PAGE_SIZE + 20, 0).slice(PAGE_SIZE + 5));
+    harness.pushAll(makeSkills(STREAM_BATCH + 20, 0).slice(STREAM_BATCH + 5));
     // The refetch over the grown prefix updates the group's card count in
     // place; wait it out rather than racing the swap.
     await waitFor(() =>
-      expect(groupHeader(BATCH_REPO, PAGE_SIZE + 20)).toBeInTheDocument(),
+      expect(groupHeader(BATCH_REPO, STREAM_BATCH + 20)).toBeInTheDocument(),
     );
   });
 

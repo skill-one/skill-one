@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { isTauri, getPage, getRegistrySnapshot, computeSkillHash } = vi.hoisted(
+const { isTauri, searchSkills, getRegistrySnapshot, computeSkillHash } = vi.hoisted(
   () => ({
     isTauri: vi.fn(),
-    getPage: vi.fn(),
+    searchSkills: vi.fn(),
     getRegistrySnapshot: vi.fn(),
     computeSkillHash: vi.fn(),
   }),
 );
 
 vi.mock("../lib/tauri", () => ({ isTauri }));
-vi.mock("../lib/registry/client", () => ({ getPage, getRegistrySnapshot }));
+vi.mock("../lib/registry/client", () => ({ searchSkills, getRegistrySnapshot }));
 // A stateful stand-in for the on-disk ledger file, so the real provenance
 // persistence round-trips inside the test.
 const { readProvenanceRaw, writeProvenanceRaw, resetLedgerFile } = vi.hoisted(
@@ -64,7 +64,7 @@ const NAMESAKE = {
 
 function mockRegistry() {
   getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 1 });
-  getPage.mockResolvedValue({ hits: [NAMESAKE], total: 1 });
+  searchSkills.mockResolvedValue({ hits: [NAMESAKE] });
 }
 
 beforeEach(() => {
@@ -123,6 +123,6 @@ describe("fetchProvenanceState", () => {
     expect(state.linked).toEqual({});
     expect(state.suggestions).toEqual({});
     expect(computeSkillHash).not.toHaveBeenCalled();
-    expect(getPage).not.toHaveBeenCalled();
+    expect(searchSkills).not.toHaveBeenCalled();
   });
 });

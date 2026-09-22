@@ -12,20 +12,20 @@ import { descriptionSimilarity } from "./description-similarity";
 import type { Skill } from "../types/skill";
 
 const {
-  getPage,
+  searchSkills,
   getRegistrySnapshot,
   computeSkillHash,
   recordSkillProvenanceBatch,
   isTauri,
 } = vi.hoisted(() => ({
-  getPage: vi.fn(),
+  searchSkills: vi.fn(),
   getRegistrySnapshot: vi.fn(),
   computeSkillHash: vi.fn(),
   recordSkillProvenanceBatch: vi.fn(),
   isTauri: vi.fn(),
 }));
 
-vi.mock("./registry/client", () => ({ getPage, getRegistrySnapshot }));
+vi.mock("./registry/client", () => ({ searchSkills, getRegistrySnapshot }));
 vi.mock("./tauri", () => ({ isTauri }));
 vi.mock("./skills-manager", () => ({ computeSkillHash }));
 vi.mock("./provenance", () => ({ recordSkillProvenanceBatch }));
@@ -46,9 +46,8 @@ function namesake(repo: string, overrides: Partial<Skill> = {}): Skill {
 
 function mockReady(entries: Skill[]) {
   getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 1 });
-  getPage.mockResolvedValue({
+  searchSkills.mockResolvedValue({
     hits: entries.map((skill) => ({ skill, matched: {} })),
-    total: entries.length,
   });
 }
 
@@ -201,7 +200,7 @@ describe("resolveAssociations", () => {
 
   it("skips hashing for skills with no namesakes at all", async () => {
     mockReady([]);
-    getPage.mockResolvedValue({ hits: [], total: 0 });
+    searchSkills.mockResolvedValue({ hits: [] });
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "totally-custom", description: "whatever" },
@@ -265,6 +264,6 @@ describe("resolveAssociations", () => {
     expect(linked).toEqual([]);
     expect(suggestions).toEqual({});
     expect(computeSkillHash).not.toHaveBeenCalled();
-    expect(getPage).not.toHaveBeenCalled();
+    expect(searchSkills).not.toHaveBeenCalled();
   });
 });

@@ -5,7 +5,6 @@ import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
-import { SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
 import {
   SKILL_CARD_SKELETON_CLASS,
   SKILL_LIST_CLASS,
@@ -54,7 +53,7 @@ export function ExplorePage() {
   // both define what a group is.
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("repo");
-  const query = useDebouncedValue(search, SEARCH_DEBOUNCE_MS).trim();
+  const query = useDebouncedValue(search).trim();
 
   // Worker progress: the climbing count, the streaming/indexing flags and
   // the retry action for a failed download.

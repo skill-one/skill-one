@@ -1,16 +1,14 @@
 import { getCdnBase, setIndexTag } from "../cdn-config";
 import type {
-  DomainInfo,
   FeaturedData,
   GroupsData,
   GroupsRequest,
   IndexInfo,
-  PageData,
-  PageRequest,
   RankingData,
   RankingRequest,
   RegistryWorkerMessage,
   RevalidateResult,
+  SearchData,
 } from "./protocol";
 import type { SkillRef } from "../../data/featured-content";
 import type { Skill } from "../../types/skill";
@@ -123,12 +121,11 @@ function ensureInit() {
 
 function request(
   type:
-    | "getPage"
+    | "searchSkills"
     | "getGroups"
     | "getFeatured"
     | "getRanking"
     | "lookupSkills"
-    | "getDomains"
     | "revalidate",
   payload?: unknown,
 ): Promise<unknown> {
@@ -156,9 +153,13 @@ export function resetRegistryClient() {
   subscribers.clear();
 }
 
-/** One paged explore result (browse or search). */
-export function getPage(request_: PageRequest): Promise<PageData> {
-  return request("getPage", request_) as Promise<PageData>;
+/**
+ * A name search over the worker's search index: matched skills in relevance
+ * order, capped. Answers empty until that index exists (see
+ * `lib/search-index`), which the main thread already waits for via `ready`.
+ */
+export function searchSkills(query: string): Promise<SearchData> {
+  return request("searchSkills", { query }) as Promise<SearchData>;
 }
 
 /**
@@ -187,15 +188,6 @@ export function lookupSkills(refs: SkillRef[]): Promise<{
   return request("lookupSkills", { refs }) as Promise<{
     entries: Array<Skill | null>;
   }>;
-}
-
-/**
- * The distinct profile domains with their skill counts, most-used first.
- * Only profiled skills contribute; an empty list means no profile data is
- * being served yet. Call once `ready`.
- */
-export function getDomains(): Promise<DomainInfo[]> {
-  return request("getDomains") as Promise<DomainInfo[]>;
 }
 
 /**

@@ -1,14 +1,12 @@
 import { createRegistryController } from "../lib/registry/worker-controller";
 import type {
-  DomainInfo,
   FeaturedData,
   GroupsData,
   GroupsRequest,
-  PageData,
-  PageRequest,
   RankingData,
   RankingRequest,
   RegistryWorkerMessage,
+  SearchData,
   SkillRef,
 } from "../lib/registry/protocol";
 import type { RegistrySnapshot } from "../lib/registry/client";
@@ -49,12 +47,11 @@ export interface RegistryHarness {
   publishTrending(ids: string[] | null): void;
   /** Make every RPC reject (worker crash stand-in) until cleared. */
   setRpcError(err: Error | null): void;
-  getPage(req: PageRequest): Promise<PageData>;
+  searchSkills(query: string): Promise<SearchData>;
   getGroups(req: GroupsRequest): Promise<GroupsData>;
   getFeatured(): Promise<FeaturedData>;
   getRanking(req: RankingRequest): Promise<RankingData>;
   lookupSkills(refs: SkillRef[]): Promise<{ entries: Array<Skill | null> }>;
-  getDomains(): Promise<DomainInfo[]>;
   getSnapshot(): RegistrySnapshot;
   subscribe(listener: () => void): () => void;
   /** Reset all state between tests; keeps registered listeners. */
@@ -181,12 +178,11 @@ export function createRegistryHarness(): RegistryHarness {
 
   async function request<T>(
     type:
-      | "getPage"
+      | "searchSkills"
       | "getGroups"
       | "getFeatured"
       | "getRanking"
-      | "lookupSkills"
-      | "getDomains",
+      | "lookupSkills",
     payload?: unknown,
   ): Promise<T> {
     if (rpcError) throw rpcError;
@@ -245,8 +241,8 @@ export function createRegistryHarness(): RegistryHarness {
     setRpcError(err) {
       rpcError = err;
     },
-    getPage(req) {
-      return request<PageData>("getPage", req);
+    searchSkills(query) {
+      return request<SearchData>("searchSkills", { query });
     },
     getGroups(req) {
       return request<GroupsData>("getGroups", req);
@@ -261,9 +257,6 @@ export function createRegistryHarness(): RegistryHarness {
       return request<{ entries: Array<Skill | null> }>("lookupSkills", {
         refs,
       });
-    },
-    getDomains() {
-      return request<DomainInfo[]>("getDomains");
     },
     getSnapshot: () => snapshot,
     subscribe(listener) {
@@ -295,12 +288,11 @@ export function createRegistryClientMock(harness: RegistryHarness) {
     __harness: harness,
     initRegistry: () => harness.init(),
     reloadRegistry: () => harness.reload(),
-    getPage: (req: PageRequest) => harness.getPage(req),
+    searchSkills: (query: string) => harness.searchSkills(query),
     getGroups: (req: GroupsRequest) => harness.getGroups(req),
     getFeatured: () => harness.getFeatured(),
     getRanking: (req: RankingRequest) => harness.getRanking(req),
     lookupSkills: (refs: SkillRef[]) => harness.lookupSkills(refs),
-    getDomains: () => harness.getDomains(),
     getRegistrySnapshot: () => harness.getSnapshot(),
     subscribeRegistry: (listener: () => void) => harness.subscribe(listener),
     resetRegistryClient: () => harness.reset(),

@@ -23,11 +23,7 @@ vi.mock("../../data/featured-content", () => ({
 import { createRegistryController } from "./worker-controller";
 import type { CachedIndex, RegistryCache } from "./cache";
 import type { PublishedIndex } from "./index-stream";
-import type {
-  RegistryWorkerMessage,
-  RevalidateResult,
-  SortOrder,
-} from "./protocol";
+import type { GroupsData, RegistryWorkerMessage, RevalidateResult } from "./protocol";
 import type { Skill } from "../../types/skill";
 import { popularity } from "../popularity";
 import { formatCount } from "../utils";
@@ -509,68 +505,8 @@ describe("createRegistryController — revalidate", () => {
   });
 });
 
-describe("createRegistryController — getPage", () => {
-  it("pages the browse list in registry order", async () => {
-    const t = setup({ skills: [skill(0), skill(1), skill(2)] });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    const page0 = t.controller.handle({
-      type: "getPage",
-      id: 1,
-      payload: { query: "", sort: "default", page: 0, pageSize: 2 },
-    });
-    const page1 = t.controller.handle({
-      type: "getPage",
-      id: 2,
-      payload: { query: "", sort: "default", page: 1, pageSize: 2 },
-    });
-
-    expect(resultData<{ total: number }>(t.recorded.results[0]).total).toBe(3);
-    expect(page1).toBeUndefined(); // handle returns nothing; results are posted
-    expect(resultData<{ total: number }>(t.recorded.results[1]).total).toBe(3);
-    expect(page0).toBeUndefined();
-  });
-
-  it("sorts by popularity and by name with per-version caching", async () => {
-    const t = setup({
-      // Installs fall with the index (100, 99, 98) while stars rise (0, 1, 2),
-      // so the blended figure orders these three the opposite way round.
-      skills: [skill(0), skill(1), skill(2)],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({
-      type: "getPage",
-      id: 1,
-      payload: { query: "", sort: "popularity", page: 0, pageSize: 3 },
-    });
-    const byPopularity = resultData<{ hits: Array<{ skill: Skill }> }>(
-      t.recorded.results[0],
-    );
-    expect(byPopularity.hits.map((h) => h.skill.name)).toEqual([
-      "skill-2",
-      "skill-1",
-      "skill-0",
-    ]);
-
-    t.controller.handle({
-      type: "getPage",
-      id: 2,
-      payload: { query: "", sort: "name", page: 0, pageSize: 3 },
-    });
-    const byName = resultData<{ hits: Array<{ skill: Skill }> }>(
-      t.recorded.results[1],
-    );
-    expect(byName.hits.map((h) => h.skill.name)).toEqual([
-      "skill-0",
-      "skill-1",
-      "skill-2",
-    ]);
-  });
-
-  it("answers a search in relevance order whatever sort is asked for", async () => {
+describe("createRegistryController — searchSkills", () => {
+  it("answers in the index's own relevance order", async () => {
     const t = setup({
       skills: [
         // Equally relevant to "redis"; only the install boost separates them.
@@ -581,37 +517,42 @@ describe("createRegistryController — getPage", () => {
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    const searchNames = (sort: SortOrder, index: number) => {
-      t.controller.handle({
-        type: "getPage",
-        id: index + 1,
-        payload: { query: "redis", sort, page: 0, pageSize: 5 },
-      });
-      return resultData<{ hits: Array<{ skill: Skill }> }>(
-        t.recorded.results[index],
-      ).hits.map((h) => h.skill.name);
-    };
-
-    // The requested sort changes nothing about a search's order: the ranking is
-    // what made these two match, and the install boost is part of that ranking.
-    expect(searchNames("default", 0)).toEqual([
+    t.controller.handle({
+      type: "searchSkills",
+      id: 1,
+      payload: { query: "redis" },
+    });
+    // Popularity is the ranking's own tie-break, so the more-installed namesake
+    // leads: nothing about a search answer is configurable by the caller.
+    const hits = resultData<{ hits: Array<{ skill: Skill }> }>(
+      t.recorded.results[0],
+    );
+    expect(hits.hits.map((h) => h.skill.name)).toEqual([
       "zeta-redis",
       "alpha-redis",
     ]);
-    expect(searchNames("name", 1)).toEqual(["zeta-redis", "alpha-redis"]);
+  });
 
-    // The browsed list, by contrast, does honour the sort — and its name order
-    // is the opposite of the search's, which is what this pairing proves.
-    t.controller.handle({
-      type: "getPage",
-      id: 3,
-      payload: { query: "", sort: "name", page: 0, pageSize: 5 },
+  it("caps a broad query so one reply stays page-sized", async () => {
+    const t = setup({
+      skills: Array.from({ length: 55 }, (_, i) =>
+        skill(i, { name: `tool-${i}`, repo: `acme/tool-${i}` }),
+      ),
     });
-    expect(
-      resultData<{ hits: Array<{ skill: Skill }> }>(
-        t.recorded.results[2],
-      ).hits.map((h) => h.skill.name),
-    ).toEqual(["alpha-redis", "zeta-redis"]);
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.controller.handle({
+      type: "searchSkills",
+      id: 1,
+      payload: { query: "tool" },
+    });
+    const hits = resultData<{ hits: Array<{ skill: Skill }> }>(
+      t.recorded.results[0],
+    );
+    // Every one of the 55 matches, but the boundary never carries more than a
+    // page's worth: a consumer that needs more narrows the query.
+    expect(hits.hits).toHaveLength(50);
   });
 
   it("answers no search until the index over the registry is built", async () => {
@@ -626,14 +567,11 @@ describe("createRegistryController — getPage", () => {
     // query is answered with nothing rather than a guess over the prefix; the
     // main thread keeps its search field disabled until `ready`.
     t.controller.handle({
-      type: "getPage",
+      type: "searchSkills",
       id: 1,
-      payload: { query: "gadget", sort: "default", page: 0, pageSize: 5 },
+      payload: { query: "gadget" },
     });
-    const midStream = resultData<{ hits: unknown[]; total: number }>(
-      t.recorded.results[0],
-    );
-    expect(midStream).toEqual({ hits: [], total: 0 });
+    expect(resultData(t.recorded.results[0])).toEqual({ hits: [] });
 
     t.complete();
     await t.flush();
@@ -641,32 +579,33 @@ describe("createRegistryController — getPage", () => {
     // Indexed: the query is answered by the search index, along with a prefix
     // of it. A typo is not — the shared entry point forgives nothing.
     t.controller.handle({
-      type: "getPage",
+      type: "searchSkills",
       id: 2,
-      payload: { query: "gadget", sort: "default", page: 0, pageSize: 5 },
+      payload: { query: "gadget" },
     });
-    const exact = resultData<{ hits: Array<{ skill: Skill }> }>(
-      t.recorded.results[1],
-    );
-    expect(exact.hits.map((h) => h.skill.name)).toEqual(["gadget-master"]);
+    expect(
+      resultData<{ hits: Array<{ skill: Skill }> }>(
+        t.recorded.results[1],
+      ).hits.map((h) => h.skill.name),
+    ).toEqual(["gadget-master"]);
 
     t.controller.handle({
-      type: "getPage",
+      type: "searchSkills",
       id: 3,
-      payload: { query: "gadget-m", sort: "default", page: 0, pageSize: 5 },
+      payload: { query: "gadget-m" },
     });
-    const prefix = resultData<{ hits: Array<{ skill: Skill }> }>(
-      t.recorded.results[2],
-    );
-    expect(prefix.hits.map((h) => h.skill.name)).toEqual(["gadget-master"]);
+    expect(
+      resultData<{ hits: Array<{ skill: Skill }> }>(
+        t.recorded.results[2],
+      ).hits.map((h) => h.skill.name),
+    ).toEqual(["gadget-master"]);
 
     t.controller.handle({
-      type: "getPage",
+      type: "searchSkills",
       id: 4,
-      payload: { query: "gadgt", sort: "default", page: 0, pageSize: 5 },
+      payload: { query: "gadgt" },
     });
-    const typo = resultData<{ hits: unknown[] }>(t.recorded.results[3]);
-    expect(typo).toEqual({ hits: [], total: 0 });
+    expect(resultData(t.recorded.results[3])).toEqual({ hits: [] });
   });
 });
 
@@ -1237,43 +1176,10 @@ describe("createRegistryController — classification", () => {
   const classified = (i: number, domain: string[]): Skill =>
     skill(i, { profile: { domain } });
 
-  it("reports the domain list from the served rows", async () => {
-    // Two skills share one domain so the count ordering is unambiguous
-    // (locale-aware tie-breaks are not asserted).
-    const t = setup({
-      skills: [
-        classified(0, ["development"]),
-        classified(1, ["content-creation"]),
-        classified(2, ["development"]),
-      ],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({ type: "getDomains", id: 1 });
-    const domains = resultData<Array<{ domain: string; count: number }>>(
-      t.recorded.results[0],
-    );
-    expect(domains).toEqual([
-      { domain: "development", count: 2 },
-      { domain: "content-creation", count: 1 },
-    ]);
-
-    t.controller.handle({
-      type: "getPage",
-      id: 2,
-      payload: { query: "", sort: "default", page: 0, pageSize: 10 },
-    });
-    const hits = resultData<{ hits: Array<{ skill: Skill }> }>(
-      t.recorded.results[1],
-    );
-    expect(hits.hits[0].skill.profile).toEqual({ domain: ["development"] });
-    expect(hits.hits[2].skill.profile).toEqual({ domain: ["development"] });
-  });
-
-  it("filters both the browse list and search results by domain", async () => {
-    // skill-2 belongs to both domains, so a single-key filter has to match by
-    // membership rather than by an exact classification.
+  it("buckets the browsed list by each skill's own classification", async () => {
+    // skill-2 belongs to both domains, so a group has to match by membership
+    // rather than by an exact classification — and the skill lands in each of
+    // its groups.
     const t = setup({
       skills: [
         classified(0, ["development"]),
@@ -1285,46 +1191,57 @@ describe("createRegistryController — classification", () => {
     await t.flush();
 
     t.controller.handle({
-      type: "getPage",
+      type: "getGroups",
       id: 1,
-      payload: {
-        query: "",
-        sort: "default",
-        page: 0,
-        pageSize: 10,
-        domain: "content-creation",
-      },
+      payload: { query: "", groupBy: "domain" },
     });
-    const browsed = resultData<{
-      hits: Array<{ skill: Skill }>;
-      total: number;
-    }>(t.recorded.results[0]);
-    expect(browsed.total).toBe(2);
-    expect(browsed.hits.map((h) => h.skill.name)).toEqual([
-      "skill-1",
-      "skill-2",
+    const data = resultData<GroupsData>(t.recorded.results[0]);
+    expect(
+      data.groups.map((g) => [
+        g.key,
+        g.skills.map((h) => h.skill.name).toSorted(),
+      ]),
+    ).toEqual([
+      // Both buckets hold two skills, so the alphabetical tie-break decides.
+      ["domain-content-creation", ["skill-1", "skill-2"]],
+      ["domain-development", ["skill-0", "skill-2"]],
     ]);
+    // The grouping dropdown's annotations count the same buckets.
+    expect(data.groupCounts.domain).toBe(2);
+    // The classification rides along on the served rows themselves.
+    const multi = data.groups[0].skills.find((h) => h.skill.name === "skill-2");
+    expect(multi?.skill.profile).toEqual({
+      domain: ["development", "content-creation"],
+    });
+  });
+
+  it("groups a search's hits by domain too", async () => {
+    const t = setup({
+      skills: [
+        classified(0, ["development"]),
+        classified(1, ["content-creation"]),
+        skill(2), // classified under nothing: it has to land in the pool
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
 
     t.controller.handle({
-      type: "getPage",
-      id: 2,
-      payload: {
-        query: "skill-",
-        sort: "popularity",
-        page: 0,
-        pageSize: 10,
-        domain: "development",
-      },
+      type: "getGroups",
+      id: 1,
+      payload: { query: "skill", groupBy: "domain" },
     });
-    const searched = resultData<{
-      hits: Array<{ skill: Skill }>;
-      total: number;
-    }>(t.recorded.results[1]);
-    expect(searched.total).toBe(2);
-    expect(searched.hits.map((h) => h.skill.name).toSorted()).toEqual([
-      "skill-0",
-      "skill-2",
+    const data = resultData<GroupsData>(t.recorded.results[0]);
+    const byKey = new Map(
+      data.groups.map((g) => [g.key, g.skills.map((h) => h.skill.name)]),
+    );
+    expect([...byKey.keys()].toSorted()).toEqual([
+      "domain-content-creation",
+      "domain-development",
+      "domain-未分类",
     ]);
+    expect(byKey.get("domain-未分类")).toEqual(["skill-2"]);
+    expect(data.total).toBe(3);
   });
 
   it("keeps the registry usable when nothing is classified", async () => {
@@ -1332,11 +1249,17 @@ describe("createRegistryController — classification", () => {
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    // Ready fired exactly once and no skill carries a profile; the domain
-    // list is empty but not an error.
+    // Ready fired exactly once and no skill carries a profile: the domain
+    // grouping still answers, with every skill pooled under 未分类.
     expect(t.recorded.readyCount).toBe(1);
-    t.controller.handle({ type: "getDomains", id: 1 });
-    expect(resultData(t.recorded.results[0])).toEqual([]);
+    t.controller.handle({
+      type: "getGroups",
+      id: 1,
+      payload: { query: "", groupBy: "domain" },
+    });
+    const data = resultData<GroupsData>(t.recorded.results[0]);
+    expect(data.groups.map((g) => g.title)).toEqual(["未分类"]);
+    expect(data.groupCounts).toEqual({ repo: 2, popularity: 1, domain: 1 });
   });
 
   it("builds featured sections from the real domains", async () => {

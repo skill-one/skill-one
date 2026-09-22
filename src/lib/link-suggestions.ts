@@ -20,15 +20,14 @@
  *    left to the user: the ranked candidates are surfaced for confirmation and
  *    nothing is written until they pick one.
  *
- * Namesake lookup goes through the registry worker's search (`getPage` with
- * the skill name, filtered to exact slug equality client-side). When the
- * registry is not ready (still streaming, or a test environment with no
- * worker) every lookup degrades to "no candidates" — the UI then shows the
- * plain local-install presentation.
+ * Namesake lookup goes through the registry worker's search (`searchSkills`,
+ * filtered to exact slug equality client-side). When the registry is not ready
+ * (still streaming, or a test environment with no worker) every lookup degrades
+ * to "no candidates" — the UI then shows the plain local-install presentation.
  */
 
 import type { Skill } from "../types/skill";
-import { getPage, getRegistrySnapshot } from "./registry/client";
+import { getRegistrySnapshot, searchSkills } from "./registry/client";
 import { computeSkillHash } from "./skills-manager";
 import { isTauri } from "./tauri";
 import { descriptionSimilarity } from "./description-similarity";
@@ -55,14 +54,8 @@ async function findNamesakes(name: string): Promise<Skill[]> {
   // (and in worker-less test environments) there are simply no candidates.
   if (!getRegistrySnapshot().ready) return [];
   try {
-    const page = await getPage({
-      query: name,
-      sort: "default",
-      page: 0,
-      // A slug is shared by at most a handful of repos; one page is plenty.
-      pageSize: 50,
-    });
-    return page.hits.map((h) => h.skill).filter((s) => s.name === name);
+    const { hits } = await searchSkills(name);
+    return hits.map((h) => h.skill).filter((s) => s.name === name);
   } catch {
     return [];
   }

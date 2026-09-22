@@ -21,39 +21,15 @@ export interface SearchHit {
 }
 
 /**
- * Explore page sort orders (mirrored by the worker's cached sort). "default"
- * keeps the registry index order — the explore toolbar no longer offers it,
- * but internal registry lookups (e.g. link suggestions) still ask for it.
- * "popularity" orders by the blended installs-and-stars figure the rows
- * display (`lib/popularity.ts`), so the order and the number beside it can
- * never disagree. A non-empty query ignores `sort` entirely and answers in
- * relevance order.
+ * The answer to a name search: matched skills in the index's own relevance
+ * order, capped so one reply stays page-sized however broad the query. Browsing
+ * is not part of this contract — the explore list is grouped by `getGroups`,
+ * and a grouped answer crosses the boundary whole.
  */
-export type SortOrder = "default" | "popularity" | "name";
-
-/** Parameters of a paged explore request. */
-export interface PageRequest {
-  /** Trimmed search text; empty means "browse the registry in order". */
-  query: string;
-  sort: SortOrder;
-  /** 0-based page index. */
-  page: number;
-  pageSize: number;
-  /**
-   * Exact domain filter from the profiles dataset ("开发编程", ...).
-   * Undefined browses all; a skill without a profile falls outside every
-   * domain. Composes with both the browse and the search paths.
-   */
-  domain?: string;
-}
-
-/** One page of explore results. `total` covers the whole (filtered) list. */
-export interface PageData {
+export interface SearchData {
   hits: SearchHit[];
-  total: number;
 }
 
-/** Parameters of the grouped (by repository) explore request. */
 /**
  * How the explore list buckets its skills. Each mode carries its own
  * ordering — groups and the skills inside them — so the toolbar offers one
@@ -152,12 +128,6 @@ export interface RankingData {
   total: number;
 }
 
-/** One distinct profile domain and how many profiled skills carry it. */
-export interface DomainInfo {
-  domain: string;
-  count: number;
-}
-
 /**
  * How the dataset currently served by the worker got here during this run.
  * Surfaced in Settings so a user can tell a real refresh from a cache reuse.
@@ -220,12 +190,11 @@ export type RegistryCommand =
 
 /** Main-thread → worker queries answered synchronously by `handle`. */
 export type RegistryQuery =
-  | { type: "getPage"; id: number; payload: PageRequest }
+  | { type: "searchSkills"; id: number; payload: { query: string } }
   | { type: "getGroups"; id: number; payload: GroupsRequest }
   | { type: "getFeatured"; id: number }
   | { type: "getRanking"; id: number; payload: RankingRequest }
-  | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } }
-  | { type: "getDomains"; id: number };
+  | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } };
 
 /** Everything the main thread can send the worker. */
 export type RegistryRequest = RegistryCommand | RegistryQuery;

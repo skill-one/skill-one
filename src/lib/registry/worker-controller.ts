@@ -4,22 +4,19 @@ import { domainLabel, domainMeta } from "../../data/domains";
 import { popularity } from "../popularity";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
 import type {
-  DomainInfo,
   FeaturedSectionData,
   Group,
   GroupCounts,
   GroupsData,
   GroupsRequest,
   IndexInfo,
-  PageData,
-  PageRequest,
   RankingData,
   RankingRequest,
   RegistryQuery,
   RegistryWorkerMessage,
   RevalidateStatus,
+  SearchData,
   SearchHit,
-  SortOrder,
 } from "./protocol";
 import type { RegistryCache } from "./cache";
 import type { PublishedIndex } from "./index-stream";
@@ -51,12 +48,12 @@ const PROGRESS_INTERVAL_MS = 400;
 const byPopularity = (a: Skill, b: Skill): number =>
   popularity(b) - popularity(a);
 
-/** Ascending name order, the alternative toolbar sort. */
-const byName = (a: Skill, b: Skill): number => a.name.localeCompare(b.name);
-
-/** The comparator for one of the two non-default toolbar orders. */
-const skillComparator = (sort: "popularity" | "name") =>
-  sort === "popularity" ? byPopularity : byName;
+/**
+ * Reply cap for one name search. A broad query over a multi-thousand-entry
+ * registry would otherwise send the whole match list across the boundary at
+ * once; consumers need a page's worth, not the answer's full length.
+ */
+const MAX_SEARCH_HITS = 50;
 
 /** The pool label the `domain` grouping collects unclassified skills under. */
 const UNCLASSIFIED_DOMAIN = "未分类";
@@ -144,7 +141,7 @@ export function createRegistryController(
   // The array every query reads. During a fresh (non-revalidating) download
   // it points at the growing buffer, so paged browse and lookups see the
   // loaded prefix while the stream is still in flight. Search is the one
-  // exception: it waits for the index over the settled dataset (see getPage).
+  // exception: it waits for the index over the settled dataset (see searchSkills).
   let store: Skill[] = [];
   let complete = false;
   let ready = false; // complete AND search index built
@@ -159,15 +156,11 @@ export function createRegistryController(
   // Sort orders are cached per data version: navigating pages of a multi-
   // thousand-entry sorted list re-slices but never re-sorts.
   let dataVersion = 0;
-  let orderCache: { version: number; sort: SortOrder; ids: number[] } | null =
-    null;
+  let orderCache: { version: number; ids: number[] } | null = null;
   // Lookup index for `lookupSkills`, cached per data version: resolving each
   // ref by a `store.find` is O(n·m), so instead the earliest matching skill
   // per key is indexed once and every request is a pair of map reads.
   let lookupCache: { version: number; map: Map<string, Skill> } | null = null;
-  // Distinct profile domains with their skill counts, cached per data
-  // version like the repo aggregation (a single O(n) pass per dataset).
-  let domainCache: { version: number; domains: DomainInfo[] } | null = null;
 
   /**
    * Drop every derived cache and bump the data version they are addressed
@@ -177,7 +170,6 @@ export function createRegistryController(
     dataVersion++;
     orderCache = null;
     lookupCache = null;
-    domainCache = null;
   };
 
   const emitProgress = () => {
@@ -361,69 +353,38 @@ export function createRegistryController(
     buildIndex();
   };
 
-  /** Cached full-list order for a sort mode, built lazily. */
-  const orderFor = (sort: SortOrder): number[] => {
-    // While the download streams in the list keeps growing, so the cached
-    // order would go stale — only cache once the dataset has landed.
-    if (
-      complete &&
-      orderCache?.version === dataVersion &&
-      orderCache.sort === sort
-    ) {
-      return orderCache.ids;
-    }
+  /**
+   * The registry's own order: the whole dataset by the blended
+   * installs-and-stars figure the rows display (`lib/popularity.ts`), so the
+   * order and the number beside it can never disagree. Cached per data
+   * version — and only once the download has landed, since a list that is
+   * still growing would leave a cached order stale.
+   */
+  const popularityOrder = (): number[] => {
+    if (complete && orderCache?.version === dataVersion) return orderCache.ids;
     const ids = store.map((_, id) => id);
-    if (sort !== "default") {
-      const compare = skillComparator(sort);
-      ids.sort((a, b) => compare(store[a], store[b]));
-    }
-    orderCache = { version: dataVersion, sort, ids };
+    ids.sort((a, b) => byPopularity(store[a], store[b]));
+    orderCache = { version: dataVersion, ids };
     return ids;
   };
 
-  /** Whether one skill belongs to the requested domain key. */
-  const inDomain = (skill: Skill, domain: string): boolean =>
-    skill.profile?.domain.includes(domain) ?? false;
-
-  const getPage = ({
-    query,
-    domain,
-    sort,
-    page,
-    pageSize,
-  }: PageRequest): PageData => {
-    const start = page * pageSize;
-    const q = query.trim();
-    if (q) {
-      // A search owns the whole registry, so there is nothing to answer with
-      // until the index over it exists: it is built once the download lands,
-      // and before that a query yields nothing rather than a guess over the
-      // partial prefix. The main thread keeps its search field disabled until
-      // `ready`, so this branch is the contract's backstop.
-      if (!search) return { hits: [], total: 0 };
-      // Always in relevance order: `sort` orders the browsed list, and
-      // re-ranking search hits by download count or name would throw away the
-      // ranking (all terms matched, exact/prefix name first, then popularity)
-      // that made them hits.
-      let hits: SearchHit[] = search(q);
-      // A category filter narrows the search results; skills the dataset has
-      // not classified simply fall outside every category. A skill classified
-      // under several domains matches each of them.
-      if (domain) {
-        hits = hits.filter((hit) => inDomain(hit.skill, domain));
-      }
-      return { hits: hits.slice(start, start + pageSize), total: hits.length };
-    }
-    let ids = orderFor(sort);
-    if (domain) {
-      ids = ids.filter((id) => inDomain(store[id], domain));
-    }
-    return {
-      hits: ids
-        .slice(start, start + pageSize)
-        .map((id) => ({ skill: store[id], matched: {} })),
-      total: ids.length,
-    };
+  /**
+   * A name search, in the index's own relevance order and capped, so a broad
+   * query can never send an unbounded reply across the boundary.
+   *
+   * A search owns the whole registry, so there is nothing to answer with until
+   * the index over it exists: it is built once the download lands, and before
+   * that a query yields nothing rather than a guess over the partial prefix.
+   * The main thread keeps its search field disabled until `ready`, so this is
+   * the contract's backstop.
+   *
+   * Relevance is the only order it speaks: ranking the hits by download count
+   * or name instead would throw away the ranking (all terms matched, exact and
+   * prefix name hits first, then popularity) that made them hits.
+   */
+  const searchSkills = (query: string): SearchData => {
+    if (!search) return { hits: [] };
+    return { hits: search(query.trim()).slice(0, MAX_SEARCH_HITS) };
   };
 
   /** Skills per popularity bucket in the `TOP 1-50` grouping. */
@@ -471,7 +432,7 @@ export function createRegistryController(
    * - `recency`: reserved — the dataset does not publish an update time yet,
    *   so the mode is not offered (see `GroupBy`).
    *
-   * Unlike `getPage` there is no slicing: the full filtered answer crosses the
+   * Unlike a search reply there is no slicing: the answer crosses the
    * boundary and the page folds groups away instead of paging them. Closed
    * groups render no cards, so the DOM stays at the expanded groups only —
    * the payload, not the render, is the price of dropping the pager.
@@ -492,7 +453,7 @@ export function createRegistryController(
       }
       hits = search(q);
     } else {
-      hits = orderFor("popularity").map((id) => ({
+      hits = popularityOrder().map((id) => ({
         skill: store[id],
         matched: {},
       }));
@@ -558,32 +519,6 @@ export function createRegistryController(
       }
     }
     return { groups, total: hits.length, groupCounts: countGroups(hits) };
-  };
-
-  /**
-   * The distinct profile domains with their skill counts, most-used first.
-   * Only classified skills contribute — the list (and every count) shrinks to
-   * zero-shaped answers when the dataset carries no classification. A skill
-   * classified under several domains counts once per domain. Cached per data
-   * version like the sort order; recomputed per request while the dataset
-   * streams in.
-   */
-  const getDomains = (): DomainInfo[] => {
-    if (complete && domainCache?.version === dataVersion) {
-      return domainCache.domains;
-    }
-    const counts = new Map<string, number>();
-    for (const skill of store) {
-      for (const domain of skill.profile?.domain ?? []) {
-        counts.set(domain, (counts.get(domain) ?? 0) + 1);
-      }
-    }
-    const domains = Array.from(counts, ([domain, count]) => ({ domain, count }))
-      .toSorted(
-        (a, b) => b.count - a.count || a.domain.localeCompare(b.domain),
-      );
-    if (complete) domainCache = { version: dataVersion, domains };
-    return domains;
   };
 
   /** Sections shown on the featured page and skills per section. */
@@ -821,8 +756,8 @@ export function createRegistryController(
       try {
         let data: unknown;
         switch (message.type) {
-          case "getPage":
-            data = getPage(message.payload);
+          case "searchSkills":
+            data = searchSkills(message.payload.query);
             break;
           case "getGroups":
             data = getGroups(message.payload);
@@ -835,9 +770,6 @@ export function createRegistryController(
             break;
           case "lookupSkills":
             data = lookupSkills(message.payload.refs);
-            break;
-          case "getDomains":
-            data = getDomains();
             break;
         }
         post({ type: "result", id: message.id, ok: true, data });
