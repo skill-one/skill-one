@@ -7,7 +7,8 @@ import {
   Loader2,
 } from "lucide-react";
 
-import { fetchSkillDetail, MIRROR } from "../../lib/skill-detail-api";
+import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { MIRROR } from "../../lib/mirror";
 import { fetchLocalSkillDetail } from "../../lib/local-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";

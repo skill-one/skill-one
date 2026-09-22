@@ -46,7 +46,6 @@ const harness = (
 ).__harness;
 
 vi.mock("../../../lib/skill-detail-api", () => ({
-  MIRROR: { repo: "skill-one/skills-profiles", ref: "dist" },
   fetchSkillDetail: vi.fn(),
 }));
 

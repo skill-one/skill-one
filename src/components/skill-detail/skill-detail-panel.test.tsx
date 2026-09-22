@@ -20,7 +20,6 @@ import {
 } from "./skill-detail-panel";
 
 vi.mock("../../lib/skill-detail-api", () => ({
-  MIRROR: { repo: "skill-one/skills-profiles", ref: "dist" },
   fetchSkillDetail: vi.fn(),
 }));
 

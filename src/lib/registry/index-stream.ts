@@ -3,10 +3,12 @@ import {
   fetchFirstJson,
   fetchFirstStreamInOrder,
   fileCandidates,
+  type FileSpec,
 } from "../cdn-config";
+import { MIRROR } from "../mirror";
 import { count, record, text } from "../value";
 import type { Skill } from "../../types/skill";
-import { parseSkillLine, type StarsFor } from "./parse";
+import { jsonLine, parseSkillLine, type StarsFor } from "./parse";
 import { readLatestTag } from "./snapshot";
 import type { SnapshotSource } from "./snapshot";
 
@@ -35,15 +37,15 @@ import type { SnapshotSource } from "./snapshot";
  */
 
 /**
- * The skills-profiles repo publishes the whole dataset (JSONL) to its `dist`
- * branch as a snapshot. Each row already carries the profile classification
- * (`domain`), so this single file *is* the dataset — there is no
- * second source decoration step.
+ * The dataset repo publishes the whole dataset (JSONL) to its `dist` branch as
+ * a snapshot. Each row already carries the profile classification (`domain`),
+ * so this single file *is* the dataset — there is no second source decoration
+ * step.
  */
 const INDEX_SPEC = {
-  repo: "skill-one/skills-profiles",
+  repo: MIRROR.repo,
   path: "skills.jsonl",
-  ref: "dist",
+  ref: MIRROR.ref,
 } as const;
 
 /** Sidecar run stats published beside the index (under `upstream/`). */
@@ -69,6 +71,22 @@ const INDEX_SOURCE: SnapshotSource = {
   branch: INDEX_SPEC.ref,
   tag: /^dist-\d{4}-\d{2}-\d{2}(?:-\d+)?$/,
 };
+
+/**
+ * Candidate URLs for one snapshot file, addressed by the file's own policy:
+ * pinned to the immutable `dist-` tag when one is resolved — cache-safe, so a
+ * lagging CDN can only serve the same snapshot — and read off the mutable
+ * branch cache-busted when none is, since a stale copy there would pass for
+ * the current publish.
+ */
+function snapshotUrls(
+  spec: FileSpec,
+  cdnBase: string,
+  tag?: string,
+): string[] {
+  const urls = fileCandidates({ ...spec, ref: tag ?? spec.ref }, cdnBase);
+  return tag ? urls : urls.map(cacheBusted);
+}
 
 /**
  * Silence allowed between body chunks before the read is treated as stalled.
@@ -186,9 +204,8 @@ function readStatsAt(
   cdnBase: string,
   tag: string,
 ): Promise<RawRunStats | null> {
-  return fetchFirstJson(
-    fileCandidates({ ...META_SPEC, ref: tag }, cdnBase),
-    (raw) => record<RawRunStats>(raw),
+  return fetchFirstJson(snapshotUrls(META_SPEC, cdnBase, tag), (raw) =>
+    record<RawRunStats>(raw),
   );
 }
 
@@ -201,9 +218,7 @@ function readStatsAt(
 async function probeBranchStats(
   cdnBase: string,
 ): Promise<PublishedIndex | null> {
-  return fetchFirstJson(
-    fileCandidates(META_SPEC, cdnBase).map(cacheBusted),
-    (raw) => {
+  return fetchFirstJson(snapshotUrls(META_SPEC, cdnBase), (raw) => {
       const stats = record<RawRunStats>(raw);
       return stats ? normalizeStats(stats) : null;
     },
@@ -237,9 +252,8 @@ export function readTrending(
   cdnBase: string,
   tag?: string,
 ): Promise<string[] | null> {
-  const spec = { ...TRENDING_SPEC, ref: tag ?? TRENDING_SPEC.ref };
   return fetchFirstJson(
-    fileCandidates(spec, cdnBase).map((url) => (tag ? url : cacheBusted(url))),
+    snapshotUrls(TRENDING_SPEC, cdnBase, tag),
     (raw) =>
       Array.isArray(raw) && raw.every((id) => typeof id === "string")
         ? (raw as string[])
@@ -262,29 +276,23 @@ export async function readRepos(
   cdnBase: string,
   tag?: string,
 ): Promise<Map<string, number>> {
-  const spec = { ...REPOS_SPEC, ref: tag ?? REPOS_SPEC.ref };
-  const urls = fileCandidates(spec, cdnBase).map((url) =>
-    tag ? url : cacheBusted(url),
-  );
   const stars = new Map<string, number>();
-  await fetchFirstStreamInOrder(urls, async (body) => {
-    stars.clear();
-    await readLines(body, (line) => {
-      const trimmed = line.trim();
-      if (trimmed.length === 0) return;
-      let raw: unknown;
-      try {
-        raw = JSON.parse(trimmed);
-      } catch {
-        return;
-      }
-      const row = record<{ repo?: unknown; stars?: unknown }>(raw);
-      if (!row) return;
-      if (typeof row.repo === "string" && typeof row.stars === "number") {
-        stars.set(row.repo, row.stars);
-      }
-    });
-  });
+  await fetchFirstStreamInOrder(
+    snapshotUrls(REPOS_SPEC, cdnBase, tag),
+    async (body) => {
+      stars.clear();
+      await readLines(body, (line) => {
+        const row = jsonLine<{ repo?: unknown; stars?: unknown }>(line);
+        if (
+          row &&
+          typeof row.repo === "string" &&
+          typeof row.stars === "number"
+        ) {
+          stars.set(row.repo, row.stars);
+        }
+      });
+    },
+  );
   return stars;
 }
 
@@ -312,23 +320,22 @@ export async function readIndex(
   onLine: (skill: Skill) => void,
   onRestart: () => void,
 ): Promise<void> {
-  const spec = { ...INDEX_SPEC, ref: tag ?? INDEX_SPEC.ref };
-  const urls = fileCandidates(spec, cdnBase).map((url) =>
-    tag ? url : cacheBusted(url),
+  await fetchFirstStreamInOrder(
+    snapshotUrls(INDEX_SPEC, cdnBase, tag),
+    async (body) => {
+      onRestart();
+      // The sidecar fetch runs concurrently with the body; by the time a
+      // candidate answers it has long settled (it never rejects: the caller
+      // catches). One await per attempt — on fallback restarts it re-reads
+      // the same resolved map instead of re-fetching.
+      const starsFor: StarsFor | undefined = await stars.then(
+        (map): StarsFor | undefined =>
+          map ? (repo) => map.get(repo) : undefined,
+      );
+      await readLines(body, (line) => {
+        const skill = parseSkillLine(line, starsFor);
+        if (skill) onLine(skill);
+      });
+    },
   );
-  await fetchFirstStreamInOrder(urls, async (body) => {
-    onRestart();
-    // The sidecar fetch runs concurrently with the body; by the time a
-    // candidate answers it has long settled (it never rejects: the caller
-    // catches). One await per attempt — on fallback restarts it re-reads
-    // the same resolved map instead of re-fetching.
-    const starsFor: StarsFor | undefined = await stars.then(
-      (map): StarsFor | undefined =>
-        map ? (repo) => map.get(repo) : undefined,
-    );
-    await readLines(body, (line) => {
-      const skill = parseSkillLine(line, starsFor);
-      if (skill) onLine(skill);
-    });
-  });
 }

@@ -2,34 +2,19 @@ import { parse as parseYaml } from "yaml";
 
 import type { SkillDetail } from "../types/skill";
 import { errorMessage } from "./utils";
-import {
-  SourceFetchError,
-  fetchFirstText,
-  fileCandidates,
-  getIndexTag,
-} from "./cdn-config";
+import { SourceFetchError, fetchFirstText, fileCandidates } from "./cdn-config";
+import { MIRROR, mirrorRef } from "./mirror";
 
 /**
- * The skills-profiles repo ships every indexed skill's full files on its
- * `dist` branch — the same snapshot the index was built from. The index and
- * the skill directories are guaranteed to match (a row exists if and only if
- * its directory exists), so a registry-known path resolves in one request.
+ * The skills-profiles snapshot ships every indexed skill's full files — the
+ * same snapshot the index was built from (see `lib/mirror`). The index and the
+ * skill directories are guaranteed to match (a row exists if and only if its
+ * directory exists), so a registry-known path resolves in one request.
  *
  * Detail fetches are pinned to the snapshot tag recorded by the registry
- * client (`getIndexTag`) whenever it can, so the SKILL.md body is read from
- * exactly the snapshot the served index describes; without a recorded tag
- * the mutable `dist` branch is used.
+ * client, so the SKILL.md body is read from exactly the snapshot the served
+ * index describes.
  */
-export const MIRROR = {
-  repo: "skill-one/skills-profiles",
-  /** Fallback ref when no snapshot tag has been recorded yet. */
-  ref: "dist",
-} as const;
-
-/** The ref detail fetches are pinned to: the recorded tag, or `dist`. */
-function mirrorRef(): string {
-  return getIndexTag() || MIRROR.ref;
-}
 
 /** Frontmatter fields surfaced in the detail view. */
 const FRONTMATTER_FIELDS = [

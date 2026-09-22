@@ -1,5 +1,5 @@
 import type { Skill } from "../../types/skill";
-import { text, textList } from "../value";
+import { record, text, textList } from "../value";
 
 /**
  * Pure parsing of the skills-profiles index's JSONL lines into the app's
@@ -103,8 +103,27 @@ function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
 }
 
 /**
- * Parse one JSONL index line into a GitHub skill. Returns null for blank
- * lines, malformed JSON, and ids that are not canonical GitHub ids.
+ * One streamed JSONL line as a raw record: null for a blank line, malformed
+ * JSON, or a value that is not an object. The single definition of what a
+ * snapshot line is, shared by the index rows (`parseSkillLine`) and the repos
+ * sidecar (see `readRepos` in `index-stream.ts`).
+ */
+export function jsonLine<T extends object>(line: string): T | null {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  return record<T>(raw);
+}
+
+/**
+ * Parse one JSONL index line into a GitHub skill. Returns null for a line that
+ * is not a usable record (see `jsonLine`), and for ids that are not canonical
+ * GitHub ids.
  *
  * `starsFor` supplies the source repo's GitHub star count (see `StarsFor`);
  * omitting it leaves every skill with 0 stars — the graceful shape when the
@@ -114,15 +133,8 @@ export function parseSkillLine(
   line: string,
   starsFor?: StarsFor,
 ): Skill | null {
-  const trimmed = line.trim();
-  if (trimmed.length === 0) return null;
-  let raw: RawSkill;
-  try {
-    raw = JSON.parse(trimmed) as RawSkill;
-  } catch {
-    return null;
-  }
-  return typeof raw.id === "string" && isCanonicalId(raw.id)
+  const raw = jsonLine<RawSkill>(line);
+  return raw && typeof raw.id === "string" && isCanonicalId(raw.id)
     ? toSkill(raw, starsFor)
     : null;
 }
