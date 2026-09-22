@@ -93,18 +93,31 @@ describe("RepoCard", () => {
     expect(container.querySelector('[data-slot="card-header"]')).toBeNull();
     expect(container.querySelector('[data-slot="card-content"]')).not.toBeNull();
 
-    // The one bar carries what the repository is, how big it is, and the way
-    // into its page.
+    // The one bar carries what the repository is and the way into its page.
     const bar = screen.getByRole("link", {
       name: `查看仓库 ${REPO}，6 个 skill`,
     });
     expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
     expect(within(bar).getByText(REPO)).toBeInTheDocument();
     expect(within(bar).getByText(formatCount(STARS))).toBeInTheDocument();
-    expect(within(bar).getByText("6 个")).toBeInTheDocument();
-    expect(within(bar).getByText("全部")).toBeInTheDocument();
+    // The count is the door's *object*, not a second figure standing beside it
+    // with a separator between them: one phrase, in one element, carrying the
+    // noun the app uses for it everywhere else — so nothing has to disambiguate
+    // 「6 个」 from the rows on screen.
+    const door = within(bar).getByText("6 个 skill");
+    expect(door.tagName).toBe("SPAN");
+    // ...and the repository's own figure rides the repository's own name, at
+    // the front of the bar, rather than out in the door's cluster — where it
+    // mixed a fact about the repository with a fact about the list.
+    const name = within(bar).getByText(REPO);
+    const stars = within(bar).getByTitle(`${STARS} stars`);
+    const follows = (first: Element, second: Element) =>
+      (first.compareDocumentPosition(second) &
+        Node.DOCUMENT_POSITION_FOLLOWING) !==
+      0;
+    expect(follows(name, stars)).toBe(true);
+    expect(follows(stars, door)).toBe(true);
     // The printed star figure is compacted; the raw one stays reachable.
-    expect(within(bar).getByTitle(`${STARS} stars`)).toBeInTheDocument();
     // The bar is the card's one repository-level control. A second link for the
     // same kind of choice — an "open on GitHub" button — used to sit beside it;
     // the repository page carries that action with a label instead.
@@ -134,7 +147,7 @@ describe("RepoCard", () => {
     const bar = screen.getByRole("link", {
       name: `查看仓库 ${REPO}，6 个 skill`,
     });
-    expect(within(bar).getByText("6 个")).toBeInTheDocument();
+    expect(within(bar).getByText("6 个 skill")).toBeInTheDocument();
     expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
   });
 
@@ -145,7 +158,10 @@ describe("RepoCard", () => {
     const bar = screen.getByRole("link", {
       name: `查看仓库 ${REPO}，1 个 skill`,
     });
-    expect(within(bar).getByText("1 个")).toBeInTheDocument();
+    // The door's label, not a bare count: it reads 「1 个 skill」 — this
+    // repository has one skill and this is the way to it — without the bar
+    // having to change shape for the smallest repository there is.
+    expect(within(bar).getByText("1 个 skill")).toBeInTheDocument();
   });
 
   it("lists every match while a search is live, uncapped", () => {

@@ -354,14 +354,14 @@ describe("ExplorePage", () => {
       name: "查看仓库 acme/widgets，2 个 skill",
     });
     // The figures a group header used to carry now ride the card's bottom bar:
-    // the repository's name, the stars compactly — exactly as a skill card's
-    // rail prints them — and the skill count, which is the repository's total.
+    // the repository's name, the stars compactly right behind it — where they
+    // say something about the repository — and the skill count, the
+    // repository's total, inside the label of the door at the far end.
     expect(within(bar).getByText("acme/widgets")).toBeInTheDocument();
     expect(
       within(bar).getByText(new RegExp(formatCount(12_300))),
     ).toBeInTheDocument();
-    expect(within(bar).getByText("2 个")).toBeInTheDocument();
-    expect(within(bar).getByText("全部")).toBeInTheDocument();
+    expect(within(bar).getByText("2 个 skill")).toBeInTheDocument();
     // Both of the repository's rows are inside the card.
     expect(
       screen.getByRole("button", { name: "查看 widget-core 详情" }),

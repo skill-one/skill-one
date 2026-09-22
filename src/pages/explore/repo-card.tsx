@@ -32,9 +32,15 @@ const PREVIEWED_SKILLS = 4;
  *
  * The card is a repository with its skills inside it, and it is read skills
  * first: the body lists them (most-installed first, the repository's own
- * leaders), and the single bar along the bottom signs the card — owner avatar,
- * `owner/repo`, the stars and the total skill count — while being the door to
- * the repository's page. Keeping the identity at the *bottom* is what makes the
+ * leaders), and the single bar along the bottom signs the card while being the
+ * door to the repository's page. The bar reads left to right as two clusters,
+ * split by what each fact is *about*: the repository — avatar, `owner/repo`, its
+ * star count — and then, at the far end, the way into its page, labelled with
+ * the total skill count that page holds. Everything in the left cluster answers
+ * "which repository is this", everything in the right one answers "how do I see
+ * all of it", and the count sits inside the door's own phrase (「12 个 skill」)
+ * rather than beside it, because the count is the door's object, not a second
+ * fact next to it. Keeping the identity at the *bottom* is what makes the
  * skills the card's content instead of an attachment to a header: a card whose
  * first line is a repository name reads as a repository with a list under it,
  * and the reader who is comparing skills has to look past the name of every
@@ -49,7 +55,7 @@ const PREVIEWED_SKILLS = 4;
  *   state live;
  * - the **bottom bar** opens the repository's page, which lists every skill the
  *   repository publishes, uncapped. A card with skills left over says so by
- *   carrying the repository's full count next to the door.
+ *   carrying the repository's full count inside the door's own label.
  *
  * The bar is the card's only repository-level control, and it deliberately does
  * not carry an "open on GitHub" button. That button is a second link for the
@@ -258,33 +264,43 @@ export function RepoCard({
             <span className="truncate text-sm font-semibold text-foreground group-hover/head:underline">
               {repo}
             </span>
-            {/* The repository's size and the figure it is ranked by, in the
-                voice the rest of the app uses for them. The count is the
-                repository's *total*: that is what tells a capped list apart
-                from a complete one. The raw figure stays reachable as the
-                title, since the printed one is compacted. */}
-            <span className="ml-auto flex shrink-0 items-center gap-1.5 tabular-nums">
-              {stars !== undefined && (
-                <span
-                  className="flex items-center gap-1"
-                  title={`${stars} stars`}
-                >
-                  <Star
-                    className="h-3 w-3 fill-amber-400 text-amber-400"
-                    aria-hidden
-                  />
-                  {formatCount(stars)}
-                  <span aria-hidden="true">·</span>
-                </span>
-              )}
-              <span>{skills.length} 个</span>
-            </span>
-            {/* The door itself. The chevron leans into the hover the way every
-                other "go deeper" affordance in the app does, and 全部 stays a
-                word rather than becoming a bare arrow: it is the half of the
-                bar's sentence that says what the click gets you. */}
-            <span className="flex shrink-0 items-center gap-0.5 font-medium text-foreground">
-              全部
+            {/* The repository's weight rides its name, because that is what the
+                figure is about: a fact about the repository, next to the
+                repository, the way a follower count sits next to an account.
+                It used to sit out in the right-hand cluster with the count and
+                the door, which mixed two different kinds of fact on one side of
+                the bar — and it was never aligned there anyway: the digits are
+                as wide as they are, so only the glyphs looked like a column.
+                The amber star is separator enough; a `·` after it punctuated a
+                group that had already ended. The raw figure stays reachable as
+                the title, since the printed one is compacted. */}
+            {stars !== undefined && (
+              <span
+                className="flex shrink-0 items-center gap-1 tabular-nums"
+                title={`${stars} stars`}
+              >
+                <Star
+                  className="h-3 w-3 fill-amber-400 text-amber-400"
+                  aria-hidden
+                />
+                {formatCount(stars)}
+              </span>
+            )}
+            {/* The door, labelled with what it opens: the count is the door's
+                *object*, so it is written inside the door's own phrase rather
+                than standing beside it as a second figure with a separator
+                between them — one phrase, one entity, and no bare 「N 个」 for
+                the reader to disambiguate against the rows on screen. The noun
+                comes from the app's own voice (`N 个 skill`, the same words the
+                bar's own accessible name and the repository page's header use),
+                which is also what settles 全部: 「全部 1 个」 reads badly for a
+                repository with one skill, while 「1 个 skill」 reads the same as
+                every other count. The chevron carries the "go" the way every
+                other deeper affordance in the app does, and the total is always
+                the repository's own — which is what lets a capped list read as
+                "these of them": the reader counts the four rows and compares. */}
+            <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
+              {skills.length} 个 skill
               <ChevronRight
                 className="h-3 w-3 transition-transform group-hover/head:translate-x-0.5"
                 aria-hidden
