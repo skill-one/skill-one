@@ -58,7 +58,7 @@ skill-one/
 │   │   ├── agent-icon.tsx  # agent 品牌图标
 │   │   ├── owner-avatar.tsx# owner 头像（元信息行的作者头像）
 │   │   ├── repo-hover-card.tsx # 作者头像 + 其仓库信息浮窗
-│   │   ├── skill-cover.tsx # skill 自身的图片位（作者首字母）
+│   │   ├── skill-cover.tsx # skill 自身的图片位（作者首字母；仅详情抽屉使用）
 │   │   ├── skill-detail/    # 共享的 skill 详情面板与模态抽屉
 │   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）

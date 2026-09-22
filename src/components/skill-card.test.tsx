@@ -36,17 +36,29 @@ const wellKnown: SkillView = {
 };
 
 describe("SkillCard", () => {
-  it("names the source under the title on a sourced skill", () => {
+  it("names the source on the rail, with the owner's chip beside it", () => {
     const { container } = renderWithRouter(<SkillCard skill={sourced} />);
 
-    // The source line is the card's second row, and it carries both the chip
-    // and the repo it stands for — the header is never a name-only row.
-    const line = container.querySelector('[data-slot="card-description"]');
-    expect(line).not.toBeNull();
-    expect(line).toHaveTextContent("anthropics/skills");
+    // The rail is the card's one metadata line, and it carries both the chip
+    // and the repo it stands for.
+    const rail = container.querySelector('[data-slot="card-footer"]');
+    expect(rail).not.toBeNull();
+    expect(rail).toHaveTextContent("anthropics/skills");
     expect(
       screen.getByRole("button", { name: "仓库 anthropics/skills" }),
     ).toBeInTheDocument();
+  });
+
+  it("opens with the name rather than a placeholder cover", () => {
+    // The dataset publishes no per-skill illustration, so the card used to
+    // open with a letter square that stood for a picture nobody had. The name
+    // leads the card instead.
+    const { container } = renderWithRouter(<SkillCard skill={sourced} />);
+
+    expect(container.querySelector('[data-slot="skill-cover"]')).toBeNull();
+    expect(
+      container.querySelector('[data-slot="card-header"] h3'),
+    ).toHaveTextContent("pdf");
   });
 
   it("labels an unsourced skill instead of naming a repo", () => {
@@ -71,12 +83,15 @@ describe("SkillCard", () => {
     );
   });
 
-  it("closes the footer rather than leaving an empty rail", () => {
-    // A skill the registry cannot back has no classification and no figure:
-    // rendering the rail anyway would leave a hairline over nothing.
+  it("keeps the rail, naming the local install in place of a source", () => {
+    // A skill the registry cannot back has no classification and no figure,
+    // but it is never blank: the rail states 本地安装 where it would otherwise
+    // name a repository, so it is not a hairline over nothing.
     const { container } = renderWithRouter(<SkillCard skill={local} />);
 
-    expect(container.querySelector('[data-slot="card-footer"]')).toBeNull();
+    const rail = container.querySelector('[data-slot="card-footer"]');
+    expect(rail).not.toBeNull();
+    expect(rail).toHaveTextContent("本地安装");
   });
 
   it("keeps the figure alone on the rail when there is no classification", () => {
@@ -104,6 +119,23 @@ describe("SkillCard", () => {
     renderWithRouter(<SkillCard skill={{ ...sourced, description: "" }} />);
 
     expect(screen.getByText("暂无描述")).toBeInTheDocument();
+  });
+
+  it("keeps the corner action's click off the card body", () => {
+    // The card body opens the detail panel; the action beside the name
+    // installs. Pressing one must never count as pressing the other.
+    const onSelect = vi.fn();
+    renderWithRouter(
+      <SkillCard
+        skill={sourced}
+        onSelect={onSelect}
+        action={<button type="button">安装</button>}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "安装" }));
+
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("dims a muted card and rings the selected one", () => {

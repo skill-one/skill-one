@@ -21,8 +21,14 @@ export const SKILL_LIST_CLASS =
  * card it replaces, so the skeleton never changes size when the real cards
  * arrive.
  *
- * Measured off a rendered store card at the app's default window: 32px of
- * card padding, a 56px header (the 48px cover row plus the source line), 24px
- * of gaps, a 40px two-line description, a 28px footer rail and the 2px border.
+ * Measured off a rendered store card at the app's default window and at the
+ * grid's narrowest column (280px): 12px of card padding above, a 28px header
+ * (the name's own line is shorter — the corner action beside it sets the row),
+ * two 12px gaps, a 36px two-line description and a 43px rail. The description
+ * is clamped and the rail's height is the same whether or not a classification
+ * rides it, so one figure covers every store card. A skill with no source is a
+ * few pixels shorter — its rail carries the 本地安装 label instead of a chip —
+ * and the grid stretches its row to match its taller neighbours, which is the
+ * case the skeleton is measuring.
  */
-export const SKILL_CARD_SKELETON_CLASS = "h-[180px] rounded-xl";
+export const SKILL_CARD_SKELETON_CLASS = "h-[143px] rounded-xl";

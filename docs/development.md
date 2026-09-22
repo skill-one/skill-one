@@ -58,7 +58,7 @@ skill-one/
 │   │   ├── agent-icon.tsx  # Agent brand icons
 │   │   ├── owner-avatar.tsx# Owner avatar (the metadata rail's author chip)
 │   │   ├── repo-hover-card.tsx # Author chip + its repository hover card
-│   │   ├── skill-cover.tsx # Skill's own image slot (author initial)
+│   │   ├── skill-cover.tsx # Skill's own image slot (author initial; detail drawer only)
 │   │   ├── skill-detail/    # Shared skill detail panel + modal drawer
 │   │   └── placeholder.tsx # Shared "nothing to show" empty state for list pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)

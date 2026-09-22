@@ -301,49 +301,43 @@ describe("MySkillsPage", () => {
     expect(screen.getByText("暂无描述")).toBeInTheDocument();
   });
 
-  it("labels every card 本地安装 and still leads it with the skill's image", async () => {
+  it("states 本地安装 on every rail and shows no owner chip", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
 
     await screen.findByText("pdf");
     // Skills installed by other tools (no ledger entry) read as a local
-    // install; every card still leads with its skill's image. Nothing loads
-    // in this env and no source can be named, so the slot shows the skill's
-    // own initial — and no owner avatar joins it.
-    expect(screen.getAllByText("本地安装")).toHaveLength(6);
-    const covers = container.querySelectorAll('ul [data-slot="skill-cover"]');
-    expect(covers).toHaveLength(6);
-    expect(covers[0]).toHaveTextContent("p");
+    // install. No source can be named, so the rail states that instead, no
+    // owner avatar joins it, and no card opens with a placeholder cover.
+    const rails = container.querySelectorAll('ul [data-slot="card-footer"]');
+    expect(rails).toHaveLength(6);
+    for (const rail of rails) expect(rail).toHaveTextContent("本地安装");
+    expect(
+      container.querySelectorAll('ul [data-slot="skill-cover"]'),
+    ).toHaveLength(0);
     expect(container.querySelectorAll('ul [data-slot="avatar"]')).toHaveLength(
       0,
     );
   });
 
-  it("shows the recorded source repo with the owner's author chip under the name", async () => {
+  it("shows the recorded source repo with the owner's author chip on the rail", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
     // The ledger has a source for pdf (installed through this app); docx is
     // a tool-installed skill with no entry.
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
 
-    // The sourced card names its repo on the source line under the name: the
-    // author chip rides it, and the chip's hover card states what it stands
-    // for.
+    // The sourced card names its repo on the rail: the author chip rides it,
+    // with the repository written out beside it.
     const chip = await screen.findByRole("button", {
       name: "仓库 anthropics/skills",
     });
-    expect(chip.closest('[data-slot="card-description"]')).not.toBeNull();
+    const rail = chip.closest('[data-slot="card-footer"]');
+    expect(rail).not.toBeNull();
+    expect(rail).toHaveTextContent("anthropics/skills");
     // docx keeps the local-install presentation.
     expect(screen.getAllByText("本地安装")).toHaveLength(5);
-    // The cover degrades to its author's initial — the owner for the sourced
-    // card, the skill's own name for the ones the ledger cannot name.
-    expect(
-      container.querySelector('[aria-label="pdf 封面图"]'),
-    ).toHaveTextContent("a");
-    expect(
-      container.querySelector('[aria-label="docx 封面图"]'),
-    ).toHaveTextContent("d");
-    // Only the sourced card can name an author, so only its metadata rail
-    // carries an author chip — and the rail exists for that chip alone, since
-    // the registry holds no entry to classify or rank the skill by.
+    // Only the sourced card can name an author, so only its rail carries an
+    // author chip — and the rail exists for that chip alone, since the
+    // registry holds no entry to classify or rank the skill by.
     expect(container.querySelectorAll('ul [data-slot="avatar"]')).toHaveLength(
       1,
     );

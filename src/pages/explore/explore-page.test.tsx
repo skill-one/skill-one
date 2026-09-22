@@ -720,12 +720,16 @@ describe("ExplorePage", () => {
 
     // The endpoint publishes no stars, so blending a real install count with an
     // absent zero would report 199k installs as a few hundred: the row carries
-    // no figure, and no rail renders empty above one.
-    expect(cardOf("sprocket").querySelector('[data-slot="card-footer"]')).toBeNull();
-    // An indexed skill keeps its rail, so the absence above is the live row's
-    // and not the harness's.
+    // no figure. Its rail is not blank — it still names the source — the figure
+    // is simply the one fact the row has no index entry to fill in.
+    const rail = cardOf("sprocket").querySelector('[data-slot="card-footer"]');
+    expect(rail).not.toBeNull();
+    expect(rail).toHaveTextContent("acme/fresh");
+    expect(rail?.querySelector('[aria-label^="热度"]')).toBeNull();
+    // An indexed skill keeps its figure, so the absence above is the live
+    // row's and not the harness's.
     expect(
-      cardOf("gadget-master").querySelector('[data-slot="card-footer"]'),
+      cardOf("gadget-master").querySelector('[aria-label^="热度"]'),
     ).not.toBeNull();
   });
 

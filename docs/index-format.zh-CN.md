@@ -55,7 +55,7 @@ GitHub star 数**不在**技能行里：它存放在下文的 `upstream/repos.js
 
 ## 分类文件（profiles/）
 
-每个已分类的技能还会发布 `profiles/{id}/domain.json`——载荷与索引行里的分类完全一致——以及供人阅读的 `md/domain.md`。应用只读索引行、从不拉取这两个文件，它们作为数据集自己的可浏览副本存在。快照不再发布逐技能封面插图：应用的图片位显示作者首字母（见 [../src/components/skill-cover.tsx](../src/components/skill-cover.tsx)）。
+每个已分类的技能还会发布 `profiles/{id}/domain.json`——载荷与索引行里的分类完全一致——以及供人阅读的 `md/domain.md`。应用只读索引行、从不拉取这两个文件，它们作为数据集自己的可浏览副本存在。快照不再发布逐技能封面插图：详情抽屉的图片位显示作者首字母（见 [../src/components/skill-cover.tsx](../src/components/skill-cover.tsx)）。列表卡片则完全不放图片位——每张卡都重复一个首字母方块，只是 48px 不承载技能任何事实的装饰——因此每张卡由名称打头，来源则写在卡片的信息行上。
 
 索引行与 `skills/` 目录按 id 一一对应：`skills/{owner}/{repo}/{slug}/` 内正是上游技能自带的全部文件。应用把每行映射为 `Skill` 模型：`name = slug`、`repo = {owner}/{repo}`、`path = skills/{id}`（快照内目录，用于详情拉取与按目录名匹配）、`rev = hash`、`firstSeenAt = fetchedAt`、`profile = { domain }`——`stars` 则来自 join 到的 `repos.jsonl` 行（未 join 到时为 0）。
 
@@ -100,4 +100,4 @@ GitHub star 数**不在**技能行里：它存放在下文的 `upstream/repos.js
 
 技能详情 `SKILL.md` 从快照按 `skills/{id}/SKILL.md` 拉取，存在已记录标签时定址到该快照（否则用可变的 `dist` 分支），见 [../src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。
 
-Owner 头像（skill 卡片元信息行上的作者头像，以及详情抽屉仓库行上的仓库所有者头像）从快照按 `upstream/avatars/{owner}.png` 拉取，走同一条下载源回退链，存在已记录标签时定址到该快照，见 [../src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx)。头像本身只是装饰：详情抽屉的仓库行会把仓库名以文本形式紧邻显示，卡片上则由头像自带的浮窗报出仓库名——卡片自己不再打印仓库文本（见 [../src/components/repo-hover-card.tsx](../src/components/repo-hover-card.tsx)），因此头像对辅助技术隐藏。
+Owner 头像（skill 卡片元信息行上的作者头像，以及详情抽屉仓库行上的仓库所有者头像）从快照按 `upstream/avatars/{owner}.png` 拉取，走同一条下载源回退链，存在已记录标签时定址到该快照，见 [../src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx)。头像本身只是装饰：详情抽屉的仓库行与卡片的信息行都会把仓库名以文本形式紧邻显示，头像自带的浮窗（见 [../src/components/repo-hover-card.tsx](../src/components/repo-hover-card.tsx)）则额外给出其 Star 数，因此头像对辅助技术隐藏。

@@ -51,21 +51,23 @@ describe("SkillListRow", () => {
     expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
   });
 
-  it("leads with the skill's own image and pins the author chip under the name", () => {
+  it("leads with the name and pins the author chip to the rail", () => {
     const { container } = renderWithRouter(<SkillListRow skill={skill} />);
 
-    // The skill's image is the card's leading element, named for assistive
-    // tech; nothing loads here, so it shows the author's initial.
-    const cover = container.querySelector('[data-slot="skill-cover"]');
-    expect(cover).toHaveAttribute("aria-label", "pdf 封面图");
+    // No cover: the name is the card's first content, and nothing else shares
+    // its line but the corner action.
+    expect(container.querySelector('[data-slot="skill-cover"]')).toBeNull();
+    expect(container.querySelector('[data-slot="card-header"] h3')).toHaveTextContent(
+      "pdf",
+    );
 
-    // The chip rides the source line under the name and names the repository
-    // it stands for, with the source written out beside it.
+    // The chip rides the rail and names the repository it stands for, with the
+    // source written out beside it.
     const chip = screen.getByRole("button", {
       name: "仓库 anthropics/skills",
     });
     expect(chip.querySelector('[data-slot="avatar"]')).not.toBeNull();
-    expect(chip.closest('[data-slot="card-description"]')).not.toBeNull();
+    expect(chip.closest('[data-slot="card-footer"]')).not.toBeNull();
   });
 
   it("lets the header shrink so a long name cannot push the action out of the card", () => {
@@ -75,7 +77,7 @@ describe("SkillListRow", () => {
 
     // jsdom lays nothing out, so what is pinned here is the guard itself: the
     // header is a grid whose `1fr` track keeps a content-based minimum, and
-    // without `min-w-0` on the leading block a name that does not fit widens
+    // without `min-w-0` on the name's own box a name that does not fit widens
     // that track past the card and carries the corner action out of the
     // border with it.
     const header = container.querySelector('[data-slot="card-header"]');
@@ -149,20 +151,20 @@ describe("SkillListRow", () => {
     ).toBeInTheDocument();
   });
 
-  it("takes the card's controls in card order: chip, install, then figure", async () => {
+  it("takes the card's controls in card order: install, chip, then figure", async () => {
     const user = userEvent.setup();
     renderWithRouter(<SkillListRow skill={skill} />);
 
-    // The tab order follows the card top to bottom: the source line under the
-    // name, then the corner action, then the rail's figure.
+    // The tab order follows the card top to bottom: the corner action, then
+    // the rail's source chip, then the figure beside it.
     await user.tab();
     expect(
-      screen.getByRole("button", { name: "仓库 anthropics/skills" }),
+      screen.getByRole("button", { name: "安装" }),
     ).toHaveFocus();
 
     await user.tab();
     expect(
-      screen.getByRole("button", { name: "安装" }),
+      screen.getByRole("button", { name: "仓库 anthropics/skills" }),
     ).toHaveFocus();
 
     await user.tab();
