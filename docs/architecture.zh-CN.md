@@ -57,7 +57,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 | `src/components/app-sidebar.tsx` | 侧边栏导航（路由与标题共用同一份配置），以及导航角标：「全部」显示已流式下载的 skill 数，「仓库」在索引就绪后显示聚合的仓库总数 |
 | `src/pages/explore/repo-card.tsx` / `repo-page.tsx` | 商店的仓库视图：一个仓库一张卡——主体是按安装量排序、有上限的 skill 列表，底部一行同时署名该仓库并通往它的页面——以及该仓库自己的页面，不限量地列出它发布的全部 skill |
 | `src/lib/view-memory.ts` / `src/hooks/use-view-memory.ts` / `use-return.ts` | 列表页自己的视图——它上面的控件、已展开的深度、滚动位置——按历史记录逐条记住：页面自带滚动容器，浏览器对它什么都不会恢复。`use-return.ts` 是应用统一的返回控件：它弹回那条记录，而不是往栈里再压一份列表——这正是上面那份记忆有意义的前提 |
-| `src/lib/owner-tint.ts` / `avatar-source.ts` | 从 owner 头像中取平均数得到的颜色，按 owner 缓存——全应用唯一一个来自数据、而非取自主题的颜色。`avatar-source.ts` 是「头像在哪里」的唯一答案，卡片绘制的图片与取色采样的图片共用它 |
+| `src/lib/avatar-source.ts` | 「owner 头像在哪里」的唯一答案：数据集镜像（定址到已记录的快照标签）、它的可变分支、最后是 GitHub 自己的端点——所有界面都从这一条链取图 |
 | `src/pages/explore/featured/` | 精选页：计算生成的榜单 hero 轮播 + 本地策划的分类区块 |
 | `src/data/featured-content.ts` | 精选页的分类 → skill 策划引用（注册表索引不含分类字段） |
 | `src/lib/tauri.ts` | 判断是否运行在 Tauri WebView 中 |

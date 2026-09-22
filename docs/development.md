@@ -107,7 +107,6 @@ Conventions when styling new UI:
 
 - Use semantic tokens (`bg-background`, `text-muted-foreground`, `border-border`) rather than raw palette colors, so a theme switch needs no per-component work.
 - A raw color is acceptable only when it sits on a brand gradient or image that reads the same in both themes (for example the featured page hero).
-- One colour comes from data rather than from the theme: a repository card's owner tint, the average of the owner's avatar (see `src/lib/owner-tint.ts`). It is still declared as tokens in `index.css` rather than computed into a component, and it carries **hue only** — the bar keeps its own lightness, so the text on it keeps the contrast the theme was designed for.
 - Where a raw color is unavoidable (status text such as `text-emerald-600`), pair it with a `dark:` variant.
 
 ## Components

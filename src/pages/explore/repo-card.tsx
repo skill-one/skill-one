@@ -1,9 +1,7 @@
-import type { CSSProperties } from "react";
 import { Link } from "react-router";
 import { ChevronRight, Star } from "lucide-react";
 
 import { domainMeta } from "../../data/domains";
-import { useOwnerTint } from "../../hooks/use-owner-tint";
 import type { SearchHit } from "../../lib/registry/protocol";
 import { skillKey } from "../../lib/skill-view";
 import { cn, formatCount } from "../../lib/utils";
@@ -92,18 +90,6 @@ const PREVIEWED_SKILLS = 4;
  * hairline at the card's bottom edge, and the step is what keeps it from reading
  * as one more row of the list it signs.
  *
- * The owner's avatar also gives the card its **tint**: the average colour of the
- * picture, read once per owner and mixed — faintly — into the card's own surface
- * and a little more strongly into its bar, so the two surfaces are one ramp in
- * the owner's hue rather than a neutral card with a coloured stripe (see
- * `lib/owner-tint.ts` and the `[data-owner-tint]` rule in `index.css`; the ring
- * is deliberately left as the theme's own hairline, because a tinted frame reads
- * as state in a wall of cards, and this is not a state). It is decoration on top
- * of decoration, and it is built to be droppable: the read is scheduled on idle,
- * a card renders its plain chrome first and gains the tint only if a colour
- * arrives, and a card that never gets one is indistinguishable from the card
- * this component drew before the feature existed.
- *
  * The body is the same for every repository, including the ones with a single
  * skill: one row per skill, never a promoted or specially-shaped first entry, so
  * nothing about the card's anatomy depends on how many skills happen to be in
@@ -147,26 +133,13 @@ export function RepoCard({
   const [owner] = repo.split("/");
   const shown = hasQuery ? skills : skills.slice(0, PREVIEWED_SKILLS);
   const href = `/repo/${repo}`;
-  // The owner's colour, off their avatar. Null is the normal state — the read is
-  // scheduled on idle and most cards paint before it lands — and it is also the
-  // permanent state wherever there is nothing to read.
-  const tint = useOwnerTint(owner);
 
   return (
     <li className="flex flex-col">
       {/* `flex-1` is the one thing the card cannot know: under the plain-grid
           fallback the lane's items are stretched to the tallest card in the
-          row, and the card is what fills that height. The tint arrives as one
-          custom property plus a marker attribute, which is what the two rules in
-          `index.css` key off — the colour itself is never written into a class,
-          so the shares that keep its contrast safe stay in the stylesheet. */}
-      <Card
-        size="sm"
-        data-repo={repo}
-        data-owner-tint={tint ? "" : undefined}
-        style={tint ? ({ "--owner-tint": tint } as CSSProperties) : undefined}
-        className="group flex-1"
-      >
+          row, and the card is what fills that height. */}
+      <Card size="sm" data-repo={repo} className="group flex-1">
         <CardContent>
           {/* A row is the unit of the body, and it is deliberately not a card:
               the repository is the card, and a skill inside it is one line of
@@ -239,18 +212,8 @@ export function RepoCard({
 
         {/* The card's one bar: what this repository is, how big it is, and the
             way in. `mt-auto` keeps it on the bottom edge when the plain-grid
-            fallback stretches a short card to its neighbour's height. A card
-            with an owner colour takes `--card-bar`, which the tint rule in
-            `index.css` declares *on the card* — that is what keeps it resolving
-            against the theme in force, where a token declared on `:root` would
-            have substituted its colours once and carried them into the other
-            theme. A card without one keeps the theme's own wash. */}
-        <CardFooter
-          className={cn(
-            "mt-auto min-w-0 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground",
-            tint && "bg-(--card-bar)",
-          )}
-        >
+            fallback stretches a short card to its neighbour's height. */}
+        <CardFooter className="mt-auto min-w-0 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
           <Link
             to={href}
             aria-label={`查看仓库 ${repo}，${skills.length} 个 skill`}

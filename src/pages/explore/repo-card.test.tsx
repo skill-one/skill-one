@@ -3,7 +3,6 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { RepoCard } from "./repo-card";
-import { useOwnerTint } from "../../hooks/use-owner-tint";
 import {
   fetchInstalledSkills,
   installSkillFromSource,
@@ -18,12 +17,6 @@ vi.mock("../../lib/local-skills", () => ({
   fetchInstalledSkills: vi.fn(),
   installSkillFromSource: vi.fn(),
 }));
-
-/** The tint is read off the owner elsewhere (`lib/owner-tint.test.ts`); here the
- *  question is only what the card does with one. */
-vi.mock("../../hooks/use-owner-tint", () => ({ useOwnerTint: vi.fn() }));
-
-const mockOwnerTint = vi.mocked(useOwnerTint);
 
 const REPO = "anthropics/skills";
 const STARS = 169_600;
@@ -80,9 +73,6 @@ const rowNames = () =>
 describe("RepoCard", () => {
   beforeEach(() => {
     vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
-    // Default: no colour for the owner — the state most cards are in, and the
-    // state every card is in where there is nothing to read.
-    mockOwnerTint.mockReturnValue(null);
   });
 
   it("leads with the skills and signs off with the repository's own bar", () => {
@@ -241,38 +231,6 @@ describe("RepoCard", () => {
     expect(screen.getAllByRole("button", { name: "查看 pdf 详情" })[0]).toHaveClass(
       "flex-1",
     );
-  });
-
-  it("renders exactly the plain card when the owner has no colour", () => {
-    const { container } = renderCard();
-
-    // The tint is decoration, so its absence is not a state: no marker, no
-    // custom property, and the bar keeps the theme's own `bg-muted/50` rather
-    // than a tint token. That last part is load-bearing: a token declared on
-    // `:root` substitutes the colours it references once, on `:root`, so its
-    // value would carry the *other* theme's wash into this one — a card with no
-    // colour is exactly the card that must never go near it.
-    const card = container.querySelector(`[data-repo="${REPO}"]`) as HTMLElement;
-    const bar = container.querySelector('[data-slot="card-footer"]') as HTMLElement;
-    expect(card).not.toHaveAttribute("data-owner-tint");
-    expect(card.getAttribute("style")).toBeNull();
-    expect(bar).toHaveClass("bg-muted/50");
-    expect(bar).not.toHaveClass("bg-(--card-bar)");
-  });
-
-  it("hands the owner's colour to the card and its bar", () => {
-    mockOwnerTint.mockReturnValue("#3b82f6");
-    const { container } = renderCard();
-
-    // The owner the tint is read for is the repository's own owner segment.
-    expect(mockOwnerTint).toHaveBeenCalledWith("anthropics");
-
-    // One custom property and one marker attribute: how much of that colour
-    // reaches the card's surface and its bar — and how much lightness it is
-    // allowed to take with it — lives in the stylesheet, not here.
-    const card = container.querySelector(`[data-repo="${REPO}"]`) as HTMLElement;
-    expect(card).toHaveAttribute("data-owner-tint");
-    expect(card.style.getPropertyValue("--owner-tint")).toBe("#3b82f6");
   });
 
   it("keeps the card's single door: the bar, and nothing beside it", () => {

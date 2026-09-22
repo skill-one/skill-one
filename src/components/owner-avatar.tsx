@@ -8,8 +8,7 @@ import { cn } from "../lib/utils";
  * Round owner avatar loaded from the mirror, degrading through GitHub's
  * avatar endpoint and finally to the owner's initial. Candidate URLs are
  * walked in order via the avatar's loading status, one step per failure; the
- * list itself lives in `lib/avatar-source.ts`, so the image this draws and the
- * image `lib/owner-tint.ts` samples for colour can never disagree.
+ * list itself lives in `lib/avatar-source.ts`.
  *
  * Decoration: every call site prints the owner or the repo it belongs to as
  * text right beside it, so the avatar is marked aria-hidden and its image

@@ -4,9 +4,10 @@ import { avatarCandidates } from "./avatar-source";
 import { setCdnBase, setIndexTag } from "./cdn-config";
 
 /**
- * The one answer to "where is an owner's avatar": the image a card draws and the
- * image its tint is read from both come from here, so a wrong list is either a
- * missing face or a card tinted by a picture it is not showing.
+ * The one answer to "where is an owner's avatar": every surface that draws a
+ * face reads the same list, so a wrong list is a missing face everywhere at
+ * once — and the chain has to survive both a tagged snapshot and a mirror
+ * that has not published one yet.
  */
 
 afterEach(() => {

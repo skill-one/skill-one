@@ -45,19 +45,6 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  /* The lightness each repository-card surface keeps when an owner's tint
-     arrives (see `[data-owner-tint]` below). Lightness and hue are split on
-     purpose: lightness is what the small ink on these surfaces is legible
-     against, so it is the one thing a tint is not allowed to move. A card
-     without a tint is untouched by either — its bar is the `bg-muted/50` wash
-     the theme has always painted it with.
-
-     `--card-body-l` sits a hair under the card's own white because white has no
-     chroma room at all: a tinted surface has to give up a little lightness
-     before it can hold any colour. Three thousandths is the whole price, and it
-     is measured — see the numbers on the tint rule below. */
-  --card-body-l: 0.993;
-  --card-bar-l: 0.985;
 }
 
 .dark {
@@ -91,43 +78,6 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  /* The same two surfaces in the dark palette: the card's own lightness for the
-     body, and half of `--muted` over `--card` for the bar — a dark surface is
-     nowhere near the top of the gamut, so a tint costs it nothing there. */
-  --card-body-l: 0.205;
-  --card-bar-l: 0.237;
-}
-
-/* A repository card's owner tint — the average colour of the owner's avatar,
-   read at runtime and cached per owner (see `lib/owner-tint.ts`). A card sets
-   `data-owner-tint` only when it actually has a colour, so a card without one
-   keeps the theme's own surface, bar wash and ring: no colour, no change.
-
-   Both surfaces of the card take it — the body is a whisper of the owner's hue
-   and the bar, being a smaller area that already sits a step down, carries the
-   same hue a little stronger. That is one tonal ramp per owner rather than one
-   decorated stripe, which is what makes the card read as *this* owner's at a
-   glance instead of as a neutral card with a coloured footer.
-
-   Only the hue is allowed to travel, and that is not a figure of speech here:
-   each surface keeps the lightness the theme gave it and takes the owner's hue
-   plus a share of their chroma. Mixing the colour in the obvious way instead —
-   `color-mix(in oklch, var(--owner-tint) 12%, …)` — takes some of a dark
-   avatar's lightness with it, and a dark avatar is the common case: a solid logo
-   averages dark. Measured on the worst of six real avatars, the card's 11px
-   description ink reads at 4.59:1 this way against 3.64:1 the other, with the
-   untinted card at 4.74:1 and the bar unchanged from what it already was.
-
-   The ring stays the theme's own hairline. A tinted frame costs no contrast —
-   nothing is written on it — but in a wall of cards a coloured border reads as
-   *state* (selected, current, focused), and this is not a state: it is a
-   surface. The colour belongs in the surface, and the surface is where it is.
-
-   A grey avatar has almost no chroma to give, so its card stays neutral by
-   itself — which is right: a black-and-white logo carries no colour to show. */
-[data-owner-tint] {
-  --card: oklch(from var(--owner-tint) var(--card-body-l) calc(c * 0.14) h);
-  --card-bar: oklch(from var(--owner-tint) var(--card-bar-l) calc(c * 0.3) h);
 }
 
 @theme inline {

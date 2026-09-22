@@ -1,10 +1,8 @@
 import { fileCandidates, getIndexTag } from "./cdn-config";
 
 /**
- * Where an owner's avatar comes from — one answer, for the two things that need
- * it: the image a card draws, and the same image sampled for its colour (see
- * `lib/owner-tint.ts`). They have to agree, or a card would be tinted by an
- * avatar it is not showing.
+ * Where an owner's avatar comes from: one answer, in one place, for the image
+ * every surface draws.
  */
 
 /**

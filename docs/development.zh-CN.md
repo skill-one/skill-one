@@ -107,7 +107,6 @@ shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 
 
 - 使用语义化 token（`bg-background`、`text-muted-foreground`、`border-border`），不要直接写调色板颜色，这样切换主题无需改动组件。
 - 只有当颜色位于品牌渐变或图片之上、两种主题下观感一致时，才可以使用固定色（例如精选页 hero）。
-- 有一处颜色来自数据而非主题：仓库卡的 owner 染色，取自 owner 头像的平均色（见 `src/lib/owner-tint.ts`）。它同样以 token 形式声明在 `index.css`、而不是在组件里算出来，并且**只携带色相**——底栏保持自身明度，因此其上的文字仍保有主题为它设计的对比度。
 - 确实无法避免时（如 `text-emerald-600` 这类状态文案），必须同时补上 `dark:` 变体。
 
 ## 组件
