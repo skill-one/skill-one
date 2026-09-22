@@ -231,17 +231,20 @@ describe("RepoCard", () => {
     const { container } = renderCard();
 
     // The tint is decoration, so its absence is not a state: no marker, no
-    // custom property — and the bar reads the one token that resolves to the
-    // theme's own wash. This is the card as it was before any of this existed.
+    // custom property, and the bar keeps the theme's own `bg-muted/50` rather
+    // than a tint token. That last part is load-bearing: a token declared on
+    // `:root` substitutes the colours it references once, on `:root`, so its
+    // value would carry the *other* theme's wash into this one — a card with no
+    // colour is exactly the card that must never go near it.
     const card = container.querySelector(`[data-repo="${REPO}"]`) as HTMLElement;
+    const bar = container.querySelector('[data-slot="card-footer"]') as HTMLElement;
     expect(card).not.toHaveAttribute("data-owner-tint");
     expect(card.getAttribute("style")).toBeNull();
-    expect(container.querySelector('[data-slot="card-footer"]')).toHaveClass(
-      "bg-(--card-bar)",
-    );
+    expect(bar).toHaveClass("bg-muted/50");
+    expect(bar).not.toHaveClass("bg-(--card-bar)");
   });
 
-  it("hands the owner's colour to the bar and the card's ring", () => {
+  it("hands the owner's colour to the card and its bar", () => {
     mockOwnerTint.mockReturnValue("#3b82f6");
     const { container } = renderCard();
 
@@ -249,8 +252,8 @@ describe("RepoCard", () => {
     expect(mockOwnerTint).toHaveBeenCalledWith("anthropics");
 
     // One custom property and one marker attribute: how much of that colour
-    // reaches the bar and the ring — and how much lightness it is allowed to
-    // take with it — lives in the stylesheet, not here.
+    // reaches the card's surface and its bar — and how much lightness it is
+    // allowed to take with it — lives in the stylesheet, not here.
     const card = container.querySelector(`[data-repo="${REPO}"]`) as HTMLElement;
     expect(card).toHaveAttribute("data-owner-tint");
     expect(card.style.getPropertyValue("--owner-tint")).toBe("#3b82f6");

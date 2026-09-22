@@ -87,13 +87,16 @@ const PREVIEWED_SKILLS = 4;
  * as one more row of the list it signs.
  *
  * The owner's avatar also gives the card its **tint**: the average colour of the
- * picture, read once per owner and mixed — a little — into the bar's wash and
- * the card's ring (see `lib/owner-tint.ts` and the `[data-owner-tint]` rule in
- * `index.css`). It is decoration on top of decoration, and it is built to be
- * droppable: the read is scheduled on idle, a card renders its plain chrome
- * first and gains the tint only if a colour arrives, and a card that never gets
- * one is indistinguishable from the card this component drew before the feature
- * existed.
+ * picture, read once per owner and mixed — faintly — into the card's own surface
+ * and a little more strongly into its bar, so the two surfaces are one ramp in
+ * the owner's hue rather than a neutral card with a coloured stripe (see
+ * `lib/owner-tint.ts` and the `[data-owner-tint]` rule in `index.css`; the ring
+ * is deliberately left as the theme's own hairline, because a tinted frame reads
+ * as state in a wall of cards, and this is not a state). It is decoration on top
+ * of decoration, and it is built to be droppable: the read is scheduled on idle,
+ * a card renders its plain chrome first and gains the tint only if a colour
+ * arrives, and a card that never gets one is indistinguishable from the card
+ * this component drew before the feature existed.
  *
  * The body is the same for every repository, including the ones with a single
  * skill: one row per skill, never a promoted or specially-shaped first entry, so
@@ -230,11 +233,18 @@ export function RepoCard({
 
         {/* The card's one bar: what this repository is, how big it is, and the
             way in. `mt-auto` keeps it on the bottom edge when the plain-grid
-            fallback stretches a short card to its neighbour's height. The bar is
-            where the owner's tint shows: `--card-bar` is the theme's own wash,
-            and a card with a colour narrows it to that colour's hue (see
-            `index.css`) — so this reads the same token either way. */}
-        <CardFooter className="mt-auto min-w-0 border-t border-border/60 bg-(--card-bar) pt-2.5 text-[11px] text-muted-foreground">
+            fallback stretches a short card to its neighbour's height. A card
+            with an owner colour takes `--card-bar`, which the tint rule in
+            `index.css` declares *on the card* — that is what keeps it resolving
+            against the theme in force, where a token declared on `:root` would
+            have substituted its colours once and carried them into the other
+            theme. A card without one keeps the theme's own wash. */}
+        <CardFooter
+          className={cn(
+            "mt-auto min-w-0 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground",
+            tint && "bg-(--card-bar)",
+          )}
+        >
           <Link
             to={href}
             aria-label={`查看仓库 ${repo}，${skills.length} 个 skill`}
