@@ -25,17 +25,22 @@ export const LOCAL_SOURCE_LABEL = "本地安装";
  * express on its own: whether the registry actually backs it.
  *
  * The store's own rows always are backed — the index they came from *is* the
- * registry. An installed row is only backed when the app resolved the store
- * entry its recorded source points at, and an unresolved one must show no
- * figures at all rather than a hardcoded zero: `stars: 0` cannot tell "the
- * store reports nothing" from "there is no store entry", and a fabricated zero
- * would contradict the store's card, which shows the real number.
+ * registry. Two callers set it explicitly, both for the same reason: an
+ * installed record no store entry resolved for, and a live skills.sh hit, which
+ * is by definition not in the index (that is why it is a separate section).
+ * Each must show no figures at all rather than a hardcoded zero — `stars: 0`
+ * cannot tell "the source reports nothing" from "there is no source", and a
+ * fabricated zero would contradict the store's card, which shows the real
+ * number.
  *
  * So an absent `storeBacked` means "backed" (every plain `Skill` from the
- * registry), and the installed list is the one caller that sets it explicitly.
+ * registry), and only those two callers set it.
  */
 export interface SkillView extends Skill {
-  /** False for an installed skill the registry holds no entry for. */
+  /**
+   * False for a skill no store entry backs: an installed record the registry
+   * holds no entry for, or a live skills.sh hit.
+   */
   storeBacked?: boolean;
   /**
    * Installed skills only: when the skill's directory landed on disk, as Unix

@@ -12,24 +12,23 @@ import { cn, formatCount } from "../lib/utils";
 import { OwnerAvatar } from "./owner-avatar";
 
 /**
- * A skill's author as one chip on the card's metadata rail: the source repo's
- * owner avatar, with a hover card that names the repository it stands for.
+ * A skill's author as one chip on the card's metadata rail: the source's owner
+ * avatar, with a hover card that names the source it stands for.
  *
  * The avatar alone only says "someone published this" — the face is small, and
  * on the rail it is the one mark with no words next to it — so the hover card
- * answers *which* repository it belongs to, and the name it prints is itself
- * the one action that belongs to a repository: opening it on GitHub, with the
- * external mark beside it saying where the click lands. Clicking the avatar
- * reveals the same card (the touch path; hover and keyboard focus open it on
- * their own), and never falls through to the card, whose body opens the detail
- * panel.
+ * answers *which* source it belongs to, and the name it prints is itself the
+ * one action that belongs to a source: opening it, with the external mark
+ * beside it saying where the click lands. Clicking the avatar reveals the same
+ * card (the touch path; hover and keyboard focus open it on their own), and
+ * never falls through to the card, whose body opens the detail panel.
  */
 export function RepoHoverCard({
   repo,
   stars,
   className,
 }: {
-  /** `owner/repo` — the repository the avatar stands for. */
+  /** `owner/repo`, or a bare host for a well-known source. */
   repo: string;
   /** The repo's GitHub stars, when the surface knows them. */
   stars?: number;
@@ -37,9 +36,14 @@ export function RepoHoverCard({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  // The source is always `owner/repo` (the mirror only lists GitHub skills).
-  const [owner] = repo.split("/");
-  const href = `https://github.com/${repo}`;
+  // The mirror only lists GitHub skills, so its sources are `owner/repo` and
+  // the name is the owner. skills.sh also publishes "well-known" sources that
+  // are a bare host — `smithery.ai`, `modelscope.cn` — where the host is both
+  // who published the skill and the page that documents it: there is no
+  // repository name to prefix with GitHub, the host *is* the address.
+  const [owner, name] = repo.split("/");
+  const source = name ? "仓库" : "来源";
+  const href = name ? `https://github.com/${repo}` : `https://${repo}`;
 
   return (
     <HoverCard open={open} onOpenChange={setOpen}>
@@ -49,7 +53,7 @@ export function RepoHoverCard({
         render={
           <button
             type="button"
-            aria-label={`仓库 ${repo}`}
+            aria-label={`${source} ${repo}`}
             onClick={(e) => {
               // Hover/focus already open the card; the click only makes sure it
               // is open (touch). It must not reach the card body behind it.
@@ -75,15 +79,17 @@ export function RepoHoverCard({
           "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
         )}
       >
-        {/* The repository names itself and opens itself: the name *is* the
-            link, with the mark that says it leaves the app right behind it.
-            Who hovers an author chip wants the repo, not a menu of things to
-            do with it, so the separate "在 GitHub 中打开" line — a second row
-            of the same card, stating what the name already offers — is gone;
-            the icon brightens instead, which is where the pointer is. */}
+        {/* The source names itself and opens itself: the name *is* the link,
+            with the mark that says it leaves the app right behind it. Who
+            hovers an author chip wants the source, not a menu of things to do
+            with it, so the separate "打开" line — a second row of the same
+            card, stating what the name already offers — is gone; the icon
+            brightens instead, which is where the pointer is. */}
         <a
           href={href}
-          aria-label={`在 GitHub 中打开 ${repo}`}
+          aria-label={
+            name ? `在 GitHub 中打开 ${repo}` : `打开 ${repo}`
+          }
           onClick={(e) => {
             e.preventDefault();
             void openExternal(href);

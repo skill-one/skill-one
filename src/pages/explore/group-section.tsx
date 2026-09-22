@@ -35,6 +35,11 @@ export interface GroupMeta {
   key: string;
   /** The header's main line: repo name, bucket range, or domain name. */
   title: string;
+  /**
+   * A quiet aside after the title, when the group needs one line of context
+   * that its name cannot carry (e.g. where a section's skills come from).
+   */
+  note?: string;
   /** The owner whose avatar leads the header, when one exists. */
   avatarOwner?: string;
   /** A category glyph shown in place of an avatar, when one exists. */
@@ -266,6 +271,11 @@ export function GroupSection<T>({
             </span>
           ) : null}
           <span className="truncate text-sm font-medium">{group.title}</span>
+          {group.note && (
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {group.note}
+            </span>
+          )}
           {/* The figures the group is weighed by, pinned to the row's far
               edge as one quiet cluster: the stars the ordering used, then
               the item count. */}

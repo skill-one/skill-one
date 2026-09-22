@@ -13,12 +13,14 @@ import userEvent from "@testing-library/user-event";
 import { HashRouter } from "react-router";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { searchSkillsSh } from "../../lib/skills-sh";
 import { PAGE_SIZE } from "../../lib/pagination";
 import {
   SKILL_CARD_SKELETON_CLASS,
   SKILL_LIST_CLASS,
 } from "../../lib/skill-list-layout";
 import { formatCount } from "../../lib/utils";
+import type { SkillView } from "../../lib/skill-view";
 import type { Skill } from "../../types/skill";
 import type { RegistryHarness } from "../../test/registry-harness";
 import { ExplorePage } from "./explore-page";
@@ -55,6 +57,19 @@ vi.mock("../../lib/skill-detail-api", () => ({
 }));
 
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
+
+/**
+ * The live skills.sh search is stubbed at the module boundary: what the page
+ * owes it is "ask once per search text, fold the answer in below the groups" —
+ * the request itself is `lib/skills-sh.test.ts`'s subject. `isSearchableQuery`
+ * stays real, so the endpoint's own query floor is exercised here too.
+ */
+vi.mock("../../lib/skills-sh", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/skills-sh")>()),
+  searchSkillsSh: vi.fn(),
+}));
+
+const mockSearchSkillsSh = vi.mocked(searchSkillsSh);
 
 /** The one repository every `makeSkills` skill belongs to. */
 const BATCH_REPO = "acme/batch";
@@ -118,6 +133,37 @@ function bootGadgetRegistry() {
   harness.complete();
 }
 
+/**
+ * One live skills.sh hit in the app's skill model: the shape `lib/skills-sh.ts`
+ * maps the endpoint's answer to — a name, a source repo and an install count,
+ * with no description, stars or snapshot path to go with them, and no index
+ * entry to back them (`storeBacked`).
+ */
+function liveSkill(name: string, repo: string, downloads: number): SkillView {
+  return {
+    name,
+    repo,
+    description: "",
+    stars: 0,
+    downloads,
+    url: `https://www.skills.sh/${repo}/${name}`,
+    storeBacked: false,
+  };
+}
+
+/**
+ * The card element of one skill, addressed by its name. An indexed row names
+ * itself for the detail panel it opens; a live row opens none, and the search
+ * highlight may have split its name into several spans anyway, so that one is
+ * addressed by its own text.
+ */
+function cardOf(name: string): HTMLElement {
+  const card =
+    screen.queryByRole("button", { name: `查看 ${name} 详情` }) ??
+    screen.getByText(name);
+  return card.closest('[data-slot="card"]') as HTMLElement;
+}
+
 let queryClient: QueryClient;
 
 function renderExplorePage() {
@@ -166,6 +212,10 @@ beforeEach(() => {
   });
   harness.reset();
   mockFetchSkillDetail.mockReset();
+  // Default: the live source has nothing to add, so every test that does not
+  // care about it sees the local answer alone.
+  mockSearchSkillsSh.mockReset();
+  mockSearchSkillsSh.mockResolvedValue([]);
   mockFetchSkillDetail.mockImplementation(
     async (_repo: string, id: string) => ({
       name: id,
@@ -621,6 +671,99 @@ describe("ExplorePage", () => {
     expect(
       await screen.findByText("未找到匹配“zzzzzzqqqq”的 Skill"),
     ).toBeInTheDocument();
+  });
+
+  it("closes the list with the live skills.sh answer, minus what the index has", async () => {
+    const user = userEvent.setup();
+    bootGadgetRegistry();
+    // The endpoint answers with one skill the index already carries (the row
+    // the local search just found) and one it does not.
+    mockSearchSkillsSh.mockResolvedValue([
+      liveSkill("gadget-master", "acme/gadgets", 99),
+      liveSkill("sprocket", "acme/fresh", 7),
+    ]);
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    await user.type(await searchField(), "gadget");
+
+    expect(
+      await screen.findByRole("button", {
+        name: "分组 skills.sh 官方搜索，1 个 skill",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("实时结果，本地索引未收录")).toBeInTheDocument();
+    // The live-only skill is on the page…
+    expect(screen.getByText("sprocket")).toBeInTheDocument();
+    expect(screen.getByText("acme/fresh")).toBeInTheDocument();
+    // …and the indexed copy is still the only gadget-master: a live hit the
+    // local answer already covers is not a second row.
+    expect(
+      screen.getAllByRole("button", { name: "查看 gadget-master 详情" }),
+    ).toHaveLength(1);
+    expect(mockSearchSkillsSh).toHaveBeenCalledWith("gadget", expect.anything());
+  });
+
+  it("shows no figure on a live row, which has no index entry to take one from", async () => {
+    const user = userEvent.setup();
+    bootGadgetRegistry();
+    mockSearchSkillsSh.mockResolvedValue([
+      liveSkill("sprocket", "acme/fresh", 199323),
+    ]);
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    await user.type(await searchField(), "gadget");
+    await screen.findByText("sprocket");
+
+    // The endpoint publishes no stars, so blending a real install count with an
+    // absent zero would report 199k installs as a few hundred: the row carries
+    // no figure, and no rail renders empty above one.
+    expect(cardOf("sprocket").querySelector('[data-slot="card-footer"]')).toBeNull();
+    // An indexed skill keeps its rail, so the absence above is the live row's
+    // and not the harness's.
+    expect(
+      cardOf("gadget-master").querySelector('[data-slot="card-footer"]'),
+    ).not.toBeNull();
+  });
+
+  it("shows the live answer when the local index has no match", async () => {
+    const user = userEvent.setup();
+    bootGadgetRegistry();
+    mockSearchSkillsSh.mockResolvedValue([liveSkill("sprocket", "acme/fresh", 7)]);
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    await user.type(await searchField(), "sprocket");
+
+    expect(
+      await screen.findByRole("button", {
+        name: "分组 skills.sh 官方搜索，1 个 skill",
+      }),
+    ).toBeInTheDocument();
+    // The live answer replaces the empty state rather than sitting behind it.
+    expect(screen.queryByText(/未找到匹配/)).not.toBeInTheDocument();
+  });
+
+  it("asks the live endpoint only once the query clears its floor", async () => {
+    const user = userEvent.setup();
+    bootGadgetRegistry();
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    // Browsing is not a search: with no query there is nothing to ask.
+    expect(mockSearchSkillsSh).not.toHaveBeenCalled();
+
+    await user.type(await searchField(), "g");
+    // The one-character query has settled locally — the filler groups are
+    // gone — while the endpoint, which answers nothing shorter than two
+    // characters, was never asked.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: /^分组 acme\/tool-/ }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(mockSearchSkillsSh).not.toHaveBeenCalled();
   });
 
   it("searches the name only: repo and description mentions are not hits", async () => {

@@ -64,7 +64,7 @@ const INTERACTIVE_CLASS =
  * the same card. The two are told apart by data, not by a flag: a skill whose
  * registry entry is unknown (`storeBacked`) has no classification and no figure
  * to show rather than a fabricated zero — which is exactly what an installed
- * skill with no recorded source is.
+ * skill with no recorded source is, and what a live skills.sh row is.
  *
  * Only what a surface *does* arrives as a slot, because only the surface knows
  * it: the corner action (an install button on the store, an enable switch on the
@@ -104,11 +104,14 @@ export function SkillCard({
   /** Test hook on the card element. */
   "data-skill"?: string;
 }) {
-  // Absent means backed: every `Skill` the registry handed over is. Only the
-  // installed list sets it, for a record no store entry was resolved for.
+  // Absent means backed: every `Skill` the registry handed over is. The two
+  // callers that set it are the installed list, for a record no store entry was
+  // resolved for, and the store's live skills.sh section, whose rows are not in
+  // the index at all.
   const storeBacked = skill.storeBacked !== false;
-  // The owner segment of the source — what the dataset hosts an avatar for. A
-  // bare owner (no slash) counts as none, exactly as it does for the cover.
+  // The owner segment of the source — what the dataset hosts an avatar for, and
+  // what the source line's chip stands for. Empty only when there is no source
+  // at all; a bare-host source is its own owner.
   const [owner] = skill.repo.split("/");
   // Classification and figure are both registry facts; the dataset simply has
   // not classified every skill, so the classification is optional. A skill may

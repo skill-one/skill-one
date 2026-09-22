@@ -3,6 +3,7 @@ import { Flame, FolderGit2, LayoutGrid } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
+import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { SEARCH_DEBOUNCE_MS } from "../../lib/pagination";
 import {
@@ -32,6 +33,9 @@ import { GroupSection } from "./group-section";
  */
 const INITIAL_GROUPS = 6;
 const GROUP_CHUNK = 6;
+
+/** Fold-state and React-key identity of the live skills.sh section. */
+const LIVE_GROUP_KEY = "skills-sh";
 
 /**
  * The grouping modes the toolbar offers. Each mode implies its own ordering
@@ -69,6 +73,12 @@ export function ExplorePage() {
   } = useRegistryGroups(query, groupBy);
 
   const groups = groupsData?.groups ?? [];
+
+  // The live skills.sh answer for the same query — the store's second source.
+  // It is fetched here rather than inside the registry worker: it is a plain
+  // upstream request, not a lookup over the local index, and it must be
+  // allowed to answer while the index is still being built.
+  const { data: liveData } = useSkillsShSearch(query);
 
   // A download failure only owns the screen while there is nothing to show;
   // with data on screen (cache / previous source) the error surfaces in the
@@ -122,6 +132,17 @@ export function ExplorePage() {
     () => (groupsData?.groups ?? []).flatMap((g) => g.skills.map((h) => h.skill)),
     [groupsData],
   );
+  // What the live answer adds: the hits the local answer does not already carry.
+  // A live hit is keyed by the same `repo/name` pair the registry keys a skill
+  // by, so identity is the whole comparison — a skill the store already lists
+  // (with its description, its stars and its SKILL.md) must not appear twice,
+  // and one it does not is exactly what this section is for. Lives on the
+  // search answer, not on the grouping: the same skills come back whichever
+  // mode buckets them.
+  const liveSkills = useMemo(() => {
+    const indexed = new Set(flatSkills.map((s) => `${s.repo}/${s.name}`));
+    return (liveData ?? []).filter((s) => !indexed.has(`${s.repo}/${s.name}`));
+  }, [liveData, flatSkills]);
   // Each group's first skill's index in that flat list, handed down so a
   // group's rows speak the same coordinate system as `selected`. Depends on
   // the query result, not the derived array, for the same reason.
@@ -225,7 +246,7 @@ export function ExplorePage() {
                 listClassName={SKILL_LIST_CLASS}
                 itemClassName={SKILL_CARD_SKELETON_CLASS}
               />
-            ) : groups.length === 0 ? (
+            ) : groups.length === 0 && liveSkills.length === 0 ? (
               <Placeholder
                 message={query ? `未找到匹配“${query}”的 Skill` : "暂无技能"}
               />
@@ -264,6 +285,33 @@ export function ExplorePage() {
                     or simply having a tall viewport — keeps revealing groups
                     until the answer is fully mounted. */}
                 {!allRendered && <div ref={sentinelRef} aria-hidden="true" />}
+                {/* The live section closes the list: skills.sh's own search
+                    answer for the same query, minus everything the local
+                    answer already covers. It is a section rather than rows
+                    mixed into the groups because it is a different kind of
+                    answer — live, upstream, and without the description and
+                    stars an indexed skill carries, which is also why its rows
+                    show no popularity figure: blending a real install count
+                    with absent stars would understate it. So it neither joins
+                    the grouping nor claims a place in the ranking. Its rows are
+                    install-only: with no snapshot path there is no SKILL.md to
+                    open, and the detail panel has nothing to show. */}
+                {liveSkills.length > 0 && (
+                  <GroupSection
+                    group={{
+                      key: LIVE_GROUP_KEY,
+                      title: "skills.sh 官方搜索",
+                      note: "实时结果，本地索引未收录",
+                      ordinal: "plain",
+                    }}
+                    index={groups.length}
+                    items={liveSkills}
+                    offset={flatSkills.length}
+                    selected={null}
+                    rowKey={(skill) => `${skill.repo}/${skill.name}`}
+                    renderItem={(skill) => <SkillListRow skill={skill} />}
+                  />
+                )}
               </div>
             )}
           </div>

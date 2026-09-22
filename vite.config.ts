@@ -74,6 +74,17 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     strictPort: true,
+    // skills.sh's live search endpoint serves no CORS headers, so a browser
+    // cannot read it directly. The dev server proxies it under the app's own
+    // origin, which is the URL `lib/skills-sh.ts` calls outside Tauri (the
+    // packaged app goes through the Tauri HTTP plugin instead).
+    proxy: {
+      "/skills-sh": {
+        target: "https://www.skills.sh",
+        changeOrigin: true,
+        rewrite: (url) => url.replace(/^\/skills-sh/, ""),
+      },
+    },
     watch: {
       // Same intent as `test.exclude` above, in the root-anchored form
       // chokidar needs — see `worktreeWatchGlob`.

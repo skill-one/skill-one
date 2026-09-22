@@ -14,6 +14,10 @@ mod update_channel;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        // The skills.sh live search: its endpoint serves no CORS headers, so
+        // the request is made from Rust instead of the webview. The allowed
+        // origin is the capability's business (`capabilities/default.json`).
+        .plugin(tauri_plugin_http::init())
         // Self-update: `updater` fetches/verifies/installs signed artifacts from
         // GitHub Releases; `process` lets the frontend relaunch after install.
         .plugin(tauri_plugin_updater::Builder::new().build())

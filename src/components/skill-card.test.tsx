@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 
 import { SkillCard } from "./skill-card";
 import { renderWithRouter } from "../test/test-utils";
@@ -20,6 +20,18 @@ const local: SkillView = {
   repo: "",
   stars: 0,
   downloads: 0,
+  storeBacked: false,
+};
+
+/**
+ * A live skills.sh hit: a well-known source is a bare host, not `owner/repo`,
+ * and the row carries no index entry to take figures from.
+ */
+const wellKnown: SkillView = {
+  ...sourced,
+  repo: "smithery.ai",
+  stars: 0,
+  downloads: 199323,
   storeBacked: false,
 };
 
@@ -44,6 +56,19 @@ describe("SkillCard", () => {
     expect(
       screen.queryByRole("button", { name: /^仓库 / }),
     ).not.toBeInTheDocument();
+  });
+
+  it("opens a bare-host source at its own address", () => {
+    renderWithRouter(<SkillCard skill={wellKnown} />);
+
+    // The chip calls a host a source, not a repository — there is no GitHub
+    // repository name to prefix, so the host is the address.
+    fireEvent.click(screen.getByRole("button", { name: "来源 smithery.ai" }));
+
+    expect(screen.getByRole("link", { name: "打开 smithery.ai" })).toHaveAttribute(
+      "href",
+      "https://smithery.ai",
+    );
   });
 
   it("closes the footer rather than leaving an empty rail", () => {
