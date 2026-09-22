@@ -16,7 +16,7 @@
   "description": "Helps users discover and install agent skills …",
   "hash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
   "fetchedAt": "2026-09-06T07:57:37.803Z",
-  "domain": ["development"]
+  "domain": "development"
 }
 ```
 
@@ -28,7 +28,7 @@
 | `description` | `string \| null` | 来自 SKILL.md frontmatter（缺失时为空） |
 | `hash` | `string \| null` | 技能文件的 SHA-256。上游任何文件变化都会使其改变，即**快照所描述的那个版本**。 |
 | `fetchedAt` | `string` | 抓取器首次取到当前内容版本的时间（ISO，UTC）：说的是*当前内容*发布了多久，不是技能最早何时出现 |
-| `domain` | `string[]` | 分类：1–3 个分类键，最贴合的在前，取自固定的英文枚举（`development`、`data-analysis`、…、`other`）。[data/domains.ts](../src/data/domains.ts) 负责把键映射为展示名与 emoji。生成器尚未处理到的技能不含该字段。 |
+| `domain` | `string \| string[]` | 分类，取自固定的英文枚举（`development`、`data-analysis`、…、`other`）。`dist` 快照当前把最贴合的那一个键作为裸字符串下发；该字段也曾承载 1–3 个键、最贴合的在前，因此应用两种形状都读、并统一存成列表。[data/domains.ts](../src/data/domains.ts) 负责把键映射为展示名与 emoji。生成器尚未处理到的技能不含该字段。 |
 
 分类随索引行一起下发，因此一行解析完就是一个装饰完整的技能——不存在需要事后合并的第二数据源。一个技能可以合法地属于多个分类，这也是分组与筛选按「包含」匹配、而不是按精确值匹配的原因。
 

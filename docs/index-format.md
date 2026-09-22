@@ -16,7 +16,7 @@ One JSON object per line, sorted by installs descending:
   "description": "Helps users discover and install agent skills …",
   "hash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
   "fetchedAt": "2026-09-06T07:57:37.803Z",
-  "domain": ["development"]
+  "domain": "development"
 }
 ```
 
@@ -28,7 +28,7 @@ One JSON object per line, sorted by installs descending:
 | `description` | `string \| null` | From the SKILL.md frontmatter (empty when missing) |
 | `hash` | `string \| null` | SHA-256 of the skill's files. Changes when any upstream file changes — i.e. **which version of the skill the snapshot describes**. |
 | `fetchedAt` | `string` | When the scraper first fetched this content version (ISO, UTC): how long the *current* content has been published, not when the skill first appeared |
-| `domain` | `string[]` | The classification: 1–3 domain keys, best fit first, drawn from a fixed English enum (`development`, `data-analysis`, …, `other`). [data/domains.ts](../src/data/domains.ts) maps a key to its display label and emoji. Absent for skills the generator has not reached. |
+| `domain` | `string \| string[]` | The classification, drawn from a fixed English enum (`development`, `data-analysis`, …, `other`). The `dist` snapshot publishes the single best-fit key as a bare string; the field has also carried a 1–3 key list, best fit first, so the app reads either shape and keeps a list. [data/domains.ts](../src/data/domains.ts) maps a key to its display label and emoji. Absent for skills the generator has not reached. |
 
 The classification rides the index row, so one parsed line yields a fully decorated skill — there is no second source to merge in afterwards. A skill may legitimately belong to several domains, which is why grouping and filtering match by membership rather than by an exact value.
 

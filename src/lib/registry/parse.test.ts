@@ -92,4 +92,22 @@ describe("parseSkillLine", () => {
     // matches its registry entry.
     expect(skill?.path?.split("/").pop()).toBe(skill?.name);
   });
+
+  it("reads the classification whichever shape the snapshot publishes it in", () => {
+    // The live `dist` rows carry one bare key; the model is a list because the
+    // dataset has carried 1–3 best-fit-first keys and can again. Reading only
+    // the list shape silently drops every classification.
+    expect(parseSkillLine(line({ domain: "development" }))?.profile).toEqual({
+      domain: ["development"],
+    });
+    expect(
+      parseSkillLine(line({ domain: ["development", "testing"] }))?.profile,
+    ).toEqual({ domain: ["development", "testing"] });
+  });
+
+  it("carries no profile for a skill the generator has not classified", () => {
+    for (const domain of [undefined, null, "", [], ["development", ""], 7, {}]) {
+      expect(parseSkillLine(line({ domain }))?.profile).toBeUndefined();
+    }
+  });
 });

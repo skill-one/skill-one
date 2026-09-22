@@ -1,5 +1,5 @@
 import type { Skill } from "../../types/skill";
-import { textList } from "../value";
+import { text, textList } from "../value";
 
 /**
  * Pure parsing of the skills-profiles index's JSONL lines into the app's
@@ -35,8 +35,10 @@ interface RawSkill {
   /** When the current content version was first fetched (ISO, UTC). */
   fetchedAt?: string | null;
   /**
-   * The dataset's classification: 1–3 domain keys, best fit first. Absent
-   * for skills the generator has not reached yet.
+   * The dataset's classification. The snapshot publishes one key per skill as a
+   * bare string (`"domain": "development"`); the model is a list because it has
+   * carried 1–3 keys, best fit first, and can again. Absent for skills the
+   * generator has not reached.
    */
   domain?: unknown;
 }
@@ -70,9 +72,11 @@ function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
   const repoId = `${owner}/${repo}`;
   // Classification is optional garnish: a skill the generator has not reached
   // simply carries no profile, and every consumer already treats it that way.
-  // A row whose `domain` is missing, empty or wrong-shaped lands on the same
-  // "no profile" shape rather than a half-filled one.
-  const domains = textList(raw.domain) ?? [];
+  // The snapshot's own shape has moved between a bare key and a list of them,
+  // so both are read — a row whose `domain` is missing, empty or of some other
+  // type lands on the same "no profile" shape rather than a half-filled one.
+  const one = text(raw.domain);
+  const domains = textList(raw.domain) ?? (one ? [one] : []);
   return {
     // The slug is the skill's name: the directory the skill ships in, and
     // what a locally installed copy of it is called.
