@@ -1,12 +1,11 @@
 import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
-import { domainLabel, domainMeta } from "../../data/domains";
+import { domainLabel } from "../../data/domains";
 import { popularity } from "../popularity";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
 import type {
   FeaturedSectionData,
   Group,
-  GroupCounts,
   GroupsData,
   GroupsRequest,
   IndexInfo,
@@ -54,9 +53,6 @@ const byPopularity = (a: Skill, b: Skill): number =>
  * once; consumers need a page's worth, not the answer's full length.
  */
 const MAX_SEARCH_HITS = 50;
-
-/** The pool label the `domain` grouping collects unclassified skills under. */
-const UNCLASSIFIED_DOMAIN = "未分类";
 
 /**
  * The dataset's catch-all domain key. It carries no meaning of its own, so
@@ -387,70 +383,24 @@ export function createRegistryController(
     return { hits: search(query.trim()).slice(0, MAX_SEARCH_HITS) };
   };
 
-  /** Skills per popularity bucket in the `TOP 1-50` grouping. */
-  const GROUP_BUCKET_SIZE = 50;
-
   /**
-   * How many groups each offered mode would produce over the same hits —
-   * the grouping dropdown annotates its options with these so the reader can
-   * compare the modes before committing to one. Every figure is a cheap set
-   * or arithmetic pass: unique repos, the bucket math, unique domains (with
-   * the unclassified pool counting as one).
-   */
-  const countGroups = (hits: SearchHit[]): GroupCounts => {
-    const repos = new Set<string>();
-    const domains = new Set<string>();
-    for (const hit of hits) {
-      repos.add(hit.skill.repo);
-      const list = hit.skill.profile?.domain;
-      if (!list || list.length === 0) domains.add(UNCLASSIFIED_DOMAIN);
-      else for (const domain of list) domains.add(domain);
-    }
-    return {
-      repo: repos.size,
-      popularity: Math.ceil(hits.length / GROUP_BUCKET_SIZE),
-      domain: domains.size,
-    };
-  };
-
-  /**
-   * The explore list grouped by the requested mode. Each mode implies its own
-   * ordering — the toolbar offers one grouping choice instead of a grouping
-   * plus a sort — and every mode starts from the same ordered hits: a search
-   * stays in relevance order, the browsed list follows the popularity blend.
-   * Bucketing those hits via `Map` insertion order puts each group's skills
-   * in hit order and the groups themselves in first-appearance order (i.e.
-   * best-hit-first under a search); the browse path re-orders the groups
-   * per mode afterwards.
+   * The explore list: one group per repository, and every group's skills in
+   * the order of the hits it was built from. A search stays in relevance
+   * order; the browsed list follows the popularity blend. Bucketing those hits
+   * via `Map` insertion order puts each group's skills in hit order and the
+   * groups themselves in first-appearance order, which under a search is
+   * best-hit-first; the browsed list re-orders the groups by stars afterwards,
+   * so the largest repositories lead.
    *
-   * - `repo`: one group per repository, most-starred first.
-   * - `popularity`: fixed-size rank buckets over the ordered hits, in rank
-   *   order by construction (`TOP 1-50`, `TOP 51-100`, …).
-   * - `domain`: one group per profile domain, most-populated first, with
-   *   unclassified skills pooled into 未分类 so nothing disappears. A skill
-   *   classified under several domains appears in each of its groups.
-   * - `recency`: reserved — the dataset does not publish an update time yet,
-   *   so the mode is not offered (see `GroupBy`).
-   *
-   * Unlike a search reply there is no slicing: the answer crosses the
-   * boundary and the page folds groups away instead of paging them. Closed
-   * groups render no cards, so the DOM stays at the expanded groups only —
-   * the payload, not the render, is the price of dropping the pager.
+   * Unlike a search reply there is no slicing: the answer crosses the boundary
+   * whole and the page reveals it in chunks instead of paging it. The payload,
+   * not the render, is the price of dropping the pager.
    */
-  const getGroups = ({
-    query,
-    groupBy,
-  }: GroupsRequest): GroupsData => {
+  const getGroups = ({ query }: GroupsRequest): GroupsData => {
     const q = query.trim();
     let hits: SearchHit[];
     if (q) {
-      if (!search) {
-        return {
-          groups: [],
-          total: 0,
-          groupCounts: { repo: 0, popularity: 0, domain: 0 },
-        };
-      }
+      if (!search) return { groups: [], total: 0 };
       hits = search(q);
     } else {
       hits = popularityOrder().map((id) => ({
@@ -459,66 +409,27 @@ export function createRegistryController(
       }));
     }
 
-    let groups: Group[];
-    if (groupBy === "popularity") {
-      // Fixed-size rank buckets over the ordered hits; the title is the rank
-      // range the bucket covers and rank order is the group order.
-      groups = [];
-      for (let start = 0; start < hits.length; start += GROUP_BUCKET_SIZE) {
-        const bucket = hits.slice(start, start + GROUP_BUCKET_SIZE);
-        groups.push({
-          key: `pop-${start}`,
-          title: `TOP ${start + 1}-${start + bucket.length}`,
-          skills: bucket,
-        });
-      }
-    } else if (groupBy === "domain") {
-      const buckets = new Map<string, SearchHit[]>();
-      for (const hit of hits) {
-        // A skill may be classified under several domains, so it lands in
-        // each of its groups; everything unclassified pools together.
-        const keys = hit.skill.profile?.domain.length
-          ? hit.skill.profile.domain
-          : [UNCLASSIFIED_DOMAIN];
-        for (const key of keys) {
-          const bucket = buckets.get(key);
-          if (bucket) bucket.push(hit);
-          else buckets.set(key, [hit]);
-        }
-      }
-      groups = Array.from(buckets, ([domain, skills]) => ({
-        key: `domain-${domain}`,
-        title: domain === UNCLASSIFIED_DOMAIN ? domain : domainLabel(domain),
-        emoji: domainMeta(domain)?.emoji,
-        skills,
-      })).toSorted(
-        (a, b) =>
-          b.skills.length - a.skills.length || a.title.localeCompare(b.title),
-      );
-    } else {
-      const buckets = new Map<string, SearchHit[]>();
-      for (const hit of hits) {
-        const bucket = buckets.get(hit.skill.repo);
-        if (bucket) bucket.push(hit);
-        else buckets.set(hit.skill.repo, [hit]);
-      }
-      groups = Array.from(buckets, ([repo, skills]) => ({
-        key: `repo-${repo}`,
-        title: repo,
-        avatarOwner: repo.split("/")[0],
-        stars: Math.max(...skills.map(({ skill }) => skill.stars)),
-        skills,
-      }));
-      if (!q) {
-        groups.sort(
-          (a, b) =>
-            (b.stars ?? 0) - (a.stars ?? 0) ||
-            b.skills.length - a.skills.length ||
-            a.title.localeCompare(b.title),
-        );
-      }
+    const buckets = new Map<string, SearchHit[]>();
+    for (const hit of hits) {
+      const bucket = buckets.get(hit.skill.repo);
+      if (bucket) bucket.push(hit);
+      else buckets.set(hit.skill.repo, [hit]);
     }
-    return { groups, total: hits.length, groupCounts: countGroups(hits) };
+    const groups: Group[] = Array.from(buckets, ([repo, skills]) => ({
+      key: `repo-${repo}`,
+      title: repo,
+      stars: Math.max(...skills.map(({ skill }) => skill.stars)),
+      skills,
+    }));
+    if (!q) {
+      groups.sort(
+        (a, b) =>
+          (b.stars ?? 0) - (a.stars ?? 0) ||
+          b.skills.length - a.skills.length ||
+          a.title.localeCompare(b.title),
+      );
+    }
+    return { groups, total: hits.length };
   };
 
   /** Sections shown on the featured page and skills per section. */

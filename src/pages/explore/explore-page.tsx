@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Flame, FolderGit2, LayoutGrid } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useViewMemory } from "../../hooks/use-view-memory";
@@ -10,15 +9,8 @@ import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
-  SKILL_CARD_SKELETON_CLASS,
-  SKILL_LIST_CLASS,
 } from "../../lib/skill-list-layout";
-import type { GroupBy, GroupCounts } from "../../lib/registry/protocol";
 import { Button } from "../../components/ui/button";
-import {
-  FilterDropdown,
-  type FilterOption,
-} from "../../components/filter-dropdown";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
@@ -42,17 +34,12 @@ const GROUP_CHUNK = 6;
 const LIVE_GROUP_KEY = "skills-sh";
 
 /**
- * The grouping modes the toolbar offers. Each mode implies its own ordering
- * — groups and the skills inside them — so one choice replaces the old
- * grouping-plus-sort pair. `recency` is reserved in the protocol until the
- * mirror publishes an update time and stays out of the menu.
+ * The store's browse list: one card per repository, and each repository's
+ * skills inside it. There is no other layout and no sort control — the page
+ * has one shape, the list is ordered by stars (repositories) and by the
+ * browse ordering (the skills inside them), and a search re-answers it in
+ * relevance order without changing how it is laid out.
  */
-const GROUP_OPTIONS: Array<FilterOption<GroupBy>> = [
-  { value: "repo", label: "按仓库", icon: FolderGit2 },
-  { value: "popularity", label: "按热度", icon: Flame },
-  { value: "domain", label: "按类型", icon: LayoutGrid },
-];
-
 export function ExplorePage() {
   // The page's own scrolling element: the list scrolls inside it, which is also
   // why the browser restores nothing for this page (see `view` below).
@@ -62,44 +49,36 @@ export function ExplorePage() {
   // the retry action for a failed download.
   const stats = useRegistryStats();
 
-  // Search text, grouping mode and reveal depth; any change re-groups the
-  // answer because the first two define what a group is. They live in one
-  // object, remembered per history entry, because a drill-down — into a
-  // repository's page and back — unmounts this page: the controls, the depth it
-  // had revealed and the scroll position all have to come back together, or the
-  // reader is handed a page they were not on.
+  // What the reader has typed, and how much of the answer they have revealed.
+  // They live in one object, remembered per history entry, because a
+  // drill-down — into a repository's page and back — unmounts this page: the
+  // search, the depth it had revealed and the scroll position all have to come
+  // back together, or the reader is handed a page they were not on.
   //
   // The scroll position waits for content: until the first skill lands the page
   // holds a skeleton, and a position restored into a skeleton is spent on
   // nothing.
   const [view, setView] = useViewMemory(
     "explore",
-    { search: "", groupBy: "repo" as GroupBy, visibleCount: INITIAL_GROUPS },
+    { search: "", visibleCount: INITIAL_GROUPS },
     listRef,
     { ready: stats.count > 0 },
   );
-  const { search, groupBy, visibleCount } = view;
+  const { search, visibleCount } = view;
   const query = useDebouncedValue(search).trim();
 
-  // The whole (filtered) registry grouped by the requested mode, from the
-  // registry worker — filtering, ordering and the bucketing all happen
-  // there. There is no pagination: the page folds groups instead, and a
-  // closed group renders no cards.
+  // The whole (filtered) registry, grouped by repository in the worker —
+  // filtering and ordering happen there too. There is no pagination: the page
+  // reveals the answer in chunks, and the detail panel walks all of it.
   const {
     data: groupsData,
     isLoading,
     isError,
     error,
     refetch: refetchPage,
-  } = useRegistryGroups(query, groupBy);
+  } = useRegistryGroups(query);
 
   const groups = groupsData?.groups ?? [];
-
-  // The repository view renders one card per group rather than a section
-  // header over a grid of cards: the group *is* the card, so there is nothing
-  // left for a header to say. The other modes keep the section shell — their
-  // groups are buckets of skills, not objects with a page of their own.
-  const repoMode = groupBy === "repo";
 
   // The live skills.sh answer for the same query — the store's second source.
   // It is fetched here rather than inside the registry worker: it is a plain
@@ -175,31 +154,11 @@ export function ExplorePage() {
     setSelected(null);
     setView((v) => ({ ...v, search: q, visibleCount: INITIAL_GROUPS }));
   };
-  const handleGroupBy = (mode: GroupBy) => {
-    setSelected(null);
-    setView((v) => ({ ...v, groupBy: mode, visibleCount: INITIAL_GROUPS }));
-  };
-
-  // Each mode's option, annotated with how many groups it would produce over
-  // the current answer — the figures ride in with the groups data itself, so
-  // a search narrows them in step with the list. Until the first answer
-  // lands there is nothing to annotate.
-  const groupOptions = useMemo(
-    () =>
-      GROUP_OPTIONS.map((option) => ({
-        ...option,
-        // The reserved `recency` mode is not offered, so the cast is safe
-        // for everything the menu actually shows.
-        count: groupsData?.groupCounts[option.value as keyof GroupCounts],
-      })),
-    [groupsData],
-  );
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-5">
-      {/* Toolbar: search on the left; the grouping mode on the right. One
-          choice replaces the old grouping-plus-sort pair — every mode implies
-          its own ordering, applied inside the worker. */}
+      {/* Toolbar: the search field and nothing else — the list has one shape,
+          so there is no layout to choose between. */}
       <div className="mb-4 flex items-center gap-3">
         {/* Search runs on the worker's MiniSearch index, which only exists
             once the whole registry has landed. Before that the field is
@@ -211,14 +170,6 @@ export function ExplorePage() {
           disabled={!stats.ready}
           placeholder={stats.ready ? undefined : "索引构建中…"}
         />
-
-        <div className="ml-auto flex items-center gap-2">
-          <FilterDropdown
-            value={groupBy}
-            options={groupOptions}
-            onChange={handleGroupBy}
-          />
-        </div>
       </div>
 
       {/* The group list; the modal detail drawer overlays it without
@@ -259,64 +210,37 @@ export function ExplorePage() {
               // an empty spin that reads as "the page never switched").
               <SkeletonList
                 rows={12}
-                listClassName={repoMode ? REPO_LIST_CLASS : SKILL_LIST_CLASS}
-                itemClassName={
-                  repoMode ? REPO_CARD_SKELETON_CLASS : SKILL_CARD_SKELETON_CLASS
-                }
+                listClassName={REPO_LIST_CLASS}
+                itemClassName={REPO_CARD_SKELETON_CLASS}
               />
             ) : groups.length === 0 && liveSkills.length === 0 ? (
               <Placeholder
                 message={query ? `未找到匹配“${query}”的 Skill` : "暂无技能"}
               />
             ) : (
-              <div
-                key={`${query}\u0000${groupBy}`}
-                className="flex flex-col gap-3"
-              >
+              <div key={query} className="flex flex-col gap-3">
                 {/* Keyed by the answer's definition, not its data: when the
-                    query or grouping mode changes the groups remount, so stale
-                    fold states never survive into a differently-shaped
-                    list. Streaming invalidations share the definition, so
-                    they update the groups in place without resetting what
-                    the reader has folded (or how far they have scrolled). */}
-                {repoMode ? (
-                  /* One card per repository, in one lane grid: the card is the
-                     group, so the list is flat where the sectioned modes are
-                     nested, and the progressive reveal below hands it whole
-                     cards instead of whole sections. */
-                  <ul className={REPO_LIST_CLASS}>
-                    {renderedGroups.map((group) => (
-                      <RepoCard
-                        key={group.key}
-                        repo={group.title}
-                        stars={group.stars}
-                        skills={group.skills}
-                        hasQuery={query.length > 0}
-                        selected={selected}
-                        onOpenSkill={setSelected}
-                      />
-                    ))}
-                  </ul>
-                ) : (
-                  renderedGroups.map((group, gi) => (
-                    <GroupSection
+                    query changes the groups remount, so stale fold states
+                    never survive into a differently-shaped list. Streaming
+                    invalidations share the definition, so they update the
+                    groups in place without resetting how far the list was
+                    revealed. */}
+                {/* One card per repository, in one lane grid: the card is the
+                    group, so the list is flat, and the progressive reveal
+                    below hands it whole cards. */}
+                <ul className={REPO_LIST_CLASS}>
+                  {renderedGroups.map((group) => (
+                    <RepoCard
                       key={group.key}
-                      group={group}
-                      index={gi}
-                      items={group.skills}
+                      repo={group.title}
+                      stars={group.stars}
+                      skills={group.skills}
+                      hasQuery={query.length > 0}
                       selected={selected}
-                      rowKey={(hit) => skillKey(hit.skill)}
-                      renderItem={(hit, isSelected) => (
-                        <SkillListRow
-                          skill={hit.skill}
-                          matched={hit.matched}
-                          selected={isSelected}
-                          onSelect={() => setSelected(skillKey(hit.skill))}
-                        />
-                      )}
+                      onOpenSkill={setSelected}
                     />
-                  ))
-                )}
+                  ))}
+                </ul>
                 {/* The sentinel ends the rendered run: while it is on screen
                     the observer above extends the run, so scrolling down —
                     or simply having a tall viewport — keeps revealing groups

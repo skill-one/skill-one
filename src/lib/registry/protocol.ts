@@ -30,72 +30,35 @@ export interface SearchData {
   hits: SearchHit[];
 }
 
-/**
- * How the explore list buckets its skills. Each mode carries its own
- * ordering — groups and the skills inside them — so the toolbar offers one
- * choice instead of a grouping plus a sort.
- *
- * - `repo`: one group per `owner/repo`, the store's default view.
- * - `popularity`: the whole registry ranked by the popularity blend, chunked
- *   into fixed-size buckets (`TOP 1-50`, `TOP 51-100`, …).
- * - `domain`: one group per profile domain, unprofiled skills pooled into
- *   「未分类」.
- * - `recency`: reserved for grouping by repository update time. The mirror
- *   does not publish that field yet (its `firstSeenAt` is the snapshot's own
- *   publication date, identical for every skill), so the mode stays out of
- *   the menu until a data source answers it.
- */
-export type GroupBy = "repo" | "popularity" | "domain" | "recency";
-
 export interface GroupsRequest {
   /** Trimmed search text; empty means "browse the registry in order". */
   query: string;
-  /** The bucketing mode; each mode implies its own ordering. */
-  groupBy: GroupBy;
 }
 
 /**
- * One group of the grouped answer — skills that share the mode's key — plus
- * the display facts its header shows. The optional fields are mode-specific:
- * `avatarOwner`/`stars` belong to `repo`, `emoji` to `domain`.
+ * One group of the grouped answer: a repository and the skills it publishes,
+ * with the display facts its card shows.
  */
 export interface Group {
   /** Stable identity for folding state and React keys. */
   key: string;
-  /** The header's main line: repo name, bucket range, or domain name. */
+  /** The repository, as `owner/repo`. */
   title: string;
-  /** The owner whose avatar leads the header (`repo` mode only). */
-  avatarOwner?: string;
-  /** A category glyph shown in place of an avatar (`domain` mode only). */
-  emoji?: string;
   /**
-   * The repository's GitHub stars (`repo` mode only). Every skill of a repo
-   * is joined against the same `repos.jsonl` row, so the figures agree; the
-   * max merely makes that expectation explicit instead of trusting it.
+   * The repository's GitHub stars. Every skill of a repo is joined against the
+   * same `repos.jsonl` row, so the figures agree; the max merely makes that
+   * expectation explicit instead of trusting it.
    */
   stars?: number;
-  /** The group's skills, in the order the mode's ordering produced. */
+  /** The group's skills, in the order the browse ordering produced. */
   skills: SearchHit[];
 }
 
-/**
- * How many groups each offered mode would produce over the same answer —
- * the grouping dropdown annotates its options with these, so the reader can
- * compare the modes before committing to one. `recency` is not offered and
- * not counted.
- */
-export interface GroupCounts {
-  repo: number;
-  popularity: number;
-  domain: number;
-}
-
-/** The whole grouped answer; no pagination — the page folds groups instead. */
+/** The whole grouped answer; no pagination — the page reveals it instead. */
 export interface GroupsData {
   groups: Group[];
   /** Total skills across all groups (the pre-grouping hit count). */
   total: number;
-  groupCounts: GroupCounts;
 }
 
 /** One resolved curated section, with global card indexes for the panel. */

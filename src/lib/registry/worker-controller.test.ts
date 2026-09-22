@@ -23,7 +23,7 @@ vi.mock("../../data/featured-content", () => ({
 import { createRegistryController } from "./worker-controller";
 import type { CachedIndex, RegistryCache } from "./cache";
 import type { PublishedIndex } from "./index-stream";
-import type { GroupsData, RegistryWorkerMessage, RevalidateResult } from "./protocol";
+import type { RegistryWorkerMessage, RevalidateResult } from "./protocol";
 import type { Skill } from "../../types/skill";
 import { popularity } from "../popularity";
 import { formatCount } from "../utils";
@@ -624,157 +624,31 @@ describe("createRegistryController — getGroups", () => {
     t.controller.handle({
       type: "getGroups",
       id: 1,
-      payload: { query: "", groupBy: "repo" },
+      payload: { query: "" },
     });
     const data = resultData<{
       groups: Array<{
         key: string;
         title: string;
-        avatarOwner?: string;
         stars?: number;
         skills: Array<{ skill: Skill }>;
       }>;
       total: number;
-      groupCounts: { repo: number; popularity: number; domain: number };
     }>(t.recorded.results[0]);
 
     // The starred repository's group leads; the starless one follows — even
     // though its lone skill is the most installed (its downloads ride the
-    // skill(2) factory). Group order reads the figure the header shows.
+    // skill(2) factory). Group order reads the figure the card's bar shows.
     expect(data.groups.map((g) => g.title)).toEqual(["o/big", "o/none"]);
     expect(data.total).toBe(3);
     expect(data.groups[0].stars).toBe(500);
     expect(data.groups[1].stars).toBe(0);
-    // The header's identity rides along: the owner for the avatar.
-    expect(data.groups[0].avatarOwner).toBe("o");
     expect(data.groups[0].key).toBe("repo-o/big");
     // Skills inside a group keep the popularity order.
     expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
       "big-b",
       "big-a",
     ]);
-    // The answer carries every mode's group count over the same hits, for
-    // the dropdown's annotations: two repos, one 50-sized bucket, one domain
-    // (nothing is profiled here, so all skills pool into 未分类).
-    expect(data.groupCounts).toEqual({ repo: 2, popularity: 1, domain: 1 });
-  });
-
-  it("chunks the popularity grouping into fixed-size rank buckets", async () => {
-    // 120 skills with strictly decreasing popularity (both counts slide down
-    // with the index), so the global rank r is exactly skill-r and the
-    // buckets tile the ranking 50/50/20.
-    const t = setup({
-      skills: Array.from({ length: 120 }, (_, i) =>
-        skill(i, { stars: 1000 - i, downloads: 1000 - i }),
-      ),
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({
-      type: "getGroups",
-      id: 1,
-      payload: { query: "", groupBy: "popularity" },
-    });
-    const data = resultData<{
-      groups: Array<{ key: string; title: string; skills: Array<{ skill: Skill }> }>;
-      total: number;
-    }>(t.recorded.results[0]);
-
-    expect(data.groups.map((g) => g.title)).toEqual([
-      "TOP 1-50",
-      "TOP 51-100",
-      "TOP 101-120",
-    ]);
-    expect(data.groups.map((g) => g.key)).toEqual(["pop-0", "pop-50", "pop-100"]);
-    // Bucket order is rank order: the first bucket holds the top of the list.
-    expect(data.groups[0].skills[0].skill.name).toBe("skill-0");
-    expect(data.groups[2].skills[0].skill.name).toBe("skill-100");
-    expect(data.total).toBe(120);
-  });
-
-  it("groups by domain, pooling the unclassified into 未分类", async () => {
-    const t = setup({
-      skills: [
-        { ...skill(0), profile: { domain: ["development"] } },
-        { ...skill(1), profile: { domain: ["content-creation"] } },
-        { ...skill(2), profile: { domain: ["development"] } },
-        skill(3),
-      ],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({
-      type: "getGroups",
-      id: 1,
-      payload: { query: "", groupBy: "domain" },
-    });
-    const data = resultData<{
-      groups: Array<{
-        title: string;
-        emoji?: string;
-        skills: Array<{ skill: Skill }>;
-      }>;
-      total: number;
-    }>(t.recorded.results[0]);
-
-    // Most-populated domain first; skill-3 carries no profile and still
-    // shows up, pooled into its own group (the equal-sized tie resolves
-    // alphabetically).
-    expect(data.groups.map((g) => g.title)).toEqual([
-      "开发编程",
-      "内容创作",
-      "未分类",
-    ]);
-    // Skills inside a group keep the popularity order (skill-2 outranks
-    // skill-0 under the blend).
-    expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
-      "skill-2",
-      "skill-0",
-    ]);
-    expect(data.groups[1].skills.map((h) => h.skill.name)).toEqual([
-      "skill-1",
-    ]);
-    expect(data.groups[2].skills.map((h) => h.skill.name)).toEqual([
-      "skill-3",
-    ]);
-    expect(data.total).toBe(4);
-  });
-
-  it("places a multi-domain skill in each of its domain groups", async () => {
-    const t = setup({
-      skills: [
-        {
-          ...skill(0),
-          profile: { domain: ["development", "content-creation"] },
-        },
-        { ...skill(1), profile: { domain: ["development"] } },
-      ],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({
-      type: "getGroups",
-      id: 1,
-      payload: { query: "", groupBy: "domain" },
-    });
-    const data = resultData<{
-      groups: Array<{ title: string; skills: Array<{ skill: Skill }> }>;
-    }>(t.recorded.results[0]);
-
-    // One skill, two groups — the multi-domain case a single-domain model
-    // could not express.
-    expect(data.groups.map((g) => g.title)).toEqual([
-      "开发编程",
-      "内容创作",
-    ]);
-    // Within-group order is the popularity blend, so compare as a set.
-    expect(
-      data.groups[0].skills.map((h) => h.skill.name).toSorted(),
-    ).toEqual(["skill-0", "skill-1"]);
-    expect(data.groups[1].skills.map((h) => h.skill.name)).toEqual(["skill-0"]);
   });
 
   it("groups search hits with the best match leading its group", async () => {
@@ -796,7 +670,7 @@ describe("createRegistryController — getGroups", () => {
     t.controller.handle({
       type: "getGroups",
       id: 1,
-      payload: { query: "redis", groupBy: "repo" },
+      payload: { query: "redis" },
     });
     const data = resultData<{
       groups: Array<{ title: string; skills: Array<{ skill: Skill }> }>;
@@ -822,18 +696,12 @@ describe("createRegistryController — getGroups", () => {
     t.controller.handle({
       type: "getGroups",
       id: 1,
-      payload: { query: "anything", groupBy: "repo" },
+      payload: { query: "anything" },
     });
-    const data = resultData<{
-      groups: unknown[];
-      total: number;
-      groupCounts: { repo: number; popularity: number; domain: number };
-    }>(t.recorded.results[0]);
-    expect(data).toEqual({
-      groups: [],
-      total: 0,
-      groupCounts: { repo: 0, popularity: 0, domain: 0 },
-    });
+    const data = resultData<{ groups: unknown[]; total: number }>(
+      t.recorded.results[0],
+    );
+    expect(data).toEqual({ groups: [], total: 0 });
   });
 });
 
@@ -1182,92 +1050,6 @@ describe("createRegistryController — classification", () => {
   /** A skill carrying the classification its index row shipped. */
   const classified = (i: number, domain: string[]): Skill =>
     skill(i, { profile: { domain } });
-
-  it("buckets the browsed list by each skill's own classification", async () => {
-    // skill-2 belongs to both domains, so a group has to match by membership
-    // rather than by an exact classification — and the skill lands in each of
-    // its groups.
-    const t = setup({
-      skills: [
-        classified(0, ["development"]),
-        classified(1, ["content-creation"]),
-        classified(2, ["development", "content-creation"]),
-      ],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({
-      type: "getGroups",
-      id: 1,
-      payload: { query: "", groupBy: "domain" },
-    });
-    const data = resultData<GroupsData>(t.recorded.results[0]);
-    expect(
-      data.groups.map((g) => [
-        g.key,
-        g.skills.map((h) => h.skill.name).toSorted(),
-      ]),
-    ).toEqual([
-      // Both buckets hold two skills, so the alphabetical tie-break decides.
-      ["domain-content-creation", ["skill-1", "skill-2"]],
-      ["domain-development", ["skill-0", "skill-2"]],
-    ]);
-    // The grouping dropdown's annotations count the same buckets.
-    expect(data.groupCounts.domain).toBe(2);
-    // The classification rides along on the served rows themselves.
-    const multi = data.groups[0].skills.find((h) => h.skill.name === "skill-2");
-    expect(multi?.skill.profile).toEqual({
-      domain: ["development", "content-creation"],
-    });
-  });
-
-  it("groups a search's hits by domain too", async () => {
-    const t = setup({
-      skills: [
-        classified(0, ["development"]),
-        classified(1, ["content-creation"]),
-        skill(2), // classified under nothing: it has to land in the pool
-      ],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({
-      type: "getGroups",
-      id: 1,
-      payload: { query: "skill", groupBy: "domain" },
-    });
-    const data = resultData<GroupsData>(t.recorded.results[0]);
-    const byKey = new Map(
-      data.groups.map((g) => [g.key, g.skills.map((h) => h.skill.name)]),
-    );
-    expect([...byKey.keys()].toSorted()).toEqual([
-      "domain-content-creation",
-      "domain-development",
-      "domain-未分类",
-    ]);
-    expect(byKey.get("domain-未分类")).toEqual(["skill-2"]);
-    expect(data.total).toBe(3);
-  });
-
-  it("keeps the registry usable when nothing is classified", async () => {
-    const t = setup({ skills: [skill(0), skill(1)] });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    // Ready fired exactly once and no skill carries a profile: the domain
-    // grouping still answers, with every skill pooled under 未分类.
-    expect(t.recorded.readyCount).toBe(1);
-    t.controller.handle({
-      type: "getGroups",
-      id: 1,
-      payload: { query: "", groupBy: "domain" },
-    });
-    const data = resultData<GroupsData>(t.recorded.results[0]);
-    expect(data.groups.map((g) => g.title)).toEqual(["未分类"]);
-    expect(data.groupCounts).toEqual({ repo: 2, popularity: 1, domain: 1 });
-  });
 
   it("builds featured sections from the real domains", async () => {
     const t = setup({

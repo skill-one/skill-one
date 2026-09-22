@@ -163,9 +163,9 @@ export function searchSkills(query: string): Promise<SearchData> {
 }
 
 /**
- * The explore list grouped by the requested mode, whole (no paging — the page
- * folds groups instead). Call once data is streaming; the answer grows with
- * the loaded prefix like a browse page does.
+ * The explore list — one group per repository — whole (no paging; the page
+ * reveals it in chunks instead). Call once data is streaming; the answer grows
+ * with the loaded prefix like a browse page does.
  */
 export function getGroups(request_: GroupsRequest): Promise<GroupsData> {
   return request("getGroups", request_) as Promise<GroupsData>;

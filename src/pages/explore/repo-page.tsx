@@ -33,9 +33,9 @@ const SKELETON_ROWS = 8;
  * top, then the same per-skill cards the store's lists use, one per skill, with
  * the detail panel walking only this repository's skills.
  *
- * It reads its data out of the query the explore list's repository mode already
- * runs (`useRegistryGroups("", "repo")`), which the query cache has therefore
- * usually answered already: arriving from a card costs no request at all. The
+ * It reads its data out of the query the explore list already runs
+ * (`useRegistryGroups("")`), which the query cache has therefore usually
+ * answered already: arriving from a card costs no request at all. The
  * unfiltered answer is deliberate — the page answers "all of this repository's
  * skills", so a search that led the reader here does not narrow it.
  *
@@ -54,7 +54,7 @@ export function RepoPage() {
   const back = useReturn("/explore");
 
   const stats = useRegistryStats();
-  const { data } = useRegistryGroups("", "repo");
+  const { data } = useRegistryGroups("");
   const group = data?.groups.find((candidate) => candidate.key === `repo-${repo}`);
   const skills = useMemo(
     () => (group?.skills ?? []).map((hit) => hit.skill),

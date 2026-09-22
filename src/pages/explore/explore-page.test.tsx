@@ -225,16 +225,6 @@ async function searchField(): Promise<HTMLElement> {
   return input;
 }
 
-/**
- * The group header trigger of one group, addressed by its aria-label —
- * titles stay intact there even when the figures beside them are long.
- */
-function groupHeader(title: string, count = 1) {
-  return screen.getByRole("button", {
-    name: `分组 ${title}，${count} 个 skill`,
-  });
-}
-
 /** Cards in DOM order, named by their stable aria-label. */
 const cardOrder = () =>
   screen
@@ -462,7 +452,6 @@ describe("ExplorePage", () => {
   });
 
   it("orders repositories by stars and a repository's skills by popularity", async () => {
-    const user = userEvent.setup();
     harness.init();
     harness.pushAll([
       {
@@ -491,25 +480,11 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("b2");
 
-    // The repo grouping puts the starred repository's group first — even
-    // though its skills are far less installed — and orders the group's own
-    // cards by popularity (b2's installs beat b1's). A group's stars, not a
-    // lone skill's installs, decide the group's place.
+    // The grouped list puts the starred repository first — even though its
+    // skills are far less installed — and orders the group's own cards by
+    // popularity (b2's installs beat b1's). A group's stars, not a lone
+    // skill's installs, decide the group's place.
     expect(cardOrder()).toEqual(["b2", "b1", "n1"]);
-
-    // The grouping control offers the three modes — each annotated with the
-    // group count it would produce over this answer — and nothing else; the
-    // textContent concatenates label and count.
-    await user.click(screen.getByRole("button", { name: "按仓库" }));
-    // The menu's portal mounts asynchronously under Base UI.
-    const rows = (await screen.findAllByRole("menuitemradio")).map(
-      (m) => m.textContent,
-    );
-    expect(rows).toEqual([
-      "按仓库2 组",
-      "按热度1 组",
-      "按类型1 组",
-    ]);
   });
 
   it("filters skills by search text", async () => {
@@ -822,143 +797,6 @@ describe("ExplorePage", () => {
     expect(
       screen.getByRole("button", { name: "查看 gadget-master 详情" }),
     ).toHaveTextContent("gadget-master");
-  });
-
-  it("keeps the grouping control in charge while searching", async () => {
-    const user = userEvent.setup();
-    bootGadgetRegistry();
-    renderExplorePage();
-    await screen.findByText("gadget-master");
-
-    const input = await searchField();
-    await user.type(input, "gadget");
-
-    // The search swap is done once every filler repository is gone.
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("link", { name: /^查看仓库 acme\/tool-/ }),
-      ).not.toBeInTheDocument(),
-    );
-
-    // A search narrows the answer but not the reader's questions: the grouping
-    // control stays live, and regrouping the matches works. The menu rows carry
-    // their group counts, so match by prefix.
-    await user.click(screen.getByRole("button", { name: "按仓库" }));
-    await activateMenuOption(await liveMenuOption(/^按类型/));
-
-    // The gadget is unprofiled, so the answer pools into one group — and that
-    // mode still leads with the section shell's own header.
-    await waitFor(() => expect(groupHeader("未分类")).toBeInTheDocument());
-  });
-
-  /**
-   * The closed menu's popup stays in the DOM until its exit transition ends,
-   * which never happens in jsdom — so its dead items remain queryable. Scope
-   * menu queries to the open popup (the one without `data-closed`).
-   */
-  const liveMenuOption = async (name: RegExp) => {
-    // The new popup mounts asynchronously while the dead one lingers, so
-    // re-query on every poll until a live option shows up.
-    return vi.waitFor(
-      () => {
-        const live = screen
-          .queryAllByRole("menuitemradio", { name })
-          .filter((el) => !el.closest("[data-closed]"));
-        if (live.length === 0) {
-          throw new Error(`no open menu option matches ${name}`);
-        }
-        return live[0];
-      },
-      { timeout: 5000 },
-    );
-  };
-
-  /**
-   * Activates a menu option via focus + Enter: a pointer click on the item
-   * can hang while the previous menu's stuck exit transition (jsdom never
-   * finishes it) still holds `pointer-events: none` over the page;
-   * keyboard activation is deterministic.
-   */
-  const activateMenuOption = async (item: HTMLElement) => {
-    item.focus();
-    fireEvent.keyDown(item, { key: "Enter" });
-  };
-
-  it("groups the list by profile domain and back to repositories", async () => {
-    // Pointer-events checks are disabled: closing the grouping menu leaves
-    // `pointer-events: none` on <body> until its exit transition settles,
-    // which never happens under jsdom.
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    harness.reset();
-    harness.init();
-    // The classification rides the index rows: two skills carry one, the
-    // other four stay unclassified.
-    harness.pushAll(
-      makeSkills(6, 0).map((s, i) =>
-        i === 0
-          ? { ...s, profile: { domain: ["development"] } }
-          : i === 1
-            ? { ...s, profile: { domain: ["content-creation"] } }
-            : s,
-      ),
-    );
-    harness.complete();
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    // The grouping control is present from the start; open it and switch
-    // the mode.
-    await user.click(screen.getByRole("button", { name: "按仓库" }));
-    await activateMenuOption(await liveMenuOption(/^按类型/));
-
-    // The same six skills regroup: two domains plus the 未分类 pool for the
-    // other four — ordered by size.
-    expect(await screen.findByText("未分类")).toBeInTheDocument();
-    expect(groupHeader("开发编程", 1)).toBeInTheDocument();
-    expect(groupHeader("内容创作", 1)).toBeInTheDocument();
-    expect(groupHeader("未分类", 4)).toBeInTheDocument();
-    expect(screen.getByText("skill-5")).toBeInTheDocument();
-
-    // The reverse switch (按类型 → 按仓库) runs the same onValueChange path
-    // with the repos value, whose grouping is already asserted by this
-    // test's initial render. Reopening the menu a second time cannot be
-    // exercised here: once a menu closes via item-press, Base UI's trigger
-    // stays wedged in jsdom because the popup's exit transition never
-    // completes — under a real browser it finishes in ~150ms and the flow
-    // works (verified manually).
-  });
-
-  it("chunks the popularity grouping into TOP buckets", async () => {
-    harness.init();
-    // 130 skills: three buckets of 50/50/30.
-    harness.pushAll(
-      Array.from({ length: 130 }, (_, i) => ({
-        name: `skill-${i}`,
-        repo: `acme/skill-${i}`,
-        description: "",
-        stars: 2000 - i,
-        downloads: 2000 - i,
-        path: `skills/skill-${i}`,
-      })),
-    );
-    harness.complete();
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "按仓库" }));
-    const popularityMenu = await screen.findByRole("menuitemradio", {
-      name: /^按热度/,
-    });
-    await userEvent.setup().click(popularityMenu);
-
-    // Rank buckets in rank order.
-    expect(await screen.findByText("TOP 1-50")).toBeInTheDocument();
-    expect(groupHeader("TOP 51-100", 50)).toBeInTheDocument();
-    expect(groupHeader("TOP 101-130", 30)).toBeInTheDocument();
-    // The first bucket holds the top of the popularity order.
-    expect(screen.getByText("skill-0")).toBeInTheDocument();
   });
 
   it("shows an error state and recovers via retry", async () => {
