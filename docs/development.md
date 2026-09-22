@@ -9,7 +9,7 @@ Build, tech stack, architecture, testing, and release notes for developers. For 
 | Layer          | Technology                                                                                      |
 | -------------- | ----------------------------------------------------------------------------------------------- |
 | Desktop runtime | [Tauri v2](https://v2.tauri.app/) + Rust                                                        |
-| UI             | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/) (Radix UI + Tailwind CSS)  |
+| UI             | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/) (Base UI + Tailwind CSS)  |
 | Routing        | [react-router v8](https://reactrouter.com/) (HashRouter)                                        |
 | Data fetching  | [TanStack Query v5](https://tanstack.com/query) (persisted to localStorage)                     |
 | Build          | [Vite 8](https://vite.dev/) + TypeScript 7.0                                                    |

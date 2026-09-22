@@ -72,18 +72,19 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // 沙盒
 
 | Tauri 命令 | 请求构造（`skills.rs`） |
 | --- | --- |
-| `install_skill` | `AddRequest { source, skills, list_only }` |
+| `install_skill` | `AddRequest { source, skills, list_only: false }` |
 | `list_installed_skills` | `manager.list()` |
-| `remove_skills` | `RemoveRequest { skills, all }` |
+| `remove_skills` | `RemoveRequest { skills, all: false }` |
 | `set_skills_enabled` | `DisableRequest` / `EnableRequest { skills, all }` |
 | `link_agents` | `AgentRequest { agents, unlink }` |
 | `link_status` | `manager.agent_status()` |
 
 ## 消费到的返回字段
 
-- **`AddOutcome`**：`list_only`、`installed`（`name` + `canonical_path`）、
-  `skipped`（同名已安装、因此原样保留的技能名）、`failed`（`skill` + `error`）、
-  `skills`（发现列表，取 `name`）。
+- **`AddOutcome`**：应用只读取 `installed`（仅取名字——返回的路径就是刚写入的规范
+  目录）、`skipped`（同名已安装、因此原样保留的技能名）与 `failed`（`skill` +
+  `error`）。应用从不请求 `list_only`，因此丢弃 `skills`（发现列表）：调用方已经点名
+  要装哪个技能，`installed` + `skipped` 就足以回答它有没有到位。
 - **`ListedSkill`**：`name`、`description`（单行，库自身已折叠块标量）、
   `path`（技能**当前**所在目录，被停用的技能即 `disabled-skills`）、`enabled`、
   `installed_at`（`Option<u64>`，Unix 秒；不记录创建时间的文件系统为 `None`）。
@@ -95,8 +96,9 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // 沙盒
   `internal_others`。对未链接的非原生 agent，库会对 agent 目录内的私有内容分类：
   链接时会收编的 skills（`internal_skills`）与会被隔离的杂项
   （`internal_others`）。应用不再自扫 agent 目录。
-- **`DisableOutcome` / `EnableOutcome`**：前端只关心操作是否成功，
-  `installed` / `requested` / `disabled`（或 `enabled`）等明细字段目前未消费。
+- **`DisableOutcome` / `EnableOutcome`**：应用返回发生移动的名字（`disabled` /
+  `enabled`），其余丢弃——`requested`、`already`、`missing` 与 `installed` 清单
+  描述的是一次前端从不发起的无参调用。
 
 ## 0.15 起的链接语义
 

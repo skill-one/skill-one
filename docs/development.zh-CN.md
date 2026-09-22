@@ -9,7 +9,7 @@
 | 层         | 技术                                                                                            |
 | ---------- | ----------------------------------------------------------------------------------------------- |
 | 桌面运行时 | [Tauri v2](https://v2.tauri.app/) + Rust                                                        |
-| UI         | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/)（Radix UI + Tailwind CSS） |
+| UI         | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/)（Base UI + Tailwind CSS） |
 | 路由       | [react-router v8](https://reactrouter.com/)（HashRouter）                                       |
 | 数据请求   | [TanStack Query v5](https://tanstack.com/query)（持久化到 localStorage）                        |
 | 构建       | [Vite 8](https://vite.dev/) + TypeScript 7.0                                                    |

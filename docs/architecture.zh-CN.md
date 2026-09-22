@@ -28,7 +28,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 ### 前端（读取）
 
-- **`src/lib/registry/`**：把注册表当作一个服务来访问——`client.ts` 是 `worker.ts` 在主线程的代理，`index-stream.ts` 先探测已发布快照再流式拉取并解析 `skills.jsonl`（逐行解析，下载进行中即可逐步拿到 skill），`worker-controller.ts` 应答分页浏览、搜索、精选与元数据查询，`cache.ts` 持久化解析结果。调用方经由它完成过滤、排序与分页，自身不持有全量注册表。
+- **`src/lib/registry/`**：把注册表当作一个服务来访问——`client.ts` 是 `worker.ts` 在主线程的代理，`index-stream.ts` 先探测已发布快照再流式拉取并解析 `skills.jsonl`（逐行解析，下载进行中即可逐步拿到 skill），`worker-controller.ts` 应答分组浏览、搜索、精选、榜单与元数据查询，`cache.ts` 持久化解析结果。调用方经由它完成过滤与分组，自身不持有全量注册表。
 - **`src/lib/search-index.ts`**：整个商店唯一的搜索入口——基于 MiniSearch，对技能名称建索引，技能注册表与已安装技能列表共用。它定义了什么算命中（见「浏览技能列表」第 9 条），直接用 MiniSearch 自带的分词；`src/lib/search-skills.ts` 在它之上叠加注册表自己的排序（名称分层、热度）。仓库与描述都不是搜索字段。注册表的大索引在 worker 里构建，条目很少的页面级列表在 `useMemo` 里构建。
 - **`src/lib/skill-detail-api.ts`**：按需拉取单个 skill 的 `SKILL.md`，解析 frontmatter 与正文。
 - **`src/lib/cdn-config.ts`**：管理下载源。默认直连 `raw.githubusercontent.com`，失败后回退到 CDN 镜像（`cdn.jsdmirror.com`），并支持用户在「设置」中配置自定义 CDN。候选地址按优先级依次尝试——包括响应体中途失败时——配置持久化到 localStorage。
@@ -37,8 +37,8 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 ### 后端（写入）
 
-- **`src-tauri/src/skills.rs`**：暴露 7 个 Tauri 命令（`install_skill`、`list_installed_skills`、`remove_skills`、`set_skills_enabled`、`link_agents`、`link_status`、`read_skill_md`），全部经由共享的 `spawn_blocking` 辅助函数把阻塞操作（git clone、install、link 等）移出异步运行时。
-- 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。自 agents-skills 0.15 起链接是单向的：agent 自带的 skills 被收编进规范目录（同名冲突保留规范目录副本），其余文件被隔离到 `.misc/<agent>/`，取消链接只断开符号链接。`list` 还会报告每个技能的描述、安装时间与描述 token 估算，应用原样透传。
+- **`src-tauri/src/skills.rs`**：暴露 8 个 Tauri 命令（`install_skill`、`list_installed_skills`、`remove_skills`、`set_skills_enabled`、`link_agents`、`link_status`、`read_skill_md`、`compute_skill_hash`），全部经由共享的 `spawn_blocking` 辅助函数把阻塞操作（git clone、install、link 等）移出异步运行时。
+- 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。自 agents-skills 0.15 起链接是单向的：agent 自带的 skills 被收编进规范目录（同名冲突保留规范目录副本），其余文件被隔离到 `.misc/<agent>/`，取消链接只断开符号链接。`list` 还会报告每个技能的描述与安装时间，应用原样透传。
 
 ### 前端写入封装
 
@@ -60,7 +60,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 | `src/lib/tauri.ts` | 判断是否运行在 Tauri WebView 中 |
 | `src/lib/open-external.ts` | 在系统浏览器中打开外链（Tauri 需 opener 插件） |
 | `src-tauri/tauri.conf.json` | 窗口、构建与打包配置 |
-| `src-tauri/capabilities/default.json` | 权限声明（`core:default`、`opener:default`） |
+| `src-tauri/capabilities/default.json` | 主窗口权限声明（`core:default`、`opener:default`、`updater:default`、`process:allow-restart`，以及 `http:default` 允许的 skills.sh 搜索来源） |
 
 ## 数据流示例
 
@@ -74,14 +74,14 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 **探索技能列表**：
 
-1. 注册表跑在按需创建的 worker 里（`lib/registry/client.ts` 是 `lib/registry/worker.ts` 的主线程代理）：主线程只接收分页结果与进度事件，从不持有 ~12 MB 索引。
+1. 注册表跑在按需创建的 worker 里（`lib/registry/client.ts` 是 `lib/registry/worker.ts` 的主线程代理）：主线程只接收分组结果、有上限的搜索回复与进度事件，从不持有那几 MB 的索引。
 2. 启动时 worker 先从 IndexedDB 读取解析结果（`lib/registry/cache.ts`）并立即用于渲染——冷启动不等网络。
 3. 随后读取 `latest` 指针拿到已发布的标签，并探测 `upstream/stats.json` 取得运行时间戳；两者都带打散缓存的时间戳，避免任何缓存副本把旧快照冒充成当前版本。时间戳与缓存一致时：**完全跳过多 MB 的正文下载**。
 4. 否则 `registry/index-stream.ts` 拉取**定址到该标签** 的 `skills.jsonl`（不可变，镜像里的副本必然是正确字节），每收到一行就解析一行；页面直接用部分数据渲染。按注册表顺序时部分列表始终是完整列表的前缀，因此翻页稳定、仅总数不断上涨；但列表按热度排序，首页是「当前最好的一批」，随着数据继续到达，早先的行的会往下移。
 5. 搜索要等整个数据集就绪：MiniSearch 索引（由 `lib/search-index.ts` 构建，见第 9 条）在流结束后一次性构建（每个快照都重建的代价高于下载本身），在 worker 报告 `ready` 之前搜索框保持禁用。因此任何查询都不会基于不完整的注册表作答——索引存在之前 worker 一律返回空，作为禁用态字段的兜底。
 6. 落地后的数据连同其身份（标签、运行时间戳）一起覆盖 IndexedDB 记录。
 7. `cdn-config.ts` 按优先级尝试自定义 CDN、直连 GitHub 与默认 CDN；某个源中途失败即交给下一个并重头解析。
-8. 广播出的身份信息经 client 快照到达主线程，「设置」页据此显示当前使用哪个快照、本次启动是复用本地缓存还是重新下载。TanStack Query 只缓存分页结果，注册表本身不在那里重复存一份。
+8. 广播出的身份信息经 client 快照到达主线程，「设置」页据此显示当前使用哪个快照、本次启动是复用本地缓存还是重新下载。TanStack Query 只缓存页面问出来的那些结果（分组答案、搜索回复），注册表本身不在那里重复存一份。
 9. 排序有一条规则和一处例外：浏览列表按工具栏的排序选择排列（默认按热度，也就是每行显示的那个「安装量 × Star 数」合成分，另一项是按名称）；只要 query 非空，worker 一律按相关度返回，不受该选择影响，此时工具栏把排序下拉换成只读的「相关度」标签，避免控件声称一种结果列表并没有遵守的顺序。下面这套排序是注册表特有的。这个顺序是：查询的每个词都必须命中，不再退化为「命中任意一个词」；名称精确命中或前缀命中排在最前，它们之间按热度排——名称命中已经确定了「这是什么」，同名之间热度才是真正有意义的差别；其余是「含有查询词但不以它开头」的名称命中，先按热度、再以 BM25 分数作为最后的平手判定。
 
 什么算命中只有一处定义，在 `lib/search-index.ts`，其余两个可搜索的列表（技能注册表、已安装技能）共用：每个查询词都必须与某个索引词完全相等，或等于它的开头，其余一概不放过——打错的词、单词中间的片段、以及只有别的文档才命中的词，都算不上。保留前缀匹配，是因为只输了一半的词是「没输完」而不是「输错」。分词直接用 MiniSearch 自带的实现（按空格与标点切、再转小写），这对唯一被索引的字段已经足够——技能名就是 ASCII slug。（列表行按命中词出现的位置高亮，所以出现在更长单词内部的命中词也会被标上。）

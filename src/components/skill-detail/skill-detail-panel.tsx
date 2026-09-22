@@ -236,7 +236,7 @@ export function SkillDetailPanel({
   surface = "store",
 }: SkillDetailPanelProps) {
   // Keep the last selected skill while the drawer plays its exit
-  // animation: `skill` is already null by the time Radix starts closing,
+  // animation: `skill` is already null by the time the sheet starts closing,
   // and an unmounting parent would cut the slide-out short.
   const [lastSkill, setLastSkill] = useState<SkillView | null>(skill);
   useEffect(() => {
@@ -268,7 +268,7 @@ export function SkillDetailPanel({
     enabled: shown != null,
   });
 
-  // ←/→ switch skills (delegated to the page); Escape is Radix's dismiss.
+  // ←/→ switch skills (delegated to the page); Escape is the sheet's dismiss.
   useEffect(() => {
     if (!skill) return;
     const onKeyDown = (e: KeyboardEvent) => {

@@ -1077,7 +1077,7 @@ describe("ExplorePage", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
 
-    // Escape also closes the panel (Radix's document-level dismiss).
+    // Escape also closes the panel (the sheet's document-level dismiss).
     await user.click(screen.getByText("skill-1"));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: "Escape" });

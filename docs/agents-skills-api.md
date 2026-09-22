@@ -79,18 +79,21 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // sandboxed
 
 | Tauri command | Request construction (`skills.rs`) |
 | --- | --- |
-| `install_skill` | `AddRequest { source, skills, list_only }` |
+| `install_skill` | `AddRequest { source, skills, list_only: false }` |
 | `list_installed_skills` | `manager.list()` |
-| `remove_skills` | `RemoveRequest { skills, all }` |
-| `set_skills_enabled` | `DisableRequest` / `EnableRequest { skills, all }` |
+| `remove_skills` | `RemoveRequest { skills, all: false }` |
+| `set_skills_enabled` | `DisableRequest` / `EnableRequest { skills, all: false }` |
 | `link_agents` | `AgentRequest { agents, unlink }` |
 | `link_status` | `manager.agent_status()` |
 
 ## Consumed return fields
 
-- **`AddOutcome`**: `list_only`, `installed` (`name` + `canonical_path`),
-  `skipped` (names left untouched because they are already installed),
-  `failed` (`skill` + `error`), `skills` (discovered list; `name` is used).
+- **`AddOutcome`**: the app reads `installed` (names only — a returned path
+  would be the canonical dir it just wrote into), `skipped` (names left
+  untouched because they are already installed) and `failed` (`skill` +
+  `error`). It never asks for `list_only`, so `skills` (the discovered list) is
+  dropped: the caller named the skill it wanted, and `installed` + `skipped`
+  already answer whether that one arrived.
 - **`ListedSkill`**: `name`, `description` (single line — the library folds
   block scalars itself), `path` (the directory the skill *currently* lives in,
   i.e. `disabled-skills` for a parked one), `enabled`, `installed_at`
@@ -105,9 +108,10 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // sandboxed
   library classifies the agent dir's private content — skills that a link
   would adopt (`internal_skills`) and non-skill entries that would be
   quarantined (`internal_others`). The app does not scan agent dirs itself.
-- **`DisableOutcome` / `EnableOutcome`**: the frontend only cares whether the
-  operation succeeded; detail fields such as `installed` / `requested` /
-  `disabled` (or `enabled`) are currently unused.
+- **`DisableOutcome` / `EnableOutcome`**: the app returns the names that moved
+  (`disabled` / `enabled`) and discards the rest — `requested`, `already`,
+  `missing` and the `installed` inventory describe a no-argument call the
+  frontend never makes.
 
 ## Link semantics since 0.15
 
