@@ -10,7 +10,13 @@ import {
   fireEvent,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HashRouter } from "react-router";
+import {
+  HashRouter,
+  MemoryRouter,
+  Route,
+  Routes,
+  useNavigate,
+} from "react-router";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { searchSkillsSh } from "../../lib/skills-sh";
@@ -180,6 +186,35 @@ function renderExplorePage() {
 }
 
 /**
+ * Where a repository card's bar leads. The page itself is stood in for —
+ * `repo-page.test.tsx` owns its behaviour — because what the drill-down tests
+ * here is what the *list* keeps while it is away.
+ */
+function RepoStandIn() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(-1)}>
+      返回探索
+    </button>
+  );
+}
+
+/** The list under the routes a drill-down needs: the list, and a page to land
+ *  on. A memory router, so a "back" is a pop of the entry the list is on. */
+function renderExploreRoutes() {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/explore"]}>
+        <Routes>
+          <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/repo/*" element={<RepoStandIn />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+/**
  * The search field, once the worker's index is ready to answer it. The field
  * stays locked until then, so every search case waits for the same unlock
  * instead of racing the index build.
@@ -316,6 +351,61 @@ describe("ExplorePage", () => {
     lastObserver().trigger(true);
     expect(renderedCards()).toBe(12);
   });
+
+  it("keeps the reader's place across a repository's page and back", async () => {
+    const user = userEvent.setup();
+    harness.init();
+    harness.pushAll(
+      Array.from({ length: 12 }, (_, i) => ({
+        name: `skill-${i}`,
+        repo: `repo-${String(i).padStart(2, "0")}/skills`,
+        description: "",
+        stars: 10,
+        downloads: 10,
+        path: `skills/skill-${i}`,
+      })),
+    );
+    harness.complete();
+    const { container } = renderExploreRoutes();
+
+    const renderedCards = () =>
+      screen.getAllByRole("link", { name: /^查看仓库 repo-\d+\/skills，/ });
+    const scroller = () =>
+      (container.querySelector("ul.grid") as HTMLElement).closest(
+        ".overflow-y-auto",
+      ) as HTMLElement;
+    const lastObserver = () =>
+      (
+        globalThis.IntersectionObserver as unknown as {
+          instances: Array<{ trigger(intersecting?: boolean): void }>;
+        }
+      ).instances.at(-1)!;
+    await screen.findByText("skill-0");
+    expect(renderedCards()).toHaveLength(6);
+
+    // The reader searches, scrolls the answer to its end — which reveals the
+    // rest of it — and leaves the list sitting partway down.
+    await user.type(await searchField(), "skill");
+    await waitFor(() => expect(document.querySelector("mark")).toBeInTheDocument());
+    lastObserver().trigger(true);
+    await waitFor(() => expect(renderedCards()).toHaveLength(12));
+    scroller().scrollTop = 300;
+    fireEvent.scroll(scroller());
+
+    // Into a repository's page, and back out of it.
+    await user.click(renderedCards()[0]);
+    await user.click(
+      await screen.findByRole("button", { name: "返回探索" }),
+    );
+
+    // The reader is handed the page they left, not a reset one: their search,
+    // the depth they had revealed, and the position they were scrolled to.
+    expect(await screen.findByRole("textbox", { name: "搜索 Skill" })).toHaveValue(
+      "skill",
+    );
+    expect(renderedCards()).toHaveLength(12);
+    expect(scroller().scrollTop).toBe(300);
+  }, 15000);
 
   it("shows a repository's stars and skill count on its card", async () => {
     harness.init();

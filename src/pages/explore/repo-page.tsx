@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, Star } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
+import { useReturn } from "../../hooks/use-return";
 import { openExternal } from "../../lib/open-external";
 import { skillKey } from "../../lib/skill-view";
 import {
@@ -48,6 +49,10 @@ export function RepoPage() {
   // `owner/repo`, and it carries a slash of its own.
   const repo = useParams()["*"] ?? "";
 
+  // The way out: back to the store list when the reader came from it, and to it
+  // by replacement when they arrived here directly.
+  const back = useReturn("/explore");
+
   const stats = useRegistryStats();
   const { data } = useRegistryGroups("", "repo");
   const group = data?.groups.find((candidate) => candidate.key === `repo-${repo}`);
@@ -69,8 +74,14 @@ export function RepoPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-5">
+      {/* Back to the list the reader came from — the entry itself, and with it
+          the search, the revealed depth and the scroll position the list was
+          left at (see `useReturn`). The href is where the control points when
+          there is no entry behind this one, and it is what a modified click
+          and assistive tech read. */}
       <Link
-        to="/explore"
+        to={back.to}
+        onClick={back.onClick}
         className="mb-3 flex w-fit items-center gap-1 rounded-md px-1.5 py-1 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden />

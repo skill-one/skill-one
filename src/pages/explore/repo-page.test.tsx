@@ -175,18 +175,31 @@ describe("RepoPage", () => {
     expect(screen.getByText("Instructions for skill-2.")).toBeInTheDocument();
   });
 
-  it("offers a way back to the store", async () => {
+  it("offers a way back to the store, and takes it", async () => {
+    const user = userEvent.setup();
     bootRegistry(skillsOf(1));
-    renderRepoPage();
+    renderWithRouter(
+      <Routes>
+        <Route path="/repo/*" element={<RepoPage />} />
+        <Route path="/explore" element={<div>store list</div>} />
+      </Routes>,
+      { route: `/repo/${REPO}` },
+    );
 
     await waitFor(() =>
       expect(
         screen.getByRole("heading", { name: REPO }),
       ).toBeInTheDocument(),
     );
-    expect(screen.getByRole("link", { name: "返回探索" })).toHaveAttribute(
-      "href",
-      "/explore",
-    );
+    // The href is where the control points for the reader the app cannot route
+    // for itself: a modified click, and assistive tech reading the link.
+    const back = screen.getByRole("link", { name: "返回探索" });
+    expect(back).toHaveAttribute("href", "/explore");
+
+    // A plain click goes through the app's own way out instead — a pop when
+    // there is an entry behind this one (see `use-return.test.tsx`), and a
+    // replacement when, as in this window, there is not.
+    await user.click(back);
+    expect(await screen.findByText("store list")).toBeInTheDocument();
   });
 });

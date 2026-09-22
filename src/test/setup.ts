@@ -1,5 +1,9 @@
+import { beforeEach } from "vitest";
+
 // Extend Vitest's `expect` with jest-dom matchers (toBeInTheDocument, etc.).
 import "@testing-library/jest-dom/vitest";
+
+import { resetViewMemories } from "../lib/view-memory";
 
 // jsdom does not implement ResizeObserver, which some Base UI primitives
 // depend on. Provide a minimal no-op implementation.
@@ -85,4 +89,31 @@ if (typeof Element !== "undefined") {
   if (!("hasPointerCapture" in proto)) proto.hasPointerCapture = () => false;
   if (!("releasePointerCapture" in proto)) proto.releasePointerCapture = () => {};
   if (!("setPointerCapture" in proto)) proto.setPointerCapture = () => {};
+  // jsdom scrolls nothing: `scrollTop` is a plain property and the methods that
+  // would move it are missing. Route `scrollTo` onto that property, so a test
+  // can read back the position the app asked for — which is what a page that
+  // restores a scroll position does.
+  if (!("scrollTo" in proto)) {
+    proto.scrollTo = function (this: Element, options: ScrollToOptions = {}) {
+      if (typeof options.top === "number") this.scrollTop = options.top;
+    };
+  }
 }
+
+// A window that has never navigated is what each test means to start from, and
+// jsdom gives a file's tests one window between them:
+//
+// - the `history` keeps its entries, and with them react-router's own index
+//   (`history.state.idx`), so a test that navigated would leave the next one
+//   with an entry behind it that it never visited — which is what
+//   `useReturn` reads to decide whether there is anywhere to go back to;
+// - and react-router keys its entries in that same state, with one exception:
+//   the entry a window *starts* on is keyed `"default"`, the same key in every
+//   window. Per window that is exactly right — there is one such entry — but
+//   across tests it makes it the one key they all share, and anything keyed by
+//   the entry (the view a list page remembers, `lib/view-memory`) is then read
+//   by a test that never visited it, previous search text and all.
+beforeEach(() => {
+  window.history.replaceState(null, "", window.location.href);
+  resetViewMemories();
+});

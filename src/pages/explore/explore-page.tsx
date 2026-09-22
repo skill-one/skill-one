@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Flame, FolderGit2, LayoutGrid } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
+import { useViewMemory } from "../../hooks/use-view-memory";
 import { skillKey } from "../../lib/skill-view";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
@@ -53,15 +54,32 @@ const GROUP_OPTIONS: Array<FilterOption<GroupBy>> = [
 ];
 
 export function ExplorePage() {
-  // Search text and grouping mode; any change re-groups the answer because
-  // both define what a group is.
-  const [search, setSearch] = useState("");
-  const [groupBy, setGroupBy] = useState<GroupBy>("repo");
-  const query = useDebouncedValue(search).trim();
+  // The page's own scrolling element: the list scrolls inside it, which is also
+  // why the browser restores nothing for this page (see `view` below).
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   // Worker progress: the climbing count, the streaming/indexing flags and
   // the retry action for a failed download.
   const stats = useRegistryStats();
+
+  // Search text, grouping mode and reveal depth; any change re-groups the
+  // answer because the first two define what a group is. They live in one
+  // object, remembered per history entry, because a drill-down — into a
+  // repository's page and back — unmounts this page: the controls, the depth it
+  // had revealed and the scroll position all have to come back together, or the
+  // reader is handed a page they were not on.
+  //
+  // The scroll position waits for content: until the first skill lands the page
+  // holds a skeleton, and a position restored into a skeleton is spent on
+  // nothing.
+  const [view, setView] = useViewMemory(
+    "explore",
+    { search: "", groupBy: "repo" as GroupBy, visibleCount: INITIAL_GROUPS },
+    listRef,
+    { ready: stats.count > 0 },
+  );
+  const { search, groupBy, visibleCount } = view;
+  const query = useDebouncedValue(search).trim();
 
   // The whole (filtered) registry grouped by the requested mode, from the
   // registry worker — filtering, ordering and the bucketing all happen
@@ -108,7 +126,6 @@ export function ExplorePage() {
   // while the reader scrolls. It resets with the answer's definition — the
   // handlers below — not with the data, so a streaming snapshot that grows
   // the list never snaps the reader back to the top chunk.
-  const [visibleCount, setVisibleCount] = useState(INITIAL_GROUPS);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const renderedGroups = groups.slice(0, visibleCount);
   const allRendered = renderedGroups.length >= groups.length;
@@ -122,12 +139,15 @@ export function ExplorePage() {
     if (!node || allRendered) return;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
-        setVisibleCount((c) => Math.min(c + GROUP_CHUNK, groups.length));
+        setView((v) => ({
+          ...v,
+          visibleCount: Math.min(v.visibleCount + GROUP_CHUNK, groups.length),
+        }));
       }
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [allRendered, groups.length]);
+  }, [allRendered, groups.length, setView]);
 
   // The skill shown in the detail panel, by identity; null keeps the panel
   // closed. Clicking a row while the panel is open simply swaps the selection,
@@ -153,13 +173,11 @@ export function ExplorePage() {
   }, [liveData, flatSkills]);
   const handleSearch = (q: string) => {
     setSelected(null);
-    setVisibleCount(INITIAL_GROUPS);
-    setSearch(q);
+    setView((v) => ({ ...v, search: q, visibleCount: INITIAL_GROUPS }));
   };
   const handleGroupBy = (mode: GroupBy) => {
     setSelected(null);
-    setVisibleCount(INITIAL_GROUPS);
-    setGroupBy(mode);
+    setView((v) => ({ ...v, groupBy: mode, visibleCount: INITIAL_GROUPS }));
   };
 
   // Each mode's option, annotated with how many groups it would produce over
@@ -216,7 +234,10 @@ export function ExplorePage() {
               stays unclipped. The top edge stays flush on purpose: the sticky
               group headers pin exactly there, and any top padding would let
               scrolled cards peek out above them. */}
-          <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5">
+          <div
+            ref={listRef}
+            className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5"
+          >
             {failure ? (
               <Placeholder message={`加载失败：${failure}`}>
                 <Button
