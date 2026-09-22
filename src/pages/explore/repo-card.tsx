@@ -19,8 +19,8 @@ import { Card, CardContent, CardFooter } from "../../components/ui/card";
  * grows with the repository only up to a point and then stops — the footer
  * always states how many skills the repository has in total, so a capped list
  * reads as "these of them" rather than as "all of them".
- * Four measures 95px for a one-skill repository and 179px at the cap, so the
- * two extremes stay within a 1.9:1 band — which is what a lane of cards remains
+ * Four measures 98px for a one-skill repository and 177px at the cap, so the
+ * two extremes stay within a 1.8:1 band — which is what a lane of cards remains
  * scannable at.
  */
 const PREVIEWED_SKILLS = 4;
@@ -69,6 +69,20 @@ const PREVIEWED_SKILLS = 4;
  * one skill, so the button is that card's own action rather than a repeated
  * glyph. A pointer that never hovers (a touch surface) still reaches the same
  * install through the detail panel, which the row opens.
+ *
+ * Because the button is only ever *shown* on intent, it does not take part in
+ * the row's layout: it floats over the row's right edge, so a name and a
+ * description get the whole of the row's width in the state every row spends
+ * nearly all of its time in — the state a reader compares skills in. The text it
+ * floats over is dissolved by a gradient of the row's own hover surface rather
+ * than cut off, so a description that runs under the button still reads as
+ * continuing rather than as clipped. The row keeps its height either way, so
+ * nothing moves under the pointer when the action arrives.
+ *
+ * The bar's identity is a deliberate size step above the rows — a 24px face and
+ * a 14px name against the rows' 13px names and 13px glyphs. The bar sits under a
+ * hairline at the card's bottom edge, and the step is what keeps it from reading
+ * as one more row of the list it signs.
  *
  * The body is the same for every repository, including the ones with a single
  * skill: one row per skill, never a promoted or specially-shaped first entry, so
@@ -134,7 +148,7 @@ export function RepoCard({
               return (
                 <li
                   key={key}
-                  className="group/row flex items-center gap-1 rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent"
+                  className="group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent"
                 >
                   {/* The row's clickable area is the skill itself; the install
                       button beside it is a sibling, so a row is never a button
@@ -168,16 +182,20 @@ export function RepoCard({
                       {skill.description}
                     </span>
                   </button>
-                  {/* Revealed on hover and on focus, never removed from the
-                      layout: the row keeps its height and nothing shifts under
-                      the pointer. The reveal sits on this wrapper rather than on
-                      the button because the button already owns `opacity` for
-                      its own states — `disabled:opacity-50` on an installed or
-                      installing button is more specific than a bare `opacity-0`
-                      and would win, drawing the button the reader did not ask
-                      for. `:focus-within` covers the button itself being
-                      focused, so it needs no rule of its own. */}
-                  <span className="flex shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
+                  {/* Floating, not laid out: the button is absolutely placed
+                      over the row's right edge, so the name and the description
+                      own the row's whole width and the reader sees more of them
+                      in the state every row spends nearly all its time in. It
+                      is revealed on hover and on focus (the row's or its own)
+                      and floats over the text it makes room for, dissolving it
+                      with a gradient of the row's own hover surface — the same
+                      treatment the detail panel's clipped description uses. The
+                      reveal sits on this wrapper rather than on the button
+                      because the button already owns `opacity` for its own
+                      states: `disabled:opacity-50` on an installed or installing
+                      button is more specific than a bare `opacity-0` and would
+                      win, drawing the button the reader did not ask for. */}
+                  <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
                     <SkillInstallButton skill={skill} className="h-7 w-7" />
                   </span>
                 </li>
@@ -195,8 +213,12 @@ export function RepoCard({
             aria-label={`查看仓库 ${repo}，${skills.length} 个 skill`}
             className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            <OwnerAvatar owner={owner} className="size-5 shrink-0 text-[10px]" />
-            <span className="truncate text-[12px] font-medium text-foreground group-hover/head:underline">
+            {/* The identity is a size step above the rows: a 24px face and a
+                14px name against the rows' 13px names and 13px glyphs. The bar
+                sits under a hairline at the bottom of the card, so the step is
+                what stops it from reading as one more row of the list. */}
+            <OwnerAvatar owner={owner} className="size-6 shrink-0 text-[11px]" />
+            <span className="truncate text-sm font-semibold text-foreground group-hover/head:underline">
               {repo}
             </span>
             {/* The repository's size and the figure it is ranked by, in the

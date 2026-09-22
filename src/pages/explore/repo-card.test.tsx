@@ -207,6 +207,14 @@ describe("RepoCard", () => {
     // a keyboard walk still sees the action of the row it stands on.
     expect(reveal).toHaveClass("group-focus-within/row:opacity-100");
     expect(install).not.toHaveClass("hidden");
+    // Floating, not laid out: the row's name and description get its whole
+    // width in the state a reader compares skills in, and the button dissolves
+    // the text it covers rather than pushing it aside.
+    expect(reveal).toHaveClass("absolute");
+    expect(reveal).toHaveClass("bg-gradient-to-l");
+    expect(screen.getAllByRole("button", { name: "查看 pdf 详情" })[0]).toHaveClass(
+      "flex-1",
+    );
   });
 
   it("keeps the card's single door: the bar, and nothing beside it", () => {
