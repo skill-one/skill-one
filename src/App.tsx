@@ -44,11 +44,6 @@ const RankingPage = lazy(() =>
     default: m.RankingPage,
   })),
 );
-const SettingsPage = lazy(() =>
-  import("./pages/settings/settings-page").then((m) => ({
-    default: m.SettingsPage,
-  })),
-);
 
 const queryClient = createQueryClient();
 
@@ -120,7 +115,6 @@ export default function App() {
                     path="/explore/featured/ranking/:rankingId"
                     element={<RankingPage />}
                   />
-                  <Route path="/settings" element={<SettingsPage />} />
                   <Route
                     path="*"
                     element={<Navigate to="/my-skills" replace />}
@@ -159,7 +153,7 @@ function PopoverNavigation() {
  * Automatic update check: once on startup, again whenever the window becomes
  * visible again, and hourly as a fallback for a session that stays hidden. The
  * store collapses all three into one request per interval, so the timer costs
- * nothing. Failures stay quiet here — the settings page surfaces them on an
+ * nothing. Failures stay quiet here — the settings popover surfaces them on an
  * explicit manual check.
  */
 function AppUpdateWatcher() {

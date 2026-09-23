@@ -35,7 +35,7 @@ Brew users can keep updating with `brew upgrade --cask skill-one`; brew download
 
 ## Staying up to date
 
-The app checks for updates at startup, whenever it regains focus, and hourly as a fallback. When a newer version exists it offers **Update now** — download, install, relaunch. You can also check manually: **Settings → Software Update → Check for updates**. Update packages are signature-verified before installation; a package with an invalid signature is never installed.
+The app checks for updates at startup, whenever it regains focus, and hourly as a fallback. When a newer version exists it offers **Update now** — download, install, relaunch. You can also check manually: **Settings popover → Software Update**. Update packages are signature-verified before installation; a package with an invalid signature is never installed.
 
 A Homebrew install is excluded from in-app updates: the app detects the cask and points you at `brew upgrade --cask skill-one` instead, so Homebrew never loses track of which version is installed.
 

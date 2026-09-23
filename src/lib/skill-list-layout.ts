@@ -77,8 +77,8 @@ export const REPO_LIST_CLASS =
 /**
  * Placeholder standing in for one repository card while a list loads, at the
  * same lane width the real cards get. Measured off a rendered card at the
- * largest preview cap the settings page offers (7 skills, 257px) — a grid row
+ * largest preview cap the settings popover offers (7 skills, 257px) — a grid row
  * is as tall as its tallest card, and the reader can raise the cap but not past
- * what the settings page offers.
+ * what the settings popover offers.
  */
 export const REPO_CARD_SKELETON_CLASS = "h-[257px] rounded-xl";

@@ -76,10 +76,11 @@ describe("App routing", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    // Navigate to Settings.
-    await user.click(screen.getByRole("link", { name: /设置/ }));
-
-    expect(await screen.findByText(/配置技能数据的下载源/)).toBeInTheDocument();
+    // 设置 is a popover trigger, not a route: it opens the quick-settings
+    // flyout in place.
+    await user.click(screen.getByRole("button", { name: /设置/ }));
+    expect(await screen.findByText("外观")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
 
     // Navigate back to the 我的 skills page.
     await user.click(screen.getByRole("link", { name: /我的 skills/ }));

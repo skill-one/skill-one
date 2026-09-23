@@ -270,7 +270,7 @@ describe("update-store throttle", () => {
   it("lets a manual force bypass the throttle window", async () => {
     mocks.check.mockResolvedValue(null);
     await checkForUpdate();
-    await checkForUpdate({ force: true }); // the settings-page button
+    await checkForUpdate({ force: true }); // the settings popover's manual check
     expect(mocks.check).toHaveBeenCalledTimes(2);
   });
 

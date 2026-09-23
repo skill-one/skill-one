@@ -60,12 +60,13 @@ skill-one/
 │   │   ├── repo-hover-card.tsx # Author chip + its repository hover card
 │   │   ├── skill-cover.tsx # Skill's own image slot (author initial; detail drawer only)
 │   │   ├── skill-detail/    # Shared skill detail panel + modal drawer
+│   │   ├── settings-popover.tsx # Settings flyout anchored to the sidebar footer
+│   │   ├── advanced-settings-dialog.tsx # Second-level settings (CDN base + data source)
 │   │   └── placeholder.tsx # Shared "nothing to show" empty state for list pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)
 │   │   ├── explore/        # Store explore pages (skill-list-row / repo-card + repo-page / group-section)
 │   │   │   └── featured/   # Curated featured page (hero leaderboards + category sections)
-│   │   ├── my-skills/      # My Skills page (agent avatar menu / agent-link-settings-dialog, etc.)
-│   │   └── settings/       # Settings page
+│   │   └── my-skills/      # My Skills page (agent avatar menu / agent-link-settings-dialog, etc.)
 │   ├── hooks/              # Custom hooks
 │   ├── lib/                # API / business logic layer
 │   ├── types/              # Type definitions
@@ -93,12 +94,12 @@ For details see [`architecture.md`](architecture.md); for the `agents-skills` AP
 
 ## Theming
 
-The app supports light, dark, and system-following appearance, switchable from the **Settings → Appearance** card.
+The app supports light, dark, and system-following appearance, switchable from the **Appearance section of the settings popover**.
 
 shadcn/ui ships the dark palette out of the box: `src/index.css` defines both a `:root` and a `.dark` set of oklch variables plus the `@custom-variant dark (&:is(.dark *))` rule, and every component under `src/components/ui/` reads semantic tokens. Supporting dark mode is therefore only a matter of toggling the `dark` class on `<html>` — which is what [next-themes](https://github.com/pacocoursey/next-themes) does:
 
 - `src/components/theme-provider.tsx` — the single shared configuration (`attribute="class"`, `defaultTheme="system"`, `enableColorScheme`, `storageKey="skill-one-theme"`), also responsible for mirroring the theme onto the native window.
-- `src/components/theme-mode-toggle.tsx` — the three-way `ToggleGroup` on the settings page.
+- `src/components/theme-mode-toggle.tsx` — the three-way `ToggleGroup` in the settings popover.
 - `src/hooks/use-native-theme.ts` — calls `getCurrentWindow().setTheme()` inside Tauri so OS-drawn surfaces (title bar, scrollbars, form controls, the tray popover's glass material) follow along. `system` maps to `null`, leaving that case to the OS. On macOS `set_theme` is app-wide, so the main window's call covers every window.
 
 Only `src/main.tsx` (main window) mounts the provider. The menu bar popover (`src/popover/popover-main.tsx`) deliberately uses no theme provider: `src/popover/popover.css` re-tokens the shadcn variables for that document with translucent system colors (label / secondary label / fills / hairline separators) driven by `prefers-color-scheme` — the same appearance source the native glass material behind the transparent window resolves from, so content and backdrop can never disagree about light or dark.

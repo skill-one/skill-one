@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router";
-import { Settings, Sparkles, LayoutGrid, Boxes } from "lucide-react";
+import { Sparkles, LayoutGrid, Boxes } from "lucide-react";
 
 import {
   Sidebar,
@@ -15,9 +15,8 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "./ui/sidebar";
-import { Badge } from "./ui/badge";
+import { SettingsMenuItem } from "./settings-popover";
 import { isTauri } from "../lib/tauri";
-import { useAppUpdate } from "../hooks/use-app-update";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
 import { useRegistrySnapshot } from "../hooks/use-registry-snapshot";
 
@@ -48,10 +47,6 @@ const mySkillsItems: NavItem[] = [
   { path: "/my-skills", label: "我的 skills", icon: Boxes },
 ];
 
-const footerItems: NavItem[] = [
-  { path: "/settings", label: "设置", icon: Settings },
-];
-
 /**
  * Real badge counts: Shop "全部" = registry total, "My Skills → 全局" =
  * installed skill count. Pages without a count source (精选) show no badge.
@@ -79,15 +74,9 @@ function useNavCounts(): Partial<Record<string, number>> {
 function NavMenuItem({
   item,
   count,
-  indicator,
 }: {
   item: NavItem;
   count?: number;
-  /**
-   * Trailing mark in the same slot as `count`. The two never coexist — a row
-   * either counts things or flags one — so passing both is a caller bug.
-   */
-  indicator?: React.ReactNode;
 }) {
   const location = useLocation();
   const isActive =
@@ -111,48 +100,7 @@ function NavMenuItem({
       {count !== undefined && (
         <SidebarMenuBadge className="tabular-nums">{count}</SidebarMenuBadge>
       )}
-      {indicator !== undefined && (
-        <SidebarMenuBadge>{indicator}</SidebarMenuBadge>
-      )}
     </SidebarMenuItem>
-  );
-}
-
-/**
- * The whole in-sidebar update affordance: one chip on 设置, in the slot the
- * other rows use for their counts — and the chip itself is the way in.
- *
- * Marking an icon the user already knows — rather than adding a row of its own
- * — is how the desktop apps this one lives next to do it: VS Code badges the
- * Settings gear, Chrome badges the ⋮ menu, Slack badges the workspace. VS Code
- * went as far as fixing a bug where the gear badge *and* its "Update" button
- * showed at once, on the grounds that two signals for one fact is noise.
- *
- * Clicking it opens the confirmation dialog from wherever the user is, so
- * nobody has to know the update is filed under settings. It says its piece
- * instead of being a bare dot — this sidebar's other badge is a plain count,
- * where a silent dot reads as decoration — and it is the only coloured thing
- * in the footer, which is what makes it read as an action among numbers. Green
- * (`success`) rather than the palette's red: an available update is something
- * to go and get, not a failure, and red would say the app is broken.
- */
-function UpdateBadge() {
-  const { open } = useAppUpdate();
-  return (
-    <Badge
-      variant="success"
-      render={
-        <button
-          type="button"
-          onClick={() => open()}
-          // The badge slot is `pointer-events-none` so it never swallows clicks
-          // meant for the row; this one is a button and wants them.
-          className="pointer-events-auto cursor-pointer"
-        >
-          有新版本
-        </button>
-      }
-    />
   );
 }
 
@@ -178,10 +126,6 @@ function BrandHeader() {
 
 export function AppSidebar() {
   const counts = useNavCounts();
-  const { phase, version } = useAppUpdate();
-  // A discovered update is marked on 设置 itself (see UpdateBadge) instead of
-  // getting a row of its own.
-  const hasUpdate = phase === "available" && version !== null;
   return (
     <Sidebar>
       <BrandHeader />
@@ -218,13 +162,7 @@ export function AppSidebar() {
       <SidebarSeparator />
       <SidebarFooter>
         <SidebarMenu>
-          {footerItems.map((item) => (
-            <NavMenuItem
-              key={item.label}
-              item={item}
-              indicator={hasUpdate ? <UpdateBadge /> : undefined}
-            />
-          ))}
+          <SettingsMenuItem />
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

@@ -23,6 +23,7 @@ export function ThemeModeToggle() {
     <ToggleGroup
       variant="outline"
       spacing={0}
+      size="sm"
       value={theme ? [theme] : []}
       onValueChange={(value) => {
         const next = value[0];
@@ -31,7 +32,7 @@ export function ThemeModeToggle() {
       aria-label="外观"
     >
       {OPTIONS.map(({ value, label, icon: Icon }) => (
-        <ToggleGroupItem key={value} value={value} className="gap-1.5 px-3">
+        <ToggleGroupItem key={value} value={value} className="gap-1 px-2">
           <Icon />
           <span>{label}</span>
         </ToggleGroupItem>

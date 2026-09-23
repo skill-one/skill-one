@@ -15,8 +15,8 @@ import { Progress } from "./ui/progress";
 /**
  * Self-update confirmation dialog. It does NOT open itself: a background or
  * startup check only flips the store to `available`, which surfaces the sidebar
- * badge; the user opens this dialog from that badge (or the settings page), and
- * the dialog is shown while `available` + `dialogOpen`. Closing keeps the
+ * badge; the user opens this dialog from that badge (or the settings popover's
+ * 软件更新 row), and the dialog is shown while `available` + `dialogOpen`. Closing keeps the
  * `available` phase (via the store's close action) so the badge persists as a
  * reminder. Install streams progress from the updater plugin; on success the app
  * relaunches into the new bundle, so this component unmounts with it.

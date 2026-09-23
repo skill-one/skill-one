@@ -74,7 +74,7 @@ describe("AppSidebar update badge", () => {
     });
 
     expect(screen.queryByRole("button", { name: "有新版本" })).toBeNull();
-    expect(screen.getByRole("link", { name: "设置" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
   });
 
   it("marks 设置 itself rather than adding a row of its own", async () => {
@@ -87,10 +87,10 @@ describe("AppSidebar update badge", () => {
     const badge = await screen.findByRole("button", { name: "有新版本" });
     // The chip hangs off the 设置 row, so the sidebar gained no destination.
     expect(badge.closest("li")).toContainElement(
-      screen.getByRole("link", { name: "设置" }),
+      screen.getByRole("button", { name: "设置" }),
     );
-    // 精选 · 全部 · 我的 skills · 设置 — and nothing else.
-    expect(screen.getAllByRole("link")).toHaveLength(4);
+    // 精选 · 全部 · 我的 skills — and nothing else; 设置 is a popover trigger.
+    expect(screen.getAllByRole("link")).toHaveLength(3);
   });
 
   it("opens the confirmation dialog from wherever the user is", async () => {
@@ -105,8 +105,8 @@ describe("AppSidebar update badge", () => {
 
     // Opening the dialog is the chip's whole job: the globally-mounted
     // UpdateDialog reacts to exactly this, so nobody has to know the update
-    // lives under settings — while 设置 stays an ordinary route.
+    // lives under settings — 设置 itself just opens the quick-settings flyout.
     expect(getUpdateStatus().dialogOpen).toBe(true);
-    expect(screen.getByRole("link", { name: "设置" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
   });
 });
