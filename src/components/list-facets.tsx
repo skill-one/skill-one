@@ -31,15 +31,12 @@ export interface Facet {
 export function ListFacets({
   facets,
   total,
-  countLabel,
   selected,
   onSelect,
 }: {
   facets: readonly Facet[];
   /** What 全部 counts, in the unit on screen. */
   total: number;
-  /** What a count counts, named in a chip's tip (e.g. 个 skill). */
-  countLabel: string;
   /** The scope on screen, by key; null is 全部. */
   selected: string | null;
   onSelect: (key: string | null) => void;
@@ -63,7 +60,6 @@ export function ListFacets({
       selected={selected === facet.key}
       emoji={domainMeta(facet.key)?.emoji}
       count={facet.count}
-      countLabel={countLabel}
       expanded={expanded}
       onClick={onPick ?? (() => onSelect(facet.key))}
     >
@@ -76,7 +72,6 @@ export function ListFacets({
       <DomainChip
         selected={selected === null}
         count={total}
-        countLabel={countLabel}
         expanded
         onClick={() => onSelect(null)}
       >

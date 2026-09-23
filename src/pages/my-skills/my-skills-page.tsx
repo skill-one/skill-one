@@ -294,7 +294,6 @@ export function MySkillsPage() {
   // What the 全部 chip counts, in the unit on screen: every repository, or every
   // skill.
   const totalCount = unit === "skill" ? rows.length : cards.length;
-  const countLabel = unit === "skill" ? "个 skill" : "个仓库";
 
   // Progressive rendering: only the first `renderedCount` items are mounted;
   // an IntersectionObserver on the sentinel below the list extends the count
@@ -348,7 +347,6 @@ export function MySkillsPage() {
           <ListFacets
             facets={chips}
             total={totalCount}
-            countLabel={countLabel}
             selected={domain}
             onSelect={(key) => setScope("installed", key)}
           />

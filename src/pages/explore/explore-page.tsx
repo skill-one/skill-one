@@ -207,8 +207,6 @@ export function ExplorePage() {
   // What the 全部 chip counts: every repository, or every skill.
   const totalCount =
     unit === "skill" ? allSkills.length : (sectionsData?.total ?? 0);
-  // What a chip's count counts, named in its tip.
-  const countLabel = unit === "skill" ? "个 skill" : "个仓库";
 
   // A download failure only owns the screen while there is nothing to show;
   // with data on screen (cache / previous source) the error surfaces in the
@@ -331,7 +329,6 @@ export function ExplorePage() {
           <ListFacets
             facets={chips}
             total={totalCount}
-            countLabel={countLabel}
             selected={selectedDomain}
             onSelect={(key) => setScope("store", key)}
           />

@@ -18,7 +18,6 @@ function renderFacets(
     <ListFacets
       facets={FACETS}
       total={42}
-      countLabel="个仓库"
       selected={null}
       onSelect={onSelect}
       {...overrides}
