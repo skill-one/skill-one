@@ -8,14 +8,14 @@ anywhere in the pipeline.
 
 - **When it checks** — at startup, each time the window becomes visible again, and hourly as a
   fallback for a session that stays hidden. `src/lib/update-store.ts` collapses all three into
-  **at most one request per 6 hours** per session; the settings-page "检查更新" button bypasses
+  **at most one request per 6 hours** per session; the settings popover's 软件更新 row bypasses
   the throttle (`force`). No check runs while the confirmation dialog is open or an install is
   in flight — an `available` emit would tear the dialog away mid-decision.
 - **When the request hangs** — `check()` is bounded by a 15 s timeout. Without one, a stalled
   request would pin the store in `checking` and silently swallow every later check.
 - **When the check fails** — a *background* failure is silent and keeps an already-discovered update
   on screen, so a network hiccup cannot retract the badge the user was about to click. Only an
-  explicit `force` check reports the error (on the settings page). Either way the retry window
+  explicit `force` check reports the error (on the 软件更新 row). Either way the retry window
   doubles per consecutive failure — 2 min, 4 min, … capped at 6 hours — so an offline or otherwise
   hopeless install settles into a slow poll instead of one doomed request per wake.
 - **Requests are live** — the check is issued by Rust (`reqwest`), not the webview, so it never
@@ -24,10 +24,10 @@ anywhere in the pipeline.
 - **When an update is found** — no modal interrupts you. A green **有新版本** badge appears on **设置**
   itself, in the slot the other sidebar rows use for their counts, and **clicking it opens the
   confirmation dialog from wherever the user is** — nobody has to know the update is filed under
-  settings. The settings page keeps the same state as a tinted callout with an **立即更新** button:
-  it is the conventional "check for updates" home, and the only place the other phases (up to date,
-  check failed, Homebrew-managed) can be shown. One badge on an icon the user already knows, as in
-  VS Code's gear, Chrome's ⋮ menu and Slack's workspace — one signal per fact instead of two.
+  settings. The 软件更新 row in the settings popover reports the other phases in place (up to date,
+  check failed, Homebrew-managed) and, when a version is waiting, hands off to the confirmation
+  dialog. One badge on an icon the user already knows, as in VS Code's gear, Chrome's ⋮ menu and
+  Slack's workspace — one signal per fact instead of two.
 - **Installing** — on your go-ahead the app downloads the package, verifies its signature against
   `plugins.updater.pubkey` (in `tauri.conf.json`), swaps the bundle and relaunches. Unsigned
   packages, or ones signed by another key, are never installed. Dismissing the dialog leaves the
@@ -41,7 +41,7 @@ anywhere in the pipeline.
 A cask-managed bundle is never self-updated. The first check asks Rust for the install channel
 (`is_homebrew_install` → `src-tauri/src/update_channel.rs`, which looks for the cask directory under
 `/opt/homebrew/Caskroom` or `/usr/local/Caskroom`) and, if it finds one, stands down: the settings
-page says so and points at `brew upgrade --cask skill-one`. Self-updating a cask install would leave
+popover says so and points at `brew upgrade --cask skill-one`. Self-updating a cask install would leave
 Homebrew recording a version it does not have, and the two updaters would fight over the bundle. A
 bundle copied out of the Caskroom goes back to self-update, and a failed probe degrades to
 self-update rather than stranding the user on an old version.

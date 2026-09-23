@@ -1,5 +1,5 @@
 // Self-update state store — a tiny external store so the global
-// UpdateDialog and the settings page share one source of truth without
+// UpdateDialog and the settings popover share one source of truth without
 // context plumbing. Update state is deliberately outside React Query: the
 // flow is a multi-step imperative one (check, then download with progress,
 // then relaunch), not a read-once query.
@@ -11,8 +11,8 @@
 // and the downloaded bundle carries no quarantine attribute.
 //
 // WHEN to check lives in the callers (startup + window visibility + an hourly
-// fallback, plus the manual button on the settings page); HOW OFTEN lives
-// here: `checkForUpdate()` is throttled to one request per interval per
+// fallback, plus the manual 软件更新 row in the settings popover); HOW OFTEN
+// lives here: `checkForUpdate()` is throttled to one request per interval per
 // session, so hopping between apps never triggers a burst. A manual check
 // passes `{ force: true }` to bypass the window — asking is the point.
 //
@@ -190,8 +190,8 @@ export async function checkForUpdate(
       });
       return;
     }
-    // Silent: nothing was asked for, and `error` is a settings-page affordance
-    // the user never navigated to. The backoff covers the retry.
+    // Silent: nothing was asked for, and `error` is an affordance behind the
+    // settings popover the user never opened. The backoff covers the retry.
     emit({ ...INITIAL });
   } finally {
     inFlight = false;

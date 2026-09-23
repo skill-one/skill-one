@@ -60,12 +60,13 @@ skill-one/
 │   │   ├── repo-hover-card.tsx # 作者头像 + 其仓库信息浮窗
 │   │   ├── skill-cover.tsx # skill 自身的图片位（作者首字母；仅详情抽屉使用）
 │   │   ├── skill-detail/    # 共享的 skill 详情面板与模态抽屉
+│   │   ├── settings-popover.tsx # 锚定在侧栏底部的设置浮窗
+│   │   ├── advanced-settings-dialog.tsx # 二级设置（CDN 基址 + 数据源）
 │   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
 │   │   ├── explore/        # 商店探索相关页面（skill-list-row / repo-card + repo-page / group-section）
 │   │   │   └── featured/   # 精选页（hero 榜单轮播 + 分类区块）
-│   │   ├── my-skills/      # 我的 Skills 页（agent 头像菜单 / agent-link-settings-dialog 等）
-│   │   └── settings/       # 设置页
+│   │   └── my-skills/      # 我的 Skills 页（agent 头像菜单 / agent-link-settings-dialog 等）
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层
 │   ├── types/              # 类型定义
@@ -93,12 +94,12 @@ skill-one/
 
 ## 主题
 
-应用支持浅色、深色与跟随系统三种外观，可在「设置 → 外观」卡片中切换。
+应用支持浅色、深色与跟随系统三种外观，可在「设置浮窗 → 外观」区切换。
 
 shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 与 `.dark` 两套 oklch 变量，并声明了 `@custom-variant dark (&:is(.dark *))`，`src/components/ui/` 下的组件全部读取语义化 token。因此支持暗黑模式只需在 `<html>` 上切换 `dark` 类，这正是 [next-themes](https://github.com/pacocoursey/next-themes) 所做的事：
 
 - `src/components/theme-provider.tsx` —— 唯一的共享配置（`attribute="class"`、`defaultTheme="system"`、`enableColorScheme`、`storageKey="skill-one-theme"`），并负责把主题同步到原生窗口。
-- `src/components/theme-mode-toggle.tsx` —— 设置页上的三选 `ToggleGroup` 分段控件。
+- `src/components/theme-mode-toggle.tsx` —— 设置浮窗里的三选 `ToggleGroup` 分段控件。
 - `src/hooks/use-native-theme.ts` —— 在 Tauri 环境中调用 `getCurrentWindow().setTheme()`，让系统绘制的部分（标题栏、滚动条、表单控件、菜单栏 popover 的玻璃材质）一并跟随；`system` 映射为 `null`，交由操作系统自行决定。macOS 上 `set_theme` 是全应用生效的，主窗口这一次调用会覆盖所有窗口。
 
 只有主窗口入口 `src/main.tsx` 需要挂载 Provider。菜单栏 popover（`src/popover/popover-main.tsx`）刻意不挂主题 Provider：`src/popover/popover.css` 只为该文档把 shadcn token 重新定义为一套半透明的系统色值（label / secondary label / 半透明填充 / hairline 分隔线），并由 `prefers-color-scheme` 驱动切换——它与透明窗口背后原生玻璃材质读取的是同一个外观源，因此内容与毛玻璃背景永远不会一深一浅。

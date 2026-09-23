@@ -15,7 +15,7 @@ import { storage } from "./storage";
 
 const STORAGE_KEY = "skill-one.repoCardLimit";
 
-/** The preview sizes the settings page offers, smallest first. */
+/** The preview sizes the settings popover offers, smallest first. */
 export const REPO_CARD_LIMITS = [3, 5, 7] as const;
 
 export type RepoCardLimit = (typeof REPO_CARD_LIMITS)[number];
