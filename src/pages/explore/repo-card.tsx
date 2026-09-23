@@ -177,12 +177,9 @@ export function RepoCard({
    * Where the bar leads. Absent means the repository's own page
    * (`/repo/owner/repo`, the store's full catalogue of it); the installed list
    * hands over its own reading of the same repository instead
-   * (`/my-skills/repo/owner/repo`, the installs on disk); an `http(s)` URL
-   * makes the bar an external door — it opens in the system browser, for a
-   * repository the store has no page of its own for (a live skills.sh source
-   * the index does not carry); `null` makes the bar a label rather than a
-   * door — for a listing that already is the whole thing and has nowhere
-   * further to go.
+   * (`/my-skills/repo/owner/repo`, the installs on disk); `null` makes the bar
+   * a label rather than a door — for a listing that already is the whole thing
+   * and has nowhere further to go.
    */
   href?: string | null;
 }) {
@@ -195,11 +192,8 @@ export function RepoCard({
   const name = repo || LOCAL_SOURCE_LABEL;
   // The door's destination; `null` leaves the bar a label (see `href`).
   const door = href === undefined ? `/repo/${repo}` : href;
-  // An `http(s)` door leads out of the app: the bar renders as a plain anchor
-  // opening in the system browser rather than a router link.
-  const externalDoor = door != null && door.startsWith("http");
-  // The door bar's content, shared by the router link and the external anchor:
-  // who published this, and how many skills the card lists.
+  // The door bar's content: who published this, and how many skills the card
+  // lists.
   const doorBar = (
     <>
       {/* The identity is a size step above the rows: a 24px face and a
@@ -372,14 +366,20 @@ export function RepoCard({
 
         {/* The card's one bar: what this repository is, how big it is, and the
             way in. `mt-auto` keeps it on the bottom edge when the plain-grid
-            fallback stretches a short card to its neighbour's height. An
-            external door (a live source the store has no page for) opens in
-            the system browser — the same bar, the same label, one step
-            further out. */}
+            fallback stretches a short card to its neighbour's height. */}
         <CardFooter className="mt-auto min-w-0 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
-          {door == null ? (
+          {door != null ? (
+            <Link
+              to={door}
+              aria-label={`查看${repo ? `仓库 ${repo}` : name}，${skills.length} 个 skill`}
+              className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {doorBar}
+            </Link>
+          ) : (
             /* A bar with nowhere to lead — the local pool's own page, which is
-               already the whole list — states the name and the total instead. */
+               already the whole list, or a live card whose rows are the whole
+               answer — states the name and the total instead. */
             <span className="flex min-w-0 flex-1 items-center gap-2">
               <span className="truncate text-sm font-semibold text-foreground">
                 {name}
@@ -388,24 +388,6 @@ export function RepoCard({
                 {skills.length} 个 skill
               </span>
             </span>
-          ) : externalDoor ? (
-            <a
-              href={door}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`查看${repo ? `仓库 ${repo}` : name}，${skills.length} 个 skill`}
-              className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              {doorBar}
-            </a>
-          ) : (
-            <Link
-              to={door}
-              aria-label={`查看${repo ? `仓库 ${repo}` : name}，${skills.length} 个 skill`}
-              className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              {doorBar}
-            </Link>
           )}
         </CardFooter>
       </Card>

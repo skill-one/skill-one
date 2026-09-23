@@ -25,11 +25,13 @@ import { searchSkillsSh } from "../../lib/skills-sh";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
+  SKILL_ROW_LIST_CLASS,
 } from "../../lib/skill-list-layout";
 import { formatCount } from "../../lib/utils";
 import type { SkillView } from "../../lib/skill-view";
 import type { Skill } from "../../types/skill";
 import type { RegistryHarness } from "../../test/registry-harness";
+import { installMockSkill, resetMockInstalledSkills } from "../../lib/mock-local";
 import { ExplorePage } from "./explore-page";
 
 /**
@@ -247,6 +249,9 @@ beforeEach(() => {
     defaultOptions: { queries: { staleTime: 10 * 60 * 1000, retry: false } },
   });
   harness.reset();
+  // The unified search view reads the installed list; the mock store's
+  // installs must not leak from one test's answer into the next one's.
+  resetMockInstalledSkills();
   mockFetchSkillDetail.mockReset();
   // Default: the live source has nothing to add, so every test that does not
   // care about it sees the local answer alone.
@@ -795,21 +800,16 @@ describe("ExplorePage", () => {
       (container.querySelector("ul.grid") as HTMLElement).closest(
         ".overflow-y-auto",
       ) as HTMLElement;
-    const lastObserver = () =>
-      (
-        globalThis.IntersectionObserver as unknown as {
-          instances: Array<{ trigger(intersecting?: boolean): void }>;
-        }
-      ).instances.at(-1)!;
     await screen.findByText("skill-0");
     expect(renderedCards()).toHaveLength(6);
 
-    // The reader searches, scrolls the answer to its end — which reveals the
-    // rest of it — and leaves the list sitting partway down.
+    // The reader searches — the answer mounts whole, no reveal to pace it —
+    // and leaves the list sitting partway down.
     await user.type(await searchField(), "skill");
-    await waitFor(() => expect(document.querySelector("mark")).toBeInTheDocument());
-    lastObserver().trigger(true);
-    await waitFor(() => expect(renderedCards()).toHaveLength(12));
+    await waitFor(() => {
+      expect(document.querySelector("mark")).toBeInTheDocument();
+      expect(renderedCards()).toHaveLength(12);
+    });
     scroller().scrollTop = 300;
     fireEvent.scroll(scroller());
 
@@ -943,7 +943,7 @@ describe("ExplorePage", () => {
     });
   });
 
-  it("restarts progressive rendering when the answer's definition changes", async () => {
+  it("renders a search's whole answer at once, leaving the reveal to the browse list", async () => {
     const user = userEvent.setup();
     // Twelve one-skill "gadget" repositories: every one of them matches the
     // search, so the search answer alone is bigger than one render chunk.
@@ -968,7 +968,8 @@ describe("ExplorePage", () => {
         name: /^查看仓库 acme\/gadget-\d+，/,
       });
 
-    // The reader has scrolled: the browsed list is fully mounted.
+    // The reader has scrolled: the browsed list is fully mounted (the reveal
+    // paces the browse answer).
     const lastObserver = () =>
       (
         globalThis.IntersectionObserver as unknown as {
@@ -980,25 +981,13 @@ describe("ExplorePage", () => {
       expect(renderedGadgetCards()).toHaveLength(12),
     );
 
-    // A new answer restarts the run at the first chunk — it must not inherit
-    // the scrolled depth of the list it replaces. The reset lands with the
-    // keystroke; the search answer lands one debounce later, so both halves
-    // wait.
+    // A search answers whole: the unified search view mounts its sections
+    // entire, no reveal to pace it and no observer to wait for.
     await user.type(await searchField(), "gadget");
-    // The search answer is the same twelve gadgets, so six visible cards alone
-    // cannot tell pre- from post-search: the pre-search list also shows six. Wait
-    // for the highlight the applied query paints on every match, then for the six
-    // cards, so the scroll below fires the observer the *new* answer mounted —
-    // not a stale one left over from before the keystroke (which the transient
-    // empty answer had already disconnected).
     await waitFor(() => {
-      expect(renderedGadgetCards()).toHaveLength(6);
+      expect(renderedGadgetCards()).toHaveLength(12);
       expect(document.querySelector("mark")).toBeInTheDocument();
     });
-
-    // And scrolling the new answer reveals the rest of it.
-    lastObserver().trigger(true);
-    await waitFor(() => expect(renderedGadgetCards()).toHaveLength(12));
   }, 15000);
 
   it("restores the full registry when the search is cleared", async () => {
@@ -1049,11 +1038,12 @@ describe("ExplorePage", () => {
 
     // The live section closes the list in the unit it is read in: repository
     // cards here, one per live repository (the covered hit's repository is
-    // gone with it, so one remains).
-    expect(
-      await screen.findByRole("region", { name: "skills.sh 官方搜索" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("1 个仓库")).toBeInTheDocument();
+    // gone with it, so one remains). The count is the live section's own —
+    // the store section above it counts its own single repository too.
+    const live = await screen.findByRole("region", {
+      name: "skills.sh 官方搜索",
+    });
+    expect(within(live).getByText("1 个仓库")).toBeInTheDocument();
     // The live-only skill is on the page, in its repository's card…
     expect(screen.getByText("sprocket")).toBeInTheDocument();
     expect(screen.getByText("acme/fresh")).toBeInTheDocument();
@@ -1065,7 +1055,7 @@ describe("ExplorePage", () => {
     expect(mockSearchSkillsSh).toHaveBeenCalledWith("gadget", expect.anything());
   });
 
-  it("shapes the live answer as repository cards whose doors follow the index", async () => {
+  it("shapes the live answer as repository cards that are labels, not doors", async () => {
     const user = userEvent.setup();
     bootGadgetRegistry();
     // Two live hits share one repository; a third lives elsewhere; a fourth
@@ -1096,55 +1086,27 @@ describe("ExplorePage", () => {
     // mark — nothing ever classified it, but nothing looked either.
     expect(within(fresh as HTMLElement).queryByText("暂无描述")).toBeNull();
     expect(within(fresh as HTMLElement).queryByText("❓")).toBeNull();
-    // A repository the index does not carry has no page in the store, so its
-    // bar leads to skills.sh in the system browser…
+    // A live card lists everything the endpoint answered, so its bar has
+    // nowhere further to go: it is a label, whatever the repository is — the
+    // rows, which open skills.sh, are the only way out.
     expect(
-      screen.getByRole("link", { name: /^查看仓库 acme\/fresh/ }),
-    ).toHaveAttribute("href", "https://www.skills.sh/acme/fresh");
-    // …while a bare discovery domain has no repo page there either: its bar
-    // stays a label, and the rows remain the only way out.
+      screen.queryByRole("link", { name: /^查看仓库 acme\/fresh/ }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: /^查看仓库 acme\/other/ }),
+    ).toBeNull();
     expect(
       screen.queryByRole("link", { name: /^查看仓库 smithery\.ai/ }),
     ).toBeNull();
     // The indexed repository's card keeps the store's own door — the only
-    // internal 查看仓库 link on the page.
-    const internalDoors = screen
-      .getAllByRole("link", { name: /^查看仓库 / })
-      .filter((el) => el.getAttribute("href")?.startsWith("#/repo/"));
-    expect(internalDoors).toHaveLength(1);
-    expect(internalDoors[0]).toHaveAttribute("href", "#/repo/acme/gadgets");
-  });
-
-  it("opens the store's own page for a live repository the index carries", async () => {
-    const user = userEvent.setup();
-    bootGadgetRegistry();
-    // The hit's skill is new to the index (so it survives the dedupe) but its
-    // repository is one the store knows: the card's door is the store's
-    // repository page, like any indexed card's.
-    mockSearchSkillsSh.mockResolvedValue([
-      liveSkill("gadget-pro", "acme/gadgets", 50),
-    ]);
-    renderExplorePage();
-    await screen.findByText("gadget-master");
-
-    await user.type(await searchField(), "gadget");
-
-    // Two cards sign the same repository — the store's own, and the live
-    // answer's — and both doors lead to the same page. The live answer lands
-    // one request after the local one, so the wait covers both.
-    await waitFor(() =>
-      expect(
-        screen.getAllByRole("link", { name: /^查看仓库 acme\/gadgets/ }),
-      ).toHaveLength(2),
-    );
+    // 查看仓库 link on the page.
+    expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(1);
     expect(
-      screen
-        .getAllByRole("link", { name: /^查看仓库 acme\/gadgets/ })
-        .map((el) => el.getAttribute("href")),
-    ).toEqual(["#/repo/acme/gadgets", "#/repo/acme/gadgets"]);
+      screen.getByRole("link", { name: /^查看仓库 acme\/gadgets/ }),
+    ).toHaveAttribute("href", "#/repo/acme/gadgets");
   });
 
-  it("caps a live repository card at the reader's preview limit", async () => {
+  it("lists a live repository whole, uncapped under the search", async () => {
     const user = userEvent.setup();
     bootGadgetRegistry();
     mockSearchSkillsSh.mockResolvedValue(
@@ -1160,20 +1122,19 @@ describe("ExplorePage", () => {
     // The live answer lands one request after the local one.
     await screen.findByText("fresh-0");
     const fresh = document.querySelector('[data-repo="acme/fresh"]')!;
-    // Five rows on the card (the default preview), two behind the door.
+    // A search's rows are matches: the card carries all seven, like the
+    // indexed cards under the same query — nothing hidden behind a door.
     expect(
       within(fresh as HTMLElement).getAllByRole("button", {
         name: /查看 .+ 详情/,
       }),
-    ).toHaveLength(5);
-    expect(within(fresh as HTMLElement).queryByText("fresh-5")).toBeNull();
-    // The bar states the repository's total, so a capped list reads as
-    // "these of them" — and leads to the whole of it on skills.sh.
+    ).toHaveLength(7);
+    expect(within(fresh as HTMLElement).getByText("fresh-6")).toBeInTheDocument();
+    // The bar states the card's total as a label: the card is the whole
+    // answer.
     expect(
-      within(fresh as HTMLElement).getByRole("link", {
-        name: "查看仓库 acme/fresh，7 个 skill",
-      }),
-    ).toHaveAttribute("href", "https://www.skills.sh/acme/fresh");
+      within(fresh as HTMLElement).getByText("7 个 skill"),
+    ).toBeInTheDocument();
   });
 
   it("opens a live row on skills.sh instead of the detail panel", async () => {
@@ -1210,30 +1171,64 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("gadget-master");
 
-    // The skill unit's live row is a standalone skill card — the surface whose
-    // rail this test is about (the repository unit renders live hits as
-    // repository-card rows, which never draw a per-skill figure).
+    // The skill unit's live row is the same full-width row the local list
+    // uses (the repository unit renders live hits as repository-card rows,
+    // which never draw a per-skill figure).
     await user.click(screen.getByRole("button", { name: "按技能" }));
     await user.type(await searchField(), "gadget");
     await screen.findByText("sprocket");
 
-    // The endpoint's rows carry no classification, so the card draws facts
+    // The endpoint's rows carry no classification, so the row draws facts
     // only for rows the store vouches for: a live row shows no figure even
-    // though the endpoint publishes an install count for it. Its rail is not
-    // blank — it still names the source.
+    // though the endpoint publishes an install count for it. Its facts
+    // cluster is not blank — it still shows the source's owner face.
     const live = cardOf("sprocket");
-    expect(live).toHaveTextContent("acme/fresh");
+    expect(live.querySelector('[data-slot="avatar"]')).not.toBeNull();
     expect(live.querySelector('[title$="次安装"]')).toBeNull();
-    // The live card's body states no description either — the endpoint
-    // publishes none, so the card claims none rather than a placeholder.
+    // The row states no description either — the endpoint publishes none,
+    // so it claims none rather than a placeholder — and no classification
+    // mark, which stays an empty slot.
     expect(live).not.toHaveTextContent("暂无描述");
+    expect(live).not.toHaveTextContent("❓");
     // The indexed skill is on the page beside it, as a repository card's row:
-    // that surface prints no per-skill figure either (the figure belongs to the
-    // standalone skill card — see skill-list-row.test.tsx), so what this test
+    // that surface prints no per-skill figure either (the figure belongs to
+    // the standalone skill card — see skill-card.test.tsx), so what this test
     // pins is that the live row asks for nothing it cannot have.
     expect(
       screen.getByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
+  });
+
+  it("reads the live answer as rows of the list it closes, plainly enumerated", async () => {
+    const user = userEvent.setup();
+    bootGadgetRegistry();
+    mockSearchSkillsSh.mockResolvedValue([
+      liveSkill("sprocket", "acme/fresh", 7),
+      liveSkill("gadget-pro", "acme/gadgets", 50),
+    ]);
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await user.type(await searchField(), "gadget");
+
+    const section = await screen.findByRole("region", {
+      name: "skills.sh 官方搜索",
+    });
+    // The section's rows are the list's own full-width rows, not the card
+    // grid a live section used to hold — one shape per unit, whichever
+    // answer the rows belong to.
+    const list = section.querySelector("ul")!;
+    expect(list).toHaveClass(SKILL_ROW_LIST_CLASS);
+    // Enumerated, not ranked: the endpoint's relevance is no contest to
+    // medal, so no live ordinal wears the podium ink the indexed rows above
+    // carry.
+    expect(section.querySelector("span")!.className).not.toContain("amber");
+    // The query's own terms highlight the live names, as they do the indexed
+    // ones.
+    expect(section.querySelector("mark")).not.toBeNull();
+    // The header counts skills, not repositories.
+    expect(within(section).getByText("2 个 skill")).toBeInTheDocument();
   });
 
   it("shows the live answer when the local index has no match", async () => {
@@ -1250,6 +1245,121 @@ describe("ExplorePage", () => {
     ).toBeInTheDocument();
     // The live answer replaces the empty state rather than sitting behind it.
     expect(screen.queryByText(/未找到匹配/)).not.toBeInTheDocument();
+  });
+
+  it("holds a searching state while the whole answer is still in flight", async () => {
+    const user = userEvent.setup();
+    bootGadgetRegistry();
+    // The live request holds its answer until the test lets go of it: the
+    // window between "the store answer landed empty" and "the live rows
+    // arrive" is exactly where the not-found flash used to live.
+    let resolveLive: (hits: SkillView[]) => void = () => {};
+    mockSearchSkillsSh.mockImplementation(
+      () =>
+        new Promise<SkillView[]>((resolve) => {
+          resolveLive = resolve;
+        }),
+    );
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    await user.type(await searchField(), "sprocket");
+
+    // Every section came back empty — the store's, the installed one's — and
+    // the live one is still in flight: a searching line holds the space
+    // instead of a "not found" that only describes half the answer.
+    expect(
+      await screen.findByText("正在搜索应用商店与 skills.sh 的实时结果…"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/未找到匹配/)).not.toBeInTheDocument();
+
+    // The answer lands and replaces the searching line in place.
+    resolveLive([liveSkill("sprocket", "acme/fresh", 7)]);
+    expect(await screen.findByText("sprocket")).toBeInTheDocument();
+    expect(
+      screen.queryByText("正在搜索应用商店与 skills.sh 的实时结果…"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("answers a search in three ordered sections", async () => {
+    const user = userEvent.setup();
+    // An install that matches, a store entry that matches, and a live hit the
+    // index does not carry: the answer spans all three sections.
+    installMockSkill("gadget-master");
+    bootGadgetRegistry();
+    mockSearchSkillsSh.mockResolvedValue([
+      liveSkill("sprocket", "acme/fresh", 7),
+    ]);
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    await user.type(await searchField(), "gadget");
+
+    const installed = await screen.findByRole("region", { name: "本地已安装" });
+    const store = await screen.findByRole("region", { name: "应用商店" });
+    const live = await screen.findByRole("region", {
+      name: "skills.sh 官方搜索",
+    });
+    // In the order the reader reaches for them: what this machine has, what
+    // the store carries, what skills.sh answers live.
+    expect(
+      installed.compareDocumentPosition(store) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      store.compareDocumentPosition(live) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Each section counts its own answer, in the unit the list is read in.
+    expect(within(installed).getByText("1 个 skill")).toBeInTheDocument();
+    expect(within(store).getByText("1 个 skill")).toBeInTheDocument();
+    expect(within(live).getByText("1 个 skill")).toBeInTheDocument();
+  });
+
+  it("walks the drawer inside the section the skill was opened from", async () => {
+    const user = userEvent.setup();
+    // The same skill legitimately sits in two sections — the install, and the
+    // store entry behind it are two facts — and the drawer wears the surface
+    // of the one that was opened.
+    installMockSkill("gadget-master");
+    bootGadgetRegistry();
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    await user.type(await searchField(), "gadget");
+
+    // The installed section's row opens the installed surface: no store
+    // install CTA — the skill is already home, and the drawer says so with
+    // the switch, not with a button.
+    const installed = await screen.findByRole("region", { name: "本地已安装" });
+    await user.click(
+      within(installed).getByRole("button", {
+        name: "查看 gadget-master 详情",
+      }),
+    );
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("dialog")).queryByRole("button", {
+        name: /安装/,
+      }),
+    ).not.toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+
+    // The store section's row opens the store surface — and its install CTA
+    // reads the persisted state: the skill is on disk, so the store's own
+    // button is the installed badge.
+    const store = await screen.findByRole("region", { name: "应用商店" });
+    await user.click(
+      within(store).getByRole("button", { name: "查看 gadget-master 详情" }),
+    );
+    const storeDialog = await screen.findByRole("dialog");
+    expect(
+      await within(storeDialog).findByRole("button", { name: "已安装" }),
+    ).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "Escape" });
   });
 
   it("asks the live endpoint only once the query clears its floor", async () => {

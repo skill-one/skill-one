@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useRepoSections } from "../../hooks/use-repo-sections";
 import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
 import { useViewMemory } from "../../hooks/use-view-memory";
 import { skillKey } from "../../lib/skill-view";
-import { openExternal } from "../../lib/open-external";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
-import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
+import { useInstalledSearchRows } from "../../hooks/use-installed-search";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import { setScope } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
@@ -19,17 +17,16 @@ import {
   SKILL_ROW_LIST_CLASS,
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
+
 import { Button } from "../../components/ui/button";
 import { ListFacets } from "../../components/list-facets";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
-import { SkillListRow } from "./skill-list-row";
 import { SkillRow } from "./skill-row";
 import { SkillRun, buildSkillRuns, byInstalls } from "./skill-run";
-import { GroupSection } from "./group-section";
 import { RepoCard } from "./repo-card";
-import { buildLiveRepoGroups } from "./live-groups";
+import { SearchResults } from "./search-results";
 
 /**
  * How many repository cards mount with the page, and how many more mount each
@@ -40,9 +37,6 @@ import { buildLiveRepoGroups } from "./live-groups";
  */
 const INITIAL_GROUPS = 6;
 const GROUP_CHUNK = 6;
-
-/** Fold-state and React-key identity of the live skills.sh section. */
-const LIVE_GROUP_KEY = "skills-sh";
 
 /**
  * The explore page's remembered view: how deep the list had been revealed.
@@ -113,23 +107,11 @@ export function ExplorePage() {
   );
   const { visibleCount } = view;
 
-  // A search's answer: repository groups in relevance order, flat. It is asked
-  // only while a search is live — the browse list answers the same repositories
-  // another way (see below), so the two never fetch together and duplicate the
-  // payload.
-  const {
-    data: groupsData,
-    isLoading: groupsLoading,
-    isError: groupsError,
-    error: groupsErrorObj,
-    refetch: refetchGroups,
-  } = useRegistryGroups(query, isSearching);
-
-  const groups = groupsData?.groups ?? [];
-
   // The browse answer: every repository once, filed under its leading domain.
   // It is both the filter's chip set (a domain, and how many repositories it
-  // holds) and, when one is chosen, that domain's own list.
+  // holds) and, when one is chosen, that domain's own list. A search's answer
+  // is not fetched here — the unified search view fetches for itself (see
+  // `SearchResults`), so browse and search never fetch together.
   const {
     data: sectionsData,
     isLoading: sectionsLoading,
@@ -137,12 +119,6 @@ export function ExplorePage() {
     error: sectionsErrorObj,
     refetch: refetchSections,
   } = useRepoSections(!isSearching);
-
-  // The live skills.sh answer for the same query — the store's second source.
-  // It is fetched here rather than inside the registry worker: it is a plain
-  // upstream request, not a lookup over the local index, and it must be
-  // allowed to answer while the index is still being built.
-  const { data: liveData } = useSkillsShSearch(query);
 
   // The browse list: the chosen domain's repositories, or — with no filter —
   // every domain's, re-filed into one ranking. A repository's leading domain is
@@ -157,23 +133,6 @@ export function ExplorePage() {
     return all.flatMap((section) => section.repos).toSorted(byRepoRank);
   }, [sectionsData, selectedDomain]);
 
-  // The list on screen: a search's relevance order, or the browse answer.
-  const activeRepos = isSearching ? groups : browseRepos;
-
-  // Every repository the local index carries, by key, unscoped — the browse
-  // answer read whole rather than through the filter. The live section reads
-  // this to decide where a live repository's door leads: the store's own page
-  // when the index knows the repository, skills.sh when it does not.
-  const indexedRepos = useMemo(
-    () =>
-      new Set(
-        (sectionsData?.sections ?? []).flatMap((section) =>
-          section.repos.map((repo) => repo.title),
-        ),
-      ),
-    [sectionsData],
-  );
-
   // Every skill the browse answer holds, flattened once: the skill unit reads
   // this list, and the filter's chip counts derive from it. A repository's
   // leading domain is unique, so no skill is listed twice.
@@ -185,19 +144,16 @@ export function ExplorePage() {
     [sectionsData],
   );
 
-  // The skill unit's list: the browse answer by install count — scoped to the
-  // chosen domain by membership — or, under a search, the matches in relevance
-  // order, flattened out of their repository groups.
+  // The skill unit's browse list: the browse answer by install count, scoped
+  // to the chosen domain by membership. A search re-answers this list in
+  // relevance order inside the unified search view instead.
   const activeSkills = useMemo(() => {
     if (unit !== "skill") return [];
-    if (isSearching) {
-      return (groupsData?.groups ?? []).flatMap((group) => group.skills);
-    }
     const list = selectedDomain
       ? allSkills.filter((hit) => domainsOf(hit.skill).includes(selectedDomain))
       : allSkills;
     return list.toSorted(byInstalls);
-  }, [unit, isSearching, groupsData, allSkills, selectedDomain]);
+  }, [unit, allSkills, selectedDomain]);
 
   // Consecutive skills from one repository, gathered into runs (see
   // `buildSkillRuns`): a repository that ships several close-ranked skills can
@@ -227,33 +183,29 @@ export function ExplorePage() {
   // A download failure only owns the screen while there is nothing to show;
   // with data on screen (cache / previous source) the error surfaces in the
   // footer count instead of blanking the page.
-  const activeError = isSearching
-    ? groupsError
-      ? groupsErrorObj
-      : null
-    : sectionsError
-      ? sectionsErrorObj
-      : null;
+  const activeError = isSearching ? null : sectionsError
+    ? sectionsErrorObj
+    : null;
   const failure =
     stats.count === 0 && !stats.complete
       ? (stats.error ??
         (activeError instanceof Error ? activeError.message : null))
       : null;
 
-  // How many entries the current answer lists, and how many are revealed: one
+  // How many entries the browse answer lists, and how many are revealed: one
   // repository card, or one skill run — a repository's consecutive skills fold
   // into a single entry (see `skillGroups`), so the run, not the skill, is what
-  // the reveal counts.
+  // the reveal counts. A search does not reveal — the unified search view
+  // renders its whole answer.
   const itemCount =
-    unit === "skill" ? skillGroups.length : activeRepos.length;
+    unit === "skill" ? skillGroups.length : browseRepos.length;
   const renderedCount = Math.min(visibleCount, itemCount);
   const allRendered = renderedCount >= itemCount;
 
   // The skeleton stays up until the very first repository arrives; after that
   // the list paints from partial data and grows with the stream.
-  const activeLoading = isSearching ? groupsLoading : sectionsLoading;
   const loading =
-    activeLoading || (itemCount === 0 && stats.count === 0 && !failure);
+    sectionsLoading || (itemCount === 0 && stats.count === 0 && !failure);
 
   // Progressive rendering: only the first `visibleCount` repository cards are
   // mounted; an IntersectionObserver on the sentinel below the list extends the
@@ -288,31 +240,19 @@ export function ExplorePage() {
   // Which folds the reader has opened, by the run head's key. The rows a fold
   // hides are still part of the answer — only the rendering changes.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  // The panel walks the flat skill list of the active answer, unwrapped: the
+  // The panel walks the flat skill list of the browse answer, unwrapped: the
   // listed skills in the skill unit, and every skill of the listed repositories
   // in the repository unit. One repository per group means no skill appears
-  // twice.
+  // twice. A search walks inside the unified search view instead, which owns
+  // its own selection and drawer.
   const flatSkills = useMemo(() => {
     if (unit === "skill") return activeSkills.map((hit) => hit.skill);
-    const source = isSearching ? (groupsData?.groups ?? []) : browseRepos;
-    return source.flatMap((group) => group.skills.map((hit) => hit.skill));
-  }, [unit, activeSkills, isSearching, groupsData, browseRepos]);
-  // What the live answer adds: the hits the local answer does not already carry.
-  // A live hit is keyed by the same `repo/name` pair the registry keys a skill
-  // by, so identity is the whole comparison — a skill the store already lists
-  // (with its description, its stars and its SKILL.md) must not appear twice,
-  // and one it does not is exactly what this section is for.
-  const liveSkills = useMemo(() => {
-    const indexed = new Set(flatSkills.map(skillKey));
-    return (liveData ?? []).filter((s) => !indexed.has(skillKey(s)));
-  }, [liveData, flatSkills]);
-  // The live answer re-filed by repository, for the repository unit's cards.
-  // Grouping is pure and cheap (the flat answer is at most one endpoint page),
-  // so it is derived for both units and the renderer picks the shape it needs.
-  const liveRepoGroups = useMemo(
-    () => buildLiveRepoGroups(liveSkills),
-    [liveSkills],
-  );
+    return browseRepos.flatMap((group) => group.skills.map((hit) => hit.skill));
+  }, [unit, activeSkills, browseRepos]);
+  // The installed answer the unified search view opens with: the installed
+  // index's own hits, render-ready with the store's default action (the
+  // install button, which an already-installed row carries as a badge).
+  const installedRows = useInstalledSearchRows(query);
   // Anything that re-answers the list resets what only described the old one:
   // the revealed depth (it belongs to the list it was revealed for), the opened
   // folds (a run's head key belongs to the answer that produced it) and the
@@ -383,12 +323,27 @@ export function ExplorePage() {
                   className="mt-2"
                   onClick={() => {
                     stats.refetch();
-                    void (isSearching ? refetchGroups() : refetchSections());
+                    void refetchSections();
                   }}
                 >
                   重试
                 </Button>
               </Placeholder>
+            ) : isSearching ? (
+              // The unified search answer: three sections — what this machine
+              // has, what the store carries, what skills.sh answers live — one
+              // shared implementation both searchable lists render (see
+              // `SearchResults`). Keyed by the answer's definition, so no stale
+              // fold or selection survives into a differently-shaped answer.
+              <SearchResults
+                key={`${unit}:${query}`}
+                unit={unit}
+                query={query}
+                installed={installedRows.map((row) => ({
+                  skill: row.skill,
+                  matched: row.matched,
+                }))}
+              />
             ) : loading ? (
               // A viewport's worth of card- or row-shaped skeletons, per the
               // unit: switching to this page paints its final layout instantly
@@ -406,27 +361,28 @@ export function ExplorePage() {
                     : REPO_CARD_SKELETON_CLASS
                 }
               />
-            ) : itemCount === 0 && liveSkills.length === 0 ? (
+            ) : itemCount === 0 ? (
               <Placeholder
                 message={query ? `未找到匹配“${query}”的 Skill` : "暂无技能"}
               />
             ) : (
               <div
-                key={`${unit}:${selectedDomain ?? "all"}:${query}`}
+                key={`${unit}:${selectedDomain ?? "all"}`}
                 className="flex flex-col gap-6"
               >
-                {/* Keyed by the answer's definition, not its data: when the
-                    query, the filter or the unit changes the list remounts, so
-                    no stale state survives into a differently-shaped list.
-                    Streaming invalidations share the definition, so they update
-                    the list in place without resetting how far it was revealed. */}
+                {/* Keyed by the browse answer's definition, not its data: when
+                    the filter or the unit changes the list remounts, so no
+                    stale state survives into a differently-shaped list.
+                    Streaming invalidations share the definition, so they
+                    update the list in place without resetting how far it was
+                    revealed. */}
                 {unit === "skill" ? (
-                  // The skill unit: one row per skill, in install order (or the
-                  // search's relevance order) — the same row a repository's own
-                  // page lists, so a skill reads the same wherever it is found.
-                  // A repository whose skills land in consecutive ranks folds
-                  // all but the best behind one row (`SkillRun`), so a prolific
-                  // repository does not flood the ranking with near-duplicates.
+                  // The skill unit: one row per skill, in install order — the
+                  // same row a repository's own page lists, so a skill reads
+                  // the same wherever it is found. A repository whose skills
+                  // land in consecutive ranks folds all but the best behind
+                  // one row (`SkillRun`), so a prolific repository does not
+                  // flood the ranking with near-duplicates.
                   <ul className={SKILL_ROW_LIST_CLASS}>
                     {skillGroups.slice(0, renderedCount).map((group) => {
                       const headKey = skillKey(group.items[0].skill);
@@ -459,18 +415,16 @@ export function ExplorePage() {
                     })}
                   </ul>
                 ) : (
-                  // The repository unit: one card per repository, whether the
-                  // answer is a search's relevance order or the browse answer
-                  // scoped by the domain filter.
+                  // The repository unit: one card per repository, the browse
+                  // answer scoped by the domain filter.
                   <ul className={REPO_LIST_CLASS}>
-                    {activeRepos.slice(0, renderedCount).map((group) => (
+                    {browseRepos.slice(0, renderedCount).map((group) => (
                       <RepoCard
                         key={group.key}
                         repo={group.title}
                         stars={group.stars}
                         skills={group.skills}
                         maxSkills={maxSkills}
-                        hasQuery={isSearching}
                         selected={selected}
                         onOpenSkill={setSelected}
                       />
@@ -482,101 +436,17 @@ export function ExplorePage() {
                     or simply having a tall viewport — keeps revealing the
                     cards until the answer is fully mounted. */}
                 {!allRendered && <div ref={sentinelRef} aria-hidden="true" />}
-                {/* The live section closes the list: skills.sh's own search
-                    answer for the same query, minus everything the local
-                    answer already covers. It is a section rather than rows
-                    mixed into the groups because it is a different kind of
-                    answer — live, upstream, and without the classification an
-                    indexed skill carries, so its rows show no figure: the card
-                    draws facts only for rows the store vouches for. It neither
-                    joins the list's ordering nor claims a place in a ranking.
-                    Like the local answer above it, the section is made of the
-                    unit the list is read in: one row per live skill in the
-                    endpoint's relevance order, or one card per live repository
-                    (see `buildLiveRepoGroups`). Either way the section's rows
-                    are install-only: with no snapshot path there is no
-                    SKILL.md to open, and the detail panel has nothing to show
-                    — a live row's only "detail" is its skills.sh page, so
-                    pressing one hands the reader to the system browser rather
-                    than the drawer. */}
-                {liveSkills.length > 0 &&
-                  (unit === "skill" ? (
-                    <GroupSection
-                      group={{
-                        key: LIVE_GROUP_KEY,
-                        title: "skills.sh 官方搜索",
-                        note: "实时结果，本地索引未收录",
-                        ordinal: "plain",
-                      }}
-                      index={groups.length}
-                      items={liveSkills}
-                      selected={selected}
-                      rowKey={skillKey}
-                      renderItem={(skill) => <SkillListRow skill={skill} />}
-                    />
-                  ) : (
-                    <section aria-label="skills.sh 官方搜索">
-                      {/* The header repeats the shell's typography (see
-                          `GroupSection`) minus its interactive parts: a
-                          trailing section of a handful of cards has nothing
-                          to fold and nothing to pin. */}
-                      <div className="flex w-full items-center gap-1.5 rounded-md px-1 py-2">
-                        <span className="truncate text-sm font-medium">
-                          skills.sh 官方搜索
-                        </span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          实时结果，本地索引未收录
-                        </span>
-                        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
-                          <span>{liveRepoGroups.length} 个仓库</span>
-                        </span>
-                      </div>
-                      <ul className={REPO_LIST_CLASS}>
-                        {liveRepoGroups.map((group) => (
-                          <RepoCard
-                            key={group.key}
-                            repo={group.title}
-                            skills={group.skills.map((skill) => ({ skill }))}
-                            // The reader's own preview cap, like any other
-                            // repository card: a live answer is a search, but
-                            // the card is still a summary, and the door below
-                            // it is where the rest lives.
-                            maxSkills={maxSkills}
-                            // The door follows where the repository's catalogue
-                            // actually lives. One the index carries opens the
-                            // store's own page (the default). One it does not
-                            // carry has no page here to open — a live-only
-                            // catalogue is upstream's, so the bar leads to
-                            // skills.sh in the system browser; a bare discovery
-                            // domain (not `owner/repo`) has no repo page there
-                            // either, so its bar stays a label.
-                            href={
-                              indexedRepos.has(group.title)
-                                ? undefined
-                                : group.title.includes("/")
-                                  ? `https://www.skills.sh/${group.title}`
-                                  : null
-                            }
-                            onOpenSkill={(key) => {
-                              const live = liveSkills.find(
-                                (s) => skillKey(s) === key,
-                              );
-                              if (live?.url) void openExternal(live.url);
-                            }}
-                          />
-                        ))}
-                      </ul>
-                    </section>
-                  ))}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Modal detail drawer; the wiring (open/close, prev/next bounds) is
-          shared with the my-skills page. It walks the flat skill list over
-          all groups, rendered or not yet rendered. */}
+      {/* Modal detail drawer for the browse answer; the wiring (open/close,
+          prev/next bounds) is shared with the my-skills page. It walks the
+          flat skill list over all groups, rendered or not yet rendered. A
+          search walks inside the unified search view instead, which owns its
+          own drawer. */}
       <SkillDetailDrawer
         skills={flatSkills}
         selected={selected}

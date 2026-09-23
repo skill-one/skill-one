@@ -30,17 +30,22 @@ configure({ asyncUtilTimeout: 5000 });
 // The provenance hook consults the registry for namesake candidates and the
 // page looks up the store entries behind recorded sources; both mocks answer
 // "nothing found" by default so the worker-less test env stays silent, and the
-// link-suggestion / store-stats tests below override them.
-const { searchSkills, lookupSkills, registrySnapshot } = vi.hoisted(() => ({
-  searchSkills: vi.fn(),
-  lookupSkills: vi.fn(),
-  // One stable object: the page reads it through useSyncExternalStore, which
-  // treats a fresh snapshot on every call as an infinite render loop.
-  registrySnapshot: { ready: true, epoch: 1 },
+// link-suggestion / store-stats tests below override them. The unified search
+// view also asks the registry's grouped search for its store section; the mock
+// answers empty by default, so that section hides.
+const { searchSkills, lookupSkills, getGroups, registrySnapshot } = vi.hoisted(
+  () => ({
+    searchSkills: vi.fn(),
+    lookupSkills: vi.fn(),
+    getGroups: vi.fn(),
+    // One stable object: the page reads it through useSyncExternalStore, which
+    // treats a fresh snapshot on every call as an infinite render loop.
+    registrySnapshot: { ready: true, epoch: 1 },
 }));
 vi.mock("../../lib/registry/client", () => ({
   searchSkills,
   lookupSkills,
+  getGroups,
   getRegistrySnapshot: () => registrySnapshot,
   subscribeRegistry: () => () => {},
 }));
@@ -48,6 +53,7 @@ vi.mock("../../lib/registry/client", () => ({
 beforeEach(() => {
   searchSkills.mockResolvedValue({ hits: [] });
   lookupSkills.mockResolvedValue({ entries: [] });
+  getGroups.mockResolvedValue({ groups: [], total: 0 });
   resetLinkSuggestions();
 });
 
@@ -690,6 +696,26 @@ describe("MySkillsPage", () => {
     await user.type(screen.getByLabelText("搜索 Skill"), "zzz");
 
     expect(await screen.findByText(/未找到匹配/)).toBeInTheDocument();
+  });
+
+  it("answers a search with the store section beside the installs", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("pdf");
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+    // The installed answer leads, in the installed index's own relevance
+    // order, and only it: docx does not match.
+    const installed = await screen.findByRole("region", { name: "本地已安装" });
+    expect(within(installed).getByText("pdf")).toBeInTheDocument();
+    expect(within(installed).queryByText("docx")).not.toBeInTheDocument();
+    // The store's section answers the same question from its own index; the
+    // mocked registry carries nothing, so its section stays empty and hidden
+    // rather than reading as a zero.
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "应用商店" })).toBeNull(),
+    );
   });
 
   it("scopes the list to a classification from the chip row", async () => {

@@ -22,6 +22,7 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
+import { SearchResults } from "../explore/search-results";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage } from "../../lib/utils";
@@ -382,14 +383,33 @@ export function MySkillsPage() {
             />
           ) : list.length === 0 ? (
             <Placeholder icon={Boxes} message="还没有安装任何技能" />
+          ) : isSearching ? (
+            // The unified search answer: three sections — what this machine
+            // has (the rows above, injected with the enable switch, the dimmed
+            // disabled install and the migration badge that only this surface
+            // knows), what the store carries, what skills.sh answers live. One
+            // shared implementation with the store's page (see
+            // `SearchResults`); keyed by the answer's definition, so no stale
+            // fold or selection survives into a differently-shaped answer.
+            <SearchResults
+              key={`${unit}:${query}`}
+              unit={unit}
+              query={query}
+              installed={rows.map((row) => ({
+                skill: row.skill,
+                matched: row.matched,
+                muted: !row.enabled,
+                extra: rowExtra(row),
+                action: <SkillEnableSwitch skill={row.skill} />,
+              }))}
+              installedHoverAction={false}
+            />
           ) : itemCount === 0 ? (
             <Placeholder
               message={
-                query
-                  ? `未找到匹配“${query}”的 Skill`
-                  : unit === "skill"
-                    ? "没有符合条件的 skill"
-                    : "没有符合条件的仓库"
+                unit === "skill"
+                  ? "没有符合条件的 skill"
+                  : "没有符合条件的仓库"
               }
             />
           ) : unit === "skill" ? (

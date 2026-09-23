@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 
 import { ordinalClass } from "../../lib/ordinal";
-import { LOCAL_SOURCE_LABEL, type SkillView } from "../../lib/skill-view";
+import {
+  isLiveSkill,
+  LOCAL_SOURCE_LABEL,
+  type SkillView,
+} from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
 import { domainEmoji, domainTooltip } from "../../data/domains";
 import {
@@ -45,10 +49,10 @@ export type { SkillMatched };
  * and both are filled in by `domainEmoji` — the same resolver the card's slot
  * calls, so the two surfaces cannot mark one skill two ways.
  *
- * It is bound to the store like `SkillListRow` is: the corner action is the
- * install button. Unlike `SkillListRow` it is a full-width row with no grid
- * cell to fill, so it is its own shape (as `RepoCard` is), sharing only the
- * interaction and the ordinal ink with the surfaces around it.
+ * It is bound to the store like the standalone skill card is: the corner
+ * action is the install button. Unlike the card it is a full-width row with
+ * no grid cell to fill, so it is its own shape (as `RepoCard` is), sharing
+ * only the interaction and the ordinal ink with the surfaces around it.
  *
  * Everything it shows is read off the skill, so it renders a registry row and
  * an installed row the same way; a skill whose entry is unknown (`storeBacked`)
@@ -104,6 +108,11 @@ export function SkillRow({
   // has none.
   const [owner] = skill.repo.split("/");
   const domain = skill.profile?.domain;
+  // A live skills.sh row claims nothing its source does not carry — which is
+  // no description and no classification at all — so it draws neither the
+  // 暂无描述 placeholder nor the ❓ mark (see `isLiveSkill`); an installed row
+  // the store cannot resolve is a local fact, and keeps both.
+  const live = isLiveSkill(skill);
 
   return (
     <li className="flex flex-col">
@@ -141,27 +150,40 @@ export function SkillRow({
 
         {/* The classification leads the row. The tip names the domain, its scope
             and any other domains the skill belongs to — and answers for a skill
-            nothing classified, which wears the question mark here. */}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <span className="flex size-7 shrink-0 items-center justify-center text-base leading-none">
-                {domainEmoji(domain)}
-              </span>
-            }
+            nothing classified, which wears the question mark here. A live row
+            draws nothing in the slot, which stays fixed so the names still line
+            up: nothing classified it, but nothing looked either. */}
+        {live ? (
+          <span
+            aria-hidden="true"
+            className="size-7 shrink-0 text-base leading-none"
           />
-          <TooltipContent>{domainTooltip(domain ?? [])}</TooltipContent>
-        </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span className="flex size-7 shrink-0 items-center justify-center text-base leading-none">
+                  {domainEmoji(domain)}
+                </span>
+              }
+            />
+            <TooltipContent>{domainTooltip(domain ?? [])}</TooltipContent>
+          </Tooltip>
+        )}
 
         {/* What is it, and what does it do: the two lines every row leads with,
-            both clamped to one line so the list stays a list. */}
+            both clamped to one line so the list stays a list. A live row states
+            no description — its source publishes none, so the line claims
+            nothing rather than a placeholder. */}
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-[14px] font-medium leading-tight">
             <HighlightedText text={skill.name} terms={matched?.name} />
           </h3>
-          <p className="truncate text-[12px] leading-snug text-muted-foreground">
-            {skill.description || "暂无描述"}
-          </p>
+          {!live && (
+            <p className="truncate text-[12px] leading-snug text-muted-foreground">
+              {skill.description || "暂无描述"}
+            </p>
+          )}
         </div>
 
         {/* The facts cluster, pushed to the far end and kept whole: the source's

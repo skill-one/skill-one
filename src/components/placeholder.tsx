@@ -11,6 +11,7 @@ export function Placeholder({
   icon: Icon = SearchX,
   message,
   className,
+  iconClassName,
   children,
 }: {
   /** The state's glyph; defaults to the search-miss magnifier. */
@@ -18,6 +19,8 @@ export function Placeholder({
   message: string;
   /** Overrides the default full-height placement (compact containers). */
   className?: string;
+  /** Merged onto the glyph: e.g. the spin an in-flight state asks for. */
+  iconClassName?: string;
   children?: ReactNode;
 }) {
   return (
@@ -27,7 +30,7 @@ export function Placeholder({
         className,
       )}
     >
-      <Icon className="h-8 w-8 opacity-40" />
+      <Icon className={cn("h-8 w-8 opacity-40", iconClassName)} />
       <p className="text-[13px]">{message}</p>
       {children}
     </div>
