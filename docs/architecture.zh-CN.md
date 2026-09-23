@@ -62,7 +62,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 | `src/lib/list-view.ts` | 这些控件背后的共享视图：两页共用一个查询，各列表另有自己的单位与范围 |
 | `src/lib/facet-overflow.ts` | 顶栏一行能放几个 chip——对测量宽度的纯算术 |
 | `src/pages/explore/repo-card.tsx` / `repo-page.tsx` | 商店的仓库视图：一个仓库一张卡——主体是按安装量排序、有上限的 skill 列表，底部一行同时署名该仓库并通往它的页面——以及该仓库自己的页面：只讲一个仓库，别的什么都不放。页面按「打开它的那份列表」来读：商店的读法不限量地列出该仓库发布的全部 skill；已安装列表的读法先列出磁盘上已有的那些，其余目录放在列表底部一个控件之后 |
-| `src/pages/explore/live-groups.ts` | skills.sh 实时搜索结果按仓库重新归组，供商店列表的仓库视图使用：把去重后的命中按 `owner/repo` 分桶——桶保持端点自己的相关度顺序，桶内 skill 按安装量降序。单位开关决定 live 段由什么构成：这里是仓库卡片，技能视图则是一行一个 skill 的扁平列表 |
+| `src/pages/explore/live-groups.ts` | skills.sh 实时搜索结果按仓库重新归组，供商店列表的仓库视图使用：把去重后的命中按 `owner/repo` 分桶——桶保持端点自己的相关度顺序，桶内 skill 按安装量降序。单位开关决定 live 段由什么构成：这里是仓库卡片（与其他卡片一样受读者预设的预览上限约束），技能视图则是一行一个 skill 的扁平列表。live 卡片的门通向仓库目录真正所在的地方：索引收录的仓库走商店自己的页面，未收录的走 skills.sh，纯粹的发现域则没有门 |
 | `src/lib/view-memory.ts` / `src/hooks/use-view-memory.ts` / `use-return.ts` | 列表页自己的视图——它上面的控件、已展开的深度、滚动位置——按历史记录逐条记住：页面自带滚动容器，浏览器对它什么都不会恢复。`use-return.ts` 是应用统一的返回控件：它弹回那条记录，而不是往栈里再压一份列表——这正是上面那份记忆有意义的前提 |
 | `src/lib/avatar-source.ts` | 「owner 头像在哪里」的唯一答案：数据集镜像（定址到已记录的快照标签）、它的可变分支、最后是 GitHub 自己的端点——所有界面都从这一条链取图 |
 | `src/lib/tauri.ts` | 判断是否运行在 Tauri WebView 中 |

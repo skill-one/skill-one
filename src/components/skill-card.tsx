@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { LOCAL_SOURCE_LABEL, type SkillView } from "../lib/skill-view";
+import { isLiveSkill, LOCAL_SOURCE_LABEL, type SkillView } from "../lib/skill-view";
 import { cn } from "../lib/utils";
 import { DomainBadge } from "./domain-badge";
 import { HighlightedText, type SkillMatched } from "./highlighted-text";
@@ -168,7 +168,10 @@ export function SkillCard({
         </CardHeader>
 
         <CardContent className="line-clamp-2 text-[13px] leading-snug text-muted-foreground">
-          {skill.description || "暂无描述"}
+          {/* A live skills.sh row's source carries no description at all, so
+              it claims none — no 暂无描述 standing in for a fact nobody
+              established (see `isLiveSkill`). */}
+          {isLiveSkill(skill) ? null : skill.description || "暂无描述"}
         </CardContent>
 
         {/* Pinned to the card's bottom edge (`mt-auto`): descriptions differ in

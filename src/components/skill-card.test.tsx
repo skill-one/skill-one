@@ -20,6 +20,10 @@ const local: SkillView = {
   repo: "",
   stars: 0,
   downloads: 0,
+  // The installed adapter always sets `installedAt` — null included (see
+  // `installedSkillView`) — which is what keeps an installed record from
+  // reading as a live hit.
+  installedAt: null,
   storeBacked: false,
 };
 
@@ -119,6 +123,26 @@ describe("SkillCard", () => {
     renderWithRouter(<SkillCard skill={{ ...sourced, description: "" }} />);
 
     expect(screen.getByText("暂无描述")).toBeInTheDocument();
+  });
+
+  it("claims no description on a live hit, whose source carries none", () => {
+    // A live row's source publishes no description field at all, so the card
+    // claims nothing rather than stating 暂无描述 — a fact nobody
+    // established. An installed record without one is a local fact, and
+    // keeps the placeholder.
+    const { container: liveContainer } = renderWithRouter(
+      <SkillCard skill={{ ...wellKnown, description: "" }} />,
+    );
+    expect(liveContainer.querySelector('[data-slot="card-content"]')).toHaveTextContent(
+      "",
+    );
+
+    const { container: localContainer } = renderWithRouter(
+      <SkillCard skill={{ ...local, description: "" }} />,
+    );
+    expect(localContainer.querySelector('[data-slot="card-content"]')).toHaveTextContent(
+      "暂无描述",
+    );
   });
 
   it("keeps the corner action's click off the card body", () => {

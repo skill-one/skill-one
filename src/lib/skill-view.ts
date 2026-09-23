@@ -47,6 +47,27 @@ export function skillKey(skill: { repo: string; name: string }): string {
   return `${skill.repo}/${skill.name}`;
 }
 
+/**
+ * Whether a skill view is a live skills.sh hit — the one unbacked shape that
+ * is not an install.
+ *
+ * The two unbacked shapes read differently on the shared cards: an installed
+ * record the store cannot resolve is a local fact (its empty description is
+ * a real "has none", and nothing classifying it is a real 未分类), while a
+ * live hit is upstream data the endpoint simply does not carry — no
+ * description, no classification, nothing the card could claim. The cards
+ * use this to draw a live row as what it is: a name, a source and an install
+ * button, with no placeholder standing in for facts nobody established.
+ *
+ * The test is structural: the installed adapter always sets `installedAt`
+ * (null included — see `installedSkillView`), so only a live hit leaves it
+ * off. It is a `SkillView` predicate rather than a field precisely so the
+ * two producers cannot drift on what a live row looks like.
+ */
+export function isLiveSkill(skill: SkillView): boolean {
+  return skill.storeBacked === false && skill.installedAt === undefined;
+}
+
 export interface SkillView extends Skill {
   /**
    * False for a skill no store entry backs: an installed record the registry

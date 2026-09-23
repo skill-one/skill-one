@@ -1065,16 +1065,18 @@ describe("ExplorePage", () => {
     expect(mockSearchSkillsSh).toHaveBeenCalledWith("gadget", expect.anything());
   });
 
-  it("shapes the live answer as repository cards, labels rather than doors", async () => {
+  it("shapes the live answer as repository cards whose doors follow the index", async () => {
     const user = userEvent.setup();
     bootGadgetRegistry();
-    // Two live hits share one repository; a third lives elsewhere. The shared
-    // repository's card lists its skills most-installed first — the order a
-    // repository card always lists its rows in.
+    // Two live hits share one repository; a third lives elsewhere; a fourth
+    // sits under a bare discovery domain. The shared repository's card lists
+    // its skills most-installed first — the order a repository card always
+    // lists its rows in.
     mockSearchSkillsSh.mockResolvedValue([
       liveSkill("sprocket", "acme/fresh", 7),
       liveSkill("cog", "acme/fresh", 9),
       liveSkill("gear", "acme/other", 3),
+      liveSkill("orphan-skill", "smithery.ai", 1),
     ]);
     renderExplorePage();
     await screen.findByText("gadget-master");
@@ -1082,20 +1084,96 @@ describe("ExplorePage", () => {
     await user.type(await searchField(), "gadget");
 
     // The section header counts repositories, not skills.
-    expect(await screen.findByText("2 个仓库")).toBeInTheDocument();
+    expect(await screen.findByText("3 个仓库")).toBeInTheDocument();
     const fresh = document.querySelector('[data-repo="acme/fresh"]')!;
     expect(
       within(fresh as HTMLElement).getAllByRole("button", {
         name: /查看 .+ 详情/,
       }).map((el) => el.getAttribute("aria-label")),
     ).toEqual(["查看 cog 详情", "查看 sprocket 详情"]);
-    // The store has no page for a repository its index does not carry, so a
-    // live card's bar is a label — the only 查看仓库 door on the page belongs
-    // to the indexed repository's card.
+    // A live row claims nothing its source does not carry: no 暂无描述
+    // placeholder standing in for a description nobody published, and no ❓
+    // mark — nothing ever classified it, but nothing looked either.
+    expect(within(fresh as HTMLElement).queryByText("暂无描述")).toBeNull();
+    expect(within(fresh as HTMLElement).queryByText("❓")).toBeNull();
+    // A repository the index does not carry has no page in the store, so its
+    // bar leads to skills.sh in the system browser…
     expect(
-      screen.queryByRole("link", { name: /^查看仓库 acme\/fresh/ }),
+      screen.getByRole("link", { name: /^查看仓库 acme\/fresh/ }),
+    ).toHaveAttribute("href", "https://www.skills.sh/acme/fresh");
+    // …while a bare discovery domain has no repo page there either: its bar
+    // stays a label, and the rows remain the only way out.
+    expect(
+      screen.queryByRole("link", { name: /^查看仓库 smithery\.ai/ }),
     ).toBeNull();
-    expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(1);
+    // The indexed repository's card keeps the store's own door — the only
+    // internal 查看仓库 link on the page.
+    const internalDoors = screen
+      .getAllByRole("link", { name: /^查看仓库 / })
+      .filter((el) => el.getAttribute("href")?.startsWith("#/repo/"));
+    expect(internalDoors).toHaveLength(1);
+    expect(internalDoors[0]).toHaveAttribute("href", "#/repo/acme/gadgets");
+  });
+
+  it("opens the store's own page for a live repository the index carries", async () => {
+    const user = userEvent.setup();
+    bootGadgetRegistry();
+    // The hit's skill is new to the index (so it survives the dedupe) but its
+    // repository is one the store knows: the card's door is the store's
+    // repository page, like any indexed card's.
+    mockSearchSkillsSh.mockResolvedValue([
+      liveSkill("gadget-pro", "acme/gadgets", 50),
+    ]);
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    await user.type(await searchField(), "gadget");
+
+    // Two cards sign the same repository — the store's own, and the live
+    // answer's — and both doors lead to the same page. The live answer lands
+    // one request after the local one, so the wait covers both.
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("link", { name: /^查看仓库 acme\/gadgets/ }),
+      ).toHaveLength(2),
+    );
+    expect(
+      screen
+        .getAllByRole("link", { name: /^查看仓库 acme\/gadgets/ })
+        .map((el) => el.getAttribute("href")),
+    ).toEqual(["#/repo/acme/gadgets", "#/repo/acme/gadgets"]);
+  });
+
+  it("caps a live repository card at the reader's preview limit", async () => {
+    const user = userEvent.setup();
+    bootGadgetRegistry();
+    mockSearchSkillsSh.mockResolvedValue(
+      Array.from({ length: 7 }, (_, i) =>
+        liveSkill(`fresh-${i}`, "acme/fresh", 100 - i),
+      ),
+    );
+    renderExplorePage();
+    await screen.findByText("gadget-master");
+
+    await user.type(await searchField(), "gadget");
+
+    // The live answer lands one request after the local one.
+    await screen.findByText("fresh-0");
+    const fresh = document.querySelector('[data-repo="acme/fresh"]')!;
+    // Five rows on the card (the default preview), two behind the door.
+    expect(
+      within(fresh as HTMLElement).getAllByRole("button", {
+        name: /查看 .+ 详情/,
+      }),
+    ).toHaveLength(5);
+    expect(within(fresh as HTMLElement).queryByText("fresh-5")).toBeNull();
+    // The bar states the repository's total, so a capped list reads as
+    // "these of them" — and leads to the whole of it on skills.sh.
+    expect(
+      within(fresh as HTMLElement).getByRole("link", {
+        name: "查看仓库 acme/fresh，7 个 skill",
+      }),
+    ).toHaveAttribute("href", "https://www.skills.sh/acme/fresh");
   });
 
   it("opens a live row on skills.sh instead of the detail panel", async () => {
@@ -1146,6 +1224,9 @@ describe("ExplorePage", () => {
     const live = cardOf("sprocket");
     expect(live).toHaveTextContent("acme/fresh");
     expect(live.querySelector('[title$="次安装"]')).toBeNull();
+    // The live card's body states no description either — the endpoint
+    // publishes none, so the card claims none rather than a placeholder.
+    expect(live).not.toHaveTextContent("暂无描述");
     // The indexed skill is on the page beside it, as a repository card's row:
     // that surface prints no per-skill figure either (the figure belongs to the
     // standalone skill card — see skill-list-row.test.tsx), so what this test

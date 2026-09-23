@@ -160,6 +160,20 @@ export function ExplorePage() {
   // The list on screen: a search's relevance order, or the browse answer.
   const activeRepos = isSearching ? groups : browseRepos;
 
+  // Every repository the local index carries, by key, unscoped — the browse
+  // answer read whole rather than through the filter. The live section reads
+  // this to decide where a live repository's door leads: the store's own page
+  // when the index knows the repository, skills.sh when it does not.
+  const indexedRepos = useMemo(
+    () =>
+      new Set(
+        (sectionsData?.sections ?? []).flatMap((section) =>
+          section.repos.map((repo) => repo.title),
+        ),
+      ),
+    [sectionsData],
+  );
+
   // Every skill the browse answer holds, flattened once: the skill unit reads
   // this list, and the filter's chip counts derive from it. A repository's
   // leading domain is unique, so no skill is listed twice.
@@ -523,11 +537,26 @@ export function ExplorePage() {
                             key={group.key}
                             repo={group.title}
                             skills={group.skills.map((skill) => ({ skill }))}
-                            hasQuery
-                            // The store has no page for a repository its
-                            // index does not carry, so the card's bar is a
-                            // label, not a door (see `RepoCard`'s `href`).
-                            href={null}
+                            // The reader's own preview cap, like any other
+                            // repository card: a live answer is a search, but
+                            // the card is still a summary, and the door below
+                            // it is where the rest lives.
+                            maxSkills={maxSkills}
+                            // The door follows where the repository's catalogue
+                            // actually lives. One the index carries opens the
+                            // store's own page (the default). One it does not
+                            // carry has no page here to open — a live-only
+                            // catalogue is upstream's, so the bar leads to
+                            // skills.sh in the system browser; a bare discovery
+                            // domain (not `owner/repo`) has no repo page there
+                            // either, so its bar stays a label.
+                            href={
+                              indexedRepos.has(group.title)
+                                ? undefined
+                                : group.title.includes("/")
+                                  ? `https://www.skills.sh/${group.title}`
+                                  : null
+                            }
                             onOpenSkill={(key) => {
                               const live = liveSkills.find(
                                 (s) => skillKey(s) === key,

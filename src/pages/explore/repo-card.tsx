@@ -5,6 +5,7 @@ import { ChevronRight, Star } from "lucide-react";
 import { domainEmoji } from "../../data/domains";
 import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
 import {
+  isLiveSkill,
   LOCAL_SOURCE_LABEL,
   skillKey,
   type SkillView,
@@ -176,9 +177,12 @@ export function RepoCard({
    * Where the bar leads. Absent means the repository's own page
    * (`/repo/owner/repo`, the store's full catalogue of it); the installed list
    * hands over its own reading of the same repository instead
-   * (`/my-skills/repo/owner/repo`, the installs on disk); `null` makes the bar
-   * a label rather than a door — for a listing that already is the whole thing
-   * and has nowhere further to go.
+   * (`/my-skills/repo/owner/repo`, the installs on disk); an `http(s)` URL
+   * makes the bar an external door — it opens in the system browser, for a
+   * repository the store has no page of its own for (a live skills.sh source
+   * the index does not carry); `null` makes the bar a label rather than a
+   * door — for a listing that already is the whole thing and has nowhere
+   * further to go.
    */
   href?: string | null;
 }) {
@@ -191,6 +195,72 @@ export function RepoCard({
   const name = repo || LOCAL_SOURCE_LABEL;
   // The door's destination; `null` leaves the bar a label (see `href`).
   const door = href === undefined ? `/repo/${repo}` : href;
+  // An `http(s)` door leads out of the app: the bar renders as a plain anchor
+  // opening in the system browser rather than a router link.
+  const externalDoor = door != null && door.startsWith("http");
+  // The door bar's content, shared by the router link and the external anchor:
+  // who published this, and how many skills the card lists.
+  const doorBar = (
+    <>
+      {/* The identity is a size step above the rows: a 24px face and a
+          14px name against the rows' 13px names and 13px glyphs. The bar
+          sits under a hairline at the bottom of the card, so the step is
+          what stops it from reading as one more row of the list. A pool
+          of source-less installs has no owner to draw, so its name leads
+          the bar alone. */}
+      {repo ? (
+        <OwnerAvatar
+          owner={owner}
+          className="size-6 shrink-0 text-[11px]"
+        />
+      ) : null}
+      <span className="truncate text-sm font-semibold text-foreground group-hover/head:underline">
+        {name}
+      </span>
+      {/* The repository's weight rides its name, because that is what the
+          figure is about: a fact about the repository, next to the
+          repository, the way a follower count sits next to an account.
+          It used to sit out in the right-hand cluster with the count and
+          the door, which mixed two different kinds of fact on one side of
+          the bar — and it was never aligned there anyway: the digits are
+          as wide as they are, so only the glyphs looked like a column.
+          The amber star is separator enough; a `·` after it punctuated a
+          group that had already ended. The raw figure stays reachable as
+          the title, since the printed one is compacted. */}
+      {stars !== undefined && (
+        <span
+          className="flex shrink-0 items-center gap-1 tabular-nums"
+          title={`${stars} stars`}
+        >
+          <Star
+            className="h-3 w-3 fill-amber-400 text-amber-400"
+            aria-hidden
+          />
+          {formatCount(stars)}
+        </span>
+      )}
+      {/* The door, labelled with what it opens: the count is the door's
+          *object*, so it is written inside the door's own phrase rather
+          than standing beside it as a second figure with a separator
+          between them — one phrase, one entity, and no bare 「N 个」 for
+          the reader to disambiguate against the rows on screen. The noun
+          comes from the app's own voice (`N 个 skill`, the same words the
+          bar's own accessible name and the repository page's header use),
+          which is also what settles 全部: 「全部 1 个」 reads badly for a
+          repository with one skill, while 「1 个 skill」 reads the same as
+          every other count. The chevron carries the "go" the way every
+          other deeper affordance in the app does, and the total is always
+          the repository's own — which is what lets a capped list read as
+          "these of them": the reader counts the rows on screen and compares. */}
+      <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
+        {skills.length} 个 skill
+        <ChevronRight
+          className="h-3 w-3 transition-transform group-hover/head:translate-x-0.5"
+          aria-hidden
+        />
+      </span>
+    </>
+  );
 
   return (
     <li className="flex flex-col">
@@ -206,7 +276,13 @@ export function RepoCard({
           <ul className="-mx-1.5 flex flex-col">
             {shown.map(({ skill, matched, muted, extra, action }) => {
               const key = skillKey(skill);
-              const emoji = domainEmoji(skill.profile?.domain);
+              // A live skills.sh row claims only what its source carries —
+              // which is no description and no classification at all — so it
+              // draws neither the 暂无描述 placeholder nor the ❓ mark (see
+              // `isLiveSkill`); an installed row the store cannot resolve is a
+              // local fact, and keeps both.
+              const live = isLiveSkill(skill);
+              const emoji = live ? undefined : domainEmoji(skill.profile?.domain);
               const isSelected = selected != null && selected === key;
               // The store installs; the installed list enables. The control is
               // the caller's, and absent means the store's install button.
@@ -239,7 +315,8 @@ export function RepoCard({
                         line up whether the skill is classified or not: a box for
                         the dataset's own 其他, the question mark for a skill
                         nothing classified — the same mark the list rows wear
-                        (see `domainEmoji`). */}
+                        (see `domainEmoji`). A live row draws nothing in the
+                        slot, which stays fixed so the names still line up. */}
                     <span
                       aria-hidden="true"
                       className="w-4 shrink-0 text-center text-[13px]"
@@ -254,7 +331,7 @@ export function RepoCard({
                       <HighlightedText text={skill.name} terms={matched?.name} />
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                      {skill.description || "暂无描述"}
+                      {live ? null : skill.description || "暂无描述"}
                     </span>
                   </button>
                   {/* The row's own additions sit beside the row button rather
@@ -295,73 +372,12 @@ export function RepoCard({
 
         {/* The card's one bar: what this repository is, how big it is, and the
             way in. `mt-auto` keeps it on the bottom edge when the plain-grid
-            fallback stretches a short card to its neighbour's height. */}
+            fallback stretches a short card to its neighbour's height. An
+            external door (a live source the store has no page for) opens in
+            the system browser — the same bar, the same label, one step
+            further out. */}
         <CardFooter className="mt-auto min-w-0 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
-          {door != null ? (
-          <Link
-            to={door}
-            aria-label={`查看${repo ? `仓库 ${repo}` : name}，${skills.length} 个 skill`}
-            className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            {/* The identity is a size step above the rows: a 24px face and a
-                14px name against the rows' 13px names and 13px glyphs. The bar
-                sits under a hairline at the bottom of the card, so the step is
-                what stops it from reading as one more row of the list. A pool
-                of source-less installs has no owner to draw, so its name leads
-                the bar alone. */}
-            {repo ? (
-              <OwnerAvatar
-                owner={owner}
-                className="size-6 shrink-0 text-[11px]"
-              />
-            ) : null}
-            <span className="truncate text-sm font-semibold text-foreground group-hover/head:underline">
-              {name}
-            </span>
-            {/* The repository's weight rides its name, because that is what the
-                figure is about: a fact about the repository, next to the
-                repository, the way a follower count sits next to an account.
-                It used to sit out in the right-hand cluster with the count and
-                the door, which mixed two different kinds of fact on one side of
-                the bar — and it was never aligned there anyway: the digits are
-                as wide as they are, so only the glyphs looked like a column.
-                The amber star is separator enough; a `·` after it punctuated a
-                group that had already ended. The raw figure stays reachable as
-                the title, since the printed one is compacted. */}
-            {stars !== undefined && (
-              <span
-                className="flex shrink-0 items-center gap-1 tabular-nums"
-                title={`${stars} stars`}
-              >
-                <Star
-                  className="h-3 w-3 fill-amber-400 text-amber-400"
-                  aria-hidden
-                />
-                {formatCount(stars)}
-              </span>
-            )}
-            {/* The door, labelled with what it opens: the count is the door's
-                *object*, so it is written inside the door's own phrase rather
-                than standing beside it as a second figure with a separator
-                between them — one phrase, one entity, and no bare 「N 个」 for
-                the reader to disambiguate against the rows on screen. The noun
-                comes from the app's own voice (`N 个 skill`, the same words the
-                bar's own accessible name and the repository page's header use),
-                which is also what settles 全部: 「全部 1 个」 reads badly for a
-                repository with one skill, while 「1 个 skill」 reads the same as
-                every other count. The chevron carries the "go" the way every
-                other deeper affordance in the app does, and the total is always
-                the repository's own — which is what lets a capped list read as
-                "these of them": the reader counts the rows on screen and compares. */}
-            <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
-              {skills.length} 个 skill
-              <ChevronRight
-                className="h-3 w-3 transition-transform group-hover/head:translate-x-0.5"
-                aria-hidden
-              />
-            </span>
-          </Link>
-          ) : (
+          {door == null ? (
             /* A bar with nowhere to lead — the local pool's own page, which is
                already the whole list — states the name and the total instead. */
             <span className="flex min-w-0 flex-1 items-center gap-2">
@@ -372,6 +388,24 @@ export function RepoCard({
                 {skills.length} 个 skill
               </span>
             </span>
+          ) : externalDoor ? (
+            <a
+              href={door}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`查看${repo ? `仓库 ${repo}` : name}，${skills.length} 个 skill`}
+              className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {doorBar}
+            </a>
+          ) : (
+            <Link
+              to={door}
+              aria-label={`查看${repo ? `仓库 ${repo}` : name}，${skills.length} 个 skill`}
+              className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {doorBar}
+            </Link>
           )}
         </CardFooter>
       </Card>
