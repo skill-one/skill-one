@@ -5,6 +5,7 @@ import { useRepoSections } from "../../hooks/use-repo-sections";
 import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
 import { useViewMemory } from "../../hooks/use-view-memory";
 import { skillKey } from "../../lib/skill-view";
+import { openExternal } from "../../lib/open-external";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
@@ -28,6 +29,7 @@ import { SkillRow } from "./skill-row";
 import { SkillRun, buildSkillRuns, byInstalls } from "./skill-run";
 import { GroupSection } from "./group-section";
 import { RepoCard } from "./repo-card";
+import { buildLiveRepoGroups } from "./live-groups";
 
 /**
  * How many repository cards mount with the page, and how many more mount each
@@ -290,6 +292,13 @@ export function ExplorePage() {
     const indexed = new Set(flatSkills.map(skillKey));
     return (liveData ?? []).filter((s) => !indexed.has(skillKey(s)));
   }, [liveData, flatSkills]);
+  // The live answer re-filed by repository, for the repository unit's cards.
+  // Grouping is pure and cheap (the flat answer is at most one endpoint page),
+  // so it is derived for both units and the renderer picks the shape it needs.
+  const liveRepoGroups = useMemo(
+    () => buildLiveRepoGroups(liveSkills),
+    [liveSkills],
+  );
   // Anything that re-answers the list resets what only described the old one:
   // the revealed depth (it belongs to the list it was revealed for), the opened
   // folds (a run's head key belongs to the answer that produced it) and the
@@ -467,24 +476,69 @@ export function ExplorePage() {
                     indexed skill carries, so its rows show no figure: the card
                     draws facts only for rows the store vouches for. It neither
                     joins the list's ordering nor claims a place in a ranking.
-                    Its rows are install-only: with no snapshot path there is no
-                    SKILL.md to open, and the detail panel has nothing to
-                    show. */}
-                {liveSkills.length > 0 && (
-                  <GroupSection
-                    group={{
-                      key: LIVE_GROUP_KEY,
-                      title: "skills.sh 官方搜索",
-                      note: "实时结果，本地索引未收录",
-                      ordinal: "plain",
-                    }}
-                    index={groups.length}
-                    items={liveSkills}
-                    selected={selected}
-                    rowKey={skillKey}
-                    renderItem={(skill) => <SkillListRow skill={skill} />}
-                  />
-                )}
+                    Like the local answer above it, the section is made of the
+                    unit the list is read in: one row per live skill in the
+                    endpoint's relevance order, or one card per live repository
+                    (see `buildLiveRepoGroups`). Either way the section's rows
+                    are install-only: with no snapshot path there is no
+                    SKILL.md to open, and the detail panel has nothing to show
+                    — a live row's only "detail" is its skills.sh page, so
+                    pressing one hands the reader to the system browser rather
+                    than the drawer. */}
+                {liveSkills.length > 0 &&
+                  (unit === "skill" ? (
+                    <GroupSection
+                      group={{
+                        key: LIVE_GROUP_KEY,
+                        title: "skills.sh 官方搜索",
+                        note: "实时结果，本地索引未收录",
+                        ordinal: "plain",
+                      }}
+                      index={groups.length}
+                      items={liveSkills}
+                      selected={selected}
+                      rowKey={skillKey}
+                      renderItem={(skill) => <SkillListRow skill={skill} />}
+                    />
+                  ) : (
+                    <section aria-label="skills.sh 官方搜索">
+                      {/* The header repeats the shell's typography (see
+                          `GroupSection`) minus its interactive parts: a
+                          trailing section of a handful of cards has nothing
+                          to fold and nothing to pin. */}
+                      <div className="flex w-full items-center gap-1.5 rounded-md px-1 py-2">
+                        <span className="truncate text-sm font-medium">
+                          skills.sh 官方搜索
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          实时结果，本地索引未收录
+                        </span>
+                        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
+                          <span>{liveRepoGroups.length} 个仓库</span>
+                        </span>
+                      </div>
+                      <ul className={REPO_LIST_CLASS}>
+                        {liveRepoGroups.map((group) => (
+                          <RepoCard
+                            key={group.key}
+                            repo={group.title}
+                            skills={group.skills.map((skill) => ({ skill }))}
+                            hasQuery
+                            // The store has no page for a repository its
+                            // index does not carry, so the card's bar is a
+                            // label, not a door (see `RepoCard`'s `href`).
+                            href={null}
+                            onOpenSkill={(key) => {
+                              const live = liveSkills.find(
+                                (s) => skillKey(s) === key,
+                              );
+                              if (live?.url) void openExternal(live.url);
+                            }}
+                          />
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
               </div>
             )}
           </div>
