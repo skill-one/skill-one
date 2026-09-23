@@ -45,8 +45,11 @@ export function useReturn(fallback: string): {
       }
       event.preventDefault();
       const index = (window.history.state as { idx?: number } | null)?.idx ?? 0;
-      if (index > 0) navigate(-1);
-      else navigate(fallback, { replace: true });
+      // react-router v8 types `navigate` as `void | Promise<void>`; nothing
+      // here reads a result, so both calls are marked handled rather than
+      // awaited — the navigation is fire-and-forget by design.
+      if (index > 0) void navigate(-1);
+      else void navigate(fallback, { replace: true });
     },
     [fallback, navigate],
   );
