@@ -379,8 +379,18 @@ export function RepoCard({
           ) : (
             /* A bar with nowhere to lead — the local pool's own page, which is
                already the whole list, or a live card whose rows are the whole
-               answer — states the name and the total instead. */
+               answer — states the name and the total instead. The face rides
+               the name whenever a repository stands behind it: a live card's
+               owner is known (and the avatar resolves through the mirror, then
+               GitHub's own endpoint — see `avatarCandidates`), while the local
+               pool has no owner to draw. */
             <span className="flex min-w-0 flex-1 items-center gap-2">
+              {repo ? (
+                <OwnerAvatar
+                  owner={owner}
+                  className="size-6 shrink-0 text-[11px]"
+                />
+              ) : null}
               <span className="truncate text-sm font-semibold text-foreground">
                 {name}
               </span>

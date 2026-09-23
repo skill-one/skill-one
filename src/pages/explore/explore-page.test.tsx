@@ -1086,6 +1086,11 @@ describe("ExplorePage", () => {
     // mark — nothing ever classified it, but nothing looked either.
     expect(within(fresh as HTMLElement).queryByText("暂无描述")).toBeNull();
     expect(within(fresh as HTMLElement).queryByText("❓")).toBeNull();
+    // The bar still knows its owner: the face rides the label, resolving
+    // through the mirror and then GitHub's own endpoint.
+    expect(
+      fresh.querySelector('[data-slot="card-footer"] [data-slot="avatar"]'),
+    ).not.toBeNull();
     // A live card lists everything the endpoint answered, so its bar has
     // nowhere further to go: it is a label, whatever the repository is — the
     // rows, which open skills.sh, are the only way out.

@@ -279,4 +279,23 @@ describe("RepoCard", () => {
     expect(screen.queryByRole("button", { name: /GitHub/ })).toBeNull();
     expect(screen.getAllByRole("link")).toHaveLength(1);
   });
+
+  it("draws the owner face on a label bar whenever a repository stands behind it", () => {
+    // A label bar (a live card's rows are the whole answer) still knows its
+    // owner: the face rides the name, resolving through the mirror and then
+    // GitHub's own endpoint. The local pool — no repository at all — has no
+    // owner to draw.
+    const { container: live } = renderCard({ href: null });
+    expect(
+      live.querySelector('[data-slot="card-footer"] [data-slot="avatar"]'),
+    ).not.toBeNull();
+
+    const { container: pool } = renderCard({
+      repo: "",
+      skills: skills.map((h) => ({ skill: h.skill })),
+    });
+    expect(
+      pool.querySelector('[data-slot="card-footer"] [data-slot="avatar"]'),
+    ).toBeNull();
+  });
 });
