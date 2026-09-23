@@ -4,11 +4,10 @@ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persist
 import { listen } from "@tauri-apps/api/event";
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
-import { AppSidebar } from "./components/app-sidebar";
+import { AppHeader } from "./components/app-header";
 import { UpdateDialog } from "./components/update-dialog";
 import { Toaster } from "./components/ui/toast";
 import { TooltipProvider } from "./components/ui/tooltip";
-import { SidebarInset, SidebarProvider } from "./components/ui/sidebar";
 import { useAutoLinkAgents } from "./hooks/use-auto-link-agents";
 import { useRegistryRefresh } from "./hooks/use-registry-refresh";
 import { useScheduledCheck } from "./hooks/use-scheduled-check";
@@ -85,38 +84,35 @@ export default function App() {
         <UpdateDialog />
         <Toaster />
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
-          <SidebarProvider
-            style={{ minHeight: 0 }}
-            className="flex-1 overflow-hidden"
-          >
-            <AppSidebar />
-            <SidebarInset className="overflow-hidden">
-              <Suspense fallback={null}>
-                <Routes>
-                  <Route
-                    path="/"
-                    element={<Navigate to="/my-skills" replace />}
-                  />
-                  <Route path="/explore" element={<ExplorePage />} />
-                  {/* One repository, every skill it publishes. The splat is
-                      `owner/repo` itself, which carries a slash. */}
-                  <Route path="/repo/*" element={<RepoPage />} />
-                  <Route path="/my-skills" element={<MySkillsPage />} />
-                  {/* The installed list's local pool, listed whole — the page
-                      the pool's card opens, as a repository's page is what a
-                      repository card's bar opens. */}
-                  <Route
-                    path="/my-skills/local"
-                    element={<LocalSkillsPage />}
-                  />
-                  <Route
-                    path="*"
-                    element={<Navigate to="/my-skills" replace />}
-                  />
-                </Routes>
-              </Suspense>
-            </SidebarInset>
-          </SidebarProvider>
+          <AppHeader />
+          {/* Each page owns the scroll container of its own list, so the shell
+              only has to hand the routes the remaining height. */}
+          <main className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
+            <Suspense fallback={null}>
+              <Routes>
+                <Route
+                  path="/"
+                  element={<Navigate to="/my-skills" replace />}
+                />
+                <Route path="/explore" element={<ExplorePage />} />
+                {/* One repository, every skill it publishes. The splat is
+                    `owner/repo` itself, which carries a slash. */}
+                <Route path="/repo/*" element={<RepoPage />} />
+                <Route path="/my-skills" element={<MySkillsPage />} />
+                {/* The installed list's local pool, listed whole — the page
+                    the pool's card opens, as a repository's page is what a
+                    repository card's bar opens. */}
+                <Route
+                  path="/my-skills/local"
+                  element={<LocalSkillsPage />}
+                />
+                <Route
+                  path="*"
+                  element={<Navigate to="/my-skills" replace />}
+                />
+              </Routes>
+            </Suspense>
+          </main>
         </div>
       </HashRouter>
       </TooltipProvider>

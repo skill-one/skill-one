@@ -2,14 +2,13 @@ import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { RegistryHarness } from "../test/registry-harness";
-import { AppSidebar } from "./app-sidebar";
-import { SidebarProvider } from "./ui/sidebar";
+import { AppHeader } from "./app-header";
+import { TooltipProvider } from "./ui/tooltip";
 import { renderWithRouter } from "../test/test-utils";
 
-// The update badge only ever shows inside Tauri, so — unlike the badge-count
+// The update chip only ever shows inside Tauri, so — unlike the navigation
 // tests — this file forces the desktop environment on. The mocks are scoped to
-// this module, leaving app-sidebar.test.tsx (which runs in browser mode)
+// this module, leaving app-header.test.tsx (which runs in browser mode)
 // untouched.
 const updateMocks = vi.hoisted(() => ({
   isTauri: true,
@@ -23,29 +22,17 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => false) }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: updateMocks.check }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: updateMocks.relaunch }));
 
-vi.mock("../lib/registry/client", async () => {
-  const { createRegistryHarness, createRegistryClientMock } = await import(
-    "../test/registry-harness"
-  );
-  return createRegistryClientMock(createRegistryHarness());
-});
-const harness = (
-  (await import("../lib/registry/client")) as unknown as {
-    __harness: RegistryHarness;
-  }
-).__harness;
-
 import {
   checkForUpdate,
   getUpdateStatus,
   resetUpdateState,
 } from "../lib/update-store";
 
-function renderSidebar() {
+function renderHeader() {
   return renderWithRouter(
-    <SidebarProvider>
-      <AppSidebar />
-    </SidebarProvider>,
+    <TooltipProvider>
+      <AppHeader />
+    </TooltipProvider>,
     { route: "/" },
   );
 }
@@ -59,16 +46,14 @@ function fakeRelease(version = "9.9.9") {
 }
 
 beforeEach(() => {
-  harness.reset();
-  harness.init();
   updateMocks.check.mockReset();
   resetUpdateState();
 });
 
-describe("AppSidebar update badge", () => {
+describe("AppHeader update chip", () => {
   it("is absent until a check finds a newer release", async () => {
     updateMocks.check.mockResolvedValue(null);
-    renderSidebar();
+    renderHeader();
     await act(async () => {
       await checkForUpdate();
     });
@@ -77,26 +62,26 @@ describe("AppSidebar update badge", () => {
     expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
   });
 
-  it("marks 设置 itself rather than adding a row of its own", async () => {
+  it("sits beside 设置 rather than adding a destination of its own", async () => {
     updateMocks.check.mockResolvedValue(fakeRelease());
-    renderSidebar();
+    renderHeader();
     await act(async () => {
       await checkForUpdate();
     });
 
-    const badge = await screen.findByRole("button", { name: "有新版本" });
-    // The chip hangs off the 设置 row, so the sidebar gained no destination.
-    expect(badge.closest("li")).toContainElement(
-      screen.getByRole("button", { name: "设置" }),
+    const chip = await screen.findByRole("button", { name: "有新版本" });
+    // The chip shares the settings slot, so the header gained no destination.
+    expect(chip.parentElement).toBe(
+      screen.getByRole("button", { name: "设置" }).parentElement,
     );
-    // 商店 · 我的 skills — and nothing else; 设置 is a popover trigger.
+    // 商店 · 我的 skills — and nothing else.
     expect(screen.getAllByRole("link")).toHaveLength(2);
   });
 
   it("opens the confirmation dialog from wherever the user is", async () => {
     const user = userEvent.setup();
     updateMocks.check.mockResolvedValue(fakeRelease());
-    renderSidebar();
+    renderHeader();
     await act(async () => {
       await checkForUpdate();
     });

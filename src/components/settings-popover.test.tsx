@@ -3,9 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "./theme-provider";
-import { SettingsMenuItem } from "./settings-popover";
+import { SettingsMenu } from "./settings-popover";
 import { TooltipProvider } from "./ui/tooltip";
-import { SidebarMenu } from "./ui/sidebar";
 import {
   DEFAULT_REPO_CARD_LIMIT,
   getRepoCardLimit,
@@ -55,21 +54,19 @@ function renderSettings() {
   return render(
     <ThemeProvider>
       <TooltipProvider>
-        <SidebarMenu>
-          <SettingsMenuItem />
-        </SidebarMenu>
+        <SettingsMenu />
       </TooltipProvider>
     </ThemeProvider>,
   );
 }
 
-/** Open the popover from its sidebar row. */
+/** Open the popover from the header's settings entry. */
 async function openPopover(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "设置" }));
   await screen.findByText("外观");
 }
 
-describe("SettingsMenuItem", () => {
+describe("SettingsMenu", () => {
   beforeEach(() => {
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
@@ -90,7 +87,7 @@ describe("SettingsMenuItem", () => {
     act(() => setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT));
   });
 
-  it("opens a popover with the quick settings from the sidebar row", async () => {
+  it("opens a popover with the quick settings from the header entry", async () => {
     const user = userEvent.setup();
     renderSettings();
 
@@ -176,7 +173,7 @@ describe("SettingsMenuItem", () => {
 
     await user.click(screen.getByRole("button", { name: /软件更新/ }));
 
-    // Both the sidebar chip and the popover row flag the discovery: the chip
+    // Both the header chip and the popover row flag the discovery: the chip
     // is a button, the row's status is a plain badge span.
     expect(
       await screen.findByRole("button", { name: "有新版本" }),

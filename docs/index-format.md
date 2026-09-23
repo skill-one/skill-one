@@ -95,7 +95,7 @@ The run stats published beside the index are what make caching possible:
 
 ### UI
 
-- The explore page renders progressively while the stream runs (the count reads "N · 加载中" until it finishes) and the sidebar's 全部 badge climbs with it.
+- The explore page renders progressively while the stream runs: its count reads "N · 加载中" until the download finishes.
 - Pages that need the whole registry — My Skills' metadata join — gate on completion and keep their skeleton until the stream finishes, because partial data would resolve the wrong skills.
 - Settings reports the served snapshot (`dist-<date>[-N]` tag, publication time, published row count) and whether this launch downloaded it or reused the local copy; until the live identity arrives it falls back to the recorded tag. It also dates the last completed check (`checkedAt`), which is what the automatic window is measured from. 检测更新 runs the same cheap check on demand, ignoring the freshness window, and reports whether anything landed; 立即重新下载 forces a re-download even when the run has not moved.
 

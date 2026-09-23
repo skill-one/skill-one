@@ -18,36 +18,34 @@ import { useRepoCardLimit } from "../hooks/use-repo-card-limit";
 import { AdvancedSettingsDialog } from "./advanced-settings-dialog";
 import { ThemeModeToggle } from "./theme-mode-toggle";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Separator } from "./ui/separator";
-import {
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "./ui/sidebar";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /** Shared chrome for the two menu rows at the bottom of the popover. */
 const rowClassName =
   "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-50";
 
 /**
- * The whole in-sidebar update affordance: one chip on 设置, in the slot the
- * other rows use for their counts — and the chip itself is the way in.
+ * The whole in-header update affordance: one chip beside 设置, and the chip
+ * itself is the way in.
  *
- * Marking an icon the user already knows — rather than adding a row of its own
- * — is how the desktop apps this one lives next to do it: VS Code badges the
- * Settings gear, Chrome badges the ⋮ menu, Slack badges the workspace. VS Code
- * went as far as fixing a bug where the gear badge *and* its "Update" button
- * showed at once, on the grounds that two signals for one fact is noise.
+ * Marking the control the user already knows — rather than adding a
+ * destination of its own — is how the desktop apps this one lives next to do
+ * it: VS Code badges the Settings gear, Chrome badges the ⋮ menu, Slack badges
+ * the workspace. VS Code went as far as fixing a bug where the gear badge
+ * *and* its "Update" button showed at once, on the grounds that two signals
+ * for one fact is noise.
  *
  * Clicking it opens the confirmation dialog from wherever the user is, so
  * nobody has to know the update is filed under settings. It says its piece
- * instead of being a bare dot — this sidebar's other badge is a plain count,
- * where a silent dot reads as decoration — and it is the only coloured thing
- * in the footer, which is what makes it read as an action among numbers. Green
- * (`success`) rather than the palette's red: an available update is something
- * to go and get, not a failure, and red would say the app is broken.
+ * instead of being a bare dot — a silent dot beside an icon reads as
+ * decoration — and it is the only coloured thing in the header, which is what
+ * makes it read as an action. Green (`success`) rather than the palette's
+ * red: an available update is something to go and get, not a failure, and red
+ * would say the app is broken.
  */
 function UpdateBadge() {
   const { open } = useAppUpdate();
@@ -98,14 +96,17 @@ function UpdateRowStatus({ phase }: { phase: ReturnType<typeof useAppUpdate>["ph
 }
 
 /**
- * Settings entry: the sidebar footer row opens a small anchored popover with
- * the at-a-glance settings (appearance, repo-card preview size, software
- * update). Heavier sections — CDN base and the registry data source — live
- * one click deeper in a dialog, per the common desktop pattern (Linear, VS
- * Code, GitHub): a lightweight flyout for the frequent toggles, a full
- * surface only when there is real content to manage.
+ * Settings entry: the header's gear opens a small anchored popover with the
+ * at-a-glance settings (appearance, repo-card preview size, software update).
+ * Heavier sections — CDN base and the registry data source — live one click
+ * deeper in a dialog, per the common desktop pattern (Linear, VS Code, GitHub):
+ * a lightweight flyout for the frequent toggles, a full surface only when there
+ * is real content to manage.
+ *
+ * The flyout opens downward: it hangs from a bar at the top of the window, so
+ * anything else would be pointing out of the window.
  */
-export function SettingsMenuItem() {
+export function SettingsMenu() {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const update = useAppUpdate();
@@ -135,22 +136,23 @@ export function SettingsMenuItem() {
 
   return (
     <>
+      {/* The chip sits beside the gear, not on it: an icon-only button has no
+          room for a label, and a bare dot would be read as decoration. */}
+      {hasUpdate && <UpdateBadge />}
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-        <SidebarMenuItem>
-          <SidebarMenuButton
-            tooltip="设置"
-            render={<PopoverTrigger aria-label="设置" />}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger
+                render={<Button variant="ghost" size="icon" aria-label="设置" />}
+              />
+            }
           >
             <Settings />
-            <span>设置</span>
-          </SidebarMenuButton>
-          {hasUpdate && (
-            <SidebarMenuBadge>
-              <UpdateBadge />
-            </SidebarMenuBadge>
-          )}
-        </SidebarMenuItem>
-        <PopoverContent side="top" align="center" className="w-60 gap-0 p-0">
+          </TooltipTrigger>
+          <TooltipContent side="bottom">设置</TooltipContent>
+        </Tooltip>
+        <PopoverContent side="bottom" align="end" className="w-60 gap-0 p-0">
           <div className="flex items-baseline justify-between px-3 pt-2.5 pb-1">
             <span className="text-sm font-medium text-foreground">设置</span>
             <span className="text-[11px] text-muted-foreground">

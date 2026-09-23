@@ -54,13 +54,13 @@ skill-one/
 ├── src/                    # 前端（React + TypeScript）
 │   ├── components/         # 跨页面共享组件
 │   │   ├── ui/             # shadcn/ui 组件
-│   │   ├── app-sidebar.tsx # 侧边栏导航（路由 + 标题栏共用）
+│   │   ├── app-header.tsx  # 应用唯一的导航：品牌 + 两个入口 + 设置
 │   │   ├── agent-icon.tsx  # agent 品牌图标
 │   │   ├── owner-avatar.tsx# owner 头像（元信息行的作者头像）
 │   │   ├── repo-hover-card.tsx # 作者头像 + 其仓库信息浮窗
 │   │   ├── skill-cover.tsx # skill 自身的图片位（作者首字母；仅详情抽屉使用）
 │   │   ├── skill-detail/    # 共享的 skill 详情面板与模态抽屉
-│   │   ├── settings-popover.tsx # 锚定在侧栏底部的设置浮窗
+│   │   ├── settings-popover.tsx # 锚定在顶栏齿轮上的设置浮窗
 │   │   ├── advanced-settings-dialog.tsx # 二级设置（CDN 基址 + 数据源）
 │   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）

@@ -54,13 +54,13 @@ skill-one/
 ├── src/                    # Frontend (React + TypeScript)
 │   ├── components/         # Components shared across pages
 │   │   ├── ui/             # shadcn/ui components
-│   │   ├── app-sidebar.tsx # Sidebar navigation (shared by routes + title bar)
+│   │   ├── app-header.tsx  # The app's only navigation: brand + the two destinations + settings
 │   │   ├── agent-icon.tsx  # Agent brand icons
 │   │   ├── owner-avatar.tsx# Owner avatar (the metadata rail's author chip)
 │   │   ├── repo-hover-card.tsx # Author chip + its repository hover card
 │   │   ├── skill-cover.tsx # Skill's own image slot (author initial; detail drawer only)
 │   │   ├── skill-detail/    # Shared skill detail panel + modal drawer
-│   │   ├── settings-popover.tsx # Settings flyout anchored to the sidebar footer
+│   │   ├── settings-popover.tsx # Settings flyout anchored to the header's gear
 │   │   ├── advanced-settings-dialog.tsx # Second-level settings (CDN base + data source)
 │   │   └── placeholder.tsx # Shared "nothing to show" empty state for list pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)
