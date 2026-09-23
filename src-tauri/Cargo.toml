@@ -29,7 +29,11 @@ tauri-plugin-opener = "2"
 # Fetches the skills.sh live search from the Rust side: the endpoint sends no
 # CORS headers, so the webview cannot read it directly. Scoped to that one
 # origin in `capabilities/default.json`.
-tauri-plugin-http = "2"
+#
+# Pinned to the minor the npm plugin ships (`@tauri-apps/plugin-http` 2.6.1 is
+# its latest published package): `tauri build` refuses a Rust/npm mismatch,
+# and the npm side lags the Rust crates here.
+tauri-plugin-http = "2.6.1"
 # In-app self-update: fetches + verifies + installs signed releases from
 # GitHub Releases; the process plugin provides relaunch() after install.
 tauri-plugin-updater = "2"
