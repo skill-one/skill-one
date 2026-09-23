@@ -56,6 +56,7 @@ skill-one/
 │   │   ├── ui/             # shadcn/ui components
 │   │   ├── app-header.tsx  # The app's chrome, one row: centred brand + the list's controls
 │   │   ├── app-rail.tsx    # The app's navigation: a narrow rail (destinations, settings)
+│   │   ├── drill-down-head.tsx # A page inside a list, as its head: the way back + the entity
 │   │   ├── list-facets.tsx # The scope chips opening a list's content (+ the 更多 flyout)
 │   │   ├── list-toolbar.tsx # The search field (row's head) + unit switch (row's tail) both lists share
 │   │   ├── agent-icon.tsx  # Agent brand icons

@@ -69,9 +69,12 @@ export interface RepoCardRow {
  * - a **row** opens that skill's detail panel — the reader was pointing at one
  *   skill, and that is where its SKILL.md, its classification and its install
  *   state live;
- * - the **bottom bar** opens the repository's page, which lists every skill the
- *   repository publishes, uncapped. A card with skills left over says so by
- *   carrying the repository's full count inside the door's own label.
+ * - the **bottom bar** opens the repository's page: uncapped, and read the way
+ *   the list it was opened from reads that repository — the store's page lists
+ *   everything the repository publishes, the installed list's opens on the
+ *   skills of it that are on disk, the rest of the catalogue one control away
+ *   from there (see `RepoPage`). A card with skills left over says so by
+ *   carrying the count its own list knows inside the door's own label.
  *
  * The bar is the card's only repository-level control, and it deliberately does
  * not carry an "open on GitHub" button. That button is a second link for the
@@ -171,8 +174,11 @@ export function RepoCard({
   hoverAction?: boolean;
   /**
    * Where the bar leads. Absent means the repository's own page
-   * (`/repo/owner/repo`); `null` makes the bar a label rather than a door — for
-   * a listing that already is the whole thing and has nowhere further to go.
+   * (`/repo/owner/repo`, the store's full catalogue of it); the installed list
+   * hands over its own reading of the same repository instead
+   * (`/my-skills/repo/owner/repo`, the installs on disk); `null` makes the bar
+   * a label rather than a door — for a listing that already is the whole thing
+   * and has nowhere further to go.
    */
   href?: string | null;
 }) {

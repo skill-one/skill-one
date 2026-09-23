@@ -46,16 +46,14 @@ describe("AppHeader", () => {
     expect(header().querySelector("button[aria-label*='全部']")).toBeNull();
   });
 
-  it("swaps the row for a drill-down's way back", () => {
+  it("leaves the row to the brand on a page inside a list", () => {
     renderHeader("/repo/acme/tools");
 
-    // The mark and one word, pointing at the list this page hangs off.
-    expect(screen.getByRole("link", { name: "返回" })).toHaveAttribute(
-      "href",
-      "/explore",
-    );
-    // A single repository has nothing to search and nothing to scope, so the
-    // header is just the way back.
+    // The way out of a drill-down is that page's own head, not the window's
+    // chrome (see `DrillDownHead`): the header is the window's, and it holds
+    // only what both lists answer to.
+    expect(screen.getByText("Skill One")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "返回" })).toBeNull();
     expect(screen.queryByLabelText("搜索 Skill")).toBeNull();
     expect(screen.queryByRole("button", { name: "按技能" })).toBeNull();
   });
@@ -65,12 +63,11 @@ describe("headerRoute", () => {
   it("maps each route to what the header holds", () => {
     expect(headerRoute("/explore")).toEqual({ destination: "store" });
     expect(headerRoute("/my-skills")).toEqual({ destination: "installed" });
-    expect(headerRoute("/repo/acme/tools")).toEqual({
-      back: { fallback: "/explore" },
-    });
-    expect(headerRoute("/my-skills/local")).toEqual({
-      back: { fallback: "/my-skills" },
-    });
+    // A page inside a list has none of the header's controls: it opens with its
+    // own head, way back and all.
+    expect(headerRoute("/repo/acme/tools")).toEqual({});
+    expect(headerRoute("/my-skills/repo/acme/tools")).toEqual({});
+    expect(headerRoute("/my-skills/local")).toEqual({});
   });
 
   it("leaves the row empty for a route it does not know", () => {
