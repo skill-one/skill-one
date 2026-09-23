@@ -65,12 +65,11 @@ skill-one/
 │   │   └── placeholder.tsx # Shared "nothing to show" empty state for list pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)
 │   │   ├── explore/        # Store explore pages (skill-list-row / repo-card + repo-page / group-section)
-│   │   │   └── featured/   # Curated featured page (hero leaderboards + category sections)
 │   │   └── my-skills/      # My Skills page (agent avatar menu / agent-link-settings-dialog, etc.)
 │   ├── hooks/              # Custom hooks
 │   ├── lib/                # API / business logic layer
 │   ├── types/              # Type definitions
-│   ├── data/               # Static data (test mock index + curated featured categories)
+│   ├── data/               # Static data (domain key → label/emoji taxonomy)
 │   ├── test/               # Test utilities and setup
 │   ├── App.tsx             # Routing and layout
 │   └── main.tsx            # Entry point
@@ -107,7 +106,7 @@ Only `src/main.tsx` (main window) mounts the provider. The menu bar popover (`sr
 Conventions when styling new UI:
 
 - Use semantic tokens (`bg-background`, `text-muted-foreground`, `border-border`) rather than raw palette colors, so a theme switch needs no per-component work.
-- A raw color is acceptable only when it sits on a brand gradient or image that reads the same in both themes (for example the featured page hero).
+- A raw color is acceptable only when it sits on a brand gradient or image that reads the same in both themes.
 - Where a raw color is unavoidable (status text such as `text-emerald-600`), pair it with a `dark:` variant.
 
 ## Components

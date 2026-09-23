@@ -65,12 +65,11 @@ skill-one/
 │   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
 │   │   ├── explore/        # 商店探索相关页面（skill-list-row / repo-card + repo-page / group-section）
-│   │   │   └── featured/   # 精选页（hero 榜单轮播 + 分类区块）
 │   │   └── my-skills/      # 我的 Skills 页（agent 头像菜单 / agent-link-settings-dialog 等）
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层
 │   ├── types/              # 类型定义
-│   ├── data/               # 静态数据（测试 mock 索引 + 精选页策划分类）
+│   ├── data/               # 静态数据（分类 key → 标签/emoji 映射）
 │   ├── test/               # 测试工具与 setup
 │   ├── App.tsx             # 路由与布局
 │   └── main.tsx            # 入口
@@ -107,7 +106,7 @@ shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 
 新增 UI 样式时的约定：
 
 - 使用语义化 token（`bg-background`、`text-muted-foreground`、`border-border`），不要直接写调色板颜色，这样切换主题无需改动组件。
-- 只有当颜色位于品牌渐变或图片之上、两种主题下观感一致时，才可以使用固定色（例如精选页 hero）。
+- 只有当颜色位于品牌渐变或图片之上、两种主题下观感一致时，才可以使用固定色。
 - 确实无法避免时（如 `text-emerald-600` 这类状态文案），必须同时补上 `dark:` 变体。
 
 ## 组件

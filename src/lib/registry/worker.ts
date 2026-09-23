@@ -1,19 +1,13 @@
 import { createRegistryCache } from "./cache";
-import {
-  probeIndexMeta,
-  readIndex,
-  readRepos,
-  readTrending,
-} from "./index-stream";
+import { probeIndexMeta, readIndex, readRepos } from "./index-stream";
 import { createRegistryController } from "./worker-controller";
 import type { RegistryRequest } from "./protocol";
 
 /**
  * Registry worker entry: the whole registry service (freshness probe,
- * download, parse, search index, pagination, featured computation) runs here
- * so the main thread never touches the multi-megabyte snapshot or the
- * CPU-heavy work over it. All logic lives in the controller; this file only
- * wires `self.onmessage`.
+ * download, parse, search index, pagination) runs here so the main thread
+ * never touches the multi-megabyte snapshot or the CPU-heavy work over it.
+ * All logic lives in the controller; this file only wires `self.onmessage`.
  *
  * The message type is the request union, not the wider worker-message union:
  * the worker only ever receives main-thread requests, and the narrow type
@@ -25,7 +19,6 @@ const controller = createRegistryController(
   {
     probeMeta: probeIndexMeta,
     readIndex,
-    readTrending,
     readRepos,
     cache: createRegistryCache(),
     now: () => Date.now(),

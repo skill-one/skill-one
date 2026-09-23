@@ -28,7 +28,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 ### 前端（读取）
 
-- **`src/lib/registry/`**：把注册表当作一个服务来访问——`client.ts` 是 `worker.ts` 在主线程的代理，`index-stream.ts` 先探测已发布快照再流式拉取并解析 `skills.jsonl`（逐行解析，下载进行中即可逐步拿到 skill），`worker-controller.ts` 应答分组浏览、搜索、精选、榜单与元数据查询，`cache.ts` 持久化解析结果。调用方经由它完成过滤与分组，自身不持有全量注册表。
+- **`src/lib/registry/`**：把注册表当作一个服务来访问——`client.ts` 是 `worker.ts` 在主线程的代理，`index-stream.ts` 先探测已发布快照再流式拉取并解析 `skills.jsonl`（逐行解析，下载进行中即可逐步拿到 skill），`worker-controller.ts` 应答分组浏览、搜索与元数据查询，`cache.ts` 持久化解析结果。调用方经由它完成过滤与分组，自身不持有全量注册表。
 - **`src/lib/search-index.ts`**：整个商店唯一的搜索入口——基于 MiniSearch，对技能名称建索引，技能注册表与已安装技能列表共用。它定义了什么算命中（见「浏览技能列表」第 9 条），直接用 MiniSearch 自带的分词；`src/lib/search-skills.ts` 在它之上叠加注册表自己的排序（名称分层、安装量）。仓库与描述都不是搜索字段。注册表的大索引在 worker 里构建，条目很少的页面级列表在 `useMemo` 里构建。
 - **`src/lib/skill-detail-api.ts`**：按需拉取单个 skill 的 `SKILL.md`，解析 frontmatter 与正文。
 - **`src/lib/cdn-config.ts`**：管理下载源。默认直连 `raw.githubusercontent.com`，失败后回退到 CDN 镜像（`cdn.jsdmirror.com`），并支持用户在「设置」中配置自定义 CDN。候选地址按优先级依次尝试——包括响应体中途失败时——配置持久化到 localStorage。
@@ -54,12 +54,10 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 | 文件 | 职责 |
 | --- | --- |
 | `src/App.tsx` | 路由、布局、TanStack Query Provider 与缓存持久化 |
-| `src/components/app-sidebar.tsx` | 侧边栏导航（路由与标题共用同一份配置），以及导航角标：「全部」显示已流式下载的 skill 数，「仓库」在索引就绪后显示聚合的仓库总数 |
+| `src/components/app-sidebar.tsx` | 侧边栏导航——「商店」与「我的 skills」两个入口，以及各自的导航角标：「商店」显示已流式下载的 skill 数，「我的 skills」显示已安装的 skill 数 |
 | `src/pages/explore/repo-card.tsx` / `repo-page.tsx` | 商店的仓库视图：一个仓库一张卡——主体是按安装量排序、有上限的 skill 列表，底部一行同时署名该仓库并通往它的页面——以及该仓库自己的页面，不限量地列出它发布的全部 skill |
 | `src/lib/view-memory.ts` / `src/hooks/use-view-memory.ts` / `use-return.ts` | 列表页自己的视图——它上面的控件、已展开的深度、滚动位置——按历史记录逐条记住：页面自带滚动容器，浏览器对它什么都不会恢复。`use-return.ts` 是应用统一的返回控件：它弹回那条记录，而不是往栈里再压一份列表——这正是上面那份记忆有意义的前提 |
 | `src/lib/avatar-source.ts` | 「owner 头像在哪里」的唯一答案：数据集镜像（定址到已记录的快照标签）、它的可变分支、最后是 GitHub 自己的端点——所有界面都从这一条链取图 |
-| `src/pages/explore/featured/` | 精选页：计算生成的榜单 hero 轮播 + 本地策划的分类区块 |
-| `src/data/featured-content.ts` | 精选页的分类 → skill 策划引用（注册表索引不含分类字段） |
 | `src/lib/tauri.ts` | 判断是否运行在 Tauri WebView 中 |
 | `src/lib/open-external.ts` | 在系统浏览器中打开外链（Tauri 需 opener 插件） |
 | `src-tauri/tauri.conf.json` | 窗口、构建与打包配置 |
@@ -88,9 +86,3 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 9. 排序有一条规则和一处例外：浏览列表只有一种形态——一个仓库一张卡、按 star 数降序排列，卡内 skill 按浏览顺序排列；而只要 query 非空，worker 一律按相关度返回。一次搜索重新作答的是列表的顺序、而不是它的布局，页面上也没有任何控件会声称相反的顺序。下面这套排序是注册表特有的。这个顺序是：查询的每个词都必须命中，不再退化为「命中任意一个词」；名称精确命中或前缀命中排在最前，它们之间按安装量排——名称命中已经确定了「这是什么」，同名之间安装量才是真正有意义的差别；其余是「含有查询词但不以它开头」的名称命中，先按安装量、再以 BM25 分数作为最后的平手判定。
 
 什么算命中只有一处定义，在 `lib/search-index.ts`，其余两个可搜索的列表（技能注册表、已安装技能）共用：每个查询词都必须与某个索引词完全相等，或等于它的开头，其余一概不放过——打错的词、单词中间的片段、以及只有别的文档才命中的词，都算不上。保留前缀匹配，是因为只输了一半的词是「没输完」而不是「输错」。分词直接用 MiniSearch 自带的实现（按空格与标点切、再转小写），这对唯一被索引的字段已经足够——技能名就是 ASCII slug。（列表行按命中词出现的位置高亮，所以出现在更长单词内部的命中词也会被标上。）
-
-**精选页**：
-
-1. `featured-page` 请 worker 计算其数据，并在索引报告完成前保持骨架屏——基于不完整注册表的排名是错误的。
-2. Hero 轮播就是 `featured-rankings.ts` 里的两份榜单，按展示顺序：`trending`（skills.sh 官方趋势 id 列表，沿上游排名）与 `popular`（全量注册表按安装量排序）。两者的每条都用与列表每行相同的安装量标注，数字同源。
-3. 分类区块将 `featured-content.ts` 中的人工策划引用与索引联结；解析不到的引用自动跳过，空分类整体隐藏。

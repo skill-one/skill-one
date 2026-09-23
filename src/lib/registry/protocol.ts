@@ -1,8 +1,4 @@
-import type { Skill } from "../../types/skill";
-import type { SkillRef } from "../../data/featured-content";
-import type { HeroSlide, RankEntry } from "./featured-rankings";
-
-export type { SkillRef };
+import type { Skill, SkillRef } from "../../types/skill";
 
 /**
  * Message contract between the main thread (registry client) and the
@@ -79,37 +75,6 @@ export interface RepoSectionsData {
   total: number;
 }
 
-/** One resolved curated section, with global card indexes for the panel. */
-export interface FeaturedSectionData {
-  id: string;
-  title: string;
-  /** The section's skills, most-installed first. */
-  skills: Skill[];
-}
-
-/** Featured page payload, fully computed inside the worker. */
-export interface FeaturedData {
-  slides: HeroSlide[];
-  sections: FeaturedSectionData[];
-}
-
-/** Parameters of a leaderboard request. */
-export interface RankingRequest {
-  /** A `RANKINGS` id, e.g. "trending". */
-  rankingId: string;
-}
-
-/** One leaderboard, ranked and truncated inside the worker. */
-export interface RankingData {
-  id: string;
-  title: string;
-  gradient: string;
-  /** Top entries of the leaderboard, at most `RANKING_SIZE`. */
-  entries: RankEntry[];
-  /** Skills that cleared the ranking floor, ignoring the truncation. */
-  total: number;
-}
-
 /**
  * How the dataset currently served by the worker got here during this run.
  * Surfaced in Settings so a user can tell a real refresh from a cache reuse.
@@ -175,8 +140,6 @@ export type RegistryQuery =
   | { type: "searchSkills"; id: number; payload: { query: string } }
   | { type: "getGroups"; id: number; payload: GroupsRequest }
   | { type: "getRepoSections"; id: number }
-  | { type: "getFeatured"; id: number }
-  | { type: "getRanking"; id: number; payload: RankingRequest }
   | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } };
 
 /** Everything the main thread can send the worker. */

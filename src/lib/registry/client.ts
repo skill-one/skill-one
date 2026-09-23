@@ -1,18 +1,14 @@
 import { getCdnBase, setIndexTag } from "../cdn-config";
 import type {
-  FeaturedData,
   GroupsData,
   GroupsRequest,
   IndexInfo,
-  RankingData,
-  RankingRequest,
   RegistryWorkerMessage,
   RepoSectionsData,
   RevalidateResult,
   SearchData,
 } from "./protocol";
-import type { SkillRef } from "../../data/featured-content";
-import type { Skill } from "../../types/skill";
+import type { Skill, SkillRef } from "../../types/skill";
 
 /**
  * Main-thread proxy of the registry worker: a lazily-spawned singleton that
@@ -125,8 +121,6 @@ function request(
     | "searchSkills"
     | "getGroups"
     | "getRepoSections"
-    | "getFeatured"
-    | "getRanking"
     | "lookupSkills"
     | "revalidate",
   payload?: unknown,
@@ -181,16 +175,6 @@ export function getGroups(request_: GroupsRequest): Promise<GroupsData> {
  */
 export function getRepoSections(): Promise<RepoSectionsData> {
   return request("getRepoSections") as Promise<RepoSectionsData>;
-}
-
-/** Featured payload; call only once `ready` (see useRegistryStats). */
-export function getFeatured(): Promise<FeaturedData> {
-  return request("getFeatured") as Promise<FeaturedData>;
-}
-
-/** One leaderboard; call only once `ready` (see useRegistryStats). */
-export function getRanking(request_: RankingRequest): Promise<RankingData> {
-  return request("getRanking", request_) as Promise<RankingData>;
 }
 
 /** Registry metadata per ref, in ref order (null on miss). */

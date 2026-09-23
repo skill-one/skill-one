@@ -39,16 +39,6 @@ const LocalSkillsPage = lazy(() =>
     default: m.LocalSkillsPage,
   })),
 );
-const FeaturedPage = lazy(() =>
-  import("./pages/explore/featured/featured-page").then((m) => ({
-    default: m.FeaturedPage,
-  })),
-);
-const RankingPage = lazy(() =>
-  import("./pages/explore/featured/ranking-page").then((m) => ({
-    default: m.RankingPage,
-  })),
-);
 
 const queryClient = createQueryClient();
 
@@ -118,14 +108,6 @@ export default function App() {
                   <Route
                     path="/my-skills/local"
                     element={<LocalSkillsPage />}
-                  />
-                  <Route
-                    path="/explore/featured"
-                    element={<FeaturedPage />}
-                  />
-                  <Route
-                    path="/explore/featured/ranking/:rankingId"
-                    element={<RankingPage />}
                   />
                   <Route
                     path="*"

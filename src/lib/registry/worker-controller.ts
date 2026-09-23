@@ -1,15 +1,11 @@
 import type { Skill } from "../../types/skill";
-import { FEATURED_CATEGORIES } from "../../data/featured-content";
-import { DOMAINS, UNCLASSIFIED_DOMAIN, domainLabel } from "../../data/domains";
+import { DOMAINS, UNCLASSIFIED_DOMAIN } from "../../data/domains";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
 import type {
-  FeaturedSectionData,
   Group,
   GroupsData,
   GroupsRequest,
   IndexInfo,
-  RankingData,
-  RankingRequest,
   RegistryQuery,
   RegistryWorkerMessage,
   RepoSectionsData,
@@ -20,21 +16,15 @@ import type {
 import type { RegistryCache } from "./cache";
 import type { PublishedIndex } from "./index-stream";
 import { byRepoRank } from "./repo-rank";
-import {
-  buildHeroSlides,
-  RANKING_SIZE,
-  rankSkills,
-  rankingById,
-} from "./featured-rankings";
 
 /**
  * The registry worker's brain, isolated from the Worker plumbing so the
  * whole service state machine is unit-testable without a real Worker.
  *
  * The controller owns the downloaded registry, the search indexes built over
- * it, and every request the main thread can ask: paged browse/search,
- * featured-page computation, and installed-skill metadata lookups. All
- * answers are page-sized or smaller — the full registry never leaves here.
+ * it, and every request the main thread can ask: paged browse/search and
+ * installed-skill metadata lookups. All answers are page-sized or smaller —
+ * the full registry never leaves here.
  *
  * The dataset arrives fully decorated: every row carries its own
  * classification, so one download yields servable skills and there is no
@@ -53,15 +43,6 @@ const byInstalls = (a: Skill, b: Skill): number => b.downloads - a.downloads;
  * once; consumers need a page's worth, not the answer's full length.
  */
 const MAX_SEARCH_HITS = 50;
-
-/**
- * The dataset's catch-all domain key — an answer ("none of the above fit"),
- * not a blank, which is why a repository whose skills *all* say 其他 is filed
- * here while one nothing classified is not (see `primaryDomain`). It carries
- * no scope of its own, so the featured sections skip it rather than leading
- * with a "其他" shelf.
- */
-const OTHER_DOMAIN = "other";
 
 /**
  * The taxonomy's own order, keyed by domain. Breaks a tied primary-domain vote
@@ -96,13 +77,6 @@ export interface ControllerDeps {
     onLine: (skill: Skill) => void,
     onRestart: () => void,
   ): Promise<void>;
-  /**
-   * Fetch the trending view's id list (skills.sh's trending rank). Called
-   * with the resolved snapshot tag so the leaderboard is read from the same
-   * snapshot as the index. Null when unavailable — a garnish, never a
-   * download failure.
-   */
-  readTrending(cdnBase: string, tag?: string): Promise<string[] | null>;
   /**
    * Fetch the repos.jsonl sidecar (GitHub stars, keyed by `{owner}/{repo}`)
    * whose rows join into the parsed skill rows. Called with the resolved
@@ -144,9 +118,6 @@ export function createRegistryController(
   // written before run addressing counts as unknown, so it always
   // re-downloads once).
   let servedGeneratedAt: string | undefined;
-  // skills.sh's trending rank, as an id list fetched alongside the index.
-  // Null while unavailable; superseded downloads never write it (gen guard).
-  let trendingIds: string[] | null = null;
   // Last announced snapshot identity, kept for `stats()` and for tests.
   let indexInfo: IndexInfo | null = null;
 
@@ -228,11 +199,6 @@ export function createRegistryController(
    * previous source) stays visible and queryable — a revalidation never
    * blanks the UI.
    *
-   * The trending id list is fetched once the tag is known, so its latency
-   * hides inside the multi-megabyte body download; it is awaited before
-   * `ready` is announced, so featured/ranking queries never race it. Its
-   * failure only trims the trending leaderboard, never the dataset.
-   *
    * `force` skips the "unchanged" short-circuit: a source switch or a user
    * retry must re-download even when the published run has not moved.
    *
@@ -250,10 +216,6 @@ export function createRegistryController(
       probed !== undefined ? probed : await deps.probeMeta(cdnBase);
     if (gen !== generation) return;
     const tag = published?.tag;
-    // Started before the body download so its latency hides inside it; the
-    // result is only assigned at the landing points below, so an early
-    // resolution can never be clobbered by the partial-buffer reset.
-    const trending = deps.readTrending(cdnBase, tag).catch(() => null);
     const identity = { tag, generatedAt: published?.generatedAt };
     const total = published?.total;
 
@@ -270,7 +232,6 @@ export function createRegistryController(
         origin: "unchanged",
         checkedAt: deps.now(),
       });
-      trendingIds = (await trending) ?? trendingIds;
       return;
     }
 
@@ -289,7 +250,6 @@ export function createRegistryController(
       // count-0 reset itself needs no event — the main-thread client boots
       // at count 0 and only paints once the first skills notify.
       store = buffer;
-      trendingIds = null;
       announcedCount = 0;
       lastNotify = 0;
       invalidateDerived();
@@ -342,10 +302,6 @@ export function createRegistryController(
     search = null;
     announcedCount = buffer.length;
     invalidateDerived();
-    // Land the trending list with the data it belongs to. A failed fetch
-    // keeps whatever was served before (null on a fresh boot) rather than
-    // dropping the board outright.
-    trendingIds = (await trending) ?? trendingIds;
     // No separate "landed" event: buildIndex immediately emits the settled
     // count and posts ready — the index build is synchronous from here.
     // The stars join is settled by now (readIndex awaited it); a failed one
@@ -507,81 +463,6 @@ export function createRegistryController(
     return { sections, total: repos.length };
   };
 
-  /** Sections shown on the featured page and skills per section. */
-  const FEATURED_DOMAIN_SECTIONS = 6;
-  const FEATURED_DOMAIN_SECTION_SIZE = 6;
-
-  /**
-   * Real-domain featured sections: the most-populated profile domains (the
-   * catch-all "其他" excluded), each led by its most-installed classified
-   * skills. Null when nothing is classified — the page then falls back to the
-   * hand-curated sections instead of going empty. A skill classified under
-   * several domains may lead more than one section.
-   */
-  const domainSections = (): FeaturedSectionData[] | null => {
-    const byDomain = new Map<string, Skill[]>();
-    for (const skill of store) {
-      for (const domain of skill.profile?.domain ?? []) {
-        if (domain === OTHER_DOMAIN) continue;
-        const bucket = byDomain.get(domain);
-        if (bucket) bucket.push(skill);
-        else byDomain.set(domain, [skill]);
-      }
-    }
-    if (byDomain.size === 0) return null;
-    return Array.from(byDomain, ([domain, skills]) => ({ domain, skills }))
-      .toSorted(
-        (a, b) =>
-          b.skills.length - a.skills.length || a.domain.localeCompare(b.domain),
-      )
-      .slice(0, FEATURED_DOMAIN_SECTIONS)
-      .map(({ domain, skills }) => ({
-        id: domain,
-        title: domainLabel(domain),
-        skills: skills
-          .toSorted((a, b) => b.downloads - a.downloads)
-          .slice(0, FEATURED_DOMAIN_SECTION_SIZE),
-      }));
-  };
-
-  /** The hand-curated fallback, resolved against the registry by identity. */
-  const curatedSections = (): FeaturedSectionData[] => {
-    return FEATURED_CATEGORIES.map((category) => ({
-      id: category.id,
-      title: category.title,
-      skills: category.skills
-        .map((ref) =>
-          store.find((s) => s.repo === ref.repo && s.name === ref.name),
-        )
-        .filter((skill): skill is Skill => skill != null),
-    }))
-      .filter((category) => category.skills.length > 0);
-  };
-
-  /** Featured payload: hero slides plus domain (or curated) sections. */
-  const getFeatured = () => ({
-    slides: buildHeroSlides(store, trendingIds),
-    sections: domainSections() ?? curatedSections(),
-  });
-
-  /**
-   * One leaderboard, ranked here and truncated to `RANKING_SIZE` so the main
-   * thread only ever receives what the page can show. An unknown id throws,
-   * which `handle` turns into an `ok: false` reply.
-   */
-  const getRanking = ({ rankingId }: RankingRequest): RankingData => {
-    const def = rankingById(rankingId);
-    if (!def) throw new Error(`未知榜单：${rankingId}`);
-    const { entries, total } = rankSkills(store, def, RANKING_SIZE, trendingIds);
-    return {
-      id: def.id,
-      title: def.title,
-      gradient: def.gradient,
-      entries,
-      total,
-    };
-  };
-
   /**
    * The lookup index for one data version, built lazily. A skill is keyed
    * by its repo+name and by its repo+path basename (a locally installed
@@ -734,12 +615,6 @@ export function createRegistryController(
             break;
           case "getRepoSections":
             data = getRepoSections();
-            break;
-          case "getFeatured":
-            data = getFeatured();
-            break;
-          case "getRanking":
-            data = getRanking(message.payload);
             break;
           case "lookupSkills":
             data = lookupSkills(message.payload.refs);

@@ -247,7 +247,7 @@ export async function fetchFirstText(
  * Fetch JSON from the first candidate whose payload `validate` accepts (it
  * returns null to reject a candidate and give the next source a turn). Null
  * when every candidate is exhausted — the shape for optional garnish files
- * (run stats, trending) whose absence is not an error, unlike
+ * (run stats, repos) whose absence is not an error, unlike
  * `fetchFirstText`, which throws a typed error instead.
  */
 export async function fetchFirstJson<T>(

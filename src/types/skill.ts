@@ -16,6 +16,18 @@ export interface SkillProfile {
   domain: string[];
 }
 
+/**
+ * A registry skill referenced by its identity fields only — the join key used
+ * when a consumer knows which skill it means but does not hold the row (the
+ * installed list's metadata lookup, resolved in the worker).
+ */
+export interface SkillRef {
+  /** Source repository in "owner/repo" form. */
+  repo: string;
+  /** Skill name (the registry index's skillId). */
+  name: string;
+}
+
 export interface Skill {
   /** Skill name, e.g. "algorithmic-art" */
   name: string;

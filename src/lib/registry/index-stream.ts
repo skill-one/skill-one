@@ -51,9 +51,6 @@ const INDEX_SPEC = {
 /** Sidecar run stats published beside the index (under `upstream/`). */
 const META_SPEC = { ...INDEX_SPEC, path: "upstream/stats.json" } as const;
 
-/** The trending view's top ids, re-fetched from upstream on every run. */
-const TRENDING_SPEC = { ...INDEX_SPEC, path: "upstream/trending.json" } as const;
-
 /**
  * Per-repo metadata sidecar (GitHub stars; one row per repo). Star counts
  * left the skill rows themselves — this file is their join table, keyed by
@@ -239,38 +236,15 @@ function normalizeStats(raw: RawRunStats): PublishedIndex {
 }
 
 /**
- * Fetch the trending view's id list. When a snapshot tag is known the fetch
- * is pinned to it, so the leaderboard is read from the same snapshot as the
- * index and its URL is cache-safe; without a tag the mutable `dist` branch is
- * probed cache-busted, like the branch stats probe.
- *
- * The list is an optional garnish, not the dataset — an unreachable or
- * future-shaped source simply yields null, which callers treat as "no
- * trending leaderboard" rather than a download failure.
- */
-export function readTrending(
-  cdnBase: string,
-  tag?: string,
-): Promise<string[] | null> {
-  return fetchFirstJson(
-    snapshotUrls(TRENDING_SPEC, cdnBase, tag),
-    (raw) =>
-      Array.isArray(raw) && raw.every((id) => typeof id === "string")
-        ? (raw as string[])
-        : null,
-  );
-}
-
-/**
  * Repo → GitHub-star lookup over the snapshot's `repos.jsonl` sidecar, keyed
  * by `{owner}/{repo}`. Follows the same addressing rules as the index body:
  * pinned to the snapshot tag when one is known (immutable, cache-safe),
  * fetched off the mutable `dist` branch cache-busted otherwise. Rows whose
  * `stars` is null (a deleted repo) are dropped, so lookups normalize to 0.
  *
- * Like trending, this is garnish, not the dataset: the caller turns a fetch
- * failure into "no join", which leaves every skill with 0 stars rather than
- * failing the download.
+ * Like the run stats, this is garnish, not the dataset: the caller turns a
+ * fetch failure into "no join", which leaves every skill with 0 stars rather
+ * than failing the download.
  */
 export async function readRepos(
   cdnBase: string,

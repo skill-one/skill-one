@@ -12,8 +12,8 @@ import { getRegistrySnapshot, subscribeRegistry } from "../lib/registry/client";
  * fresh download, or a revalidation. `whileStreaming` covers the other half of
  * a browsed answer's life — while the download is in flight the answer is
  * computed over the loaded prefix, so every progress count invalidates too.
- * Queries that only mean anything against the whole registry (featured
- * curation, leaderboards) stay off that, since they wait for `ready` anyway.
+ * Queries that only mean anything against the whole registry (My Skills'
+ * metadata join) stay off that, since they wait for `ready` anyway.
  */
 export function useInvalidateOnRegistryEpoch(
   queryKey: readonly unknown[],

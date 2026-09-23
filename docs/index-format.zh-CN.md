@@ -2,7 +2,7 @@
 
 [English](index-format.md) | [简体中文](index-format.zh-CN.md)
 
-商店内容来自 [skill-one/skills-profiles](https://github.com/skill-one/skills-profiles)——它覆盖 [skills.sh](https://www.skills.sh) 上全部 GitHub 来源技能，并为每个技能生成分类。快照发布在 `dist` 分支：`skills.jsonl` 每行一个技能，`skills/` 目录存放每个技能的完整文件，`profiles/` 目录是该数据集自带的分类可浏览副本，`upstream/` 目录则存放镜像侧的附属文件（`stats.json`、`repos.jsonl`、`trending.json`、`avatars/`）。
+商店内容来自 [skill-one/skills-profiles](https://github.com/skill-one/skills-profiles)——它覆盖 [skills.sh](https://www.skills.sh) 上全部 GitHub 来源技能，并为每个技能生成分类。快照发布在 `dist` 分支：`skills.jsonl` 每行一个技能，`skills/` 目录存放每个技能的完整文件，`profiles/` 目录是该数据集自带的分类可浏览副本，`upstream/` 目录则存放镜像侧的附属文件（`stats.json`、`repos.jsonl`、`avatars/`）。
 
 ## 格式
 
@@ -88,16 +88,15 @@ GitHub star 数**不在**技能行里：它存放在下文的 `upstream/repos.js
 - 若指针与分支统计均无法解析，则退回可变的 `dist` ref——此时必须打散缓存，因为没有定址锚点时，一份一天前的边缘副本与当前索引无从分辨。
 - 解析结果连同其身份（`tag` + `finishedAt`）一起持久化到 IndexedDB，同时把标签记录到 localStorage（`skill-one.indexTag`），用于锚定 SKILL.md 详情拉取并在「设置」页展示。下次启动立即用该缓存渲染，再把探测到的时间戳与存储的比较：相同则**完全跳过多 MB 的正文下载**。
 - 应用只是开着不动时，该探测也会被重复：每小时检查一次是否距上次完成的校验超过 12 小时（数据集每日发布一次），窗口重新可见时（例如系统休眠吞掉了若干次 tick）也会再查一次。整个过程不向用户索要任何操作——刷新是原地替换当前快照、不闪白屏，失败或没有变化的校验也完全不提——但**确实拉到了新快照时会顺带提示一句**，免得列表在眼皮底下变化被当成故障。当前快照身份上的 `checkedAt` 就是校验时间的来源（窗口即以此为基准），且**只有真正得到应答的探测才会写入它**，因此数据源不可达时下一次 tick 会自行重试。注意：周期性校验在解析不出标签时**绝不**回退到未锚定的正文下载（启动与强制重下才会）——探测没有应答就什么都不下载，原有数据原样保留，而不是凭猜测拉取整份索引。
-- [index-stream.ts](../src/lib/registry/index-stream.ts) 中的 `INDEX_SPEC` 固定 `repo` / `path: "skills.jsonl"` / `ref: "dist"`（上面的标签由每次下载注入），三个附属文件都相对它定址：`upstream/stats.json`、`upstream/trending.json`、`upstream/repos.jsonl`。
+- [index-stream.ts](../src/lib/registry/index-stream.ts) 中的 `INDEX_SPEC` 固定 `repo` / `path: "skills.jsonl"` / `ref: "dist"`（上面的标签由每次下载注入），两个附属文件都相对它定址：`upstream/stats.json`、`upstream/repos.jsonl`。
 - 解析后过滤掉非规范 GitHub id（非三段、owner 含 `.`）的行，其余映射为 `Skill` 模型。
 - 下载是流式的：响应体逐行解码，每凑齐一行就立即解析，界面不必等待整份约 6.9MB 的文件。进度最多每 400ms 推送一次；某个下载源中途失败、切换到下一个候选重新解析时活动缓冲区会被清空重头解析，因此推送出的计数是单调的，永远只增不减。
-- `upstream/trending.json`（趋势视图 top-100 的 id 列表，按上游排名排序）在标签确定后定址到同一快照标签拉取，保证榜单与索引发自同一快照。列表缺失或不可达时只是隐藏该板块。
-- `upstream/repos.jsonl`（GitHub star 数的 join 表，见上文）同样定址到同一快照标签拉取，与正文同时启动，因此其延迟隐藏在多 MB 的索引下载之内；解析出的行在解析阶段 join 进每一行技能数据。与 trending 一样它只是点缀：附属文件缺失或不可达时技能以 0 star 呈现，而不是让下载失败。「未变化」短路会完全跳过它——缓存里的技能早已带着各自的 star 数。join 失败的结果也绝不落缓存：只有 sidecar 真正应答过（空 map 算应答，null 不算）才写入冷启动缓存，因此本轮的 0 star 不会被带进下一轮；下次启动会重新下载并重试 join。
+- `upstream/repos.jsonl`（GitHub star 数的 join 表，见上文）同样定址到同一快照标签拉取，与正文同时启动，因此其延迟隐藏在多 MB 的索引下载之内；解析出的行在解析阶段 join 进每一行技能数据。它只是点缀：附属文件缺失或不可达时技能以 0 star 呈现，而不是让下载失败。「未变化」短路会完全跳过它——缓存里的技能早已带着各自的 star 数。join 失败的结果也绝不落缓存：只有 sidecar 真正应答过（空 map 算应答，null 不算）才写入冷启动缓存，因此本轮的 0 star 不会被带进下一轮；下次启动会重新下载并重试 join。
 
 ### 界面
 
 - 探索页在流式下载期间渐进渲染（计数显示为「N · 加载中」），侧边栏「全部」的数字随下载推进持续增长。
-- 依赖全量数据的页面——精选页的榜单排名与精选 join、「我的技能」的元数据 join——以「下载完成」为门控，在此之前保持骨架屏，因为部分数据会导致排名错误。
+- 依赖全量数据的页面——「我的技能」的元数据 join——以「下载完成」为门控，在此之前保持骨架屏，因为部分数据会解析出错误的技能。
 - 「设置」页报告当前服务的快照（`dist-<date>[-N]` 标签、发布时间、发布行数），以及本次启动是重新下载还是复用了本地缓存；在线身份到来之前会回退显示已记录的标签。它还会给出上次完成的校验时间（`checkedAt`），自动刷新的窗口正是以此为基准。「检测更新」按需执行同一套廉价校验（不受新鲜度窗口限制）并报告是否拉到了新快照；「立即重新下载」则即使快照没有变化也强制重下。
 
 技能详情 `SKILL.md` 从快照按 `skills/{id}/SKILL.md` 拉取，存在已记录标签时定址到该快照（否则用可变的 `dist` 分支），见 [../src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。

@@ -1,18 +1,14 @@
 import { createRegistryController } from "../lib/registry/worker-controller";
 import type {
-  FeaturedData,
   GroupsData,
   GroupsRequest,
-  RankingData,
-  RankingRequest,
   RegistryWorkerMessage,
   RepoSectionsData,
   SearchData,
-  SkillRef,
 } from "../lib/registry/protocol";
 import type { RegistrySnapshot } from "../lib/registry/client";
 import type { PublishedIndex } from "../lib/registry/index-stream";
-import type { Skill } from "../types/skill";
+import type { Skill, SkillRef } from "../types/skill";
 
 /**
  * In-memory stand-in for the registry worker, driven by the real controller:
@@ -44,15 +40,11 @@ export interface RegistryHarness {
   publishMeta(meta: PublishedIndex | null): void;
   /** Tag the most recent download was pinned to (undefined = branch). */
   readonly pinnedTag: string | undefined;
-  /** Advertise the trending id list the fake source serves (null = missing). */
-  publishTrending(ids: string[] | null): void;
   /** Make every RPC reject (worker crash stand-in) until cleared. */
   setRpcError(err: Error | null): void;
   searchSkills(query: string): Promise<SearchData>;
   getGroups(req: GroupsRequest): Promise<GroupsData>;
   getRepoSections(): Promise<RepoSectionsData>;
-  getFeatured(): Promise<FeaturedData>;
-  getRanking(req: RankingRequest): Promise<RankingData>;
   lookupSkills(refs: SkillRef[]): Promise<{ entries: Array<Skill | null> }>;
   getSnapshot(): RegistrySnapshot;
   subscribe(listener: () => void): () => void;
@@ -101,8 +93,6 @@ export function createRegistryHarness(): RegistryHarness {
   let published: PublishedIndex | null = null;
   /** Tag the newest download was pinned to (undefined = branch fallback). */
   let pinnedTag: string | undefined;
-  /** The trending id list the fake source serves; null = file missing. */
-  let trending: string[] | null = null;
 
   const replies = new Map<
     number,
@@ -132,7 +122,6 @@ export function createRegistryHarness(): RegistryHarness {
           });
         },
         probeMeta: async () => published,
-        readTrending: async () => trending,
         readRepos: async () => null,
         cache: {
           load: async () => null,
@@ -183,8 +172,6 @@ export function createRegistryHarness(): RegistryHarness {
       | "searchSkills"
       | "getGroups"
       | "getRepoSections"
-      | "getFeatured"
-      | "getRanking"
       | "lookupSkills",
     payload?: unknown,
   ): Promise<T> {
@@ -238,9 +225,6 @@ export function createRegistryHarness(): RegistryHarness {
     get pinnedTag() {
       return pinnedTag;
     },
-    publishTrending(ids) {
-      trending = ids;
-    },
     setRpcError(err) {
       rpcError = err;
     },
@@ -252,12 +236,6 @@ export function createRegistryHarness(): RegistryHarness {
     },
     getRepoSections() {
       return request<RepoSectionsData>("getRepoSections");
-    },
-    getFeatured() {
-      return request<FeaturedData>("getFeatured");
-    },
-    getRanking(req) {
-      return request<RankingData>("getRanking", req);
     },
     lookupSkills(refs) {
       return request<{ entries: Array<Skill | null> }>("lookupSkills", {
@@ -282,7 +260,6 @@ export function createRegistryHarness(): RegistryHarness {
       earlyError = undefined;
       published = null;
       pinnedTag = undefined;
-      trending = null;
       controller = spawnController();
     },
   };
@@ -297,8 +274,6 @@ export function createRegistryClientMock(harness: RegistryHarness) {
     searchSkills: (query: string) => harness.searchSkills(query),
     getGroups: (req: GroupsRequest) => harness.getGroups(req),
     getRepoSections: () => harness.getRepoSections(),
-    getFeatured: () => harness.getFeatured(),
-    getRanking: (req: RankingRequest) => harness.getRanking(req),
     lookupSkills: (refs: SkillRef[]) => harness.lookupSkills(refs),
     getRegistrySnapshot: () => harness.getSnapshot(),
     subscribeRegistry: (listener: () => void) => harness.subscribe(listener),

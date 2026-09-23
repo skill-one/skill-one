@@ -536,8 +536,8 @@ export function ExplorePage() {
       </div>
 
       {/* Modal detail drawer; the wiring (open/close, prev/next bounds) is
-          shared with the featured page. It walks the flat skill list over all
-          groups, rendered or not yet rendered. */}
+          shared with the my-skills page. It walks the flat skill list over
+          all groups, rendered or not yet rendered. */}
       <SkillDetailDrawer
         skills={flatSkills}
         selected={selected}

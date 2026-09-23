@@ -89,8 +89,8 @@ describe("AppSidebar update badge", () => {
     expect(badge.closest("li")).toContainElement(
       screen.getByRole("button", { name: "设置" }),
     );
-    // 精选 · 全部 · 我的 skills — and nothing else; 设置 is a popover trigger.
-    expect(screen.getAllByRole("link")).toHaveLength(3);
+    // 商店 · 我的 skills — and nothing else; 设置 is a popover trigger.
+    expect(screen.getAllByRole("link")).toHaveLength(2);
   });
 
   it("opens the confirmation dialog from wherever the user is", async () => {

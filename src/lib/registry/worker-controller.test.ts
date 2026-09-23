@@ -1,31 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
-
-// The curated sections are resolved against the registry by repo + name;
-// stub them with references the test dataset actually contains.
-vi.mock("../../data/featured-content", () => ({
-  FEATURED_CATEGORIES: [
-    {
-      id: "curated",
-      title: "Curated",
-      skills: [
-        { repo: "acme/alpha", name: "alpha" },
-        { repo: "acme/beta", name: "beta" },
-      ],
-    },
-    {
-      id: "curated-2",
-      title: "Curated 2",
-      skills: [{ repo: "acme/alpha", name: "alpha" }],
-    },
-  ],
-}));
+import { describe, it, expect } from "vitest";
 
 import { createRegistryController } from "./worker-controller";
 import type { CachedIndex, RegistryCache } from "./cache";
 import type { PublishedIndex } from "./index-stream";
 import type { RegistryWorkerMessage, RevalidateResult } from "./protocol";
 import type { Skill } from "../../types/skill";
-import { formatCount } from "../utils";
 
 /** Deterministic skill factory; `i` varies name, repo and metrics. */
 function skill(i: number, over: Partial<Skill> = {}): Skill {
@@ -68,8 +47,6 @@ function setup(options?: {
   now?: () => number;
   /** What the sources advertise as published; null = probe found nothing. */
   published?: PublishedIndex | null;
-  /** What the trending source serves; null (default) = list unavailable. */
-  trending?: string[] | null;
   /**
    * What the repos.jsonl source serves (the stars join); null (default) =
    * sidecar unavailable.
@@ -122,7 +99,6 @@ function setup(options?: {
     {
       probeMeta: async () => options?.published ?? null,
       readIndex,
-      readTrending: async () => options?.trending ?? null,
       // Default: the sidecar answered (an empty map is a valid join); pass
       // `stars: null` to simulate an unreachable repos.jsonl. `??` alone
       // would fall through on null, so the guard is explicit.
@@ -790,58 +766,7 @@ describe("createRegistryController — getRepoSections", () => {
   });
 });
 
-describe("createRegistryController — featured + lookup", () => {
-  it("computes hero slides and resolves the curated sections", async () => {
-    const t = setup({
-      skills: [
-        { ...skill(0), name: "alpha", repo: "acme/alpha", downloads: 500 },
-        { ...skill(1), name: "beta", repo: "acme/beta", downloads: 100 },
-      ],
-      // Upstream rank order differs from the downloads order — trending wins.
-      trending: ["acme/beta/beta", "acme/alpha/alpha"],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({ type: "getFeatured", id: 1 });
-    const data = resultData<{
-      slides: Array<{ id: string; entries: Array<{ skill: Skill }> }>;
-      sections: Array<{ id: string; skills: Skill[] }>;
-    }>(t.recorded.results[0]);
-    // The trending board exists and follows the upstream id order.
-    const trending = data.slides.find((s) => s.id === "trending");
-    expect(trending?.entries.map((e) => e.skill.name)).toEqual([
-      "beta",
-      "alpha",
-    ]);
-    // Curated references resolve against the registry by identity, in
-    // curation order, and unresolved ones are dropped — the sections carry the
-    // skills themselves because the detail drawer walks them by identity.
-    expect(
-      data.sections.map((section) =>
-        section.skills.map((entry) => `${entry.repo}/${entry.name}`),
-      ),
-    ).toEqual([
-      ["acme/alpha/alpha", "acme/beta/beta"],
-      ["acme/alpha/alpha"],
-    ]);
-  });
-
-  it("omits the trending slide when no trending list was served", async () => {
-    const t = setup({
-      skills: [{ ...skill(0), name: "alpha", repo: "acme/alpha" }],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({ type: "getFeatured", id: 1 });
-    const data = resultData<{
-      slides: Array<{ id: string }>;
-    }>(t.recorded.results[0]);
-
-    expect(data.slides.map((s) => s.id)).toEqual(["popular"]);
-  });
-
+describe("createRegistryController — lookup", () => {
   it("resolves installed-skill refs by name and by path basename", async () => {
     const t = setup({
       skills: [
@@ -942,130 +867,6 @@ describe("createRegistryController — featured + lookup", () => {
   });
 });
 
-describe("createRegistryController — getRanking", () => {
-  /** Boot a complete registry of `n` ranked skills (skill-0 leads). */
-  async function boot(n: number, trending?: string[] | null) {
-    const t = setup({
-      skills: Array.from({ length: n }, (_, i) =>
-        skill(i, { downloads: (n - i) * 1_000 }),
-      ),
-      trending,
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-    return t;
-  }
-
-  it("returns the trending leaderboard in upstream order", async () => {
-    // Upstream ranks the *least* downloaded skill first: its order, not the
-    // registry's, decides the leaderboard.
-    // skill(2) lives in owner-2/repo-0 (the factory's repo = i % 2).
-    const t = await boot(3, [
-      "owner-2/repo-0/skill-2",
-      "owner-0/repo-0/skill-0",
-      "missing/repo/x",
-    ]);
-
-    t.controller.handle({
-      type: "getRanking",
-      id: 1,
-      payload: { rankingId: "trending" },
-    });
-    const data = resultData<{
-      id: string;
-      entries: Array<{ rank: number; skill: Skill; label: string }>;
-      total: number;
-    }>(t.recorded.results[0]);
-
-    expect(data.id).toBe("trending");
-    expect(data.entries.map((e) => e.skill.name)).toEqual([
-      "skill-2",
-      "skill-0",
-    ]);
-    expect(data.entries.map((e) => e.rank)).toEqual([1, 2]);
-    // Upstream decides the order; the number is the row's own install count.
-    expect(data.entries[0].label).toBe("1K");
-    expect(data.total).toBe(2);
-  });
-
-  it("returns the popular leaderboard ranked, truncated and counted", async () => {
-    const t = await boot(150);
-
-    t.controller.handle({
-      type: "getRanking",
-      id: 1,
-      payload: { rankingId: "popular" },
-    });
-    const data = resultData<{
-      id: string;
-      entries: Array<{ rank: number; skill: Skill; label: string }>;
-      total: number;
-    }>(t.recorded.results[0]);
-
-    expect(data.id).toBe("popular");
-    // Truncated to the page size, but counted in full.
-    expect(data.entries).toHaveLength(100);
-    expect(data.total).toBe(150);
-    // Each label is the row metric, and the ranks follow it descending. Which
-    // skill leads is the metric's business, so this asserts the wiring rather
-    // than one tie-prone name.
-    const values = data.entries.map((e) => e.skill.downloads);
-    expect(data.entries.map((e) => e.label)).toEqual(values.map(formatCount));
-    expect(values).toEqual([...values].toSorted((a, b) => b - a));
-    expect(data.entries[0]).toMatchObject({ rank: 1 });
-    expect(data.entries[99]).toMatchObject({ rank: 100 });
-  });
-
-  it("carries the leaderboard's own presentation", async () => {
-    const t = await boot(5);
-
-    t.controller.handle({
-      type: "getRanking",
-      id: 1,
-      payload: { rankingId: "popular" },
-    });
-    const data = resultData<{ title: string; gradient: string }>(
-      t.recorded.results[0],
-    );
-
-    expect(data.title).toBe("安装量总榜");
-    expect(data.gradient).toContain("gradient");
-  });
-
-  it("answers with an empty leaderboard instead of failing", async () => {
-    // No trending list was served, so the trending board has no entries.
-    const t = await boot(5, null);
-
-    t.controller.handle({
-      type: "getRanking",
-      id: 1,
-      payload: { rankingId: "trending" },
-    });
-    const data = resultData<{ entries: unknown[]; total: number }>(
-      t.recorded.results[0],
-    );
-
-    expect(data.entries).toEqual([]);
-    expect(data.total).toBe(0);
-  });
-
-  it("rejects an unknown leaderboard id", async () => {
-    const t = await boot(5);
-
-    t.controller.handle({
-      type: "getRanking",
-      id: 1,
-      payload: { rankingId: "nope" },
-    });
-
-    expect(t.recorded.results[0]).toMatchObject({
-      ok: false,
-      id: 1,
-      error: "未知榜单：nope",
-    });
-  });
-});
-
 describe("createRegistryController — failures", () => {
   it("resets to an empty registry and surfaces the error without prior data", async () => {
     const t = setup();
@@ -1127,90 +928,5 @@ describe("createRegistryController — failures", () => {
     // the stale stream's single skill.
     expect(t.recorded.readyCount).toBe(0);
     expect(t.controller.stats().complete).toBe(false);
-  });
-});
-
-describe("createRegistryController — classification", () => {
-  /** A skill carrying the classification its index row shipped. */
-  const classified = (i: number, domain: string[]): Skill =>
-    skill(i, { profile: { domain } });
-
-  it("builds featured sections from the real domains", async () => {
-    const t = setup({
-      skills: [
-        classified(0, ["development"]),
-        classified(1, ["development"]),
-        classified(2, ["content-creation"]),
-      ],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({ type: "getFeatured", id: 1 });
-    const featured = resultData<{
-      sections: Array<{ id: string; skills: Skill[] }>;
-    }>(t.recorded.results[0]);
-
-    // Sections are the real domains, most-populated first, skills within a
-    // section led by the most installed.
-    expect(featured.sections.map((s) => s.id)).toEqual([
-      "development",
-      "content-creation",
-    ]);
-    expect(featured.sections[0].skills.map((s) => s.name)).toEqual([
-      "skill-0",
-      "skill-1",
-    ]);
-    expect(featured.sections[1].skills.map((s) => s.name)).toEqual([
-      "skill-2",
-    ]);
-  });
-
-  it("skips the catch-all domain when leading the featured sections", async () => {
-    const t = setup({
-      skills: [
-        classified(0, ["development"]),
-        classified(1, ["other"]),
-        skill(2),
-      ],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({ type: "getFeatured", id: 1 });
-    const featured = resultData<{
-      sections: Array<{ id: string; skills: Skill[] }>;
-    }>(t.recorded.results[0]);
-
-    // "other" classifies nothing on its own, so it never leads a section.
-    expect(featured.sections.map((s) => s.id)).toEqual(["development"]);
-  });
-
-  it("falls back to curated featured sections when nothing is classified", async () => {
-    // Skills shaped to match the mocked FEATURED_CATEGORIES refs, but with no
-    // classification: the domain sections cannot be built, so the hand-curated
-    // ones answer instead.
-    const t = setup({
-      skills: [
-        { ...skill(0), name: "alpha", repo: "acme/alpha" },
-        { ...skill(1), name: "beta", repo: "acme/beta" },
-      ],
-    });
-    t.controller.init({ cdnBase: "test" });
-    await t.flush();
-
-    t.controller.handle({ type: "getFeatured", id: 1 });
-    const featured = resultData<{
-      sections: Array<{ id: string; skills: Skill[] }>;
-    }>(t.recorded.results[0]);
-
-    expect(featured.sections.map((s) => s.id)).toEqual([
-      "curated",
-      "curated-2",
-    ]);
-    expect(featured.sections[0].skills.map((s) => s.name)).toEqual([
-      "alpha",
-      "beta",
-    ]);
   });
 });

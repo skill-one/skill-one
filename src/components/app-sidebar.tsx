@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router";
-import { Sparkles, LayoutGrid, Boxes } from "lucide-react";
+import { LayoutGrid, Boxes } from "lucide-react";
 
 import {
   Sidebar,
@@ -7,7 +7,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuBadge,
@@ -24,33 +23,18 @@ interface NavItem {
   path: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  /**
-   * "prefix" keeps the item active for its sub-routes too (e.g. 精选 stays
-   * highlighted on a leaderboard page). Only opt in where the item owns a
-   * page family — a plain startsWith would light up 全部 for every /explore/*
-   * path, since /explore is a prefix of them.
-   */
-  match?: "prefix";
 }
 
-const shopItems: NavItem[] = [
-  {
-    path: "/explore/featured",
-    label: "精选",
-    icon: Sparkles,
-    match: "prefix",
-  },
-  { path: "/explore", label: "全部", icon: LayoutGrid },
-];
-
-const mySkillsItems: NavItem[] = [
+/** The sidebar's two destinations: the store, and the installed skills. */
+const navItems: NavItem[] = [
+  { path: "/explore", label: "商店", icon: LayoutGrid },
   { path: "/my-skills", label: "我的 skills", icon: Boxes },
 ];
 
 /**
- * Real badge counts: Shop "全部" = registry total, "My Skills → 全局" =
- * installed skill count. Pages without a count source (精选) show no badge.
- * The badge is not rendered while its data is loading, avoiding a flash of 0.
+ * Real badge counts: 商店 = registry total, 我的 skills = installed skill
+ * count. A badge is not rendered while its data is loading, avoiding a flash
+ * of 0.
  *
  * The registry count is progressive: it mirrors the registry worker's
  * progress count, so it reports the skills parsed so far and climbs as the
@@ -79,10 +63,7 @@ function NavMenuItem({
   count?: number;
 }) {
   const location = useLocation();
-  const isActive =
-    location.pathname === item.path ||
-    (item.match === "prefix" &&
-      location.pathname.startsWith(`${item.path}/`));
+  const isActive = location.pathname === item.path;
   const Icon = item.icon;
 
   return (
@@ -131,24 +112,9 @@ export function AppSidebar() {
       <BrandHeader />
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>商店</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {shopItems.map((item) => (
-                <NavMenuItem
-                  key={item.label}
-                  item={item}
-                  count={counts[item.path]}
-                />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>管理</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mySkillsItems.map((item) => (
+              {navItems.map((item) => (
                 <NavMenuItem
                   key={item.label}
                   item={item}

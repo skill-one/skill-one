@@ -22,7 +22,6 @@ vi.mock("./lib/registry/client", () => ({
   reloadRegistry: vi.fn(),
   revalidateRegistry: vi.fn(() => new Promise(() => {})),
   searchSkills: vi.fn(() => new Promise(() => {})),
-  getFeatured: vi.fn(() => new Promise(() => {})),
   lookupSkills: vi.fn(() => new Promise(() => {})),
   getRegistrySnapshot: () => INITIAL_SNAPSHOT,
   subscribeRegistry: vi.fn(() => () => {}),

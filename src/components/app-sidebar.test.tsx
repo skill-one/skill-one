@@ -63,29 +63,28 @@ describe("AppSidebar", () => {
     renderSidebar();
 
     expect(screen.getByText("Skill One")).toBeInTheDocument();
-    expect(screen.getByText("精选")).toBeInTheDocument();
-    expect(screen.getByText("全部")).toBeInTheDocument();
+    expect(screen.getByText("商店")).toBeInTheDocument();
     expect(screen.getByText("我的 skills")).toBeInTheDocument();
     expect(screen.getByText("设置")).toBeInTheDocument();
   });
 
-  it("shows the registry total on 全部 and the installed count on 全局", async () => {
+  it("shows the registry total on 商店 and the installed count on 我的 skills", async () => {
     await boot(registryOf(400));
     harness.complete();
     await act(async () => {});
     renderSidebar();
 
-    // Mock skills are installed (see ../lib/mock-local): 全部 shows the
-    // registry total (400); 精选 has no count source and shows none.
+    // Mock skills are installed (see ../lib/mock-local): 商店 shows the
+    // registry total (400) and 我的 skills the installed count (6).
     expect(await screen.findByText("400")).toBeInTheDocument();
     expect(await screen.findByText("6")).toBeInTheDocument();
   });
 
-  it("omits badges for pages without a count source and hides badges before data loads", async () => {
+  it("hides the registry badge before any data loads", async () => {
     renderSidebar();
 
     // No registry data yet → no 400 badge; the installed skills render sync
-    // from the mock store, so 全局 still shows 6.
+    // from the mock store, so 我的 skills still shows 6.
     expect(screen.queryByText("400")).not.toBeInTheDocument();
     expect(await screen.findByText("6")).toBeInTheDocument();
   });

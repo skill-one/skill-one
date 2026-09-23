@@ -6,7 +6,6 @@ import {
   readIndex,
   readLines,
   readRepos,
-  readTrending,
 } from "./index-stream";
 import { readLatestTag } from "./snapshot";
 
@@ -320,68 +319,6 @@ describe("probeIndexMeta", () => {
       return statsResponse("<html>");
     });
     await expect(probeIndexMeta("")).resolves.toBeNull();
-  });
-});
-
-describe("readTrending", () => {
-  const ORIGIN_TRENDING =
-    "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/upstream/trending.json";
-  const TAG = "dist-2026-09-06";
-  const PINNED_TRENDING = `https://raw.githubusercontent.com/skill-one/skills-profiles/${TAG}/upstream/trending.json`;
-
-  const fetchMock = vi.fn();
-
-  beforeEach(() => {
-    vi.stubGlobal("fetch", fetchMock);
-    fetchMock.mockReset();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("returns the id list cache-busted from the mutable branch", async () => {
-    const ids = ["a/b/c", "d/e/f"];
-    fetchMock.mockImplementation(async () => {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ids,
-      } as unknown as Response;
-    });
-
-    expect(await readTrending("")).toEqual(ids);
-    expect(fetchMock.mock.calls[0][0]).toMatch(`${ORIGIN_TRENDING}?t=`);
-  });
-
-  it("pins the fetch to the snapshot tag without busting", async () => {
-    const ids = ["a/b/c"];
-    fetchMock.mockImplementation(async () => {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ids,
-      } as unknown as Response;
-    });
-
-    expect(await readTrending("", TAG)).toEqual(ids);
-    // The tag-addressed URL is immutable: fetched untouched, no bust stamp.
-    expect(fetchMock.mock.calls[0][0]).toBe(PINNED_TRENDING);
-  });
-
-  it("returns null when every source fails or serves a malformed list", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      // First candidate: 404 (a snapshot from before the file existed).
-      // Second candidate: not an id array.
-      if (url.startsWith(ORIGIN_TRENDING)) return { ok: false, status: 404 };
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({ trending: [] }),
-      } as unknown as Response;
-    });
-
-    await expect(readTrending("")).resolves.toBeNull();
   });
 });
 
