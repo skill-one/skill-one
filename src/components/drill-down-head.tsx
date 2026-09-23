@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 import { useReturn } from "../hooks/use-return";
 import {
@@ -25,7 +25,7 @@ import {
  * repository, not at the title bar above it. The rail still says which list the
  * page belongs to — it lights that list up for the whole time the page is
  * mounted — so the control names no destination, and it does not print the word
- * 返回 beside the arrow either: on a row whose other half is a name the reader
+ * 返回 beside the mark either: on a row whose other half is a name the reader
  * is trying to read, a word whose meaning they can already see is noise. The
  * word moves to where a mark that cannot say it itself says it — the control's
  * accessible name and its hover tip — which is the arrangement the list's own
@@ -69,7 +69,13 @@ export function DrillDownHead({
   return (
     <div className="mb-4 flex min-w-0 items-center gap-3">
       {/* The mark alone, in a square the size the app's other icon-only
-          controls wear (see `SkillInstallButton`). It is a plain `<Link>` so a
+          controls wear (see `SkillInstallButton`). The mark is a chevron, not a
+          full arrow, for two reasons that are both about this row: the reader
+          got here by pressing a card's `›` door (see `RepoCard`), so `‹` is the
+          inverse of the exact mark that brought them — go in with one, come out
+          with the other — and a chevron carries less ink than an arrow in the
+          same box, which is what keeps an icon this size from reading heavier
+          than the 18px name it stands beside. It is a plain `<Link>` so a
           modified click, or assistive tech reading it, gets the destination the
           fallback names — the hook only intercepts the plain clicks it is for —
           and `aria-label` is what keeps the word 返回 attached to it, the tip
@@ -85,7 +91,7 @@ export function DrillDownHead({
             />
           }
         >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
+          <ChevronLeft className="h-4.5 w-4.5" aria-hidden />
         </TooltipTrigger>
         {/* Below the control: it opens the page, on the first row the content
             has, so the tip has nowhere to go but down. */}
