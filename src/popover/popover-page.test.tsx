@@ -56,7 +56,6 @@ const fetchInstalledSkillsMock = vi.mocked(fetchInstalledSkills);
 function skill(overrides: Partial<InstalledSkill>): InstalledSkill {
   return {
     name: "pdf",
-    path: "/skills/pdf",
     enabled: true,
     description: "PDF 工具",
     ...overrides,

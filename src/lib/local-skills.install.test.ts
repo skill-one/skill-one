@@ -27,19 +27,18 @@ afterEach(() => {
 });
 
 describe("installSkillFromSource", () => {
-  it("hands the owner/repo source to the backend's GitHub install (Tauri)", async () => {
+  it("hands the owner/repo@<skill> source to the backend's install (Tauri)", async () => {
     isTauri.mockReturnValue(true);
-    installSkill.mockResolvedValue({
-      installed: ["pdf"],
-      skipped: [],
-      failed: [],
-    });
+    installSkill.mockResolvedValue({ skill: "pdf", skipped: false });
 
     await installSkillFromSource("anthropics/skills", "pdf", {
       rev: "rev-at-install",
     });
 
-    expect(installSkill).toHaveBeenCalledWith("anthropics/skills", ["pdf"]);
+    // Since agents-skills 0.21 the source carries the skill: one source is one
+    // skill, matched on the directory basename — which is what the store's
+    // slug already is.
+    expect(installSkill).toHaveBeenCalledWith("anthropics/skills@pdf");
     // The install source lands in the provenance ledger (Tauri path) with
     // the store-side content hash as the installed version marker.
     expect(recordSkillProvenance).toHaveBeenCalledWith(
@@ -51,11 +50,7 @@ describe("installSkillFromSource", () => {
 
   it("records the install without a hash when the entry carries no rev", async () => {
     isTauri.mockReturnValue(true);
-    installSkill.mockResolvedValue({
-      installed: ["pdf"],
-      skipped: [],
-      failed: [],
-    });
+    installSkill.mockResolvedValue({ skill: "pdf", skipped: false });
 
     await installSkillFromSource("anthropics/skills", "pdf");
 
@@ -66,41 +61,36 @@ describe("installSkillFromSource", () => {
     );
   });
 
-  it("throws the backend failure when the install reports an error", async () => {
+  it("propagates the backend's install failure", async () => {
+    // One source is one skill, so a failure is this call's rejection — there
+    // is no per-skill outcome list to inspect, and nothing to translate: the
+    // library's message is what the reader sees.
     isTauri.mockReturnValue(true);
-    installSkill.mockResolvedValue({
-      installed: [],
-      skipped: [],
-      failed: [{ skill: "pdf", error: "clone failed: network unreachable" }],
-    });
+    installSkill.mockRejectedValue(
+      new Error("download failed: network unreachable"),
+    );
 
     await expect(
       installSkillFromSource("anthropics/skills", "pdf"),
-    ).rejects.toThrow("clone failed: network unreachable");
+    ).rejects.toThrow("download failed: network unreachable");
   });
 
-  it("throws when the named skill is not found in the source repo", async () => {
+  it("propagates the backend's refusal of an unresolvable source", async () => {
     isTauri.mockReturnValue(true);
-    installSkill.mockResolvedValue({
-      installed: [],
-      skipped: [],
-      failed: [],
-    });
+    installSkill.mockRejectedValue(
+      new Error("no directory named missing in anthropics/skills"),
+    );
 
     await expect(
       installSkillFromSource("anthropics/skills", "missing"),
-    ).rejects.toThrow("未在 anthropics/skills 中找到可安装的技能 missing");
+    ).rejects.toThrow("no directory named missing");
   });
 
   it("treats an already-installed skill as a no-op, not a failure", async () => {
     // Since agents-skills 0.17 `add` never overwrites: a same-named skill comes
-    // back in `skipped`, which must not read as "not found in the repo".
+    // back as `skipped`, which must not read as a failure.
     isTauri.mockReturnValue(true);
-    installSkill.mockResolvedValue({
-      installed: [],
-      skipped: ["pdf"],
-      failed: [],
-    });
+    installSkill.mockResolvedValue({ skill: "pdf", skipped: true });
 
     await installSkillFromSource("anthropics/skills", "pdf", { rev: "rev-1" });
 
@@ -131,17 +121,15 @@ describe("installSkillFromSource", () => {
     );
   });
 
-  it("does not record provenance when the backend reports a failure", async () => {
+  it("does not record provenance when the install fails", async () => {
     isTauri.mockReturnValue(true);
-    installSkill.mockResolvedValue({
-      installed: [],
-      skipped: [],
-      failed: [{ skill: "pdf", error: "clone failed: network unreachable" }],
-    });
+    installSkill.mockRejectedValue(
+      new Error("download failed: network unreachable"),
+    );
 
     await expect(
       installSkillFromSource("anthropics/skills", "pdf"),
-    ).rejects.toThrow("clone failed: network unreachable");
+    ).rejects.toThrow("download failed: network unreachable");
 
     expect(recordSkillProvenance).not.toHaveBeenCalled();
   });

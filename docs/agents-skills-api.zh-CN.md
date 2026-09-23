@@ -2,7 +2,7 @@
 
 [English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
-本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.19 的
+本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.22 的
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
 门面，将技能安装与 agent 链接能力暴露给前端。前端经 `src/lib/skills-manager.ts`
 的 `invoke` 封装访问这些 Tauri 命令。
@@ -13,12 +13,12 @@
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.19"
+agents-skills = "0.22"
 ```
 
-## 0.15–0.19 的主要变化
+## 0.15–0.22 的主要变化
 
-本项目最初基于 0.14 编写，之后跨越了五个 breaking 版本。下表的变化均已在
+本项目最初基于 0.14 编写，之后跨越了八个 breaking 版本。下表的变化均已在
 `skills.rs` 中体现：
 
 | 版本 | 变化 | 对本项目的影响 |
@@ -28,6 +28,9 @@ agents-skills = "0.19"
 | 0.17 | `add` 不再覆盖（新增 `AddOutcome.skipped`）；移除项目级作用域 | `global` 系列字段、`ListRequest`、`Agent.skills_dir`、`is_universal()` 删除；`Manager::list` 不再接收请求 |
 | 0.18 | `list` 短暂新增 `estimated_tokens` | 在其存在的一天里，详情抽屉展示了描述常驻上下文的估算开销 |
 | 0.19 | 回退 0.18 的 token 估算：`ListedSkill.estimated_tokens` 与整个 `core::tokens` 模块删除 | `list` 回到 0.16 的形态，应用侧的镜像字段随之删除 |
+| 0.20 | `ListedSkill.name` 改为技能在磁盘上的目录名，且 `ListedSkill` / `list --json` 移除 `path`（改用新的 `Manager::skill_dir` 解析目录） | 应用的 DTO 随之删除 `path`；`read_skill_md` 与 `compute_skill_hash` 改经 `skill_dir` 解析目录 |
+| 0.21 | 一个 source 只对应一个技能：`AddRequest` 缩减为 `{ source, reference }`，`AddOutcome` 缩减为 `{ source, skill, canonical_path, skipped }`，失败改为返回 `Err`（`InstallSuccess` / `InstallFailure` 删除）；source 只剩本地技能目录与 `owner/repo@<skill>` 两种形式，远程安装改走 GitHub API（git clone / zip / tar / URL 等 source 形式删除） | `install_skill` 只接收一个 `source` 字符串，返回 `{ skill, skipped }`；安装失败即命令的 `Err`，也就是前端的 rejection |
+| 0.22 | 技能的身份永远是目录 basename——`SKILL.md` frontmatter 的 `name` 不再被读取或参与匹配；`owner/repo@<skill>` 在仓库树中按 basename（不区分大小写）匹配最浅的目录，只下载该目录；缺失或无法解析的 `SKILL.md` 不再致命 | 商店的 skill slug 原样放进 source；其余无需改动 |
 
 ### 更早的变化
 
@@ -72,7 +75,7 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // 沙盒
 
 | Tauri 命令 | 请求构造（`skills.rs`） |
 | --- | --- |
-| `install_skill` | `AddRequest { source, skills, list_only: false }` |
+| `install_skill` | `AddRequest::new(source)`——`source` 即 `owner/repo@<skill>` |
 | `list_installed_skills` | `manager.list()` |
 | `remove_skills` | `RemoveRequest { skills, all: false }` |
 | `set_skills_enabled` | `DisableRequest` / `EnableRequest { skills, all }` |
@@ -81,15 +84,16 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // 沙盒
 
 ## 消费到的返回字段
 
-- **`AddOutcome`**：应用只读取 `installed`（仅取名字——返回的路径就是刚写入的规范
-  目录）、`skipped`（同名已安装、因此原样保留的技能名）与 `failed`（`skill` +
-  `error`）。应用从不请求 `list_only`，因此丢弃 `skills`（发现列表）：调用方已经点名
-  要装哪个技能，`installed` + `skipped` 就足以回答它有没有到位。
-- **`ListedSkill`**：`name`、`description`（单行，库自身已折叠块标量）、
-  `path`（技能**当前**所在目录，被停用的技能即 `disabled-skills`）、`enabled`、
+- **`AddOutcome`**：应用只读取 `skill.name`（安装后技能的磁盘目录名——即
+  `remove` / `disable` / `enable` 使用的身份）与 `skipped`（同名技能已存在——无论
+  启用还是停用——因此未复制任何内容）。安装失败不会以 DTO 形式出现：`add` 返回
+  `Err`，它成为命令的 `Err`、也就是前端的 rejection，库给出的错误信息就是读者看到的
+  失败原因。
+- **`ListedSkill`**：`name`、`description`（单行，库自身已折叠块标量）、`enabled`、
   `installed_at`（`Option<u64>`，Unix 秒；不记录创建时间的文件系统为 `None`）。
-  应用把这五个字段原样透传为 `ListedSkillDto`——本地不再提取任何内容。
-  （`estimated_tokens` 仅在 0.18 到 0.19 之间短暂存在。）
+  应用把这四个字段原样透传为 `ListedSkillDto`——本地不再提取任何内容。
+  （`path` 在 0.19 及之前存在，0.20 起改用 `Manager::skill_dir` 解析目录；
+  `estimated_tokens` 仅在 0.18 到 0.19 之间短暂存在。）
 - **`AgentOutcome`**：`results: Vec<AgentLinkResult>`；每条 `AgentLinkResult` 含
   `agent`、`display`、`outcome: LinkOutcome`。
 - **`AgentStatus`**：`name`、`display`、`linked`、`canonical`、`internal_skills`、

@@ -4,7 +4,7 @@
 
 Through the Tauri backend (`src-tauri/src/skills.rs`), this project calls the
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
-facade of `agents-skills` v0.19 to expose skill installation and agent-linking
+facade of `agents-skills` v0.22 to expose skill installation and agent-linking
 capabilities to the frontend. The frontend reaches these Tauri commands via the
 `invoke` wrapper in `src/lib/skills-manager.ts`.
 
@@ -14,12 +14,12 @@ capabilities to the frontend. The frontend reaches these Tauri commands via the
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.19"
+agents-skills = "0.22"
 ```
 
-## What 0.15–0.19 changed
+## What 0.15–0.22 changed
 
-Five breaking releases separate the API this app was written against (0.14)
+Eight breaking releases separate the API this app was written against (0.14)
 from the current one. Everything below is reflected in `skills.rs`:
 
 | Version | Change | Effect here |
@@ -29,6 +29,9 @@ from the current one. Everything below is reflected in `skills.rs`:
 | 0.17 | `add` never overwrites (`AddOutcome.skipped`); project scope removed | `global` flags, `ListRequest`, `Agent.skills_dir`, `is_universal()` gone; `Manager::list` takes no request |
 | 0.18 | `list` briefly reported `estimated_tokens` | The drawer showed the description's resident context cost for the day this existed |
 | 0.19 | 0.18's token estimate reverted: `ListedSkill.estimated_tokens` and the whole `core::tokens` module removed | `list` is back to its 0.16 shape, and the app's mirror of the field was removed with it |
+| 0.20 | `ListedSkill.name` is the on-disk directory name, and `path` is gone from `ListedSkill` / `list --json` (resolve a directory with the new `Manager::skill_dir`) | The app's DTO drops `path` with it; `read_skill_md` and `compute_skill_hash` resolve the directory through `skill_dir` |
+| 0.21 | One source is one skill: `AddRequest` reduced to `{ source, reference }`, `AddOutcome` reduced to `{ source, skill, canonical_path, skipped }`, failures returned as `Err` (`InstallSuccess` / `InstallFailure` gone); sources reduced to a local skill directory or `owner/repo@<skill>`, resolved through the GitHub API (git clone / zip / tar / URL sources removed) | `install_skill` takes one `source` string and returns `{ skill, skipped }`; a failed install is the command's `Err` and the frontend's rejection |
+| 0.22 | A skill's identity is always its directory basename — the `SKILL.md` frontmatter `name` is no longer read or matched anywhere; `owner/repo@<skill>` searches the repository tree for a directory whose basename matches (shallowest wins) and downloads only that directory; a missing or unparseable `SKILL.md` is no longer fatal | The store's skill slug is sent verbatim inside the source; nothing else had to change |
 
 ### Earlier changes
 
@@ -79,7 +82,7 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // sandboxed
 
 | Tauri command | Request construction (`skills.rs`) |
 | --- | --- |
-| `install_skill` | `AddRequest { source, skills, list_only: false }` |
+| `install_skill` | `AddRequest::new(source)` — `source` is `owner/repo@<skill>` |
 | `list_installed_skills` | `manager.list()` |
 | `remove_skills` | `RemoveRequest { skills, all: false }` |
 | `set_skills_enabled` | `DisableRequest` / `EnableRequest { skills, all: false }` |
@@ -88,19 +91,19 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // sandboxed
 
 ## Consumed return fields
 
-- **`AddOutcome`**: the app reads `installed` (names only — a returned path
-  would be the canonical dir it just wrote into), `skipped` (names left
-  untouched because they are already installed) and `failed` (`skill` +
-  `error`). It never asks for `list_only`, so `skills` (the discovered list) is
-  dropped: the caller named the skill it wanted, and `installed` + `skipped`
-  already answer whether that one arrived.
+- **`AddOutcome`**: the app reads `skill.name` (the installed skill's on-disk
+  directory name — the identity `remove` / `disable` / `enable` use) and
+  `skipped` (nothing was copied because the same name is already installed,
+  enabled or parked). A failed install never reaches a DTO: `add` returns
+  `Err`, which becomes the command's `Err` and the frontend's rejection, the
+  library's message riding along as the reason the reader sees.
 - **`ListedSkill`**: `name`, `description` (single line — the library folds
-  block scalars itself), `path` (the directory the skill *currently* lives in,
-  i.e. `disabled-skills` for a parked one), `enabled`, `installed_at`
-  (`Option<u64>`, Unix seconds; `None` on filesystems that record no creation
-  time). The app passes all five straight through as its `ListedSkillDto` —
-  nothing is extracted locally any more. (`estimated_tokens` existed between
-  0.18 and 0.19 only.)
+  block scalars itself), `enabled`, `installed_at` (`Option<u64>`, Unix
+  seconds; `None` on filesystems that record no creation time). The app passes
+  all four straight through as its `ListedSkillDto` — nothing is extracted
+  locally any more. (`path` existed until 0.19; since 0.20 a directory is
+  resolved with `Manager::skill_dir`. `estimated_tokens` existed between 0.18
+  and 0.19 only.)
 - **`AgentOutcome`**: `results: Vec<AgentLinkResult>`; each `AgentLinkResult`
   carries `agent`, `display`, and `outcome: LinkOutcome`.
 - **`AgentStatus`**: `name`, `display`, `linked`, `canonical`,

@@ -9,8 +9,14 @@ import type { AgentStatus, InstalledSkill } from "./skills-manager";
 
 // ---------------------------------------------------------------- skills
 
-/** A skill's on-disk path (global dir keeps a `~` prefix for readability). */
-function mockPathFor(name: string): string {
+/**
+ * A skill's on-disk directory (global dir keeps a `~` prefix for readability).
+ *
+ * The mock's `InstalledSkill` records carry no `path` — agents-skills 0.20
+ * dropped it from `list` — so this is only what the mock's own SKILL.md reader
+ * needs to address a skill's directory.
+ */
+export function mockPathFor(name: string): string {
   return `~/.agents/skills/${name}`;
 }
 
@@ -66,7 +72,6 @@ function mockSkill(
 ): InstalledSkill {
   return {
     name,
-    path: mockPathFor(name),
     description,
     enabled: true,
     installedAt,

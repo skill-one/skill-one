@@ -43,7 +43,6 @@ const runQueryFn = fetchProvenanceState;
 function installed(name: string, description = ""): InstalledSkill {
   return {
     name,
-    path: `~/.agents/skills/${name}`,
     enabled: true,
     description,
   };

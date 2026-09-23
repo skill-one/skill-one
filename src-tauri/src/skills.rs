@@ -1,7 +1,8 @@
 //! Skills install / agent management, backed by the `agents-skills` library.
 //!
 //! Exposes the library's [`Manager`] facade as async Tauri commands. All blocking
-//! work (git clone, install, link, ...) is offloaded to the blocking thread pool.
+//! work (GitHub downloads, install, link, hashing, ...) is offloaded to the
+//! blocking thread pool.
 
 use serde::Serialize;
 
@@ -19,10 +20,10 @@ fn manager() -> Manager {
     Manager::new()
 }
 
-/// Run a blocking manager operation off the async runtime (git clone, install,
-/// link, ...), mapping a failed join to the command error string. `task` names
-/// the operation for that message ("install", "list", ...). Every command's
-/// backend work goes through here.
+/// Run a blocking manager operation off the async runtime (install, link,
+/// hashing, ...), mapping a failed join to the command error string. `task`
+/// names the operation for that message ("install", "list", ...). Every
+/// command's backend work goes through here.
 async fn run_blocking<T, F>(task: &str, f: F) -> Result<T, String>
 where
     F: FnOnce(&Manager) -> Result<T, String> + Send + 'static,
@@ -37,21 +38,16 @@ where
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct InstallFailureDto {
-    pub skill: String,
-    pub error: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct InstallResult {
-    /// Names this pass moved into the canonical dir.
-    pub installed: Vec<String>,
-    /// Selected skills left untouched because a skill of the same name is
+    /// The installed skill's on-disk directory name — the identity
+    /// `remove`/`disable`/`enable` use. Since 0.22 the `SKILL.md` frontmatter
+    /// `name` is never read, so this is always the directory basename.
+    pub skill: String,
+    /// `true` when nothing was copied because a skill of the same name is
     /// already installed (enabled or disabled): since 0.17 `add` never
-    /// overwrites, so a repeat install is a no-op reported here.
-    pub skipped: Vec<String>,
-    pub failed: Vec<InstallFailureDto>,
+    /// overwrites, so a repeat install is a no-op reported here, never a
+    /// failure.
+    pub skipped: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -99,15 +95,16 @@ pub struct AgentStatusDto {
 /// A listed skill, as the library reports it since 0.16.
 ///
 /// `description` (single-line) and `installed_at` come straight from
-/// `Manager::list` — the app no longer parses SKILL.md itself.
+/// `Manager::list` — the app no longer parses SKILL.md itself. Since 0.20 the
+/// library's `ListedSkill` carries no `path` either (the name *is* the on-disk
+/// directory name; resolve a directory with `Manager::skill_dir` when one is
+/// needed), and neither does this DTO.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListedSkillDto {
     pub name: String,
     /// Single-line description from the on-disk SKILL.md frontmatter.
     pub description: String,
-    /// Directory the skill currently lives in (canonical, or `disabled-skills`).
-    pub path: String,
     pub enabled: bool,
     /// The skill directory's creation time as Unix seconds (UTC), when the
     /// platform/filesystem records one; `None` otherwise.
@@ -132,7 +129,6 @@ fn listed_skill_dto(skill: agents_skills::ListedSkill) -> ListedSkillDto {
     ListedSkillDto {
         name: skill.name,
         description: skill.description,
-        path: skill.path.display().to_string(),
         enabled: skill.enabled,
         installed_at: skill.installed_at,
     }
@@ -216,13 +212,11 @@ mod tests {
         let dto = listed_skill_dto(agents_skills::ListedSkill {
             name: "pdf".into(),
             description: "读取 PDF 文件。".into(),
-            path: std::path::PathBuf::from("/skills/pdf"),
             enabled: true,
             installed_at: Some(1_760_000_000),
         });
         assert_eq!(dto.name, "pdf");
         assert_eq!(dto.description, "读取 PDF 文件。");
-        assert_eq!(dto.path, "/skills/pdf");
         assert!(dto.enabled);
         assert_eq!(dto.installed_at, Some(1_760_000_000));
     }
@@ -233,7 +227,6 @@ mod tests {
         let dto = listed_skill_dto(agents_skills::ListedSkill {
             name: "pdf".into(),
             description: "d".into(),
-            path: std::path::PathBuf::from("/skills/disabled/pdf"),
             enabled: false,
             installed_at: None,
         });
@@ -328,42 +321,36 @@ mod tests {
 
 // ============================ Tauri commands ============================
 
-/// Install the named skills from a source (git repo, GitHub `owner/repo`,
-/// local path or download URL).
+/// Install one skill into the global skills directory.
 ///
-/// Since 0.17 `add` never overwrites: a skill whose name is already installed
-/// comes back in `skipped` untouched.
+/// `source` is one of the two forms agents-skills 0.21 accepts: a local skill
+/// directory (it must directly contain a `SKILL.md`), or `owner/repo@<skill>`
+/// for one skill on GitHub — resolved through the GitHub API, which downloads
+/// only the matched skill directory (the git clone / archive paths are gone).
+/// The app always sends the GitHub form; the store's skill name is the
+/// directory name the source matches on.
+///
+/// One source resolves to exactly one skill, so there is no per-skill outcome
+/// list: a failure is this command's `Err`, and `skipped` reports the 0.17
+/// no-overwrite rule (a skill of the same name already installed, enabled or
+/// parked, is left untouched).
 #[tauri::command]
-pub async fn install_skill(
-    source: String,
-    skills: Option<Vec<String>>,
-) -> Result<InstallResult, String> {
+pub async fn install_skill(source: String) -> Result<InstallResult, String> {
     run_blocking("install", move |manager| {
-        let req = AddRequest {
-            source,
-            skills: skills.unwrap_or_default(),
-            list_only: false,
-        };
-        let outcome = manager.add(&req).map_err(|e| e.to_string())?;
+        let outcome = manager
+            .add(&AddRequest::new(source))
+            .map_err(|e| e.to_string())?;
         Ok(InstallResult {
-            installed: outcome.installed.into_iter().map(|s| s.name).collect(),
+            skill: outcome.skill.name,
             skipped: outcome.skipped,
-            failed: outcome
-                .failed
-                .into_iter()
-                .map(|f| InstallFailureDto {
-                    skill: f.skill,
-                    error: f.error,
-                })
-                .collect(),
         })
     })
     .await
 }
 
 /// List installed skills in the global skills directory. Returns the same
-/// camelCase shape as `list --json`: name, single-line description, path,
-/// enablement and install time.
+/// camelCase shape as `list --json`: name, single-line description, enablement
+/// and install time.
 #[tauri::command]
 pub async fn list_installed_skills() -> Result<Vec<ListedSkillDto>, String> {
     run_blocking("list", move |manager| {
@@ -477,7 +464,7 @@ pub async fn read_skill_md(name: String) -> Result<SkillMdDto, String> {
             .into_iter()
             .find(|s| s.name == name)
             .ok_or_else(|| format!("skill {name} is not installed"))?;
-        read_skill_md_file(&skill.path)
+        read_skill_md_file(&manager.skill_dir(&skill))
     })
     .await
 }
@@ -494,7 +481,7 @@ pub async fn compute_skill_hash(name: String) -> Result<Option<String>, String> 
         let listed = manager.list().map_err(|e| e.to_string())?;
         match listed.into_iter().find(|s| s.name == name) {
             None => Ok(None),
-            Some(skill) => skill_hash::hash_skill_dir(&skill.path).map(Some),
+            Some(skill) => skill_hash::hash_skill_dir(&manager.skill_dir(&skill)).map(Some),
         }
     })
     .await

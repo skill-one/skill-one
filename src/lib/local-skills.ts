@@ -32,6 +32,7 @@ import {
   getMockInstalledSkills,
   installMockSkill,
   linkMockAgent,
+  mockPathFor,
   removeMockSkill,
   setMockSkillEnabled,
   unlinkMockAgent,
@@ -41,7 +42,7 @@ import {
   removeSkillProvenance,
 } from "./provenance";
 
-/** Simulated clone duration for browser mock installs, in milliseconds. */
+/** Simulated download duration for browser mock installs, in milliseconds. */
 export const MOCK_INSTALL_DELAY_MS = 1200;
 
 /** All skills installed into the global skills directory. */
@@ -77,7 +78,7 @@ export async function fetchLocalSkillDetail(name: string): Promise<SkillDetail> 
     name: skill.name,
     description,
     instructions: `演示数据：${skill.name} 的本地 SKILL.md 正文。\n\n（浏览器演示数据：模拟的本地 SKILL.md）`,
-    path: `${skill.path}/SKILL.md`,
+    path: `${mockPathFor(skill.name)}/SKILL.md`,
   };
 }
 
@@ -86,16 +87,16 @@ export async function fetchLocalSkillDetail(name: string): Promise<SkillDetail> 
  * global skills directory. Only the named skill is installed, never the entire
  * repo.
  *
- * In Tauri the `owner/repo` source is handed straight to the backend, which
- * uses agents-skills' GitHub install (clones the repo, pulling the skill's
- * supporting files along) rather than downloading a single SKILL.md. The
- * backend reports the outcome via `installed`/`skipped`/`failed` — an Ok
- * response alone does not mean anything was installed (the name may fail to
- * match, or the clone/install can fail), so failures are surfaced here instead
- * of being silently swallowed. Since agents-skills 0.17 a skill that is already
- * installed comes back in `skipped` rather than being overwritten; that is a
- * no-op, not a failure, so it is not reported as one. In the browser this
- * records the install in the mock store instead.
+ * In Tauri the source handed to the backend is `owner/repo@<skill>`: since
+ * agents-skills 0.21 the source carries the skill, and it is resolved through
+ * the GitHub API, which downloads only the matched skill directory rather than
+ * cloning the repo (the store's skill name is the directory name the source
+ * matches on). One source resolves to exactly one skill, so a failure is this
+ * call's rejection and there is no outcome list to inspect — the store's Ok
+ * response does mean the skill is installed, and a same-named skill already on
+ * disk comes back as `skipped` (0.17's no-overwrite rule), which is a no-op,
+ * not a failure. In the browser this records the install in the mock store
+ * instead.
  *
  * `options.rev` is the store entry's content hash at install time (from the
  * registry index). It is recorded in the provenance ledger as the version
@@ -112,20 +113,15 @@ export async function installSkillFromSource(
   options: { rev?: string } = {},
 ): Promise<void> {
   if (isTauri()) {
-    const result = await installSkill(repo, [name]);
-    if (result.failed.length > 0) {
-      const f = result.failed[0];
-      throw new Error(f.error || `安装失败：${f.skill}`);
-    }
-    // Already installed → the library left it untouched and reported it as
-    // skipped. Nothing to do, and nothing went wrong.
-    if (result.installed.length === 0 && !result.skipped.includes(name)) {
-      throw new Error(`未在 ${repo} 中找到可安装的技能 ${name}`);
-    }
+    // The source carries the skill (`owner/repo@<skill>`), and a failure is
+    // this call's rejection — the backend has no outcome list to inspect. An
+    // install that comes back `skipped` is the no-overwrite no-op, and it is
+    // already the state the caller is driving the button to.
+    await installSkill(`${repo}@${name}`);
   } else {
-    // Simulate a realistic clone duration so the installing state is
-    // observable in the browser demo; the real Tauri install clones over
-    // the network.
+    // Simulate a realistic download duration so the installing state is
+    // observable in the browser demo; the real Tauri install fetches the skill
+    // directory from GitHub.
     await new Promise((resolve) => setTimeout(resolve, MOCK_INSTALL_DELAY_MS));
     installMockSkill(name);
   }

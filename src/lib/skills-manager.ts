@@ -15,10 +15,15 @@ import { isTauri } from "./tauri";
 /**
  * A listed skill, as the backend's directory scan reports it. Models the
  * subset of `list --json` the UI reads; the backend DTO may carry more.
+ *
+ * Since agents-skills 0.20 the name is the skill's on-disk directory name —
+ * the identity `remove`/`disable`/`enable` use, with the `SKILL.md` frontmatter
+ * `name` no longer read anywhere — and `list` carries no `path` any more
+ * (resolve a directory with the library's `Manager::skill_dir` when one is
+ * needed, which the app does on the backend only).
  */
 export interface InstalledSkill {
   name: string;
-  path: string;
   /**
    * Whether the skill is enabled (`true`) or parked in the disabled dir
    * (`false`). Set by the backend from the on-disk state, not a UI preference.
@@ -47,21 +52,17 @@ export interface SkillMd {
   content: string;
 }
 
-export interface InstallFailureDto {
-  skill: string;
-  error: string;
-}
-
+/**
+ * The outcome of one install. One source resolves to exactly one skill, so
+ * there is no per-skill outcome list: a failed install rejects the call, and
+ * `skipped` reports the 0.17 no-overwrite rule (a skill of the same name
+ * already installed — enabled or parked — is left untouched).
+ */
 export interface InstallResult {
-  /** Names this pass moved into the canonical dir. */
-  installed: string[];
-  /**
-   * Selected skills left untouched because a skill of the same name is already
-   * installed (enabled or disabled). Since agents-skills 0.17 `add` never
-   * overwrites — replacing means `remove` then `add`.
-   */
-  skipped: string[];
-  failed: InstallFailureDto[];
+  /** The installed skill's on-disk directory name. */
+  skill: string;
+  /** `true` when nothing was copied because the skill is already installed. */
+  skipped: boolean;
 }
 
 export type AgentLinkStatus =
@@ -132,15 +133,15 @@ function requireTauri(): void {
 }
 
 /**
- * Install `skills` from a source: a git URL, GitHub `owner/repo`, local path or
- * download URL.
+ * Install one skill from `source` — one of the two forms agents-skills 0.21
+ * accepts: a local skill directory (it must directly contain a `SKILL.md`), or
+ * `owner/repo@<skill>` for one skill on GitHub. The app always sends the
+ * GitHub form; the store's skill name is the directory name the source matches
+ * on. A failed install rejects; see `InstallResult` for the success shape.
  */
-export async function installSkill(
-  source: string,
-  skills: string[],
-): Promise<InstallResult> {
+export async function installSkill(source: string): Promise<InstallResult> {
   requireTauri();
-  return invoke<InstallResult>("install_skill", { source, skills });
+  return invoke<InstallResult>("install_skill", { source });
 }
 
 /** List installed skills in the global skills directory. */

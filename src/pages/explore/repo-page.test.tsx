@@ -99,7 +99,6 @@ function installedOnDisk(names: string[], disabled: string[] = [], repo = REPO) 
   vi.mocked(fetchInstalledSkills).mockResolvedValue(
     names.map((name) => ({
       name,
-      path: `skills/${name}`,
       enabled: !disabled.includes(name),
       description: `${name} on disk.`,
       installedAt: null,
