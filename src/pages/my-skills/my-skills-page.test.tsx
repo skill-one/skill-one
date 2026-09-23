@@ -12,7 +12,7 @@ import { toast } from "../../components/ui/toast";
 import { getExcludedAgents } from "../../lib/agent-link-preferences";
 
 import { MySkillsPage } from "./my-skills-page";
-import { ListToolbar } from "../../components/list-toolbar";
+import { AppHeader } from "../../components/app-header";
 import { renderWithRouter } from "../../test/test-utils";
 import {
   addMockLocalSkill,
@@ -71,15 +71,14 @@ const menuItem = (display: string, state: string) =>
   screen.findByRole("menuitem", { name: new RegExp(`${display}.*${state}`) });
 
 /**
- * The page as the app mounts it, with the header's own controls above it: the
- * search field and the unit switch belong to the header now, shared with the
- * store's list, so a list that is typed into or re-unit-ed has to be mounted
- * with them.
+ * The page as the app mounts it: inside the shell, under the route the deep link
+ * arrives on. The header carries the two controls both lists share, so a page
+ * mounted alone could be typed into but not searched.
  */
 function renderPage(route = "/my-skills") {
   return renderWithRouter(
     <>
-      <ListToolbar destination="installed" />
+      <AppHeader />
       <MySkillsPage />
     </>,
     { route },

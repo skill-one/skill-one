@@ -54,9 +54,12 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 | File | Responsibility |
 | --- | --- |
 | `src/App.tsx` | Routing, layout, TanStack Query provider, and cache persistence |
-| `src/components/app-header.tsx` | The app's whole chrome: the brand, the two destinations, one slot holding the current page's controls (a list's search field and unit switch, or a drill-down's way back), and the settings entry — plus the window's drag region, which is what the overlay title bar leaves to the app |
-| `src/components/list-toolbar.tsx` | The two controls both lists share, bound to the shared view: what the reader is looking for (locked on the store until the index over the registry is ready) and how the list reads |
-| `src/lib/list-view.ts` | That shared view: one query for both lists, and each list's own unit and scope. Module-level, because the header that writes it is a sibling of the page that reads it |
+| `src/components/app-header.tsx` | The app's chrome, one row: the brand on the window's centreline, the current list's search field leading the row and its unit switch closing it (a drill-down's way back takes the leading edge instead), and the window's drag region — which is what the overlay title bar leaves to the app |
+| `src/components/app-rail.tsx` | The app's navigation: a 72px rail holding the two destinations and the settings entry |
+| `src/components/list-toolbar.tsx` | The two controls both lists share, in the header's first row: what the reader is looking for (locked on the store until the index over the registry is ready) and how the list reads. Bound to the shared view rather than to either page, which is what makes them the same controls in both |
+| `src/components/list-facets.tsx` | The scope chips of the list on screen, opening that list's own content: as many as the line holds, and a 更多 flyout for the rest |
+| `src/lib/list-view.ts` | The shared view behind those controls: one query for both lists, and each list's own unit and scope |
+| `src/lib/facet-overflow.ts` | How many chips fit on the header's line — pure arithmetic over measured widths |
 | `src/pages/explore/repo-card.tsx` / `repo-page.tsx` | The store's repository view: one card per repository, led by its most-installed skills in a capped list and signed off by a single bottom bar that names the repository and opens its page — plus that page, which lists every skill the repository publishes, uncapped |
 | `src/lib/view-memory.ts` / `src/hooks/use-view-memory.ts` / `use-return.ts` | A list page's view — its controls, its revealed depth, its scroll position — remembered per history entry, because a page that owns its own scrolling element is a page the browser restores nothing for. `use-return.ts` is the app's back control: it pops that entry rather than pushing a fresh copy of its path, which is what makes the memory worth having |
 | `src/lib/avatar-source.ts` | The single answer to where an owner's avatar lives: the dataset mirror at the pinned snapshot tag, then its mutable branch, then GitHub's own endpoint — every surface draws from this one chain |

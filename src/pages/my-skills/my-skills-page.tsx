@@ -14,7 +14,6 @@ import {
   skillKey,
   type SkillView,
 } from "../../lib/skill-view";
-import { domainLabel, domainMeta } from "../../data/domains";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import {
   REPO_CARD_SKELETON_CLASS,
@@ -33,7 +32,7 @@ import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { SkillRow } from "../explore/skill-row";
 import { SkillRun, buildSkillRuns, byInstalls } from "../explore/skill-run";
 import { SkeletonList } from "../../components/skeleton-list";
-import { DomainChip } from "../../components/domain-chip";
+import { ListFacets } from "../../components/list-facets";
 import { LinkSuggestionBadge } from "./link-suggestion-badge";
 import type { LinkCandidate } from "../../lib/link-suggestions";
 import { RepoCard } from "../explore/repo-card";
@@ -134,10 +133,10 @@ export function MySkillsPage() {
   const list = useMemo(() => skills ?? [], [skills]);
 
   // What the reader is looking for, how the list reads, and which
-  // classification they scoped it to: all three are the header's controls,
-  // shared with the store's list (see `lib/list-view`), so they are read from
-  // there. The full installed list is already in memory, so everything below
-  // filters on the main thread.
+  // classification they scoped it to: all three are shared with the store's
+  // list (see `lib/list-view`), so they are read from the shared view rather
+  // than held here. The full installed list is already in memory, so everything
+  // below filters on the main thread.
   const search = useListQuery();
   const { unit, scope } = useDestinationView("installed");
   const domain = scope ?? null;
@@ -157,9 +156,9 @@ export function MySkillsPage() {
   // the opened folds (a run's head key belongs to the answer that produced it)
   // and the detail panel (its skill may not be in the new answer at all).
   //
-  // The controls are the header's now, so this watches the answer instead of
-  // each control. Switching the unit still lands here as one change, because
-  // the list view drops the scope with the unit (`lib/list-view`).
+  // The controls are shared with the other list now, so this watches the answer
+  // instead of each control. Switching the unit still lands here as one change,
+  // because the list view drops the scope with the unit (`lib/list-view`).
   const shownAnswer = useRef(`${query}\u0000${unit}\u0000${domain ?? "all"}`);
   useEffect(() => {
     const answer = `${query}\u0000${unit}\u0000${domain ?? "all"}`;
@@ -328,41 +327,23 @@ export function MySkillsPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The list's own row: every classification that holds an install, flat,
-          one press to scope the list (全部 clears it), and the installed
-          list's own control — the agent strip — out at the far edge. The
-          classification filter is a browse control: a search re-orders the list
-          by relevance and ignores it, so the chips stand only while browsing.
-          Its chips count what the unit lists, so their figures and the list
-          they scope can never disagree.
-          The strip is a status the reader is owed at all times, so it stays
-          whether or not there is a search — which is why this row stands even
-          when the chips do not. */}
-      <div className="mb-3 flex min-h-7 flex-wrap items-center gap-1.5">
+      {/* The list's own first row: the classifications that hold an install (one
+          press to scope the list; 全部 clears it), and the agent strip — this
+          page's own status — out at the far edge.
+          The chips are a browse control — a search re-orders the list by
+          relevance and ignores them — so they stand down while a search is live;
+          the strip stays, because a status the reader is owed does not depend on
+          what they happen to be looking at. The chips count what the unit lists,
+          so the figures and the list they scope can never disagree. */}
+      <div className="mb-3 flex min-w-0 items-center gap-3">
         {!isSearching && rows.length > 0 && (
-          <>
-            <DomainChip
-              selected={domain === null}
-              count={totalCount}
-              countLabel={countLabel}
-              expanded
-              onClick={() => setScope("installed", null)}
-            >
-              全部
-            </DomainChip>
-            {chips.map(({ key, count }) => (
-              <DomainChip
-                key={key}
-                selected={domain === key}
-                emoji={domainMeta(key)?.emoji}
-                count={count}
-                countLabel={countLabel}
-                onClick={() => setScope("installed", key)}
-              >
-                {domainLabel(key)}
-              </DomainChip>
-            ))}
-          </>
+          <ListFacets
+            facets={chips}
+            total={totalCount}
+            countLabel={countLabel}
+            selected={domain}
+            onSelect={(key) => setScope("installed", key)}
+          />
         )}
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <AgentAvatarMenu />

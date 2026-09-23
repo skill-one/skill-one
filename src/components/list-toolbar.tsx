@@ -8,10 +8,13 @@ import { setQuery, setUnit, type Destination } from "../lib/list-view";
  * The controls every list answers to, bound to the shared view (see
  * `lib/list-view`): what the reader is looking for, and how the list reads.
  *
- * They live in the header and not on the pages because both lists want the same
- * two controls in the same place, and a control that travels with the page is a
- * control the reader has to find again after every switch. A page keeps only
- * what is its own — the scope chips, its trailing action, its list.
+ * They span the header's row with the brand on the centreline between them —
+ * the field opening it, past the corner the traffic lights keep, and the switch
+ * closing it. One action per edge: search is what a reader comes to a list to
+ * do, and how it reads is the last thing they change. They are *bound* to the
+ * shared view rather than to page state, which is what makes them the same
+ * controls in both lists: one field to type in, one query to answer, wherever
+ * the reader happens to be.
  *
  * The search stays enabled on the installed list and is locked on the store's
  * until the index over the registry exists: the installed list is already in
@@ -22,7 +25,7 @@ export function ListToolbar({ destination }: { destination: Destination }) {
   const query = useListQuery();
   const { unit } = useDestinationView(destination);
 
-  // `ready` on its own, so a climbing count never re-renders the header.
+  // `ready` on its own, so a climbing count never re-renders the list's head.
   const ready = useRegistrySnapshot((s) => s.ready);
   const waiting = destination === "store" && !ready;
 
@@ -34,15 +37,11 @@ export function ListToolbar({ destination }: { destination: Destination }) {
         label="搜索 Skill"
         disabled={waiting}
         placeholder={waiting ? "索引构建中…" : undefined}
-        // Grows to its cap and shrinks below it, but never past a usable
-        // width: the header holds the brand, both destinations, this field
-        // and the settings entry inside the window's minimum width.
-        className="min-w-[9rem] flex-1 max-w-sm"
       />
       <ListUnitToggle
+        className="ml-auto"
         unit={unit}
         onChange={(next) => setUnit(destination, next)}
-        className="shrink-0"
       />
     </div>
   );

@@ -9,7 +9,6 @@ import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
-import { domainLabel, domainMeta } from "../../data/domains";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import { setScope } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
@@ -20,7 +19,7 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import { Button } from "../../components/ui/button";
-import { DomainChip } from "../../components/domain-chip";
+import { ListFacets } from "../../components/list-facets";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
@@ -46,10 +45,10 @@ const LIVE_GROUP_KEY = "skills-sh";
 /**
  * The explore page's remembered view: how deep the list had been revealed.
  *
- * The controls are not in here any more. They belong to the header and are
- * shared with the installed list (see `lib/list-view`), so what a page alone
- * knows is what a page alone remembers — and `useViewMemory` drops even that
- * once the controls have moved on to another answer.
+ * The controls are not in here any more. They are shared with the installed
+ * list (see `lib/list-view`), so what a page alone knows is what a page alone
+ * remembers — and `useViewMemory` drops even that once the controls have moved
+ * on to another answer.
  */
 interface ExploreView {
   visibleCount: number;
@@ -79,8 +78,8 @@ export function ExplorePage() {
   const maxSkills = useRepoCardLimit();
 
   // What the reader is looking for, how the list reads, and which domain they
-  // scoped the browse to: all three are the header's controls, shared with the
-  // installed list, so they are read from there rather than held here.
+  // scoped the browse to: all three are shared with the installed list, so they
+  // are read from the shared view rather than held here.
   const search = useListQuery();
   const { unit, scope } = useDestinationView("store");
   // The filter is a browse control: a search re-orders the whole registry by
@@ -298,9 +297,9 @@ export function ExplorePage() {
   // folds (a run's head key belongs to the answer that produced it) and the
   // detail panel (its skill may not be in the new answer at all).
   //
-  // The controls are the header's now, so this watches the answer instead of
-  // each control. Switching the unit still lands here as one change, because
-  // the list view drops the scope with the unit (`lib/list-view`).
+  // The controls are shared with the other list now, so this watches the answer
+  // instead of each control. Switching the unit still lands here as one change,
+  // because the list view drops the scope with the unit (`lib/list-view`).
   //
   // Only a *change* resets: mounting with the answer already in hand is the
   // reader coming back to it, and the depth they left it at is the whole point
@@ -320,38 +319,22 @@ export function ExplorePage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The domain filter: every domain that holds rows, flat, one press to
-          scope the list (全部 clears it). It is a browse control — a search
-          re-orders the whole registry by relevance and ignores it — so it stands
-          only while browsing. Its chips and their counts follow the unit: the
-          repository unit weighs a domain by repositories, the skill unit by
-          skills.
-          It is content, not chrome: the header above already carries the two
-          controls both lists share, so this row is the list's own and reads as
-          part of it. */}
+      {/* The list's own first row: the domains that hold rows, flat, one press
+          to scope the list (全部 clears it).
+          The chips are a browse control — a search re-orders the whole registry
+          by relevance and ignores the scope — so they stand down while a search
+          is live, and the list opens the content on its own then.
+          Their counts follow the unit: the repository unit weighs a domain by
+          repositories, the skill unit by skills. */}
       {!isSearching && (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          <DomainChip
-            selected={selectedDomain === null}
-            count={totalCount}
+        <div className="mb-3 flex min-w-0 items-center">
+          <ListFacets
+            facets={chips}
+            total={totalCount}
             countLabel={countLabel}
-            expanded
-            onClick={() => setScope("store", null)}
-          >
-            全部
-          </DomainChip>
-          {chips.map(({ key, count }) => (
-            <DomainChip
-              key={key}
-              selected={selectedDomain === key}
-              emoji={domainMeta(key)?.emoji}
-              count={count}
-              countLabel={countLabel}
-              onClick={() => setScope("store", key)}
-            >
-              {domainLabel(key)}
-            </DomainChip>
-          ))}
+            selected={selectedDomain}
+            onSelect={(key) => setScope("store", key)}
+          />
         </div>
       )}
 

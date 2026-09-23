@@ -90,7 +90,7 @@ describe("list view", () => {
     setScope("store", "development");
     setQuery("pdf");
 
-    // The header re-renders on every change; a list whose own view did not move
+    // A control re-renders on every change; a list whose own view did not move
     // must not re-render its readers with it.
     expect(getListView().views.installed).toBe(before);
   });

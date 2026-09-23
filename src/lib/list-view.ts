@@ -1,14 +1,16 @@
 /**
- * The controls both lists share, held in one place because they now live in
- * one place: the header holds a single search field and a single unit switch,
- * so the state behind them cannot belong to either page. A page reads what it
- * needs out of here and answers with it; the header writes.
+ * The controls both lists show, held in one place because they mean one thing:
+ * there is a single search field and a single unit switch, and the state behind
+ * them cannot belong to either page. A page reads the slice it needs out of
+ * here and answers with it; the page showing the list writes.
  *
- * A module-level store rather than a context because the two readers sit on
- * opposite sides of the tree — the header is a sibling of the routed page, so
- * neither can provide for the other — and because this is plain state, not a
- * render-time value: the same reason `lib/view-memory` and the registry
- * client's snapshot are module-level.
+ * Module-level rather than a context because the two lists are never mounted
+ * together — each page renders its own copy of the controls while the other is
+ * gone — so the state has to outlive the page that set it. That the state
+ * outlives the page is the point, not a side effect: a query typed on one list
+ * is still there on the other, which is what one field shared by two lists
+ * means. (It is also plain state rather than a render-time value, the same
+ * reason `lib/view-memory` and the registry client's snapshot are module-level.)
  *
  * What is *not* here is everything that is one page's own business: the
  * revealed depth, the scroll position, which folds are open. Those belong to

@@ -54,14 +54,16 @@ skill-one/
 ├── src/                    # Frontend (React + TypeScript)
 │   ├── components/         # Components shared across pages
 │   │   ├── ui/             # shadcn/ui components
-│   │   ├── app-header.tsx  # The app's chrome: brand, destinations, the current page's controls, settings
-│   │   ├── list-toolbar.tsx # The search field and the unit switch both lists share
+│   │   ├── app-header.tsx  # The app's chrome, one row: centred brand + the list's controls
+│   │   ├── app-rail.tsx    # The app's navigation: a narrow rail (destinations, settings)
+│   │   ├── list-facets.tsx # The scope chips opening a list's content (+ the 更多 flyout)
+│   │   ├── list-toolbar.tsx # The search field (row's head) + unit switch (row's tail) both lists share
 │   │   ├── agent-icon.tsx  # Agent brand icons
 │   │   ├── owner-avatar.tsx# Owner avatar (the metadata rail's author chip)
 │   │   ├── repo-hover-card.tsx # Author chip + its repository hover card
 │   │   ├── skill-cover.tsx # Skill's own image slot (author initial; detail drawer only)
 │   │   ├── skill-detail/    # Shared skill detail panel + modal drawer
-│   │   ├── settings-popover.tsx # Settings flyout anchored to the header's gear
+│   │   ├── settings-popover.tsx # Settings flyout anchored to the rail's foot
 │   │   ├── advanced-settings-dialog.tsx # Second-level settings (CDN base + data source)
 │   │   └── placeholder.tsx # Shared "nothing to show" empty state for list pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)

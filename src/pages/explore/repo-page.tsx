@@ -91,8 +91,9 @@ export function RepoPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The way back to the list is the header's: this page is inside the store,
-          and the header is where every page says what it is and how to leave it.
+      {/* The way back to the list is the header's first row: this page is inside
+          the store, and the header is where every page says what it is and how
+          to leave it (see `AppHeader`).
 
           What is left here is the repository's identity, in the same voice as
           the card's head: who published it, what it is called, and the two

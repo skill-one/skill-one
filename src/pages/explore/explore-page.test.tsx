@@ -18,6 +18,8 @@ import {
   useNavigate,
 } from "react-router";
 
+import { AppHeader } from "../../components/app-header";
+
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { searchSkillsSh } from "../../lib/skills-sh";
 import {
@@ -28,7 +30,6 @@ import { formatCount } from "../../lib/utils";
 import type { SkillView } from "../../lib/skill-view";
 import type { Skill } from "../../types/skill";
 import type { RegistryHarness } from "../../test/registry-harness";
-import { ListToolbar } from "../../components/list-toolbar";
 import { ExplorePage } from "./explore-page";
 
 /**
@@ -176,13 +177,16 @@ function cardOf(name: string): HTMLElement {
 let queryClient: QueryClient;
 
 function renderExplorePage() {
+  // The app's own router, hash and all: the header reads the current list off
+  // the path, and the links it wraps carry the hash prefix the app renders.
+  window.location.hash = "#/explore";
   return render(
     <QueryClientProvider client={queryClient}>
-      {/* The real app mounts pages under a HashRouter, with the header above
-          them — and the search field and the unit switch are the header's now,
-          so a list that is typed into has to be mounted with it. */}
+      {/* The real app mounts pages inside the shell: the header above them, with
+          the two controls both lists share in it. The page's own first row — its
+          domain chips — is its own and renders with it. */}
       <HashRouter>
-        <ListToolbar destination="store" />
+        <AppHeader />
         <ExplorePage />
       </HashRouter>
     </QueryClientProvider>,
@@ -209,7 +213,7 @@ function renderExploreRoutes() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/explore"]}>
-        <ListToolbar destination="store" />
+        <AppHeader />
         <Routes>
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/repo/*" element={<RepoStandIn />} />
@@ -264,6 +268,16 @@ beforeEach(() => {
 vi.setConfig({ testTimeout: 15_000 });
 
 describe("ExplorePage", () => {
+  it("keeps the domain chips in the content, not in the header", async () => {
+    bootRegistry(4);
+    renderExplorePage();
+
+    const chip = await screen.findByRole("button", { name: /全部/ });
+    // They narrow the list they sit on, so they open the list's own content
+    // rather than sharing the shell's row with the controls both lists use.
+    expect(document.querySelector("header")?.contains(chip)).toBe(false);
+  });
+
   it("leads the repository view with one card per repository", async () => {
     bootRegistry(50);
     renderExplorePage();

@@ -91,4 +91,20 @@ describe("ListToolbar", () => {
     act(() => setQuery(""));
     expect(screen.getByLabelText("搜索 Skill")).toHaveValue("");
   });
+
+  it("shows a mark per unit, and keeps the words for the hover", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<ListToolbar destination="store" />);
+
+    // Neither half spends the row's width on a word — the pair reads from the
+    // two marks and the raised half — but both stay addressable by name, and
+    // the words are a hover away for anyone who wants them.
+    const repo = screen.getByRole("button", { name: "按仓库" });
+    const skill = screen.getByRole("button", { name: "按技能" });
+    expect(repo).toHaveTextContent("");
+    expect(skill).toHaveTextContent("");
+
+    await user.hover(skill);
+    expect(await screen.findByText("按技能")).toBeInTheDocument();
+  });
 });

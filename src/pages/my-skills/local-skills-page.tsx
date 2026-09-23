@@ -92,9 +92,9 @@ export function LocalSkillsPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The way back to the installed list is the header's: this page is inside
-          it, and the header is where every page says what it is and how to leave
-          it.
+      {/* The way back to the installed list is the header's first row: this page
+          is inside it, and the header is where every page says what it is and
+          how to leave it (see `AppHeader`).
 
           What is left here is the pool's identity, in the same voice as a
           repository page's head — minus the repository, which is the whole point

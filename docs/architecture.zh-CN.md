@@ -54,9 +54,12 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 | 文件 | 职责 |
 | --- | --- |
 | `src/App.tsx` | 路由、布局、TanStack Query Provider 与缓存持久化 |
-| `src/components/app-header.tsx` | 应用整体外壳：品牌、两个入口、一个「当前页控件」槽位（列表页放搜索框与单位切换，子页面放返回），以及设置入口——同时承担窗口拖拽区，这正是 overlay 标题栏留给应用的活 |
-| `src/components/list-toolbar.tsx` | 两个列表共用的两个控件，绑定到共享视图：读者在找什么（商店在索引就绪前锁定输入），以及列表以什么单位呈现 |
-| `src/lib/list-view.ts` | 那份共享视图：两页共用一个查询，各列表另有自己的单位与范围。模块级状态，因为写它的顶栏与读它的页面互为兄弟 |
+| `src/components/app-header.tsx` | 应用外壳，只有一行：品牌居中于窗口中线（原生标题的位置），行首是当前列表的搜索框、行尾是单位切换（子页面时返回占据行首）——同时承担窗口拖拽区，这正是 overlay 标题栏留给应用的活 |
+| `src/components/app-rail.tsx` | 应用导航：72px 窄轨，内含两个入口与设置入口 |
+| `src/components/list-toolbar.tsx` | 两个列表共用的两个控件，位于顶栏第一行：读者在找什么（商店在索引就绪前锁定输入），以及列表以什么单位呈现。它绑定的是共享视图而非某个页面，这才使两页上的控件是同一套 |
+| `src/components/list-facets.tsx` | 当前列表的分类 chips，作为该列表内容区的首行：能放几个放几个，其余收进「更多」浮层 |
+| `src/lib/list-view.ts` | 这些控件背后的共享视图：两页共用一个查询，各列表另有自己的单位与范围 |
+| `src/lib/facet-overflow.ts` | 顶栏一行能放几个 chip——对测量宽度的纯算术 |
 | `src/pages/explore/repo-card.tsx` / `repo-page.tsx` | 商店的仓库视图：一个仓库一张卡——主体是按安装量排序、有上限的 skill 列表，底部一行同时署名该仓库并通往它的页面——以及该仓库自己的页面，不限量地列出它发布的全部 skill |
 | `src/lib/view-memory.ts` / `src/hooks/use-view-memory.ts` / `use-return.ts` | 列表页自己的视图——它上面的控件、已展开的深度、滚动位置——按历史记录逐条记住：页面自带滚动容器，浏览器对它什么都不会恢复。`use-return.ts` 是应用统一的返回控件：它弹回那条记录，而不是往栈里再压一份列表——这正是上面那份记忆有意义的前提 |
 | `src/lib/avatar-source.ts` | 「owner 头像在哪里」的唯一答案：数据集镜像（定址到已记录的快照标签）、它的可变分支、最后是 GitHub 自己的端点——所有界面都从这一条链取图 |

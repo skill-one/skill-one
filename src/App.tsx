@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppHeader } from "./components/app-header";
+import { AppRail } from "./components/app-rail";
 import { UpdateDialog } from "./components/update-dialog";
 import { Toaster } from "./components/ui/toast";
 import { TooltipProvider } from "./components/ui/tooltip";
@@ -85,34 +86,37 @@ export default function App() {
         <Toaster />
         <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
           <AppHeader />
-          {/* Each page owns the scroll container of its own list, so the shell
-              only has to hand the routes the remaining height. */}
-          <main className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
-            <Suspense fallback={null}>
-              <Routes>
-                <Route
-                  path="/"
-                  element={<Navigate to="/my-skills" replace />}
-                />
-                <Route path="/explore" element={<ExplorePage />} />
-                {/* One repository, every skill it publishes. The splat is
-                    `owner/repo` itself, which carries a slash. */}
-                <Route path="/repo/*" element={<RepoPage />} />
-                <Route path="/my-skills" element={<MySkillsPage />} />
-                {/* The installed list's local pool, listed whole — the page
-                    the pool's card opens, as a repository's page is what a
-                    repository card's bar opens. */}
-                <Route
-                  path="/my-skills/local"
-                  element={<LocalSkillsPage />}
-                />
-                <Route
-                  path="*"
-                  element={<Navigate to="/my-skills" replace />}
-                />
-              </Routes>
-            </Suspense>
-          </main>
+          <div className="flex min-h-0 flex-1">
+            <AppRail />
+            {/* Each page owns the scroll container of its own list, so the shell
+                only has to hand the routes the remaining space. */}
+            <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+              <Suspense fallback={null}>
+                <Routes>
+                  <Route
+                    path="/"
+                    element={<Navigate to="/my-skills" replace />}
+                  />
+                  <Route path="/explore" element={<ExplorePage />} />
+                  {/* One repository, every skill it publishes. The splat is
+                      `owner/repo` itself, which carries a slash. */}
+                  <Route path="/repo/*" element={<RepoPage />} />
+                  <Route path="/my-skills" element={<MySkillsPage />} />
+                  {/* The installed list's local pool, listed whole — the page
+                      the pool's card opens, as a repository's page is what a
+                      repository card's bar opens. */}
+                  <Route
+                    path="/my-skills/local"
+                    element={<LocalSkillsPage />}
+                  />
+                  <Route
+                    path="*"
+                    element={<Navigate to="/my-skills" replace />}
+                  />
+                </Routes>
+              </Suspense>
+            </main>
+          </div>
         </div>
       </HashRouter>
       </TooltipProvider>

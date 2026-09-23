@@ -37,6 +37,10 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  /* The navigation rail's width, in one place: the rail takes it, and anything
+     that has to sit on the same grid as the content beside it reads the same
+     value. */
+  --rail-w: 72px;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);

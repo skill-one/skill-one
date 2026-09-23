@@ -60,7 +60,7 @@ function renderSettings() {
   );
 }
 
-/** Open the popover from the header's settings entry. */
+/** Open the popover from the rail's settings entry. */
 async function openPopover(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "设置" }));
   await screen.findByText("外观");
@@ -87,7 +87,7 @@ describe("SettingsMenu", () => {
     act(() => setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT));
   });
 
-  it("opens a popover with the quick settings from the header entry", async () => {
+  it("opens a popover with the quick settings from the rail entry", async () => {
     const user = userEvent.setup();
     renderSettings();
 
@@ -173,7 +173,7 @@ describe("SettingsMenu", () => {
 
     await user.click(screen.getByRole("button", { name: /软件更新/ }));
 
-    // Both the header chip and the popover row flag the discovery: the chip
+    // Both the rail chip and the popover row flag the discovery: the chip
     // is a button, the row's status is a plain badge span.
     expect(
       await screen.findByRole("button", { name: "有新版本" }),

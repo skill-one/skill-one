@@ -83,7 +83,7 @@ describe("App routing", () => {
     expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
 
-  it("navigates between routes via the sidebar", async () => {
+  it("navigates between routes via the rail", async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -93,8 +93,8 @@ describe("App routing", () => {
     expect(await screen.findByText("外观")).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
-    // Navigate back to the 我的 skills page.
-    await user.click(screen.getByRole("link", { name: /我的 skills/ }));
+    // Navigate back to the installed list, the rail's 我的.
+    await user.click(screen.getByRole("link", { name: /^我的$/ }));
 
     expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
@@ -117,7 +117,7 @@ describe("App routing", () => {
     await user.click(screen.getByRole("link", { name: /商店/ }));
     expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
 
-    await user.click(screen.getByRole("link", { name: /我的 skills/ }));
+    await user.click(screen.getByRole("link", { name: /^我的$/ }));
 
     // Still the reader's question, and live on the list it was typed on: the
     // installed list answers it. The page debounces the field it reads, so the

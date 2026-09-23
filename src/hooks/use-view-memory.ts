@@ -35,11 +35,11 @@ import {
  * @param scroller  the page's own scrolling element, whose position is part of
  *                  the view
  * @param ready     whether the list has content to scroll yet
- * @param signature the answer this view describes. The reader's controls live
- *                  in the header now, so they can change the list without the
- *                  page ever being unmounted: a depth remembered under a
- *                  different answer is not a place this reader was ever at, and
- *                  is dropped rather than restored.
+ * @param signature the answer this view describes. The reader's controls are
+ *                  shared with the other list, so they can change this one's
+ *                  answer without the page ever being unmounted: a depth
+ *                  remembered under a different answer is not a place this
+ *                  reader was ever at, and is dropped rather than restored.
  */
 export function useViewMemory<V>(
   name: string,

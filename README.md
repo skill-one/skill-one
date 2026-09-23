@@ -51,7 +51,7 @@ After that the app opens normally, and later in-app updates never prompt again. 
 
 ## Usage
 
-After launching the app, use the header's switcher to move between the following pages:
+After launching the app, use the rail on the left to move between the following pages:
 
 1. **Store / Explore**: Browse and install skills.
 2. **My Skills**: Update or uninstall installed skills.

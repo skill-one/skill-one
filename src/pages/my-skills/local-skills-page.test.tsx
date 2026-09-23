@@ -116,8 +116,8 @@ describe("LocalSkillsPage", () => {
   });
 
   it("offers the way back to the installed list from the header", async () => {
-    // The way out is the header's now, so the header is what the page is
-    // mounted under here.
+    // The way out is the header's first row now, so the header is what the page
+    // is mounted under here.
     renderWithRouter(
       <>
         <AppHeader />
@@ -126,9 +126,10 @@ describe("LocalSkillsPage", () => {
       { route: "/my-skills/local" },
     );
 
-    expect(
-      await screen.findByRole("link", { name: "返回我的 skills" }),
-    ).toHaveAttribute("href", "/my-skills");
+    expect(await screen.findByRole("link", { name: "返回" })).toHaveAttribute(
+      "href",
+      "/my-skills",
+    );
   });
 
   it("shows the empty state when every install has a source", async () => {
