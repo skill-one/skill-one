@@ -15,6 +15,7 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import { errorMessage } from "../../lib/utils";
+import { DrillDownHead } from "../../components/drill-down-head";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
 import { SkeletonList } from "../../components/skeleton-list";
@@ -92,21 +93,16 @@ export function LocalSkillsPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The way back to the installed list is the header's first row: this page
-          is inside it, and the header is where every page says what it is and
-          how to leave it (see `AppHeader`).
-
-          What is left here is the pool's identity, in the same voice as a
-          repository page's head — minus the repository, which is the whole point
-          of this page. */}
-      <div className="mb-4 min-w-0">
-        <h1 className="truncate text-lg font-semibold tracking-tight">
-          {LOCAL_SOURCE_LABEL}
-        </h1>
-        <p className="text-[12px] text-muted-foreground tabular-nums">
-          {rows.length} 个 skill
-        </p>
-      </div>
+      {/* The page's head: the way back to the installed list, and the pool's
+          identity in the same voice as a repository page's head — minus the
+          repository, which is the whole point of this page, and minus the face
+          and the action that would have to stand for one (see
+          `DrillDownHead`). */}
+      <DrillDownHead
+        back="/my-skills"
+        title={LOCAL_SOURCE_LABEL}
+        meta={`${rows.length} 个 skill`}
+      />
 
       <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5">
         {isError ? (

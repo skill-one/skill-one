@@ -99,6 +99,26 @@ describe("App routing", () => {
     expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
 
+  it("mounts a repository's page under the installed list's own route", async () => {
+    // The installed list's repository cards point here (see the card's own
+    // test); this is the route existing at all, which only the shell can say.
+    window.location.hash = "#/my-skills/repo/anthropics/skills";
+    render(<App />);
+
+    // The page mounts rather than falling through to the catch-all redirect —
+    // and it says which repository it is, the index it would list never landing
+    // in this file.
+    expect(
+      await screen.findByRole("heading", { name: "anthropics/skills" }),
+    ).toBeInTheDocument();
+    // The way out is the header's, and it leads back to the list this page
+    // hangs off. The shell routes on the hash, so that is what the href carries.
+    expect(screen.getByRole("link", { name: "返回" })).toHaveAttribute(
+      "href",
+      "#/my-skills",
+    );
+  });
+
   it("redirects unknown routes back to /my-skills", async () => {
     window.location.hash = "#/does-not-exist";
     render(<App />);

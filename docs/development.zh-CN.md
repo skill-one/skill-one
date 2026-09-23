@@ -56,6 +56,7 @@ skill-one/
 │   │   ├── ui/             # shadcn/ui 组件
 │   │   ├── app-header.tsx  # 应用外壳，单行：品牌居中 + 当前列表的控件
 │   │   ├── app-rail.tsx    # 应用导航：窄轨（两个入口、设置）
+│   │   ├── drill-down-head.tsx # 列表内页面的头行：返回控件 + 实体身份
 │   │   ├── list-facets.tsx # 当前列表内容区首行的分类 chips（含「更多」浮层）
 │   │   ├── list-toolbar.tsx # 两个列表共用的搜索框（行首）与单位切换（行尾）
 │   │   ├── agent-icon.tsx  # agent 品牌图标

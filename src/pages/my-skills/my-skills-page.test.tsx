@@ -156,6 +156,10 @@ describe("MySkillsPage", () => {
       name: "查看仓库 acme/tools，6 个 skill",
     });
     expect(bar).toHaveTextContent("6 个 skill");
+    // The door leads to the repository as *this* list reads it — the installs
+    // on disk — and not to the store's page for the same repository, which is
+    // one deliberate step further in (see `RepoPage`).
+    expect(bar).toHaveAttribute("href", "/my-skills/repo/acme/tools");
     expect(
       screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
     ).toHaveLength(5);

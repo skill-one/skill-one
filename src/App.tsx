@@ -102,6 +102,14 @@ export default function App() {
                       `owner/repo` itself, which carries a slash. */}
                   <Route path="/repo/*" element={<RepoPage />} />
                   <Route path="/my-skills" element={<MySkillsPage />} />
+                  {/* One repository as the installed list reads it: the skills
+                      of it that are on disk, with the rest of the catalogue a
+                      step away. The store's own page for the same repository
+                      is `/repo/*`, and the two share one component. */}
+                  <Route
+                    path="/my-skills/repo/*"
+                    element={<RepoPage origin="installed" />}
+                  />
                   {/* The installed list's local pool, listed whole — the page
                       the pool's card opens, as a repository's page is what a
                       repository card's bar opens. */}

@@ -4,7 +4,6 @@ import userEvent from "@testing-library/user-event";
 
 import { LocalSkillsPage } from "./local-skills-page";
 import { renderWithRouter } from "../../test/test-utils";
-import { AppHeader } from "../../components/app-header";
 import {
   resetMockAgentStatus,
   resetMockInstalledSkills,
@@ -115,21 +114,20 @@ describe("LocalSkillsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers the way back to the installed list from the header", async () => {
-    // The way out is the header's first row now, so the header is what the page
-    // is mounted under here.
-    renderWithRouter(
-      <>
-        <AppHeader />
-        <LocalSkillsPage />
-      </>,
-      { route: "/my-skills/local" },
-    );
+  it("carries the way back to the installed list in its own head", async () => {
+    // The way out is the page's head, beside the pool's identity — not the
+    // window's chrome above it (see `DrillDownHead`).
+    renderWithRouter(<LocalSkillsPage />, { route: "/my-skills/local" });
 
-    expect(await screen.findByRole("link", { name: "返回" })).toHaveAttribute(
-      "href",
-      "/my-skills",
-    );
+    const head = await screen.findByRole("heading", {
+      name: "本地安装",
+    });
+    const back = screen.getByRole("link", { name: "返回" });
+    expect(back).toHaveAttribute("href", "/my-skills");
+    // One row holds both: the control leads, the identity follows.
+    expect(
+      head.compareDocumentPosition(back) & Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy();
   });
 
   it("shows the empty state when every install has a source", async () => {

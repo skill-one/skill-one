@@ -109,6 +109,12 @@ no caller-controlled paths are accepted.
   it the same way. Its author chip is the one part that survives: the ledger
   vouches for the repo even when the registry does not. And a card's image slot
   falls back to the skill's own initial whenever no cover can be addressed.
+  A repository card's bar opens that repository as *this* list reads it
+  (`/my-skills/repo/owner/repo`): the installs the ledger placed there, listed
+  with the installed list's own chrome, and the rest of the store's catalogue
+  for the same repository behind one control at the foot of the list. The
+  store's own page for it (`/repo/owner/repo`) stays one step further away,
+  which is why a card no longer leads straight to it.
 
 ## Associating skills installed by other tools
 
