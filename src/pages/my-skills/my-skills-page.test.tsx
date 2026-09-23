@@ -711,6 +711,204 @@ describe("MySkillsPage", () => {
     );
   });
 
+  // The skill unit: the store's second reading of the same installs — one row
+  // per skill rather than one card per source. The page's own mocks serve it.
+
+  /** The four installs every run test gathers into one source. */
+  const RUN_SOURCE = ["pdf", "docx", "pptx", "mcp-builder"];
+
+  /** Records one source for every name of the run. */
+  function seedRunSource(repo = "acme/tools") {
+    seedMockProvenance(
+      Object.fromEntries(
+        RUN_SOURCE.map((name) => [name, { repo, slug: name }]),
+      ),
+    );
+  }
+
+  /**
+   * Answers the store-entry lookup with an entry per recorded source, so the
+   * installed list carries the registry facts (a classification, a figure) it
+   * cannot read off the disk. `downloads` names the ones that have a figure.
+   */
+  function seedStoreEntries(
+    downloads: Record<string, number> = {},
+    domain = "development",
+  ) {
+    lookupSkills.mockImplementation(
+      async (refs: Array<{ repo: string; name: string }>) => ({
+        entries: refs.map((ref) => ({
+          name: ref.name,
+          repo: ref.repo,
+          description: `${ref.name} 的商店描述`,
+          stars: 1200,
+          downloads: downloads[ref.name] ?? 0,
+          path: `skills/${ref.repo}/${ref.name}`,
+          profile: { domain: [domain] },
+        })),
+      }),
+    );
+  }
+
+  it("lists every install as its own row in the skill unit", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await screen.findByText("pdf");
+
+    await user.click(screen.getByRole("button", { name: "按技能" }));
+
+    // One row per install, uncapped: this is the whole list, so the unit that
+    // reads it one skill at a time reads all of it.
+    expect(
+      await screen.findAllByRole("button", { name: /查看 .+ 详情/ }),
+    ).toHaveLength(6);
+    // No card, so no bar: nothing in this unit is a door to a repository.
+    expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: /^查看本地安装/ }),
+    ).toBeNull();
+    // The enable switch rides the row, so both units manage the same skills.
+    expect(screen.getAllByRole("switch")).toHaveLength(6);
+  });
+
+  it("keeps the pool of source-less installs out of a run", async () => {
+    const user = userEvent.setup();
+    // Every install is a tool install: they share the empty source, and a run
+    // *means* "these come from one repository" — folding them would have to
+    // invent the one thing they do not have.
+    renderWithRouter(<MySkillsPage />);
+    await screen.findByText("pdf");
+
+    await user.click(screen.getByRole("button", { name: "按技能" }));
+
+    await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
+    expect(screen.queryByRole("button", { name: /还有 \d+ 个来自/ })).toBeNull();
+  });
+
+  it("folds a repository's run of four installs, stating the run's own figure", async () => {
+    const user = userEvent.setup();
+    // Four installs share one source the registry still lists: the store's own
+    // skill unit would fold them, and so does this one.
+    seedRunSource();
+    seedStoreEntries({ pdf: 30, docx: 20, pptx: 10, "mcp-builder": 5 });
+    renderWithRouter(<MySkillsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "按技能" }));
+
+    // The run leads with its most-installed skill and states the other three in
+    // one line, with the run's own combined figure (30 + 20 + 10 + 5) — not the
+    // whole list's and not another run's.
+    const fold = await screen.findByRole("button", {
+      name: /还有 3 个来自 acme\/tools/,
+    });
+    expect(fold).toHaveTextContent("共 65");
+    expect(fold).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "查看 docx 详情" })).toBeNull();
+
+    // A press unfolds them in place, in rank order.
+    await user.click(fold);
+    expect(
+      await screen.findByRole("button", { name: "查看 docx 详情" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /查看 .+ 详情/ })).toHaveLength(6);
+  });
+
+  it("states no figure for a run the registry cannot place", async () => {
+    const user = userEvent.setup();
+    // The same run, with no store entry behind it (a fork the index dropped):
+    // its rows carry no install figure, so the fold has none to state either —
+    // a fabricated 共 0 would contradict the rows above it.
+    seedRunSource();
+    renderWithRouter(<MySkillsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "按技能" }));
+
+    const fold = await screen.findByRole("button", {
+      name: /还有 3 个来自 acme\/tools/,
+    });
+    expect(fold).not.toHaveTextContent("共");
+  });
+
+  it("counts skills rather than repositories in the skill unit's chips", async () => {
+    const user = userEvent.setup();
+    seedMockProvenance({
+      pdf: { repo: "anthropics/skills", slug: "pdf" },
+      docx: { repo: "anthropics/skills", slug: "docx" },
+    });
+    seedStoreEntries({ pdf: 2991984, docx: 1991984 }, "content-creation");
+    renderWithRouter(<MySkillsPage />);
+
+    // The repository unit weighs a domain by repositories: one source holds
+    // both classified installs, so 内容创作 counts 1 beside 全部's 2 cards.
+    const chip = await screen.findByRole("button", { name: /^内容创作/ });
+    expect(chip).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent("2");
+
+    await user.click(screen.getByRole("button", { name: "按技能" }));
+
+    // The same chip now weighs skills, and 全部 every install.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^内容创作/ })).toHaveTextContent(
+        "2",
+      ),
+    );
+    expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent("6");
+
+    // Scoping keeps the skills that belong to the domain, whoever they share a
+    // source with: two is below the fold threshold, so each keeps its own row.
+    await user.click(screen.getByRole("button", { name: /^内容创作/ }));
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+      ).toHaveLength(2),
+    );
+
+    // Switching units clears the scope with it: the two units weigh a domain
+    // differently, so a scope set in one need not mean anything in the other.
+    await user.click(screen.getByRole("button", { name: "按仓库" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
+        "2",
+      ),
+    );
+  });
+
+  it("answers a search with rows in the skill unit", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await user.click(await screen.findByRole("button", { name: "按技能" }));
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+    // The match comes back as a row rather than a card, and as the only row: a
+    // search re-answers the list by relevance in either unit.
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+      ).toHaveLength(1),
+    );
+    expect(
+      screen.getByRole("button", { name: "查看 pdf 详情" }),
+    ).toBeInTheDocument();
+  });
+
+  it("walks the skill unit's own order in the detail drawer", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<MySkillsPage />);
+    await user.click(await screen.findByRole("button", { name: "按技能" }));
+
+    // The pool rows keep the unit's own order (equal figures, so source and
+    // name decide): code-review first, docx second.
+    await user.click(
+      await screen.findByRole("button", { name: "查看 code-review 详情" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("code-review")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(await within(dialog).findByText("docx")).toBeInTheDocument();
+  });
+
   it("stands the category bar down while searching", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);

@@ -90,7 +90,10 @@ no caller-controlled paths are accepted.
   `repo` matches the store entry's (or when there is no ledger entry — unknown
   source falls back to name-only). A same-named skill from a different repo
   stays installable.
-- **My-skills page** (`my-skills-page.tsx`): cards with a ledger entry carry
+- **My-skills page** (`my-skills-page.tsx`): the page lists the same installs in
+  either unit — the repository cards (按仓库) and the skill rows (按技能) — and
+  both present a skill identically, so a skill reads the same either way. A row
+  with a ledger entry carries
   the owner's GitHub avatar (the author chip on the card's metadata rail, whose
   hover card names the repo the card itself no longer prints) and the drawer's
   repo line; the detail drawer links to the source repo instead of reading as

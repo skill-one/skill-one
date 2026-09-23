@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Boxes, ChevronDown, List } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useRepoSections } from "../../hooks/use-repo-sections";
@@ -12,8 +11,6 @@ import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { domainLabel, domainMeta } from "../../data/domains";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import { byRepoRank } from "../../lib/registry/repo-rank";
-import { cn, formatCount } from "../../lib/utils";
-import type { SearchHit } from "../../lib/registry/protocol";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
@@ -22,13 +19,14 @@ import {
 } from "../../lib/skill-list-layout";
 import { Button } from "../../components/ui/button";
 import { DomainChip } from "../../components/domain-chip";
+import { ListUnitToggle, type ListUnit } from "../../components/list-unit-toggle";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
 import { SearchInput } from "../../components/search-input";
-import { ToggleGroup, ToggleGroupItem } from "../../components/ui/toggle-group";
 import { SkillListRow } from "./skill-list-row";
 import { SkillRow } from "./skill-row";
+import { SkillRun, buildSkillRuns, byInstalls } from "./skill-run";
 import { GroupSection } from "./group-section";
 import { RepoCard } from "./repo-card";
 
@@ -44,38 +42,6 @@ const GROUP_CHUNK = 6;
 
 /** Fold-state and React-key identity of the live skills.sh section. */
 const LIVE_GROUP_KEY = "skills-sh";
-
-/** What the list is made of: one repository card each, or one skill row each. */
-type Unit = "repo" | "skill";
-
-/** The skill unit's order: most installed first, then by source and name. */
-function byInstalls(a: SearchHit, b: SearchHit): number {
-  return (
-    b.skill.downloads - a.skill.downloads ||
-    a.skill.repo.localeCompare(b.skill.repo) ||
-    a.skill.name.localeCompare(b.skill.name)
-  );
-}
-
-/**
- * The smallest run of consecutive skills from one repository worth folding
- * away. A shorter run is listed whole: hiding one or two rows behind a "+N"
- * line trades a plain row for a row plus a press, which costs more than it
- * saves. From four on, the fold earns its keep.
- */
-const FOLD_MIN_RUN = 4;
-
-/** A run of consecutive skills from one repository. */
-interface SkillGroup {
-  /** The repository the run belongs to. */
-  repo: string;
-  /** The run head's rank (zero-based) in the flat list. */
-  start: number;
-  /** The run's skills, head first. */
-  items: SearchHit[];
-  /** The run's total installs, for the fold row's figure. */
-  total: number;
-}
 
 /**
  * The explore page's remembered view: the controls that have to come back
@@ -93,7 +59,7 @@ interface ExploreView {
    * The list's unit. Absent in entries written before the switch existed, and
    * read as `repo` — the page's original shape.
    */
-  unit?: Unit;
+  unit?: ListUnit;
 }
 
 /**
@@ -216,31 +182,10 @@ export function ExplorePage() {
     return list.toSorted(byInstalls);
   }, [unit, isSearching, groupsData, allSkills, selectedDomain]);
 
-  // Consecutive skills from one repository, gathered into runs so a repository
-  // that ships several close-ranked skills can show its best and fold the rest
-  // behind a single "+N more" row (see `SkillRun`, which decides whether a run
-  // is long enough to be worth folding). Only *adjacent* skills form a run: a
-  // repository whose skills the ranking separates stays listed where each falls.
-  const skillGroups = useMemo(() => {
-    const runs: SkillGroup[] = [];
-    let index = 0;
-    for (const hit of activeSkills) {
-      const last = runs.at(-1);
-      if (last && last.repo === hit.skill.repo) {
-        last.items.push(hit);
-        last.total += hit.skill.downloads;
-      } else {
-        runs.push({
-          repo: hit.skill.repo,
-          start: index,
-          items: [hit],
-          total: hit.skill.downloads,
-        });
-      }
-      index += 1;
-    }
-    return runs;
-  }, [activeSkills]);
+  // Consecutive skills from one repository, gathered into runs (see
+  // `buildSkillRuns`): a repository that ships several close-ranked skills can
+  // show its best and fold the rest behind a single "+N more" row.
+  const skillGroups = useMemo(() => buildSkillRuns(activeSkills), [activeSkills]);
 
   // The filter's chips for the current unit — repositories per domain, or skills
   // per domain: the two units file the same data differently. Both lead with the
@@ -368,7 +313,7 @@ export function ExplorePage() {
   // — and so does the domain scope: the two units file domains differently (a
   // repository's leading domain vs a skill's own), so a scope from one may have
   // no meaning in the other.
-  const handleUnit = (next: Unit) => {
+  const handleUnit = (next: ListUnit) => {
     if (next === unit) return;
     setSelected(null);
     setOpenGroups({});
@@ -396,30 +341,9 @@ export function ExplorePage() {
           disabled={!stats.ready}
           placeholder={stats.ready ? undefined : "索引构建中…"}
         />
-        {/* A segmented control, not a menu: there are exactly two units and
-            both are worth naming, so the current one stays legible at a glance
-            instead of hiding behind a trigger. */}
-        <ToggleGroup
-          className="ml-auto shrink-0"
-          variant="outline"
-          size="lg"
-          spacing={0}
-          value={[unit]}
-          onValueChange={(value) => {
-            const next = value[0];
-            if (next) handleUnit(next as Unit);
-          }}
-          aria-label="列表单位"
-        >
-          <ToggleGroupItem value="repo" className="gap-1.5 px-3">
-            <Boxes aria-hidden />
-            <span>按仓库</span>
-          </ToggleGroupItem>
-          <ToggleGroupItem value="skill" className="gap-1.5 px-3">
-            <List aria-hidden />
-            <span>按技能</span>
-          </ToggleGroupItem>
-        </ToggleGroup>
+        {/* The same unit switch the installed list offers, out at the far edge:
+            both lists re-answer themselves the same way. */}
+        <ListUnitToggle unit={unit} onChange={handleUnit} className="ml-auto" />
       </div>
 
       {/* The domain filter: every domain that holds rows, flat, one press to
@@ -531,8 +455,19 @@ export function ExplorePage() {
                           key={headKey}
                           group={group}
                           open={!!openGroups[headKey]}
-                          selected={selected}
-                          onOpen={setSelected}
+                          renderRow={(hit, index) => {
+                            const key = skillKey(hit.skill);
+                            return (
+                              <SkillRow
+                                key={key}
+                                skill={hit.skill}
+                                matched={hit.matched}
+                                index={index}
+                                selected={key === selected}
+                                onSelect={() => setSelected(key)}
+                              />
+                            );
+                          }}
                           onToggle={() =>
                             setOpenGroups((prev) => ({
                               ...prev,
@@ -611,92 +546,3 @@ export function ExplorePage() {
   );
 }
 
-/**
- * One repository's run in the skill unit: its best-ranked skill, and — when the
- * repository ships more than one — a quiet row that folds the rest away.
- *
- * A repository's skills are ranked together (they share a source, so they tend
- * to hold neighbouring installs), and a long run of them would push every other
- * repository down the page for what is, to the reader, one entry. So a run of
- * `FOLD_MIN_RUN` or more leads with its head and states the rest in one line —
- * "+N more from owner/repo", with the run's combined installs — unfolding them
- * in place on a press; a shorter run is listed whole, since hiding one or two
- * rows costs more than it saves. The fold is the reader's own toggle: the hidden
- * rows mount the moment it opens, and they stay part of the answer's detail walk
- * either way.
- *
- * The fold row borrows the row's own rhythm — the ordinal and glyph columns
- * stand empty — so its text starts exactly where every skill name does.
- */
-function SkillRun({
-  group,
-  open,
-  selected,
-  onOpen,
-  onToggle,
-}: {
-  group: SkillGroup;
-  /** Whether the run's hidden skills are unfolded. */
-  open: boolean;
-  /** The skill shown in the detail panel, by identity. */
-  selected: string | null;
-  /** Opens a skill's detail panel. */
-  onOpen: (key: string) => void;
-  /** Folds or unfolds the run's hidden skills. */
-  onToggle: () => void;
-}) {
-  // A run folds only once hiding actually saves rows: below the threshold it is
-  // listed whole — head and all — so there is no fold row and nothing to press.
-  const foldable = group.items.length >= FOLD_MIN_RUN;
-  const hidden = foldable ? group.items.slice(1) : [];
-  const shown = open || !foldable ? group.items : group.items.slice(0, 1);
-  return (
-    <>
-      {shown.map((hit, offset) => {
-        const key = skillKey(hit.skill);
-        return (
-          <SkillRow
-            key={key}
-            skill={hit.skill}
-            matched={hit.matched}
-            index={group.start + offset}
-            selected={key === selected}
-            onSelect={() => onOpen(key)}
-          />
-        );
-      })}
-      {hidden.length > 0 && (
-        <li className="-mt-2 flex flex-col">
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={onToggle}
-            className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-[12px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-          >
-            {/* The ordinal and glyph columns, left empty: the fold's text then
-                lines up with every skill name above and below it. */}
-            <span aria-hidden="true" className="w-6 shrink-0" />
-            <span aria-hidden="true" className="size-7 shrink-0" />
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate">
-                {open ? "收起" : `还有 ${hidden.length} 个来自 ${group.repo}`}
-              </span>
-              {!open && (
-                <span className="shrink-0 tabular-nums opacity-70">
-                  共 {formatCount(group.total)}
-                </span>
-              )}
-              <ChevronDown
-                aria-hidden="true"
-                className={cn(
-                  "size-3.5 shrink-0 transition-transform",
-                  open && "rotate-180",
-                )}
-              />
-            </span>
-          </button>
-        </li>
-      )}
-    </>
-  );
-}
