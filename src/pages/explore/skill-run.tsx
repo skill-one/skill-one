@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { cn, formatCount } from "../../lib/utils";
+import { OwnerAvatar } from "../../components/owner-avatar";
 
 /**
  * The skill unit's run and its fold, shared by the two skill lists that offer
@@ -136,9 +137,14 @@ export function SkillRun<T extends RankedSkill>({
       {shown.map((hit, offset) => renderRow(hit, group.start + offset))}
       {hidden.length > 0 && (
         <li className="-mt-2 flex flex-col">
+          {/* The name is stated in full rather than read off the split
+              children: the face sits between the words and the repo, and an
+              accessible name assembled from them would lose the space the
+              layout shows. */}
           <button
             type="button"
             aria-expanded={open}
+            aria-label={open ? "收起" : `还有 ${hidden.length} 个来自 ${group.repo}`}
             onClick={onToggle}
             className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-[12px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
           >
@@ -147,9 +153,27 @@ export function SkillRun<T extends RankedSkill>({
             <span aria-hidden="true" className="w-6 shrink-0" />
             <span aria-hidden="true" className="size-7 shrink-0" />
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate">
-                {open ? "收起" : `还有 ${hidden.length} 个来自 ${group.repo}`}
-              </span>
+              {open ? (
+                <span className="truncate">收起</span>
+              ) : (
+                <>
+                  <span className="shrink-0">
+                    {`还有 ${hidden.length} 个来自`}
+                  </span>
+                  {/* The owner's face right before the owner/repo it stands
+                      for — the same face the folded rows carry, so the fold
+                      reads as one source at a glance. A run's repo is never
+                      empty (buildSkillRuns never gathers the sourceless pool),
+                      but the guard keeps the fold renderable regardless. */}
+                  {group.repo && (
+                    <OwnerAvatar
+                      owner={group.repo.split("/")[0]}
+                      className="size-5 shrink-0 text-[9px]"
+                    />
+                  )}
+                  <span className="truncate">{group.repo}</span>
+                </>
+              )}
               {/* The run's combined installs, and only when the run carries a
                   figure at all: a run whose skills are all outside the registry
                   has none to state, and a fabricated 共 0 would contradict the

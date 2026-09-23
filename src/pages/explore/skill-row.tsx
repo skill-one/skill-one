@@ -171,7 +171,11 @@ export function SkillRow({
             and 48 identical copies only crowd the names. A skill with no source
             at all states it in words instead, there being no face to stand for
             it. The classification lives on the leading glyph, so it is not
-            repeated here. */}
+            repeated here. The figure takes a fixed right-aligned slot, sized
+            to the format's longest rendering (four digits, a point, a suffix —
+            "169.6K"): the digits then end on one edge at the row's far right,
+            where magnitudes are compared, and the face left of it sits in a
+            column of its own instead of drifting with the digits' width. */}
         <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
           {showSource && owner && (
             <OwnerAvatar
@@ -182,7 +186,9 @@ export function SkillRow({
           {showSource && !owner && (
             <span className="truncate">{LOCAL_SOURCE_LABEL}</span>
           )}
-          {storeBacked && <SkillInstalls skill={skill} className="text-[11px]" />}
+          {storeBacked && (
+            <SkillInstalls skill={skill} className="w-16 justify-end" />
+          )}
           {extra}
         </div>
 
