@@ -1,11 +1,9 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
-import { ArrowLeft, Boxes } from "lucide-react";
+import { Boxes } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
-import { useReturn } from "../../hooks/use-return";
 import {
   LOCAL_SOURCE_LABEL,
   installedSkillView,
@@ -92,23 +90,15 @@ export function LocalSkillsPage() {
   // The drawer walks the same list the page renders, in the same order.
   const allViews = useMemo(() => rows.map((row) => row.view), [rows]);
 
-  // Back to the installed list the reader came from — the entry itself, so the
-  // search, the scope and the revealed depth it was left at come back with it.
-  const back = useReturn("/my-skills");
-
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-5">
-      <Link
-        to={back.to}
-        onClick={back.onClick}
-        className="mb-3 flex w-fit items-center gap-1 rounded-md px-1.5 py-1 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-        返回我的 skills
-      </Link>
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
+      {/* The way back to the installed list is the header's: this page is inside
+          it, and the header is where every page says what it is and how to leave
+          it.
 
-      {/* The pool's identity, in the same voice as a repository page's head —
-          minus the repository, which is the whole point of this page. */}
+          What is left here is the pool's identity, in the same voice as a
+          repository page's head — minus the repository, which is the whole point
+          of this page. */}
       <div className="mb-4 min-w-0">
         <h1 className="truncate text-lg font-semibold tracking-tight">
           {LOCAL_SOURCE_LABEL}

@@ -1,11 +1,15 @@
 import { Search } from "lucide-react";
 
+import { cn } from "../lib/utils";
 import { Input } from "./ui/input";
 
 /**
- * The list pages' search field: a rounded input with a leading magnifier.
- * `label` names what is being searched and doubles as the accessible label,
- * so the visible hint and the announced one can never drift apart.
+ * The list search field: a rounded input with a leading magnifier. `label`
+ * names what is being searched and doubles as the accessible label, so the
+ * visible hint and the announced one can never drift apart.
+ *
+ * The width belongs to the caller: the field now sits in the header, where how
+ * much room it gets decides whether the row fits at the window's minimum size.
  */
 export function SearchInput({
   value,
@@ -13,6 +17,7 @@ export function SearchInput({
   label,
   disabled = false,
   placeholder,
+  className,
 }: {
   value: string;
   /** Receives the raw field value; debouncing is the caller's. */
@@ -23,9 +28,10 @@ export function SearchInput({
   disabled?: boolean;
   /** Overrides the `${label}...` hint, e.g. to say why the field is locked. */
   placeholder?: string;
+  className?: string;
 }) {
   return (
-    <div className="relative w-full max-w-sm">
+    <div className={cn("relative w-full", className)}>
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         value={value}

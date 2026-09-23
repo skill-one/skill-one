@@ -1,14 +1,8 @@
 import { Boxes, List } from "lucide-react";
 
 import { cn } from "../lib/utils";
+import type { ListUnit } from "../lib/list-view";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
-
-/**
- * What a skill list is made of: one repository card each, or one skill row each.
- * Absent in a remembered view written before the switch existed, and read as
- * `repo` — the shape both lists had first.
- */
-export type ListUnit = "repo" | "skill";
 
 /**
  * The unit switch shared by the two lists that offer both readings — the store's

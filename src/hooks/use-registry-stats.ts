@@ -9,8 +9,10 @@ import {
 
 /**
  * Progress snapshot of the registry worker: the climbing skill count, the
- * streaming/indexing flags, and a retry for a failed download. Shared by the
- * sidebar badge and the explore page's count row.
+ * streaming/indexing flags, and a retry for a failed download. The explore
+ * page's count row reads it; a consumer that wants one flag out of it should
+ * subscribe to that flag alone (`useRegistrySnapshot`), so a climbing count
+ * does not re-render it.
  */
 export function useRegistryStats(): RegistrySnapshot & {
   /** Re-download the registry (user-facing retry). */

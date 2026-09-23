@@ -54,7 +54,8 @@ skill-one/
 ├── src/                    # Frontend (React + TypeScript)
 │   ├── components/         # Components shared across pages
 │   │   ├── ui/             # shadcn/ui components
-│   │   ├── app-header.tsx  # The app's only navigation: brand + the two destinations + settings
+│   │   ├── app-header.tsx  # The app's chrome: brand, destinations, the current page's controls, settings
+│   │   ├── list-toolbar.tsx # The search field and the unit switch both lists share
 │   │   ├── agent-icon.tsx  # Agent brand icons
 │   │   ├── owner-avatar.tsx# Owner avatar (the metadata rail's author chip)
 │   │   ├── repo-hover-card.tsx # Author chip + its repository hover card

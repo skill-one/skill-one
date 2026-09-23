@@ -19,10 +19,19 @@
  * to be scrolled to.
  */
 export type ViewMemory<V> = {
-  /** The page's own controls and reveal depth, as the page holds them. */
+  /** The page's own reveal depth, as the page holds it. */
   view: V;
   /** Where the page's scroller sat, in pixels. */
   scrollTop: number;
+  /**
+   * The answer the page was showing when this was written — its query, its
+   * unit, its scope, however it names them. A list's controls live in the
+   * header, so a page can be re-answered without ever being unmounted; the
+   * reader then comes back to the same entry looking at a different list, and
+   * a depth from the old one is not a place they were ever at. Callers that
+   * have no such identity leave this out, and every visit is the same visit.
+   */
+  signature?: string;
 };
 
 const memories = new Map<string, ViewMemory<unknown>>();

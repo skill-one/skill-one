@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { Boxes, Users } from "lucide-react";
 
@@ -6,6 +6,7 @@ import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
+import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
 import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
 import {
@@ -26,9 +27,8 @@ import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage } from "../../lib/utils";
 import { buildSearchIndex } from "../../lib/search-index";
-import { SearchInput } from "../../components/search-input";
+import { setQuery, setScope } from "../../lib/list-view";
 import type { SkillMatched } from "../../components/skill-card";
-import { ListUnitToggle, type ListUnit } from "../../components/list-unit-toggle";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { SkillRow } from "../explore/skill-row";
 import { SkillRun, buildSkillRuns, byInstalls } from "../explore/skill-run";
@@ -133,17 +133,16 @@ export function MySkillsPage() {
 
   const list = useMemo(() => skills ?? [], [skills]);
 
-  // The search text, the domain scope and the list's unit are local state — the
-  // full installed list is already in memory, so everything below filters on
-  // the main thread.
-  const [search, setSearch] = useState("");
-  const [domain, setDomain] = useState<string | null>(null);
-  // The unit the list is read in: the repository cards it opened with, or one
-  // row per install (the store's own switch — see `ListUnitToggle`).
-  const [unit, setUnit] = useState<ListUnit>("repo");
+  // What the reader is looking for, how the list reads, and which
+  // classification they scoped it to: all three are the header's controls,
+  // shared with the store's list (see `lib/list-view`), so they are read from
+  // there. The full installed list is already in memory, so everything below
+  // filters on the main thread.
+  const search = useListQuery();
+  const { unit, scope } = useDestinationView("installed");
+  const domain = scope ?? null;
   // Which folds the reader has opened, by the run head's key: only the skill
-  // unit folds, and a run's head key belongs to the answer that produced it, so
-  // every control that re-answers the list clears these.
+  // unit folds, and a run's head key belongs to the answer that produced it.
   const [openRuns, setOpenRuns] = useState<Record<string, boolean>>({});
   // Open skill in the shared detail drawer, tracked by identity rather than by
   // index: the provenance and store-entry queries land asynchronously and
@@ -154,27 +153,21 @@ export function MySkillsPage() {
   const query = useDebouncedValue(search).trim();
   const isSearching = query.length > 0;
 
-  const handleSearch = (q: string) => {
-    setSearch(q);
+  // Anything that re-answers the list resets what only described the old one:
+  // the opened folds (a run's head key belongs to the answer that produced it)
+  // and the detail panel (its skill may not be in the new answer at all).
+  //
+  // The controls are the header's now, so this watches the answer instead of
+  // each control. Switching the unit still lands here as one change, because
+  // the list view drops the scope with the unit (`lib/list-view`).
+  const shownAnswer = useRef(`${query}\u0000${unit}\u0000${domain ?? "all"}`);
+  useEffect(() => {
+    const answer = `${query}\u0000${unit}\u0000${domain ?? "all"}`;
+    if (shownAnswer.current === answer) return;
+    shownAnswer.current = answer;
     setSelectedKey(null);
-    setOpenRuns({});
-  };
-  const handleDomain = (next: string | null) => {
-    if (next === domain) return;
-    setDomain(next);
-    setSelectedKey(null);
-    setOpenRuns({});
-  };
-  // Switching the unit re-answers the list, so the revealed depth is re-seeded
-  // with it — and so is the domain scope: the two units weigh a domain
-  // differently (repositories vs skills), so a scope from one may leave the
-  // other empty for a reason the reader never asked for.
-  const handleUnit = (next: ListUnit) => {
-    setUnit(next);
-    setSelectedKey(null);
-    setDomain(null);
-    setOpenRuns({});
-  };
+    setOpenRuns((open) => (Object.keys(open).length === 0 ? open : {}));
+  }, [query, unit, domain]);
 
   // Deep link from the menu bar popover: `/my-skills?skill=<name>` pre-fills
   // the search box, which ranks the targeted skill near the top (its name is
@@ -185,9 +178,7 @@ export function MySkillsPage() {
   useEffect(() => {
     const target = searchParams.get("skill");
     if (!target) return;
-    setSearch(target);
-    setSelectedKey(null);
-    setOpenRuns({});
+    setQuery(target);
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -336,50 +327,47 @@ export function MySkillsPage() {
     ) : undefined;
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-5">
-      {/* Toolbar, styled like the store's: the search field first, the same unit
-          switch the store offers, and the installed list's own control (the
-          agent strip) out at the far edge. */}
-      <div className="mb-4 flex items-center gap-3">
-        <SearchInput value={search} onChange={handleSearch} label="搜索 Skill" />
-
-        <ListUnitToggle unit={unit} onChange={handleUnit} className="ml-auto" />
-
-        <div className="flex items-center gap-2">
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
+      {/* The list's own row: every classification that holds an install, flat,
+          one press to scope the list (全部 clears it), and the installed
+          list's own control — the agent strip — out at the far edge. The
+          classification filter is a browse control: a search re-orders the list
+          by relevance and ignores it, so the chips stand only while browsing.
+          Its chips count what the unit lists, so their figures and the list
+          they scope can never disagree.
+          The strip is a status the reader is owed at all times, so it stays
+          whether or not there is a search — which is why this row stands even
+          when the chips do not. */}
+      <div className="mb-3 flex min-h-7 flex-wrap items-center gap-1.5">
+        {!isSearching && rows.length > 0 && (
+          <>
+            <DomainChip
+              selected={domain === null}
+              count={totalCount}
+              countLabel={countLabel}
+              expanded
+              onClick={() => setScope("installed", null)}
+            >
+              全部
+            </DomainChip>
+            {chips.map(({ key, count }) => (
+              <DomainChip
+                key={key}
+                selected={domain === key}
+                emoji={domainMeta(key)?.emoji}
+                count={count}
+                countLabel={countLabel}
+                onClick={() => setScope("installed", key)}
+              >
+                {domainLabel(key)}
+              </DomainChip>
+            ))}
+          </>
+        )}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <AgentAvatarMenu />
         </div>
       </div>
-
-      {/* The category filter: every classification that holds an install, flat,
-          one press to scope the list (全部 clears it). It is a browse control —
-          a search re-orders the list by relevance and ignores it — so it stands
-          only while browsing. Its chips count what the unit lists, so their
-          figures and the list they scope can never disagree. */}
-      {!isSearching && rows.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          <DomainChip
-            selected={domain === null}
-            count={totalCount}
-            countLabel={countLabel}
-            expanded
-            onClick={() => handleDomain(null)}
-          >
-            全部
-          </DomainChip>
-          {chips.map(({ key, count }) => (
-            <DomainChip
-              key={key}
-              selected={domain === key}
-              emoji={domainMeta(key)?.emoji}
-              count={count}
-              countLabel={countLabel}
-              onClick={() => handleDomain(key)}
-            >
-              {domainLabel(key)}
-            </DomainChip>
-          ))}
-        </div>
-      )}
 
       {/* The list — repository cards or skill rows; the modal detail drawer
           overlays either without reflowing it or moving its scroll position. */}

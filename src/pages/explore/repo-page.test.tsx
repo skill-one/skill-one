@@ -9,6 +9,7 @@ import { formatCount } from "../../lib/utils";
 import type { RegistryHarness } from "../../test/registry-harness";
 import type { Skill } from "../../types/skill";
 import { renderWithRouter } from "../../test/test-utils";
+import { AppHeader } from "../../components/app-header";
 import { RepoPage } from "./repo-page";
 
 /**
@@ -253,14 +254,19 @@ describe("RepoPage", () => {
     expect(screen.getByText("Instructions for skill-2.")).toBeInTheDocument();
   });
 
-  it("offers a way back to the store, and takes it", async () => {
+  it("offers a way back to the store from the header, and takes it", async () => {
     const user = userEvent.setup();
     bootRegistry(skillsOf(1));
+    // The way out is the header's now, so the header is what the page is
+    // mounted under here.
     renderWithRouter(
-      <Routes>
-        <Route path="/repo/*" element={<RepoPage />} />
-        <Route path="/explore" element={<div>store list</div>} />
-      </Routes>,
+      <>
+        <AppHeader />
+        <Routes>
+          <Route path="/repo/*" element={<RepoPage />} />
+          <Route path="/explore" element={<div>store list</div>} />
+        </Routes>
+      </>,
       { route: `/repo/${REPO}` },
     );
 
@@ -271,7 +277,7 @@ describe("RepoPage", () => {
     );
     // The href is where the control points for the reader the app cannot route
     // for itself: a modified click, and assistive tech reading the link.
-    const back = screen.getByRole("link", { name: "返回探索" });
+    const back = screen.getByRole("link", { name: "返回商店" });
     expect(back).toHaveAttribute("href", "/explore");
 
     // A plain click goes through the app's own way out instead — a pop when

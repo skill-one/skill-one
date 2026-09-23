@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import App from "./App";
@@ -23,9 +23,21 @@ vi.mock("./lib/registry/client", () => ({
   revalidateRegistry: vi.fn(() => new Promise(() => {})),
   searchSkills: vi.fn(() => new Promise(() => {})),
   lookupSkills: vi.fn(() => new Promise(() => {})),
+  // The store's own two answers. They stay pending: these tests drive real
+  // routing, not the worker, and a page that never resolves is a page that
+  // never needs data.
+  getGroups: vi.fn(() => new Promise(() => {})),
+  getRepoSections: vi.fn(() => new Promise(() => {})),
   getRegistrySnapshot: () => INITIAL_SNAPSHOT,
   subscribeRegistry: vi.fn(() => () => {}),
   resetRegistryClient: vi.fn(),
+}));
+
+// The live skills.sh answer is a plain upstream request and not this file's
+// subject, so it stays pending rather than reaching the network.
+vi.mock("./lib/skills-sh", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./lib/skills-sh")>()),
+  searchSkillsSh: vi.fn(() => new Promise(() => {})),
 }));
 
 // Vitest 5 clears mock history before every test (`clearMocks` defaults to
@@ -92,5 +104,28 @@ describe("App routing", () => {
     render(<App />);
 
     expect(await screen.findByText("pdf")).toBeInTheDocument();
+  });
+
+  it("keeps one search across both lists", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    // The field is the header's, and there is one of it: the question it holds
+    // follows the reader instead of being emptied for them.
+    await user.type(await screen.findByLabelText("搜索 Skill"), "pdf");
+
+    await user.click(screen.getByRole("link", { name: /商店/ }));
+    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
+
+    await user.click(screen.getByRole("link", { name: /我的 skills/ }));
+
+    // Still the reader's question, and live on the list it was typed on: the
+    // installed list answers it. The page debounces the field it reads, so the
+    // answer lands a beat after the value does.
+    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
+    await waitFor(() =>
+      expect(screen.queryByText("docx")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("pdf")).toBeInTheDocument();
   });
 });

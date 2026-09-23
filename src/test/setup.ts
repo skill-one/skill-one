@@ -4,6 +4,7 @@ import { beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { resetViewMemories } from "../lib/view-memory";
+import { resetListView } from "../lib/list-view";
 
 // jsdom does not implement ResizeObserver, which some Base UI primitives
 // depend on. Provide a minimal no-op implementation.
@@ -113,7 +114,12 @@ if (typeof Element !== "undefined") {
 //   across tests it makes it the one key they all share, and anything keyed by
 //   the entry (the view a list page remembers, `lib/view-memory`) is then read
 //   by a test that never visited it, previous search text and all.
+//
+// The shared list view (`lib/list-view`) needs the same treatment for a
+// different reason: it is not keyed by anything, so a query one test typed would
+// still be in the header when the next one renders.
 beforeEach(() => {
   window.history.replaceState(null, "", window.location.href);
   resetViewMemories();
+  resetListView();
 });

@@ -28,6 +28,7 @@ import { formatCount } from "../../lib/utils";
 import type { SkillView } from "../../lib/skill-view";
 import type { Skill } from "../../types/skill";
 import type { RegistryHarness } from "../../test/registry-harness";
+import { ListToolbar } from "../../components/list-toolbar";
 import { ExplorePage } from "./explore-page";
 
 /**
@@ -177,8 +178,11 @@ let queryClient: QueryClient;
 function renderExplorePage() {
   return render(
     <QueryClientProvider client={queryClient}>
-      {/* The real app mounts pages under a HashRouter. */}
+      {/* The real app mounts pages under a HashRouter, with the header above
+          them — and the search field and the unit switch are the header's now,
+          so a list that is typed into has to be mounted with it. */}
       <HashRouter>
+        <ListToolbar destination="store" />
         <ExplorePage />
       </HashRouter>
     </QueryClientProvider>,
@@ -205,6 +209,7 @@ function renderExploreRoutes() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/explore"]}>
+        <ListToolbar destination="store" />
         <Routes>
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/repo/*" element={<RepoStandIn />} />

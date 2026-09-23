@@ -54,7 +54,8 @@ skill-one/
 ├── src/                    # 前端（React + TypeScript）
 │   ├── components/         # 跨页面共享组件
 │   │   ├── ui/             # shadcn/ui 组件
-│   │   ├── app-header.tsx  # 应用唯一的导航：品牌 + 两个入口 + 设置
+│   │   ├── app-header.tsx  # 应用外壳：品牌、两个入口、当前页控件、设置
+│   │   ├── list-toolbar.tsx # 两个列表共用的搜索框与单位切换
 │   │   ├── agent-icon.tsx  # agent 品牌图标
 │   │   ├── owner-avatar.tsx# owner 头像（元信息行的作者头像）
 │   │   ├── repo-hover-card.tsx # 作者头像 + 其仓库信息浮窗

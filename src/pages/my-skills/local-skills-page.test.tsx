@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 import { LocalSkillsPage } from "./local-skills-page";
 import { renderWithRouter } from "../../test/test-utils";
+import { AppHeader } from "../../components/app-header";
 import {
   resetMockAgentStatus,
   resetMockInstalledSkills,
@@ -114,8 +115,16 @@ describe("LocalSkillsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers the way back to the installed list", async () => {
-    renderWithRouter(<LocalSkillsPage />, { route: "/my-skills/local" });
+  it("offers the way back to the installed list from the header", async () => {
+    // The way out is the header's now, so the header is what the page is
+    // mounted under here.
+    renderWithRouter(
+      <>
+        <AppHeader />
+        <LocalSkillsPage />
+      </>,
+      { route: "/my-skills/local" },
+    );
 
     expect(
       await screen.findByRole("link", { name: "返回我的 skills" }),

@@ -12,6 +12,7 @@ import { toast } from "../../components/ui/toast";
 import { getExcludedAgents } from "../../lib/agent-link-preferences";
 
 import { MySkillsPage } from "./my-skills-page";
+import { ListToolbar } from "../../components/list-toolbar";
 import { renderWithRouter } from "../../test/test-utils";
 import {
   addMockLocalSkill,
@@ -69,6 +70,22 @@ async function openAgentMenu(user: ReturnType<typeof userEvent.setup>) {
 const menuItem = (display: string, state: string) =>
   screen.findByRole("menuitem", { name: new RegExp(`${display}.*${state}`) });
 
+/**
+ * The page as the app mounts it, with the header's own controls above it: the
+ * search field and the unit switch belong to the header now, shared with the
+ * store's list, so a list that is typed into or re-unit-ed has to be mounted
+ * with them.
+ */
+function renderPage(route = "/my-skills") {
+  return renderWithRouter(
+    <>
+      <ListToolbar destination="installed" />
+      <MySkillsPage />
+    </>,
+    { route },
+  );
+}
+
 describe("MySkillsPage", () => {
   afterEach(() => {
     resetMockInstalledSkills();
@@ -80,7 +97,7 @@ describe("MySkillsPage", () => {
   });
 
   it("gives every source-less install a home in one repository-style card", async () => {
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     // The browse bar leads with 全部 and the 未分类 chip: an install no store
     // entry covers has no classification either, and that is not the dataset's
@@ -105,7 +122,7 @@ describe("MySkillsPage", () => {
   });
 
   it("renders each installed skill", async () => {
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     expect(await screen.findByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("docx")).toBeInTheDocument();
@@ -134,7 +151,7 @@ describe("MySkillsPage", () => {
         ].map((name) => [name, { repo: "acme/tools", slug: name }]),
       ),
     );
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     const bar = await screen.findByRole("link", {
       name: "查看仓库 acme/tools，6 个 skill",
@@ -148,7 +165,7 @@ describe("MySkillsPage", () => {
 
   it("removes a skill from its detail panel and updates the stats", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     // No card carries an uninstall control: the whole card body is a click
     // target and removal is irreversible, so the action lives one step away.
@@ -172,7 +189,7 @@ describe("MySkillsPage", () => {
 
   it("shows the empty state after removing every skill", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     for (let remaining = 6; remaining > 0; remaining--) {
       // The cards only answer to a role query once the panel has closed, so
@@ -193,7 +210,7 @@ describe("MySkillsPage", () => {
   });
 
   it("offers an enable toggle per row, all on by default", async () => {
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     const switches = await screen.findAllByRole("switch");
     expect(switches).toHaveLength(5);
@@ -204,7 +221,7 @@ describe("MySkillsPage", () => {
 
   it("toggles a skill off and back on", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     const pdfOn = await screen.findByRole("switch", { name: "关闭 pdf" });
     await user.click(pdfOn);
@@ -222,14 +239,14 @@ describe("MySkillsPage", () => {
     // A skill parked in the backend's disabled dir is reported with
     // enabled=false; the switch must reflect that instead of assuming on.
     setMockSkillEnabled("pdf", false);
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     const pdf = await screen.findByRole("switch", { name: "开启 pdf" });
     expect(pdf).toHaveAttribute("aria-checked", "false");
   });
 
   it("draws each row's switch without waiting for the pointer", async () => {
-    const { container } = renderWithRouter(<MySkillsPage />);
+    const { container } = renderPage();
 
     await screen.findByRole("switch", { name: "关闭 pdf" });
 
@@ -245,7 +262,7 @@ describe("MySkillsPage", () => {
   it("dims a disabled row and keeps its switch drawn", async () => {
     // The off switch is the fact that explains the dimmed row.
     setMockSkillEnabled("pdf", false);
-    const { container } = renderWithRouter(<MySkillsPage />);
+    const { container } = renderPage();
 
     await screen.findByRole("switch", { name: "开启 pdf" });
     const row = container.querySelector('[data-skill="pdf"]');
@@ -254,7 +271,7 @@ describe("MySkillsPage", () => {
   });
 
   it("shows each skill's description", async () => {
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     expect(
       await screen.findByText("PDF 文档读取、生成、合并、拆分与标注。"),
@@ -263,7 +280,7 @@ describe("MySkillsPage", () => {
 
   it("opens the shared detail drawer when a row is clicked", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     await user.click(
       await screen.findByRole("button", { name: "查看 pdf 详情" }),
@@ -289,7 +306,7 @@ describe("MySkillsPage", () => {
 
   it("walks the installed list with the arrow keys inside the drawer", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     await user.click(
       await screen.findByRole("button", { name: "查看 pdf 详情" }),
@@ -307,7 +324,7 @@ describe("MySkillsPage", () => {
   it("labels a no-source skill's drawer as 本地安装 without repo links", async () => {
     const user = userEvent.setup();
     addMockLocalSkill("my-local");
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     await user.click(
       await screen.findByRole("button", { name: "查看 my-local 详情" }),
@@ -320,7 +337,7 @@ describe("MySkillsPage", () => {
 
   it("does not open the drawer from the card's switch", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await screen.findByText("pdf");
 
     await user.click(await screen.findByRole("switch", { name: "关闭 pdf" }));
@@ -329,14 +346,14 @@ describe("MySkillsPage", () => {
 
   it("uses '暂无描述' as a placeholder when a skill has no description", async () => {
     installMockSkill("no-desc-skill");
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     expect(await screen.findByText("no-desc-skill")).toBeInTheDocument();
     expect(screen.getByText("暂无描述")).toBeInTheDocument();
   });
 
   it("names a source-less install as 本地安装 and draws no owner face", async () => {
-    const { container } = renderWithRouter(<MySkillsPage />);
+    const { container } = renderPage();
 
     await screen.findByText("pdf");
     // Every install here is tool-installed (no ledger entry), so the one card's
@@ -355,7 +372,7 @@ describe("MySkillsPage", () => {
   });
 
   it("names a recorded source in the card's bar, with the owner's face", async () => {
-    const { container } = renderWithRouter(<MySkillsPage />);
+    const { container } = renderPage();
     // The ledger has a source for pdf (installed through this app); the other
     // five are tool installs with no entry.
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
@@ -378,7 +395,7 @@ describe("MySkillsPage", () => {
   it("links a sourced skill's detail drawer to its repo instead of 本地安装", async () => {
     const user = userEvent.setup();
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await screen.findByText("pdf");
     // The provenance query lands asynchronously and moves pdf into its own
     // repository card; wait for that reshuffle to settle before clicking, so
@@ -403,7 +420,7 @@ describe("MySkillsPage", () => {
   it("carries the enable switch, and no registry figures, into the drawer", async () => {
     const user = userEvent.setup();
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     // Same wait: the provenance-driven regroup settles before the click.
     await screen.findByText("pdf");
     await screen.findByRole("link", {
@@ -456,7 +473,7 @@ describe("MySkillsPage", () => {
         },
       ],
     });
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     // The resolved entry is what classifies the install, so a chip for its
     // domain joins the filter bar — and the card's bar prints the repository's
@@ -479,7 +496,7 @@ describe("MySkillsPage", () => {
     // The lookup answers nothing for the ref (a fork the index dropped, say):
     // the card keeps the recorded source — its bar is what names it — and shows
     // no classification and no figure: an absent fact is not a zero one.
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     expect(
       await screen.findByRole("link", {
@@ -512,7 +529,7 @@ describe("MySkillsPage", () => {
       ],
       total: 1,
     });
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     const badge = await screen.findByRole("button", {
       name: "将 pdf 迁移至商店版",
@@ -564,7 +581,7 @@ describe("MySkillsPage", () => {
       ],
       total: 1,
     });
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     // No migration affordance — it linked on its own.
     await waitFor(() =>
@@ -588,7 +605,7 @@ describe("MySkillsPage", () => {
   it("pre-fills the search box from the ?skill= deep link", async () => {
     // The menu bar popover deep links to /my-skills?skill=<name>; the page
     // must land with that skill pre-filtered and consume the param.
-    renderWithRouter(<MySkillsPage />, { route: "/my-skills?skill=pdf" });
+    renderPage("/my-skills?skill=pdf");
 
     expect(
       await screen.findByLabelText("搜索 Skill"),
@@ -601,7 +618,7 @@ describe("MySkillsPage", () => {
 
   it("filters skills by search text", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await screen.findByText("pdf");
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
@@ -624,7 +641,7 @@ describe("MySkillsPage", () => {
 
   it("highlights matched terms on a searched card, like the store's list", async () => {
     const user = userEvent.setup();
-    const { container } = renderWithRouter(<MySkillsPage />);
+    const { container } = renderPage();
     await screen.findByText("pdf");
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
@@ -637,7 +654,7 @@ describe("MySkillsPage", () => {
   });
 
   it("renders no marks outside a search", async () => {
-    const { container } = renderWithRouter(<MySkillsPage />);
+    const { container } = renderPage();
 
     await screen.findByText("pdf");
     expect(container.querySelector("mark")).toBeNull();
@@ -645,7 +662,7 @@ describe("MySkillsPage", () => {
 
   it("searches Chinese text but not a fragment inside a word", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await screen.findByText("pdf");
 
     // The descriptions here are Chinese and carry no word separators; the
@@ -664,7 +681,7 @@ describe("MySkillsPage", () => {
 
   it("shows a no-match empty state for a search with no results", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await screen.findByText("pdf");
 
     await user.type(screen.getByLabelText("搜索 Skill"), "zzz");
@@ -690,7 +707,7 @@ describe("MySkillsPage", () => {
         },
       ],
     });
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     await user.click(await screen.findByRole("button", { name: /^内容创作/ }));
 
@@ -754,7 +771,7 @@ describe("MySkillsPage", () => {
 
   it("lists every install as its own row in the skill unit", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await screen.findByText("pdf");
 
     await user.click(screen.getByRole("button", { name: "按技能" }));
@@ -778,7 +795,7 @@ describe("MySkillsPage", () => {
     // Every install is a tool install: they share the empty source, and a run
     // *means* "these come from one repository" — folding them would have to
     // invent the one thing they do not have.
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await screen.findByText("pdf");
 
     await user.click(screen.getByRole("button", { name: "按技能" }));
@@ -793,7 +810,7 @@ describe("MySkillsPage", () => {
     // skill unit would fold them, and so does this one.
     seedRunSource();
     seedStoreEntries({ pdf: 30, docx: 20, pptx: 10, "mcp-builder": 5 });
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     await user.click(await screen.findByRole("button", { name: "按技能" }));
 
@@ -821,7 +838,7 @@ describe("MySkillsPage", () => {
     // its rows carry no install figure, so the fold has none to state either —
     // a fabricated 共 0 would contradict the rows above it.
     seedRunSource();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     await user.click(await screen.findByRole("button", { name: "按技能" }));
 
@@ -838,7 +855,7 @@ describe("MySkillsPage", () => {
       docx: { repo: "anthropics/skills", slug: "docx" },
     });
     seedStoreEntries({ pdf: 2991984, docx: 1991984 }, "content-creation");
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     // The repository unit weighs a domain by repositories: one source holds
     // both classified installs, so 内容创作 counts 1 beside 全部's 2 cards.
@@ -877,7 +894,7 @@ describe("MySkillsPage", () => {
 
   it("answers a search with rows in the skill unit", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await user.click(await screen.findByRole("button", { name: "按技能" }));
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
@@ -896,7 +913,7 @@ describe("MySkillsPage", () => {
 
   it("walks the skill unit's own order in the detail drawer", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await user.click(await screen.findByRole("button", { name: "按技能" }));
 
     // The pool rows keep the unit's own order (equal figures, so source and
@@ -913,7 +930,7 @@ describe("MySkillsPage", () => {
 
   it("stands the category bar down while searching", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await screen.findByText("pdf");
     expect(screen.getByRole("button", { name: /^全部/ })).toBeInTheDocument();
 
@@ -930,7 +947,7 @@ describe("MySkillsPage", () => {
 
   it("lists every detected agent in the strip's dropdown menu", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
 
     await openAgentMenu(user);
 
@@ -946,7 +963,7 @@ describe("MySkillsPage", () => {
 
   it("keeps the menu rows inert — linking is automatic", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await openAgentMenu(user);
 
     // Selecting a row changes nothing: the menu is a status view, and the
@@ -962,7 +979,7 @@ describe("MySkillsPage", () => {
   it("unlinks a linked agent from the settings dialog and remembers it", async () => {
     const user = userEvent.setup();
     const successSpy = vi.spyOn(toast, "add");
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await openAgentMenu(user);
     await user.click(
       await screen.findByRole("button", { name: "Agent 链接设置" }),
@@ -985,7 +1002,7 @@ describe("MySkillsPage", () => {
   it("re-links an unlinked agent from the settings dialog", async () => {
     const user = userEvent.setup();
     const successSpy = vi.spyOn(toast, "add");
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await openAgentMenu(user);
     await user.click(
       await screen.findByRole("button", { name: "Agent 链接设置" }),
@@ -1007,7 +1024,7 @@ describe("MySkillsPage", () => {
 
   it("pins a canonical agent's switch in the settings dialog", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
+    renderPage();
     await openAgentMenu(user);
     await user.click(
       await screen.findByRole("button", { name: "Agent 链接设置" }),

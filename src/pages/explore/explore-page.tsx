@@ -8,8 +8,10 @@ import { skillKey } from "../../lib/skill-view";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
+import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { domainLabel, domainMeta } from "../../data/domains";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
+import { setScope } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
 import {
   REPO_CARD_SKELETON_CLASS,
@@ -19,11 +21,9 @@ import {
 } from "../../lib/skill-list-layout";
 import { Button } from "../../components/ui/button";
 import { DomainChip } from "../../components/domain-chip";
-import { ListUnitToggle, type ListUnit } from "../../components/list-unit-toggle";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
-import { SearchInput } from "../../components/search-input";
 import { SkillListRow } from "./skill-list-row";
 import { SkillRow } from "./skill-row";
 import { SkillRun, buildSkillRuns, byInstalls } from "./skill-run";
@@ -44,22 +44,15 @@ const GROUP_CHUNK = 6;
 const LIVE_GROUP_KEY = "skills-sh";
 
 /**
- * The explore page's remembered view: the controls that have to come back
- * together after a drill-down, plus how deep the list was revealed.
+ * The explore page's remembered view: how deep the list had been revealed.
+ *
+ * The controls are not in here any more. They belong to the header and are
+ * shared with the installed list (see `lib/list-view`), so what a page alone
+ * knows is what a page alone remembers — and `useViewMemory` drops even that
+ * once the controls have moved on to another answer.
  */
 interface ExploreView {
-  search: string;
   visibleCount: number;
-  /**
-   * The domain the list is scoped to, by its key; absent means every domain
-   * ("全部"). Absent in entries written before the filter existed.
-   */
-  domain?: string;
-  /**
-   * The list's unit. Absent in entries written before the switch existed, and
-   * read as `repo` — the page's original shape.
-   */
-  unit?: ListUnit;
 }
 
 /**
@@ -85,30 +78,39 @@ export function ExplorePage() {
   // Settings; a change there re-renders this list live.
   const maxSkills = useRepoCardLimit();
 
-  // What the reader has typed, how deep they had revealed the list, and which
-  // domain they scoped the browse to. They live in one object, remembered per
-  // history entry, because a drill-down — into a repository's page and back —
-  // unmounts this page: all three have to come back together, or the reader is
-  // handed a page they were not on.
+  // What the reader is looking for, how the list reads, and which domain they
+  // scoped the browse to: all three are the header's controls, shared with the
+  // installed list, so they are read from there rather than held here.
+  const search = useListQuery();
+  const { unit, scope } = useDestinationView("store");
+  // The filter is a browse control: a search re-orders the whole registry by
+  // relevance, so it ignores the filter (and the filter bar stands down).
+  const selectedDomain = scope ?? null;
+
+  const query = useDebouncedValue(search).trim();
+  const isSearching = query.length > 0;
+
+  // The answer this page is showing, named by the controls that produced it.
+  // The depth below is remembered against it: the controls can re-answer the
+  // list without the page ever being unmounted, and a depth revealed for one
+  // answer is not a place the reader is at under another.
+  const signature = `${query}\u0000${unit}\u0000${selectedDomain ?? "all"}`;
+
+  // How deep the list had been revealed, remembered per history entry: a
+  // drill-down — into a repository's page and back — unmounts this page, and
+  // the depth has to come back with it or the reader is handed a page they were
+  // not on.
   //
   // The scroll position waits for content: until the first skill lands the page
   // holds a skeleton, and a position restored into a skeleton is spent on
   // nothing.
   const [view, setView] = useViewMemory<ExploreView>(
     "explore",
-    { search: "", visibleCount: INITIAL_GROUPS },
+    { visibleCount: INITIAL_GROUPS },
     listRef,
-    { ready: stats.count > 0 },
+    { ready: stats.count > 0, signature },
   );
-  const { search, visibleCount } = view;
-  const query = useDebouncedValue(search).trim();
-  const isSearching = query.length > 0;
-  // The filter is a browse control: a search re-orders the whole registry by
-  // relevance, so it ignores the filter (and the filter bar stands down).
-  const selectedDomain = view.domain ?? null;
-  // The list's unit — one repository card each, or one skill row each. Absent in
-  // entries written before the switch existed, read as `repo`.
-  const unit = view.unit ?? "repo";
+  const { visibleCount } = view;
 
   // A search's answer: repository groups in relevance order, flat. It is asked
   // only while a search is live — the browse list answers the same repositories
@@ -291,68 +293,42 @@ export function ExplorePage() {
     const indexed = new Set(flatSkills.map(skillKey));
     return (liveData ?? []).filter((s) => !indexed.has(skillKey(s)));
   }, [liveData, flatSkills]);
-  const handleSearch = (q: string) => {
+  // Anything that re-answers the list resets what only described the old one:
+  // the revealed depth (it belongs to the list it was revealed for), the opened
+  // folds (a run's head key belongs to the answer that produced it) and the
+  // detail panel (its skill may not be in the new answer at all).
+  //
+  // The controls are the header's now, so this watches the answer instead of
+  // each control. Switching the unit still lands here as one change, because
+  // the list view drops the scope with the unit (`lib/list-view`).
+  //
+  // Only a *change* resets: mounting with the answer already in hand is the
+  // reader coming back to it, and the depth they left it at is the whole point
+  // of the memory above.
+  const shownAnswer = useRef(signature);
+  useEffect(() => {
+    if (shownAnswer.current === signature) return;
+    shownAnswer.current = signature;
     setSelected(null);
-    setOpenGroups({});
-    setView((v) => ({ ...v, search: q, visibleCount: INITIAL_GROUPS }));
-  };
-  // Picking a domain (or 全部) re-answers the list, so the revealed depth resets
-  // with it — the same reset a new search gets, and for the same reason: the old
-  // depth describes a list that no longer exists. The opened folds reset with it
-  // for a like reason: a run's head key belongs to the answer that produced it.
-  const handleDomain = (next: string | null) => {
-    if (next === selectedDomain) return;
-    setSelected(null);
-    setOpenGroups({});
-    setView((v) => ({
-      ...v,
-      domain: next ?? undefined,
-      visibleCount: INITIAL_GROUPS,
-    }));
-  };
-  // Switching the unit re-answers the list, so the revealed depth resets with it
-  // — and so does the domain scope: the two units file domains differently (a
-  // repository's leading domain vs a skill's own), so a scope from one may have
-  // no meaning in the other.
-  const handleUnit = (next: ListUnit) => {
-    if (next === unit) return;
-    setSelected(null);
-    setOpenGroups({});
-    setView((v) => ({
-      ...v,
-      unit: next,
-      domain: undefined,
-      visibleCount: INITIAL_GROUPS,
-    }));
-  };
+    setOpenGroups((open) => (Object.keys(open).length === 0 ? open : {}));
+    setView((v) =>
+      v.visibleCount === INITIAL_GROUPS
+        ? v
+        : { ...v, visibleCount: INITIAL_GROUPS },
+    );
+  }, [signature, setView]);
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-5">
-      {/* Toolbar: the search field, and the list's unit out at the far edge.
-          Both re-answer the same list, so they share one bar; the domain filter
-          below belongs to both units. */}
-      <div className="mb-4 flex items-center gap-3">
-        {/* Search runs on the worker's MiniSearch index, which only exists
-            once the whole registry has landed. Before that the field is
-            locked, so a query is never answered over a partial registry. */}
-        <SearchInput
-          value={search}
-          onChange={handleSearch}
-          label="搜索 Skill"
-          disabled={!stats.ready}
-          placeholder={stats.ready ? undefined : "索引构建中…"}
-        />
-        {/* The same unit switch the installed list offers, out at the far edge:
-            both lists re-answer themselves the same way. */}
-        <ListUnitToggle unit={unit} onChange={handleUnit} className="ml-auto" />
-      </div>
-
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
       {/* The domain filter: every domain that holds rows, flat, one press to
           scope the list (全部 clears it). It is a browse control — a search
           re-orders the whole registry by relevance and ignores it — so it stands
           only while browsing. Its chips and their counts follow the unit: the
           repository unit weighs a domain by repositories, the skill unit by
-          skills. */}
+          skills.
+          It is content, not chrome: the header above already carries the two
+          controls both lists share, so this row is the list's own and reads as
+          part of it. */}
       {!isSearching && (
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
           <DomainChip
@@ -360,7 +336,7 @@ export function ExplorePage() {
             count={totalCount}
             countLabel={countLabel}
             expanded
-            onClick={() => handleDomain(null)}
+            onClick={() => setScope("store", null)}
           >
             全部
           </DomainChip>
@@ -371,7 +347,7 @@ export function ExplorePage() {
               emoji={domainMeta(key)?.emoji}
               count={count}
               countLabel={countLabel}
-              onClick={() => handleDomain(key)}
+              onClick={() => setScope("store", key)}
             >
               {domainLabel(key)}
             </DomainChip>
