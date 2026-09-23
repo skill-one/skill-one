@@ -723,7 +723,7 @@ describe("createRegistryController — getRepoSections", () => {
         // A tied lead count (1–1): the heavier development skill decides.
         classified(3, "o/mixed", ["development"], { downloads: 50 }),
         classified(4, "o/mixed", ["testing"], { downloads: 10 }),
-        // No profile at all → the catch-all beside the dataset's own.
+        // No profile at all → nobody classified this repository.
         skill(5, { repo: "o/none", downloads: 5 }),
         classified(6, "o/other", ["other"], { downloads: 1 }),
       ],
@@ -737,12 +737,14 @@ describe("createRegistryController — getRepoSections", () => {
       total: number;
     }>(t.recorded.results[0]);
 
-    // Two repositories each in development and the catch-all; their tie breaks
-    // by the taxonomy's own order, so development leads.
+    // Development holds two repositories and leads; the three singletons follow
+    // in the taxonomy's own order, with the dataset's 其他 before the
+    // unclassified one — an answer before a blank.
     expect(data.sections.map((s) => s.key)).toEqual([
       "domain-development",
-      "domain-other",
       "domain-testing",
+      "domain-other",
+      "domain-unclassified",
     ]);
     // The tied repository joins development, and each section keeps the browse
     // order (stars first).
@@ -750,10 +752,10 @@ describe("createRegistryController — getRepoSections", () => {
       "o/mixed",
       "o/dev",
     ]);
-    expect(data.sections[1].repos.map((r) => r.title)).toEqual([
-      "o/other",
-      "o/none",
-    ]);
+    // A repository whose skills all say 其他 is not the same as one nothing
+    // classified: each keeps its own section, and so its own chip.
+    expect(data.sections[2].repos.map((r) => r.title)).toEqual(["o/other"]);
+    expect(data.sections[3].repos.map((r) => r.title)).toEqual(["o/none"]);
     // Every repository appears exactly once.
     expect(data.total).toBe(5);
     expect(data.sections.flatMap((s) => s.repos)).toHaveLength(5);

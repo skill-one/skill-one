@@ -32,6 +32,8 @@ One JSON object per line, sorted by installs descending:
 
 The classification rides the index row, so one parsed line yields a fully decorated skill — there is no second source to merge in afterwards. A skill may legitimately belong to several domains, which is why grouping and filtering match by membership rather than by an exact value.
 
+A *missing* classification is a third state, not 其他: the enum's `other` is the dataset's answer that no domain fits, while a skill the generator never reached has no answer at all. The app marks the two apart — 其他 wears a box (📦), the unanswered one a question mark (❓, 未分类) — and the filter bar keeps a chip for each, so a scope that promises 其他 never silently includes the skills nobody looked at.
+
 GitHub star counts are **not** carried by the skill rows: they live in the `upstream/repos.jsonl` sidecar below and are joined in at parse time.
 
 ## Repo metadata (upstream/repos.jsonl)

@@ -82,12 +82,14 @@ describe("MySkillsPage", () => {
   it("gives every source-less install a home in one repository-style card", async () => {
     renderWithRouter(<MySkillsPage />);
 
-    // The browse bar leads with 全部 and a chip for the catch-all every
-    // unclassified install pools into.
+    // The browse bar leads with 全部 and the 未分类 chip: an install no store
+    // entry covers has no classification either, and that is not the dataset's
+    // 其他 — nobody has looked at it at all.
     expect(
       await screen.findByRole("button", { name: /^全部/ }),
     ).toHaveTextContent("1");
-    expect(screen.getByRole("button", { name: /^其他/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^未分类/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^其他/ })).toBeNull();
     // No install has a recorded source, so every skill lives in one pool card:
     // it lists the preview size, and its bar states the total.
     expect(await screen.findByText("本地安装")).toBeInTheDocument();

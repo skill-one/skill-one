@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { ordinalClass } from "../../lib/ordinal";
 import { LOCAL_SOURCE_LABEL, type SkillView } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
-import { domainMeta, domainTooltip } from "../../data/domains";
+import { domainEmoji, domainTooltip } from "../../data/domains";
 import {
   HighlightedText,
   type SkillMatched,
@@ -40,8 +40,10 @@ export type { SkillMatched };
  * The leading glyph is the classification, not the owner: on a repository's own
  * page the owner is the same for every row and says nothing, while the domain is
  * the one fact that varies row to row. Pointing at the glyph names the domain,
- * its scope and any other domains the skill belongs to; an unclassified skill
- * wears the catch-all mark.
+ * its scope and any other domains the skill belongs to. A skill nothing
+ * classified wears the question mark, a box stands for the dataset's own 其他,
+ * and both are filled in by `domainEmoji` — the same resolver the card's slot
+ * calls, so the two surfaces cannot mark one skill two ways.
  *
  * It is bound to the store like `SkillListRow` is: the corner action is the
  * install button. Unlike `SkillListRow` it is a full-width row with no grid
@@ -102,7 +104,6 @@ export function SkillRow({
   // has none.
   const [owner] = skill.repo.split("/");
   const domain = skill.profile?.domain;
-  const meta = domain?.[0] ? domainMeta(domain[0]) : undefined;
 
   return (
     <li className="flex flex-col">
@@ -139,13 +140,13 @@ export function SkillRow({
         </span>
 
         {/* The classification leads the row. The tip names the domain, its scope
-            and any other domains the skill belongs to; an unclassified skill
-            wears the catch-all mark. */}
+            and any other domains the skill belongs to — and answers for a skill
+            nothing classified, which wears the question mark here. */}
         <Tooltip>
           <TooltipTrigger
             render={
               <span className="flex size-7 shrink-0 items-center justify-center text-base leading-none">
-                {meta?.emoji ?? "❓"}
+                {domainEmoji(domain)}
               </span>
             }
           />

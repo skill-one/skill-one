@@ -6,6 +6,19 @@
  *
  * A key missing here (a future rename upstream) simply renders as its raw key
  * without an emoji, and the tooltip falls back to that label.
+ *
+ * A skill's classification has three states, and the taxonomy keeps two of them
+ * apart on purpose:
+ *
+ * - **A domain** — the dataset placed the skill, and the label says where.
+ * - **`other`** (其他, 📦) — the dataset placed it *nowhere*: an answer, "none of
+ *   the above fit", which is why it wears a box of leftovers rather than a
+ *   question.
+ * - **Nothing at all** ({@link UNCLASSIFIED_DOMAIN}, 未分类, ❓) — nobody
+ *   classified it: a local install the store has never seen, an index that does
+ *   not list it, or a key this build does not know. That one is a question, so
+ *   it wears one, and it is deliberately *not* part of `DOMAINS`: the upstream
+ *   enum has no such value, and nothing may file a skill there.
  */
 
 export interface DomainMeta {
@@ -100,18 +113,43 @@ export const DOMAINS: DomainMeta[] = [
   {
     key: "other",
     name: "其他",
-    emoji: "❓",
-    description: "仅当以上分类确实都不贴合时使用, 不要勉强归类",
+    // A box of leftovers, not a question mark: the dataset *did* classify
+    // these, and its answer was "none of the above fit". The question mark
+    // belongs to the skills nothing classified at all.
+    emoji: "📦",
+    description: "以上分类都不贴合, 或横跨多个领域而无法归入单一分类",
   },
 ];
 
-const BY_KEY = new Map(DOMAINS.map((domain) => [domain.key, domain]));
-const BY_NAME = new Map(DOMAINS.map((domain) => [domain.name, domain]));
+/**
+ * The key for the third state: a skill no classification covers at all. Not an
+ * upstream value — the facets report it for a skill with no `profile.domain`,
+ * and {@link domainMeta} resolves it so every surface can name and mark it the
+ * same way.
+ */
+export const UNCLASSIFIED_DOMAIN = "unclassified";
+
+/** See {@link UNCLASSIFIED_DOMAIN}; outside `DOMAINS`, resolvable all the same. */
+const UNCLASSIFIED: DomainMeta = {
+  key: UNCLASSIFIED_DOMAIN,
+  name: "未分类",
+  emoji: "❓",
+  description: "没有分类信息: 商店未收录, 或上游的分类键本版不认识",
+};
+
+const BY_KEY = new Map(
+  [...DOMAINS, UNCLASSIFIED].map((domain) => [domain.key, domain]),
+);
+const BY_NAME = new Map(
+  [...DOMAINS, UNCLASSIFIED].map((domain) => [domain.name, domain]),
+);
 
 /**
  * The metadata for one domain, looked up by its upstream key or by its
  * display label — a group header carries the label while a skill's profile
- * carries the key, and both need the emoji. Undefined when unknown.
+ * carries the key, and both need the emoji. Also answers for
+ * {@link UNCLASSIFIED_DOMAIN}, so the state with no upstream key still has a
+ * label, a mark and a tip. Undefined when unknown.
  */
 export function domainMeta(nameOrKey: string): DomainMeta | undefined {
   return BY_KEY.get(nameOrKey) ?? BY_NAME.get(nameOrKey);
@@ -123,16 +161,28 @@ export function domainLabel(key: string): string {
 }
 
 /**
+ * The mark a skill wears in a list's glyph slot: its leading domain's emoji, or
+ * the question mark when nothing classified it — an empty list, or a key this
+ * build does not know. The one resolver the row and the card both call, so a
+ * skill is marked the same wherever it is listed; a slot with nothing to say is
+ * still a slot that lines up.
+ */
+export function domainEmoji(domain?: readonly string[]): string {
+  const key = domain?.[0];
+  return (key ? domainMeta(key)?.emoji : undefined) ?? UNCLASSIFIED.emoji;
+}
+
+/**
  * The hover text for a skill's classification: the leading domain's scope
  * description — or its label, for a key outside the taxonomy — plus the other
- * domains the skill belongs to. `domain` is best fit first; empty (a skill the
- * dataset has not classified) reads as 未分类.
+ * domains the skill belongs to. `domain` is best fit first; empty (a skill
+ * nothing classified) reads as 未分类, and so does an unknown key, which is the
+ * same state one upstream rename later.
  */
-export function domainTooltip(domain: string[]): string {
-  const key = domain[0];
-  if (!key) return "未分类";
-  const meta = domainMeta(key);
-  const base = meta ? `${meta.emoji} ${meta.description}` : domainLabel(key);
+export function domainTooltip(domain: readonly string[]): string {
+  const key = domain[0] ?? UNCLASSIFIED_DOMAIN;
+  const meta = domainMeta(key) ?? UNCLASSIFIED;
+  const base = `${meta.emoji} ${meta.description}`;
   const others = domain.slice(1).map(domainLabel);
   return others.length > 0 ? `${base}（同时属于：${others.join("、")}）` : base;
 }

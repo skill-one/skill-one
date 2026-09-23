@@ -190,8 +190,9 @@ export function ExplorePage() {
   // The filter's chips for the current unit — repositories per domain, or skills
   // per domain: the two units file the same data differently. Both lead with the
   // biggest domain, ties broken by the taxonomy's own order. A skill rides every
-  // domain it belongs to; an unclassified one pools into the catch-all (as the
-  // repository unit files it).
+  // domain it belongs to, and one nothing classified holds the 未分类 chip — as
+  // the repository unit files such a repository, and never under 其他, which is
+  // the dataset's own answer.
   const chips = useMemo(() => {
     if (unit === "skill") {
       return domainFacets(allSkills, (hit) => domainsOf(hit.skill));

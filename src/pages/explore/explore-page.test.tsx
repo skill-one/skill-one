@@ -374,8 +374,9 @@ describe("ExplorePage", () => {
     renderExplorePage();
 
     // The list opens on 全部: one card per repository, and a chip for every
-    // domain that holds one — plus the catch-all for the unclassified
-    // repository.
+    // domain that holds one — plus 未分类 for the repository nothing classified,
+    // which is a different claim from the dataset's own 其他 and so takes a chip
+    // of its own.
     const cards = () => screen.getAllByRole("link", { name: /^查看仓库 / });
     await screen.findByText("redis");
     expect(cards()).toHaveLength(3);
@@ -388,7 +389,9 @@ describe("ExplorePage", () => {
     expect(
       screen.getByRole("button", { name: /测试与质量/ }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /其他/ })).toBeInTheDocument();
+    const unclassified = screen.getByRole("button", { name: /^未分类/ });
+    expect(within(unclassified).getByText("❓")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^其他/ })).toBeNull();
 
     // Pressing a domain scopes the list to its repositories alone.
     await user.click(screen.getByRole("button", { name: /开发编程/ }));
@@ -399,10 +402,74 @@ describe("ExplorePage", () => {
     expect(screen.queryByText("orphan")).not.toBeInTheDocument();
     expect(cards()).toHaveLength(1);
 
+    // The unclassified chip scopes to the repository no classification covers.
+    await user.click(screen.getByRole("button", { name: /^未分类/ }));
+    await waitFor(() =>
+      expect(screen.queryByText("redis")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("orphan")).toBeInTheDocument();
+    expect(cards()).toHaveLength(1);
+
     // 全部 clears the scope again.
     await user.click(screen.getByRole("button", { name: /^全部/ }));
     expect(await screen.findByText("lint")).toBeInTheDocument();
     expect(cards()).toHaveLength(3);
+  });
+
+  it("keeps the dataset's 其他 apart from what nothing classified", async () => {
+    const user = userEvent.setup();
+    harness.reset();
+    harness.init();
+    harness.pushAll([
+      {
+        name: "stray",
+        repo: "acme/stray",
+        description: "",
+        stars: 200,
+        downloads: 200,
+        path: "skills/stray",
+        // The dataset looked and answered "none of these fit".
+        profile: { domain: ["other"] },
+      },
+      {
+        name: "orphan",
+        repo: "acme/orphan",
+        description: "",
+        stars: 100,
+        downloads: 100,
+        path: "skills/orphan",
+        // Nobody classified it at all.
+      },
+    ]);
+    harness.complete();
+    renderExplorePage();
+
+    // An answer and a blank, told apart in the chip bar: the box for 其他, the
+    // question mark for 未分类, each counting its own.
+    const other = await screen.findByRole("button", { name: /^其他/ });
+    const unclassified = screen.getByRole("button", { name: /^未分类/ });
+    expect(within(other).getByText("📦")).toBeInTheDocument();
+    expect(within(unclassified).getByText("❓")).toBeInTheDocument();
+    expect(other).toHaveTextContent("1");
+    expect(unclassified).toHaveTextContent("1");
+
+    // The repository unit's card rows mark them the same way …
+    const strayCardRow = screen.getByRole("button", { name: "查看 stray 详情" });
+    expect(within(strayCardRow).getByText("📦")).toBeInTheDocument();
+    const orphanCardRow = screen.getByRole("button", { name: "查看 orphan 详情" });
+    expect(within(orphanCardRow).getByText("❓")).toBeInTheDocument();
+
+    // … and so do the skill unit's rows, which share the resolver.
+    await user.click(screen.getByRole("button", { name: "按技能" }));
+    const strayRow = await screen.findByRole("button", {
+      name: "查看 stray 详情",
+    });
+    expect(within(strayRow).getByText("📦")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("button", { name: "查看 orphan 详情" })).getByText(
+        "❓",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("keeps a domain chip's label collapsed until the chip is chosen", async () => {

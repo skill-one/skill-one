@@ -123,6 +123,13 @@ describe("RepoPage", () => {
         path: "skills/redis",
         profile: { domain: ["development"] },
       },
+      // The dataset looked at this one and answered "none of these fit".
+      {
+        ...skillsOf(1)[0],
+        name: "stray",
+        path: "skills/stray",
+        profile: { domain: ["other"] },
+      },
       { ...skillsOf(1)[0], name: "orphan", path: "skills/orphan" },
     ]);
     renderRepoPage();
@@ -134,7 +141,11 @@ describe("RepoPage", () => {
     });
     expect(within(redis).getByText("💻")).toBeInTheDocument();
 
-    // A skill the dataset has not classified wears the catch-all mark.
+    // 其他 is an answer and wears the box; a skill nothing classified is a
+    // question and wears the question mark. Both fill the same column, so the
+    // names still line up either way.
+    const stray = screen.getByRole("button", { name: "查看 stray 详情" });
+    expect(within(stray).getByText("📦")).toBeInTheDocument();
     const orphan = screen.getByRole("button", { name: "查看 orphan 详情" });
     expect(within(orphan).getByText("❓")).toBeInTheDocument();
   });

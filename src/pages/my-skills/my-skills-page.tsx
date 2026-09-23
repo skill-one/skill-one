@@ -258,10 +258,11 @@ export function MySkillsPage() {
 
   // The category chips of the unit on screen: how many *repositories* a domain
   // holds, or how many *skills*. A repository rides every domain its rows belong
-  // to and a skill every domain it belongs to; either way an unclassified one
-  // pools into the catch-all. The two units file the same installs differently,
-  // which is exactly why the count follows the unit — a chip that promised six
-  // skills must not scope the list to two cards.
+  // to and a skill every domain it belongs to; either way one nothing classified
+  // holds the 未分类 chip of its own, apart from the dataset's 其他. The two
+  // units file the same installs differently, which is exactly why the count
+  // follows the unit — a chip that promised six skills must not scope the list
+  // to two cards.
   const chips = useMemo(() => {
     if (unit === "skill") {
       return domainFacets(rows, (row) => domainsOf(row.skill));

@@ -1,6 +1,6 @@
 import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
-import { DOMAINS, domainLabel } from "../../data/domains";
+import { DOMAINS, UNCLASSIFIED_DOMAIN, domainLabel } from "../../data/domains";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
 import type {
   FeaturedSectionData,
@@ -55,9 +55,11 @@ const byInstalls = (a: Skill, b: Skill): number => b.downloads - a.downloads;
 const MAX_SEARCH_HITS = 50;
 
 /**
- * The dataset's catch-all domain key. It carries no meaning of its own, so
- * the featured sections skip it instead of leading with a "其他" shelf, and a
- * repository with no classified skill falls into it in the domain filter.
+ * The dataset's catch-all domain key — an answer ("none of the above fit"),
+ * not a blank, which is why a repository whose skills *all* say 其他 is filed
+ * here while one nothing classified is not (see `primaryDomain`). It carries
+ * no scope of its own, so the featured sections skip it rather than leading
+ * with a "其他" shelf.
  */
 const OTHER_DOMAIN = "other";
 
@@ -449,8 +451,9 @@ export function createRegistryController(
    * The one domain a repository is filed under by the domain filter: the
    * domain its skills *lead* with most often (their `domain[0]`, the dataset's
    * best fit), ties broken by the installs those leading skills carry and then
-   * by the taxonomy's own order. A repository with no classified skill falls
-   * into the catch-all 其他.
+   * by the taxonomy's own order. A repository with no classified skill at all
+   * is filed as unclassified rather than as 其他: the two are different claims,
+   * and the chip bar states them apart (see `data/domains`).
    */
   const primaryDomain = (skills: SearchHit[]): string => {
     const votes = new Map<string, { count: number; downloads: number }>();
@@ -462,7 +465,7 @@ export function createRegistryController(
       vote.downloads += skill.downloads;
       votes.set(lead, vote);
     }
-    if (votes.size === 0) return OTHER_DOMAIN;
+    if (votes.size === 0) return UNCLASSIFIED_DOMAIN;
     return [...votes].toSorted(
       ([aKey, a], [bKey, b]) =>
         b.count - a.count ||

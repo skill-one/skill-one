@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { ChevronRight, Star } from "lucide-react";
 
-import { domainMeta } from "../../data/domains";
+import { domainEmoji } from "../../data/domains";
 import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
 import {
   LOCAL_SOURCE_LABEL,
@@ -200,8 +200,7 @@ export function RepoCard({
           <ul className="-mx-1.5 flex flex-col">
             {shown.map(({ skill, matched, muted, extra, action }) => {
               const key = skillKey(skill);
-              const domain = skill.profile?.domain[0];
-              const emoji = domain ? domainMeta(domain)?.emoji : undefined;
+              const emoji = domainEmoji(skill.profile?.domain);
               const isSelected = selected != null && selected === key;
               // The store installs; the installed list enables. The control is
               // the caller's, and absent means the store's install button.
@@ -231,7 +230,10 @@ export function RepoCard({
                     )}
                   >
                     {/* The classification's glyph, in a fixed slot so the names
-                        of classified and unclassified skills still line up. */}
+                        line up whether the skill is classified or not: a box for
+                        the dataset's own 其他, the question mark for a skill
+                        nothing classified — the same mark the list rows wear
+                        (see `domainEmoji`). */}
                     <span
                       aria-hidden="true"
                       className="w-4 shrink-0 text-center text-[13px]"
