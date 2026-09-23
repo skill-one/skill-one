@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { ordinalClass } from "../../lib/ordinal";
 import { LOCAL_SOURCE_LABEL, type SkillView } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
@@ -20,8 +22,9 @@ import {
 export type { SkillMatched };
 
 /**
- * One skill in a collection page's list — a repository's own skills, read as a
- * list rather than as the store's multi-column grid.
+ * One skill in a collection page's list — a repository's own skills, or the
+ * installed list's local pool, read as a list rather than as the store's
+ * multi-column grid.
  *
  * The row is the store card laid on its side, and it keeps the card's order of
  * address: the ordinal first (the list's one addition — where this skill stands
@@ -57,6 +60,10 @@ export function SkillRow({
   selected = false,
   showSource = true,
   onSelect,
+  action,
+  muted = false,
+  extra,
+  ranked = true,
 }: {
   /** The skill to render, from the registry or from the installed list. */
   skill: SkillView;
@@ -74,6 +81,18 @@ export function SkillRow({
   showSource?: boolean;
   /** Opens the skill detail panel; without it the row is not a button. */
   onSelect?: () => void;
+  /** The row's corner control; absent means the store's install button. */
+  action?: ReactNode;
+  /** Dimmed presentation: an installed skill that is disabled. */
+  muted?: boolean;
+  /** Trails the facts cluster: the migration badge on an unlinked install. */
+  extra?: ReactNode;
+  /**
+   * Whether the list is ranked or merely enumerated: a ranked list medals its
+   * top three, an enumeration — a pool of installs that carries no order to win
+   * — prints plain numbers.
+   */
+  ranked?: boolean;
 }) {
   // Absent means backed: every row a collection page lists comes from the
   // registry, and the flag only ever unsets a caller with no store entry.
@@ -103,16 +122,17 @@ export function SkillRow({
           "flex-row items-center px-3",
           onSelect && INTERACTIVE_CLASS,
           selected && "border-primary ring-1 ring-primary",
+          muted && "opacity-60",
         )}
       >
         {/* The list's one addition: where this skill stands in the collection,
-            top three medalled. A fixed-width, centred box keeps every name in
-            the list starting at the same offset whether the number is one or
-            four digits. */}
+            top three medalled when the list is ranked. A fixed-width, centred
+            box keeps every name in the list starting at the same offset whether
+            the number is one or four digits. */}
         <span
           className={cn(
             "w-6 shrink-0 text-center text-sm",
-            ordinalClass(index),
+            ordinalClass(index, ranked),
           )}
         >
           {index + 1}
@@ -162,12 +182,14 @@ export function SkillRow({
             <span className="truncate">{LOCAL_SOURCE_LABEL}</span>
           )}
           {storeBacked && <SkillInstalls skill={skill} className="text-[11px]" />}
+          {extra}
         </div>
 
         {/* The corner action. Clicks on the slot stop here: the row body opens
-            the detail panel, the action must not. */}
+            the detail panel, the action must not. The installed list hands over
+            the enable switch; the store's rows keep the install button. */}
         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-          <SkillInstallButton skill={skill} />
+          {action ?? <SkillInstallButton skill={skill} />}
         </div>
       </Card>
     </li>

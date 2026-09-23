@@ -34,6 +34,11 @@ const RepoPage = lazy(() =>
     default: m.RepoPage,
   })),
 );
+const LocalSkillsPage = lazy(() =>
+  import("./pages/my-skills/local-skills-page").then((m) => ({
+    default: m.LocalSkillsPage,
+  })),
+);
 const FeaturedPage = lazy(() =>
   import("./pages/explore/featured/featured-page").then((m) => ({
     default: m.FeaturedPage,
@@ -112,6 +117,13 @@ export default function App() {
                       `owner/repo` itself, which carries a slash. */}
                   <Route path="/repo/*" element={<RepoPage />} />
                   <Route path="/my-skills" element={<MySkillsPage />} />
+                  {/* The installed list's local pool, listed whole — the page
+                      the pool's card opens, as a repository's page is what a
+                      repository card's bar opens. */}
+                  <Route
+                    path="/my-skills/local"
+                    element={<LocalSkillsPage />}
+                  />
                   <Route
                     path="/explore/featured"
                     element={<FeaturedPage />}

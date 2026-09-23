@@ -1,18 +1,50 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { ChevronRight, Star } from "lucide-react";
 
 import { domainMeta } from "../../data/domains";
-import type { SearchHit } from "../../lib/registry/protocol";
 import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
-import { skillKey } from "../../lib/skill-view";
+import {
+  LOCAL_SOURCE_LABEL,
+  skillKey,
+  type SkillView,
+} from "../../lib/skill-view";
 import { cn, formatCount } from "../../lib/utils";
-import { HighlightedText } from "../../components/highlighted-text";
+import {
+  HighlightedText,
+  type SkillMatched,
+} from "../../components/highlighted-text";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { Card, CardContent, CardFooter } from "../../components/ui/card";
 
 /**
- * One repository, as one card — the store's repository view.
+ * One row of a repository card: a skill, plus whatever its surface adds to it.
+ *
+ * The store hands over plain search hits — a skill and the terms to highlight —
+ * and the installed list hands over the same shape with the two facts only it
+ * knows: whether the skill is enabled (a disabled row is dimmed) and the
+ * migration badge for an install whose source the ledger cannot vouch for. The
+ * row's corner control is a slot for the same reason: the store installs, the
+ * installed list enables, and the card draws whichever it is handed.
+ */
+export interface RepoCardRow {
+  /** The skill the row renders. */
+  skill: SkillView;
+  /** Search-hit highlights; absent outside a search (nothing highlighted). */
+  matched?: SkillMatched;
+  /** Dimmed presentation: an installed skill that is disabled. */
+  muted?: boolean;
+  /** Beside the row button, before the action: the migration badge. */
+  extra?: ReactNode;
+  /** The row's corner control; absent means the store's install button. */
+  action?: ReactNode;
+}
+
+/**
+ * One repository, as one card — the store's repository view, and the installed
+ * list's unit too: the same card, with each row's action slot carrying the
+ * enable switch instead of the install button (see `RepoCardRow`).
  *
  * The card is a repository with its skills inside it, and it is read skills
  * first: the body lists them (most-installed first, the repository's own
@@ -103,14 +135,17 @@ export function RepoCard({
   hasQuery = false,
   selected = null,
   onOpenSkill,
+  hoverAction = true,
+  href,
 }: {
-  /** `owner/repo` — the repository the card stands for. */
+  /** `owner/repo` — the repository the card stands for; empty for the installed
+   *  list's pool of skills no recorded source vouches for. */
   repo: string;
   /** The repository's GitHub stars, when the grouping knows them. */
   stars?: number;
-  /** The repository's skills, in the order the grouping produced (most
+  /** The repository's rows, in the order the grouping produced (most
    *  installed first). */
-  skills: SearchHit[];
+  skills: RepoCardRow[];
   /**
    * How many of the repository's skills to list before the footer's door is the
    * only way to the rest — the reader's own choice, set in Settings (see
@@ -127,12 +162,29 @@ export function RepoCard({
   selected?: string | null;
   /** Opens one skill's detail panel. */
   onOpenSkill: (key: string) => void;
+  /**
+   * Whether each row's action waits for the pointer (the store, where a card's
+   * worth of install buttons would be the loudest thing in the grid) or is
+   * drawn always (the installed list, whose enable switch is a fact a reader
+   * scanning for a disabled skill must see without pointing).
+   */
+  hoverAction?: boolean;
+  /**
+   * Where the bar leads. Absent means the repository's own page
+   * (`/repo/owner/repo`); `null` makes the bar a label rather than a door — for
+   * a listing that already is the whole thing and has nowhere further to go.
+   */
+  href?: string | null;
 }) {
   // The owner segment is what the dataset hosts an avatar for; a repository
   // group always has one (a bare-host source is its own owner).
   const [owner] = repo.split("/");
   const shown = hasQuery ? skills : skills.slice(0, maxSkills);
-  const href = `/repo/${repo}`;
+  // The bar's own name: the repository when there is one, and the label for the
+  // installed list's pool of skills no source vouches for when there is not.
+  const name = repo || LOCAL_SOURCE_LABEL;
+  // The door's destination; `null` leaves the bar a label (see `href`).
+  const door = href === undefined ? `/repo/${repo}` : href;
 
   return (
     <li className="flex flex-col">
@@ -146,15 +198,24 @@ export function RepoCard({
               its content. The horizontal bleed lets the hover highlight read as
               a row band rather than as a box inside the card's padding. */}
           <ul className="-mx-1.5 flex flex-col">
-            {shown.map(({ skill, matched }) => {
+            {shown.map(({ skill, matched, muted, extra, action }) => {
               const key = skillKey(skill);
               const domain = skill.profile?.domain[0];
               const emoji = domain ? domainMeta(domain)?.emoji : undefined;
               const isSelected = selected != null && selected === key;
+              // The store installs; the installed list enables. The control is
+              // the caller's, and absent means the store's install button.
+              const control = action ?? (
+                <SkillInstallButton skill={skill} className="h-7 w-7" />
+              );
               return (
                 <li
                   key={key}
-                  className="group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent"
+                  data-skill={skill.name}
+                  className={cn(
+                    "group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent",
+                    muted && "opacity-60",
+                  )}
                 >
                   {/* The row's clickable area is the skill itself; the install
                       button beside it is a sibling, so a row is never a button
@@ -185,9 +246,13 @@ export function RepoCard({
                       <HighlightedText text={skill.name} terms={matched?.name} />
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                      {skill.description}
+                      {skill.description || "暂无描述"}
                     </span>
                   </button>
+                  {/* The row's own additions sit beside the row button rather
+                      than inside it: a control nested in a control is invalid,
+                      and a click must never mean both. */}
+                  {extra}
                   {/* Floating, not laid out: the button is absolutely placed
                       over the row's right edge, so the name and the description
                       own the row's whole width and the reader sees more of them
@@ -205,9 +270,15 @@ export function RepoCard({
                       installed above all — is what the `has-data` rule keeps on
                       screen; it reads the button's own `data-state`, so this
                       wrapper never has to know the state itself. */}
-                  <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100">
-                    <SkillInstallButton skill={skill} className="h-7 w-7" />
-                  </span>
+                  {hoverAction ? (
+                    <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100">
+                      {control}
+                    </span>
+                  ) : (
+                    <span className="ml-1 flex shrink-0 items-center">
+                      {control}
+                    </span>
+                  )}
                 </li>
               );
             })}
@@ -218,18 +289,26 @@ export function RepoCard({
             way in. `mt-auto` keeps it on the bottom edge when the plain-grid
             fallback stretches a short card to its neighbour's height. */}
         <CardFooter className="mt-auto min-w-0 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
+          {door != null ? (
           <Link
-            to={href}
-            aria-label={`查看仓库 ${repo}，${skills.length} 个 skill`}
+            to={door}
+            aria-label={`查看${repo ? `仓库 ${repo}` : name}，${skills.length} 个 skill`}
             className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             {/* The identity is a size step above the rows: a 24px face and a
                 14px name against the rows' 13px names and 13px glyphs. The bar
                 sits under a hairline at the bottom of the card, so the step is
-                what stops it from reading as one more row of the list. */}
-            <OwnerAvatar owner={owner} className="size-6 shrink-0 text-[11px]" />
+                what stops it from reading as one more row of the list. A pool
+                of source-less installs has no owner to draw, so its name leads
+                the bar alone. */}
+            {repo ? (
+              <OwnerAvatar
+                owner={owner}
+                className="size-6 shrink-0 text-[11px]"
+              />
+            ) : null}
             <span className="truncate text-sm font-semibold text-foreground group-hover/head:underline">
-              {repo}
+              {name}
             </span>
             {/* The repository's weight rides its name, because that is what the
                 figure is about: a fact about the repository, next to the
@@ -274,6 +353,18 @@ export function RepoCard({
               />
             </span>
           </Link>
+          ) : (
+            /* A bar with nowhere to lead — the local pool's own page, which is
+               already the whole list — states the name and the total instead. */
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="truncate text-sm font-semibold text-foreground">
+                {name}
+              </span>
+              <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
+                {skills.length} 个 skill
+              </span>
+            </span>
+          )}
         </CardFooter>
       </Card>
     </li>

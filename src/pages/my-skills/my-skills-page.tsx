@@ -1,279 +1,101 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import {
-  Boxes,
-  CalendarDays,
-  FolderGit2,
-  LayoutGrid,
-  ToggleLeft,
-  Users,
-} from "lucide-react";
+import { Boxes, Users } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
-import type { InstalledSkill } from "../../lib/skills-manager";
+import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
+import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
+import { installedSkillView, type SkillView } from "../../lib/skill-view";
+import { domainLabel, domainMeta } from "../../data/domains";
+import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import {
-  installedSkillView,
-  skillKey,
-  type SkillView,
-} from "../../lib/skill-view";
-import { TIME_BUCKETS, timeBucketOf } from "../../lib/time-buckets";
+  REPO_CARD_SKELETON_CLASS,
+  REPO_LIST_CLASS,
+} from "../../lib/skill-list-layout";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
-import { FilterDropdown, type FilterOption } from "../../components/filter-dropdown";
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage } from "../../lib/utils";
-import { domainLabel, domainMeta } from "../../data/domains";
 import { buildSearchIndex } from "../../lib/search-index";
-import {
-  SKILL_CARD_SKELETON_CLASS,
-  SKILL_LIST_CLASS,
-} from "../../lib/skill-list-layout";
 import { SearchInput } from "../../components/search-input";
-import { SkillCard, type SkillMatched } from "../../components/skill-card";
+import type { SkillMatched } from "../../components/skill-card";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { SkeletonList } from "../../components/skeleton-list";
+import { DomainChip } from "../../components/domain-chip";
 import { LinkSuggestionBadge } from "./link-suggestion-badge";
 import type { LinkCandidate } from "../../lib/link-suggestions";
-import { GroupSection, type GroupMeta } from "../explore/group-section";
+import { RepoCard } from "../explore/repo-card";
 
 /**
- * The grouping modes the toolbar offers. Each mode buckets the installed
- * list and orders the groups itself, so one choice replaces the old
- * grouping-plus-filter pair:
- *
- * - `repo`: one group per source repository (from the provenance ledger);
- *   skills installed by other tools pool into 未关联仓库.
- * - `time`: the install timeline — 今天 / 近 7 天 / … / 更早
- *   (`lib/time-buckets`). The one mode whose sections are ordered *by the
- *   data* rather than by size, which is what makes it read as a chronology;
- *   its ordinals are consequently un-medalled.
- * - `status`: the enablement split — 已启用 / 已禁用 — the old toolbar
- *   filter, promoted to a grouping.
- * - `domain`: the store's classification; skills the registry cannot
- *   classify pool into 未分类.
+ * How many repository cards mount with the page, and how many more mount each
+ * time the reader scrolls the list's sentinel into view — the same progressive
+ * pacing the store's lists use.
  */
-type MyGroupBy = "repo" | "time" | "status" | "domain";
-
-const GROUP_OPTIONS: Array<FilterOption<MyGroupBy>> = [
-  { value: "repo", label: "按仓库", icon: FolderGit2 },
-  { value: "time", label: "按时间", icon: CalendarDays },
-  { value: "status", label: "按状态", icon: ToggleLeft },
-  { value: "domain", label: "按类型", icon: LayoutGrid },
-];
-
-/** How many groups mount with the page, and how many more mount each time
- * the reader scrolls the list's sentinel into view — the same progressive
- * pacing the store's grouped list uses. */
-const INITIAL_GROUPS = 6;
-const GROUP_CHUNK = 6;
+const INITIAL_CARDS = 6;
+const CARD_CHUNK = 6;
 
 /** Placeholder cards while the on-disk list is first read. */
-const SKELETON_ROWS = 12;
+const SKELETON_CARDS = 8;
 
-/**
- * One row of the grouped list: everything rendering an installed skill's
- * card needs, precomputed where the grouping pass runs.
- */
+/** React-key identity of the pool card: skills no recorded source vouches for. */
+const LOCAL_POOL_KEY = "local";
+
+/** Where the pool card's bar leads: the page that lists the pool whole. */
+const LOCAL_POOL_PATH = "/my-skills/local";
+
+/** One installed skill, precomputed where the list is built. */
 interface Row {
   view: SkillView;
   enabled: boolean;
   suggestion?: LinkCandidate[];
+  /** Search-hit highlights, so a searched name reads like the store's. */
+  matched?: SkillMatched;
 }
 
-/** The grouped answer for one mode: identity metadata plus its rows. */
-interface MyGroup {
-  meta: GroupMeta;
+/** One card's worth of installs: a repository, or the source-less pool. */
+interface RepoGroup {
+  /** `owner/repo`, or "" for the pool of skills no source vouches for. */
+  repo: string;
   items: Row[];
 }
 
-/** A group that pools the rows no mode-specific key names. */
-const POOL_TITLE_BY_MODE = {
-  repo: "未关联仓库",
-  domain: "未分类",
-} as const;
-
 /**
- * Bucket the rows by the requested mode. Every mode starts from the rows in
- * list order (a search has already reordered them by relevance) and keeps
- * that order inside each bucket.
- *
- * The groups themselves follow their mode. The pooling modes (`repo`,
- * `domain`) lead with the most-populated bucket, ties resolved by title; the
- * modes that carry a reading order of their own emit their sections in it and
- * simply drop the empty ones — `time` newest first, `status` running skills
- * first.
- *
- * `time` also reorders *within* its sections, the one place a mode overrides
- * the incoming list order: a timeline whose contents ran alphabetically would
- * not be a timeline. Relevance is then only what *selects* the rows of a
- * search, never how they are laid out.
+ * The stars a card's bar shows: the registry's figure, and only when the card's
+ * source resolved to a store entry. An install the registry cannot place has no
+ * figure to state, which is not the same as a figure of zero.
  */
-function buildGroups(rows: Row[], groupBy: MyGroupBy): MyGroup[] {
-  if (groupBy === "time") {
-    // The timeline. Sections are positional (newest first) rather than
-    // weighed, so this must never reach the size ordering at the tail below;
-    // an empty stretch is simply absent, and a skill whose install time was
-    // never recorded keeps a section of its own instead of being filed under
-    // 更早, which would claim more than the record does.
-    const buckets = new Map<string, Row[]>();
-    for (const row of rows) {
-      const key = timeBucketOf(row.view.installedAt);
-      const bucket = buckets.get(key);
-      if (bucket) bucket.push(row);
-      else buckets.set(key, [row]);
-    }
-    // Chronological inside a section too, not just between them — otherwise a
-    // timeline's contents read alphabetically. This is what makes a batch
-    // legible: one `add owner/repo` gives every skill it installs the same
-    // second, so the run of cards it produced stays together instead of being
-    // scattered through the section by name. A skill with no recorded time
-    // sorts last, which `?? 0` gives for free.
-    for (const items of buckets.values()) {
-      items.sort(
-        (a, b) => (b.view.installedAt ?? 0) - (a.view.installedAt ?? 0),
-      );
-    }
-    const groups: MyGroup[] = [];
-    for (const bucket of TIME_BUCKETS) {
-      const items = buckets.get(bucket.key);
-      if (items) {
-        groups.push({
-          meta: { key: bucket.key, title: bucket.title, ordinal: "plain" },
-          items,
-        });
-      }
-    }
-    return groups;
-  }
-
-  if (groupBy === "status") {
-    // The enablement split has a natural order — running skills first — and
-    // empty halves are simply not shown.
-    const enabled = rows.filter((row) => row.enabled);
-    const disabled = rows.filter((row) => !row.enabled);
-    return [
-      { meta: { key: "status-enabled", title: "已启用" }, items: enabled },
-      { meta: { key: "status-disabled", title: "已禁用" }, items: disabled },
-    ].filter((group) => group.items.length > 0);
-  }
-
-  const poolTitle = POOL_TITLE_BY_MODE[groupBy];
-  const buckets = new Map<string, Row[]>();
-  for (const row of rows) {
-    // A skill may be classified under several domains, so it lands in every
-    // domain group it belongs to. Everything the mode cannot key — an
-    // unrecorded source, an unclassified skill — pools under one title.
-    const keys =
-      groupBy === "repo"
-        ? [row.view.repo || poolTitle]
-        : row.view.profile?.domain.length
-          ? row.view.profile.domain
-          : [poolTitle];
-    for (const key of keys) {
-      const bucket = buckets.get(key);
-      if (bucket) bucket.push(row);
-      else buckets.set(key, [row]);
-    }
-  }
-  return Array.from(buckets, ([key, items]) => {
-    if (groupBy === "repo" && key !== poolTitle) {
-      return {
-        meta: {
-          key: `repo-${key}`,
-          title: key,
-          avatarOwner: key.split("/")[0],
-        },
-        items,
-      };
-    }
-    if (groupBy === "domain" && key !== poolTitle) {
-      return {
-        meta: {
-          key: `domain-${key}`,
-          title: domainLabel(key),
-          emoji: domainMeta(key)?.emoji,
-        },
-        items,
-      };
-    }
-    return { meta: { key, title: key }, items };
-  }).toSorted(
-    (a, b) =>
-      b.items.length - a.items.length || a.meta.title.localeCompare(b.meta.title),
-  );
-}
-
-/** Stable identity for a row: a skill's name is unique in the global directory. */
-function rowId(skill: InstalledSkill): string {
-  return skill.name;
+function starsOf(group: RepoGroup): number | undefined {
+  const first = group.items[0]?.view;
+  return first?.storeBacked ? first.stars : undefined;
 }
 
 /**
- * One installed skill — the installed list's binding of the shared
- * `SkillCard`, and the counterpart of the store's `SkillListRow`.
+ * The installed list — the management counterpart of the store's 全部 page, in
+ * the same unit: **one card per source repository**, listing that repository's
+ * installed skills (up to the preview size set in Settings, 5 by default) and
+ * signed off by the bar that names the repository and opens its page.
  *
- * What the installed list adds to the card is what only it knows. The corner
- * action is the enable switch rather than an install button (`SkillEnableSwitch`,
- * which writes through the backend on its own); a disabled skill is dimmed
- * rather than hidden, so the list still reads as the full inventory. A source
- * the ledger cannot vouch for falls back to the card's own source label, with
- * the migration badge trailing it as the one route to recording where the
- * skill came from.
+ * Installs no recorded source vouches for have no repository to belong to, so
+ * they pool into one card of their own rather than inventing one — the same
+ * shape, with its bar stating 本地安装 in place of a repository it would have to
+ * make up, and opening the page that lists the pool whole.
  *
- * Uninstalling is deliberately absent: it lives in the detail panel, so a card
- * (whose whole body is a click target) never carries an irreversible action.
+ * What the page adds to the store's card is what only an installed skill has:
+ * the enable switch in each row's action slot (drawn always — a reader
+ * scanning for a disabled skill must see it without pointing), the dimming of a
+ * disabled row, and the migration badge beside an install whose source the
+ * ledger cannot vouch for.
  */
-function InstalledSkillRow({
-  view,
-  enabled,
-  selected,
-  matched,
-  suggestion,
-  onOpen,
-}: {
-  /** The on-disk record merged with the store entry it resolved to. */
-  view: SkillView;
-  /** Whether the skill is enabled on disk; a disabled row is dimmed. */
-  enabled: boolean;
-  /** Whether this card is the one shown in the detail panel. */
-  selected: boolean;
-  /** Search-hit highlights, so a searched name reads like the store's. */
-  matched?: SkillMatched;
-  /** Confirmable same-name store entries for a tool-installed skill. */
-  suggestion?: LinkCandidate[];
-  /** Opens the shared skill detail panel. */
-  onOpen: () => void;
-}) {
-  return (
-    <SkillCard
-      data-skill={view.name}
-      skill={view}
-      matched={matched}
-      muted={!enabled}
-      selected={selected}
-      onSelect={onOpen}
-      action={<SkillEnableSwitch skill={view} />}
-      // The migration affordance is only meaningful while the source is
-      // unknown; a recorded one needs no route to the store.
-      sourceExtra={
-        !view.repo && suggestion && suggestion.length > 0 ? (
-          <LinkSuggestionBadge name={view.name} candidates={suggestion} />
-        ) : undefined
-      }
-    />
-  );
-}
-
 export function MySkillsPage() {
   const { data: skills, isLoading, isError, error } = useInstalledSkills();
 
   // Install sources recorded by this app (the provenance ledger), reconciled
   // against the on-disk list on every fetch. Absent entries mean "installed
   // by another tool" — those keep the local-install presentation, and if the
-  // registry has plausible namesakes the card offers a confirmable link.
+  // registry has plausible namesakes the row offers a confirmable link.
   const { data: provenanceState } = useSkillProvenance();
   const linked = provenanceState?.linked;
   const suggestions = provenanceState?.suggestions;
@@ -284,35 +106,33 @@ export function MySkillsPage() {
   // the skills the ledger placed. Empty for tool installs — nothing to resolve.
   const storeEntries = useInstalledStoreEntries(linked);
 
+  // How many rows a card lists before its bar is the only way to the rest — the
+  // reader's own choice, shared with the store's cards.
+  const maxSkills = useRepoCardLimit();
+
   const list = useMemo(() => skills ?? [], [skills]);
 
-  // Search and grouping mode are local state — the full installed list is
-  // already in memory, so everything below filters and groups on the main
-  // thread.
+  // The search text and the domain scope are local state — the full installed
+  // list is already in memory, so everything below filters on the main thread.
   const [search, setSearch] = useState("");
-  const [groupBy, setGroupBy] = useState<MyGroupBy>("repo");
+  const [domain, setDomain] = useState<string | null>(null);
   // Open skill in the shared detail drawer, tracked by identity rather than by
   // index: the provenance and store-entry queries land asynchronously and
-  // regroup the list under the reader's pointer, so an index captured at click
+  // reshape the list under the reader's pointer, so an index captured at click
   // time could point at a different skill a moment later. The drawer resolves
   // the key against its own list, and a key it cannot find keeps it closed.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const query = useDebouncedValue(search).trim();
-  // Progressive rendering: only the first `visibleCount` groups are mounted;
-  // an IntersectionObserver on the sentinel below the list extends the count
-  // while the reader scrolls.
-  const [visibleCount, setVisibleCount] = useState(INITIAL_GROUPS);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const isSearching = query.length > 0;
 
   const handleSearch = (q: string) => {
     setSearch(q);
     setSelectedKey(null);
-    setVisibleCount(INITIAL_GROUPS);
   };
-  const handleGroupBy = (mode: MyGroupBy) => {
-    setGroupBy(mode);
+  const handleDomain = (next: string | null) => {
+    if (next === domain) return;
+    setDomain(next);
     setSelectedKey(null);
-    setVisibleCount(INITIAL_GROUPS);
   };
 
   // Deep link from the menu bar popover: `/my-skills?skill=<name>` pre-fills
@@ -326,7 +146,6 @@ export function MySkillsPage() {
     if (!target) return;
     setSearch(target);
     setSelectedKey(null);
-    setVisibleCount(INITIAL_GROUPS);
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -334,106 +153,137 @@ export function MySkillsPage() {
   // found by name, every query term must match, a mistyped word does not.
   // Installed lists are short, so the index is cheap to build here and rebuild
   // when the list changes — unlike the registry, which builds the same index in
-  // the worker. The matched terms the index reports ride along to the cards,
+  // the worker. The matched terms the index reports ride along to the rows,
   // exactly as the store's hits do.
   const searchInstalled = useMemo(() => buildSearchIndex(list), [list]);
-
-  // The hits of the current query, or null when browsing. A query orders its
-  // own results by relevance; the enablement state then only decides which
-  // group a skill lands in.
   const hits = useMemo(
     () => (query ? searchInstalled(query) : null),
     [query, searchInstalled],
   );
 
-  const matchedById = useMemo(() => {
-    const matched: Record<string, SkillMatched> = {};
-    for (const hit of hits ?? []) matched[rowId(hit.doc)] = hit.matched;
-    return matched;
-  }, [hits]);
-
-  const filtered = useMemo(() => {
-    const docs = hits ? hits.map((hit) => hit.doc) : list;
-    return docs;
-  }, [hits, list]);
-
   // One view per listed skill: the on-disk record merged with the store entry
-  // its recorded source resolved to. Both the card and the drawer read these
+  // its recorded source resolved to. Both the rows and the drawer read these
   // objects, so the two can never disagree about what a skill looks like, and
   // the store's facts are present exactly when the registry holds an entry.
-  const rows = useMemo<Row[]>(
+  const rows = useMemo<Row[]>(() => {
+    const entries = hits
+      ? hits.map((hit) => ({ skill: hit.doc, matched: hit.matched }))
+      : list.map((skill) => ({ skill, matched: undefined }));
+    return entries.map(({ skill, matched }) => ({
+      view: installedSkillView(skill, linked, storeEntries[skill.name]),
+      enabled: skill.enabled,
+      suggestion: suggestions?.[skill.name],
+      matched,
+    }));
+  }, [hits, list, linked, storeEntries, suggestions]);
+
+  // One card per source repository, most-populated first (ties by name); the
+  // skills no recorded source vouches for pool into the one card that stands
+  // for them, so every installed skill still lives somewhere.
+  const cards = useMemo<RepoGroup[]>(() => {
+    const byRepo = new Map<string, Row[]>();
+    for (const row of rows) {
+      const bucket = byRepo.get(row.view.repo);
+      if (bucket) bucket.push(row);
+      else byRepo.set(row.view.repo, [row]);
+    }
+    return Array.from(byRepo, ([repo, items]) => ({ repo, items })).toSorted(
+      (a, b) => b.items.length - a.items.length || a.repo.localeCompare(b.repo),
+    );
+  }, [rows]);
+
+  // The category chips count cards: a card rides every domain its rows belong
+  // to, and an unclassified install pools into the catch-all.
+  const chips = useMemo(
     () =>
-      filtered.map((skill) => ({
-        view: installedSkillView(skill, linked, storeEntries[skill.name]),
-        enabled: skill.enabled,
-        suggestion: suggestions?.[skill.name],
-      })),
-    [filtered, linked, storeEntries, suggestions],
+      domainFacets(cards, (card) => {
+        const keys = new Set<string>();
+        for (const row of card.items) {
+          for (const key of domainsOf(row.view)) keys.add(key);
+        }
+        return Array.from(keys);
+      }),
+    [cards],
   );
 
-  // The groups of every mode, so the grouping dropdown can annotate its
-  // options with what each choice would produce. Installed lists are short —
-  // three passes over them cost nothing.
-  const groupsByMode = useMemo(
-    () => ({
-      repo: buildGroups(rows, "repo"),
-      time: buildGroups(rows, "time"),
-      status: buildGroups(rows, "status"),
-      domain: buildGroups(rows, "domain"),
-    }),
-    [rows],
-  );
-  const groups = groupsByMode[groupBy];
-  const groupOptions = useMemo(
+  // The list on screen. The domain scope is a browse control: a search
+  // re-orders the list by relevance and ignores it (the chip row stands down),
+  // the same division of labour the store's filter has.
+  const visible = useMemo(
     () =>
-      GROUP_OPTIONS.map((option) => ({
-        ...option,
-        count: groupsByMode[option.value].length,
-      })),
-    [groupsByMode],
+      isSearching || domain === null
+        ? cards
+        : cards.filter((card) =>
+            card.items.some((row) => domainsOf(row.view).includes(domain)),
+          ),
+    [cards, isSearching, domain],
   );
 
-  const renderedGroups = groups.slice(0, visibleCount);
-  const allRendered = renderedGroups.length >= groups.length;
+  // Progressive rendering: only the first `renderedCount` cards are mounted;
+  // an IntersectionObserver on the sentinel below the list extends the count
+  // while the reader scrolls. A new answer (a search, a scope, a reshaped list)
+  // re-seeds the run to the same depth.
+  const {
+    count: renderedCount,
+    sentinelRef,
+    done,
+  } = useProgressiveReveal({
+    total: visible.length,
+    initial: INITIAL_CARDS,
+    step: CARD_CHUNK,
+    resetKey: `${query}\u0000${domain ?? "all"}\u0000${list.length}`,
+  });
+  const shown = visible.slice(0, renderedCount);
 
-  useEffect(() => {
-    const node = sentinelRef.current;
-    if (!node || allRendered) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setVisibleCount((c) => Math.min(c + GROUP_CHUNK, groups.length));
-      }
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [allRendered, groups.length]);
-
-  // The drawer walks the flat grouped list, unwrapped — the same coordinates
-  // the groups hand their rows.
+  // The drawer walks every skill of the visible cards, capped rows included:
+  // a card's preview is a rendering choice, not the list's extent.
   const detailSkills = useMemo(
-    () => groups.flatMap((group) => group.items.map((row) => row.view)),
-    [groups],
+    () => visible.flatMap((card) => card.items.map((row) => row.view)),
+    [visible],
   );
+
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-5 pb-5">
-      {/* Toolbar, styled like the store's grouped list: search first, the
-          grouping mode and the agent strip clustered on the right. */}
+      {/* Toolbar, styled like the store's: the search field first, the
+          installed list's own control (the agent strip) out at the far edge. */}
       <div className="mb-4 flex items-center gap-3">
         <SearchInput value={search} onChange={handleSearch} label="搜索 Skill" />
 
         <div className="ml-auto flex items-center gap-2">
           <AgentAvatarMenu />
-
-          <FilterDropdown
-            value={groupBy}
-            options={groupOptions}
-            onChange={handleGroupBy}
-          />
         </div>
       </div>
 
-      {/* The grouped skill list; the modal detail drawer overlays it without
-          reflowing it or moving its scroll position. */}
+      {/* The category filter: every classification that holds an installed
+          skill, flat, one press to scope the list (全部 clears it). It is a
+          browse control — a search re-orders the list by relevance and ignores
+          it — so it stands only while browsing. */}
+      {!isSearching && cards.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <DomainChip
+            selected={domain === null}
+            count={cards.length}
+            expanded
+            onClick={() => handleDomain(null)}
+          >
+            全部
+          </DomainChip>
+          {chips.map(({ key, count }) => (
+            <DomainChip
+              key={key}
+              selected={domain === key}
+              emoji={domainMeta(key)?.emoji}
+              count={count}
+              onClick={() => handleDomain(key)}
+            >
+              {domainLabel(key)}
+            </DomainChip>
+          ))}
+        </div>
+      )}
+
+      {/* The repository cards; the modal detail drawer overlays them without
+          reflowing them or moving their scroll position. */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5">
           {isError ? (
@@ -445,62 +295,68 @@ export function MySkillsPage() {
             // The same card-shaped skeleton the store lists paint: switching
             // to this page lands on its final layout instead of an empty spin.
             <SkeletonList
-              rows={SKELETON_ROWS}
-              listClassName={SKILL_LIST_CLASS}
-              itemClassName={SKILL_CARD_SKELETON_CLASS}
+              rows={SKELETON_CARDS}
+              listClassName={REPO_LIST_CLASS}
+              itemClassName={REPO_CARD_SKELETON_CLASS}
             />
           ) : list.length === 0 ? (
             <Placeholder icon={Boxes} message="还没有安装任何技能" />
-          ) : groups.length === 0 ? (
+          ) : visible.length === 0 ? (
             <Placeholder
               message={
-                query ? `未找到匹配“${query}”的 Skill` : "没有符合条件的 Skill"
+                query ? `未找到匹配“${query}”的 Skill` : "没有符合条件的仓库"
               }
             />
           ) : (
-            <div
-              key={`${query}\u0000${groupBy}\u0000${list.length}`}
-              className="flex flex-col gap-3"
-            >
-              {/* Keyed by the answer's definition, so stale fold states and
-                  scroll depth never survive into a differently-shaped list;
-                  the skill count rides along because uninstalling reshapes
-                  the groups too. */}
-              {renderedGroups.map((group, gi) => (
-                <GroupSection
-                  key={group.meta.key}
-                  group={group.meta}
-                  index={gi}
-                  items={group.items}
+            <ul className={REPO_LIST_CLASS}>
+              {shown.map((card) => (
+                <RepoCard
+                  key={card.repo || LOCAL_POOL_KEY}
+                  repo={card.repo}
+                  stars={starsOf(card)}
+                  skills={card.items.map((row) => ({
+                    skill: row.view,
+                    matched: row.matched,
+                    muted: !row.enabled,
+                    // The migration affordance is only meaningful while the
+                    // source is unknown; a recorded one needs no route to the
+                    // store.
+                    extra:
+                      !row.view.repo && row.suggestion?.length ? (
+                        <LinkSuggestionBadge
+                          name={row.view.name}
+                          candidates={row.suggestion}
+                        />
+                      ) : undefined,
+                    action: <SkillEnableSwitch skill={row.view} />,
+                  }))}
+                  maxSkills={maxSkills}
+                  hasQuery={isSearching}
                   selected={selectedKey}
-                  rowKey={(row) => skillKey(row.view)}
-                  renderItem={(row, isSelected) => (
-                    <InstalledSkillRow
-                      view={row.view}
-                      enabled={row.enabled}
-                      selected={isSelected}
-                      matched={matchedById[row.view.name]}
-                      suggestion={row.suggestion}
-                      onOpen={() => setSelectedKey(skillKey(row.view))}
-                    />
-                  )}
+                  onOpenSkill={setSelectedKey}
+                  // A repository card's bar opens the repository's page; the
+                  // pool's opens the installed list's own pool page.
+                  href={card.repo ? undefined : LOCAL_POOL_PATH}
+                  // The switch is a fact about the row, not an invitation: it
+                  // is drawn always rather than revealed on hover.
+                  hoverAction={false}
                 />
               ))}
-              {/* The sentinel ends the rendered run: while it is on screen
-                  the observer above extends the run, so scrolling down keeps
-                  revealing groups until the answer is fully mounted. */}
-              {!allRendered && <div ref={sentinelRef} aria-hidden="true" />}
-            </div>
+            </ul>
           )}
+          {/* The sentinel ends the rendered run: while it is on screen the
+              observer above extends the run, so scrolling down keeps revealing
+              cards until the answer is fully mounted. */}
+          {!done && <div ref={sentinelRef} aria-hidden="true" />}
         </div>
       </div>
 
       {/* Same right-side detail drawer the store pages use, told which list
           owns it: the installed surface replaces the store's install CTA with
           the enable switch and shows no registry-only figures. ←/→ walks the
-          whole grouped list. Uninstalling from it closes it: this list
-          shrinks with the skill. (Selection by identity is what makes that
-          swap impossible in the first place — see `SkillDetailDrawer`.) */}
+          whole list. Uninstalling from it closes it: this list shrinks with
+          the skill. (Selection by identity is what makes that swap impossible
+          in the first place — see `SkillDetailDrawer`.) */}
       <SkillDetailDrawer
         skills={detailSkills}
         selected={selectedKey}

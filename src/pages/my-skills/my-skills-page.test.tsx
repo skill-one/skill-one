@@ -69,16 +69,6 @@ async function openAgentMenu(user: ReturnType<typeof userEvent.setup>) {
 const menuItem = (display: string, state: string) =>
   screen.findByRole("menuitem", { name: new RegExp(`${display}.*${state}`) });
 
-/**
- * The group header trigger of one group, addressed by its aria-label —
- * titles stay intact there even when the figures beside them are long.
- */
-function groupHeader(title: string, count: number) {
-  return screen.getByRole("button", {
-    name: `分组 ${title}，${count} 个 skill`,
-  });
-}
-
 describe("MySkillsPage", () => {
   afterEach(() => {
     resetMockInstalledSkills();
@@ -89,17 +79,27 @@ describe("MySkillsPage", () => {
     window.localStorage.clear();
   });
 
-  it("groups the ungrouped default into a single 未关联仓库 group", async () => {
+  it("gives every source-less install a home in one repository-style card", async () => {
     renderWithRouter(<MySkillsPage />);
 
-    // Wait for the (mock) query to land: 6 skills installed globally, none
-    // with a recorded source — they pool into one group.
+    // The browse bar leads with 全部 and a chip for the catch-all every
+    // unclassified install pools into.
     expect(
-      await screen.findByRole("button", {
-        name: "分组 未关联仓库，6 个 skill",
-      }),
-    ).toBeInTheDocument();
-    expect(await screen.findByText("pdf")).toBeInTheDocument();
+      await screen.findByRole("button", { name: /^全部/ }),
+    ).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: /^其他/ })).toBeInTheDocument();
+    // No install has a recorded source, so every skill lives in one pool card:
+    // it lists the preview size, and its bar states the total.
+    expect(await screen.findByText("本地安装")).toBeInTheDocument();
+    expect(screen.getByText("6 个 skill")).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+    ).toHaveLength(5);
+    // The pool is not a repository, so its bar opens the page that lists it
+    // whole rather than a repository's page.
+    expect(
+      screen.getByRole("link", { name: "查看本地安装，6 个 skill" }),
+    ).toHaveAttribute("href", "/my-skills/local");
   });
 
   it("renders each installed skill", async () => {
@@ -110,7 +110,38 @@ describe("MySkillsPage", () => {
     expect(screen.getByText("pptx")).toBeInTheDocument();
     expect(screen.getByText("mcp-builder")).toBeInTheDocument();
     expect(screen.getByText("code-review")).toBeInTheDocument();
-    expect(screen.getByText("frontend-design")).toBeInTheDocument();
+    // The sixth is past the pool card's preview: the bar's own total accounts
+    // for it, and the bar's door is where it is listed whole.
+    expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
+    expect(screen.getByText("6 个 skill")).toBeInTheDocument();
+  });
+
+  it("caps a repository's card at the preview size and states its total", async () => {
+    // All six installs share one repository: the card lists the first five and
+    // its bar states the repository's own total, which is what lets a capped
+    // list read as "these of them" beside the door to the rest.
+    seedMockProvenance(
+      Object.fromEntries(
+        [
+          "pdf",
+          "docx",
+          "pptx",
+          "mcp-builder",
+          "code-review",
+          "frontend-design",
+        ].map((name) => [name, { repo: "acme/tools", slug: name }]),
+      ),
+    );
+    renderWithRouter(<MySkillsPage />);
+
+    const bar = await screen.findByRole("link", {
+      name: "查看仓库 acme/tools，6 个 skill",
+    });
+    expect(bar).toHaveTextContent("6 个 skill");
+    expect(
+      screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+    ).toHaveLength(5);
+    expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
   });
 
   it("removes a skill from its detail panel and updates the stats", async () => {
@@ -163,7 +194,7 @@ describe("MySkillsPage", () => {
     renderWithRouter(<MySkillsPage />);
 
     const switches = await screen.findAllByRole("switch");
-    expect(switches).toHaveLength(6);
+    expect(switches).toHaveLength(5);
     switches.forEach((sw) =>
       expect(sw).toHaveAttribute("aria-checked", "true"),
     );
@@ -195,28 +226,29 @@ describe("MySkillsPage", () => {
     expect(pdf).toHaveAttribute("aria-checked", "false");
   });
 
-  it("shows an enabled skill's switch without hover", async () => {
+  it("draws each row's switch without waiting for the pointer", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
 
     await screen.findByRole("switch", { name: "关闭 pdf" });
 
-    // Like the store's install button, the corner control is always shown: a
-    // grid whose controls appear only under the pointer reads as unstable.
-    const action = container.querySelector(
-      '[data-skill="pdf"] [data-slot="card-action"]',
-    );
-    expect(action).not.toHaveClass("opacity-0", "pointer-events-none");
+    // Unlike the store's install button (revealed on hover), the installed
+    // list's switch is a fact about the row: it is drawn always, so a reader
+    // scanning for a disabled skill sees it without pointing at anything.
+    const row = container.querySelector('[data-skill="pdf"]');
+    expect(row).not.toBeNull();
+    expect(row).not.toHaveClass("opacity-0");
+    expect(row?.querySelector(".opacity-0")).toBeNull();
   });
 
-  it("keeps a disabled skill's switch visible without hover", async () => {
-    // The off switch is the fact that explains the dimmed card.
+  it("dims a disabled row and keeps its switch drawn", async () => {
+    // The off switch is the fact that explains the dimmed row.
     setMockSkillEnabled("pdf", false);
     const { container } = renderWithRouter(<MySkillsPage />);
 
     await screen.findByRole("switch", { name: "开启 pdf" });
-    expect(
-      container.querySelector('[data-skill="pdf"] [data-slot="card-action"]'),
-    ).not.toHaveClass("opacity-0");
+    const row = container.querySelector('[data-skill="pdf"]');
+    expect(row).toHaveClass("opacity-60");
+    expect(row?.querySelector(".opacity-0")).toBeNull();
   });
 
   it("shows each skill's description", async () => {
@@ -301,43 +333,41 @@ describe("MySkillsPage", () => {
     expect(screen.getByText("暂无描述")).toBeInTheDocument();
   });
 
-  it("states 本地安装 on every rail and shows no owner chip", async () => {
+  it("names a source-less install as 本地安装 and draws no owner face", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
 
     await screen.findByText("pdf");
-    // Skills installed by other tools (no ledger entry) read as a local
-    // install. No source can be named, so the rail states that instead, no
-    // owner avatar joins it, and no card opens with a placeholder cover.
-    const rails = container.querySelectorAll('ul [data-slot="card-footer"]');
-    expect(rails).toHaveLength(6);
-    for (const rail of rails) expect(rail).toHaveTextContent("本地安装");
+    // Every install here is tool-installed (no ledger entry), so the one card's
+    // bar states that in place of a repository, and no owner face joins it.
+    const bars = container.querySelectorAll('[data-slot="card-footer"]');
+    expect(bars).toHaveLength(1);
+    expect(bars[0]).toHaveTextContent("本地安装");
     expect(
-      container.querySelectorAll('ul [data-slot="skill-cover"]'),
+      container.querySelectorAll(
+        '[data-slot="card-footer"] [data-slot="avatar"]',
+      ),
     ).toHaveLength(0);
-    expect(container.querySelectorAll('ul [data-slot="avatar"]')).toHaveLength(
-      0,
-    );
+    expect(
+      container.querySelectorAll('[data-slot="skill-cover"]'),
+    ).toHaveLength(0);
   });
 
-  it("shows the recorded source repo with the owner's author chip on the rail", async () => {
+  it("names a recorded source in the card's bar, with the owner's face", async () => {
     const { container } = renderWithRouter(<MySkillsPage />);
-    // The ledger has a source for pdf (installed through this app); docx is
-    // a tool-installed skill with no entry.
+    // The ledger has a source for pdf (installed through this app); the other
+    // five are tool installs with no entry.
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
 
-    // The sourced card names its repo on the rail: the author chip rides it,
-    // with the repository written out beside it.
-    const chip = await screen.findByRole("button", {
-      name: "仓库 anthropics/skills",
+    // The sourced skill gets a card of its own, and its bar is the door to the
+    // repository: the owner's face, the repo path, and the count.
+    const bar = await screen.findByRole("link", {
+      name: /^查看仓库 anthropics\/skills/,
     });
-    const rail = chip.closest('[data-slot="card-footer"]');
-    expect(rail).not.toBeNull();
-    expect(rail).toHaveTextContent("anthropics/skills");
-    // docx keeps the local-install presentation.
-    expect(screen.getAllByText("本地安装")).toHaveLength(5);
-    // Only the sourced card can name an author, so only its rail carries an
-    // author chip — and the rail exists for that chip alone, since the
-    // registry holds no entry to classify or rank the skill by.
+    expect(bar).toHaveTextContent("anthropics/skills");
+    expect(bar).toHaveTextContent("1 个 skill");
+    // The other five keep the pool card, whose bar names no repository.
+    expect(screen.getAllByText("本地安装")).toHaveLength(1);
+    // Only the sourced card can name an owner, so it carries the only face.
     expect(container.querySelectorAll('ul [data-slot="avatar"]')).toHaveLength(
       1,
     );
@@ -349,9 +379,11 @@ describe("MySkillsPage", () => {
     renderWithRouter(<MySkillsPage />);
     await screen.findByText("pdf");
     // The provenance query lands asynchronously and moves pdf into its own
-    // repository group; wait for that reshuffle to settle before clicking,
-    // so the card is not detached mid-press.
-    await screen.findByRole("button", { name: "仓库 anthropics/skills" });
+    // repository card; wait for that reshuffle to settle before clicking, so
+    // the row is not detached mid-press.
+    await screen.findByRole("link", {
+      name: /^查看仓库 anthropics\/skills/,
+    });
 
     await user.click(
       await screen.findByRole("button", { name: "查看 pdf 详情" }),
@@ -372,7 +404,9 @@ describe("MySkillsPage", () => {
     renderWithRouter(<MySkillsPage />);
     // Same wait: the provenance-driven regroup settles before the click.
     await screen.findByText("pdf");
-    await screen.findByRole("button", { name: "仓库 anthropics/skills" });
+    await screen.findByRole("link", {
+      name: /^查看仓库 anthropics\/skills/,
+    });
 
     await user.click(
       await screen.findByRole("button", { name: "查看 pdf 详情" }),
@@ -422,12 +456,16 @@ describe("MySkillsPage", () => {
     });
     renderWithRouter(<MySkillsPage />);
 
-    // The card is the store's card: the profiles dataset's chip and the same
-    // install figure the store's own rows show.
-    expect(await screen.findByText("内容创作")).toBeInTheDocument();
-    expect(screen.getByText("3M")).toBeInTheDocument();
+    // The resolved entry is what classifies the install, so a chip for its
+    // domain joins the filter bar — and the card's bar prints the repository's
+    // stars, the same figure the store's own repository cards carry.
+    expect(
+      await screen.findByRole("button", { name: /^内容创作/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByTitle("169600 stars")).toBeInTheDocument();
 
-    // And the drawer agrees with the row that opened it, figure included.
+    // The drawer states the classification and the store figure the compact
+    // repository row has no room for.
     await user.click(screen.getByRole("button", { name: "查看 pdf 详情" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("3M")).toBeInTheDocument();
@@ -437,14 +475,17 @@ describe("MySkillsPage", () => {
   it("shows no store facts for a source the registry no longer lists", async () => {
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
     // The lookup answers nothing for the ref (a fork the index dropped, say):
-    // the card keeps the recorded source — the author chip is what names it —
-    // and shows no chip and no figure: an absent figure is not a zero one.
+    // the card keeps the recorded source — its bar is what names it — and shows
+    // no classification and no figure: an absent fact is not a zero one.
     renderWithRouter(<MySkillsPage />);
 
     expect(
-      await screen.findByRole("button", { name: "仓库 anthropics/skills" }),
+      await screen.findByRole("link", {
+        name: /^查看仓库 anthropics\/skills/,
+      }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("安装量")).not.toBeInTheDocument();
+    expect(screen.queryByText("内容创作")).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/stars/)).toBeNull();
   });
 
   it("offers a confirmable store link for a tool-installed skill", async () => {
@@ -484,15 +525,14 @@ describe("MySkillsPage", () => {
     expect(screen.getByText(/\d+%/)).toBeInTheDocument();
     await user.click(candidate);
 
-    // The association becomes indistinguishable from a native install: the
-    // card now speaks for the repo through its author chip, and the
+    // The association becomes indistinguishable from a native install: pdf now
+    // lives in its own repository card, whose bar names the source, and the
     // affordance is gone.
-    const card = screen.getByRole("button", { name: "查看 pdf 详情" });
-    await waitFor(() =>
-      expect(
-        within(card).getByRole("button", { name: "仓库 anthropics/skills" }),
-      ).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByRole("link", {
+        name: /^查看仓库 anthropics\/skills/,
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "将 pdf 迁移至商店版" }),
     ).not.toBeInTheDocument();
@@ -537,8 +577,10 @@ describe("MySkillsPage", () => {
           .pdf?.repo,
       ).toBe("anthropics/skills"),
     );
-    // And pdf has left the unlinked group (6 → 5) on its own.
-    await screen.findByRole("button", { name: /未关联仓库.*5 个/ });
+    // And pdf's card now names the source it was linked to on its own.
+    await screen.findByRole("link", {
+      name: /^查看仓库 anthropics\/skills/,
+    });
   });
 
   it("pre-fills the search box from the ?skill= deep link", async () => {
@@ -574,7 +616,7 @@ describe("MySkillsPage", () => {
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-      ).toHaveLength(6),
+      ).toHaveLength(5),
     );
   });
 
@@ -628,120 +670,62 @@ describe("MySkillsPage", () => {
     expect(await screen.findByText(/未找到匹配/)).toBeInTheDocument();
   });
 
-  it("groups by enablement state from the toolbar dropdown", async () => {
+  it("scopes the list to a classification from the chip row", async () => {
     const user = userEvent.setup();
-    setMockSkillEnabled("pdf", false);
+    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    // The registry still lists the source the ledger recorded, so pdf wears a
+    // store classification and a chip for it joins the filter bar.
+    lookupSkills.mockResolvedValue({
+      entries: [
+        {
+          name: "pdf",
+          repo: "anthropics/skills",
+          description: "PDF 文档读取、生成、合并、拆分与标注。",
+          stars: 169600,
+          downloads: 2991984,
+          path: "skills/anthropics/skills/pdf",
+          profile: { domain: ["content-creation"] },
+        },
+      ],
+    });
     renderWithRouter(<MySkillsPage />);
-    await screen.findByText("pdf");
 
-    await user.click(screen.getByRole("button", { name: "按仓库" }));
-    await user.click(
-      await screen.findByRole("menuitemradio", { name: /^按状态/ }),
+    await user.click(await screen.findByRole("button", { name: /^内容创作/ }));
+
+    // The scope leaves only the classified skill on screen...
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+      ).toHaveLength(1),
     );
-
-    // The enablement split takes over: two groups, running skills first,
-    // with the disabled skill dimmed inside its own group.
-    expect(await screen.findByText("已启用")).toBeInTheDocument();
-    expect(groupHeader("已启用", 5)).toBeInTheDocument();
-    expect(groupHeader("已禁用", 1)).toBeInTheDocument();
     expect(
-      screen.getByRole("switch", { name: "开启 pdf" }),
+      screen.getByRole("button", { name: "查看 pdf 详情" }),
     ).toBeInTheDocument();
+
+    // ...and 全部 clears the scope again.
+    await user.click(screen.getByRole("button", { name: /^全部/ }));
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+      ).toHaveLength(6),
+    );
   });
 
-  it("groups by install age into a chronological timeline", async () => {
+  it("stands the category bar down while searching", async () => {
     const user = userEvent.setup();
     renderWithRouter(<MySkillsPage />);
     await screen.findByText("pdf");
+    expect(screen.getByRole("button", { name: /^全部/ })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "按仓库" }));
-    await user.click(
-      await screen.findByRole("menuitemradio", { name: /^按时间/ }),
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+    // A search re-orders the list by relevance and ignores the scope, so the
+    // bar goes away with it — exactly as it does in the store.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: /^全部/ }),
+      ).not.toBeInTheDocument(),
     );
-
-    // Newest first, and never the size ordering the pooling modes use: 近一年
-    // holds two skills yet sits fourth, because it is younger than 更早.
-    const headers = screen
-      .getAllByRole("button", { name: /^分组 / })
-      .map((header) => header.getAttribute("aria-label"));
-    expect(headers).toEqual([
-      "分组 今天，1 个 skill",
-      "分组 近 7 天，1 个 skill",
-      "分组 近 30 天，1 个 skill",
-      "分组 近一年，2 个 skill",
-      "分组 更早，1 个 skill",
-    ]);
-  });
-
-  it("orders the timeline chronologically inside a section too", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
-    await screen.findByText("pdf");
-
-    await user.click(screen.getByRole("button", { name: "按仓库" }));
-    await user.click(
-      await screen.findByRole("menuitemradio", { name: /^按时间/ }),
-    );
-
-    // Not just "newest section first": 近一年 holds two skills and the younger
-    // one leads. Left in the list's alphabetical order it would be code-review
-    // before mcp-builder.
-    const cards = screen
-      .getAllByRole("button", { name: /^查看 .* 详情$/ })
-      .map((card) => card.getAttribute("aria-label"));
-    expect(cards).toEqual([
-      "查看 pdf 详情",
-      "查看 docx 详情",
-      "查看 pptx 详情",
-      "查看 mcp-builder 详情",
-      "查看 code-review 详情",
-      "查看 frontend-design 详情",
-    ]);
-  });
-
-  it("medals a ranked mode's ordinals and leaves the timeline's plain", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<MySkillsPage />);
-    await screen.findByText("pdf");
-
-    // The default mode weighs its groups by size, so the top one takes the
-    // podium's gold…
-    const rankedOrdinal = within(
-      screen.getByRole("button", { name: /^分组 未关联仓库/ }),
-    ).getByText("1");
-    expect(rankedOrdinal.className).toContain("text-amber-500");
-
-    await user.click(screen.getByRole("button", { name: "按仓库" }));
-    await user.click(
-      await screen.findByRole("menuitemradio", { name: /^按时间/ }),
-    );
-
-    // …while the timeline's first section is merely the most recent, not the
-    // winner, so it prints in the row's ordinary muted ink.
-    const plainOrdinal = within(groupHeader("今天", 1)).getByText("1");
-    expect(plainOrdinal.className).not.toContain("text-amber-500");
-  });
-
-  it("annotates the grouping options with the group counts", async () => {
-    const user = userEvent.setup();
-    setMockSkillEnabled("pptx", false);
-    renderWithRouter(<MySkillsPage />);
-    await screen.findByText("pdf");
-
-    await user.click(screen.getByRole("button", { name: "按仓库" }));
-    // The menu's portal mounts asynchronously under Base UI.
-    const rows = (await screen.findAllByRole("menuitemradio")).map(
-      (m) => m.textContent,
-    );
-    // All six skills share one repo-less pool; their install ages spread over
-    // five stretches; disabling pptx splits the status mode into two groups;
-    // nothing is classified.
-    expect(rows).toEqual([
-      "按仓库1 组",
-      "按时间5 组",
-      "按状态2 组",
-      "按类型1 组",
-    ]);
   });
 
   it("lists every detected agent in the strip's dropdown menu", async () => {

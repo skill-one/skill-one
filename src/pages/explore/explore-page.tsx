@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Boxes, ChevronDown, List } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
@@ -9,11 +9,11 @@ import { skillKey } from "../../lib/skill-view";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
-import { DOMAINS, domainLabel, domainMeta } from "../../data/domains";
+import { domainLabel, domainMeta } from "../../data/domains";
+import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import { byRepoRank } from "../../lib/registry/repo-rank";
 import { cn, formatCount } from "../../lib/utils";
 import type { SearchHit } from "../../lib/registry/protocol";
-import type { Skill } from "../../types/skill";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
@@ -21,16 +21,12 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import { Button } from "../../components/ui/button";
+import { DomainChip } from "../../components/domain-chip";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
 import { SearchInput } from "../../components/search-input";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/toggle-group";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "../../components/ui/tooltip";
 import { SkillListRow } from "./skill-list-row";
 import { SkillRow } from "./skill-row";
 import { GroupSection } from "./group-section";
@@ -49,26 +45,8 @@ const GROUP_CHUNK = 6;
 /** Fold-state and React-key identity of the live skills.sh section. */
 const LIVE_GROUP_KEY = "skills-sh";
 
-/**
- * The taxonomy's catch-all key. A skill the dataset never classified pools into
- * it, exactly as the worker files an unclassified repository.
- */
-const OTHER_DOMAIN = "other";
-
-/** The taxonomy's own order, for a stable tie-break between equal-sized chips. */
-const TAXONOMY_RANK = new Map(
-  DOMAINS.map((domain, index) => [domain.key, index]),
-);
-const taxonomyRank = (key: string) => TAXONOMY_RANK.get(key) ?? DOMAINS.length;
-
 /** What the list is made of: one repository card each, or one skill row each. */
 type Unit = "repo" | "skill";
-
-/** A skill's classification keys; an unclassified one pools into the catch-all. */
-function domainsOf(skill: Skill): string[] {
-  const domain = skill.profile?.domain;
-  return domain && domain.length > 0 ? domain : [OTHER_DOMAIN];
-}
 
 /** The skill unit's order: most installed first, then by source and name. */
 function byInstalls(a: SearchHit, b: SearchHit): number {
@@ -264,36 +242,20 @@ export function ExplorePage() {
     return runs;
   }, [activeSkills]);
 
-  // How many skills each domain holds, for the filter's chips in the skill unit:
-  // a skill rides every domain it belongs to, and an unclassified one pools into
-  // the catch-all (as the repository unit files it).
-  const domainSkillCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const hit of allSkills) {
-      for (const key of domainsOf(hit.skill)) {
-        counts.set(key, (counts.get(key) ?? 0) + 1);
-      }
-    }
-    return counts;
-  }, [allSkills]);
-
   // The filter's chips for the current unit — repositories per domain, or skills
   // per domain: the two units file the same data differently. Both lead with the
-  // biggest domain, ties broken by the taxonomy's own order.
+  // biggest domain, ties broken by the taxonomy's own order. A skill rides every
+  // domain it belongs to; an unclassified one pools into the catch-all (as the
+  // repository unit files it).
   const chips = useMemo(() => {
     if (unit === "skill") {
-      return [...domainSkillCounts]
-        .map(([key, count]) => ({ key, count }))
-        .toSorted(
-          (a, b) =>
-            b.count - a.count || taxonomyRank(a.key) - taxonomyRank(b.key),
-        );
+      return domainFacets(allSkills, (hit) => domainsOf(hit.skill));
     }
     return (sectionsData?.sections ?? []).map((section) => ({
       key: section.title,
       count: section.repos.length,
     }));
-  }, [unit, domainSkillCounts, sectionsData]);
+  }, [unit, allSkills, sectionsData]);
 
   // What the 全部 chip counts: every repository, or every skill.
   const totalCount =
@@ -736,89 +698,5 @@ function SkillRun({
         </li>
       )}
     </>
-  );
-}
-
-/**
- * One press of the domain filter: a chip that scopes the list to a domain (or,
- * for 全部, clears the scope).
- *
- * At rest a chip shows only its glyph, so the bar reads as a line of emoji and a
- * dozen domains stay scannable at a glance. Pointing at one names it in a tip —
- * nothing in the row moves; the label only unfolds once the chip is pressed, and
- * stays open so the current scope is always named. The label is clipped rather
- * than unmounted, so the chip's accessible name is complete with no pointer.
- * 全部 carries no glyph, so it keeps its label at rest (and carries no tip).
- */
-function DomainChip({
-  selected,
-  emoji,
-  count,
-  countLabel = "个仓库",
-  expanded = false,
-  onClick,
-  children,
-}: {
-  selected: boolean;
-  emoji?: string;
-  count?: number;
-  /** What the count counts, named in the tip (e.g. 个 skill). */
-  countLabel?: string;
-  /** Keep the label visible at rest, for a chip with no glyph to stand for it. */
-  expanded?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  const revealed = selected || expanded;
-  const chip = (
-    <Button
-      type="button"
-      variant={selected ? "default" : "outline"}
-      size="sm"
-      aria-pressed={selected}
-      onClick={onClick}
-    >
-      {/* One child, so the button's own gap never widens the collapsed chip:
-          the emoji and the clipped label meet the padding symmetrically. */}
-      <span className="flex items-center">
-        {emoji && (
-          <span aria-hidden="true" className="text-[13px] leading-none">
-            {emoji}
-          </span>
-        )}
-        <span
-          className={cn(
-            "grid items-center transition-[grid-template-columns] duration-150",
-            revealed ? "grid-cols-[1fr]" : "grid-cols-[0fr]",
-          )}
-        >
-          <span className="overflow-hidden">
-            <span className="flex items-center gap-1 pl-1.5 whitespace-nowrap">
-              {children}
-              {count !== undefined && (
-                <span className="text-[11px] tabular-nums opacity-70">
-                  {count}
-                </span>
-              )}
-            </span>
-          </span>
-        </span>
-      </span>
-    </Button>
-  );
-
-  // A chip at rest is a bare glyph, so hovering names it in a tip rather than
-  // unfolding the row — a row that shifts under the pointer is hard to scan.
-  // The label unfolds only once the chip is chosen. A chip already showing its
-  // label carries no tip.
-  if (revealed) return chip;
-  return (
-    <Tooltip>
-      <TooltipTrigger render={chip} />
-      <TooltipContent>
-        {children}
-        {count !== undefined && ` · ${count} ${countLabel}`}
-      </TooltipContent>
-    </Tooltip>
   );
 }
