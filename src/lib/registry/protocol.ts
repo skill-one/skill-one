@@ -33,32 +33,18 @@ export interface SearchData {
 export interface GroupsRequest {
   /** Trimmed search text; empty means "browse the registry in order". */
   query: string;
-  /**
-   * The dimension the browse list is bucketed by: the repository that
-   * publishes each skill, or its profile classification. Defaults to `repo`.
-   */
-  by?: GroupBy;
 }
 
-/** The dimensions the explore list can bucket the registry by. */
-export type GroupBy = "repo" | "domain";
-
 /**
- * One group of the grouped answer: a bucket of the selected dimension and the
- * skills inside it, with the display facts its card shows.
+ * One group of the grouped answer: a repository bucket and the skills inside
+ * it, with the display facts its card shows.
  */
 export interface Group {
   /** Stable identity for folding state and React keys. */
   key: string;
-  /**
-   * The group's own name in its mode's vocabulary: `owner/repo` for repository
-   * groups, the domain key (see `data/domains`) for category groups.
-   */
+  /** The group's own name: `owner/repo`. */
   title: string;
-  /**
-   * The repository's GitHub stars. Repository groups only — a category spans
-   * many repositories, so there is no single figure to weigh.
-   */
+  /** The repository's GitHub stars. */
   stars?: number;
   /** The group's skills, in the order the browse ordering produced. */
   skills: SearchHit[];
@@ -68,6 +54,28 @@ export interface Group {
 export interface GroupsData {
   groups: Group[];
   /** Total skills across all groups (the pre-grouping hit count). */
+  total: number;
+}
+
+/** One domain's share of the repository browse answer. */
+export interface RepoSection {
+  /** Stable identity for React keys: `domain-<key>`. */
+  key: string;
+  /** The domain key (see `data/domains`). */
+  title: string;
+  /** The repositories filed here, in the browse order (stars first). */
+  repos: Group[];
+}
+
+/**
+ * The repository browse answer, filed by domain: every repository card once,
+ * under the single domain that best describes it. The explore page's domain
+ * filter reads it — the sections are its chips, and one section is the list a
+ * chip scopes to. No pagination — the page reveals it.
+ */
+export interface RepoSectionsData {
+  sections: RepoSection[];
+  /** Distinct repositories across all sections (each appears once). */
   total: number;
 }
 
@@ -166,6 +174,7 @@ export type RegistryCommand =
 export type RegistryQuery =
   | { type: "searchSkills"; id: number; payload: { query: string } }
   | { type: "getGroups"; id: number; payload: GroupsRequest }
+  | { type: "getRepoSections"; id: number }
   | { type: "getFeatured"; id: number }
   | { type: "getRanking"; id: number; payload: RankingRequest }
   | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } };

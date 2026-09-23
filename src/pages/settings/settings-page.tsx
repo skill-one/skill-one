@@ -14,6 +14,11 @@ import {
   getIndexTag,
   setCdnBase,
 } from "../../lib/cdn-config";
+import {
+  REPO_CARD_LIMITS,
+  setRepoCardLimit,
+  type RepoCardLimit,
+} from "../../lib/repo-card-preview";
 import { reloadRegistry } from "../../lib/registry/client";
 import { checkForRegistryUpdate } from "../../lib/registry/refresh";
 import type {
@@ -23,9 +28,11 @@ import type {
 import { cn } from "../../lib/utils";
 import { useAppUpdate } from "../../hooks/use-app-update";
 import { useRegistrySnapshot } from "../../hooks/use-registry-snapshot";
+import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { ThemeModeToggle } from "../../components/theme-mode-toggle";
+import { ToggleGroup, ToggleGroupItem } from "../../components/ui/toggle-group";
 
 /** How the served snapshot got here, phrased for the settings page. */
 const INDEX_ORIGIN_LABEL: Record<IndexOrigin, string> = {
@@ -64,6 +71,9 @@ export function SettingsPage() {
     null,
   );
   const update = useAppUpdate();
+  // The repository-card preview size, read live so the control reflects it and a
+  // change notifies any list already on screen.
+  const repoCardLimit = useRepoCardLimit();
   // Only the served snapshot identity drives this card; count climbs and
   // progress flags during a streaming download must not re-render the page.
   const index = useRegistrySnapshot((s) => s.index);
@@ -122,6 +132,37 @@ export function SettingsPage() {
             </p>
             <div className="mt-3">
               <ThemeModeToggle />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border/70 bg-card p-4">
+            <h3 className="text-[13px] font-medium text-foreground">
+              仓库卡片
+            </h3>
+            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+              每个仓库卡片最多预览几个 skill，超出的部分通过卡片底部的入口进入仓库页查看。
+            </p>
+            <div className="mt-3">
+              <ToggleGroup
+                variant="outline"
+                spacing={0}
+                value={[String(repoCardLimit)]}
+                onValueChange={(values) => {
+                  const next = values[0];
+                  if (next) setRepoCardLimit(Number(next) as RepoCardLimit);
+                }}
+                aria-label="仓库卡片预览数量"
+              >
+                {REPO_CARD_LIMITS.map((limit) => (
+                  <ToggleGroupItem
+                    key={limit}
+                    value={String(limit)}
+                    className="px-3"
+                  >
+                    {limit}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
             </div>
           </div>
 

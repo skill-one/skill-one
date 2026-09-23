@@ -6,6 +6,7 @@ import type {
   RankingData,
   RankingRequest,
   RegistryWorkerMessage,
+  RepoSectionsData,
   SearchData,
   SkillRef,
 } from "../lib/registry/protocol";
@@ -49,6 +50,7 @@ export interface RegistryHarness {
   setRpcError(err: Error | null): void;
   searchSkills(query: string): Promise<SearchData>;
   getGroups(req: GroupsRequest): Promise<GroupsData>;
+  getRepoSections(): Promise<RepoSectionsData>;
   getFeatured(): Promise<FeaturedData>;
   getRanking(req: RankingRequest): Promise<RankingData>;
   lookupSkills(refs: SkillRef[]): Promise<{ entries: Array<Skill | null> }>;
@@ -180,6 +182,7 @@ export function createRegistryHarness(): RegistryHarness {
     type:
       | "searchSkills"
       | "getGroups"
+      | "getRepoSections"
       | "getFeatured"
       | "getRanking"
       | "lookupSkills",
@@ -247,6 +250,9 @@ export function createRegistryHarness(): RegistryHarness {
     getGroups(req) {
       return request<GroupsData>("getGroups", req);
     },
+    getRepoSections() {
+      return request<RepoSectionsData>("getRepoSections");
+    },
     getFeatured() {
       return request<FeaturedData>("getFeatured");
     },
@@ -290,6 +296,7 @@ export function createRegistryClientMock(harness: RegistryHarness) {
     reloadRegistry: () => harness.reload(),
     searchSkills: (query: string) => harness.searchSkills(query),
     getGroups: (req: GroupsRequest) => harness.getGroups(req),
+    getRepoSections: () => harness.getRepoSections(),
     getFeatured: () => harness.getFeatured(),
     getRanking: (req: RankingRequest) => harness.getRanking(req),
     lookupSkills: (refs: SkillRef[]) => harness.lookupSkills(refs),

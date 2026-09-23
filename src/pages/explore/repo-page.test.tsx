@@ -89,8 +89,9 @@ describe("RepoPage", () => {
     bootRegistry(skillsOf(7));
     renderRepoPage();
 
-    // Seven cards: the repository card's cap belongs to the card, not to the
-    // page — opening the repository is how a reader sees all of them.
+    // All seven skills, one card each: the repository card's preview cap belongs
+    // to the card, not to the page — opening the repository is how a reader sees
+    // all of them.
     expect(await screen.findByRole("heading", { name: REPO })).toBeInTheDocument();
     expect(
       await screen.findAllByRole("button", { name: /^查看 skill-\d+ 详情$/ }),
@@ -112,6 +113,30 @@ describe("RepoPage", () => {
     expect(within(fourth).getByText("4").className).not.toContain(
       "text-amber-500",
     );
+  });
+
+  it("leads each row with the skill's classification glyph", async () => {
+    bootRegistry([
+      {
+        ...skillsOf(1)[0],
+        name: "redis",
+        path: "skills/redis",
+        profile: { domain: ["development"] },
+      },
+      { ...skillsOf(1)[0], name: "orphan", path: "skills/orphan" },
+    ]);
+    renderRepoPage();
+
+    // The classification, not the owner (the same for every row on this page),
+    // leads the row.
+    const redis = await screen.findByRole("button", {
+      name: "查看 redis 详情",
+    });
+    expect(within(redis).getByText("💻")).toBeInTheDocument();
+
+    // A skill the dataset has not classified wears the catch-all mark.
+    const orphan = screen.getByRole("button", { name: "查看 orphan 详情" });
+    expect(within(orphan).getByText("❓")).toBeInTheDocument();
   });
 
   it("reveals more rows as the reader scrolls", async () => {

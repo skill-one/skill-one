@@ -11,10 +11,9 @@ import { formatCount } from "../../lib/utils";
  * keeps a pinned header under the pointer across a toggle that removes cards.
  *
  * Rendered directly rather than through a page. The shell is shared by the
- * store's category modes, the live section and the installed list, and its
- * mechanics are identical in all of them, so they belong to the shell. Which
- * mode builds which groups — and what a group's rows look like — is the page's
- * own subject, tested there.
+ * live section and the installed list, and its mechanics are identical in
+ * both, so they belong to the shell. Which mode builds which groups — and what
+ * a group's rows look like — is the page's own subject, tested there.
  */
 
 type Item = { id: string };
@@ -69,20 +68,18 @@ describe("GroupSection", () => {
     expect(within(head).getByText("3 个")).toBeInTheDocument();
   });
 
-  it("leads with a glyph and a note when the group has no owner", () => {
-    // The live section's shape: a category glyph instead of an avatar, a note
-    // that nothing else on the row carries, and an ordinal that is merely a
-    // sequence (`plain`) rather than a rank.
+  it("carries a note and a sequence ordinal when the group has no owner", () => {
+    // The live section's shape: no avatar, a note that nothing else on the row
+    // carries, and an ordinal that is merely a sequence (`plain`) rather than a
+    // rank.
     renderSection(2, {
       key: "skills-sh",
       title: "skills.sh 官方搜索",
       note: "实时结果，本地索引未收录",
-      emoji: "🔎",
       ordinal: "plain",
     });
 
     const head = header("skills.sh 官方搜索", 2);
-    expect(within(head).getByText("🔎")).toBeInTheDocument();
     expect(within(head).getByText("实时结果，本地索引未收录")).toBeInTheDocument();
     expect(within(head).getByText("1")).toBeInTheDocument();
   });

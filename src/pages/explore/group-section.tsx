@@ -27,9 +27,8 @@ const PREVIEW_ROWS = 2;
 
 /**
  * The identity and figures a group header shows, attached by whoever built
- * the group. Everything is optional except the key and title: repository
- * groups carry the owner avatar and the stars their ordering used, category
- * groups a glyph, rank buckets neither.
+ * the group. Everything is optional except the key and title: a group may
+ * carry the owner avatar and the stars its ordering used.
  */
 export interface GroupMeta {
   /** Stable identity for folding state and React keys. */
@@ -43,8 +42,6 @@ export interface GroupMeta {
   note?: string;
   /** The owner whose avatar leads the header, when one exists. */
   avatarOwner?: string;
-  /** A category glyph shown in place of an avatar, when one exists. */
-  emoji?: string;
   /** The stars the ordering used, when the mode orders by them. */
   stars?: number;
   /**
@@ -241,20 +238,13 @@ export function GroupSection<T>({
               {index + 1}
             </span>
           </span>
-          {/* The identity slot: the owner's avatar for repository groups,
-              the category's emoji for domain groups, nothing otherwise. */}
+          {/* The identity slot: the owner's avatar when one exists, nothing
+              otherwise. */}
           {group.avatarOwner ? (
             <OwnerAvatar
               owner={group.avatarOwner}
               className="h-5 w-5 shrink-0"
             />
-          ) : group.emoji ? (
-            <span
-              aria-hidden="true"
-              className="flex h-5 w-5 shrink-0 items-center justify-center text-sm"
-            >
-              {group.emoji}
-            </span>
           ) : null}
           <span className="truncate text-sm font-medium">{group.title}</span>
           {group.note && (

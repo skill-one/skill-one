@@ -7,6 +7,7 @@ import type {
   RankingData,
   RankingRequest,
   RegistryWorkerMessage,
+  RepoSectionsData,
   RevalidateResult,
   SearchData,
 } from "./protocol";
@@ -123,6 +124,7 @@ function request(
   type:
     | "searchSkills"
     | "getGroups"
+    | "getRepoSections"
     | "getFeatured"
     | "getRanking"
     | "lookupSkills"
@@ -169,6 +171,16 @@ export function searchSkills(query: string): Promise<SearchData> {
  */
 export function getGroups(request_: GroupsRequest): Promise<GroupsData> {
   return request("getGroups", request_) as Promise<GroupsData>;
+}
+
+/**
+ * The repository browse answer, filed by domain — every repository card once,
+ * under its leading domain. It backs the explore page's domain filter: the
+ * sections are the filter's chips, and one section is the list a chip scopes
+ * to. Whole (no paging; the page reveals it in chunks instead).
+ */
+export function getRepoSections(): Promise<RepoSectionsData> {
+  return request("getRepoSections") as Promise<RepoSectionsData>;
 }
 
 /** Featured payload; call only once `ready` (see useRegistryStats). */

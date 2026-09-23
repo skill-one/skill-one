@@ -6,6 +6,11 @@ import { ThemeProvider } from "../../components/theme-provider";
 import { SettingsPage } from "./settings-page";
 import type { IndexInfo } from "../../lib/registry/protocol";
 import { setIndexTag } from "../../lib/cdn-config";
+import {
+  DEFAULT_REPO_CARD_LIMIT,
+  getRepoCardLimit,
+  setRepoCardLimit,
+} from "../../lib/repo-card-preview";
 import { getUpdateStatus, resetUpdateState } from "../../lib/update-store";
 import { resetUpdateChannel } from "../../lib/update-channel";
 
@@ -94,6 +99,7 @@ describe("SettingsPage", () => {
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
     setIndexTag("");
+    setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT);
   });
 
   it("hosts the appearance picker alongside the CDN settings", () => {
@@ -102,6 +108,17 @@ describe("SettingsPage", () => {
     expect(screen.getByText("外观")).toBeInTheDocument();
     expect(screen.getByText("CDN 基址")).toBeInTheDocument();
     expect(screen.getByText("跟随系统")).toBeInTheDocument();
+  });
+
+  it("lets the reader size the repository card preview", async () => {
+    const user = userEvent.setup();
+    setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT);
+    renderSettings();
+
+    expect(screen.getByText("仓库卡片")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "7" }));
+
+    expect(getRepoCardLimit()).toBe(7);
   });
 
   it("names the served snapshot and that it was reused, not downloaded", () => {

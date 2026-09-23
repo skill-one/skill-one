@@ -274,8 +274,9 @@ describe("ExplorePage", () => {
     expect(harness.downloads).toBe(1);
   });
 
-  it("caps a repository's rows and hands the rest to its page", async () => {
-    // One repository with eight skills: seven on the card, one behind it.
+  it("caps a repository's rows at the default preview and hands the rest to its page", async () => {
+    // One repository with eight skills: five on the card (the default preview),
+    // three behind it.
     harness.init();
     harness.pushAll(makeSkills(8, 0));
     harness.complete();
@@ -284,65 +285,358 @@ describe("ExplorePage", () => {
     // The cap is what keeps one big repository from pushing every other card
     // off the screen; the bar carries the repository's *total*, so a capped list
     // reads as "these of them" and its door leads to all of them.
-    expect(await screen.findByText("skill-6")).toBeInTheDocument();
-    expect(screen.queryByText("skill-7")).not.toBeInTheDocument();
+    expect(await screen.findByText("skill-4")).toBeInTheDocument();
+    expect(screen.queryByText("skill-5")).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: `查看仓库 ${BATCH_REPO}，8 个 skill` }),
       // The app is a hash router, so the rendered href carries the hash.
     ).toHaveAttribute("href", `#/repo/${BATCH_REPO}`);
     expect(
       screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
-    ).toHaveLength(7);
+    ).toHaveLength(5);
   });
 
-  it("switches to the category view, bucketing by classification", async () => {
+  it("lets a search ignore the domain filter", async () => {
     const user = userEvent.setup();
-    const classify = (name: string, domain: string[], repo: string): Skill => ({
-      name,
-      repo,
-      description: "",
-      stars: 1_000,
-      downloads: 1_000,
-      path: `skills/${name}`,
-      profile: { domain },
-    });
+    harness.reset();
     harness.init();
     harness.pushAll([
-      classify("redis-clip", ["development"], "acme/a"),
-      classify("redis-lab", ["development"], "acme/b"),
-      classify("lint-fix", ["testing"], "acme/c"),
-      // No profile: the dataset never classified it.
+      {
+        name: "redis",
+        repo: "acme/dev",
+        description: "",
+        stars: 300,
+        downloads: 300,
+        path: "skills/redis",
+        profile: { domain: ["development"] },
+      },
+      {
+        name: "lint",
+        repo: "acme/test",
+        description: "",
+        stars: 200,
+        downloads: 200,
+        path: "skills/lint",
+        profile: { domain: ["testing"] },
+      },
+    ]);
+    harness.complete();
+    renderExplorePage();
+
+    // Scope the browse list to one domain...
+    await user.click(await screen.findByRole("button", { name: /开发编程/ }));
+    await waitFor(() =>
+      expect(screen.queryByText("lint")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("redis")).toBeInTheDocument();
+
+    // ...then search: the query re-answers across the whole registry, so the
+    // filtered-out domain's skill comes back.
+    await user.type(await searchField(), "lint");
+    expect(
+      await screen.findByRole("button", { name: "查看 lint 详情" }),
+    ).toBeInTheDocument();
+  });
+
+  it("scopes the browse list to one domain when its chip is pressed", async () => {
+    const user = userEvent.setup();
+    harness.reset();
+    harness.init();
+    harness.pushAll([
+      {
+        name: "redis",
+        repo: "acme/dev",
+        description: "",
+        stars: 300,
+        downloads: 300,
+        path: "skills/redis",
+        profile: { domain: ["development"] },
+      },
+      {
+        name: "lint",
+        repo: "acme/test",
+        description: "",
+        stars: 200,
+        downloads: 200,
+        path: "skills/lint",
+        profile: { domain: ["testing"] },
+      },
       {
         name: "orphan",
-        repo: "acme/d",
+        repo: "acme/misc",
         description: "",
-        stars: 1,
-        downloads: 1,
+        stars: 100,
+        downloads: 100,
         path: "skills/orphan",
       },
     ]);
     harness.complete();
     renderExplorePage();
 
-    // The browse list starts on the repository view: one card per repository.
+    // The list opens on 全部: one card per repository, and a chip for every
+    // domain that holds one — plus the catch-all for the unclassified
+    // repository.
+    const cards = () => screen.getAllByRole("link", { name: /^查看仓库 / });
+    await screen.findByText("redis");
+    expect(cards()).toHaveLength(3);
+    expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
+      "3",
+    );
     expect(
-      await screen.findByRole("link", { name: "查看仓库 acme/a，1 个 skill" }),
+      screen.getByRole("button", { name: /开发编程/ }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /测试与质量/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /其他/ })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "按分类" }));
+    // Pressing a domain scopes the list to its repositories alone.
+    await user.click(screen.getByRole("button", { name: /开发编程/ }));
+    await waitFor(() =>
+      expect(screen.queryByText("lint")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("redis")).toBeInTheDocument();
+    expect(screen.queryByText("orphan")).not.toBeInTheDocument();
+    expect(cards()).toHaveLength(1);
 
-    // The category view: one card per domain, its door leading to its page.
+    // 全部 clears the scope again.
+    await user.click(screen.getByRole("button", { name: /^全部/ }));
+    expect(await screen.findByText("lint")).toBeInTheDocument();
+    expect(cards()).toHaveLength(3);
+  });
+
+  it("keeps a domain chip's label collapsed until the chip is chosen", async () => {
+    const user = userEvent.setup();
+    harness.reset();
+    harness.init();
+    harness.pushAll([
+      {
+        name: "redis",
+        repo: "acme/dev",
+        description: "",
+        stars: 300,
+        downloads: 300,
+        path: "skills/redis",
+        profile: { domain: ["development"] },
+      },
+    ]);
+    harness.complete();
+    renderExplorePage();
+
+    // The label is in the DOM (so the chip is named) but clipped to nothing at
+    // rest — only the glyph shows.
+    const chip = await screen.findByRole("button", { name: /开发编程/ });
+    expect(chip.querySelector("span.grid")).toHaveClass("grid-cols-[0fr]");
+    expect(chip.querySelector("span.grid")).not.toHaveClass(
+      "grid-cols-[1fr]",
+    );
+
+    // Choosing the chip unfolds its label for good, so the scope always reads.
+    await user.click(chip);
+    const revealed = screen.getByRole("button", { name: /开发编程/ });
+    expect(revealed.querySelector("span.grid")).toHaveClass("grid-cols-[1fr]");
+  });
+
+  it("lists skills by install count and leaves a short run whole", async () => {
+    const user = userEvent.setup();
+    harness.reset();
+    harness.init();
+    harness.pushAll([
+      {
+        name: "r1",
+        repo: "o/one",
+        description: "",
+        stars: 10,
+        downloads: 50,
+        path: "skills/r1",
+      },
+      {
+        name: "r2",
+        repo: "o/one",
+        description: "",
+        stars: 10,
+        downloads: 40,
+        path: "skills/r2",
+      },
+      {
+        name: "r3",
+        repo: "o/one",
+        description: "",
+        stars: 10,
+        downloads: 30,
+        path: "skills/r3",
+      },
+      {
+        name: "z1",
+        repo: "o/two",
+        description: "",
+        stars: 10,
+        downloads: 20,
+        path: "skills/z1",
+      },
+    ]);
+    harness.complete();
+    const { container } = renderExplorePage();
+
+    // The repository unit leads with one card per repository...
+    await screen.findByRole("link", { name: /^查看仓库 o\/one/ });
+    await user.click(screen.getByRole("button", { name: "按技能" }));
+
+    // ...and the skill unit with one row per skill, most installed first. o/one's
+    // three skills are a run, but below the fold threshold it is listed whole —
+    // every row stands on its own, and no fold row appears.
+    await waitFor(() => expect(cardOrder()).toEqual(["r1", "r2", "r3", "z1"]));
+    expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
     expect(
-      await screen.findByRole("link", { name: "查看分类 开发编程，2 个 skill" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
+    ).toBeNull();
+    // Each row keeps only its source's owner face — the repo path itself is gone.
+    expect(container.querySelectorAll('[data-slot="avatar"]')).toHaveLength(4);
+  });
+
+  it("folds a run of four or more and unfolds it on a press", async () => {
+    const user = userEvent.setup();
+    harness.reset();
+    harness.init();
+    harness.pushAll([
+      {
+        name: "r1",
+        repo: "o/one",
+        description: "",
+        stars: 10,
+        downloads: 50,
+        path: "skills/r1",
+      },
+      {
+        name: "r2",
+        repo: "o/one",
+        description: "",
+        stars: 10,
+        downloads: 40,
+        path: "skills/r2",
+      },
+      {
+        name: "r3",
+        repo: "o/one",
+        description: "",
+        stars: 10,
+        downloads: 30,
+        path: "skills/r3",
+      },
+      {
+        name: "r4",
+        repo: "o/one",
+        description: "",
+        stars: 10,
+        downloads: 20,
+        path: "skills/r4",
+      },
+      {
+        name: "z1",
+        repo: "o/two",
+        description: "",
+        stars: 10,
+        downloads: 10,
+        path: "skills/z1",
+      },
+    ]);
+    harness.complete();
+    renderExplorePage();
+
+    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await waitFor(() => expect(cardOrder()).toEqual(["r1", "z1"]));
+
+    // o/one's four-skill run folds its three hidden rows into one line whose
+    // figure is the run's own combined installs (50 + 40 + 30 + 20), not the
+    // whole registry's and not a figure carried over from another run.
+    const fold = screen.getByRole("button", { name: /还有 3 个来自 o\/one/ });
+    expect(fold).toHaveTextContent("共 140");
+    expect(fold).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "查看 r2 详情" })).toBeNull();
+
+    // A press unfolds them in place, in rank order, and marks the row open.
+    await user.click(fold);
+    await waitFor(() =>
+      expect(cardOrder()).toEqual(["r1", "r2", "r3", "r4", "z1"]),
+    );
+    expect(screen.getByRole("button", { name: /收起/ })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+
+  it("files skills by their own domain in the skill unit", async () => {
+    const user = userEvent.setup();
+    harness.reset();
+    harness.init();
+    harness.pushAll([
+      {
+        name: "alpha",
+        repo: "o/dev",
+        description: "",
+        stars: 10,
+        downloads: 50,
+        path: "skills/alpha",
+        profile: { domain: ["development"] },
+      },
+      {
+        name: "beta",
+        repo: "o/dev",
+        description: "",
+        stars: 10,
+        downloads: 40,
+        path: "skills/beta",
+        profile: { domain: ["development", "testing"] },
+      },
+      {
+        name: "gamma",
+        repo: "o/mix",
+        description: "",
+        stars: 10,
+        downloads: 30,
+        path: "skills/gamma",
+        profile: { domain: ["testing"] },
+      },
+      {
+        name: "delta",
+        repo: "o/none",
+        description: "",
+        stars: 10,
+        downloads: 20,
+        path: "skills/delta",
+      },
+    ]);
+    harness.complete();
+    renderExplorePage();
+
+    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await waitFor(() =>
+      expect(cardOrder()).toEqual(["alpha", "beta", "gamma", "delta"]),
+    );
+
+    // The chip counts skills, not repositories: `beta` answers both domains, so
+    // testing holds two while no repository leads with it.
+    const testing = screen.getByRole("button", { name: /测试与质量/ });
+    expect(testing).toHaveTextContent("2");
+
+    // Scoping to testing keeps every skill that belongs to it — including the
+    // one whose repository leads elsewhere.
+    await user.click(testing);
+    await waitFor(() => expect(cardOrder()).toEqual(["beta", "gamma"]));
+  });
+
+  it("answers a search with skill rows in the skill unit", async () => {
+    const user = userEvent.setup();
+    bootGadgetRegistry();
+    renderExplorePage();
+
+    await user.click(await screen.findByRole("button", { name: "按技能" }));
+    await user.type(await searchField(), "gadget");
+
+    // The match comes back as a skill row rather than a repository card.
     expect(
-      screen.getByRole("link", { name: "查看分类 测试与质量，1 个 skill" }),
+      await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
-    // The unclassified skill pools into the catch-all rather than vanishing.
-    expect(
-      screen.getByRole("link", { name: "查看分类 其他，1 个 skill" }),
-    ).toBeInTheDocument();
-    // The repository cards are gone: the two views are alternatives.
     expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
   });
 
@@ -938,10 +1232,10 @@ describe("ExplorePage", () => {
 
     const list = container.querySelector("ul.grid")!;
     expect(list.className).toContain(REPO_LIST_CLASS);
-    // One repository card in the list, seven rows in the card: the list run is
+    // One repository card in the list, five rows in the card: the list run is
     // the cap, not the full 50-skill repository.
     expect(list.children).toHaveLength(1);
-    expect(list.querySelectorAll("li li")).toHaveLength(7);
+    expect(list.querySelectorAll("li li")).toHaveLength(5);
 
     // Opening the drawer overlays the list: its classes — and with them its
     // layout and scroll position — stay exactly the same while the drawer is
@@ -956,7 +1250,7 @@ describe("ExplorePage", () => {
     );
     expect(list.className).toContain(REPO_LIST_CLASS);
     expect(list.children).toHaveLength(1);
-    expect(list.querySelectorAll("li li")).toHaveLength(7);
+    expect(list.querySelectorAll("li li")).toHaveLength(5);
   });
 });
 
@@ -986,7 +1280,7 @@ describe("ExplorePage streaming", () => {
 
     harness.pushAll(makeSkills(STREAM_BATCH + 5, 0));
 
-    // The card paints from the partial data (its seven rows, then the tail) and
+    // The card paints from the partial data (its capped rows, then the tail) and
     // grows in place as more of the stream lands, without disturbing the card
     // the reader already has open.
     expect(await screen.findByText("skill-0")).toBeInTheDocument();

@@ -123,18 +123,16 @@ export function domainLabel(key: string): string {
 }
 
 /**
- * The metadata for a domain key as a *view* names it: `domainMeta` is undefined
- * for a key the taxonomy no longer knows, but a card or a page still has to put
- * something in its glyph slot and its title, so this always yields a label and
- * a glyph — the raw key, led by the catch-all's question mark.
+ * The hover text for a skill's classification: the leading domain's scope
+ * description — or its label, for a key outside the taxonomy — plus the other
+ * domains the skill belongs to. `domain` is best fit first; empty (a skill the
+ * dataset has not classified) reads as 未分类.
  */
-export function domainDisplay(nameOrKey: string): DomainMeta {
-  return (
-    domainMeta(nameOrKey) ?? {
-      key: nameOrKey,
-      name: nameOrKey,
-      emoji: "❓",
-      description: "",
-    }
-  );
+export function domainTooltip(domain: string[]): string {
+  const key = domain[0];
+  if (!key) return "未分类";
+  const meta = domainMeta(key);
+  const base = meta ? `${meta.emoji} ${meta.description}` : domainLabel(key);
+  const others = domain.slice(1).map(domainLabel);
+  return others.length > 0 ? `${base}（同时属于：${others.join("、")}）` : base;
 }

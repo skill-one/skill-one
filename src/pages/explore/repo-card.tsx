@@ -3,27 +3,13 @@ import { ChevronRight, Star } from "lucide-react";
 
 import { domainMeta } from "../../data/domains";
 import type { SearchHit } from "../../lib/registry/protocol";
+import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
 import { skillKey } from "../../lib/skill-view";
 import { cn, formatCount } from "../../lib/utils";
 import { HighlightedText } from "../../components/highlighted-text";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { Card, CardContent, CardFooter } from "../../components/ui/card";
-
-/**
- * How many of a repository's skills the card lists before the footer's door is
- * the only way to the rest.
- *
- * The card's height is what this number bounds: a repository with one skill and
- * a repository with fifty have to read as the same kind of object, so the list
- * grows with the repository only up to a point and then stops — the footer
- * always states how many skills the repository has in total, so a capped list
- * reads as "these of them" rather than as "all of them".
- * Seven measures 98px for a one-skill repository and 257px at the cap, so the
- * two extremes stay within a 2.6:1 band — which is what a lane of cards remains
- * scannable at.
- */
-const PREVIEWED_SKILLS = 7;
 
 /**
  * One repository, as one card — the store's repository view.
@@ -67,8 +53,8 @@ const PREVIEWED_SKILLS = 7;
  * The row's **install button** is the third: it installs without either. It is
  * a sibling of the row button rather than a child, so the two never nest and
  * the button stops its own clicks from reaching the row; and it is *revealed* on
- * hover (or when the row is focused) rather than always drawn. Seven always-on
- * buttons per card would be the loudest thing in the grid — the repository view
+ * hover (or when the row is focused) rather than always drawn. A card's worth of
+ * always-on buttons would be the loudest thing in the grid — the repository view
  * exists to compare skills, and the action is one hover away from the skill it
  * applies to. The one state that ignores that rule is 已安装: an installed badge
  * is a fact rather than an invitation, so it stays drawn without the pointer and
@@ -101,8 +87,8 @@ const PREVIEWED_SKILLS = 7;
  *
  * `hasQuery` is the one thing a search changes: a repository's rows are then
  * *matches*, and hiding a match behind the cap would defeat the search, so the
- * list stops capping itself while a query is live. Leaving the cap off for a
- * category — never for one skill — is the whole of what the query does here.
+ * list stops capping itself while a query is live — leaving the cap off is the
+ * whole of what the query does here.
  *
  * The selected row (the skill in the detail panel) is marked in place. A skill
  * past the cap cannot be marked — it has no row to mark — which is a fact about
@@ -113,6 +99,7 @@ export function RepoCard({
   repo,
   stars,
   skills,
+  maxSkills = DEFAULT_REPO_CARD_LIMIT,
   hasQuery = false,
   selected = null,
   onOpenSkill,
@@ -124,6 +111,16 @@ export function RepoCard({
   /** The repository's skills, in the order the grouping produced (most
    *  installed first). */
   skills: SearchHit[];
+  /**
+   * How many of the repository's skills to list before the footer's door is the
+   * only way to the rest — the reader's own choice, set in Settings (see
+   * `lib/repo-card-preview`). The figure bounds the card's height: a repository
+   * with one skill and one with fifty have to read as the same kind of object,
+   * so the list grows with the repository only up to a point and then stops —
+   * the footer always states the repository's total, so a capped list reads as
+   * "these of them" rather than as "all of them".
+   */
+  maxSkills?: number;
   /** Whether a search is live; see the note above about the cap. */
   hasQuery?: boolean;
   /** `skillKey` of the skill in the detail panel, when one is open. */
@@ -134,7 +131,7 @@ export function RepoCard({
   // The owner segment is what the dataset hosts an avatar for; a repository
   // group always has one (a bare-host source is its own owner).
   const [owner] = repo.split("/");
-  const shown = hasQuery ? skills : skills.slice(0, PREVIEWED_SKILLS);
+  const shown = hasQuery ? skills : skills.slice(0, maxSkills);
   const href = `/repo/${repo}`;
 
   return (
@@ -268,7 +265,7 @@ export function RepoCard({
                 every other count. The chevron carries the "go" the way every
                 other deeper affordance in the app does, and the total is always
                 the repository's own — which is what lets a capped list read as
-                "these of them": the reader counts the seven rows and compares. */}
+                "these of them": the reader counts the rows on screen and compares. */}
             <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
               {skills.length} 个 skill
               <ChevronRight

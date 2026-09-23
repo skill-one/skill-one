@@ -119,15 +119,7 @@ describe("RepoCard", () => {
   it("lists the repository's skills in order, under a glyph and a description", () => {
     renderCard();
 
-    expect(rowNames()).toEqual([
-      "pdf",
-      "docx",
-      "pptx",
-      "xlsx",
-      "slides",
-      "canvas",
-      "figma",
-    ]);
+    expect(rowNames()).toEqual(["pdf", "docx", "pptx", "xlsx", "slides"]);
     const pdf = screen.getByRole("button", { name: "查看 pdf 详情" });
     // The classification rides the row as its glyph, the name is the row's own
     // strong element, and the description follows it on the same line.
@@ -135,19 +127,35 @@ describe("RepoCard", () => {
     expect(pdf).toHaveTextContent("pdf does something useful.");
   });
 
-  it("caps the list at seven rows and states the repository's total", () => {
+  it("caps the list at the default five rows and states the repository's total", () => {
     renderCard();
 
-    // Past the cap a skill is not rendered as a row...
-    expect(screen.queryByText("notion")).not.toBeInTheDocument();
-    // ...and the bar's figure is the repository's total, not the seven on
-    // screen: that is what makes a capped list read as "these of them", with
-    // 全部 beside it as the way to the rest.
+    // The default preview holds five rows; past the cap a skill is not rendered.
+    expect(rowNames()).toEqual(["pdf", "docx", "pptx", "xlsx", "slides"]);
+    expect(screen.queryByText("canvas")).not.toBeInTheDocument();
+    // The bar's figure is the repository's total, not the five on screen: that
+    // is what makes a capped list read as "these of them", with the door beside
+    // it as the way to the rest.
     const bar = screen.getByRole("link", {
       name: `查看仓库 ${REPO}，8 个 skill`,
     });
     expect(within(bar).getByText("8 个 skill")).toBeInTheDocument();
     expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
+  });
+
+  it("honours a smaller preview size", () => {
+    renderCard({ maxSkills: 3 });
+
+    expect(rowNames()).toEqual(["pdf", "docx", "pptx"]);
+    expect(screen.queryByText("xlsx")).not.toBeInTheDocument();
+  });
+
+  it("honours a larger preview size", () => {
+    renderCard({ maxSkills: 7 });
+
+    expect(rowNames()).toHaveLength(7);
+    expect(screen.getByText("figma")).toBeInTheDocument();
+    expect(screen.queryByText("notion")).not.toBeInTheDocument();
   });
 
   it("renders a one-skill repository with the same body and the same bar", () => {
@@ -219,10 +227,10 @@ describe("RepoCard", () => {
   it("keeps the install button out of the way until the row is pointed at", () => {
     renderCard();
 
-    // Seven always-on buttons would be the loudest thing on the card, so the
-    // action waits for the row to be hovered or focused — but it stays in the
-    // layout rather than being `hidden`, so the row keeps its height and
-    // nothing shifts under the pointer.
+    // A card's worth of always-on buttons would be the loudest thing on the
+    // card, so the action waits for the row to be hovered or focused — but it
+    // stays in the layout rather than being `hidden`, so the row keeps its
+    // height and nothing shifts under the pointer.
     const install = screen.getAllByRole("button", { name: "安装" })[0];
     // The reveal rides the button's wrapper: the button owns `opacity` for its
     // own states (an installed one is `disabled:opacity-50`, which is more

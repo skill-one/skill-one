@@ -1,6 +1,6 @@
 import type { Skill } from "../../types/skill";
 import { FEATURED_CATEGORIES } from "../../data/featured-content";
-import { domainLabel } from "../../data/domains";
+import { DOMAINS, domainLabel } from "../../data/domains";
 import { buildSkillSearch, type SkillSearch } from "../search-skills";
 import type {
   FeaturedSectionData,
@@ -12,12 +12,14 @@ import type {
   RankingRequest,
   RegistryQuery,
   RegistryWorkerMessage,
+  RepoSectionsData,
   RevalidateStatus,
   SearchData,
   SearchHit,
 } from "./protocol";
 import type { RegistryCache } from "./cache";
 import type { PublishedIndex } from "./index-stream";
+import { byRepoRank } from "./repo-rank";
 import {
   buildHeroSlides,
   RANKING_SIZE,
@@ -54,9 +56,23 @@ const MAX_SEARCH_HITS = 50;
 
 /**
  * The dataset's catch-all domain key. It carries no meaning of its own, so
- * the featured sections skip it instead of leading with a "其他" shelf.
+ * the featured sections skip it instead of leading with a "其他" shelf, and a
+ * repository with no classified skill falls into it in the domain filter.
  */
 const OTHER_DOMAIN = "other";
+
+/**
+ * The taxonomy's own order, keyed by domain. Breaks a tied primary-domain vote
+ * deterministically and orders domain sections that hold the same number of
+ * repositories.
+ */
+const TAXONOMY_INDEX = new Map(
+  DOMAINS.map((domain, index) => [domain.key, index]),
+);
+
+/** A domain key's taxonomy position; unknown keys sort after every known one. */
+const taxonomyIndex = (key: string): number =>
+  TAXONOMY_INDEX.get(key) ?? DOMAINS.length;
 
 export interface ControllerDeps {
   /**
@@ -381,19 +397,19 @@ export function createRegistryController(
   };
 
   /**
-   * The explore list: one group per bucket of the requested dimension, and
-   * every group's skills in the order of the hits it was built from. A search
-   * stays in relevance order; the browsed list follows install count.
-   * Bucketing hits via `Map` insertion order puts each group's skills in hit
-   * order and the groups themselves in first-appearance order, which under a
-   * search is best-hit-first; browsing re-orders the groups afterwards (by
-   * stars, or by size for categories), so the largest buckets lead.
+   * The explore list: one group per repository, and every group's skills in
+   * the order of the hits it was built from. A search stays in relevance
+   * order; the browsed list follows install count. Bucketing hits via `Map`
+   * insertion order puts each group's skills in hit order and the groups
+   * themselves in first-appearance order, which under a search is
+   * best-hit-first; browsing re-orders the groups afterwards (by stars), so
+   * the largest repositories lead.
    *
    * Unlike a search reply there is no slicing: the answer crosses the boundary
    * whole and the page reveals it in chunks instead of paging it. The payload,
    * not the render, is the price of dropping the pager.
    */
-  const getGroups = ({ query, by = "repo" }: GroupsRequest): GroupsData => {
+  const getGroups = ({ query }: GroupsRequest): GroupsData => {
     const q = query.trim();
     let hits: SearchHit[];
     if (q) {
@@ -406,19 +422,10 @@ export function createRegistryController(
       }));
     }
 
-    const groups = by === "domain" ? domainGroups(hits) : repoGroups(hits);
-    if (!q) {
-      // Browsing leads with the biggest bucket. A repository group is weighed
-      // by its stars (the figure its card's bar carries); a category, which
-      // spans many repositories, by how many skills it pools.
-      groups.sort((a, b) =>
-        by === "domain"
-          ? b.skills.length - a.skills.length || a.title.localeCompare(b.title)
-          : (b.stars ?? 0) - (a.stars ?? 0) ||
-            b.skills.length - a.skills.length ||
-            a.title.localeCompare(b.title),
-      );
-    }
+    const groups = repoGroups(hits);
+    // Browsing leads with the biggest repository, weighed by the stars its
+    // card's bar carries.
+    if (!q) groups.sort(byRepoRank);
     return { groups, total: hits.length };
   };
 
@@ -439,27 +446,62 @@ export function createRegistryController(
   };
 
   /**
-   * Bucket hits by the profile classification. A skill may belong to several
-   * domains, so it lands in every group it belongs to; a skill the dataset has
-   * not classified at all pools into the catch-all 其他, so the category view
-   * still partitions the whole registry rather than only its classified part.
+   * The one domain a repository is filed under by the domain filter: the
+   * domain its skills *lead* with most often (their `domain[0]`, the dataset's
+   * best fit), ties broken by the installs those leading skills carry and then
+   * by the taxonomy's own order. A repository with no classified skill falls
+   * into the catch-all 其他.
    */
-  const domainGroups = (hits: SearchHit[]): Group[] => {
-    const buckets = new Map<string, SearchHit[]>();
-    for (const hit of hits) {
-      const domains = hit.skill.profile?.domain;
-      const keys = domains && domains.length > 0 ? domains : [OTHER_DOMAIN];
-      for (const domain of keys) {
-        const bucket = buckets.get(domain);
-        if (bucket) bucket.push(hit);
-        else buckets.set(domain, [hit]);
-      }
+  const primaryDomain = (skills: SearchHit[]): string => {
+    const votes = new Map<string, { count: number; downloads: number }>();
+    for (const { skill } of skills) {
+      const lead = skill.profile?.domain[0];
+      if (!lead) continue;
+      const vote = votes.get(lead) ?? { count: 0, downloads: 0 };
+      vote.count += 1;
+      vote.downloads += skill.downloads;
+      votes.set(lead, vote);
     }
-    return Array.from(buckets, ([domain, skills]) => ({
+    if (votes.size === 0) return OTHER_DOMAIN;
+    return [...votes].toSorted(
+      ([aKey, a], [bKey, b]) =>
+        b.count - a.count ||
+        b.downloads - a.downloads ||
+        taxonomyIndex(aKey) - taxonomyIndex(bKey),
+    )[0][0];
+  };
+
+  /**
+   * The repository browse answer, filed by domain: every repository once, under
+   * its {@link primaryDomain}. The explore page's filter reads it — the sections
+   * are its chips, and one section is the list a chip scopes to. Sections are
+   * ordered by size (biggest first, ties by the taxonomy's order); within a
+   * section the repositories keep the browse order.
+   */
+  const getRepoSections = (): RepoSectionsData => {
+    const repos = repoGroups(
+      installsOrder().map((id) => ({ skill: store[id], matched: {} })),
+    );
+
+    const byDomain = new Map<string, Group[]>();
+    for (const repo of repos) {
+      const domain = primaryDomain(repo.skills);
+      const bucket = byDomain.get(domain);
+      if (bucket) bucket.push(repo);
+      else byDomain.set(domain, [repo]);
+    }
+
+    const sections = Array.from(byDomain, ([domain, group]) => ({
       key: `domain-${domain}`,
       title: domain,
-      skills,
-    }));
+      repos: group.toSorted(byRepoRank),
+    })).toSorted(
+      (a, b) =>
+        b.repos.length - a.repos.length ||
+        taxonomyIndex(a.title) - taxonomyIndex(b.title),
+    );
+
+    return { sections, total: repos.length };
   };
 
   /** Sections shown on the featured page and skills per section. */
@@ -686,6 +728,9 @@ export function createRegistryController(
             break;
           case "getGroups":
             data = getGroups(message.payload);
+            break;
+          case "getRepoSections":
+            data = getRepoSections();
             break;
           case "getFeatured":
             data = getFeatured();

@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 
-import { domainLabel, domainMeta } from "../data/domains";
+import { domainLabel, domainMeta, domainTooltip } from "../data/domains";
 import { Badge } from "./ui/badge";
 import {
   Tooltip,
@@ -41,10 +41,7 @@ export function DomainBadge({
   if (!key) return null;
   const meta = domainMeta(key);
   const label = domainLabel(key);
-  const others = domain.slice(1).map(domainLabel);
-  const base = meta ? `${meta.emoji} ${meta.description}` : label;
-  const tooltip =
-    others.length > 0 ? `${base}（同时属于：${others.join("、")}）` : base;
+  const tooltip = domainTooltip(domain);
   return (
     <Tooltip>
       <TooltipTrigger

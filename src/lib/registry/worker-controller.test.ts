@@ -704,99 +704,87 @@ describe("createRegistryController — getGroups", () => {
   });
 });
 
-describe("createRegistryController — getGroups (category)", () => {
-  /** A skill carrying the classification its index row shipped. */
-  const classified = (i: number, domain: string[], over: Partial<Skill> = {}) =>
-    skill(i, { profile: { domain }, ...over });
+describe("createRegistryController — getRepoSections", () => {
+  /** A skill filed under the given leads, best fit first. */
+  const classified = (
+    i: number,
+    repo: string,
+    domain: string[],
+    over: Partial<Skill> = {},
+  ) => skill(i, { repo, profile: { domain }, ...over });
 
-  it("buckets the browse list by category, biggest first", async () => {
+  it("files every repository once, biggest section first", async () => {
     const t = setup({
       skills: [
-        classified(0, ["development"]),
-        classified(1, ["development", "testing"]),
-        classified(2, ["testing"]),
-        // No profile at all: the dataset never classified it, so it pools into
-        // the catch-all beside the skills the dataset itself filed there.
-        skill(3),
-        classified(4, ["other"]),
+        // Two development skills: the repository leads there twice.
+        classified(0, "o/dev", ["development"], { downloads: 100 }),
+        classified(1, "o/dev", ["development"], { downloads: 90 }),
+        classified(2, "o/test", ["testing"], { downloads: 80 }),
+        // A tied lead count (1–1): the heavier development skill decides.
+        classified(3, "o/mixed", ["development"], { downloads: 50 }),
+        classified(4, "o/mixed", ["testing"], { downloads: 10 }),
+        // No profile at all → the catch-all beside the dataset's own.
+        skill(5, { repo: "o/none", downloads: 5 }),
+        classified(6, "o/other", ["other"], { downloads: 1 }),
       ],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    t.controller.handle({
-      type: "getGroups",
-      id: 1,
-      payload: { query: "", by: "domain" },
-    });
+    t.controller.handle({ type: "getRepoSections", id: 1 });
     const data = resultData<{
-      groups: Array<{ key: string; skills: Array<{ skill: Skill }> }>;
+      sections: Array<{ key: string; repos: Array<{ title: string }> }>;
       total: number;
     }>(t.recorded.results[0]);
 
-    // Three categories of two skills each — ties break by title, the raw key —
-    // and the unclassified skill shares 其他 with the dataset's own catch-all.
-    expect(data.groups.map((g) => g.key)).toEqual([
+    // Two repositories each in development and the catch-all; their tie breaks
+    // by the taxonomy's own order, so development leads.
+    expect(data.sections.map((s) => s.key)).toEqual([
       "domain-development",
       "domain-other",
       "domain-testing",
     ]);
-    // A skill classified under several domains rides every one of them.
-    expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
-      "skill-0",
-      "skill-1",
+    // The tied repository joins development, and each section keeps the browse
+    // order (stars first).
+    expect(data.sections[0].repos.map((r) => r.title)).toEqual([
+      "o/mixed",
+      "o/dev",
     ]);
-    expect(data.groups[1].skills.map((h) => h.skill.name)).toEqual([
-      "skill-3",
-      "skill-4",
+    expect(data.sections[1].repos.map((r) => r.title)).toEqual([
+      "o/other",
+      "o/none",
     ]);
-    expect(data.groups[2].skills.map((h) => h.skill.name)).toEqual([
-      "skill-1",
-      "skill-2",
-    ]);
-    // The total is the pre-grouping hit count, so the multi-domain skill is
-    // counted once even though it rides two cards.
+    // Every repository appears exactly once.
     expect(data.total).toBe(5);
+    expect(data.sections.flatMap((s) => s.repos)).toHaveLength(5);
   });
 
-  it("answers a search's categories in best-hit order", async () => {
+  it("breaks a tied leading vote by installs, then by taxonomy order", async () => {
     const t = setup({
       skills: [
-        classified(0, ["development"], {
-          name: "redis-clip",
-          repo: "o/clip",
-          stars: 1000,
-          downloads: 1000,
-        }),
-        classified(1, ["testing"], { name: "redis-tool", repo: "o/tool" }),
-        classified(2, ["development"], { name: "redis-lab", repo: "o/clip" }),
+        // The heavier lead wins the tie.
+        classified(0, "o/heavy", ["testing"], { downloads: 40 }),
+        classified(1, "o/heavy", ["development"], { downloads: 10 }),
+        // Dead even: the taxonomy's own order settles it — development first.
+        classified(2, "o/even", ["testing"], { downloads: 20 }),
+        classified(3, "o/even", ["development"], { downloads: 20 }),
       ],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    t.controller.handle({
-      type: "getGroups",
-      id: 1,
-      payload: { query: "redis", by: "domain" },
-    });
+    t.controller.handle({ type: "getRepoSections", id: 1 });
     const data = resultData<{
-      groups: Array<{ key: string; skills: Array<{ skill: Skill }> }>;
-      total: number;
+      sections: Array<{ key: string; repos: Array<{ title: string }> }>;
     }>(t.recorded.results[0]);
 
-    // Relevance, not size, orders a search's categories: the group whose best
-    // hit leads the whole search comes first, and each group keeps the hits in
-    // the order the index returned them.
-    expect(data.groups.map((g) => g.key)).toEqual([
-      "domain-development",
-      "domain-testing",
-    ]);
-    expect(data.groups[0].skills.map((h) => h.skill.name)).toEqual([
-      "redis-clip",
-      "redis-lab",
-    ]);
-    expect(data.total).toBe(3);
+    const domainOf = new Map(
+      data.sections.flatMap((s) =>
+        s.repos.map((r) => [r.title, s.key] as const),
+      ),
+    );
+    expect(domainOf.get("o/heavy")).toBe("domain-testing");
+    expect(domainOf.get("o/even")).toBe("domain-development");
   });
 });
 

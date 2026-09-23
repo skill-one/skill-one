@@ -34,8 +34,8 @@ export const SKILL_LIST_CLASS =
 export const SKILL_CARD_SKELETON_CLASS = "h-[143px] rounded-xl";
 
 /**
- * A collection page's list — a repository's or a category's own skills. One
- * full-width row per skill rather than the store's multi-column grid, so a long
+ * A collection page's list — a repository's own skills. One full-width row per
+ * skill rather than the store's multi-column grid, so a long
  * list reads top to bottom and its ordinals form one column; the rows' gaps
  * match the grid's own 16px so the two surfaces feel the same rhythm.
  */
@@ -64,7 +64,8 @@ export const SKILL_ROW_SKELETON_CLASS = "h-[58px] rounded-xl";
  * On a browser with CSS Grid Lanes (Safari 26.4+, and therefore the WKWebView
  * this app ships in) the same track definition becomes a masonry layout: every
  * card takes its own height — a one-skill repository measures 98px, a
- * repository at its cap 257px — instead of being stretched to its neighbour. A
+ * repository at the largest preview cap 257px — instead of being stretched to
+ * its neighbour. A
  * browser without it drops the unsupported `display` (the declaration sits
  * behind `@supports`, so the plain `grid` above still applies) and the row is
  * equal-height: the short card then wears its neighbour's height as space above
@@ -75,8 +76,9 @@ export const REPO_LIST_CLASS =
 
 /**
  * Placeholder standing in for one repository card while a list loads, at the
- * same lane width the real cards get. Measured off a rendered card at its cap —
- * 257px — because the cap, not a one-skill repository, is what a grid row is
- * as tall as.
+ * same lane width the real cards get. Measured off a rendered card at the
+ * largest preview cap the settings page offers (7 skills, 257px) — a grid row
+ * is as tall as its tallest card, and the reader can raise the cap but not past
+ * what the settings page offers.
  */
 export const REPO_CARD_SKELETON_CLASS = "h-[257px] rounded-xl";

@@ -1,37 +1,49 @@
 import { ordinalClass } from "../../lib/ordinal";
 import { LOCAL_SOURCE_LABEL, type SkillView } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
-import { DomainBadge } from "../../components/domain-badge";
+import { domainMeta, domainTooltip } from "../../data/domains";
 import {
   HighlightedText,
   type SkillMatched,
 } from "../../components/highlighted-text";
-import { RepoHoverCard } from "../../components/repo-hover-card";
+import { OwnerAvatar } from "../../components/owner-avatar";
 import { INTERACTIVE_CLASS } from "../../components/skill-card";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillInstalls } from "../../components/skill-installs";
 import { Card } from "../../components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 
 export type { SkillMatched };
 
 /**
- * One skill in a collection page's list — a repository's or a category's own
- * skills, read as a list rather than as the store's multi-column grid.
+ * One skill in a collection page's list — a repository's own skills, read as a
+ * list rather than as the store's multi-column grid.
  *
  * The row is the store card laid on its side, and it keeps the card's order of
  * address: the ordinal first (the list's one addition — where this skill stands
- * in the whole collection, top three medalled), then who published it (the
- * owner's avatar), then *what is it* (the name) over *what does it do* (the
- * description), and finally the facts as a quiet cluster on the far right:
- * the source, the classification, the install figure, and the corner action.
- * A row is read one at a time, top to bottom, which is exactly what a list is
- * for — the ordinals give the eye a single column to run down, and the facts
- * line up so two rows can be compared without re-reading them.
+ * in the whole collection, top three medalled), then the skill's classification
+ * glyph, then *what is it* (the name) over *what does it do* (the description),
+ * and finally the facts as a quiet cluster on the far right: the source's owner
+ * face — the repository's own name lives on the detail panel, so the row keeps
+ * only the face — the install figure, and the corner action. A row is read one
+ * at a time, top to bottom, which is exactly what a list is for — the ordinals
+ * give the eye a single column to run down, and the facts line up so two rows
+ * can be compared without re-reading them.
+ *
+ * The leading glyph is the classification, not the owner: on a repository's own
+ * page the owner is the same for every row and says nothing, while the domain is
+ * the one fact that varies row to row. Pointing at the glyph names the domain,
+ * its scope and any other domains the skill belongs to; an unclassified skill
+ * wears the catch-all mark.
  *
  * It is bound to the store like `SkillListRow` is: the corner action is the
  * install button. Unlike `SkillListRow` it is a full-width row with no grid
- * cell to fill, so it is its own shape (as `RepoCard` and `CategoryCard` are),
- * sharing only the interaction and the ordinal ink with the surfaces around it.
+ * cell to fill, so it is its own shape (as `RepoCard` is), sharing only the
+ * interaction and the ordinal ink with the surfaces around it.
  *
  * Everything it shows is read off the skill, so it renders a registry row and
  * an installed row the same way; a skill whose entry is unknown (`storeBacked`)
@@ -56,8 +68,8 @@ export function SkillRow({
   selected?: boolean;
   /**
    * Whether to name the source. A repository's own page states it once in the
-   * head, so repeating it on every row is noise there; a category gathers
-   * skills from many repositories, so that page keeps it.
+   * head, so repeating it on every row is noise there; a list that gathers
+   * skills from many repositories keeps it.
    */
   showSource?: boolean;
   /** Opens the skill detail panel; without it the row is not a button. */
@@ -66,11 +78,12 @@ export function SkillRow({
   // Absent means backed: every row a collection page lists comes from the
   // registry, and the flag only ever unsets a caller with no store entry.
   const storeBacked = skill.storeBacked !== false;
-  // The owner segment is what the dataset hosts an avatar for; a bare-host
-  // source is its own owner, and an empty repo (an installed skill with no
-  // recorded source) has none.
+  // The owner segment is what the source line names; a bare-host source is its
+  // own owner, and an empty repo (an installed skill with no recorded source)
+  // has none.
   const [owner] = skill.repo.split("/");
   const domain = skill.profile?.domain;
+  const meta = domain?.[0] ? domainMeta(domain[0]) : undefined;
 
   return (
     <li className="flex flex-col">
@@ -105,15 +118,19 @@ export function SkillRow({
           {index + 1}
         </span>
 
-        {owner && (
-          <RepoHoverCard
-            repo={skill.repo}
-            // A backless row carries 0 stars because there is no store entry
-            // to ask, not because the repo has none.
-            stars={storeBacked ? skill.stars : undefined}
-            className="size-7 shrink-0 text-[11px]"
+        {/* The classification leads the row. The tip names the domain, its scope
+            and any other domains the skill belongs to; an unclassified skill
+            wears the catch-all mark. */}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className="flex size-7 shrink-0 items-center justify-center text-base leading-none">
+                {meta?.emoji ?? "❓"}
+              </span>
+            }
           />
-        )}
+          <TooltipContent>{domainTooltip(domain ?? [])}</TooltipContent>
+        </Tooltip>
 
         {/* What is it, and what does it do: the two lines every row leads with,
             both clamped to one line so the list stays a list. */}
@@ -126,25 +143,23 @@ export function SkillRow({
           </p>
         </div>
 
-        {/* The facts cluster, pushed to the far end and kept whole: the source
-            is the one part that may truncate — the classification and the
-            figure are short and must stay readable. The source drops out on a
+        {/* The facts cluster, pushed to the far end and kept whole: the source's
+            owner face, then the install figure — both short and fixed, so the
+            description keeps the width it needs. The face drops out on a
             repository's own page (see `showSource`): the head already names it,
-            and 48 identical copies only crowd the names. */}
+            and 48 identical copies only crowd the names. A skill with no source
+            at all states it in words instead, there being no face to stand for
+            it. The classification lives on the leading glyph, so it is not
+            repeated here. */}
         <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
-          {showSource && (
-            <span className="max-w-[16rem] truncate">
-              {owner ? skill.repo : LOCAL_SOURCE_LABEL}
-            </span>
-          )}
-          {domain && domain.length > 0 && (
-            <DomainBadge
-              domain={domain}
-              // Flattened to plain text, as the card's rail does: this is a
-              // line of facts, not a row of badges.
-              variant="ghost"
-              className="px-0 py-0 text-[11px] font-normal"
+          {showSource && owner && (
+            <OwnerAvatar
+              owner={owner}
+              className="size-5 shrink-0 text-[9px]"
             />
+          )}
+          {showSource && !owner && (
+            <span className="truncate">{LOCAL_SOURCE_LABEL}</span>
           )}
           {storeBacked && <SkillInstalls skill={skill} className="text-[11px]" />}
         </div>
