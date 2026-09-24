@@ -778,6 +778,85 @@ describe("ExplorePage", () => {
     expect(renderedCards()).toBe(12);
   });
 
+  it("files a long repository answer into rank bands, revealed like the grid", async () => {
+    // The gadget registry is one skill per repository: 71 repositories, so the
+    // ranking cuts into Top 25 / 26–50 and a 51–71 tail (a band keeps its real
+    // end, not the next boundary).
+    bootGadgetRegistry();
+    renderExplorePage();
+
+    const cardLinks = () => screen.getAllByRole("link", { name: /^查看仓库 / }).length;
+    const triggerSentinel = () =>
+      (
+        globalThis.IntersectionObserver as unknown as {
+          instances: Array<{ trigger(intersecting?: boolean): void }>;
+        }
+      ).instances.at(-1)?.trigger(true);
+
+    // Only the leading band mounts at first, and only with the first chunk:
+    // its header already states the band's full count.
+    const leading = await screen.findByRole("region", { name: "Top 25" });
+    expect(within(leading).getByText("25 个仓库")).toBeInTheDocument();
+    expect(cardLinks()).toBe(6);
+    expect(screen.queryByRole("region", { name: "26–50" })).not.toBeInTheDocument();
+
+    // Revealing to the bottom mounts the other bands with their true ranges
+    // and counts, keeping every card once.
+    await waitFor(() => {
+      triggerSentinel();
+      expect(cardLinks()).toBe(71);
+    });
+    const middle = screen.getByRole("region", { name: "26–50" });
+    const tail = screen.getByRole("region", { name: "51–71" });
+    expect(within(middle).getByText("25 个仓库")).toBeInTheDocument();
+    expect(within(tail).getByText("21 个仓库")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Top 25" })).getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(25);
+  });
+
+  it("folds one rank band without touching the other bands", async () => {
+    bootGadgetRegistry();
+    renderExplorePage();
+
+    const triggerSentinel = () =>
+      (
+        globalThis.IntersectionObserver as unknown as {
+          instances: Array<{ trigger(intersecting?: boolean): void }>;
+        }
+      ).instances.at(-1)?.trigger(true);
+    await screen.findByRole("region", { name: "Top 25" });
+    await waitFor(() => {
+      triggerSentinel();
+      expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(71);
+    });
+
+    // Folding the leading band removes just its 25 cards; the folded header
+    // keeps its count, and the other bands stay put.
+    await userEvent.click(screen.getByRole("button", { name: /Top\s*25\s*25 个仓库/ }));
+    expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(46);
+    expect(screen.getByRole("region", { name: "26–50" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "51–71" })).toBeInTheDocument();
+
+    // Unfolding restores the grid whole.
+    await userEvent.click(screen.getByRole("button", { name: /Top\s*25\s*25 个仓库/ }));
+    await waitFor(() =>
+      expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(71),
+    );
+  });
+
+  it("keeps a repository answer of 25 or fewer as one flat grid", async () => {
+    // The first 25 one-skill repositories of the gadget registry: below the
+    // leading band's size, so no band header rides the grid.
+    harness.reset();
+    harness.init();
+    harness.pushAll(gadgetRegistry().slice(0, 25));
+    harness.complete();
+    renderExplorePage();
+
+    await screen.findByText("gadget-master");
+    expect(screen.queryByRole("region", { name: "Top 25" })).not.toBeInTheDocument();
+    expect(document.querySelector("ul.grid")).toBeInTheDocument();
+  });
+
   it("keeps the reader's place across a repository's page and back", async () => {
     const user = userEvent.setup();
     harness.init();

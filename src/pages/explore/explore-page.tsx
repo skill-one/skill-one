@@ -11,6 +11,7 @@ import { useInstalledSearchRows } from "../../hooks/use-installed-search";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import { setScope } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
+import { FIRST_RANK_BAND, rankBands } from "../../lib/registry/rank-bands";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
@@ -18,6 +19,7 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 
+import { CollapsibleSection } from "../../components/collapsible-section";
 import { Button } from "../../components/ui/button";
 import { ListFacets } from "../../components/list-facets";
 import { SkeletonList } from "../../components/skeleton-list";
@@ -132,6 +134,19 @@ export function ExplorePage() {
     }
     return all.flatMap((section) => section.repos).toSorted(byRepoRank);
   }, [sectionsData, selectedDomain]);
+
+  // The repository answer cut into rank bands (Top 25, 26–50, 51–100, …) for
+  // the grid's collapsible headers — null while the answer is short enough to
+  // stay one flat grid, since a lone "Top 25" header over the whole answer
+  // would be noise. Cut from the full answer, not the revealed prefix: a band
+  // the reader has not reached still owns its true count and its range.
+  const repoBands = useMemo(
+    () =>
+      unit === "repo" && browseRepos.length > FIRST_RANK_BAND
+        ? rankBands(browseRepos)
+        : null,
+    [unit, browseRepos],
+  );
 
   // Every skill the browse answer holds, flattened once: the skill unit reads
   // this list, and the filter's chip counts derive from it. A repository's
@@ -414,9 +429,49 @@ export function ExplorePage() {
                       );
                     })}
                   </ul>
+                ) : repoBands ? (
+                  // The repository unit, answer long enough to pace by rank:
+                  // one collapsible band per rank range, each carrying the
+                  // same card grid, styled like the installed list's time
+                  // buckets. Reveal stays global — a band mounts only once the
+                  // revealed prefix reaches its first rank, and then with just
+                  // the revealed slice — so the sentinel below paces the bands
+                  // exactly as it paced the flat grid.
+                  <div className="flex flex-col gap-6">
+                    {repoBands.map((band) => {
+                      const revealed = band.items.slice(
+                        0,
+                        Math.max(0, renderedCount - (band.start - 1)),
+                      );
+                      if (revealed.length === 0) return null;
+                      return (
+                        <CollapsibleSection
+                          key={band.key}
+                          title={band.title}
+                          count={`${band.items.length} 个仓库`}
+                        >
+                          <ul className={REPO_LIST_CLASS}>
+                            {revealed.map((group) => (
+                              <RepoCard
+                                key={group.key}
+                                repo={group.title}
+                                stars={group.stars}
+                                skills={group.skills}
+                                maxSkills={maxSkills}
+                                selected={selected}
+                                onOpenSkill={setSelected}
+                              />
+                            ))}
+                          </ul>
+                        </CollapsibleSection>
+                      );
+                    })}
+                  </div>
                 ) : (
-                  // The repository unit: one card per repository, the browse
-                  // answer scoped by the domain filter.
+                  // The repository unit with a short answer — a small registry
+                  // or a domain filter with few repositories: one flat grid,
+                  // the browse answer scoped by the domain filter, with no band
+                  // header over it.
                   <ul className={REPO_LIST_CLASS}>
                     {browseRepos.slice(0, renderedCount).map((group) => (
                       <RepoCard
