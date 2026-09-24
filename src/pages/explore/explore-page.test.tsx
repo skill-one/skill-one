@@ -852,6 +852,42 @@ describe("ExplorePage", () => {
     );
   });
 
+  it("keeps revealing past a band folded partway down the answer", async () => {
+    // The regression: folding a band shrinks the list around the sentinel —
+    // the next revealed chunk mounts inside the folded panel, so nothing
+    // visibly grows and the sentinel never leaves the view. Only the
+    // observer re-arming on every extension keeps the reveal moving; the
+    // stall it answers used to strand the list one chunk past the fold,
+    // dead to further scrolling too.
+    bootGadgetRegistry();
+    renderExplorePage();
+
+    const cardLinks = () =>
+      screen.queryAllByRole("link", { name: /^查看仓库 / }).length;
+    const triggerSentinel = () =>
+      (
+        globalThis.IntersectionObserver as unknown as {
+          instances: Array<{ trigger(intersecting?: boolean): void }>;
+        }
+      ).instances.at(-1)?.trigger(true);
+
+    await screen.findByRole("region", { name: "Top 25" });
+    expect(cardLinks()).toBe(6);
+
+    // Folding the leading band takes its cards off the screen.
+    await userEvent.click(screen.getByRole("button", { name: /Top\s*25\s*25 个仓库/ }));
+    expect(cardLinks()).toBe(0);
+
+    // The fold leaves the sentinel in view. One intersection event must be
+    // enough: the reveal carries on by itself — through the chunk hidden in
+    // the folded panel — until the open bands below are fully mounted
+    // (25 + 21 cards; the folded band's 25 stay hidden).
+    triggerSentinel();
+    await waitFor(() => expect(cardLinks()).toBe(46));
+    expect(screen.getByRole("region", { name: "51–71" })).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "26–50" })).getByText("25 个仓库")).toBeInTheDocument();
+  });
+
   it("keeps a repository answer of 25 or fewer as one flat grid", async () => {
     // The first 25 one-skill repositories of the gadget registry: below the
     // leading band's size, so no band header rides the grid.
