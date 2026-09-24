@@ -185,10 +185,15 @@ describe("MySkillsPage", () => {
     await user.click(screen.getByRole("button", { name: "查看 pdf 详情" }));
     await user.click(await screen.findByRole("button", { name: "移除" }));
 
+    // The press opens the ask, not the act: the dialog names the skill, and
+    // only its destructive confirm removes.
+    const ask = await screen.findByRole("dialog", { name: "移除 pdf？" });
+    await user.click(within(ask).getByRole("button", { name: "移除" }));
+
     // The panel closes with the skill: this list shrinks, so the index it was
     // open at would otherwise land on a different skill.
     await waitFor(() =>
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      expect(screen.queryByRole("dialog", { name: "移除 pdf？" })).not.toBeInTheDocument(),
     );
     await waitFor(() => {
       expect(
@@ -209,6 +214,10 @@ describe("MySkillsPage", () => {
       });
       await user.click(first);
       await user.click(await screen.findByRole("button", { name: "移除" }));
+      const ask = await screen.findByRole("dialog", {
+        name: /移除 .+？/,
+      });
+      await user.click(within(ask).getByRole("button", { name: "移除" }));
       await waitFor(() =>
         expect(
           screen.queryAllByRole("button", { name: /查看 .+ 详情/ }),

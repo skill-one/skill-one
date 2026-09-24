@@ -493,6 +493,10 @@ describe("SkillDetailPanel", () => {
 
     await user.click(await screen.findByRole("button", { name: "移除" }));
 
+    // The press opens the ask, not the act; the dialog's confirm removes.
+    const ask = await screen.findByRole("dialog", { name: "移除 pdf？" });
+    await user.click(within(ask).getByRole("button", { name: "移除" }));
+
     expect(mockRemoveInstalledSkill).toHaveBeenCalledWith("pdf");
   });
 
