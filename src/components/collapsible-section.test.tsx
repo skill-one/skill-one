@@ -32,10 +32,29 @@ describe("CollapsibleSection", () => {
 
   it("pins the trigger while its section scrolls past", () => {
     renderSection();
-    expect(screen.getByRole("button", { name: /今天/ })).toHaveClass(
+    // The pinning ground is the trigger's wrapper: a square, opaque rectangle
+    // (the trigger keeps its rounded hover corners inside it).
+    const trigger = screen.getByRole("button", { name: /今天/ });
+    expect(trigger.parentElement).toHaveClass(
       "sticky",
       "top-0",
+      "z-10",
+      "bg-background",
     );
+  });
+
+  it("keeps the body 16px below the header and drops the gap when folded", async () => {
+    const user = userEvent.setup();
+    renderSection();
+
+    // The gap is the panel's top padding on top of the trigger's own padding.
+    const panel = screen.getByText("section body").parentElement!;
+    expect(panel).toHaveClass("pt-2");
+
+    // Folding unmounts the panel, so its gap leaves with it — a folded header
+    // carries no trailing space.
+    await user.click(screen.getByRole("button", { name: /今天/ }));
+    expect(screen.queryByText("section body")).not.toBeInTheDocument();
   });
 
   it("folds the body from the header, then unfolds it, keeping the count", async () => {
