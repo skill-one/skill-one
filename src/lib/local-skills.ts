@@ -37,10 +37,7 @@ import {
   setMockSkillEnabled,
   unlinkMockAgent,
 } from "./mock-local";
-import {
-  recordSkillProvenance,
-  removeSkillProvenance,
-} from "./provenance";
+import { recordSkillProvenance, removeSkillProvenance } from "./provenance";
 
 /** Simulated download duration for browser mock installs, in milliseconds. */
 export const MOCK_INSTALL_DELAY_MS = 1200;
@@ -64,7 +61,9 @@ export async function fetchInstalledSkills(): Promise<InstalledSkill[]> {
  * parser the store detail view uses. In the browser the mock store provides
  * an equivalent record.
  */
-export async function fetchLocalSkillDetail(name: string): Promise<SkillDetail> {
+export async function fetchLocalSkillDetail(
+  name: string,
+): Promise<SkillDetail> {
   if (isTauri()) {
     const { path, content } = await readSkillMd(name);
     return toDetail(content, name, path);
@@ -255,4 +254,16 @@ export async function setSkillEnabled(
     return;
   }
   setMockSkillEnabled(name, enabled);
+}
+
+/** Enable or disable several installed skills in one backend write. */
+export async function setManySkillsEnabled(
+  names: string[],
+  enabled: boolean,
+): Promise<void> {
+  if (isTauri()) {
+    await setSkillsEnabled(enabled, names);
+    return;
+  }
+  names.forEach((name) => setMockSkillEnabled(name, enabled));
 }

@@ -1,14 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
-import { ChevronUp, ExternalLink, Star } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, Star } from "lucide-react";
 
+import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
+import { useListQuery } from "../../hooks/use-list-view";
 import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import type { Destination } from "../../lib/list-view";
 import { openExternal } from "../../lib/open-external";
+import { buildSearchIndex } from "../../lib/search-index";
 import {
   installedSkillView,
   skillKey,
@@ -23,14 +26,28 @@ import { formatCount } from "../../lib/utils";
 import { DrillDownHead } from "../../components/drill-down-head";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { Placeholder } from "../../components/placeholder";
+import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { Button } from "../../components/ui/button";
-import { SkillRow } from "./skill-row";
+import { SkillRow, type SkillMatched } from "./skill-row";
 
 /** How many card-shaped placeholders stand in while the index streams in. */
 const SKELETON_ROWS = 8;
+
+/**
+ * One row the page lists: the skill view, the surface it wears (the installed
+ * list's enable switch versus the store's install CTA), and — for a row that
+ * answered the search — the terms to highlight.
+ */
+interface RepoRow {
+  skill: SkillView;
+  /** Store chrome (`false`, install CTA) or installed chrome (`true`, switch). */
+  installed: boolean;
+  /** Search-hit highlights; absent outside the matches section. */
+  matched?: SkillMatched;
+}
 
 /**
  * How many rows mount with the page, and how many more each scroll-to-bottom
@@ -63,19 +80,40 @@ const ROW_CHUNK = 12;
  * - **from the installed list**, the repository is a drawer of things already
  *   taken home: the page opens on the skills that are on disk — the enable
  *   switch in every row, the disabled ones dimmed — and the rest of the
- *   catalogue stays behind the control at the foot of the list, which swaps
- *   the whole reading in place and back.
+ *   catalogue stays below a dividing line between the two readings, folded
+ *   until the reader presses the line. The installs never move and never
+ *   change voice: the line is a fold for the second reading, not a swap of the
+ *   first one — unfold it and the installs still read first, exactly as they
+ *   did, with the catalogue continuing beneath them; fold it back and the
+ *   page is the installed list again.
+ *
+ * The installed reading puts the card bar's one-shot switch in its own head
+ * too: what the card governs in one press from the list, the head governs in
+ * the same press from inside the repository. Individual switches stay on the
+ * rows — which is what the card sent the reader here for.
  *
  * The installed reading is what keeps the two lists telling one story: the card
  * said "these of them are on your machine", and the page it opens says the same
  * thing at full length, with the rest one deliberate step away rather than
  * mixed into what the reader already has.
  *
- * It reads its data out of the query the explore list already runs
- * (`useRegistryGroups("")`), which the query cache has therefore usually
- * answered already: arriving from a card costs no request at all. The
- * unfiltered answer is deliberate — the page answers "all of this repository's
- * skills", so a search that led the reader here does not narrow it.
+ * It reads its data out of the queries the explore list already runs
+ * (`useRegistryGroups("")` and, while a search is live, the query's own
+ * answer), which the query cache has therefore usually answered already:
+ * arriving from a card costs no request at all.
+ *
+ * A search that led the reader here narrows the page the same way it narrowed
+ * the card they pressed: the matching skills open on top, in the answer's own
+ * order and with their matches highlighted, exactly the rows the card showed,
+ * and the repository's other skills wait below a dividing rule of the same
+ * kind as the installed reading's catalogue fold. The matches never move: the
+ * rule is a fold for the rest, not a swap of the answer — unfold it and the
+ * matches still read first, with the repository continuing beneath them. In
+ * the installed reading that first fold widens *within the installs*; the
+ * catalogue keeps its own fold, nested one step deeper, so a reader who
+ * searched first widens to the rest of what they have and only then meets the
+ * uninstalled catalogue. A query this repository does not answer widens to the
+ * ordinary page rather than opening on an empty matches section.
  *
  * Until the index says it is complete, a repository that is not (yet) in the
  * answer is a repository the stream has not reached: the page holds a skeleton,
@@ -96,7 +134,9 @@ export function RepoPage({
 
   const stats = useRegistryStats();
   const { data } = useRegistryGroups("");
-  const group = data?.groups.find((candidate) => candidate.key === `repo-${repo}`);
+  const group = data?.groups.find(
+    (candidate) => candidate.key === `repo-${repo}`,
+  );
   // What the repository publishes, most-installed first — the store's own
   // answer, which is also the installed reading's second half.
   const published = useMemo(
@@ -145,41 +185,168 @@ export function RepoPage({
     return [...listed, ...unpublished];
   }, [fromInstalled, published, records, linked]);
 
-  // Whether the repository has a second reading at all: skills it publishes
-  // that are not on disk. With none, the two readings are one list (barring an
-  // install the index no longer publishes, which the installed one already
-  // shows), and a control between them would open nothing new.
-  const hasRest = useMemo(
-    () => fromInstalled && published.some((skill) => !records.has(skill.name)),
+  // What the repository publishes but this machine does not have — the
+  // installed reading's second half, kept out of the list until the reader
+  // unfolds it. With none, the installs are the whole repository (barring an
+  // install the index no longer publishes, which the first half already
+  // shows), and the dividing line would fold nothing.
+  const rest = useMemo(
+    () =>
+      fromInstalled
+        ? published.filter((skill) => !records.has(skill.name))
+        : [],
     [fromInstalled, published, records],
   );
+  const hasRest = rest.length > 0;
 
-  // Which reading is on screen: the installed list opens on what is on disk,
-  // the store's page — and the installed page once the reader asks for the rest
-  // — lists the repository whole. The state is the page's own, not the shared
-  // list view's: it describes this repository's answer, nothing wider.
-  const [whole, setWhole] = useState(false);
-  const catalogue = whole || !fromInstalled;
-  const skills = catalogue ? published : onDisk;
+  // The search the reader came here with. The search box is one control shared
+  // by both lists (see `lib/list-view`), so a query that opened a repository
+  // card is still live on the page the card opens — and that page answers it
+  // the same way the card did rather than silently widening back to the whole
+  // repository.
+  const search = useListQuery();
+  const query = useDebouncedValue(search).trim();
+  const searching = query.length > 0;
 
-  // The list reveals itself a chunk at a time; `resetKey` re-seeds it when a
-  // different repository — or the other reading of this one — takes over the
-  // route without remounting.
+  // The store's own answer to that query, shared with the explore list (the
+  // query observer dedupes, so arriving from a search costs no request). It is
+  // the matches section's source in the store reading.
+  const { data: searchData } = useRegistryGroups(query, searching);
+  const searchGroup = useMemo(
+    () =>
+      searching
+        ? (searchData?.groups.find(
+            (candidate) => candidate.key === `repo-${repo}`,
+          ) ?? null)
+        : null,
+    [searching, searchData, repo],
+  );
+
+  // The installed reading answers the same query over what is on disk, with
+  // the same index the installed list uses: the page a card opens cannot match
+  // differently than the card did.
+  const diskSearch = useMemo(
+    () => (fromInstalled ? buildSearchIndex([...records.values()]) : null),
+    [fromInstalled, records],
+  );
+  const diskHits = useMemo(
+    () => (searching && diskSearch ? diskSearch(query) : null),
+    [searching, diskSearch, query],
+  );
+
+  // The matches section, in the answer's own order (relevance), when a search
+  // is live and this repository answers it. A query it does not answer widens
+  // to the ordinary page: an empty matches section would read as a dead end.
+  const matchedStore = useMemo<RepoRow[] | null>(() => {
+    if (fromInstalled || !searching || !searchGroup) return null;
+    const rows: RepoRow[] = searchGroup.skills.map((hit) => ({
+      skill: hit.skill,
+      matched: hit.matched,
+      installed: false,
+    }));
+    return rows.length > 0 ? rows : null;
+  }, [fromInstalled, searching, searchGroup]);
+
+  const matchedDisk = useMemo<RepoRow[] | null>(() => {
+    if (!fromInstalled || !diskHits) return null;
+    const byName = new Map(onDisk.map((skill) => [skill.name, skill]));
+    const rows: RepoRow[] = [];
+    for (const hit of diskHits) {
+      const skill = byName.get(hit.doc.name);
+      if (skill) rows.push({ skill, matched: hit.matched, installed: true });
+    }
+    return rows.length > 0 ? rows : null;
+  }, [fromInstalled, diskHits, onDisk]);
+
+  // The page reads as up to three ordered sections:
+  //
+  // 1. `first` — the matches in the answer's order when a search is live, or
+  //    the ordinary reading (the catalogue whole in the store, the installs in
+  //    the installed list) when it is not;
+  // 2. `second` — what the search ruled out, folded behind the first dividing
+  //    rule (the store's remaining catalogue; the installed reading's other
+  //    installs);
+  // 3. `third` — the installed reading's uninstalled catalogue, folded behind
+  //    its own rule, nested one step inside the search fold so a reader who
+  //    searched widens within what they have before meeting the catalogue.
+  const first = useMemo<RepoRow[]>(
+    () =>
+      fromInstalled
+        ? (matchedDisk ?? onDisk.map((skill) => ({ skill, installed: true })))
+        : (matchedStore ??
+          published.map((skill) => ({ skill, installed: false }))),
+    [fromInstalled, matchedDisk, matchedStore, onDisk, published],
+  );
+
+  const second = useMemo<RepoRow[] | null>(() => {
+    const matches = fromInstalled ? matchedDisk : matchedStore;
+    if (!matches) return null;
+    const names = new Set(matches.map((row) => row.skill.name));
+    const source = fromInstalled ? onDisk : published;
+    const rows: RepoRow[] = source
+      .filter((skill) => !names.has(skill.name))
+      .map((skill) => ({ skill, installed: fromInstalled }));
+    return rows.length > 0 ? rows : null;
+  }, [fromInstalled, matchedDisk, matchedStore, onDisk, published]);
+
+  const third = useMemo<RepoRow[] | null>(
+    () =>
+      fromInstalled && hasRest
+        ? rest.map((skill) => ({ skill, installed: false }))
+        : null,
+    [fromInstalled, hasRest, rest],
+  );
+
+  // The folds are the page's own state, not the shared list view's: they fold
+  // this repository, nothing wider. Both stand down when the question changes —
+  // another query, or a different repository — because a fold opened for one
+  // answer is not a place the reader stands under the next.
+  const [secondOpen, setSecondOpen] = useState(false);
+  const [thirdOpen, setThirdOpen] = useState(false);
+  const questionKey = `${repo}\u0000${query}`;
+  const lastQuestion = useRef(questionKey);
+  useEffect(() => {
+    if (lastQuestion.current === questionKey) return;
+    lastQuestion.current = questionKey;
+    setSecondOpen(false);
+    setThirdOpen(false);
+  }, [questionKey]);
+
+  // Which folded sections are mounted. The catalogue fold (third) is nested in
+  // the search fold (second): with the search fold present, its rule only
+  // stands after the reader widens within what they have; with no search fold
+  // it stands where it always did, directly under the installs.
+  const secondSection = secondOpen ? second : null;
+  const showThirdRule = third != null && (second == null || secondOpen);
+  const thirdSection = thirdOpen && showThirdRule ? third : null;
+
+  // One reveal paces the page across whichever sections are mounted: folded,
+  // the count runs through the first section alone; a fold open runs it on into
+  // that section, numbering continuing rather than restarting. `resetKey`
+  // re-seeds it when the question, a fold, or the repository itself changes.
+  const total =
+    first.length + (secondSection?.length ?? 0) + (thirdSection?.length ?? 0);
   const { count, sentinelRef, done } = useProgressiveReveal({
-   total: skills.length,
-   initial: INITIAL_ROWS,
-   step: ROW_CHUNK,
-   resetKey: `${repo}\u0000${catalogue ? "all" : "installed"}`,
+    total,
+    initial: INITIAL_ROWS,
+    step: ROW_CHUNK,
+    resetKey: `${questionKey}\u0000${secondSection ? "more" : "match"}\u0000${thirdSection ? "rest-open" : "rest-folded"}\u0000${fromInstalled ? "installed" : "store"}`,
   });
-  const shown = skills.slice(0, count);
+  const firstShownRows = first.slice(0, count);
+  const secondShownRows = secondSection
+    ? secondSection.slice(0, Math.max(0, count - first.length))
+    : [];
+  const thirdStart = first.length + (secondSection?.length ?? 0);
+  const thirdShownRows = thirdSection
+    ? thirdSection.slice(0, Math.max(0, count - thirdStart))
+    : [];
 
   const [selected, setSelected] = useState<string | null>(null);
 
   // Nothing to show yet: either the stream has not reached this repository, or
   // the download failed before it could serve anything (the explore page draws
   // the same line between the two).
-  const failure =
-    stats.count === 0 && !stats.complete ? stats.error : null;
+  const failure = stats.count === 0 && !stats.complete ? stats.error : null;
   // The index has spoken about this repository and does not carry it.
   const absent = group == null && stats.ready && failure == null;
   // The installed reading's own two facts, still being read: a list that has
@@ -191,18 +358,61 @@ export function RepoPage({
   // facts, and it needs the repository's full count to offer the rest.
   const waiting = reading || (group == null && !absent);
 
-  // What an empty list means, in the reading on screen: a repository whose
-  // skills are none of them on disk, or one the index does not carry at all.
-  const emptyMessage =
-    fromInstalled && !catalogue && !absent
-      ? "该仓库没有已安装的 skill"
-      : `索引中没有仓库 ${repo}`;
+  // What an empty page means: in the installed reading it is a repository with
+  // nothing on disk *and* nothing left to unfold (when there is more, the fold
+  // is the page's content instead); in the store's reading it is one the
+  // completed index does not carry.
+  const emptyMessage = absent
+    ? `索引中没有仓库 ${repo}`
+    : "该仓库没有已安装的 skill";
+  const isEmpty =
+    (!fromInstalled && published.length === 0) ||
+    (fromInstalled && onDisk.length === 0 && !hasRest);
 
-  // The head's figure: published skills in the whole reading, installs in the
-  // installed one — the same two numbers the card's bar and its rows showed.
-  const headCount = catalogue
-    ? `${skills.length} 个 skill`
-    : `${skills.length} 个已安装 skill`;
+  // The head's figure: the published total in the store's reading, the count on
+  // disk in the installed one — the same number the card's bar stated — and it
+  // does not move when a fold opens: each fold states its own count.
+  const headCount = fromInstalled
+    ? `${onDisk.length} 个已安装 skill`
+    : `${published.length} 个 skill`;
+
+  // The drawer walks the rows on screen, and the panel's chrome follows the
+  // section the open skill belongs to: an installed row offers the enable
+  // switch, a folded-out row the store's install CTA.
+  const drawerSkills = [
+    ...first,
+    ...(secondSection ?? []),
+    ...(thirdSection ?? []),
+  ].map((row) => row.skill);
+  const ownedKeys = new Set(onDisk.map((skill) => skillKey(skill)));
+  const drawerSurface =
+    !fromInstalled || (selected != null && !ownedKeys.has(selected))
+      ? "store"
+      : "installed";
+
+  // One row in whichever section mounted it, with that section's own chrome:
+  // the enable switch and dimming for installs, the store's install CTA for
+  // everything folded out.
+  const renderRow = (row: RepoRow, index: number) => {
+    const record = records.get(row.skill.name);
+    return (
+      <SkillRow
+        key={skillKey(row.skill)}
+        skill={row.skill}
+        matched={row.matched}
+        index={index}
+        selected={skillKey(row.skill) === selected}
+        muted={row.installed && record?.enabled === false}
+        action={
+          row.installed ? <SkillEnableSwitch skill={row.skill} /> : undefined
+        }
+        // The page's head already names the repository, so its rows do not
+        // repeat it on every line.
+        showSource={false}
+        onSelect={() => setSelected(skillKey(row.skill))}
+      />
+    );
+  };
 
   const [owner] = repo.split("/");
 
@@ -240,15 +450,27 @@ export function RepoPage({
           </>
         }
         action={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void openExternal(`https://github.com/${repo}`)}
-            className="shrink-0"
-          >
-            <ExternalLink />
-            在 GitHub 打开
-          </Button>
+          <>
+            {/* The installed reading carries the card bar's same one-shot
+                switch into the page: the whole repository's installs, in one
+                press, from the head as well as from the list the reader came
+                from. The store's reading installs rather than enables, so it
+                carries nothing here. */}
+            {fromInstalled && onDisk.length > 0 && (
+              <RepoEnableSwitch
+                names={onDisk.map((skill) => skill.name)}
+                label={repo}
+              />
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void openExternal(`https://github.com/${repo}`)}
+              className="shrink-0"
+            >
+              <ExternalLink />在 GitHub 打开
+            </Button>
+          </>
         }
       />
 
@@ -270,78 +492,159 @@ export function RepoPage({
             listClassName={SKILL_ROW_LIST_CLASS}
             itemClassName={SKILL_ROW_SKELETON_CLASS}
           />
-        ) : skills.length === 0 ? (
+        ) : isEmpty ? (
           <Placeholder message={emptyMessage} />
         ) : (
           <>
-            <ul className={SKILL_ROW_LIST_CLASS}>
-              {shown.map((skill, index) => {
-                // The install record, when this row is one: it is what makes a
-                // row carry the enable switch and dim when disabled. In the
-                // whole reading the rows are the store's — an installed one
-                // says so through its install button, like any store row — so
-                // the record only ever matters in the installed reading.
-                const record = catalogue ? undefined : records.get(skill.name);
-                return (
-                  <SkillRow
-                    key={skillKey(skill)}
-                    skill={skill}
-                    index={index}
-                    selected={skillKey(skill) === selected}
-                    muted={record?.enabled === false}
-                    action={
-                      record ? <SkillEnableSwitch skill={skill} /> : undefined
-                    }
-                    // The page's head already names the repository, so its rows
-                    // do not repeat it on every line.
-                    showSource={false}
-                    onSelect={() => setSelected(skillKey(skill))}
-                  />
-                );
-              })}
-            </ul>
-            {/* The sentinel ends the rendered run: while it is on screen the
-                observer extends the run, so scrolling down — or simply having
-                a tall viewport — keeps revealing rows until every skill of the
-                repository is mounted. */}
-            {!done && <div ref={sentinelRef} aria-hidden="true" />}
-            {/* The foot of the installed reading: what the repository has that
-                this machine does not, stated as the door to it rather than
-                mixed into the list above. One press swaps the reading in place;
-                the whole catalogue keeps the control so the reader can walk
-                back to their own installs without leaving the repository. */}
-            {fromInstalled && (hasRest || catalogue) && (
-              <div className="mt-4 flex justify-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setWhole((all) => !all)}
-                >
-                  {catalogue ? (
-                    <>
-                      <ChevronUp />
-                      只看已安装
-                    </>
-                  ) : (
-                    `查看该仓库全部 ${published.length} 个 skill`
-                  )}
-                </Button>
+            {/* The first section: the matches when a search led here, or the
+                ordinary reading (the catalogue whole / the installs). These
+                rows never move or change voice when a fold below opens — the
+                whole point of folding rather than swapping. */}
+            {firstShownRows.length > 0 && (
+              <ul className={SKILL_ROW_LIST_CLASS}>
+                {firstShownRows.map((row, index) => renderRow(row, index))}
+              </ul>
+            )}
+
+            {/* The search fold: the repository's skills the query ruled out,
+                drawn as a dividing rule across the list — the matches end
+                where the rule begins, and the rest begins where it ends. The
+                catalogue fold (if any) is nested inside this one rather than
+                stacked under it: widen within the matches first. */}
+            {second != null && (
+              <div className={firstShownRows.length > 0 ? "py-4" : "pt-1"}>
+                <RepoFoldRule
+                  controls="repo-other-skills"
+                  open={secondOpen}
+                  closedLabel={`查看同仓库其他 ${second.length} 个${
+                    fromInstalled ? "已安装" : ""
+                  } skill`}
+                  openLabel={`收起其他 ${second.length} 个${
+                    fromInstalled ? "已安装" : ""
+                  } skill`}
+                  onToggle={() => {
+                    setSecondOpen((open) => !open);
+                    // Folding the search fold also folds the catalogue nested
+                    // in it; opening never auto-opens that further fold.
+                    setThirdOpen(false);
+                  }}
+                />
               </div>
             )}
+            {secondSection && secondShownRows.length > 0 && (
+              <ul id="repo-other-skills" className={SKILL_ROW_LIST_CLASS}>
+                {secondShownRows.map((row, i) =>
+                  renderRow(row, first.length + i),
+                )}
+              </ul>
+            )}
+
+            {/* The catalogue fold — the installed reading's uninstalled skills
+                — in the same voice it had before searches existed. Under a
+                search it only stands once the search fold is open, so the two
+                rules never stack over an empty list. */}
+            {showThirdRule && third != null && (
+              <div
+                className={
+                  first.length + (secondSection?.length ?? 0) > 0
+                    ? "py-4"
+                    : "pt-1"
+                }
+              >
+                <RepoFoldRule
+                  controls="repo-rest-skills"
+                  open={thirdOpen}
+                  closedLabel={`查看同仓库其他 ${third.length} 个未安装 skill`}
+                  openLabel={`收起未安装的 ${third.length} 个 skill`}
+                  onToggle={() => setThirdOpen((open) => !open)}
+                />
+              </div>
+            )}
+            {thirdSection && thirdShownRows.length > 0 && (
+              <ul id="repo-rest-skills" className={SKILL_ROW_LIST_CLASS}>
+                {thirdShownRows.map((row, i) => renderRow(row, thirdStart + i))}
+              </ul>
+            )}
+
+            {/* The sentinel ends the rendered run: while it is on screen the
+                observer extends the run, so scrolling down — or simply having
+                a tall viewport — keeps revealing rows until every mounted
+                section is fully mounted. */}
+            {!done && <div ref={sentinelRef} aria-hidden="true" />}
           </>
         )}
       </div>
 
-      {/* The panel walks this repository's skills, not the store's answer: the
-          page is one repository, so prev/next stays inside it. Which chrome it
-          wears follows the reading on screen: the installed reading offers the
-          enable switch, the whole one the store's install and remove. */}
+      {/* The panel walks the rows on screen, so prev/next stays inside this
+          repository — and inside the fold: a folded catalogue is not part of
+          the walk. The chrome follows the half the open skill stands in: the
+          installed half offers the enable switch, the folded-out half the
+          store's install and remove. */}
       <SkillDetailDrawer
-        skills={skills}
+        skills={drawerSkills}
         selected={selected}
         onSelect={setSelected}
-        surface={catalogue ? "store" : "installed"}
+        surface={drawerSurface}
       />
     </div>
+  );
+}
+
+/**
+ * A fold between two sections of one repository, drawn as a rule across the
+ * list rather than a button beneath it: one section ends where the rule
+ * begins, the next begins where it ends. One press unfolds the next section
+ * beneath; a second folds it away again, and the rule stays exactly where it
+ * was. The two hairlines flank the rule's own label, which states exactly what
+ * unfolding adds.
+ */
+function RepoFoldRule({
+  controls,
+  open,
+  closedLabel,
+  openLabel,
+  onToggle,
+}: {
+  /** The folded list this rule governs (for `aria-controls`). */
+  controls: string;
+  /** Whether the section it folds is currently mounted. */
+  open: boolean;
+  /** The rule's label while the section is folded away. */
+  closedLabel: string;
+  /** The rule's label while the section is unfolded. */
+  openLabel: string;
+  /** Toggle the fold. */
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-controls={controls}
+      onClick={onToggle}
+      className="group flex w-full items-center gap-3 rounded-md px-1 py-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      <span
+        aria-hidden
+        className="h-px flex-1 bg-border transition-colors group-hover:bg-foreground/30"
+      />
+      <span className="flex shrink-0 items-center gap-1.5">
+        {open ? (
+          <>
+            <ChevronUp className="size-3.5" aria-hidden />
+            {openLabel}
+          </>
+        ) : (
+          <>
+            <ChevronDown className="size-3.5" aria-hidden />
+            {closedLabel}
+          </>
+        )}
+      </span>
+      <span
+        aria-hidden
+        className="h-px flex-1 bg-border transition-colors group-hover:bg-foreground/30"
+      />
+    </button>
   );
 }

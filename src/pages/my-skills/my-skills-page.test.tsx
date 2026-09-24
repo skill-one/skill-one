@@ -212,65 +212,129 @@ describe("MySkillsPage", () => {
     expect(await screen.findByText("还没有安装任何技能")).toBeInTheDocument();
   });
 
-  it("offers an enable toggle per row, all on by default", async () => {
+  it("offers one group switch per card, on when every skill is enabled", async () => {
     renderPage();
 
-    const switches = await screen.findAllByRole("switch");
-    expect(switches).toHaveLength(5);
-    switches.forEach((sw) =>
-      expect(sw).toHaveAttribute("aria-checked", "true"),
-    );
+    // All six installs pool into one card: its bar carries the one switch that
+    // governs them all, checked because the pool is fully enabled.
+    const groupSwitch = await screen.findByRole("switch", {
+      name: "全部关闭（本地安装）",
+    });
+    expect(groupSwitch).toHaveAttribute("aria-checked", "true");
+    expect(screen.getAllByRole("switch")).toHaveLength(1);
   });
 
-  it("toggles a skill off and back on", async () => {
+  it("disables every skill of a card with one press, and re-enables them", async () => {
     const user = userEvent.setup();
-    renderPage();
+    const { container } = renderPage();
 
-    const pdfOn = await screen.findByRole("switch", { name: "关闭 pdf" });
-    await user.click(pdfOn);
+    await user.click(
+      await screen.findByRole("switch", { name: "全部关闭（本地安装）" }),
+    );
 
-    const pdfOff = await screen.findByRole("switch", { name: "开启 pdf" });
-    expect(pdfOff).toHaveAttribute("aria-checked", "false");
+    // The whole pool is now off: the visible rows dim together and the bar's
+    // own switch flips, including for the two skills past the preview cap that
+    // the backend write still covers (the card re-reads the same records).
+    const off = await screen.findByRole("switch", {
+      name: "全部开启（本地安装）",
+    });
+    expect(off).toHaveAttribute("aria-checked", "false");
+    const rows = container.querySelectorAll("[data-skill]");
+    expect(rows.length).toBeGreaterThan(0);
+    rows.forEach((row) => expect(row).toHaveClass("opacity-60"));
 
-    await user.click(pdfOff);
+    await user.click(off);
     expect(
-      await screen.findByRole("switch", { name: "关闭 pdf" }),
+      await screen.findByRole("switch", { name: "全部关闭（本地安装）" }),
     ).toHaveAttribute("aria-checked", "true");
+    rows.forEach((row) => expect(row).not.toHaveClass("opacity-60"));
   });
 
-  it("shows a backend-disabled skill as switched off", async () => {
-    // A skill parked in the backend's disabled dir is reported with
-    // enabled=false; the switch must reflect that instead of assuming on.
+  it("shows a card with one disabled skill as a half-on switch", async () => {
+    // One skill parked in the backend's disabled dir: the card is neither all
+    // on nor all off, so its switch reads as the half state rather than
+    // pretending the group is simply off.
     setMockSkillEnabled("pdf", false);
     renderPage();
 
-    const pdf = await screen.findByRole("switch", { name: "开启 pdf" });
-    expect(pdf).toHaveAttribute("aria-checked", "false");
+    const groupSwitch = await screen.findByRole("switch", {
+      name: "全部开启（本地安装）",
+    });
+    expect(groupSwitch).toHaveAttribute("aria-checked", "false");
+    expect(groupSwitch).toHaveClass("data-unchecked:bg-primary/40!");
   });
 
-  it("draws each row's switch without waiting for the pointer", async () => {
+  it("enables every skill of a half-on card with one press", async () => {
+    const user = userEvent.setup();
+    setMockSkillEnabled("pdf", false);
     const { container } = renderPage();
 
-    await screen.findByRole("switch", { name: "关闭 pdf" });
+    await user.click(
+      await screen.findByRole("switch", { name: "全部开启（本地安装）" }),
+    );
 
-    // Unlike the store's install button (revealed on hover), the installed
-    // list's switch is a fact about the row: it is drawn always, so a reader
-    // scanning for a disabled skill sees it without pointing at anything.
+    // Enable-all-first: the previously disabled skill joins the rest, its row
+    // un-dims, and the group reaches the fully-on state in one press.
+    expect(
+      await screen.findByRole("switch", { name: "全部关闭（本地安装）" }),
+    ).toHaveAttribute("aria-checked", "true");
+    const row = container.querySelector('[data-skill="pdf"]');
+    expect(row).not.toHaveClass("opacity-60");
+  });
+
+  it("keeps enablement on the bar rather than on each row", async () => {
+    const { container } = renderPage();
+
+    await screen.findByRole("switch", { name: "全部关闭（本地安装）" });
+
+    // No row carries a switch: per-skill switching waits for the repository's
+    // own page, so a card reads as a list rather than as a row of controls.
     const row = container.querySelector('[data-skill="pdf"]');
     expect(row).not.toBeNull();
-    expect(row).not.toHaveClass("opacity-0");
-    expect(row?.querySelector(".opacity-0")).toBeNull();
+    expect(row?.querySelector('[role="switch"]')).toBeNull();
   });
 
-  it("dims a disabled row and keeps its switch drawn", async () => {
-    // The off switch is the fact that explains the dimmed row.
+  it("dims a disabled row behind the bar's group switch", async () => {
+    // The dimmed row is the evidence the group switch's half state explains.
     setMockSkillEnabled("pdf", false);
     const { container } = renderPage();
 
-    await screen.findByRole("switch", { name: "开启 pdf" });
+    await screen.findByRole("switch", { name: "全部开启（本地安装）" });
     const row = container.querySelector('[data-skill="pdf"]');
     expect(row).toHaveClass("opacity-60");
-    expect(row?.querySelector(".opacity-0")).toBeNull();
+  });
+
+  it("scopes each card's switch to that card's own skills", async () => {
+    const user = userEvent.setup();
+    // pdf carries a recorded source and moves into its own repository card;
+    // the other five stay pooled under 本地安装.
+    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    const { container } = renderPage();
+
+    const repoSwitch = await screen.findByRole("switch", {
+      name: "全部关闭（anthropics/skills）",
+    });
+    const poolSwitch = screen.getByRole("switch", {
+      name: "全部关闭（本地安装）",
+    });
+    expect(screen.getAllByRole("switch")).toHaveLength(2);
+
+    await user.click(repoSwitch);
+
+    // Only the repository's one skill goes off: its row dims and only its bar
+    // switch flips, while the pool's five stay enabled behind a checked switch.
+    expect(
+      await screen.findByRole("switch", {
+        name: "全部开启（anthropics/skills）",
+      }),
+    ).toHaveAttribute("aria-checked", "false");
+    expect(poolSwitch).toHaveAttribute("aria-checked", "true");
+    expect(container.querySelector('[data-skill="pdf"]')).toHaveClass(
+      "opacity-60",
+    );
+    expect(container.querySelector('[data-skill="docx"]')).not.toHaveClass(
+      "opacity-60",
+    );
   });
 
   it("shows each skill's description", async () => {
@@ -335,16 +399,25 @@ describe("MySkillsPage", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("本地安装")).toBeInTheDocument();
-    expect(within(dialog).queryByText("anthropics/skills")).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByText("anthropics/skills"),
+    ).not.toBeInTheDocument();
   });
 
-  it("does not open the drawer from the card's switch", async () => {
+  it("does not open the drawer or the door from the bar's switch", async () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("pdf");
 
-    await user.click(await screen.findByRole("switch", { name: "关闭 pdf" }));
+    await user.click(
+      await screen.findByRole("switch", { name: "全部关闭（本地安装）" }),
+    );
+    // The switch is a sibling of the bar's door, not a child: the press toggles
+    // the group without opening the drawer or walking through the door.
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "查看本地安装，6 个 skill" }),
+    ).toBeInTheDocument();
   });
 
   it("uses '暂无描述' as a placeholder when a skill has no description", async () => {
@@ -414,9 +487,7 @@ describe("MySkillsPage", () => {
     const dialog = await screen.findByRole("dialog");
     // The panel now knows the repo: the description is the source link, not
     // the bare 本地安装 label.
-    expect(
-      within(dialog).getByText("anthropics/skills"),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText("anthropics/skills")).toBeInTheDocument();
     expect(within(dialog).queryByText("本地安装")).not.toBeInTheDocument();
   });
 
@@ -435,9 +506,8 @@ describe("MySkillsPage", () => {
     );
 
     const dialog = await screen.findByRole("dialog");
-    // The same switch the row carries takes the slot the store's drawer puts
-    // its install CTA in — this list installs nothing, its skills are already
-    // on disk.
+    // The per-skill switch takes the slot the store's drawer puts its install
+    // CTA in — this list installs nothing, its skills are already on disk.
     expect(
       within(dialog).getByRole("switch", { name: "关闭 pdf" }),
     ).toBeInTheDocument();
@@ -447,11 +517,9 @@ describe("MySkillsPage", () => {
     // A recorded repo does not turn the drawer into the store's: there are no
     // registry figures to show, and an install figure rendering as a 0 here
     // would contradict the card, which shows none.
-    expect(
-      within(dialog).queryByText("安装量"),
-    ).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("安装量")).not.toBeInTheDocument();
 
-    // The drawer's switch writes the same backend state the card's does.
+    // The drawer's switch writes the same backend state the bar's does.
     await user.click(within(dialog).getByRole("switch", { name: "关闭 pdf" }));
     expect(
       await within(dialog).findByRole("switch", { name: "开启 pdf" }),
@@ -610,9 +678,7 @@ describe("MySkillsPage", () => {
     // must land with that skill pre-filtered and consume the param.
     renderPage("/my-skills?skill=pdf");
 
-    expect(
-      await screen.findByLabelText("搜索 Skill"),
-    ).toHaveValue("pdf");
+    expect(await screen.findByLabelText("搜索 Skill")).toHaveValue("pdf");
     expect(await screen.findByText("pdf")).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.queryByText("docx")).not.toBeInTheDocument(),
@@ -786,9 +852,7 @@ describe("MySkillsPage", () => {
     ).toHaveLength(6);
     // No card, so no bar: nothing in this unit is a door to a repository.
     expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
-    expect(
-      screen.queryByRole("link", { name: /^查看本地安装/ }),
-    ).toBeNull();
+    expect(screen.queryByRole("link", { name: /^查看本地安装/ })).toBeNull();
     // The enable switch rides the row, so both units manage the same skills.
     expect(screen.getAllByRole("switch")).toHaveLength(6);
   });
@@ -804,7 +868,9 @@ describe("MySkillsPage", () => {
     await user.click(screen.getByRole("button", { name: "按技能" }));
 
     await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
-    expect(screen.queryByRole("button", { name: /还有 \d+ 个来自/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
+    ).toBeNull();
   });
 
   it("folds a repository's run of four installs, stating the run's own figure", async () => {
@@ -832,7 +898,9 @@ describe("MySkillsPage", () => {
     expect(
       await screen.findByRole("button", { name: "查看 docx 详情" }),
     ).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /查看 .+ 详情/ })).toHaveLength(6);
+    expect(
+      screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+    ).toHaveLength(6);
   });
 
   it("states no figure for a run the registry cannot place", async () => {
@@ -864,17 +932,21 @@ describe("MySkillsPage", () => {
     // both classified installs, so 内容创作 counts 1 beside 全部's 2 cards.
     const chip = await screen.findByRole("button", { name: /^内容创作/ });
     expect(chip).toHaveTextContent("1");
-    expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent("2");
+    expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
+      "2",
+    );
 
     await user.click(screen.getByRole("button", { name: "按技能" }));
 
     // The same chip now weighs skills, and 全部 every install.
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /^内容创作/ })).toHaveTextContent(
-        "2",
-      ),
+      expect(
+        screen.getByRole("button", { name: /^内容创作/ }),
+      ).toHaveTextContent("2"),
     );
-    expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent("6");
+    expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
+      "6",
+    );
 
     // Scoping keeps the skills that belong to the domain, whoever they share a
     // source with: two is below the fold threshold, so each keeps its own row.
@@ -1040,5 +1112,4 @@ describe("MySkillsPage", () => {
     expect(switchEl).toHaveAttribute("aria-disabled", "true");
     expect(switchEl).toHaveAttribute("aria-checked", "true");
   });
-
 });

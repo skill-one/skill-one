@@ -16,6 +16,7 @@ import {
 } from "../../lib/skill-list-layout";
 import { errorMessage } from "../../lib/utils";
 import { DrillDownHead } from "../../components/drill-down-head";
+import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
 import { SkeletonList } from "../../components/skeleton-list";
@@ -96,17 +97,30 @@ export function LocalSkillsPage() {
       {/* The page's head: the way back to the installed list, and the pool's
           identity in the same voice as a repository page's head — minus the
           repository, which is the whole point of this page, and minus the face
-          and the action that would have to stand for one (see
-          `DrillDownHead`). */}
+          that would have to stand for one (see `DrillDownHead`). It keeps the
+          card bar's one action: the switch that enables or disables the whole
+          pool in one press, the same group switch a repository page carries —
+          per-skill switches stay on the rows below. */}
       <DrillDownHead
         back="/my-skills"
         title={LOCAL_SOURCE_LABEL}
         meta={`${rows.length} 个 skill`}
+        action={
+          rows.length > 0 ? (
+            <RepoEnableSwitch
+              names={rows.map((row) => row.view.name)}
+              label={LOCAL_SOURCE_LABEL}
+            />
+          ) : undefined
+        }
       />
 
       <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5">
         {isError ? (
-          <Placeholder icon={Boxes} message={`加载失败：${errorMessage(error)}`} />
+          <Placeholder
+            icon={Boxes}
+            message={`加载失败：${errorMessage(error)}`}
+          />
         ) : isLoading ? (
           <SkeletonList
             rows={SKELETON_ROWS}

@@ -279,4 +279,37 @@ describe("RepoCard", () => {
     expect(screen.queryByRole("button", { name: /GitHub/ })).toBeNull();
     expect(screen.getAllByRole("link")).toHaveLength(1);
   });
+
+  it("draws no row control when the surface owns enablement itself", () => {
+    renderCard({ rowActions: false });
+
+    // The installed list's cards manage skills as a group from the bar: the
+    // rows list skills without a corner on any of them.
+    expect(screen.queryAllByRole("button", { name: "安装" })).toHaveLength(0);
+  });
+
+  it("mounts the footer action beside the door, never inside it", async () => {
+    const user = userEvent.setup();
+    const onFooter = vi.fn();
+    renderCard({
+      rowActions: false,
+      footerAction: (
+        <button type="button" onClick={onFooter}>
+          group
+        </button>
+      ),
+    });
+
+    // The door still leads to the repository, and the footer action is its own
+    // control: a press on the action must not walk through the door, so the
+    // action is a sibling of the link rather than a child of it.
+    const door = screen.getByRole("link", {
+      name: `查看仓库 ${REPO}，8 个 skill`,
+    });
+    const action = screen.getByRole("button", { name: "group" });
+    expect(door).toBeInTheDocument();
+    expect(door.contains(action)).toBe(false);
+    await user.click(action);
+    expect(onFooter).toHaveBeenCalledOnce();
+  });
 });

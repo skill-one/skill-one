@@ -23,11 +23,13 @@ import { Card, CardContent, CardFooter } from "../../components/ui/card";
  * One row of a repository card: a skill, plus whatever its surface adds to it.
  *
  * The store hands over plain search hits — a skill and the terms to highlight —
- * and the installed list hands over the same shape with the two facts only it
- * knows: whether the skill is enabled (a disabled row is dimmed) and the
+ * and the installed list hands over the same shape with the one fact only it
+ * knows: whether the skill is enabled (a disabled row is dimmed), plus the
  * migration badge for an install whose source the ledger cannot vouch for. The
- * row's corner control is a slot for the same reason: the store installs, the
- * installed list enables, and the card draws whichever it is handed.
+ * row's corner control is the store's install button; the installed list draws
+ * no per-row control at all — a card manages its skills as one group, from the
+ * bar (`footerAction`), and per-skill switching waits one level deeper, on the
+ * repository's own page.
  */
 export interface RepoCardRow {
   /** The skill the row renders. */
@@ -36,16 +38,15 @@ export interface RepoCardRow {
   matched?: SkillMatched;
   /** Dimmed presentation: an installed skill that is disabled. */
   muted?: boolean;
-  /** Beside the row button, before the action: the migration badge. */
+  /** Beside the row button: the migration badge. */
   extra?: ReactNode;
-  /** The row's corner control; absent means the store's install button. */
-  action?: ReactNode;
 }
 
 /**
  * One repository, as one card — the store's repository view, and the installed
- * list's unit too: the same card, with each row's action slot carrying the
- * enable switch instead of the install button (see `RepoCardRow`).
+ * list's unit too: the same card, whose bar carries a one-shot switch over the
+ * card's skills instead of the rows carrying one switch each (see
+ * `RepoEnableSwitch`).
  *
  * The card is a repository with its skills inside it, and it is read skills
  * first: the body lists them (most-installed first, the repository's own
@@ -84,22 +85,28 @@ export interface RepoCardRow {
  * whole bar was as tall as: removing it is what makes the bar a line of text
  * rather than a line of text beside a button. The source is still two clicks
  * away (a row's panel links to it, and the repository page has the labeled
- * button), while the list itself stays one target per card.
+ * button), while the list itself stays one target per card. The one companion
+ * the bar admits is `footerAction` — the installed list's one-shot switch over
+ * the card's skills, a sibling of the door rather than a child of it: a press
+ * on the switch must never also walk through the door.
  *
- * The row's **install button** is the third: it installs without either. It is
- * a sibling of the row button rather than a child, so the two never nest and
- * the button stops its own clicks from reaching the row; and it is *revealed* on
- * hover (or when the row is focused) rather than always drawn. A card's worth of
- * always-on buttons would be the loudest thing in the grid — the repository view
- * exists to compare skills, and the action is one hover away from the skill it
- * applies to. The one state that ignores that rule is 已安装: an installed badge
- * is a fact rather than an invitation, so it stays drawn without the pointer and
- * a reader scanning a lane sees at a glance which skills they already have.
- * This is where the card deliberately parts with the standalone skill card,
- * whose idle install button stays visible: there, one card carries one skill, so
- * the button is that card's own action rather than a repeated glyph. A pointer
- * that never hovers (a touch surface) still reaches the same install through the
- * detail panel, which the row opens.
+ * The store rows' **install button** is the third destination: it installs
+ * without either. It is a sibling of the row button rather than a child, so the
+ * two never nest and the button stops its own clicks from reaching the row; and
+ * it is *revealed* on hover (or when the row is focused) rather than always
+ * drawn. A card's worth of always-on buttons would be the loudest thing in the
+ * grid — the repository view exists to compare skills, and the action is one
+ * hover away from the skill it applies to. The one state that ignores that rule
+ * is 已安装: an installed badge is a fact rather than an invitation, so it stays
+ * drawn without the pointer and a reader scanning a lane sees at a glance which
+ * skills they already have. This is where the card deliberately parts with the
+ * standalone skill card, whose idle install button stays visible: there, one
+ * card carries one skill, so the button is that card's own action rather than a
+ * repeated glyph. A pointer that never hovers (a touch surface) still reaches
+ * the same install through the detail panel, which the row opens. The installed
+ * list asks for no row control at all (`rowActions={false}`): comparing and
+ * grouping installed skills is what its cards are for, and enablement is one
+ * group action on the bar until the reader deliberately enters the repository.
  *
  * Because the button is only ever *shown* on intent, it does not take part in
  * the row's layout: it floats over the row's right edge, so a name and a
@@ -139,7 +146,8 @@ export function RepoCard({
   hasQuery = false,
   selected = null,
   onOpenSkill,
-  hoverAction = true,
+  rowActions = true,
+  footerAction,
   href,
 }: {
   /** `owner/repo` — the repository the card stands for; empty for the installed
@@ -167,12 +175,18 @@ export function RepoCard({
   /** Opens one skill's detail panel. */
   onOpenSkill: (key: string) => void;
   /**
-   * Whether each row's action waits for the pointer (the store, where a card's
-   * worth of install buttons would be the loudest thing in the grid) or is
-   * drawn always (the installed list, whose enable switch is a fact a reader
-   * scanning for a disabled skill must see without pointing).
+   * Whether the rows carry their corner control (the store's hover-revealed
+   * install button). The installed list passes `false`: its cards carry no
+   * per-skill control — the group switch on the bar and the per-skill switches
+   * on the repository's page split that job.
    */
-  hoverAction?: boolean;
+  rowActions?: boolean;
+  /**
+   * A control at the bar's far end, a sibling of the door rather than a child
+   * of it. The installed list hands over the one-shot enable switch over the
+   * card's skills; absent (the store) leaves the bar one unbroken door.
+   */
+  footerAction?: ReactNode;
   /**
    * Where the bar leads. Absent means the repository's own page
    * (`/repo/owner/repo`, the store's full catalogue of it); the installed list
@@ -209,10 +223,7 @@ export function RepoCard({
           of source-less installs has no owner to draw, so its name leads
           the bar alone. */}
       {repo ? (
-        <OwnerAvatar
-          owner={owner}
-          className="size-6 shrink-0 text-[11px]"
-        />
+        <OwnerAvatar owner={owner} className="size-6 shrink-0 text-[11px]" />
       ) : null}
       <span className="truncate text-sm font-semibold text-foreground group-hover/head:underline">
         {name}
@@ -232,10 +243,7 @@ export function RepoCard({
           className="flex shrink-0 items-center gap-1 tabular-nums"
           title={`${stars} stars`}
         >
-          <Star
-            className="h-3 w-3 fill-amber-400 text-amber-400"
-            aria-hidden
-          />
+          <Star className="h-3 w-3 fill-amber-400 text-amber-400" aria-hidden />
           {formatCount(stars)}
         </span>
       )}
@@ -274,7 +282,7 @@ export function RepoCard({
               its content. The horizontal bleed lets the hover highlight read as
               a row band rather than as a box inside the card's padding. */}
           <ul className="-mx-1.5 flex flex-col">
-            {shown.map(({ skill, matched, muted, extra, action }) => {
+            {shown.map(({ skill, matched, muted, extra }) => {
               const key = skillKey(skill);
               // A live skills.sh row claims only what its source carries —
               // which is no description and no classification at all — so it
@@ -282,13 +290,10 @@ export function RepoCard({
               // `isLiveSkill`); an installed row the store cannot resolve is a
               // local fact, and keeps both.
               const live = isLiveSkill(skill);
-              const emoji = live ? undefined : domainEmoji(skill.profile?.domain);
+              const emoji = live
+                ? undefined
+                : domainEmoji(skill.profile?.domain);
               const isSelected = selected != null && selected === key;
-              // The store installs; the installed list enables. The control is
-              // the caller's, and absent means the store's install button.
-              const control = action ?? (
-                <SkillInstallButton skill={skill} className="h-7 w-7" />
-              );
               return (
                 <li
                   key={key}
@@ -328,7 +333,10 @@ export function RepoCard({
                         it shrinks only up to half the row, so a long
                         description can never truncate it away. */}
                     <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
-                      <HighlightedText text={skill.name} terms={matched?.name} />
+                      <HighlightedText
+                        text={skill.name}
+                        terms={matched?.name}
+                      />
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
                       {live ? null : skill.description || "暂无描述"}
@@ -338,7 +346,11 @@ export function RepoCard({
                       than inside it: a control nested in a control is invalid,
                       and a click must never mean both. */}
                   {extra}
-                  {/* Floating, not laid out: the button is absolutely placed
+                  {/* The installed list's rows carry no corner control: the
+                      group switch on the bar owns enablement, and an
+                      individual switch waits on the repository's own page. */}
+                  {rowActions && (
+                    /* Floating, not laid out: the button is absolutely placed
                       over the row's right edge, so the name and the description
                       own the row's whole width and the reader sees more of them
                       in the state every row spends nearly all its time in. It
@@ -354,14 +366,9 @@ export function RepoCard({
                       button that carries a state instead of an invitation —
                       installed above all — is what the `has-data` rule keeps on
                       screen; it reads the button's own `data-state`, so this
-                      wrapper never has to know the state itself. */}
-                  {hoverAction ? (
+                      wrapper never has to know the state itself. */
                     <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100">
-                      {control}
-                    </span>
-                  ) : (
-                    <span className="ml-1 flex shrink-0 items-center">
-                      {control}
+                      <SkillInstallButton skill={skill} className="h-7 w-7" />
                     </span>
                   )}
                 </li>
@@ -376,7 +383,7 @@ export function RepoCard({
             external door (a live source the store has no page for) opens in
             the system browser — the same bar, the same label, one step
             further out. */}
-        <CardFooter className="mt-auto min-w-0 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
+        <CardFooter className="mt-auto min-w-0 gap-2 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
           {door == null ? (
             /* A bar with nowhere to lead — the local pool's own page, which is
                already the whole list — states the name and the total instead. */
@@ -406,6 +413,12 @@ export function RepoCard({
             >
               {doorBar}
             </Link>
+          )}
+          {/* The bar's one companion control: a sibling of the door, never a
+              child, so a press on it cannot also open the page. The installed
+              list mounts the group switch here; the store mounts nothing. */}
+          {footerAction && (
+            <span className="flex shrink-0 items-center">{footerAction}</span>
           )}
         </CardFooter>
       </Card>

@@ -12,6 +12,7 @@ import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
 import {
   installedSkillView,
   skillKey,
+  LOCAL_SOURCE_LABEL,
   type SkillView,
 } from "../../lib/skill-view";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
@@ -29,6 +30,7 @@ import { buildSearchIndex } from "../../lib/search-index";
 import { setQuery, setScope } from "../../lib/list-view";
 import type { SkillMatched } from "../../components/skill-card";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
+import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillRow } from "../explore/skill-row";
 import { SkillRun, buildSkillRuns, byInstalls } from "../explore/skill-run";
 import { SkeletonList } from "../../components/skeleton-list";
@@ -110,10 +112,12 @@ function starsOf(group: RepoGroup): number | undefined {
  *   time reads all of them.
  *
  * What the page adds to the store's surfaces is what only an installed skill
- * has: the enable switch in each row's action slot (drawn always — a reader
- * scanning for a disabled skill must see it without pointing), the dimming of a
- * disabled row, and the migration badge beside an install whose source the
- * ledger cannot vouch for. Both units carry all three, and both feed the same
+ * has: enablement — as one group switch on each repository card's bar (a press
+ * enables or disables every skill of that card; a mixed card reads as half on)
+ * rather than one switch per row, since per-skill switching waits one level
+ * deeper, on the repository's own page — the dimming of a disabled row, and the
+ * migration badge beside an install whose source the ledger cannot vouch for.
+ * The skill unit carries its per-row switch, and both units feed the same
  * detail drawer, so what a skill looks like never depends on how the list is
  * grouped.
  */
@@ -450,7 +454,6 @@ export function MySkillsPage() {
                     matched: row.matched,
                     muted: !row.enabled,
                     extra: rowExtra(row),
-                    action: <SkillEnableSwitch skill={row.skill} />,
                   }))}
                   maxSkills={maxSkills}
                   hasQuery={isSearching}
@@ -461,10 +464,22 @@ export function MySkillsPage() {
                   // catalogue behind one control; the pool's bar opens the
                   // installed list's own pool page, having no repository to
                   // open.
-                  href={card.repo ? `${REPO_PAGE_PATH}${card.repo}` : LOCAL_POOL_PATH}
-                  // The switch is a fact about the row, not an invitation: it
-                  // is drawn always rather than revealed on hover.
-                  hoverAction={false}
+                  href={
+                    card.repo
+                      ? `${REPO_PAGE_PATH}${card.repo}`
+                      : LOCAL_POOL_PATH
+                  }
+                  // Card rows carry no per-skill switch: enablement is one
+                  // group action on the bar (below), and an individual switch
+                  // waits on the page the bar opens. The disabled rows stay
+                  // dimmed so the group switch's state has its evidence.
+                  rowActions={false}
+                  footerAction={
+                    <RepoEnableSwitch
+                      names={card.items.map((row) => row.skill.name)}
+                      label={card.repo || LOCAL_SOURCE_LABEL}
+                    />
+                  }
                 />
               ))}
             </ul>
