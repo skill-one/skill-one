@@ -38,7 +38,7 @@ Read data is cached through TanStack Query (`staleTime` 10 minutes, `gcTime` inf
 ### Backend (writes)
 
 - **`src-tauri/src/skills.rs`**: Exposes 8 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `set_skills_enabled`, `link_agents`, `link_status`, `read_skill_md`, `compute_skill_hash`), all of which route their blocking work (GitHub downloads, install, link, hashing, etc.) through a shared `spawn_blocking` helper to keep it off the async runtime.
-- Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Since agents-skills 0.15 linking is one-way: an agent's own skills are adopted into the canonical dir (a name clash keeps the canonical copy), its other files are quarantined into `.misc/<agent>/`, and unlink only breaks the symlink. `list` also reports each skill's description and install time, which the app passes straight through. Since 0.21 an install is one source and one skill — `owner/repo@<skill>`, resolved through the GitHub API, which downloads only the matched skill directory — and a failure is the command's `Err`, so `install_skill` returns just `{ skill, skipped }`.
+- Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Since agents-skills 0.15 linking is one-way: an agent's own skills are adopted into the canonical dir (a name clash keeps the canonical copy), its other files are quarantined into `.misc/<agent>/`, and unlink only breaks the symlink. `list` also reports each skill's description and install time, which the app passes straight through. Since 0.21 an install is one source and one skill — `owner/repo@<skill>`; since 0.23 the backend downloads the repository tarball from codeload.github.com and matches the skill locally (the GitHub REST API and its anonymous rate limit are no longer involved) — and a failure is the command's `Err`, so `install_skill` returns just `{ skill, skipped }`.
 
 ### Frontend write wrapper
 
@@ -79,7 +79,7 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 
 1. The user clicks "Install" on the explore page.
 2. `local-skills.installSkillFromSource(repo, name)` checks the environment and composes the source `owner/repo@<skill>`.
-3. Tauri environment → `skills-manager.installSkill` → `invoke("install_skill", ...)` → Rust `install_skill` command → `agents-skills::Manager.add` (the GitHub API downloads only the matched skill directory).
+3. Tauri environment → `skills-manager.installSkill` → `invoke("install_skill", ...)` → Rust `install_skill` command → `agents-skills::Manager.add` (since 0.23 it downloads the repository tarball from codeload.github.com and matches the named skill directory locally).
 4. When finished, the frontend refreshes the `installed-skills` query cache.
 5. Browser environment → writes via `mock-local.installMockSkill`.
 

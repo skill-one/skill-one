@@ -4,7 +4,7 @@
 
 Through the Tauri backend (`src-tauri/src/skills.rs`), this project calls the
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
-facade of `agents-skills` v0.22 to expose skill installation and agent-linking
+facade of `agents-skills` v0.23 to expose skill installation and agent-linking
 capabilities to the frontend. The frontend reaches these Tauri commands via the
 `invoke` wrapper in `src/lib/skills-manager.ts`.
 
@@ -14,12 +14,12 @@ capabilities to the frontend. The frontend reaches these Tauri commands via the
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.22"
+agents-skills = "0.23"
 ```
 
-## What 0.15–0.22 changed
+## What 0.15–0.23 changed
 
-Eight breaking releases separate the API this app was written against (0.14)
+Nine breaking releases separate the API this app was written against (0.14)
 from the current one. Everything below is reflected in `skills.rs`:
 
 | Version | Change | Effect here |
@@ -32,6 +32,7 @@ from the current one. Everything below is reflected in `skills.rs`:
 | 0.20 | `ListedSkill.name` is the on-disk directory name, and `path` is gone from `ListedSkill` / `list --json` (resolve a directory with the new `Manager::skill_dir`) | The app's DTO drops `path` with it; `read_skill_md` and `compute_skill_hash` resolve the directory through `skill_dir` |
 | 0.21 | One source is one skill: `AddRequest` reduced to `{ source, reference }`, `AddOutcome` reduced to `{ source, skill, canonical_path, skipped }`, failures returned as `Err` (`InstallSuccess` / `InstallFailure` gone); sources reduced to a local skill directory or `owner/repo@<skill>`, resolved through the GitHub API (git clone / zip / tar / URL sources removed) | `install_skill` takes one `source` string and returns `{ skill, skipped }`; a failed install is the command's `Err` and the frontend's rejection |
 | 0.22 | A skill's identity is always its directory basename — the `SKILL.md` frontmatter `name` is no longer read or matched anywhere; `owner/repo@<skill>` searches the repository tree for a directory whose basename matches (shallowest wins) and downloads only that directory; a missing or unparseable `SKILL.md` is no longer fatal | The store's skill slug is sent verbatim inside the source; nothing else had to change |
+| 0.23 | Remote installs are one tarball request to `codeload.github.com` (unpacked, matched locally): the GitHub REST API and its anonymous rate limit are gone, as are `GITHUB_TOKEN`, Git LFS resolution, and abbreviated-SHA refs | No code change — the public types used here (`AddRequest`, `Manager`) are unchanged; only comments/docs describing the fetch mechanism were updated |
 
 ### Earlier changes
 

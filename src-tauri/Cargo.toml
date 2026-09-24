@@ -42,10 +42,12 @@ tauri-plugin-process = "2"
 # Since 0.16 `Manager::list` reports a skill's `description` and
 # `installed_at` itself, so the app no longer parses SKILL.md frontmatter;
 # 0.19 reverted the token estimate 0.18 had briefly added; since 0.21 one
-# source (`owner/repo@<skill>`, resolved through the GitHub API) is one skill
-# and a failure is an `Err`; since 0.22 a skill's identity is its directory
-# basename alone.
-agents-skills = "0.22"
+# source (`owner/repo@<skill>`) is one skill and a failure is an `Err`;
+# since 0.22 a skill's identity is its directory basename alone; since 0.23
+# remote installs download the repository tarball from codeload.github.com
+# and match the skill locally, so the GitHub REST API (its anonymous rate
+# limit) and GITHUB_TOKEN are no longer involved.
+agents-skills = "0.23"
 serde = { version = "1", features = ["derive"] }
 # Required directly by the `tauri::generate_context!` macro (updater config).
 serde_json = "1"

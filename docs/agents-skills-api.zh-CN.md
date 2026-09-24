@@ -2,7 +2,7 @@
 
 [English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
-本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.22 的
+本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.23 的
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
 门面，将技能安装与 agent 链接能力暴露给前端。前端经 `src/lib/skills-manager.ts`
 的 `invoke` 封装访问这些 Tauri 命令。
@@ -13,12 +13,12 @@
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.22"
+agents-skills = "0.23"
 ```
 
-## 0.15–0.22 的主要变化
+## 0.15–0.23 的主要变化
 
-本项目最初基于 0.14 编写，之后跨越了八个 breaking 版本。下表的变化均已在
+本项目最初基于 0.14 编写，之后跨越了九个 breaking 版本。下表的变化均已在
 `skills.rs` 中体现：
 
 | 版本 | 变化 | 对本项目的影响 |
@@ -31,6 +31,7 @@ agents-skills = "0.22"
 | 0.20 | `ListedSkill.name` 改为技能在磁盘上的目录名，且 `ListedSkill` / `list --json` 移除 `path`（改用新的 `Manager::skill_dir` 解析目录） | 应用的 DTO 随之删除 `path`；`read_skill_md` 与 `compute_skill_hash` 改经 `skill_dir` 解析目录 |
 | 0.21 | 一个 source 只对应一个技能：`AddRequest` 缩减为 `{ source, reference }`，`AddOutcome` 缩减为 `{ source, skill, canonical_path, skipped }`，失败改为返回 `Err`（`InstallSuccess` / `InstallFailure` 删除）；source 只剩本地技能目录与 `owner/repo@<skill>` 两种形式，远程安装改走 GitHub API（git clone / zip / tar / URL 等 source 形式删除） | `install_skill` 只接收一个 `source` 字符串，返回 `{ skill, skipped }`；安装失败即命令的 `Err`，也就是前端的 rejection |
 | 0.22 | 技能的身份永远是目录 basename——`SKILL.md` frontmatter 的 `name` 不再被读取或参与匹配；`owner/repo@<skill>` 在仓库树中按 basename（不区分大小写）匹配最浅的目录，只下载该目录；缺失或无法解析的 `SKILL.md` 不再致命 | 商店的 skill slug 原样放进 source；其余无需改动 |
+| 0.23 | 远程安装改为向 `codeload.github.com` 发起一次 tarball 请求（下载到本地后解包匹配）：不再走 GitHub REST API，也就没有匿名限流；同时移除 `GITHUB_TOKEN`、Git LFS 解析与缩写 SHA ref | 无需改代码——本项目使用的公开类型（`AddRequest`、`Manager`）未变，仅更新了描述下载机制的注释与文档 |
 
 ### 更早的变化
 
