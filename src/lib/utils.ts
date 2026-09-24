@@ -61,6 +61,27 @@ export function formatUnixDate(
 }
 
 /**
+ * A calendar-day heading for a grouped list, e.g. 9月22日 / "September 22"; a
+ * day of another year carries the year (2025年12月3日 / "December 3, 2025").
+ * `ms` is the day's local midnight, as the time filing reports it (`DayFiling`
+ * start); `now` is injectable purely so the year test is frozen-clock
+ * testable.
+ */
+export function formatDayHeading(
+  ms: number,
+  locale: AppLocale,
+  now: number = Date.now(),
+): string {
+  const sameYear =
+    new Date(ms).getFullYear() === new Date(now).getFullYear();
+  return new Intl.DateTimeFormat(bcp47(locale), {
+    month: "long",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(new Date(ms));
+}
+
+/**
  * Largest unit first: the first one at least a whole unit has elapsed in wins.
  * A table instead of a ladder of `if`s, so adding `week` or `quarter` is one
  * row. Seconds are the fallback below this table, not a row in it.

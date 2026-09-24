@@ -56,8 +56,8 @@ function keepHeaderUnderPointer(header: HTMLElement) {
 
 /**
  * One collapsible section of a grouped answer — the shell every sticky group
- * header in the app is drawn through: the installed list's relative-time
- * buckets (今天, 本周…) and the unified search answer's three sources
+ * header in the app is drawn through: the installed list's per-day
+ * groups (今天, 9月22日…) and the unified search answer's three sources
  * (本地已安装, 应用商店, skills.sh). The header row pins to the top of the
  * scrolling container while its section passes, and the whole row folds and
  * unfolds the section — the count badge stays on the header either way, so a

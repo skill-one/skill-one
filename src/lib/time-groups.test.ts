@@ -1,122 +1,157 @@
 import { describe, it, expect } from "vitest";
 
 import {
-  TIME_BUCKETS,
-  timeBucketOf,
+  dayFilingOf,
   groupByInstallTime,
   compareByInstalledTime,
   newestInstallTime,
-  type TimeBucketKey,
 } from "./time-groups";
 
-describe("timeBucketOf", () => {
-  // A fixed afternoon, expressed in local time: every boundary is local
-  // midnight, so the fixtures are offsets of that midnight too, which keeps
-  // the assertions true in whatever zone the suite runs in.
+describe("dayFilingOf", () => {
+  // A fixed afternoon, expressed in local time. Stamps are built from explicit
+  // local calendar dates rather than midnight offsets, so the assertions stay
+  // true in whatever zone (and across whatever DST shifts) the suite runs in.
   const now = new Date(2026, 8, 24, 15, 30);
-  const midnight = new Date(2026, 8, 24).getTime() / 1000;
-  const DAY = 24 * 60 * 60;
-  const at = (daysOffset: number, secondsIntoDay = 0) =>
-    midnight + daysOffset * DAY + secondsIntoDay;
+  const at = (year: number, month: number, day: number, hour = 0) =>
+    Math.floor(new Date(year, month - 1, day, hour).getTime() / 1000);
+  const midnightOf = (year: number, month: number, day: number) =>
+    new Date(year, month - 1, day).getTime();
 
   it("files a same-day install into 今天", () => {
-    expect(timeBucketOf(at(0, 9 * 3600), now)).toBe("today");
+    expect(dayFilingOf(at(2026, 9, 24, 9), now)).toEqual({
+      key: "today",
+      titleKey: "time.today",
+      start: null,
+    });
   });
 
   it("files a stamp ahead of the clock into 今天 rather than failing", () => {
     // Clock skew or a hand-made directory: it is still the newest thing on
-    // disk, so it reads with the newest bucket.
-    expect(timeBucketOf(at(0, 23 * 3600), now)).toBe("today");
-    expect(timeBucketOf(at(2, 0), now)).toBe("today");
+    // disk, so it reads with the newest day.
+    expect(dayFilingOf(at(2026, 9, 24, 23), now)).toEqual({
+      key: "today",
+      titleKey: "time.today",
+      start: null,
+    });
+    expect(dayFilingOf(at(2026, 9, 30), now)).toEqual({
+      key: "today",
+      titleKey: "time.today",
+      start: null,
+    });
   });
 
   it("files yesterday's calendar day into 昨天", () => {
-    expect(timeBucketOf(at(-1, 0), now)).toBe("yesterday");
-    expect(timeBucketOf(at(-1, 23 * 3600 + 59 * 60), now)).toBe("yesterday");
+    expect(dayFilingOf(at(2026, 9, 23), now)).toEqual({
+      key: "yesterday",
+      titleKey: "time.yesterday",
+      start: null,
+    });
+    expect(dayFilingOf(at(2026, 9, 23, 23), now)).toEqual({
+      key: "yesterday",
+      titleKey: "time.yesterday",
+      start: null,
+    });
   });
 
-  it("files the rest of the week window into 近7天", () => {
-    // Two whole days ago, and the edge exactly seven midnights back: both are
-    // inside "the last seven calendar days" but outside the two named days.
-    expect(timeBucketOf(at(-2, 12 * 3600), now)).toBe("week");
-    expect(timeBucketOf(at(-7, 0), now)).toBe("week");
+  it("gives every older day its own key and its midnight to format", () => {
+    // A dated day carries no i18n key: the render layer formats `start` in
+    // the locale the UI renders in (see `formatDayHeading`).
+    expect(dayFilingOf(at(2026, 9, 22, 12), now)).toEqual({
+      key: "2026-09-22",
+      titleKey: null,
+      start: midnightOf(2026, 9, 22),
+    });
+    expect(dayFilingOf(at(2026, 1, 3), now)).toEqual({
+      key: "2026-01-03",
+      titleKey: null,
+      start: midnightOf(2026, 1, 3),
+    });
+    expect(dayFilingOf(at(2025, 12, 3), now)).toEqual({
+      key: "2025-12-03",
+      titleKey: null,
+      start: midnightOf(2025, 12, 3),
+    });
   });
 
-  it("files the rest of the month window into 近30天", () => {
-    expect(timeBucketOf(at(-8, 0), now)).toBe("month");
-    expect(timeBucketOf(at(-30, 0), now)).toBe("month");
-  });
-
-  it("files anything older into 更早", () => {
-    expect(timeBucketOf(at(-31, 0), now)).toBe("earlier");
-    expect(timeBucketOf(at(-400, 0), now)).toBe("earlier");
-  });
-
-  it("files a missing or unusable stamp into 时间未知", () => {
-    expect(timeBucketOf(undefined, now)).toBe("unknown");
-    expect(timeBucketOf(null, now)).toBe("unknown");
-    expect(timeBucketOf(Number.NaN, now)).toBe("unknown");
+  it("files a missing or unusable stamp nowhere", () => {
+    expect(dayFilingOf(undefined, now)).toBeNull();
+    expect(dayFilingOf(null, now)).toBeNull();
+    expect(dayFilingOf(Number.NaN, now)).toBeNull();
   });
 
   it("uses the real clock by default", () => {
     // Sanity rather than a fixed fact: a stamp now is always today.
-    expect(timeBucketOf(Math.floor(Date.now() / 1000))).toBe("today");
+    expect(dayFilingOf(Math.floor(Date.now() / 1000))?.key).toBe("today");
   });
 });
 
 describe("groupByInstallTime", () => {
   const now = new Date(2026, 8, 24, 15, 30);
-  const midnight = new Date(2026, 8, 24).getTime() / 1000;
   const DAY = 24 * 60 * 60;
+  // Same stamp arithmetic the page's own clocks produce: whole days back from
+  // the fixed afternoon, so every fixture lands squarely inside its day.
+  const at = (daysBack: number) =>
+    Math.floor(now.getTime() / 1000) - daysBack * DAY;
 
   interface Item {
     name: string;
     at: number | null;
   }
-  const item = (name: string, daysOffset: number): Item => ({
+  const item = (name: string, daysBack: number): Item => ({
     name,
-    at: midnight + daysOffset * DAY,
+    at: at(daysBack),
   });
 
-  it("omits empty buckets and keeps the fixed newest-first order", () => {
+  it("gives each day that holds an install its own group, newest first", () => {
     const groups = groupByInstallTime(
-      [item("old", -100), item("fresh", 0), item("weekish", -3)],
+      [item("old", 100), item("fresh", 0), item("recent", 3)],
       (i) => i.at,
       now,
     );
-    expect(groups.map((g) => g.key)).toEqual(["today", "week", "earlier"]);
-    expect(groups.map((g) => g.title)).toEqual([
+    expect(groups.map((g) => g.key)).toEqual([
+      "today",
+      "2026-09-21",
+      "2026-06-16",
+    ]);
+    expect(groups.map((g) => g.titleKey)).toEqual([
       "time.today",
-      "time.week",
-      "time.earlier",
+      null,
+      null,
     ]);
   });
 
-  it("orders the items inside a bucket newest-first", () => {
+  it("pools installs of the same day into one group", () => {
     const groups = groupByInstallTime(
-      [item("a", -45), item("b", -200), item("c", -400)],
+      [item("a", 45), item("b", 45), item("c", 3)],
+      (i) => i.at,
+      now,
+    );
+    expect(groups).toHaveLength(2);
+    expect(groups[0].key).toBe("2026-09-21");
+    expect(groups[0].items.map((i) => i.name)).toEqual(["c"]);
+    expect(groups[1].key).toBe("2026-08-10");
+    expect(groups[1].items.map((i) => i.name)).toEqual(["a", "b"]);
+    // A dated group carries its own midnight for the render layer.
+    expect(groups[1].start).toBe(new Date(2026, 7, 10).getTime());
+  });
+
+  it("orders the items inside a day newest-first", () => {
+    const groups = groupByInstallTime(
+      [
+        { name: "a", at: at(45) - 200 },
+        { name: "b", at: at(45) },
+        { name: "c", at: at(45) - 400 },
+      ],
       (i) => i.at,
       now,
     );
     expect(groups).toHaveLength(1);
-    expect(groups[0].items.map((i) => i.name)).toEqual(["a", "b", "c"]);
-  });
-
-  it("files the whole surface as buckets in display order", () => {
-    const keys = TIME_BUCKETS.map((b) => b.key);
-    expect(keys).toEqual([
-      "today",
-      "yesterday",
-      "week",
-      "month",
-      "earlier",
-      "unknown",
-    ]);
+    expect(groups[0].items.map((i) => i.name)).toEqual(["b", "a", "c"]);
   });
 
   it("keeps equal timestamps in incoming order and never reorders 时间未知", () => {
-    const sameA = item("a", -3);
-    const sameB = item("b", -3);
+    const sameA = item("a", 3);
+    const sameB = item("b", 3);
     const unknowns: Item[] = [
       { name: "u1", at: null },
       { name: "u2", at: null },
@@ -126,11 +161,15 @@ describe("groupByInstallTime", () => {
       (i) => i.at,
       now,
     );
-    const week = groups.find((g) => g.key === "week");
+    const day = groups.find((g) => g.key === "2026-09-21");
     const unknown = groups.find((g) => g.key === "unknown");
-    expect(week?.items.map((i) => i.name)).toEqual(["a", "b"]);
+    // The stampless pool trails every day, under its own header.
+    expect(groups.at(-1)?.key).toBe("unknown");
+    expect(day?.items.map((i) => i.name)).toEqual(["a", "b"]);
     // No timestamp means no provable order: the incoming order is preserved.
     expect(unknown?.items.map((i) => i.name)).toEqual(["u1", "u2"]);
+    expect(unknown?.titleKey).toBe("time.unknown");
+    expect(unknown?.start).toBeNull();
   });
 
   it("returns an empty filing for an empty list", () => {
@@ -138,23 +177,10 @@ describe("groupByInstallTime", () => {
   });
 
   it("does not mutate the input array", () => {
-    const input = [item("old", -100), item("fresh", 0)];
+    const input = [item("old", 100), item("fresh", 0)];
     const snapshot = input.map((i) => i.name);
     groupByInstallTime(input, (i) => i.at, now);
     expect(input.map((i) => i.name)).toEqual(snapshot);
-  });
-
-  it("accepts the bucket keys as a closed union", () => {
-    // Compile-time guard that the renderer can switch on every key.
-    const expected: TimeBucketKey[] = [
-      "today",
-      "yesterday",
-      "week",
-      "month",
-      "earlier",
-      "unknown",
-    ];
-    expect(TIME_BUCKETS.map((b) => b.key)).toEqual(expected);
   });
 });
 

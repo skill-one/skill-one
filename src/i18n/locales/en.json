@@ -2,9 +2,6 @@
   "time": {
     "today": "Today",
     "yesterday": "Yesterday",
-    "week": "Previous 7 days",
-    "month": "Previous 30 days",
-    "earlier": "Earlier",
     "unknown": "Time unknown"
   },
   "facet": {

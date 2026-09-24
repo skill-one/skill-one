@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import type { ParseKeys } from "i18next";
+import type { ParseKeys, TFunction } from "i18next";
+
+import { useAppLocale } from "../../i18n/use-language";
+import type { AppLocale } from "../../lib/i18n-content";
 import { Boxes, Users } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
@@ -27,7 +30,7 @@ import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-dr
 import { SearchResults } from "../explore/search-results";
 import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { Placeholder } from "../../components/placeholder";
-import { errorMessage } from "../../lib/utils";
+import { errorMessage, formatDayHeading } from "../../lib/utils";
 import { buildSearchIndex } from "../../lib/search-index";
 import { setQuery, setScope } from "../../lib/list-view";
 import type { SkillMatched } from "../../components/skill-card";
@@ -117,8 +120,9 @@ function starsOf(group: RepoGroup): number | undefined {
  *   so they pool into one card of their own rather than inventing one — the
  *   same shape, with its bar stating 本地安装 in place of a repository it
  *   would have to make up, and opening the page that lists the pool whole.
- * - **按技能**: one row per install, filed newest-first into relative-time
- *   groups — 今天 / 昨天 / 近7天 / 近30天 / 更早, with installs no
+ * - **按技能**: one row per install, filed newest-first into per-day
+ *   groups — 今天 / 昨天, then one dated group per calendar day (9月22日,
+ *   a day of another year carrying the year), with installs no
  *   timestamp vouches for pooled last under 时间未知 (see
  *   `lib/time-groups`) — so "what did I add lately" reads top to bottom.
  *   Either unit's search re-answers it in relevance order and stands the
@@ -135,8 +139,27 @@ function starsOf(group: RepoGroup): number | undefined {
  * detail drawer, so what a skill looks like never depends on how the list is
  * grouped.
  */
+
+/**
+ * The header a time group renders: a named day (今天 / 昨天 / 时间未知)
+ * speaks its i18n key, a dated day reads as a date in the locale the UI
+ * renders in (9月22日; another year carries the year — see
+ * `formatDayHeading`). `titleKey` null is exactly `start` set, so the pair
+ * never half-applies.
+ */
+function groupHeading<T>(
+  group: TimeGroup<T>,
+  t: TFunction<"translation", undefined>,
+  locale: AppLocale,
+): string {
+  return group.titleKey
+    ? t(group.titleKey as ParseKeys)
+    : formatDayHeading(group.start ?? 0, locale);
+}
+
 export function MySkillsPage() {
   const { t } = useTranslation();
+  const locale = useAppLocale();
   const { data: skills, isLoading, isError, error } = useInstalledSkills();
 
   // Install sources recorded by this app (the provenance ledger), reconciled
@@ -256,12 +279,12 @@ export function MySkillsPage() {
     })).toSorted((a, b) => a.repo.localeCompare(b.repo));
   }, [rows]);
 
-  // The skill unit's filing: the same rows, grouped by when each install
-  // landed (relative-time buckets, newest first — see `lib/time-groups`)
-  // rather than ranked by the store's install count, and scoped to the chosen
-  // domain by membership, since a skill's own classification is what the chip
-  // row counts here. Installs the platform recorded no birth time for pool in
-  // the trailing 时间未知 bucket.
+  // The skill unit's filing: the same rows, grouped by the calendar day each
+  // install landed on (one group per day, newest first — see
+  // `lib/time-groups`) rather than ranked by the store's install count, and
+  // scoped to the chosen domain by membership, since a skill's own
+  // classification is what the chip row counts here. Installs the platform
+  // recorded no birth time for pool in the trailing 时间未知 group.
   const timeGroups = useMemo<TimeGroup<Row>[]>(() => {
     if (unit !== "skill" || isSearching) return [];
     const scoped =
@@ -271,7 +294,7 @@ export function MySkillsPage() {
     return groupByInstallTime(scoped, (row) => row.skill.installedAt);
   }, [unit, rows, isSearching, domain]);
 
-  // The unit's flat order: groups in bucket order, skills newest-first within
+  // The unit's flat order: groups in day order, skills newest-first within
   // each one — the order the rows' ordinals enumerate and the drawer walks. A
   // search is left exactly as the index answered it: relevance is a ranking
   // too, and the better one while a query is live — the same order the store
@@ -318,7 +341,7 @@ export function MySkillsPage() {
 
   // The repository unit's filing: the cards, grouped by when their *newest*
   // install landed — a card reading 今天 has something new in it — ordered
-  // newest-first within every bucket (ties by name, set in `cards`), and
+  // newest-first within every day (ties by name, set in `cards`), and
   // scoped to the chosen domain by membership, since a card rides every domain
   // its rows belong to. Cards whose installs all lack a birth time pool in the
   // trailing 时间未知 bucket. A search leaves the filing to the index.
@@ -464,8 +487,8 @@ export function MySkillsPage() {
               }
             />
           ) : unit === "skill" ? (
-            // The skill unit: one section per relative-time bucket — 今天
-            // first, 时间未知 last — and within a section one row per install,
+            // The skill unit: one section per calendar day — 今天 first,
+            // 时间未知 last — and within a section one row per install,
             // newest first. The same row a repository's own page lists, so a
             // skill reads the same wherever it is found. The sections pace
             // reading and fold on demand from their own header; a fold is
@@ -476,7 +499,7 @@ export function MySkillsPage() {
               {shownSkillGroups.map((group) => (
                 <CollapsibleSection
                   key={group.key}
-                  title={t(group.title as ParseKeys)}
+                  title={groupHeading(group, t, locale)}
                   count={t("state.skillCount", { count: group.items.length })}
                 >
                   <ul className={SKILL_ROW_LIST_CLASS}>
@@ -517,7 +540,7 @@ export function MySkillsPage() {
               {shownRepoGroups.map((group) => (
                 <CollapsibleSection
                   key={group.key}
-                  title={t(group.title as ParseKeys)}
+                  title={groupHeading(group, t, locale)}
                   count={t("state.repoCount", { count: group.items.length })}
                 >
                   <ul className={REPO_LIST_CLASS}>

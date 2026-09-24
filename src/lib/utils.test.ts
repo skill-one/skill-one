@@ -5,6 +5,7 @@ import {
   errorMessage,
   formatCount,
   formatDate,
+  formatDayHeading,
   formatRelativeTime,
 } from "./utils";
 
@@ -33,6 +34,28 @@ describe("formatDate", () => {
   it("returns null for a missing or unparseable stamp", () => {
     expect(formatDate(undefined, "en")).toBeNull();
     expect(formatDate("not a date", "en")).toBeNull();
+  });
+});
+
+describe("formatDayHeading", () => {
+  // Local midnights built from explicit calendar dates, so the assertions hold
+  // in whatever zone the suite runs in.
+  const day = (year: number, month: number, dayOfMonth: number) =>
+    new Date(year, month - 1, dayOfMonth).getTime();
+  // An afternoon in 2026, the year the "same year" cases live in.
+  const now = day(2026, 9, 24) + 15 * 60 * 60 * 1000;
+
+  it("reads a day of the current year as month and day alone", () => {
+    expect(formatDayHeading(day(2026, 9, 22), "zh", now)).toBe("9月22日");
+    expect(formatDayHeading(day(2026, 1, 3), "zh", now)).toBe("1月3日");
+    expect(formatDayHeading(day(2026, 9, 22), "en", now)).toBe("September 22");
+  });
+
+  it("carries the year on a day of another year", () => {
+    expect(formatDayHeading(day(2025, 12, 3), "zh", now)).toBe("2025年12月3日");
+    expect(formatDayHeading(day(2025, 12, 3), "en", now)).toBe(
+      "December 3, 2025",
+    );
   });
 });
 
