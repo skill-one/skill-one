@@ -31,6 +31,11 @@ import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { Button } from "../../components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import { SkillRow, type SkillMatched } from "./skill-row";
 
 /** How many card-shaped placeholders stand in while the index streams in. */
@@ -434,6 +439,28 @@ export function RepoPage({
           <OwnerAvatar owner={owner} className="size-10 shrink-0 text-base" />
         }
         title={repo}
+        // The repository's one way out, as a mark beside the name it opens
+        // rather than a labelled control at the row's far end: the tip (and
+        // the accessible name) carry the word, the way the head's own back
+        // control does.
+        titleAction={
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="在 GitHub 打开"
+                  onClick={() => void openExternal(`https://github.com/${repo}`)}
+                  className="shrink-0 text-muted-foreground"
+                />
+              }
+            >
+              <ExternalLink aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent side="bottom">在 GitHub 打开</TooltipContent>
+          </Tooltip>
+        }
         meta={
           <>
             {group?.stars !== undefined && (
@@ -462,14 +489,6 @@ export function RepoPage({
                 label={repo}
               />
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void openExternal(`https://github.com/${repo}`)}
-              className="shrink-0"
-            >
-              <ExternalLink />在 GitHub 打开
-            </Button>
           </>
         }
       />

@@ -253,7 +253,7 @@ describe("RepoPage", () => {
 
     const head = await screen.findByRole("heading", { name: REPO });
     expect(head).toBeInTheDocument();
-    const figures = head.parentElement as HTMLElement;
+    const figures = head.parentElement?.parentElement as HTMLElement;
     expect(figures).toHaveTextContent(formatCount(STARS));
     expect(figures).toHaveTextContent("3 个 skill");
 
@@ -380,7 +380,7 @@ describe("RepoPage", () => {
 
       // The head counts what the reader has, not what the repository publishes.
       const head = await screen.findByRole("heading", { name: REPO });
-      const figures = head.parentElement as HTMLElement;
+      const figures = head.parentElement?.parentElement as HTMLElement;
       await waitFor(() =>
         expect(figures).toHaveTextContent("2 个已安装 skill"),
       );

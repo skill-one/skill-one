@@ -54,8 +54,30 @@ describe("DrillDownHead", () => {
       title.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     // The figures ride the name's own column, never a line of their own.
-    expect(title.parentElement).toHaveTextContent("12 个 skill");
+    expect(title.parentElement?.parentElement).toHaveTextContent(
+      "12 个 skill",
+    );
     expect(screen.getByTestId("face")).toBeInTheDocument();
+  });
+
+  it("rides a titleAction beside the name, outside the heading", () => {
+    renderHead({ titleAction: <button type="button">打开仓库</button> });
+
+    const title = screen.getByRole("heading", { name: "acme/tools" });
+    const beside = screen.getByRole("button", { name: "打开仓库" });
+
+    // The mark follows the name and leads the trailing action, and it stays
+    // out of the `h1` so the heading keeps the entity's name as its whole
+    // accessible name.
+    expect(
+      title.compareDocumentPosition(beside) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      beside.compareDocumentPosition(
+        screen.getByRole("button", { name: "在 GitHub 打开" }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("keeps 返回 as the mark's name and its tip, not as a word on the row", async () => {

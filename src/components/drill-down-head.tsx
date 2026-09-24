@@ -50,6 +50,7 @@ export function DrillDownHead({
   back,
   avatar,
   title,
+  titleAction,
   meta,
   action,
 }: {
@@ -59,6 +60,10 @@ export function DrillDownHead({
   avatar?: ReactNode;
   /** What the page is about — the entity's own name, and the page's `h1`. */
   title: string;
+  /** A small control that belongs to the name itself — a mark beside it, not
+   * a row of its own. It sits outside the `h1`, so the heading keeps the
+   * entity's name as its whole accessible name. */
+  titleAction?: ReactNode;
   /** The figures the page states about the entity, in the name's own column. */
   meta: ReactNode;
   /** The page's one action, at the trailing edge; absent leaves the slot empty. */
@@ -101,9 +106,12 @@ export function DrillDownHead({
       {avatar}
 
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-lg font-semibold tracking-tight">
-          {title}
-        </h1>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h1 className="truncate text-lg font-semibold tracking-tight">
+            {title}
+          </h1>
+          {titleAction}
+        </div>
         <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground tabular-nums">
           {meta}
         </p>
