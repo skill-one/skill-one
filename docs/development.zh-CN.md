@@ -56,6 +56,7 @@ skill-one/
 │   │   ├── ui/             # shadcn/ui 组件
 │   │   ├── app-header.tsx  # 应用外壳，单行：品牌居中 + 当前列表的控件
 │   │   ├── app-rail.tsx    # 应用导航：窄轨（两个入口、设置）
+│   │   ├── collapsible-section.tsx # 所有分组列表共用的吸顶可折叠分组头
 │   │   ├── drill-down-head.tsx # 列表内页面的头行：返回控件 + 实体身份
 │   │   ├── list-facets.tsx # 当前列表内容区首行的分类 chips（含「更多」浮层）
 │   │   ├── list-toolbar.tsx # 两个列表共用的搜索框（行首）与单位切换（行尾）
@@ -68,7 +69,7 @@ skill-one/
 │   │   ├── advanced-settings-dialog.tsx # 二级设置（CDN 基址 + 数据源）
 │   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
-│   │   ├── explore/        # 商店探索相关页面（skill-row + skill-run / repo-card + repo-page / group-section / live-groups / search-results）
+│   │   ├── explore/        # 商店探索相关页面（skill-row + skill-run / repo-card + repo-page / live-groups / search-results）
 │   │   └── my-skills/      # 我的 Skills 页（agent 头像菜单 / agent-link-settings-dialog 等）
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层

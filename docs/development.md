@@ -56,6 +56,7 @@ skill-one/
 │   │   ├── ui/             # shadcn/ui components
 │   │   ├── app-header.tsx  # The app's chrome, one row: centred brand + the list's controls
 │   │   ├── app-rail.tsx    # The app's navigation: a narrow rail (destinations, settings)
+│   │   ├── collapsible-section.tsx # Sticky, foldable group header shared by every grouped list
 │   │   ├── drill-down-head.tsx # A page inside a list, as its head: the way back + the entity
 │   │   ├── list-facets.tsx # The scope chips opening a list's content (+ the 更多 flyout)
 │   │   ├── list-toolbar.tsx # The search field (row's head) + unit switch (row's tail) both lists share
@@ -68,7 +69,7 @@ skill-one/
 │   │   ├── advanced-settings-dialog.tsx # Second-level settings (CDN base + data source)
 │   │   └── placeholder.tsx # Shared "nothing to show" empty state for list pages
 │   ├── pages/              # Page-level components, grouped per page (with private subcomponents and tests)
-│   │   ├── explore/        # Store explore pages (skill-row + skill-run / repo-card + repo-page / group-section / live-groups / search-results)
+│   │   ├── explore/        # Store explore pages (skill-row + skill-run / repo-card + repo-page / live-groups / search-results)
 │   │   └── my-skills/      # My Skills page (agent avatar menu / agent-link-settings-dialog, etc.)
 │   ├── hooks/              # Custom hooks
 │   ├── lib/                # API / business logic layer

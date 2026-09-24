@@ -2,8 +2,8 @@ import { cn } from "./utils";
 
 /**
  * The podium ink for the first three of a ranked list: gold, silver, bronze —
- * the one thing every ordinal in the app shares, from a group header
- * (`GroupSection`) to a collection page's list row (`SkillRow`).
+ * the one thing every ordinal in the app shares, wherever a ranked list prints
+ * one (a collection page's list row, `SkillRow`).
  */
 export const MEDAL_CLASSES = [
   "text-amber-500 dark:text-amber-400",

@@ -39,7 +39,7 @@ import {
   newestInstallTime,
   type TimeGroup,
 } from "../../lib/time-groups";
-import { SectionHeader } from "../../components/section-header";
+import { CollapsibleSection } from "../../components/collapsible-section";
 import { SkeletonList } from "../../components/skeleton-list";
 import { ListFacets } from "../../components/list-facets";
 import { LinkSuggestionBadge } from "./link-suggestion-badge";
@@ -461,17 +461,18 @@ export function MySkillsPage() {
             // The skill unit: one section per relative-time bucket — 今天
             // first, 时间未知 last — and within a section one row per install,
             // newest first. The same row a repository's own page lists, so a
-            // skill reads the same wherever it is found. The sections only pace
-            // reading: they never hide an install, and the drawer walks every
-            // row in the same flat newest-first order. The section header pins
-            // while its rows scroll past, the same way the search sections do.
+            // skill reads the same wherever it is found. The sections pace
+            // reading and fold on demand from their own header; a fold is
+            // visual only — the drawer still walks every row in the same flat
+            // newest-first order. The header pins while its rows scroll past,
+            // the same way the search sections' do.
             <div className="flex flex-col gap-6">
               {shownSkillGroups.map((group) => (
-                <section key={group.key} aria-label={group.title}>
-                  <SectionHeader
-                    title={group.title}
-                    count={`${group.items.length} 个 skill`}
-                  />
+                <CollapsibleSection
+                  key={group.key}
+                  title={group.title}
+                  count={`${group.items.length} 个 skill`}
+                >
                   <ul className={SKILL_ROW_LIST_CLASS}>
                     {group.items.map((row) => {
                       const key = skillKey(row.skill);
@@ -495,23 +496,24 @@ export function MySkillsPage() {
                       );
                     })}
                   </ul>
-                </section>
+                </CollapsibleSection>
               ))}
             </div>
           ) : (
             // The repository unit: one section per relative-time bucket — a
             // card sits in the bucket its newest install belongs to — and
             // within a section one card per repository, newest-first. The card
-            // itself lists its installs newest-first. The sections only pace
-            // reading, like in the skill unit: they never hide a card, and the
-            // drawer walks every card's rows in the same flat order.
+            // itself lists its installs newest-first. The sections pace
+            // reading and fold on demand, like in the skill unit; a fold is
+            // visual only, and the drawer still walks every card's rows in the
+            // same flat order.
             <div className="flex flex-col gap-6">
               {shownRepoGroups.map((group) => (
-                <section key={group.key} aria-label={group.title}>
-                  <SectionHeader
-                    title={group.title}
-                    count={`${group.items.length} 个仓库`}
-                  />
+                <CollapsibleSection
+                  key={group.key}
+                  title={group.title}
+                  count={`${group.items.length} 个仓库`}
+                >
                   <ul className={REPO_LIST_CLASS}>
                     {group.items.map((card) => (
                       <RepoCard
@@ -553,7 +555,7 @@ export function MySkillsPage() {
                       />
                     ))}
                   </ul>
-                </section>
+                </CollapsibleSection>
               ))}
             </div>
           )}
