@@ -33,7 +33,8 @@ import type { SkillMatched } from "../../components/skill-card";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillRow } from "../explore/skill-row";
-import { SkillRun, buildSkillRuns, byInstalls } from "../explore/skill-run";
+import { groupByInstallTime, type TimeGroup } from "../../lib/time-groups";
+import { SectionHeader } from "../../components/section-header";
 import { SkeletonList } from "../../components/skeleton-list";
 import { ListFacets } from "../../components/list-facets";
 import { LinkSuggestionBadge } from "./link-suggestion-badge";
@@ -105,12 +106,13 @@ function starsOf(group: RepoGroup): number | undefined {
  *   they pool into one card of their own rather than inventing one — the same
  *   shape, with its bar stating 本地安装 in place of a repository it would have
  *   to make up, and opening the page that lists the pool whole.
- * - **按技能**: one row per install, most-installed first (a search re-answers
- *   either unit in relevance order), with the same per-repository run and fold
- *   the store's skill unit uses (`SkillRun`), so a repository that ships several
- *   close-ranked installs does not flood the ranking. Nothing caps the rows
- *   here: this unit is the whole list, so the unit that reads it one skill at a
- *   time reads all of them.
+ * - **按技能**: one row per install, filed newest-first into relative-time
+ *   groups — 今天 / 昨天 / 近7天 / 近30天 / 更早, with installs no
+ *   timestamp vouches for pooled last under 时间未知 (see
+ *   `lib/time-groups`) — so "what did I add lately" reads top to bottom. A
+ *   search re-answers the unit in relevance order and stands the groups down.
+ *   Nothing caps the rows here: this unit is the whole list, so the unit that
+ *   reads it one skill at a time reads all of them.
  *
  * What the page adds to the store's surfaces is what only an installed skill
  * has: enablement — as one group switch on each repository card's bar (a press
@@ -153,9 +155,6 @@ export function MySkillsPage() {
   const search = useListQuery();
   const { unit, scope } = useDestinationView("installed");
   const domain = scope ?? null;
-  // Which folds the reader has opened, by the run head's key: only the skill
-  // unit folds, and a run's head key belongs to the answer that produced it.
-  const [openRuns, setOpenRuns] = useState<Record<string, boolean>>({});
   // Open skill in the shared detail drawer, tracked by identity rather than by
   // index: the provenance and store-entry queries land asynchronously and
   // reshape the list under the reader's pointer, so an index captured at click
@@ -165,9 +164,8 @@ export function MySkillsPage() {
   const query = useDebouncedValue(search).trim();
   const isSearching = query.length > 0;
 
-  // Anything that re-answers the list resets what only described the old one:
-  // the opened folds (a run's head key belongs to the answer that produced it)
-  // and the detail panel (its skill may not be in the new answer at all).
+  // Anything that re-answers the list resets the detail panel: its skill may
+  // not be in the new answer at all.
   //
   // The controls are shared with the other list now, so this watches the answer
   // instead of each control. Switching the unit still lands here as one change,
@@ -178,7 +176,6 @@ export function MySkillsPage() {
     if (shownAnswer.current === answer) return;
     shownAnswer.current = answer;
     setSelectedKey(null);
-    setOpenRuns((open) => (Object.keys(open).length === 0 ? open : {}));
   }, [query, unit, domain]);
 
   // Deep link from the menu bar popover: `/my-skills?skill=<name>` pre-fills
@@ -237,27 +234,45 @@ export function MySkillsPage() {
     );
   }, [rows]);
 
-  // The skill unit's list: the same rows, ranked by install count instead of
-  // filed by source — and scoped to the chosen domain by membership, since a
-  // skill's own classification is what the chip row counts here.
-  //
-  // A search is left exactly as the index answered it: relevance is a ranking
-  // too, and the better one while a query is live — the same order the store
-  // keeps there.
-  const activeRows = useMemo(() => {
-    if (unit !== "skill") return [];
-    if (isSearching) return rows;
+  // The skill unit's filing: the same rows, grouped by when each install
+  // landed (relative-time buckets, newest first — see `lib/time-groups`)
+  // rather than ranked by the store's install count, and scoped to the chosen
+  // domain by membership, since a skill's own classification is what the chip
+  // row counts here. Installs the platform recorded no birth time for pool in
+  // the trailing 时间未知 bucket.
+  const timeGroups = useMemo<TimeGroup<Row>[]>(() => {
+    if (unit !== "skill" || isSearching) return [];
     const scoped =
       domain === null
         ? rows
         : rows.filter((row) => domainsOf(row.skill).includes(domain));
-    return scoped.toSorted(byInstalls);
+    return groupByInstallTime(scoped, (row) => row.skill.installedAt);
   }, [unit, rows, isSearching, domain]);
 
-  // The consecutive skills of one source, gathered into runs so a repository
-  // that ships several close-ranked installs folds all but its best away (see
-  // `SkillRun`).
-  const runs = useMemo(() => buildSkillRuns(activeRows), [activeRows]);
+  // The unit's flat order: groups in bucket order, skills newest-first within
+  // each one — the order the rows' ordinals enumerate and the drawer walks. A
+  // search is left exactly as the index answered it: relevance is a ranking
+  // too, and the better one while a query is live — the same order the store
+  // keeps there.
+  const activeRows = useMemo(
+    () =>
+      unit !== "skill"
+        ? []
+        : isSearching
+          ? rows
+          : timeGroups.flatMap((group) => group.items),
+    [unit, isSearching, rows, timeGroups],
+  );
+
+  // Each row's ordinal in the flat order, so numbering runs continuously
+  // across the groups rather than restarting per bucket.
+  const rowOrdinals = useMemo(() => {
+    const ordinals = new Map<string, number>();
+    activeRows.forEach((row, index) =>
+      ordinals.set(skillKey(row.skill), index),
+    );
+    return ordinals;
+  }, [activeRows]);
 
   // The category chips of the unit on screen: how many *repositories* a domain
   // holds, or how many *skills*. A repository rides every domain its rows belong
@@ -292,10 +307,10 @@ export function MySkillsPage() {
     [cards, isSearching, domain],
   );
 
-  // What the answer on screen is made of: one card per repository, or one run
-  // per source in the skill unit — a run, not a skill, is what the reveal counts
-  // there, because a run is what that unit lists (see `SkillRun`).
-  const itemCount = unit === "skill" ? runs.length : visible.length;
+  // What the answer on screen is made of: one card per repository, or one
+  // time bucket in the skill unit — a bucket, not a skill, is what the reveal
+  // counts there, because a bucket is what that unit lists.
+  const itemCount = unit === "skill" ? timeGroups.length : visible.length;
   // What the 全部 chip counts, in the unit on screen: every repository, or every
   // skill.
   const totalCount = unit === "skill" ? rows.length : cards.length;
@@ -315,11 +330,11 @@ export function MySkillsPage() {
     resetKey: `${unit}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}`,
   });
   const shown = visible.slice(0, renderedCount);
-  const shownRuns = runs.slice(0, renderedCount);
+  const shownGroups = timeGroups.slice(0, renderedCount);
 
   // The drawer walks every skill of the answer on screen, in the order the unit
-  // lists it: a card's preview cap and the skill unit's folds are rendering
-  // choices, not the list's extent.
+  // lists it: a card's preview cap and the groups' progressive reveal are
+  // rendering choices, not the list's extent.
   const detailSkills = useMemo(
     () =>
       unit === "skill"
@@ -411,34 +426,33 @@ export function MySkillsPage() {
           ) : itemCount === 0 ? (
             <Placeholder
               message={
-                unit === "skill"
-                  ? "没有符合条件的 skill"
-                  : "没有符合条件的仓库"
+                unit === "skill" ? "没有符合条件的 skill" : "没有符合条件的仓库"
               }
             />
           ) : unit === "skill" ? (
-            // The skill unit: one row per install, most-installed first (or the
-            // search's relevance order) — the same row a repository's own page
-            // lists, so a skill reads the same wherever it is found. A
-            // repository whose installs land in consecutive ranks folds all but
-            // the best behind one row (`SkillRun`); the fold hides rows, never
-            // the install itself, which the drawer still walks.
-            <ul className={SKILL_ROW_LIST_CLASS}>
-              {shownRuns.map((group) => {
-                const headKey = skillKey(group.items[0].skill);
-                return (
-                  <SkillRun
-                    key={headKey}
-                    group={group}
-                    open={!!openRuns[headKey]}
-                    renderRow={(row, index) => {
+            // The skill unit: one section per relative-time bucket — 今天
+            // first, 时间未知 last — and within a section one row per install,
+            // newest first. The same row a repository's own page lists, so a
+            // skill reads the same wherever it is found. The sections only pace
+            // reading: they never hide an install, and the drawer walks every
+            // row in the same flat newest-first order. The section header pins
+            // while its rows scroll past, the same way the search sections do.
+            <div className="flex flex-col gap-6">
+              {shownGroups.map((group) => (
+                <section key={group.key} aria-label={group.title}>
+                  <SectionHeader
+                    title={group.title}
+                    count={`${group.items.length} 个 skill`}
+                  />
+                  <ul className={SKILL_ROW_LIST_CLASS}>
+                    {group.items.map((row) => {
                       const key = skillKey(row.skill);
                       return (
                         <SkillRow
                           key={key}
                           skill={row.skill}
                           matched={row.matched}
-                          index={index}
+                          index={rowOrdinals.get(key) ?? 0}
                           // An installed list is not a leaderboard: the figures
                           // it does carry come from the store, and the installs
                           // it cannot place at all would leave the podium on
@@ -451,17 +465,11 @@ export function MySkillsPage() {
                           onSelect={() => setSelectedKey(key)}
                         />
                       );
-                    }}
-                    onToggle={() =>
-                      setOpenRuns((prev) => ({
-                        ...prev,
-                        [headKey]: !prev[headKey],
-                      }))
-                    }
-                  />
-                );
-              })}
-            </ul>
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
           ) : (
             <ul className={REPO_LIST_CLASS}>
               {shown.map((card) => (
