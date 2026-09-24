@@ -7,7 +7,8 @@ import {
   type SkillView,
 } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
-import { domainEmoji, domainTooltip } from "../../data/domains";
+import { domainIcon, domainTooltip } from "../../data/domains";
+import { DomainGlyph } from "../../components/domain-glyph";
 import {
   HighlightedText,
   type SkillMatched,
@@ -45,9 +46,9 @@ export type { SkillMatched };
  * page the owner is the same for every row and says nothing, while the domain is
  * the one fact that varies row to row. Pointing at the glyph names the domain,
  * its scope and any other domains the skill belongs to. A skill nothing
- * classified wears the question mark, a box stands for the dataset's own 其他,
- * and both are filled in by `domainEmoji` — the same resolver the card's slot
- * calls, so the two surfaces cannot mark one skill two ways.
+ * classified wears the help icon, mixed shapes stand for the dataset's own
+ * 其他, and both are filled in by `domainIcon` — the same resolver the card's
+ * slot calls, so the two surfaces cannot mark one skill two ways.
  *
  * It is bound to the store like the standalone skill card is: the corner
  * action is the install button. Unlike the card it is a full-width row with
@@ -110,8 +111,8 @@ export function SkillRow({
   const domain = skill.profile?.domain;
   // A live skills.sh row claims nothing its source does not carry — which is
   // no description and no classification at all — so it draws neither the
-  // 暂无描述 placeholder nor the ❓ mark (see `isLiveSkill`); an installed row
-  // the store cannot resolve is a local fact, and keeps both.
+  // 暂无描述 placeholder nor the help mark (see `isLiveSkill`); an installed
+  // row the store cannot resolve is a local fact, and keeps both.
   const live = isLiveSkill(skill);
 
   return (
@@ -150,20 +151,23 @@ export function SkillRow({
 
         {/* The classification leads the row. The tip names the domain, its scope
             and any other domains the skill belongs to — and answers for a skill
-            nothing classified, which wears the question mark here. A live row
+            nothing classified, which wears the help icon here. A live row
             draws nothing in the slot, which stays fixed so the names still line
             up: nothing classified it, but nothing looked either. */}
         {live ? (
           <span
             aria-hidden="true"
-            className="size-7 shrink-0 text-base leading-none"
+            className="size-7 shrink-0 leading-none"
           />
         ) : (
           <Tooltip>
             <TooltipTrigger
               render={
-                <span className="flex size-7 shrink-0 items-center justify-center text-base leading-none">
-                  {domainEmoji(domain)}
+                <span className="flex size-7 shrink-0 items-center justify-center text-muted-foreground">
+                  <DomainGlyph
+                    icon={domainIcon(domain)}
+                    className="size-4"
+                  />
                 </span>
               }
             />

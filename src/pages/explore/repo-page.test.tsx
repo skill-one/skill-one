@@ -212,15 +212,15 @@ describe("RepoPage", () => {
     const redis = await screen.findByRole("button", {
       name: "查看 redis 详情",
     });
-    expect(within(redis).getByText("💻")).toBeInTheDocument();
+    expect(redis.querySelector("svg.lucide-code")).toBeInTheDocument();
 
-    // 其他 is an answer and wears the box; a skill nothing classified is a
-    // question and wears the question mark. Both fill the same column, so the
+    // 其他 is an answer and wears the mixed shapes; a skill nothing classified
+    // is a question and wears the help icon. Both fill the same column, so the
     // names still line up either way.
     const stray = screen.getByRole("button", { name: "查看 stray 详情" });
-    expect(within(stray).getByText("📦")).toBeInTheDocument();
+    expect(stray.querySelector("svg.lucide-shapes")).toBeInTheDocument();
     const orphan = screen.getByRole("button", { name: "查看 orphan 详情" });
-    expect(within(orphan).getByText("❓")).toBeInTheDocument();
+    expect(orphan.querySelector("svg.lucide-circle-help")).toBeInTheDocument();
   });
 
   it("reveals more rows as the reader scrolls", async () => {

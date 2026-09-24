@@ -58,7 +58,7 @@ export function ListFacets({
     <DomainChip
       key={facet.key}
       selected={selected === facet.key}
-      emoji={domainMeta(facet.key)?.emoji}
+      icon={domainMeta(facet.key)?.icon}
       count={facet.count}
       expanded={expanded}
       onClick={onPick ?? (() => onSelect(facet.key))}

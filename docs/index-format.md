@@ -28,11 +28,11 @@ One JSON object per line, sorted by installs descending:
 | `description` | `string \| null` | From the SKILL.md frontmatter (empty when missing) |
 | `hash` | `string \| null` | SHA-256 of the skill's files. Changes when any upstream file changes — i.e. **which version of the skill the snapshot describes**. |
 | `fetchedAt` | `string` | When the scraper first fetched this content version (ISO, UTC): how long the *current* content has been published, not when the skill first appeared |
-| `domain` | `string \| string[]` | The classification, drawn from a fixed English enum (`development`, `data-analysis`, …, `other`). The `dist` snapshot publishes the single best-fit key as a bare string; the field has also carried a 1–3 key list, best fit first, so the app reads either shape and keeps a list. [data/domains.ts](../src/data/domains.ts) maps a key to its display label and emoji. Absent for skills the generator has not reached. |
+| `domain` | `string \| string[]` | The classification, drawn from a fixed English enum (`development`, `data-analysis`, …, `other`). The `dist` snapshot publishes the single best-fit key as a bare string; the field has also carried a 1–3 key list, best fit first, so the app reads either shape and keeps a list. [data/domains.ts](../src/data/domains.ts) maps a key to its display label and monochrome lucide icon. Absent for skills the generator has not reached. |
 
 The classification rides the index row, so one parsed line yields a fully decorated skill — there is no second source to merge in afterwards. A skill may legitimately belong to several domains, which is why grouping and filtering match by membership rather than by an exact value.
 
-A *missing* classification is a third state, not 其他: the enum's `other` is the dataset's answer that no domain fits, while a skill the generator never reached has no answer at all. The app marks the two apart — 其他 wears a box (📦), the unanswered one a question mark (❓, 未分类) — and the filter bar keeps a chip for each, so a scope that promises 其他 never silently includes the skills nobody looked at.
+A *missing* classification is a third state, not 其他: the enum's `other` is the dataset's answer that no domain fits, while a skill the generator never reached has no answer at all. The app marks the two apart — 其他 wears a mixed-shapes icon, the unanswered one a help icon (未分类) — and the filter bar keeps a chip for each, so a scope that promises 其他 never silently includes the skills nobody looked at.
 
 GitHub star counts are **not** carried by the skill rows: they live in the `upstream/repos.jsonl` sidecar below and are joined in at parse time.
 

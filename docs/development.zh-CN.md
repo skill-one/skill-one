@@ -74,7 +74,7 @@ skill-one/
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层
 │   ├── types/              # 类型定义
-│   ├── data/               # 静态数据（分类 key → 标签/emoji 映射）
+│   ├── data/               # 静态数据（分类 key → 标签/单色图标映射）
 │   ├── test/               # 测试工具与 setup
 │   ├── App.tsx             # 路由与布局
 │   └── main.tsx            # 入口

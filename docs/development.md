@@ -74,7 +74,7 @@ skill-one/
 │   ├── hooks/              # Custom hooks
 │   ├── lib/                # API / business logic layer
 │   ├── types/              # Type definitions
-│   ├── data/               # Static data (domain key → label/emoji taxonomy)
+│   ├── data/               # Static data (domain key → label/monochrome icon taxonomy)
 │   ├── test/               # Test utilities and setup
 │   ├── App.tsx             # Routing and layout
 │   └── main.tsx            # Entry point

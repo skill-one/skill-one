@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
@@ -14,23 +15,24 @@ import {
  * list, so both surfaces' filter bar is the same control.
  *
  * At rest a chip shows its glyph and its count, so the bar reads as a line of
- * figures over emoji and the reader can weigh the domains without pressing any
- * of them. Pointing at one names it in a tip — nothing in the row moves; the
- * label only unfolds once the chip is pressed, and stays open so the current
- * scope is always named. The label is clipped rather than unmounted, so the
- * chip's accessible name is complete with no pointer. 全部 carries no glyph, so
- * it keeps its label at rest (and carries no tip).
+ * figures over monochrome marks and the reader can weigh the domains without
+ * pressing any of them. Pointing at one names it in a tip — nothing in the row
+ * moves; the label only unfolds once the chip is pressed, and stays open so the
+ * current scope is always named. The label is clipped rather than unmounted, so
+ * the chip's accessible name is complete with no pointer. 全部 carries no
+ * glyph, so it keeps its label at rest (and carries no tip).
  */
 export function DomainChip({
   selected,
-  emoji,
+  icon: Icon,
   count,
   expanded = false,
   onClick,
   children,
 }: {
   selected: boolean;
-  emoji?: string;
+  /** The domain's monochrome mark; absent (全部) leaves the label to stand for it. */
+  icon?: LucideIcon;
   count?: number;
   /** Keep the label visible at rest, for a chip with no glyph to stand for it. */
   expanded?: boolean;
@@ -49,11 +51,7 @@ export function DomainChip({
       {/* One child, so the button's own gap never widens the collapsed chip:
           the glyph and the count meet the padding symmetrically. */}
       <span className="flex items-center">
-        {emoji && (
-          <span aria-hidden="true" className="text-[13px] leading-none">
-            {emoji}
-          </span>
-        )}
+        {Icon && <Icon aria-hidden className="size-3.5" />}
         <span
           className={cn(
             "grid items-center transition-[grid-template-columns] duration-150",

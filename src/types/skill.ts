@@ -9,7 +9,7 @@ export interface SkillProfile {
   /**
    * The dataset's classification: 1–3 domain keys, best fit first. The keys
    * are the generator's English enum (`development`, `data-analysis`, …);
-   * `data/domains.ts` maps a key to its display label and emoji. A skill may
+   * `data/domains.ts` maps a key to its display label and icon. A skill may
    * legitimately belong to several, so grouping and filtering match by
    * membership.
    */
