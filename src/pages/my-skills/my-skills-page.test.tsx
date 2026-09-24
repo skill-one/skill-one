@@ -41,7 +41,8 @@ const { searchSkills, lookupSkills, getGroups, registrySnapshot } = vi.hoisted(
     // One stable object: the page reads it through useSyncExternalStore, which
     // treats a fresh snapshot on every call as an infinite render loop.
     registrySnapshot: { ready: true, epoch: 1 },
-}));
+  }),
+);
 vi.mock("../../lib/registry/client", () => ({
   searchSkills,
   lookupSkills,
@@ -826,12 +827,13 @@ describe("MySkillsPage", () => {
   });
 
   // The skill unit: the store's second reading of the same installs — one row
-  // per skill rather than one card per source. The page's own mocks serve it.
+  // per skill rather than one card per source, filed newest-first into
+  // relative-time groups. The page's own mocks serve it.
 
-  /** The four installs every run test gathers into one source. */
+  /** The four installs the one-source tests gather into one source. */
   const RUN_SOURCE = ["pdf", "docx", "pptx", "mcp-builder"];
 
-  /** Records one source for every name of the run. */
+  /** Records one source for every name of the set. */
   function seedRunSource(repo = "acme/tools") {
     seedMockProvenance(
       Object.fromEntries(
@@ -883,66 +885,81 @@ describe("MySkillsPage", () => {
     expect(screen.getAllByRole("switch")).toHaveLength(6);
   });
 
-  it("keeps the pool of source-less installs out of a run", async () => {
+  it("files the skill unit's installs into relative-time groups, newest first", async () => {
     const user = userEvent.setup();
-    // Every install is a tool install: they share the empty source, and a run
-    // *means* "these come from one repository" — folding them would have to
-    // invent the one thing they do not have.
-    renderPage();
+    // Every install is a tool install here; their mock ages spread across the
+    // whole bucket ladder (0 / 3 / 12 / 45 / 200 / 400 days ago).
+    const { container } = renderPage();
     await screen.findByText("pdf");
 
     await user.click(screen.getByRole("button", { name: "按技能" }));
-
     await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
+
+    // Only the buckets the ages land in render, in the fixed newest-first
+    // order: 昨天 holds nothing, so it does not appear.
+    const sections = [
+      ...container.querySelectorAll("section[aria-label]"),
+    ] as HTMLElement[];
+    expect(sections.map((node) => node.getAttribute("aria-label"))).toEqual([
+      "今天",
+      "近7天",
+      "近30天",
+      "更早",
+    ]);
+
+    // One row in its own bucket: pdf landed today, docx three days ago, pptx
+    // twelve.
+    expect(
+      within(sections[0]).getByRole("button", { name: "查看 pdf 详情" }),
+    ).toBeInTheDocument();
+    expect(
+      within(sections[1]).getByRole("button", {
+        name: "查看 docx 详情",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(sections[2]).getByRole("button", {
+        name: "查看 pptx 详情",
+      }),
+    ).toBeInTheDocument();
+
+    // Inside 更早 the newest of the old installs leads: 45, then 200, then
+    // 400 days ago.
+    expect(
+      within(sections[3])
+        .getAllByRole("button", { name: /查看 .+ 详情/ })
+        .map((node) => node.getAttribute("aria-label")),
+    ).toEqual([
+      "查看 mcp-builder 详情",
+      "查看 code-review 详情",
+      "查看 frontend-design 详情",
+    ]);
+
+    // Time groups replace the store-style run fold: no row hides behind one.
     expect(
       screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
     ).toBeNull();
   });
 
-  it("folds a repository's run of four installs, stating the run's own figure", async () => {
+  it("files one source's several installs by time instead of folding them", async () => {
     const user = userEvent.setup();
-    // Four installs share one source the registry still lists: the store's own
-    // skill unit would fold them, and so does this one.
+    // Four installs share one source the registry still lists: where the old
+    // install-count ranking folded them behind one row, time filing lists every
+    // one — they simply land in different buckets.
     seedRunSource();
     seedStoreEntries({ pdf: 30, docx: 20, pptx: 10, "mcp-builder": 5 });
     renderPage();
 
     await user.click(await screen.findByRole("button", { name: "按技能" }));
 
-    // The run leads with its most-installed skill and states the other three in
-    // one line, with the run's own combined figure (30 + 20 + 10 + 5) — not the
-    // whole list's and not another run's.
-    const fold = await screen.findByRole("button", {
-      name: /还有 3 个来自 acme\/tools/,
-    });
-    expect(fold).toHaveTextContent("共 65");
-    expect(fold).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("button", { name: "查看 docx 详情" })).toBeNull();
-
-    // A press unfolds them in place, in rank order.
-    await user.click(fold);
+    // Every install keeps its own row, across the buckets...
     expect(
-      await screen.findByRole("button", { name: "查看 docx 详情" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+      await screen.findAllByRole("button", { name: /查看 .+ 详情/ }),
     ).toHaveLength(6);
-  });
-
-  it("states no figure for a run the registry cannot place", async () => {
-    const user = userEvent.setup();
-    // The same run, with no store entry behind it (a fork the index dropped):
-    // its rows carry no install figure, so the fold has none to state either —
-    // a fabricated 共 0 would contradict the rows above it.
-    seedRunSource();
-    renderPage();
-
-    await user.click(await screen.findByRole("button", { name: "按技能" }));
-
-    const fold = await screen.findByRole("button", {
-      name: /还有 3 个来自 acme\/tools/,
-    });
-    expect(fold).not.toHaveTextContent("共");
+    // ...and no run fold survives from the store-style ranking.
+    expect(
+      screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
+    ).toBeNull();
   });
 
   it("counts skills rather than repositories in the skill unit's chips", async () => {
@@ -1012,13 +1029,14 @@ describe("MySkillsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("walks the skill unit's own order in the detail drawer", async () => {
+  it("walks the skill unit's newest-first time order in the detail drawer", async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByRole("button", { name: "按技能" }));
 
-    // The pool rows keep the unit's own order (equal figures, so source and
-    // name decide): code-review first, docx second.
+    // The walk follows the time filing: inside 更早 the order is mcp-builder
+    // (45 days), code-review (200), frontend-design (400) — so one press from
+    // code-review lands on frontend-design, never back on a newer install.
     await user.click(
       await screen.findByRole("button", { name: "查看 code-review 详情" }),
     );
@@ -1026,7 +1044,9 @@ describe("MySkillsPage", () => {
     expect(within(dialog).getByText("code-review")).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(await within(dialog).findByText("docx")).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText("frontend-design"),
+    ).toBeInTheDocument();
   });
 
   it("stands the category bar down while searching", async () => {
