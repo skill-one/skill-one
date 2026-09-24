@@ -826,6 +826,115 @@ describe("MySkillsPage", () => {
     );
   });
 
+  // The repository unit (the default): one card per source, each card filed
+  // into the relative-time bucket its newest install belongs to.
+
+  it("files the repository unit's cards by each card's newest install", async () => {
+    // Mock install ages: pdf today, docx 3 days, pptx 12, mcp-builder 45,
+    // code-review 200, frontend-design 400. The ledgers split them three ways:
+    // a one-skill repo fresh today, the pool (docx/pptx, newest 3 days), and a
+    // repo whose skills are all old (45+ days).
+    seedMockProvenance({
+      pdf: { repo: "zoo/new", slug: "pdf" },
+      "mcp-builder": { repo: "acme/tools", slug: "mcp-builder" },
+      "code-review": { repo: "acme/tools", slug: "code-review" },
+      "frontend-design": { repo: "acme/tools", slug: "frontend-design" },
+    });
+    const { container } = renderPage();
+
+    await screen.findByText("zoo/new");
+    // The three cards land in three buckets, newest first — the middle name of
+    // each bucket names one repository, never a skill count.
+    const sections = [
+      ...container.querySelectorAll("section[aria-label]"),
+    ] as HTMLElement[];
+    expect(sections.map((node) => node.getAttribute("aria-label"))).toEqual([
+      "今天",
+      "近7天",
+      "更早",
+    ]);
+
+    expect(
+      within(sections[0]).getByRole("link", {
+        name: "查看仓库 zoo/new，1 个 skill",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(sections[1]).getByRole("link", {
+        name: "查看本地安装，2 个 skill",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(sections[2]).getByRole("link", {
+        name: "查看仓库 acme/tools，3 个 skill",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("files a card by its newest install and lists that install first", async () => {
+    // One repository holds both a fresh install (pdf, today) and an ancient one
+    // (frontend-design, 400 days): the card reads 今天, not 更早 — and the
+    // fresh install leads the card's preview instead of hiding past the cap.
+    seedMockProvenance({
+      pdf: { repo: "acme/tools", slug: "pdf" },
+      "frontend-design": { repo: "acme/tools", slug: "frontend-design" },
+    });
+    const { container } = renderPage();
+
+    await screen.findByText("acme/tools");
+    const sections = [
+      ...container.querySelectorAll("section[aria-label]"),
+    ] as HTMLElement[];
+    // The pool (newest docx, 3 days) is the other, older bucket.
+    expect(sections.map((node) => node.getAttribute("aria-label"))).toEqual([
+      "今天",
+      "近7天",
+    ]);
+
+    const today = sections[0];
+    expect(
+      within(today).getByRole("link", {
+        name: "查看仓库 acme/tools，2 个 skill",
+      }),
+    ).toBeInTheDocument();
+    // Inside the card, newest first.
+    expect(
+      within(today)
+        .getAllByRole("button", { name: /查看 .+ 详情/ })
+        .map((node) => node.getAttribute("aria-label")),
+    ).toEqual(["查看 pdf 详情", "查看 frontend-design 详情"]);
+  });
+
+  it("walks the drawer across the time buckets in newest-first order", async () => {
+    const user = userEvent.setup();
+    seedMockProvenance({
+      pdf: { repo: "zoo/new", slug: "pdf" },
+      "mcp-builder": { repo: "acme/tools", slug: "mcp-builder" },
+      "code-review": { repo: "acme/tools", slug: "code-review" },
+      "frontend-design": { repo: "acme/tools", slug: "frontend-design" },
+    });
+    renderPage();
+
+    await screen.findByText("zoo/new");
+    // pdf is the only row of today's card; the next thing the walk reaches is
+    // the pool's own newest row (docx, 近7天) — the bucket boundary does not
+    // interrupt the walk.
+    const pdfButton = await screen.findByRole("button", {
+      name: "查看 pdf 详情",
+    });
+    await user.click(pdfButton);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("pdf")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    // The drawer now shows the pool's own newest install (docx), identified by
+    // its description the same way the other drawer test names it.
+    expect(
+      await within(dialog).findByText("以编程方式创建和编辑 Word 文档。"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("docx")).toBeInTheDocument();
+  });
+
   // The skill unit: the store's second reading of the same installs — one row
   // per skill rather than one card per source, filed newest-first into
   // relative-time groups. The page's own mocks serve it.

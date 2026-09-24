@@ -33,7 +33,12 @@ import type { SkillMatched } from "../../components/skill-card";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillRow } from "../explore/skill-row";
-import { groupByInstallTime, type TimeGroup } from "../../lib/time-groups";
+import {
+  groupByInstallTime,
+  compareByInstalledTime,
+  newestInstallTime,
+  type TimeGroup,
+} from "../../lib/time-groups";
 import { SectionHeader } from "../../components/section-header";
 import { SkeletonList } from "../../components/skeleton-list";
 import { ListFacets } from "../../components/list-facets";
@@ -88,31 +93,36 @@ interface RepoGroup {
 /**
  * The stars a card's bar shows: the registry's figure, and only when the card's
  * source resolved to a store entry. An install the registry cannot place has no
- * figure to state, which is not the same as a figure of zero.
+ * figure to state, which is not the same as a figure of zero. The figure is
+ * read from whichever row resolved — the card files by its newest install, so
+ * that row is no longer necessarily the one the registry placed.
  */
 function starsOf(group: RepoGroup): number | undefined {
-  const first = group.items[0]?.skill;
-  return first?.storeBacked ? first.stars : undefined;
+  const backed = group.items.find((row) => row.skill.storeBacked);
+  return backed ? backed.skill.stars : undefined;
 }
 
 /**
  * The installed list — the management counterpart of the store's 全部 page, in
  * the same two units, switched on the toolbar exactly as the store's are:
  *
- * - **按仓库**: one card per source repository, listing that repository's
- *   installed skills (up to the preview size set in Settings, 5 by default) and
- *   signed off by the bar that names the repository and opens its page.
- *   Installs no recorded source vouches for have no repository to belong to, so
- *   they pool into one card of their own rather than inventing one — the same
- *   shape, with its bar stating 本地安装 in place of a repository it would have
- *   to make up, and opening the page that lists the pool whole.
+ * - **按仓库**: one card per source repository, filed newest-first into the
+ *   same relative-time groups as the skill unit — a repository sits in the
+ *   bucket its *newest* install belongs to, so a card reading 今天 has
+ *   something new in it — and listing that repository's installed skills in
+ *   the same newest-first order (up to the preview size set in Settings, 5 by
+ *   default; that newest install is therefore always inside the preview).
+ *   Installs no recorded source vouches for have no repository to belong to,
+ *   so they pool into one card of their own rather than inventing one — the
+ *   same shape, with its bar stating 本地安装 in place of a repository it
+ *   would have to make up, and opening the page that lists the pool whole.
  * - **按技能**: one row per install, filed newest-first into relative-time
  *   groups — 今天 / 昨天 / 近7天 / 近30天 / 更早, with installs no
  *   timestamp vouches for pooled last under 时间未知 (see
- *   `lib/time-groups`) — so "what did I add lately" reads top to bottom. A
- *   search re-answers the unit in relevance order and stands the groups down.
- *   Nothing caps the rows here: this unit is the whole list, so the unit that
- *   reads it one skill at a time reads all of them.
+ *   `lib/time-groups`) — so "what did I add lately" reads top to bottom.
+ *   Either unit's search re-answers it in relevance order and stands the
+ *   groups down. Nothing caps the skill rows: that unit is the whole list, so
+ *   the unit that reads it one skill at a time reads all of them.
  *
  * What the page adds to the store's surfaces is what only an installed skill
  * has: enablement — as one group switch on each repository card's bar (a press
@@ -219,9 +229,13 @@ export function MySkillsPage() {
     }));
   }, [hits, list, linked, storeEntries, suggestions]);
 
-  // One card per source repository, most-populated first (ties by name); the
-  // skills no recorded source vouches for pool into the one card that stands
-  // for them, so every installed skill still lives somewhere.
+  // One card per source repository: the skills no recorded source vouches for
+  // pool into the one card that stands for them, so every installed skill still
+  // lives somewhere. Inside each card the installs read newest-first (the same
+  // order the time filing below puts the cards in, and the order the card's
+  // preview caps, so the newest install is the first row rather than hidden
+  // past the cap), and the cards themselves are name-ordered here purely as
+  // the stable base the time filing ties break against.
   const cards = useMemo<RepoGroup[]>(() => {
     const byRepo = new Map<string, Row[]>();
     for (const row of rows) {
@@ -229,9 +243,15 @@ export function MySkillsPage() {
       if (bucket) bucket.push(row);
       else byRepo.set(row.skill.repo, [row]);
     }
-    return Array.from(byRepo, ([repo, items]) => ({ repo, items })).toSorted(
-      (a, b) => b.items.length - a.items.length || a.repo.localeCompare(b.repo),
-    );
+    return Array.from(byRepo, ([repo, items]) => ({
+      repo,
+      items: items.toSorted(
+        compareByInstalledTime(
+          (row) => row.skill.installedAt,
+          (a, b) => a.skill.name.localeCompare(b.skill.name),
+        ),
+      ),
+    })).toSorted((a, b) => a.repo.localeCompare(b.repo));
   }, [rows]);
 
   // The skill unit's filing: the same rows, grouped by when each install
@@ -294,23 +314,29 @@ export function MySkillsPage() {
     });
   }, [unit, rows, cards]);
 
-  // The list on screen. The domain scope is a browse control: a search
-  // re-orders the list by relevance and ignores it (the chip row stands down),
-  // the same division of labour the store's filter has.
-  const visible = useMemo(
-    () =>
-      isSearching || domain === null
+  // The repository unit's filing: the cards, grouped by when their *newest*
+  // install landed — a card reading 今天 has something new in it — ordered
+  // newest-first within every bucket (ties by name, set in `cards`), and
+  // scoped to the chosen domain by membership, since a card rides every domain
+  // its rows belong to. Cards whose installs all lack a birth time pool in the
+  // trailing 时间未知 bucket. A search leaves the filing to the index.
+  const repoGroups = useMemo<TimeGroup<RepoGroup>[]>(() => {
+    if (unit !== "repo" || isSearching) return [];
+    const scoped =
+      domain === null
         ? cards
         : cards.filter((card) =>
             card.items.some((row) => domainsOf(row.skill).includes(domain)),
-          ),
-    [cards, isSearching, domain],
-  );
+          );
+    return groupByInstallTime(scoped, (card) =>
+      newestInstallTime(card.items, (row) => row.skill.installedAt),
+    );
+  }, [unit, isSearching, cards, domain]);
 
-  // What the answer on screen is made of: one card per repository, or one
-  // time bucket in the skill unit — a bucket, not a skill, is what the reveal
-  // counts there, because a bucket is what that unit lists.
-  const itemCount = unit === "skill" ? timeGroups.length : visible.length;
+  // What the answer on screen is made of: one time bucket in either unit —
+  // a bucket, not a card or skill, is what the reveal counts, because a bucket
+  // is what both units list.
+  const itemCount = unit === "skill" ? timeGroups.length : repoGroups.length;
   // What the 全部 chip counts, in the unit on screen: every repository, or every
   // skill.
   const totalCount = unit === "skill" ? rows.length : cards.length;
@@ -329,8 +355,8 @@ export function MySkillsPage() {
     step: CARD_CHUNK,
     resetKey: `${unit}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}`,
   });
-  const shown = visible.slice(0, renderedCount);
-  const shownGroups = timeGroups.slice(0, renderedCount);
+  const shownSkillGroups = timeGroups.slice(0, renderedCount);
+  const shownRepoGroups = repoGroups.slice(0, renderedCount);
 
   // The drawer walks every skill of the answer on screen, in the order the unit
   // lists it: a card's preview cap and the groups' progressive reveal are
@@ -339,8 +365,10 @@ export function MySkillsPage() {
     () =>
       unit === "skill"
         ? activeRows.map((row) => row.skill)
-        : visible.flatMap((card) => card.items.map((row) => row.skill)),
-    [unit, activeRows, visible],
+        : repoGroups.flatMap((group) =>
+            group.items.flatMap((card) => card.items.map((row) => row.skill)),
+          ),
+    [unit, activeRows, repoGroups],
   );
 
   // The migration affordance trails a row in either unit, and it is only
@@ -438,7 +466,7 @@ export function MySkillsPage() {
             // row in the same flat newest-first order. The section header pins
             // while its rows scroll past, the same way the search sections do.
             <div className="flex flex-col gap-6">
-              {shownGroups.map((group) => (
+              {shownSkillGroups.map((group) => (
                 <section key={group.key} aria-label={group.title}>
                   <SectionHeader
                     title={group.title}
@@ -471,46 +499,63 @@ export function MySkillsPage() {
               ))}
             </div>
           ) : (
-            <ul className={REPO_LIST_CLASS}>
-              {shown.map((card) => (
-                <RepoCard
-                  key={card.repo || LOCAL_POOL_KEY}
-                  repo={card.repo}
-                  stars={starsOf(card)}
-                  skills={card.items.map((row) => ({
-                    skill: row.skill,
-                    matched: row.matched,
-                    muted: !row.enabled,
-                    extra: rowExtra(row),
-                  }))}
-                  maxSkills={maxSkills}
-                  hasQuery={isSearching}
-                  selected={selectedKey}
-                  onOpenSkill={setSelectedKey}
-                  // A repository card's bar opens the repository as this list
-                  // reads it — the installs on disk, with the rest of the
-                  // catalogue behind one control; the pool's bar opens the
-                  // installed list's own pool page, having no repository to
-                  // open.
-                  href={
-                    card.repo
-                      ? `${REPO_PAGE_PATH}${card.repo}`
-                      : LOCAL_POOL_PATH
-                  }
-                  // Card rows carry no per-skill switch: enablement is one
-                  // group action on the bar (below), and an individual switch
-                  // waits on the page the bar opens. The disabled rows stay
-                  // dimmed so the group switch's state has its evidence.
-                  rowActions={false}
-                  footerAction={
-                    <RepoEnableSwitch
-                      names={card.items.map((row) => row.skill.name)}
-                      label={card.repo || LOCAL_SOURCE_LABEL}
-                    />
-                  }
-                />
+            // The repository unit: one section per relative-time bucket — a
+            // card sits in the bucket its newest install belongs to — and
+            // within a section one card per repository, newest-first. The card
+            // itself lists its installs newest-first. The sections only pace
+            // reading, like in the skill unit: they never hide a card, and the
+            // drawer walks every card's rows in the same flat order.
+            <div className="flex flex-col gap-6">
+              {shownRepoGroups.map((group) => (
+                <section key={group.key} aria-label={group.title}>
+                  <SectionHeader
+                    title={group.title}
+                    count={`${group.items.length} 个仓库`}
+                  />
+                  <ul className={REPO_LIST_CLASS}>
+                    {group.items.map((card) => (
+                      <RepoCard
+                        key={card.repo || LOCAL_POOL_KEY}
+                        repo={card.repo}
+                        stars={starsOf(card)}
+                        skills={card.items.map((row) => ({
+                          skill: row.skill,
+                          matched: row.matched,
+                          muted: !row.enabled,
+                          extra: rowExtra(row),
+                        }))}
+                        maxSkills={maxSkills}
+                        hasQuery={isSearching}
+                        selected={selectedKey}
+                        onOpenSkill={setSelectedKey}
+                        // A repository card's bar opens the repository as this
+                        // list reads it — the installs on disk, with the rest
+                        // of the catalogue behind one control; the pool's bar
+                        // opens the installed list's own pool page, having no
+                        // repository to open.
+                        href={
+                          card.repo
+                            ? `${REPO_PAGE_PATH}${card.repo}`
+                            : LOCAL_POOL_PATH
+                        }
+                        // Card rows carry no per-skill switch: enablement is
+                        // one group action on the bar (below), and an
+                        // individual switch waits on the page the bar opens.
+                        // The disabled rows stay dimmed so the group switch's
+                        // state has its evidence.
+                        rowActions={false}
+                        footerAction={
+                          <RepoEnableSwitch
+                            names={card.items.map((row) => row.skill.name)}
+                            label={card.repo || LOCAL_SOURCE_LABEL}
+                          />
+                        }
+                      />
+                    ))}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
           )}
           {/* The sentinel ends the rendered run: while it is on screen the
               observer above extends the run, so scrolling down keeps revealing

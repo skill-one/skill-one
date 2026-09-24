@@ -1,13 +1,15 @@
 /**
- * Relative-time filing for the installed list's skill unit.
+ * Relative-time filing for the installed list.
  *
  * Every installed skill carries when its directory landed on disk
- * (`SkillView.installedAt`, Unix seconds). The skill unit files that fact into
+ * (`SkillView.installedAt`, Unix seconds). Both units file that fact into
  * fixed, non-overlapping buckets a reader scans newest-first — 今天, 昨天,
  * 近7天 (the current week window minus the two named days), 近30天, 更早 —
  * plus one trailing bucket, 时间未知, for installs the platform recorded no
  * birth time for (some Linux filesystems) or that another tool dropped on disk
- * without one.
+ * without one. The skill unit files the skills themselves; the repository unit
+ * files each repository by the newest install it contains, and lists the
+ * skills inside it in the same newest-first order.
  *
  * The boundaries are calendar-day based in the reader's own time zone, so the
  * labels say what a clock on the wall says rather than "the last 86 400 000
@@ -81,6 +83,47 @@ export interface TimeGroup<T> {
 }
 
 /**
+ * Newest-first comparator over anything carrying an install timestamp.
+ *
+ * Time is the whole of the ordering: a newer timestamp always wins, and an
+ * item with no timestamp cannot claim any position the filesystem proves, so
+ * it settles last. Equal stamps — which include every pair in 时间未知 —
+ * defer to `tieBreak` (a name, a key) so ties stay deterministic without the
+ * tie-break ever outranking time.
+ */
+export function compareByInstalledTime<T>(
+  timeOf: (item: T) => number | null | undefined,
+  tieBreak: (a: T, b: T) => number = () => 0,
+): (a: T, b: T) => number {
+  return (a, b) => {
+    const ta = timeOf(a);
+    const tb = timeOf(b);
+    if (ta == null && tb == null) return tieBreak(a, b);
+    if (ta == null) return 1;
+    if (tb == null) return -1;
+    if (tb !== ta) return tb - ta;
+    return tieBreak(a, b);
+  };
+}
+
+/**
+ * The newest timestamp among `items` (Unix seconds), or `null` when none of
+ * them carries one — the timestamp a repository files under.
+ */
+export function newestInstallTime<T>(
+  items: readonly T[],
+  timeOf: (item: T) => number | null | undefined,
+): number | null {
+  let newest: number | null = null;
+  for (const item of items) {
+    const t = timeOf(item);
+    if (t == null) continue;
+    if (newest == null || t > newest) newest = t;
+  }
+  return newest;
+}
+
+/**
  * File items into the relative-time buckets, most recent first. Items inside
  * every timestamped bucket are ordered newest-first too; equal timestamps keep
  * their incoming order (the sort is stable), and the 时间未知 bucket is never
@@ -106,7 +149,7 @@ export function groupByInstallTime<T>(
     const bucket = byKey.get(key);
     if (!bucket) continue;
     if (key !== "unknown") {
-      bucket.sort((a, b) => (timeOf(b) ?? 0) - (timeOf(a) ?? 0));
+      bucket.sort(compareByInstalledTime(timeOf));
     }
     groups.push({ key, title, items: bucket });
   }
