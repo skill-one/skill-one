@@ -40,7 +40,10 @@ import {
   setMockSkillMd,
   unlinkMockAgent,
 } from "./mock-local";
-import { recordSkillProvenance, removeSkillProvenance } from "./provenance";
+import {
+  recordSkillProvenance,
+  removeSkillProvenanceBatch,
+} from "./provenance";
 
 /** Simulated download duration for browser mock installs, in milliseconds. */
 export const MOCK_INSTALL_DELAY_MS = 1200;
@@ -165,13 +168,20 @@ export async function installSkillFromSource(
 
 /** Remove an installed skill from the global skills directory. */
 export async function removeInstalledSkill(name: string): Promise<void> {
+  await removeInstalledSkills([name]);
+}
+
+/** Remove several installed skills from the global skills directory. */
+export async function removeInstalledSkills(names: readonly string[]): Promise<void> {
   if (isTauri()) {
-    await removeSkills([name]);
-    await removeSkillProvenance(name);
+    // One backend round trip: `remove_skills` takes the whole list, and the
+    // ledger update is one read-modify-write for all of them.
+    await removeSkills([...names]);
+    await removeSkillProvenanceBatch(names);
     return;
   }
-  removeMockSkill(name);
-  await removeSkillProvenance(name);
+  for (const name of names) removeMockSkill(name);
+  await removeSkillProvenanceBatch(names);
 }
 
 /**

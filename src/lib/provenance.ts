@@ -204,6 +204,24 @@ export async function removeSkillProvenance(name: string): Promise<void> {
 }
 
 /**
+ * Forget several skills' provenance after one uninstall pass — the batch
+ * removal of a whole repository is logically one ledger update, and calling
+ * the single-name version per skill would be N reads + N writes for it.
+ * Best-effort like recording: the ledger must never turn a removal into an
+ * error.
+ */
+export async function removeSkillProvenanceBatch(names: readonly string[]): Promise<void> {
+  try {
+    const ledger = await loadProvenanceLedger();
+    let next = ledger;
+    for (const name of names) next = dropProvenanceEntry(next, name);
+    if (next !== ledger) await saveProvenanceLedger(next);
+  } catch (e) {
+    console.warn("provenance: failed to forget install sources", e);
+  }
+}
+
+/**
  * Record several freshly auto-linked skills in one read-modify-write pass —
  * the hash tier can match a handful of skills in one reconcile, and each of
  * them writing the file on its own would be N reads + N writes for what is

@@ -13,6 +13,7 @@ import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import {
   fetchInstalledSkills,
   fetchLocalSkillDetail,
+  removeInstalledSkills,
   setManySkillsEnabled,
 } from "../../lib/local-skills";
 import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
@@ -49,6 +50,7 @@ vi.mock("../../lib/local-skills", () => ({
   installSkillFromSource: vi.fn(),
   fetchLocalSkillDetail: vi.fn(),
   setManySkillsEnabled: vi.fn(),
+  removeInstalledSkills: vi.fn(),
 }));
 
 vi.mock("../../lib/open-external", () => ({ openExternal: vi.fn() }));
@@ -90,6 +92,7 @@ function renderInstalledRepoPage(repo = REPO) {
         path="/my-skills/repo/*"
         element={<RepoPage origin="installed" />}
       />
+      <Route path="/my-skills" element={<div>installed list</div>} />
     </Routes>,
     { route: `/my-skills/repo/${repo}` },
   );
@@ -631,6 +634,107 @@ describe("RepoPage", () => {
       expect(
         screen.getByRole("button", { name: "查看 skill-2 详情" }),
       ).toHaveClass("opacity-60");
+    });
+
+    it("rides the batch removal beside the group switch, in the installed head only", async () => {
+      bootRegistry(skillsOf(2));
+      installedOnDisk(["skill-0"]);
+      const installed = renderInstalledRepoPage();
+
+      // The head's two batch controls sit together: the switch, then the
+      // removal mark — the pair of one-shot actions this page's granularity
+      // offers. (The one install is enabled, so the switch reads all on.)
+      const group = await screen.findByRole("switch", {
+        name: "全部关闭（anthropics/skills）",
+      });
+      const remove = screen.getByRole("button", {
+        name: "移除全部（anthropics/skills）",
+      });
+      expect(
+        group.compareDocumentPosition(remove) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      installed.unmount();
+
+      // The store's reading has nothing installed to remove, and its head
+      // carries the nothing it should.
+      renderWithRouter(
+        <Routes>
+          <Route path="/repo/*" element={<RepoPage />} />
+        </Routes>,
+        { route: `/repo/${REPO}` },
+      );
+      await screen.findByRole("heading", { name: REPO });
+      expect(
+        screen.queryByRole("button", { name: /移除全部/ }),
+      ).toBeNull();
+    });
+
+    it("removes every install only after the dialog confirms it", async () => {
+      const user = userEvent.setup();
+      bootRegistry(skillsOf(4));
+      const names = ["skill-0", "skill-2"];
+      // A backend that answers from mutable state, so the refetch the
+      // removal's own invalidation triggers reports the deletion the mock
+      // just made.
+      const onDisk = new Set(names);
+      vi.mocked(fetchInstalledSkills).mockImplementation(async () =>
+        [...onDisk].map((name) => ({
+          name,
+          enabled: true,
+          description: `${name} on disk.`,
+          installedAt: null,
+        })),
+      );
+      seedMockProvenance(
+        Object.fromEntries(
+          names.map((name) => [name, { repo: REPO, slug: name }]),
+        ),
+      );
+      vi.mocked(removeInstalledSkills).mockImplementation(
+        async (targets: readonly string[]) => {
+          targets.forEach((name) => onDisk.delete(name));
+        },
+      );
+      renderInstalledRepoPage();
+      await user.click(
+        await screen.findByRole("button", {
+          name: "移除全部（anthropics/skills）",
+        }),
+      );
+
+      // The press opens the ask, not the act: the dialog names what will go —
+      // count and names. (A modal dialog hides the page from queries, so the
+      // rows behind it are asserted once it is gone.)
+      const dialog = await screen.findByRole("dialog");
+      expect(
+        within(dialog).getByText(/将从本机卸载 anthropics\/skills 的 2 个 skill/),
+      ).toBeInTheDocument();
+      expect(within(dialog).getByText("skill-0")).toBeInTheDocument();
+      expect(within(dialog).getByText("skill-2")).toBeInTheDocument();
+
+      // Backing out changes nothing.
+      await user.click(within(dialog).getByRole("button", { name: "取消" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(vi.mocked(removeInstalledSkills)).not.toHaveBeenCalled();
+      expect(rows()).toHaveLength(2);
+
+      // The second press acts: one call names both installs to the batch
+      // write, the refetched page holds no rows — and the page, its subject
+      // gone from disk, goes back to the list it came from.
+      await user.click(
+        screen.getByRole("button", { name: "移除全部（anthropics/skills）" }),
+      );
+      await user.click(
+        await within(await screen.findByRole("dialog")).findByRole("button", {
+          name: "移除",
+        }),
+      );
+      expect(vi.mocked(removeInstalledSkills)).toHaveBeenCalledWith(names);
+      await waitFor(() =>
+        expect(screen.getByText("installed list")).toBeInTheDocument(),
+      );
+      expect(screen.queryByRole("heading", { name: REPO })).toBeNull();
     });
 
     it("matches the detail panel's chrome to the half the open row stands in", async () => {

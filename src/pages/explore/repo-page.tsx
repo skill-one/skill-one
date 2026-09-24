@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { ChevronDown, ChevronUp, ExternalLink, Star } from "lucide-react";
 
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
@@ -27,6 +27,7 @@ import { DrillDownHead } from "../../components/drill-down-head";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { Placeholder } from "../../components/placeholder";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
+import { RepoRemoveButton } from "../../components/repo-remove-button";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
@@ -136,6 +137,7 @@ export function RepoPage({
   // The repository is the route's splat rather than a path parameter: it is
   // `owner/repo`, and it carries a slash of its own.
   const repo = useParams()["*"] ?? "";
+  const navigate = useNavigate();
 
   const stats = useRegistryStats();
   const { data } = useRegistryGroups("");
@@ -484,10 +486,24 @@ export function RepoPage({
                 from. The store's reading installs rather than enables, so it
                 carries nothing here. */}
             {fromInstalled && onDisk.length > 0 && (
-              <RepoEnableSwitch
-                names={onDisk.map((skill) => skill.name)}
-                label={repo}
-              />
+              <>
+                <RepoEnableSwitch
+                  names={onDisk.map((skill) => skill.name)}
+                  label={repo}
+                />
+                {/* The batch removal rides the same slot and the same names:
+                    one destructive press with a confirm between the ask and
+                    the act, and — once the repository is gone from disk — the
+                    page has nothing left to show, so it goes back to the list
+                    the reader came from. */}
+                <RepoRemoveButton
+                  names={onDisk.map((skill) => skill.name)}
+                  label={repo}
+                  onRemoved={() =>
+                    void navigate(fromInstalled ? "/my-skills" : "/explore")
+                  }
+                />
+              </>
             )}
           </>
         }
