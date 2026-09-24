@@ -4,7 +4,11 @@ import { Globe, HardDrive, Loader2, Store } from "lucide-react";
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { openExternal } from "../../lib/open-external";
-import { skillKey, type SkillView } from "../../lib/skill-view";
+import {
+  skillKey,
+  LOCAL_SOURCE_LABEL,
+  type SkillView,
+} from "../../lib/skill-view";
 import type { ListUnit } from "../../lib/list-view";
 import {
   REPO_CARD_SKELETON_CLASS,
@@ -14,6 +18,7 @@ import {
 } from "../../lib/skill-list-layout";
 import type { SkillMatched } from "../../components/highlighted-text";
 import { SectionHeader } from "../../components/section-header";
+import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
 import { SkeletonList } from "../../components/skeleton-list";
@@ -83,7 +88,7 @@ export function SearchResults({
   unit,
   query,
   installed,
-  installedHoverAction = true,
+  installedSurface = false,
 }: {
   /** The unit every section is read in. */
   unit: ListUnit;
@@ -92,11 +97,12 @@ export function SearchResults({
   /** The installed answer, render-ready; empty hides the section. */
   installed: SearchRow[];
   /**
-   * Whether the installed rows' action waits for the pointer (the store
-   * page's install button, revealed on intent) or is drawn always (the
-   * installed list's enable switch, a fact a reader scans for).
+   * Whether the answer is read from the my-skills surface. There, installed
+   * repository cards carry no per-row control: one group switch on the bar
+   * manages the card's skills, the same as the list behind the search. The
+   * store leaves installed cards their hover-revealed install buttons.
    */
-  installedHoverAction?: boolean;
+  installedSurface?: boolean;
 }) {
   // The store's answer: matched groups in the worker's relevance order. The
   // component only ever renders under a live search, so the query enables
@@ -104,7 +110,10 @@ export function SearchResults({
   const groupsQuery = useRegistryGroups(query, true);
   const storeLoading = groupsQuery.isLoading;
   // Memoized so the derivations below keep stable inputs across renders.
-  const storeGroups = useMemo(() => groupsQuery.data?.groups ?? [], [groupsQuery]);
+  const storeGroups = useMemo(
+    () => groupsQuery.data?.groups ?? [],
+    [groupsQuery],
+  );
 
   // The live skills.sh answer for the same query, in flight while it fetches —
   // the empty state below waits for it before saying "not found".
@@ -145,9 +154,10 @@ export function SearchResults({
 
   // The open skill, addressed by the section it was opened in plus its
   // identity — see the component note above.
-  const [selected, setSelected] = useState<
-    { section: "installed" | "store"; key: string } | null
-  >(null);
+  const [selected, setSelected] = useState<{
+    section: "installed" | "store";
+    key: string;
+  } | null>(null);
 
   // The installed section's repository cards, most-populated first (ties by
   // name); the skills no recorded source vouches for pool into the one card
@@ -292,9 +302,7 @@ export function SearchResults({
                       skills={card.items}
                       hasQuery
                       selected={
-                        selected?.section === "installed"
-                          ? selected.key
-                          : null
+                        selected?.section === "installed" ? selected.key : null
                       }
                       onOpenSkill={(key) =>
                         setSelected({ section: "installed", key })
@@ -307,7 +315,18 @@ export function SearchResults({
                           ? `${INSTALLED_REPO_PATH}${card.repo}`
                           : LOCAL_POOL_PATH
                       }
-                      hoverAction={installedHoverAction}
+                      // On the my-skills surface the card rows stay
+                      // control-less: one group switch on the bar owns the
+                      // card's skills, matching the list behind the search.
+                      rowActions={!installedSurface}
+                      footerAction={
+                        installedSurface ? (
+                          <RepoEnableSwitch
+                            names={card.items.map((row) => row.skill.name)}
+                            label={card.repo || LOCAL_SOURCE_LABEL}
+                          />
+                        ) : undefined
+                      }
                     />
                   ))}
                 </ul>

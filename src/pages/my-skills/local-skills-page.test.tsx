@@ -96,7 +96,39 @@ describe("LocalSkillsPage", () => {
     // that explains an off one.
     const off = await screen.findByRole("switch", { name: "开启 pdf" });
     expect(off.closest('[data-slot="card"]')).toHaveClass("opacity-60");
-    expect(screen.getAllByRole("switch")).toHaveLength(6);
+    // Six row switches, plus the head's one group switch over the whole pool.
+    expect(screen.getAllByRole("switch")).toHaveLength(7);
+    expect(
+      screen.getByRole("switch", { name: "全部开启（本地安装）" }),
+    ).toBeInTheDocument();
+  });
+
+  it("enables and disables the whole pool from the head's group switch", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<LocalSkillsPage />, { route: "/my-skills/local" });
+
+    // One press in the head is the press the card bar offered: every row
+    // switch flips with it, and the rows dim together.
+    await user.click(
+      await screen.findByRole("switch", { name: "全部关闭（本地安装）" }),
+    );
+    for (const name of NAMES) {
+      expect(
+        await screen.findByRole("switch", { name: `开启 ${name}` }),
+      ).toBeInTheDocument();
+    }
+    const group = screen.getByRole("switch", {
+      name: "全部开启（本地安装）",
+    });
+    expect(group).toHaveAttribute("aria-checked", "false");
+
+    // And back, in one press.
+    await user.click(group);
+    for (const name of NAMES) {
+      expect(
+        await screen.findByRole("switch", { name: `关闭 ${name}` }),
+      ).toBeInTheDocument();
+    }
   });
 
   it("opens the same detail drawer the installed list uses", async () => {

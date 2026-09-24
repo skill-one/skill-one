@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router";
 
@@ -7,11 +13,10 @@ import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import {
   fetchInstalledSkills,
   fetchLocalSkillDetail,
+  setManySkillsEnabled,
 } from "../../lib/local-skills";
-import {
-  resetMockProvenance,
-  seedMockProvenance,
-} from "../../lib/provenance";
+import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
+import { resetListView, setQuery } from "../../lib/list-view";
 import { formatCount } from "../../lib/utils";
 import type { RegistryHarness } from "../../test/registry-harness";
 import type { Skill } from "../../types/skill";
@@ -43,6 +48,7 @@ vi.mock("../../lib/local-skills", () => ({
   fetchInstalledSkills: vi.fn(),
   installSkillFromSource: vi.fn(),
   fetchLocalSkillDetail: vi.fn(),
+  setManySkillsEnabled: vi.fn(),
 }));
 
 vi.mock("../../lib/open-external", () => ({ openExternal: vi.fn() }));
@@ -95,7 +101,11 @@ function renderInstalledRepoPage(repo = REPO) {
  * card opens reads back. `disabled` names are parked, as the backend reports a
  * disabled skill.
  */
-function installedOnDisk(names: string[], disabled: string[] = [], repo = REPO) {
+function installedOnDisk(
+  names: string[],
+  disabled: string[] = [],
+  repo = REPO,
+) {
   vi.mocked(fetchInstalledSkills).mockResolvedValue(
     names.map((name) => ({
       name,
@@ -141,6 +151,9 @@ describe("RepoPage", () => {
     // The provenance ledger is the browser's (localStorage): one test's
     // installs must not place skills in the next one's repositories.
     resetMockProvenance();
+    // The shared search box is module-level state: one case's query must not
+    // narrow the next case's repository page.
+    resetListView();
   });
 
   it("lists every skill of the repository, uncapped", async () => {
@@ -150,7 +163,9 @@ describe("RepoPage", () => {
     // All seven skills, one card each: the repository card's preview cap belongs
     // to the card, not to the page — opening the repository is how a reader sees
     // all of them.
-    expect(await screen.findByRole("heading", { name: REPO })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: REPO }),
+    ).toBeInTheDocument();
     expect(
       await screen.findAllByRole("button", { name: /^查看 skill-\d+ 详情$/ }),
     ).toHaveLength(7);
@@ -235,10 +250,7 @@ describe("RepoPage", () => {
   });
 
   it("names the repository with the figures the grouping carried", async () => {
-    bootRegistry([
-      ...skillsOf(3),
-      ...skillsOf(1, "other/repo"),
-    ]);
+    bootRegistry([...skillsOf(3), ...skillsOf(1, "other/repo")]);
     renderRepoPage();
 
     const head = await screen.findByRole("heading", { name: REPO });
@@ -260,13 +272,17 @@ describe("RepoPage", () => {
 
     // Nothing has arrived: card-shaped placeholders stand in, and the page
     // already says which repository it is showing.
-    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(8);
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(
+      8,
+    );
 
     // Another repository's skills land first — this one is still not reached,
     // so the skeleton stays.
     harness.pushAll(skillsOf(2, "other/repo"));
     await act(async () => {});
-    expect(container.querySelector('[data-slot="skeleton"]')).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-slot="skeleton"]'),
+    ).toBeInTheDocument();
 
     // Its own skills arrive and the placeholders give way.
     harness.pushAll(skillsOf(2));
@@ -325,9 +341,7 @@ describe("RepoPage", () => {
     );
 
     await waitFor(() =>
-      expect(
-        screen.getByRole("heading", { name: REPO }),
-      ).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: REPO })).toBeInTheDocument(),
     );
     // The href is where the control points for the reader the app cannot route
     // for itself: a modified click, and assistive tech reading the link.
@@ -343,15 +357,24 @@ describe("RepoPage", () => {
 
   /**
    * The installed list's reading of the same repository: what the reader has,
-   * and the rest of the catalogue one deliberate step behind a control. The
-   * store's reading above is unchanged by any of this.
+   * and the rest of the catalogue one deliberate step below a fold. The store's
+   * reading above is unchanged by any of this.
    */
   describe("read from the installed list", () => {
     /** The rows on screen, in the order the page lists them. */
     const rows = () =>
       screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情$/ });
 
-    it("opens on the installs, and keeps the rest behind one control", async () => {
+    /** Each row's skill name, in document order. */
+    const rowNames = () =>
+      rows().map((row) =>
+        row
+          .getAttribute("aria-label")
+          ?.replace("查看 ", "")
+          .replace(" 详情", ""),
+      );
+
+    it("opens on the installs, with the rest folded beneath a dividing rule", async () => {
       const user = userEvent.setup();
       bootRegistry(skillsOf(4));
       installedOnDisk(["skill-0", "skill-2"]);
@@ -360,33 +383,87 @@ describe("RepoPage", () => {
       // The head counts what the reader has, not what the repository publishes.
       const head = await screen.findByRole("heading", { name: REPO });
       const figures = head.parentElement as HTMLElement;
-      await waitFor(() => expect(figures).toHaveTextContent("2 个已安装 skill"));
+      await waitFor(() =>
+        expect(figures).toHaveTextContent("2 个已安装 skill"),
+      );
       expect(figures).toHaveTextContent(formatCount(STARS));
 
-      // Only the installs are listed — the other two are not on this machine.
+      // Only the installs are listed, in the repository's own order — the other
+      // two are not on this machine and wait below the fold.
       await waitFor(() => expect(rows()).toHaveLength(2));
+      expect(rowNames()).toEqual(["skill-0", "skill-2"]);
       expect(
-        screen.getByRole("button", { name: "查看 skill-0 详情" }),
-      ).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "查看 skill-1 详情" })).toBeNull();
+        screen.queryByRole("button", { name: "查看 skill-1 详情" }),
+      ).toBeNull();
 
-      // The repository's other skills are named by the control at the foot,
-      // which swaps the reading in place rather than leaving the repository.
-      await user.click(
-        screen.getByRole("button", { name: "查看该仓库全部 4 个 skill" }),
-      );
-      expect(rows()).toHaveLength(4);
+      // The fold is a rule between the two readings rather than a button under
+      // them; it names exactly what unfolding adds.
+      const fold = screen.getByRole("button", {
+        name: "查看同仓库其他 2 个未安装 skill",
+      });
+      expect(fold).toHaveAttribute("aria-expanded", "false");
+
+      // One press unfolds the catalogue *beneath* the installs: they stay first
+      // in the same rows, and the catalogue continues after the rule, numbering
+      // on from the installs rather than starting over.
+      await user.click(fold);
+      await waitFor(() => expect(rows()).toHaveLength(4));
+      expect(rowNames()).toEqual(["skill-0", "skill-2", "skill-1", "skill-3"]);
+      const firstRest = screen
+        .getByRole("button", { name: "查看 skill-1 详情" })
+        .closest("li") as HTMLElement;
+      // The catalogue numbers on from the installs (two rows) rather than
+      // starting over: skill-1 is third overall. The ordinal slot is scoped
+      // explicitly because this row's install figure happens to read "3" too.
       expect(
-        screen.getByRole("button", { name: "查看 skill-1 详情" }),
+        within(firstRest).getByText("3", { selector: "span.w-6" }),
       ).toBeInTheDocument();
-      expect(figures).toHaveTextContent("4 个 skill");
-      expect(figures).not.toHaveTextContent("已安装");
 
-      // And back, to the reader's own installs.
-      await user.click(screen.getByRole("button", { name: "只看已安装" }));
-      expect(rows()).toHaveLength(2);
-      expect(screen.queryByRole("button", { name: "查看 skill-1 详情" })).toBeNull();
+      // The two readings keep their own chrome: switches on the installs, the
+      // store's install buttons on the folded-out rows.
+      expect(
+        screen.getByRole("switch", { name: "关闭 skill-0" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("switch", { name: "关闭 skill-2" }),
+      ).toBeInTheDocument();
+      expect(within(firstRest).queryByRole("switch")).toBeNull();
+      expect(
+        within(firstRest).getByRole("button", { name: "安装" }),
+      ).toBeInTheDocument();
+
+      // The head never swaps readings, so its count stays the count on disk.
       expect(figures).toHaveTextContent("2 个已安装 skill");
+      expect(fold).toHaveAttribute("aria-expanded", "true");
+      expect(fold).toHaveTextContent("收起未安装的 2 个 skill");
+
+      // A second press folds the catalogue away; the installs are exactly as
+      // they were — same two rows, same order, same head.
+      await user.click(fold);
+      await waitFor(() => expect(rows()).toHaveLength(2));
+      expect(rowNames()).toEqual(["skill-0", "skill-2"]);
+      expect(
+        screen.queryByRole("button", { name: "查看 skill-1 详情" }),
+      ).toBeNull();
+      expect(fold).toHaveAttribute("aria-expanded", "false");
+      expect(figures).toHaveTextContent("2 个已安装 skill");
+    });
+
+    it("still offers the fold when nothing is installed yet", async () => {
+      const user = userEvent.setup();
+      bootRegistry(skillsOf(3));
+      // Nothing on disk at all: rather than dead-ending in an empty message,
+      // the fold is the page's content and one press opens the repository.
+      renderInstalledRepoPage();
+
+      const fold = await screen.findByRole("button", {
+        name: "查看同仓库其他 3 个未安装 skill",
+      });
+      expect(screen.queryByText("该仓库没有已安装的 skill")).toBeNull();
+      await user.click(fold);
+      expect(
+        await screen.findAllByRole("button", { name: /^查看 skill-\d+ 详情$/ }),
+      ).toHaveLength(3);
     });
 
     it("gives each install the installed list's own chrome", async () => {
@@ -446,8 +523,9 @@ describe("RepoPage", () => {
         await screen.findByRole("button", { name: "查看 skill-0 详情" }),
       ).toBeInTheDocument();
       expect(screen.queryByText(`索引中没有仓库 ${REPO}`)).toBeNull();
+      // No catalogue, no fold: the rule only stands where something unfolds.
       expect(
-        screen.queryByRole("button", { name: /^查看该仓库全部/ }),
+        screen.queryByRole("button", { name: /查看同仓库其他/ }),
       ).toBeNull();
     });
 
@@ -468,25 +546,286 @@ describe("RepoPage", () => {
       // The two readings share one component but not one list: the page a card
       // opens goes back to where the card was, not to the store's page for the
       // same repository.
-      expect(
-        await screen.findByRole("link", { name: "返回" }),
-      ).toHaveAttribute("href", "/my-skills");
+      expect(await screen.findByRole("link", { name: "返回" })).toHaveAttribute(
+        "href",
+        "/my-skills",
+      );
     });
 
-    it("offers no second reading when the repository has nothing left to install", async () => {
+    it("offers no fold when the repository has nothing left to install", async () => {
       bootRegistry(skillsOf(3));
       installedOnDisk(["skill-0", "skill-1", "skill-2"]);
       renderInstalledRepoPage();
 
       expect(await screen.findByText("skill-0")).toBeInTheDocument();
       expect(rows()).toHaveLength(3);
-      // The two readings would be the same list, so the control stands down.
+      // Everything published is on disk, so the rule would fold nothing.
       expect(
-        screen.queryByRole("button", { name: /^查看该仓库全部/ }),
+        screen.queryByRole("button", { name: /查看同仓库其他/ }),
       ).toBeNull();
+      expect(screen.queryByRole("button", { name: /收起未安装/ })).toBeNull();
+    });
+
+    it("carries the card bar's group switch in the head, half-on like the card", async () => {
+      bootRegistry(skillsOf(4));
+      installedOnDisk(["skill-0", "skill-2"], ["skill-2"]);
+      renderInstalledRepoPage();
+
+      // The same one-shot switch the repository card carries, named for this
+      // repository — and reading the same half state: one install off reads as
+      // the half-filled track, not as simply off.
+      const group = await screen.findByRole("switch", {
+        name: "全部开启（anthropics/skills）",
+      });
+      expect(group).toHaveAttribute("aria-checked", "false");
+      expect(group).toHaveClass("data-unchecked:bg-primary/40!");
+    });
+
+    it("flips every install of the repository from the head switch", async () => {
+      const user = userEvent.setup();
+      bootRegistry(skillsOf(4));
+      const names = ["skill-0", "skill-2"];
+      // A backend that answers from mutable state, so the refetch the switch's
+      // own invalidation triggers reports the write the mock just made.
+      const disabled = new Set<string>();
+      vi.mocked(fetchInstalledSkills).mockImplementation(async () =>
+        names.map((name) => ({
+          name,
+          enabled: !disabled.has(name),
+          description: `${name} on disk.`,
+          installedAt: null,
+        })),
+      );
+      seedMockProvenance(
+        Object.fromEntries(
+          names.map((name) => [name, { repo: REPO, slug: name }]),
+        ),
+      );
+      vi.mocked(setManySkillsEnabled).mockImplementation(
+        async (targets: string[], enabled: boolean) => {
+          targets.forEach((name) =>
+            enabled ? disabled.delete(name) : disabled.add(name),
+          );
+        },
+      );
+      renderInstalledRepoPage();
+
+      await user.click(
+        await screen.findByRole("switch", {
+          name: "全部关闭（anthropics/skills）",
+        }),
+      );
+
+      // One press names both installs to the batch write, and the refetched
+      // rows agree: both rows dim behind a switch that now reads all off.
+      expect(vi.mocked(setManySkillsEnabled)).toHaveBeenCalledWith(
+        names,
+        false,
+      );
       expect(
-        screen.queryByRole("button", { name: "只看已安装" }),
+        await screen.findByRole("switch", {
+          name: "全部开启（anthropics/skills）",
+        }),
+      ).toHaveAttribute("aria-checked", "false");
+      expect(
+        screen.getByRole("button", { name: "查看 skill-0 详情" }),
+      ).toHaveClass("opacity-60");
+      expect(
+        screen.getByRole("button", { name: "查看 skill-2 详情" }),
+      ).toHaveClass("opacity-60");
+    });
+
+    it("matches the detail panel's chrome to the half the open row stands in", async () => {
+      const user = userEvent.setup();
+      bootRegistry(skillsOf(4));
+      installedOnDisk(["skill-0"]);
+      renderInstalledRepoPage();
+
+      // An installed row opens the installed panel: the enable switch.
+      await user.click(
+        await screen.findByRole("button", { name: "查看 skill-0 详情" }),
+      );
+      expect(
+        await within(await screen.findByRole("dialog")).findByRole("switch", {
+          name: "关闭 skill-0",
+        }),
+      ).toBeInTheDocument();
+      await user.keyboard("{Escape}");
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+
+      // A folded-out row opens the store's panel instead: the install CTA, and
+      // no switch.
+      await user.click(
+        screen.getByRole("button", {
+          name: "查看同仓库其他 3 个未安装 skill",
+        }),
+      );
+      await user.click(
+        await screen.findByRole("button", { name: "查看 skill-1 详情" }),
+      );
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).queryByRole("switch")).toBeNull();
+      expect(
+        within(dialog).getByRole("button", { name: "安装" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * A search that opened the repository card is still live on the page it
+   * opens: the matches read first, exactly the rows the card showed, and the
+   * repository's other skills wait behind a dividing rule of the same kind.
+   */
+  describe("opened from a search", () => {
+    /** Each row's skill name, in document order. */
+    const rowNames = () =>
+      screen
+        .getAllByRole("button", { name: /^查看 skill-\d+ 详情$/ })
+        .map((row) =>
+          row
+            .getAttribute("aria-label")
+            ?.replace("查看 ", "")
+            .replace(" 详情", ""),
+        );
+
+    it("opens on the matches and folds the store's other skills beneath a rule", async () => {
+      const user = userEvent.setup();
+      bootRegistry(skillsOf(4));
+      // The query is set before the page mounts, exactly the state the shared
+      // search box is in when a card's door walks through to this page.
+      setQuery("skill-1");
+      renderRepoPage();
+
+      // Only the match is listed at first, in its own row with the matched
+      // term highlighted.
+      await waitFor(() => expect(rowNames()).toEqual(["skill-1"]));
+      const match = screen
+        .getByRole("button", {
+          name: "查看 skill-1 详情",
+        })
+        .closest("li") as HTMLElement;
+      // The matched term is highlighted in the row's name.
+      expect(match.querySelector("mark")).not.toBeNull();
+
+      // The fold names exactly what unfolding adds.
+      const fold = screen.getByRole("button", {
+        name: "查看同仓库其他 3 个 skill",
+      });
+      expect(fold).toHaveAttribute("aria-expanded", "false");
+      expect(fold).toHaveAttribute("aria-controls", "repo-other-skills");
+
+      // One press continues the repository beneath the match, in its own order,
+      // numbering on from the match rather than starting over.
+      await user.click(fold);
+      await waitFor(() => expect(rowNames()).toHaveLength(4));
+      expect(rowNames()).toEqual(["skill-1", "skill-0", "skill-2", "skill-3"]);
+      const firstOther = screen
+        .getByRole("button", { name: "查看 skill-0 详情" })
+        .closest("li") as HTMLElement;
+      expect(
+        within(firstOther).getByText("2", { selector: "span.w-6" }),
+      ).toBeInTheDocument();
+      expect(fold).toHaveTextContent("收起其他 3 个 skill");
+
+      // A second press folds the others away; the match is exactly as it was.
+      await user.click(fold);
+      await waitFor(() => expect(rowNames()).toEqual(["skill-1"]));
+    });
+
+    it("folds the search's other installs, then the uninstalled catalogue one level deeper", async () => {
+      const user = userEvent.setup();
+      bootRegistry(skillsOf(4));
+      installedOnDisk(["skill-0", "skill-1", "skill-2"]);
+      setQuery("skill-2");
+      renderInstalledRepoPage();
+
+      // The one matching install opens first, in the installed reading's own
+      // chrome — its switch rides the row.
+      await waitFor(() => expect(rowNames()).toEqual(["skill-2"]));
+      expect(
+        screen.getByRole("switch", { name: "关闭 skill-2" }),
+      ).toBeInTheDocument();
+
+      // The search fold widens within the installs; the uninstalled catalogue
+      // is nested a level deeper and offers no rule yet.
+      const more = screen.getByRole("button", {
+        name: "查看同仓库其他 2 个已安装 skill",
+      });
+      expect(
+        screen.queryByRole("button", { name: /未安装 skill$/ }),
+      ).toBeNull();
+      await user.click(more);
+
+      // The other installs continue beneath the match with their switches —
+      // and now the catalogue fold stands.
+      await waitFor(() => expect(rowNames()).toHaveLength(3));
+      expect(rowNames()).toEqual(["skill-2", "skill-0", "skill-1"]);
+      expect(
+        screen.getByRole("switch", { name: "关闭 skill-0" }),
+      ).toBeInTheDocument();
+      const catalogue = screen.getByRole("button", {
+        name: "查看同仓库其他 1 个未安装 skill",
+      });
+
+      // The catalogue unfolds one level deeper still, in store chrome.
+      await user.click(catalogue);
+      await waitFor(() => expect(rowNames()).toHaveLength(4));
+      expect(screen.getByText("skill-3")).toBeInTheDocument();
+
+      // Folding the search fold folds the catalogue nested in it too: the page
+      // is the matches alone again.
+      await user.click(more);
+      await waitFor(() => expect(rowNames()).toEqual(["skill-2"]));
+      expect(
+        screen.queryByRole("button", { name: /未安装 skill$/ }),
       ).toBeNull();
     });
+
+    it("widens to the ordinary page when the repository answers nothing", async () => {
+      bootRegistry(skillsOf(3));
+      setQuery("something-this-repository-does-not-have");
+      renderRepoPage();
+
+      // No matches here: rather than opening on an empty answer, the page is
+      // the repository whole, with nothing folded.
+      await waitFor(() => expect(rowNames()).toHaveLength(3));
+      expect(
+        screen.queryByRole("button", { name: /查看同仓库其他/ }),
+      ).toBeNull();
+    });
+
+    it("folds the newly ruled-out skills when the query changes", async () => {
+      const user = userEvent.setup();
+      bootRegistry(skillsOf(4));
+      setQuery("skill-1");
+      renderRepoPage();
+
+      const fold = await screen.findByRole("button", {
+        name: "查看同仓库其他 3 个 skill",
+      });
+      await user.click(fold);
+      await waitFor(() => expect(rowNames()).toHaveLength(4));
+
+      // A different question resets the fold it inherited: the new answer opens
+      // on its match alone.
+      setQuery("skill-2");
+      await waitFor(() => expect(rowNames()).toEqual(["skill-2"]));
+      expect(
+        screen.getByRole("button", {
+          name: "查看同仓库其他 3 个 skill",
+        }),
+      ).toHaveAttribute("aria-expanded", "false");
+    });
+  });
+
+  it("carries no group switch in the store reading's head", async () => {
+    bootRegistry(skillsOf(2));
+    renderRepoPage();
+
+    await screen.findByText("skill-0");
+    // The store installs; it has nothing to enable as a group.
+    expect(screen.queryByRole("switch")).toBeNull();
   });
 });
