@@ -1,4 +1,6 @@
 import { Link, useLocation } from "react-router";
+import { useTranslation } from "react-i18next";
+import type { ParseKeys } from "i18next";
 import { PackageCheck, Store } from "lucide-react";
 
 import { cn } from "../lib/utils";
@@ -7,7 +9,8 @@ import { SettingsMenu } from "./settings-popover";
 interface NavItem {
   /** Where the entry leads. */
   path: string;
-  label: string;
+  /** i18n key of the entry's name. */
+  labelKey: ParseKeys;
   icon: React.ComponentType<{ className?: string }>;
   /**
    * Every route prefix this destination owns: its own list, and the pages a
@@ -30,13 +33,13 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     path: "/explore",
-    label: "商店",
+    labelKey: "nav.store",
     icon: Store,
     owns: ["/explore", "/repo"],
   },
   {
     path: "/my-skills",
-    label: "我的",
+    labelKey: "nav.my",
     icon: PackageCheck,
     owns: ["/my-skills"],
   },
@@ -65,9 +68,10 @@ function belongsTo(roots: readonly string[], pathname: string): boolean {
  * the full height beside the content.
  */
 export function AppRail() {
+  const { t } = useTranslation();
   return (
     <nav
-      aria-label="主导航"
+      aria-label={t("nav.mainAria")}
       className="flex w-[var(--rail-w)] shrink-0 flex-col items-center border-r border-border bg-background"
     >
       <div className="flex w-full flex-col items-center gap-1 px-1.5 pt-2">
@@ -90,6 +94,7 @@ export function AppRail() {
  * assistive tech.
  */
 function RailLink({ item }: { item: NavItem }) {
+  const { t } = useTranslation();
   const { pathname } = useLocation();
   const isActive = belongsTo(item.owns, pathname);
   const Icon = item.icon;
@@ -107,7 +112,7 @@ function RailLink({ item }: { item: NavItem }) {
     >
       <Icon className="h-5 w-5" />
       <span className="text-[10px] leading-none whitespace-nowrap">
-        {item.label}
+        {t(item.labelKey)}
       </span>
     </Link>
   );

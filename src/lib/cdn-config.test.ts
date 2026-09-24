@@ -116,7 +116,7 @@ describe("fetchFirstText", () => {
     expect(err).toBeInstanceOf(SourceFetchError);
     expect(err.kind).toBe("network");
     expect(err.status).toBeUndefined();
-    expect(err.message).toMatch(/无法连接数据源/);
+    expect(err.message).toMatch(/Unable to reach the data source/);
   });
 
   it("classifies a mixed failure (one 404, one network error) as network", async () => {

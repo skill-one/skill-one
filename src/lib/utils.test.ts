@@ -31,8 +31,8 @@ describe("formatCount", () => {
 
 describe("formatDate", () => {
   it("returns null for a missing or unparseable stamp", () => {
-    expect(formatDate(undefined)).toBeNull();
-    expect(formatDate("not a date")).toBeNull();
+    expect(formatDate(undefined, "en")).toBeNull();
+    expect(formatDate("not a date", "en")).toBeNull();
   });
 });
 
@@ -42,35 +42,35 @@ describe("formatRelativeTime", () => {
   const ago = (seconds: number) => Math.floor(NOW / 1000) - seconds;
 
   it("returns null for a missing or unusable stamp", () => {
-    expect(formatRelativeTime(undefined)).toBeNull();
-    expect(formatRelativeTime(null)).toBeNull();
-    expect(formatRelativeTime(Number.NaN)).toBeNull();
+    expect(formatRelativeTime(undefined, "zh")).toBeNull();
+    expect(formatRelativeTime(null, "zh")).toBeNull();
+    expect(formatRelativeTime(Number.NaN, "zh")).toBeNull();
   });
 
   it("counts the whole units that have passed", () => {
     // 47 hours is one day that has passed, not two rounded up.
-    expect(formatRelativeTime(ago(47 * 3600), NOW)).toBe("1天前");
-    expect(formatRelativeTime(ago(3 * 86400), NOW)).toBe("3天前");
-    expect(formatRelativeTime(ago(45 * 86400), NOW)).toBe("1个月前");
-    expect(formatRelativeTime(ago(800 * 86400), NOW)).toBe("2年前");
+    expect(formatRelativeTime(ago(47 * 3600), "zh", NOW)).toBe("1天前");
+    expect(formatRelativeTime(ago(3 * 86400), "zh", NOW)).toBe("3天前");
+    expect(formatRelativeTime(ago(45 * 86400), "zh", NOW)).toBe("1个月前");
+    expect(formatRelativeTime(ago(800 * 86400), "zh", NOW)).toBe("2年前");
   });
 
   it("keeps every bucket uniform rather than idiomatic per bucket", () => {
     // `numeric: "auto"` would say 昨天 / 上个月 / 去年 here. A fact is more
     // useful than an idiom, and the exact date is one hover away.
-    expect(formatRelativeTime(ago(86400), NOW)).toBe("1天前");
-    expect(formatRelativeTime(ago(40 * 86400), NOW)).toBe("1个月前");
-    expect(formatRelativeTime(ago(400 * 86400), NOW)).toBe("1年前");
+    expect(formatRelativeTime(ago(86400), "zh", NOW)).toBe("1天前");
+    expect(formatRelativeTime(ago(40 * 86400), "zh", NOW)).toBe("1个月前");
+    expect(formatRelativeTime(ago(400 * 86400), "zh", NOW)).toBe("1年前");
   });
 
   it("reads the last minute as 刚刚", () => {
-    expect(formatRelativeTime(ago(30), NOW)).toBe("刚刚");
+    expect(formatRelativeTime(ago(30), "zh", NOW)).toBe("刚刚");
   });
 
   it("reports a stamp ahead of the clock as such, not as the past", () => {
     // Only clock skew or a hand-made directory produces one; saying 2小时后
     // is honest about what the filesystem reported.
-    expect(formatRelativeTime(ago(-2 * 3600), NOW)).toBe("2小时后");
+    expect(formatRelativeTime(ago(-2 * 3600), "zh", NOW)).toBe("2小时后");
   });
 });
 
@@ -90,9 +90,9 @@ describe("errorMessage", () => {
   });
 
   it("falls back when nothing usable is there", () => {
-    expect(errorMessage(new Error(""))).toBe("未知错误");
-    expect(errorMessage(undefined)).toBe("未知错误");
-    expect(errorMessage("   ")).toBe("未知错误");
-    expect(errorMessage(null, "移除失败")).toBe("移除失败");
+    expect(errorMessage(new Error(""))).toBe("Unknown error");
+    expect(errorMessage(undefined)).toBe("Unknown error");
+    expect(errorMessage("   ")).toBe("Unknown error");
+    expect(errorMessage(null, "Remove failed")).toBe("Remove failed");
   });
 });

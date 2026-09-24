@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Download } from "lucide-react";
 
 import { cn, formatCount } from "../lib/utils";
@@ -24,16 +25,19 @@ export function SkillInstalls({
   skill: Skill;
   className?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <span
-      title={`${skill.downloads.toLocaleString("en-US")} 次安装`}
+      title={t("common.installsTitle", {
+        count: skill.downloads.toLocaleString("en-US"),
+      })}
       className={cn(
         "flex shrink-0 cursor-default items-center gap-1 text-[12px] text-muted-foreground",
         className,
       )}
     >
       <Download aria-hidden="true" className="h-3.5 w-3.5" />
-      <span className="sr-only">安装量</span>
+      <span className="sr-only">{t("common.installs")}</span>
       <span className="font-medium tabular-nums">
         {formatCount(skill.downloads)}
       </span>

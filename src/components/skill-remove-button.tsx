@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Trash2 } from "lucide-react";
 import { toast } from "./ui/toast";
 
@@ -47,6 +48,7 @@ export function SkillRemoveButton({
 
   const queryClient = useQueryClient();
   const { data: installed } = useInstalledSkills();
+  const { t } = useTranslation();
   const onDisk = installed?.some((s) => s.name === skill.name) ?? false;
 
   if (!onDisk) return null;
@@ -58,11 +60,11 @@ export function SkillRemoveButton({
       // Same broadcast the batch removal makes: the my-skills list, the
       // sidebar count and the menu bar popover all read this one signal.
       await markSkillsChanged(queryClient);
-      toast.add({ title: `已移除 ${skill.name}`, type: "success" });
+      toast.add({ title: t("action.removed", { name: skill.name }), type: "success" });
       setOpen(false);
       onRemoved?.();
     } catch (err) {
-      toast.add({ title: errorMessage(err, "移除失败"), type: "error" });
+      toast.add({ title: errorMessage(err, t("action.removeFailed")), type: "error" });
     } finally {
       setRemoving(false);
     }
@@ -73,7 +75,7 @@ export function SkillRemoveButton({
       <Button
         variant="outline"
         size="sm"
-        title="移除"
+        title={t("action.remove")}
         onClick={(e) => {
           setOpen(true);
           e.stopPropagation();
@@ -81,14 +83,14 @@ export function SkillRemoveButton({
         className={className}
       >
         <Trash2 className="h-3.5 w-3.5" />
-        移除
+        {t("action.remove")}
       </Button>
 
       <RemoveConfirmDialog
         open={open}
         onOpenChange={setOpen}
-        title={`移除 ${skill.name}？`}
-        description="将从本机卸载该 skill。此操作无法从应用内撤销；之后可随时重新安装。"
+        title={t("action.removeConfirmTitle", { name: skill.name })}
+        description={t("action.removeConfirmDescription")}
         pending={removing}
         onConfirm={() => void handleRemove()}
       />

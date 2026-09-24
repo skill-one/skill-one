@@ -29,7 +29,7 @@ export type TimeBucketKey =
 /** One bucket's identity and the header it renders. */
 export interface TimeBucket {
   key: TimeBucketKey;
-  /** The group header's title, pinned to zh-CN like the rest of the chrome. */
+  /** i18n key of the group header. */
   title: string;
 }
 
@@ -42,12 +42,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * render, so this is the filing order rather than the rendered list itself.
  */
 export const TIME_BUCKETS: readonly TimeBucket[] = [
-  { key: "today", title: "今天" },
-  { key: "yesterday", title: "昨天" },
-  { key: "week", title: "近7天" },
-  { key: "month", title: "近30天" },
-  { key: "earlier", title: "更早" },
-  { key: "unknown", title: "时间未知" },
+  { key: "today", title: "time.today" },
+  { key: "yesterday", title: "time.yesterday" },
+  { key: "week", title: "time.week" },
+  { key: "month", title: "time.month" },
+  { key: "earlier", title: "time.earlier" },
+  { key: "unknown", title: "time.unknown" },
 ];
 
 /** Local midnight (the reader's time zone) of the day `now` belongs to. */

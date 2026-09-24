@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Globe, HardDrive, Loader2, Store } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
@@ -6,7 +7,6 @@ import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { openExternal } from "../../lib/open-external";
 import {
   skillKey,
-  LOCAL_SOURCE_LABEL,
   type SkillView,
 } from "../../lib/skill-view";
 import type { ListUnit } from "../../lib/list-view";
@@ -104,6 +104,7 @@ export function SearchResults({
    */
   installedSurface?: boolean;
 }) {
+  const { t } = useTranslation();
   // The store's answer: matched groups in the worker's relevance order. The
   // component only ever renders under a live search, so the query enables
   // itself.
@@ -225,11 +226,11 @@ export function SearchResults({
         searching ? (
           <Placeholder
             icon={Loader2}
-            message="正在搜索应用商店与 skills.sh 的实时结果…"
+            message={t("search.searchingLive")}
             iconClassName="animate-spin"
           />
         ) : (
-          <Placeholder message={`未找到匹配“${query}”的 Skill`} />
+          <Placeholder message={t("state.noMatch", { query })} />
         )
       ) : (
         <>
@@ -237,11 +238,11 @@ export function SearchResults({
           {installed.length > 0 && (
             <CollapsibleSection
               icon={HardDrive}
-              title="本地已安装"
+              title={t("search.installed")}
               count={
                 unit === "repo"
-                  ? `${installedCards.length} 个仓库`
-                  : `${installed.length} 个 skill`
+                  ? t("state.repoCount", { count: installedCards.length })
+                  : t("state.skillCount", { count: installed.length })
               }
             >
               {unit === "skill" ? (
@@ -322,7 +323,7 @@ export function SearchResults({
                         installedSurface ? (
                           <RepoEnableSwitch
                             names={card.items.map((row) => row.skill.name)}
-                            label={card.repo || LOCAL_SOURCE_LABEL}
+                            label={card.repo || t("common.localInstall")}
                           />
                         ) : undefined
                       }
@@ -340,13 +341,13 @@ export function SearchResults({
           {(storeSkills.length > 0 || storeLoading) && (
             <CollapsibleSection
               icon={Store}
-              title="应用商店"
+              title={t("search.store")}
               count={
                 storeLoading
-                  ? "搜索中…"
+                  ? t("search.searching")
                   : unit === "repo"
-                    ? `${storeGroups.length} 个仓库`
-                    : `${storeSkills.length} 个 skill`
+                    ? t("state.repoCount", { count: storeGroups.length })
+                    : t("state.skillCount", { count: storeSkills.length })
               }
             >
               {storeLoading ? (
@@ -424,11 +425,11 @@ export function SearchResults({
           {liveSkills.length > 0 && (
             <CollapsibleSection
               icon={Globe}
-              title="skills.sh 官方搜索"
+              title={t("search.skillsSh")}
               count={
                 unit === "repo"
-                  ? `${liveRepoGroups.length} 个仓库`
-                  : `${liveSkills.length} 个 skill`
+                  ? t("state.repoCount", { count: liveRepoGroups.length })
+                  : t("state.skillCount", { count: liveSkills.length })
               }
             >
               {unit === "skill" ? (

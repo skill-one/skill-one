@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Loader2, Trash2 } from "lucide-react";
 
 import { Button } from "./ui/button";
@@ -44,6 +45,7 @@ export function RemoveConfirmDialog({
   pending: boolean;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false}>
@@ -64,7 +66,7 @@ export function RemoveConfirmDialog({
             onClick={() => onOpenChange(false)}
             disabled={pending}
           >
-            取消
+            {t("action.cancel")}
           </Button>
           <Button
             variant="destructive"
@@ -76,7 +78,7 @@ export function RemoveConfirmDialog({
             ) : (
               <Trash2 aria-hidden />
             )}
-            移除
+            {t("action.remove")}
           </Button>
         </DialogFooter>
       </DialogContent>

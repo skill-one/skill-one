@@ -15,7 +15,7 @@ describe("domainMeta", () => {
       // not a colourful emoji string.
       expect(domain.icon).toEqual(expect.any(Object));
       expect(domain.icon.displayName).toEqual(expect.any(String));
-      expect(domain.description.length).toBeGreaterThan(4);
+      expect(domain.description.zh.length).toBeGreaterThan(4);
     }
   });
 

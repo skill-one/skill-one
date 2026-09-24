@@ -76,7 +76,7 @@ export async function fetchLocalSkillDetail(
   }
   const skill = getMockInstalledSkills().find((s) => s.name === name);
   if (!skill) {
-    throw new Error(`本地未安装技能 ${name}`);
+    throw new Error(`Skill ${name} is not installed locally`);
   }
   const description = skill.description;
   return {

@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { ThemeProvider } from "./components/theme-provider";
+import { I18nProvider } from "./i18n/language-provider";
 import { initRegistry } from "./lib/registry/client";
 import App from "./App";
 import "./index.css";
@@ -12,8 +13,10 @@ initRegistry();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    <I18nProvider>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </I18nProvider>
   </React.StrictMode>
 );

@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronDown } from "lucide-react";
 
 import { domainLabel, domainMeta } from "../data/domains";
+import { useAppLocale } from "../i18n/use-language";
 import { FACET_GAP, useFacetOverflow } from "../hooks/use-facet-overflow";
 import { DomainChip } from "./domain-chip";
 import { Button } from "./ui/button";
@@ -44,6 +46,8 @@ export function ListFacets({
   const { rowRef, measureRef, moreRef, visibleCount } = useFacetOverflow(
     facets.length,
   );
+  const { t } = useTranslation();
+  const locale = useAppLocale();
   const [open, setOpen] = useState(false);
 
   const shown = visibleCount === null ? facets : facets.slice(0, visibleCount);
@@ -63,7 +67,7 @@ export function ListFacets({
       expanded={expanded}
       onClick={onPick ?? (() => onSelect(facet.key))}
     >
-      {domainLabel(facet.key)}
+      {domainLabel(facet.key, locale)}
     </DomainChip>
   );
 
@@ -75,7 +79,7 @@ export function ListFacets({
         expanded
         onClick={() => onSelect(null)}
       >
-        全部
+        {t("facet.all")}
       </DomainChip>
 
       <div
@@ -95,12 +99,20 @@ export function ListFacets({
                     type="button"
                     variant={hiddenScope ? "default" : "outline"}
                     size="sm"
-                    aria-label={hiddenScope ? `更多分类，已选 ${domainLabel(selected)}` : "更多分类"}
+                    aria-label={
+                      hiddenScope
+                        ? t("facet.moreCategoriesSelected", {
+                            label: domainLabel(selected, locale),
+                          })
+                        : t("facet.moreCategories")
+                    }
                   />
                 }
               >
                 <span className="max-w-24 truncate whitespace-nowrap">
-                  {hiddenScope ? domainLabel(selected) : "更多"}
+                  {hiddenScope
+                    ? domainLabel(selected, locale)
+                    : t("facet.more")}
                 </span>
                 <ChevronDown />
               </PopoverTrigger>

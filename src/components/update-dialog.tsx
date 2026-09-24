@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useAppUpdate } from "../hooks/use-app-update";
 import { Button } from "./ui/button";
@@ -24,6 +25,7 @@ import { Progress } from "./ui/progress";
 export function UpdateDialog() {
   const { phase, version, notes, dialogOpen, close: closeDialog, install } =
     useAppUpdate();
+  const { t } = useTranslation();
   // `null` = the download reported no total size, so there is no percentage to
   // show; the label says "downloading" instead of pretending it is 0%.
   const [percent, setPercent] = useState<number | null>(0);
@@ -55,12 +57,10 @@ export function UpdateDialog() {
       <DialogContent showCloseButton={!installing}>
         <DialogHeader>
           <DialogTitle>
-            更新到 v{version}
+            {t("update.dialogTitle", { version })}
           </DialogTitle>
           <DialogDescription>
-            {installing
-              ? "正在下载并安装更新，完成后应用会自动重启…"
-              : "新版本已准备就绪，安装过程中应用会短暂重启。"}
+            {installing ? t("update.downloadingHint") : t("update.readyHint")}
           </DialogDescription>
         </DialogHeader>
 
@@ -68,7 +68,7 @@ export function UpdateDialog() {
           <div className="flex flex-col gap-2">
             <Progress value={percent ?? 0} />
             <p className="text-right text-[12px] text-muted-foreground">
-              {percent === null ? "正在下载…" : `${percent}%`}
+              {percent === null ? t("update.downloading") : `${percent}%`}
             </p>
           </div>
         ) : (
@@ -81,20 +81,20 @@ export function UpdateDialog() {
 
         {failure && (
           <p role="alert" className="text-[12px] text-destructive">
-            更新失败：{failure}
+            {t("update.failedLabel", { message: failure })}
           </p>
         )}
 
         <DialogFooter>
           <Button variant="ghost" onClick={handleClose} disabled={installing}>
-            稍后再说
+            {t("update.later")}
           </Button>
           <Button onClick={() => void startInstall()} disabled={installing}>
             {installing
-              ? "正在更新…"
+              ? t("update.updating")
               : failure
-                ? "重试更新"
-                : "立即更新"}
+                ? t("update.retryUpdate")
+                : t("update.updateNow")}
           </Button>
         </DialogFooter>
       </DialogContent>

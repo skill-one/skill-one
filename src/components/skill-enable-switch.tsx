@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { toast } from "./ui/toast";
 
 import { setSkillEnabled } from "../lib/local-skills";
@@ -38,6 +39,7 @@ export function SkillEnableSwitch({
 }) {
   const queryClient = useQueryClient();
   const { data: installed } = useInstalledSkills();
+  const { t } = useTranslation();
   // The record is the truth; a pending write is held over the top of it only
   // until the refetch that follows the write lands.
   const [pending, setPending] = useState<boolean | null>(null);
@@ -51,7 +53,7 @@ export function SkillEnableSwitch({
     },
     onError: (e) => {
       setPending(null);
-      toast.add({ title: errorMessage(e, "切换失败"), type: "error" });
+      toast.add({ title: errorMessage(e, t("action.toggleFailed")), type: "error" });
       // Best-effort refresh: the error is already shown, so keep the promise
       // from turning into an unhandled rejection.
       void markSkillsChanged(queryClient);
@@ -68,7 +70,10 @@ export function SkillEnableSwitch({
       checked={enabled}
       onCheckedChange={(next) => toggle.mutate(next)}
       onClick={(e) => e.stopPropagation()}
-      aria-label={`${enabled ? "关闭" : "开启"} ${skill.name}`}
+      aria-label={t("action.enableAria", {
+        state: enabled ? t("action.turnOff") : t("action.turnOn"),
+        name: skill.name,
+      })}
       className={className}
     />
   );

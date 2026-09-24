@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Boxes } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
 import {
-  LOCAL_SOURCE_LABEL,
   installedSkillView,
   skillKey,
   type SkillView,
@@ -56,6 +56,7 @@ interface Row {
  * head already states it.
  */
 export function LocalSkillsPage() {
+  const { t } = useTranslation();
   const { data: installed, isLoading, isError, error } = useInstalledSkills();
 
   // The ledger is what tells a placed install from one nothing vouches for: a
@@ -103,13 +104,13 @@ export function LocalSkillsPage() {
           per-skill switches stay on the rows below. */}
       <DrillDownHead
         back="/my-skills"
-        title={LOCAL_SOURCE_LABEL}
-        meta={`${rows.length} 个 skill`}
+        title={t("common.localInstall")}
+        meta={t("state.skillCount", { count: rows.length })}
         action={
           rows.length > 0 ? (
             <RepoEnableSwitch
               names={rows.map((row) => row.view.name)}
-              label={LOCAL_SOURCE_LABEL}
+              label={t("common.localInstall")}
             />
           ) : undefined
         }
@@ -119,7 +120,9 @@ export function LocalSkillsPage() {
         {isError ? (
           <Placeholder
             icon={Boxes}
-            message={`加载失败：${errorMessage(error)}`}
+            message={t("state.loadFailed", {
+              message: errorMessage(error),
+            })}
           />
         ) : isLoading ? (
           <SkeletonList
@@ -128,7 +131,7 @@ export function LocalSkillsPage() {
             itemClassName={SKILL_ROW_SKELETON_CLASS}
           />
         ) : rows.length === 0 ? (
-          <Placeholder icon={Boxes} message="没有本地安装的 skill" />
+          <Placeholder icon={Boxes} message={t("state.noLocal")} />
         ) : (
           <>
             <ul className={SKILL_ROW_LIST_CLASS}>

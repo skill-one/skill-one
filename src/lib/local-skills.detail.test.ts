@@ -56,7 +56,7 @@ describe("fetchLocalSkillDetail", () => {
     isTauri.mockReturnValue(false);
 
     await expect(fetchLocalSkillDetail("ghost")).rejects.toThrow(
-      "本地未安装技能 ghost",
+      "Skill ghost is not installed locally",
     );
   });
 });

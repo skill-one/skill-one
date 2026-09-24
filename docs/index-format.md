@@ -14,6 +14,7 @@ One JSON object per line, sorted by installs descending:
   "installs": 3474068,
   "url": "https://www.skills.sh/vercel-labs/skills/find-skills",
   "description": "Helps users discover and install agent skills …",
+  "description_zh": "帮助用户发现和安装 agent skills …",
   "hash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
   "fetchedAt": "2026-09-06T07:57:37.803Z",
   "domain": "development"
@@ -26,6 +27,7 @@ One JSON object per line, sorted by installs descending:
 | `installs` | `number` | Total installs recorded by skills.sh |
 | `url` | `string` | The skill's page on skills.sh |
 | `description` | `string \| null` | From the SKILL.md frontmatter (empty when missing) |
+| `description_zh` | `string \| null` | Chinese translation of `description`. The app prefers it in Chinese mode and falls back to `description` when it is missing or blank. |
 | `hash` | `string \| null` | SHA-256 of the skill's files. Changes when any upstream file changes — i.e. **which version of the skill the snapshot describes**. |
 | `fetchedAt` | `string` | When the scraper first fetched this content version (ISO, UTC): how long the *current* content has been published, not when the skill first appeared |
 | `domain` | `string \| string[]` | The classification, drawn from a fixed English enum (`development`, `data-analysis`, …, `other`). The `dist` snapshot publishes the single best-fit key as a bare string; the field has also carried a 1–3 key list, best fit first, so the app reads either shape and keeps a list. [data/domains.ts](../src/data/domains.ts) maps a key to its display label and monochrome lucide icon. Absent for skills the generator has not reached. |
@@ -59,7 +61,7 @@ The dataset copies every owner's GitHub avatar into the snapshot as a regular fi
 
 Each classified skill also publishes `profiles/{id}/domain.json` — the same payload the index row carries — beside its human-readable `md/domain.md`. The app reads the index row and never fetches these; they exist as the dataset's own browsable copy. There is no per-skill cover illustration: the detail drawer's image slot shows the author's initial (see [src/components/skill-cover.tsx](../src/components/skill-cover.tsx)). Card lists show no image at all — a letter square repeated on every row was 48px of chrome carrying no fact about the skill — so each card is led by its name, with the source stated in words on the card's rail.
 
-The index rows are joined with the `skills/` directory by id: `skills/{owner}/{repo}/{slug}/` holds exactly the files the upstream skill ships. The app maps each row to the `Skill` model as `name = slug`, `repo = {owner}/{repo}`, `path = skills/{id}` (the snapshot directory, used for detail fetches and basename matching), `rev = hash`, `firstSeenAt = fetchedAt`, `profile = { domain }` — with `stars` supplied by the joined `repos.jsonl` row (0 when unjoined).
+The index rows are joined with the `skills/` directory by id: `skills/{owner}/{repo}/{slug}/` holds exactly the files the upstream skill ships. The app maps each row to the `Skill` model as `name = slug`, `repo = {owner}/{repo}`, `path = skills/{id}` (the snapshot directory, used for detail fetches and basename matching), `rev = hash`, `firstSeenAt = fetchedAt`, `descriptionZh = description_zh`, `profile = { domain }` — with `stars` supplied by the joined `repos.jsonl` row (0 when unjoined).
 
 The detail drawer shows `hash` as 版本 (`#b1460085`, full value in the tooltip) and `fetchedAt` as 收录时间, and the classification as the domain chip. An author-declared frontmatter `version` is deliberately not displayed next to it: it is a different kind of claim about a different thing.
 

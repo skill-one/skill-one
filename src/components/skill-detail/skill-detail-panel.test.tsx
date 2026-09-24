@@ -16,6 +16,7 @@ import {
 import { openExternal } from "../../lib/open-external";
 import type { SkillView } from "../../lib/skill-view";
 import { Sheet } from "../ui/sheet";
+import { I18nProvider } from "../../i18n/language-provider";
 import { toast } from "../ui/toast";
 import {
   SkillDetailPanel,
@@ -144,14 +145,16 @@ function DetailDrawer({
   const [open, setOpen] = useState(currentSkill != null);
   return (
     <QueryClientProvider client={queryClient}>
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SkillDetailPanel
-          skill={currentSkill}
-          surface={surface}
-          onPrev={onPrev ?? (() => {})}
-          onNext={onNext ?? (() => {})}
-        />
-      </Sheet>
+      <I18nProvider>
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SkillDetailPanel
+            skill={currentSkill}
+            surface={surface}
+            onPrev={onPrev ?? (() => {})}
+            onNext={onNext ?? (() => {})}
+          />
+        </Sheet>
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

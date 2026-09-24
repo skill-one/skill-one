@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 import { toast } from "../../components/ui/toast";
 
@@ -49,6 +50,7 @@ export function AgentLinkSettingsDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   // Shared cache with the avatar menu; fetching is gated on open so the
   // dialog costs nothing while closed.
@@ -89,11 +91,14 @@ export function AgentLinkSettingsDialog({
             : notice.kind === "warning"
               ? "warning"
               : "success";
-        toast.add({ title: notice.text, type });
+        toast.add({ title: notice.render(t), type });
       }
     },
     onError: (err) =>
-      toast.add({ title: errorMessage(err, "操作失败"), type: "error" }),
+      toast.add({
+        title: errorMessage(err, t("action.operationFailed")),
+        type: "error",
+      }),
   });
 
   const busyFor = (name: string) =>
@@ -103,18 +108,15 @@ export function AgentLinkSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Agent 链接设置</DialogTitle>
+          <DialogTitle>{t("agentLink.dialogTitle")}</DialogTitle>
           <DialogDescription>
-            已检测到的 agent 会自动链接到统一的 skills
-            目录，无需手动操作。链接时 agent 自带的内容会被收编进统一目录、其余文件隔离到
-            .misc，取消链接不会移回。在此可对个别 agent
-            取消链接，取消后不会再被自动链接。
+            {t("agentLink.dialogDescription")}
           </DialogDescription>
         </DialogHeader>
 
         {isError ? (
           <p className="py-4 text-center text-[12px] text-muted-foreground">
-            加载失败：{errorMessage(error)}
+            {t("state.loadFailed", { message: errorMessage(error) })}
           </p>
         ) : isLoading || !agents ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
@@ -137,10 +139,18 @@ export function AgentLinkSettingsDialog({
                     {(skillsCount > 0 || othersCount > 0) && (
                       <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                         {skillsCount > 0 && (
-                          <span>{skillsCount} 个 skill 待收编</span>
+                          <span>
+                            {t("agentLink.skillsPending", {
+                              count: skillsCount,
+                            })}
+                          </span>
                         )}
                         {othersCount > 0 && (
-                          <span>{othersCount} 项文件待隔离</span>
+                          <span>
+                            {t("agentLink.filesPending", {
+                              count: othersCount,
+                            })}
+                          </span>
                         )}
                       </div>
                     )}
@@ -157,7 +167,9 @@ export function AgentLinkSettingsDialog({
                     onCheckedChange={(link) =>
                       toggle.mutate({ name: agent.name, link })
                     }
-                    aria-label={`${agent.display} 链接开关`}
+                    aria-label={t("agentLink.toggleAria", {
+                      name: agent.display,
+                    })}
                   />
                 </div>
               );

@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 
-import { isLiveSkill, LOCAL_SOURCE_LABEL, type SkillView } from "../lib/skill-view";
+import { useTranslation } from "react-i18next";
+
+import { skillDescription } from "../lib/i18n-content";
+import { isLiveSkill, type SkillView } from "../lib/skill-view";
 import { cn } from "../lib/utils";
+import { useAppLocale } from "../i18n/use-language";
 import { DomainBadge } from "./domain-badge";
 import { HighlightedText, type SkillMatched } from "./highlighted-text";
 import { RepoHoverCard } from "./repo-hover-card";
@@ -114,6 +118,8 @@ export function SkillCard({
   // not classified every skill, so the classification is optional. A skill may
   // belong to several domains — the badge leads with the best-fitting one.
   const domain = skill.profile?.domain;
+  const locale = useAppLocale();
+  const { t } = useTranslation();
 
   return (
     <li className="flex flex-col">
@@ -124,7 +130,7 @@ export function SkillCard({
         data-skill={dataSkill}
         role={onSelect ? "button" : undefined}
         tabIndex={onSelect ? 0 : undefined}
-        aria-label={onSelect ? `查看 ${skill.name} 详情` : undefined}
+        aria-label={onSelect ? t("common.viewDetailAria", { name: skill.name }) : undefined}
         onClick={onSelect}
         onKeyDown={(e) => {
           if (onSelect && (e.key === "Enter" || e.key === " ")) {
@@ -171,7 +177,9 @@ export function SkillCard({
           {/* A live skills.sh row's source carries no description at all, so
               it claims none — no 暂无描述 standing in for a fact nobody
               established (see `isLiveSkill`). */}
-          {isLiveSkill(skill) ? null : skill.description || "暂无描述"}
+          {isLiveSkill(skill)
+            ? null
+            : skillDescription(skill, locale) || t("common.noDescription")}
         </CardContent>
 
         {/* Pinned to the card's bottom edge (`mt-auto`): descriptions differ in
@@ -199,7 +207,7 @@ export function SkillCard({
             </>
           ) : (
             <>
-              <span className="truncate">{LOCAL_SOURCE_LABEL}</span>
+              <span className="truncate">{t("common.localInstall")}</span>
               {sourceExtra}
             </>
           )}

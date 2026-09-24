@@ -28,6 +28,7 @@ import {
   SKILL_ROW_LIST_CLASS,
 } from "../../lib/skill-list-layout";
 import { formatCount } from "../../lib/utils";
+import { I18nProvider } from "../../i18n/language-provider";
 import type { SkillView } from "../../lib/skill-view";
 import type { Skill } from "../../types/skill";
 import type { RegistryHarness } from "../../test/registry-harness";
@@ -184,13 +185,15 @@ function renderExplorePage() {
   window.location.hash = "#/explore";
   return render(
     <QueryClientProvider client={queryClient}>
-      {/* The real app mounts pages inside the shell: the header above them, with
-          the two controls both lists share in it. The page's own first row — its
-          domain chips — is its own and renders with it. */}
-      <HashRouter>
-        <AppHeader />
-        <ExplorePage />
-      </HashRouter>
+      <I18nProvider>
+        {/* The real app mounts pages inside the shell: the header above them, with
+            the two controls both lists share in it. The page's own first row — its
+            domain chips — is its own and renders with it. */}
+        <HashRouter>
+          <AppHeader />
+          <ExplorePage />
+        </HashRouter>
+      </I18nProvider>
     </QueryClientProvider>,
   );
 }
@@ -214,13 +217,15 @@ function RepoStandIn() {
 function renderExploreRoutes() {
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/explore"]}>
-        <AppHeader />
-        <Routes>
-          <Route path="/explore" element={<ExplorePage />} />
-          <Route path="/repo/*" element={<RepoStandIn />} />
-        </Routes>
-      </MemoryRouter>
+      <I18nProvider>
+        <MemoryRouter initialEntries={["/explore"]}>
+          <AppHeader />
+          <Routes>
+            <Route path="/explore" element={<ExplorePage />} />
+            <Route path="/repo/*" element={<RepoStandIn />} />
+          </Routes>
+        </MemoryRouter>
+      </I18nProvider>
     </QueryClientProvider>,
   );
 }

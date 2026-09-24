@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderOptions } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 
+import { I18nProvider } from "../i18n/language-provider";
+
 /**
  * Render a component wrapped in a MemoryRouter and a fresh QueryClient so that
  * NavLink / Link / useNavigate and @tanstack/react-query hooks work in
@@ -18,7 +20,9 @@ export function renderWithRouter(
   return render(ui, {
     wrapper: ({ children }) => (
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+        <I18nProvider>
+          <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+        </I18nProvider>
       </QueryClientProvider>
     ),
     ...options,

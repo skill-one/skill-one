@@ -1,0 +1,256 @@
+{
+  "time": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "week": "Previous 7 days",
+    "month": "Previous 30 days",
+    "earlier": "Earlier",
+    "unknown": "Time unknown"
+  },
+  "facet": {
+    "all": "All",
+    "more": "More",
+    "moreCategories": "More categories",
+    "moreCategoriesSelected": "More categories, selected {{label}}"
+  },
+  "common": {
+    "unknown": "Unknown",
+    "unknownError": "Unknown error",
+    "noDescription": "No description",
+    "coverAria": "{{name}} cover",
+    "installsTitle": "{{count}} installs",
+    "installs": "Installs",
+    "searchSkills": "Search skills",
+    "indexBuilding": "Building index…",
+    "listUnit": "List unit",
+    "back": "Back",
+    "viewDetailAria": "View {{name}} details",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "repository": "Repository",
+    "source": "Source",
+    "repoAria": "{{source}} {{repo}}",
+    "openAria": "Open {{repo}}",
+    "openOnGitHubAria": "Open {{repo}} on GitHub",
+    "stars": "{{count}} stars",
+    "localInstall": "Installed locally"
+  },
+  "nav": {
+    "mainAria": "Main navigation",
+    "store": "Store",
+    "my": "My"
+  },
+  "unit": {
+    "byRepo": "By repository",
+    "bySkill": "By skill"
+  },
+  "action": {
+    "install": "Install",
+    "installing": "Installing",
+    "installed": "Installed",
+    "retry": "Retry",
+    "installFailed": "Install failed, please try again",
+    "removed": "Removed {{name}}",
+    "remove": "Remove",
+    "removeFailed": "Removal failed",
+    "cancel": "Cancel",
+    "removeConfirmTitle": "Remove {{name}}?",
+    "removeConfirmDescription": "This skill will be uninstalled from this machine. This cannot be undone from the app; you can reinstall it later at any time.",
+    "removeAll": "Remove all",
+    "removeAllAria": "Remove all ({{label}})",
+    "removeRepoTitle": "Remove every skill of this repository?",
+    "removeRepoDescription": "{{count}} skills of {{label}} will be uninstalled from this machine. This cannot be undone from the app; they can be reinstalled later at any time.",
+    "removedRepoCount": "Removed {{count}} skills of {{label}}",
+    "turnOff": "Turn off",
+    "turnOn": "Turn on",
+    "enableAria": "{{state}} {{name}}",
+    "toggleFailed": "Toggle failed",
+    "enableAll": "Enable all",
+    "disableAll": "Disable all",
+    "partialOn": "Partially enabled · click to enable all",
+    "enableAllAria": "Enable all ({{label}})",
+    "disableAllAria": "Disable all ({{label}})",
+    "openOnGitHub": "Open on GitHub",
+    "operationFailed": "Operation failed"
+  },
+  "settings": {
+    "title": "Settings",
+    "appearance": "Appearance",
+    "repoPreviewCount": "Skills previewed on repository card",
+    "repoPreviewAria": "Number of skills previewed on repository card",
+    "softwareUpdate": "Software update",
+    "advanced": "Advanced settings"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "zh": "中文",
+    "system": "System"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "update": {
+    "newVersion": "Update available",
+    "checking": "Checking…",
+    "upToDate": "Up to date",
+    "managed": "Managed by Homebrew",
+    "failed": "Check failed",
+    "dialogTitle": "Update to v{{version}}",
+    "readyHint": "The new version is ready. The app will restart briefly during installation.",
+    "downloadingHint": "Downloading and installing the update. The app will restart automatically when done…",
+    "downloading": "Downloading…",
+    "failedLabel": "Update failed: {{message}}",
+    "later": "Later",
+    "updating": "Updating…",
+    "retryUpdate": "Retry update",
+    "updateNow": "Update now"
+  },
+  "search": {
+    "installed": "Installed on this machine",
+    "store": "Store",
+    "skillsSh": "skills.sh official search",
+    "searching": "Searching…",
+    "searchingLive": "Searching the store and skills.sh live results…"
+  },
+  "link": {
+    "agentFailed": "{{name}} failed",
+    "autoPartial": "Automatic agent linking partially failed: {{detail}}",
+    "autoFailed": "Automatic agent linking failed: {{message}}",
+    "adopted": "adopted {{count}} skills",
+    "quarantined": "quarantined {{count}} files",
+    "conflicts": "skipped {{count}} name conflicts",
+    "linked": "{{name}} linked",
+    "linkedWithDetail": "{{name}} linked ({{detail}})",
+    "alreadyLinked": "{{name}} is already linked",
+    "refused": "{{name}} refused to link: {{message}}",
+    "noReason": "no reason provided",
+    "skipped": "{{name}} skipped",
+    "failed": "{{name}} failed: {{message}}",
+    "unlinked": "{{name}} unlinked",
+    "notLinked": "{{name}} not linked",
+    "listSeparator": ", ",
+    "toastSeparator": "; "
+  },
+  "agent": {
+    "native": "Native",
+    "linked": "Linked",
+    "unlinked": "Unlinked"
+  },
+  "agentLink": {
+    "dialogTitle": "Agent link settings",
+    "dialogDescription": "Detected agents are linked to the unified skills directory automatically, with no manual action needed. When an agent is linked, its own content is adopted into the unified directory and other files are quarantined to .misc; unlinking does not move them back. Here you can unlink individual agents, and they will not be linked automatically again.",
+    "noAgents": "No available agents detected",
+    "triggerAria": "Manage agent links ({{count}} total)",
+    "menuHeader": "Agents · {{count}} total",
+    "skillsPending": "{{count}} skills pending adoption",
+    "filesPending": "{{count}} files pending quarantine",
+    "toggleAria": "{{name}} link switch"
+  },
+  "migration": {
+    "migrated": "Migrated to store version: {{repo}}",
+    "migrateFailed": "Migration failed",
+    "triggerAria": "Migrate {{name}} to its store version",
+    "badge": "Migratable",
+    "title": "Store entries with the same name",
+    "similarityTitle": "Description similarity (reference only, not a basis for migration)",
+    "hint": "Clicking an entry completes the migration and records the source permanently; local files never move. Similarity is for reference only."
+  },
+  "refresh": {
+    "dataUpdated": "Skill data updated to the latest snapshot"
+  },
+  "state": {
+    "loadFailed": "Failed to load: {{message}}",
+    "noMatch": "No skills matching “{{query}}”",
+    "noSkills": "No skills yet",
+    "repoCount": "{{count}} repositories",
+    "skillCount": "{{count}} skills",
+    "viewRepoAria": "View repository {{repo}}, {{count}} skills",
+    "viewPoolAria": "View {{name}}, {{count}} skills",
+    "repoNotInIndex": "Repository {{repo}} is not in the index",
+    "repoNoInstalled": "No installed skills from this repository",
+    "installedCount": "{{count}} installed skills",
+    "noInstalled": "No skills installed yet",
+    "noMatchSkill": "No skills match the filters",
+    "noMatchRepo": "No repositories match the filters",
+    "noLocal": "No locally installed skills"
+  },
+  "repo": {
+    "showOther": "Show {{count}} more skills in this repository",
+    "showOtherInstalled": "Show {{count}} more installed skills in this repository",
+    "showOtherUninstalled": "Show {{count}} more uninstalled skills in this repository",
+    "collapseOther": "Collapse {{count}} more skills",
+    "collapseOtherInstalled": "Collapse {{count}} more installed skills",
+    "collapseUninstalled": "Collapse {{count}} uninstalled skills"
+  },
+  "run": {
+    "moreFrom": "{{count}} more from",
+    "moreFromAria": "{{count}} more from {{repo}}",
+    "total": "{{count}} total"
+  },
+  "popover": {
+    "skillCount": "{{count}} skills",
+    "loadFailed": "Failed to load skill list",
+    "noneEnabled": "No enabled skills",
+    "noneEnabledHint": "Install or enable one in the main app",
+    "open": "Open Skill One"
+  },
+  "detail": {
+    "source": "Source",
+    "localFile": "Local file",
+    "provenanceTitle": "View version and source info",
+    "provenanceTitleLocal": "View source info",
+    "versionLabel": "Version ",
+    "seenAtLabel": "Indexed ",
+    "installedAtLabel": "Installed ",
+    "installedAtHint": "Creation time of the skill directory; skills adopted from an agent directory keep their original timestamp.",
+    "saved": "Saved {{name}}",
+    "saveFailed": "Save failed",
+    "noBody": "(SKILL.md has no body content)",
+    "openSourceRepo": "Open source repository on GitHub",
+    "openOnSkillsSh": "Open on skills.sh",
+    "unsavedChanges": "Unsaved changes",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "editSkill": "Edit SKILL.md",
+    "loadFailed": "Failed to load: {{message}}",
+    "loadFailedHint": "The skill directory may not contain an accessible SKILL.md."
+  },
+  "advanced": {
+    "title": "Advanced settings",
+    "description": "Configure the download source for skill data (index, SKILL.md details, and installs all follow this setting).",
+    "cdnTitle": "CDN base",
+    "cdnSaved": "Saved",
+    "cdnHintBefore": "Empty = connect to GitHub directly first (",
+    "cdnHintAfter": "); if that is unreachable, fall back to the default CDN. A custom value is used first when provided.",
+    "cdnExampleBefore": "Examples: leave empty for direct GitHub access; the default CDN is ",
+    "directGithub": "Direct GitHub",
+    "useDefaultCdn": "Use default CDN",
+    "save": "Save",
+    "dataSource": "Data source",
+    "dataSourceHint": "Store data comes from daily snapshots published by two GitHub repositories. It is verified on launch and then silently updated daily — no manual action needed.",
+    "checkingNow": "Checking…",
+    "checkUpdate": "Check for updates",
+    "redownload": "Re-download now",
+    "skillSource": "Skill data source",
+    "skillSourceNote": "(skills-profiles)",
+    "snapshot": "Snapshot",
+    "publishedAt": "Published",
+    "entryCount": "Entries",
+    "lastChecked": "Last checked",
+    "notReady": "Data not ready yet",
+    "origin": {
+      "updated": "Latest index downloaded",
+      "unchanged": "Index unchanged, local cache reused",
+      "cache": "Verifying local cache…"
+    },
+    "checkResult": {
+      "updated": "New snapshot found and updated in the background",
+      "current": "Already on the latest snapshot",
+      "unknown": "Check failed, please try again later"
+    }
+  }
+}

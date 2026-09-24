@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { setManySkillsEnabled } from "../lib/local-skills";
 import {
@@ -46,6 +47,7 @@ export function RepoEnableSwitch({
 }) {
   const queryClient = useQueryClient();
   const { data: installed } = useInstalledSkills();
+  const { t } = useTranslation();
   const [pending, setPending] = useState<boolean | null>(null);
 
   const toggle = useMutation({
@@ -57,7 +59,7 @@ export function RepoEnableSwitch({
     },
     onError: (e) => {
       setPending(null);
-      toast.add({ title: errorMessage(e, "切换失败"), type: "error" });
+      toast.add({ title: errorMessage(e, t("action.toggleFailed")), type: "error" });
       void markSkillsChanged(queryClient);
     },
   });
@@ -74,15 +76,19 @@ export function RepoEnableSwitch({
   const mixed = pending === null && !allOn && someOn;
 
   const tooltip = allOn
-    ? "全部关闭"
+    ? t("action.disableAll")
     : someOn
-      ? "部分开启 · 点击全部开启"
-      : "全部开启";
+      ? t("action.partialOn")
+      : t("action.enableAll");
 
   return (
     <Tooltip>
       <TooltipTrigger
-        aria-label={checked ? `全部关闭（${label}）` : `全部开启（${label}）`}
+        aria-label={
+          checked
+            ? t("action.disableAllAria", { label })
+            : t("action.enableAllAria", { label })
+        }
         render={
           <Switch
             checked={checked}

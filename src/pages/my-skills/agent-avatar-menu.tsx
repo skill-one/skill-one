@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Loader2, Settings2, Users } from "lucide-react";
 
 import { fetchAgentStatus } from "../../lib/local-skills";
@@ -16,7 +17,11 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { AgentAvatarGroup } from "./agent-avatar-group";
-import { agentLinkState, agentStateDotClass, agentStateLabel } from "./agent-link-state";
+import {
+  agentLinkState,
+  agentStateDotClass,
+  agentStateLabelKey,
+} from "./agent-link-state";
 import { AgentLinkSettingsDialog } from "./agent-link-settings-dialog";
 
 /**
@@ -33,6 +38,7 @@ import { AgentLinkSettingsDialog } from "./agent-link-settings-dialog";
  * strip only ever shows a prefix of them inline, while the menu lists all.
  */
 export function AgentAvatarMenu() {
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -55,7 +61,7 @@ export function AgentAvatarMenu() {
         <Placeholder
           icon={Users}
           className="h-auto min-h-0 gap-1.5 py-8 pb-0"
-          message={`加载失败：${errorMessage(error)}`}
+          message={t("state.loadFailed", { message: errorMessage(error) })}
         />
       ) : isLoading ? (
         <div className="flex items-center justify-center py-8 text-muted-foreground">
@@ -65,7 +71,7 @@ export function AgentAvatarMenu() {
         <Placeholder
           icon={Users}
           className="h-auto min-h-0 gap-1.5 py-8 pb-0"
-          message="未检测到可用的 agent"
+          message={t("agentLink.noAgents")}
         />
       ) : (
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -73,7 +79,9 @@ export function AgentAvatarMenu() {
             render={
               <button
                 type="button"
-                aria-label={`管理 agent 链接（共 ${list.length} 个）`}
+                aria-label={t("agentLink.triggerAria", {
+                  count: list.length,
+                })}
                 className="rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <AgentAvatarGroup agents={list} />
@@ -91,7 +99,7 @@ export function AgentAvatarMenu() {
                   the accessibility tree, which would hide the gear below. */}
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[11px] font-normal text-muted-foreground">
-                  Agents · 共 {list.length} 个
+                  {t("agentLink.menuHeader", { count: list.length })}
                 </span>
                 {/* The single control: opens the per-agent settings dialog.
                     The menu closes first so the modal dialog does not sit on
@@ -99,7 +107,7 @@ export function AgentAvatarMenu() {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  aria-label="Agent 链接设置"
+                  aria-label={t("agentLink.dialogTitle")}
                   onClick={(e) => {
                     e.stopPropagation();
                     setMenuOpen(false);
@@ -136,10 +144,18 @@ export function AgentAvatarMenu() {
                       {(skillsCount > 0 || othersCount > 0) && (
                         <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
                           {skillsCount > 0 && (
-                            <span>{skillsCount} 个 skill 待收编</span>
+                            <span>
+                              {t("agentLink.skillsPending", {
+                                count: skillsCount,
+                              })}
+                            </span>
                           )}
                           {othersCount > 0 && (
-                            <span>{othersCount} 项文件待隔离</span>
+                            <span>
+                              {t("agentLink.filesPending", {
+                                count: othersCount,
+                              })}
+                            </span>
                           )}
                         </div>
                       )}
@@ -151,7 +167,7 @@ export function AgentAvatarMenu() {
                           agentStateDotClass[agentLinkState(agent)],
                         )}
                       />
-                      {agentStateLabel(agent)}
+                      {t(agentStateLabelKey(agent))}
                     </span>
                   </DropdownMenuItem>
                 );

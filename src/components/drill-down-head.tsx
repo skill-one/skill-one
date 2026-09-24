@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import { ChevronLeft } from "lucide-react";
 
 import { useReturn } from "../hooks/use-return";
@@ -70,6 +71,7 @@ export function DrillDownHead({
   action?: ReactNode;
 }) {
   const wayBack = useReturn(back);
+  const { t } = useTranslation();
 
   return (
     <div className="mb-4 flex min-w-0 items-center gap-3">
@@ -91,7 +93,7 @@ export function DrillDownHead({
             <Link
               to={wayBack.to}
               onClick={wayBack.onClick}
-              aria-label="返回"
+              aria-label={t("common.back")}
               className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
           }
@@ -100,7 +102,7 @@ export function DrillDownHead({
         </TooltipTrigger>
         {/* Below the control: it opens the page, on the first row the content
             has, so the tip has nowhere to go but down. */}
-        <TooltipContent side="bottom">返回</TooltipContent>
+        <TooltipContent side="bottom">{t("common.back")}</TooltipContent>
       </Tooltip>
 
       {avatar}

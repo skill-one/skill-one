@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
+import { useAppLocale } from "../../i18n/use-language";
+import { skillDescription } from "../../lib/i18n-content";
 import { ordinalClass } from "../../lib/ordinal";
 import {
   isLiveSkill,
-  LOCAL_SOURCE_LABEL,
   type SkillView,
 } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
@@ -114,6 +116,8 @@ export function SkillRow({
   // 暂无描述 placeholder nor the help mark (see `isLiveSkill`); an installed
   // row the store cannot resolve is a local fact, and keeps both.
   const live = isLiveSkill(skill);
+  const locale = useAppLocale();
+  const { t } = useTranslation();
 
   return (
     <li className="flex flex-col">
@@ -121,7 +125,7 @@ export function SkillRow({
         size="sm"
         role={onSelect ? "button" : undefined}
         tabIndex={onSelect ? 0 : undefined}
-        aria-label={onSelect ? `查看 ${skill.name} 详情` : undefined}
+        aria-label={onSelect ? t("common.viewDetailAria", { name: skill.name }) : undefined}
         onClick={onSelect}
         onKeyDown={(e) => {
           if (onSelect && (e.key === "Enter" || e.key === " ")) {
@@ -171,7 +175,7 @@ export function SkillRow({
                 </span>
               }
             />
-            <TooltipContent>{domainTooltip(domain ?? [])}</TooltipContent>
+            <TooltipContent>{domainTooltip(domain ?? [], locale)}</TooltipContent>
           </Tooltip>
         )}
 
@@ -185,7 +189,7 @@ export function SkillRow({
           </h3>
           {!live && (
             <p className="truncate text-[12px] leading-snug text-muted-foreground">
-              {skill.description || "暂无描述"}
+              {skillDescription(skill, locale) || t("common.noDescription")}
             </p>
           )}
         </div>
@@ -210,7 +214,7 @@ export function SkillRow({
             />
           )}
           {showSource && !owner && (
-            <span className="truncate">{LOCAL_SOURCE_LABEL}</span>
+            <span className="truncate">{t("common.localInstall")}</span>
           )}
           {storeBacked && (
             <SkillInstalls skill={skill} className="w-16 justify-end" />

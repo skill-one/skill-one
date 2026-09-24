@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { ListUnitToggle } from "./list-unit-toggle";
 import { SearchInput } from "./search-input";
 import { useDestinationView, useListQuery } from "../hooks/use-list-view";
@@ -22,6 +24,7 @@ import { setQuery, setUnit, type Destination } from "../lib/list-view";
  * wrongly.
  */
 export function ListToolbar({ destination }: { destination: Destination }) {
+  const { t } = useTranslation();
   const query = useListQuery();
   const { unit } = useDestinationView(destination);
 
@@ -34,9 +37,9 @@ export function ListToolbar({ destination }: { destination: Destination }) {
       <SearchInput
         value={query}
         onChange={setQuery}
-        label="搜索 Skill"
+        label={t("common.searchSkills")}
         disabled={waiting}
-        placeholder={waiting ? "索引构建中…" : undefined}
+        placeholder={waiting ? t("common.indexBuilding") : undefined}
       />
       <ListUnitToggle
         className="ml-auto"

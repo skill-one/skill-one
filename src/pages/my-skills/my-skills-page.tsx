@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import { useTranslation } from "react-i18next";
+import type { ParseKeys } from "i18next";
 import { Boxes, Users } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
@@ -12,7 +14,6 @@ import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
 import {
   installedSkillView,
   skillKey,
-  LOCAL_SOURCE_LABEL,
   type SkillView,
 } from "../../lib/skill-view";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
@@ -135,6 +136,7 @@ function starsOf(group: RepoGroup): number | undefined {
  * grouped.
  */
 export function MySkillsPage() {
+  const { t } = useTranslation();
   const { data: skills, isLoading, isError, error } = useInstalledSkills();
 
   // Install sources recorded by this app (the provenance ledger), reconciled
@@ -411,7 +413,9 @@ export function MySkillsPage() {
           {isError ? (
             <Placeholder
               icon={Users}
-              message={`加载失败：${errorMessage(error)}`}
+              message={t("state.loadFailed", {
+                message: errorMessage(error),
+              })}
             />
           ) : isLoading ? (
             // The same card- or row-shaped skeleton the store lists paint:
@@ -429,7 +433,7 @@ export function MySkillsPage() {
               }
             />
           ) : list.length === 0 ? (
-            <Placeholder icon={Boxes} message="还没有安装任何技能" />
+            <Placeholder icon={Boxes} message={t("state.noInstalled")} />
           ) : isSearching ? (
             // The unified search answer: three sections — what this machine
             // has (the rows above, injected with the enable switch, the dimmed
@@ -454,7 +458,9 @@ export function MySkillsPage() {
           ) : itemCount === 0 ? (
             <Placeholder
               message={
-                unit === "skill" ? "没有符合条件的 skill" : "没有符合条件的仓库"
+                unit === "skill"
+                  ? t("state.noMatchSkill")
+                  : t("state.noMatchRepo")
               }
             />
           ) : unit === "skill" ? (
@@ -470,8 +476,8 @@ export function MySkillsPage() {
               {shownSkillGroups.map((group) => (
                 <CollapsibleSection
                   key={group.key}
-                  title={group.title}
-                  count={`${group.items.length} 个 skill`}
+                  title={t(group.title as ParseKeys)}
+                  count={t("state.skillCount", { count: group.items.length })}
                 >
                   <ul className={SKILL_ROW_LIST_CLASS}>
                     {group.items.map((row) => {
@@ -511,8 +517,8 @@ export function MySkillsPage() {
               {shownRepoGroups.map((group) => (
                 <CollapsibleSection
                   key={group.key}
-                  title={group.title}
-                  count={`${group.items.length} 个仓库`}
+                  title={t(group.title as ParseKeys)}
+                  count={t("state.repoCount", { count: group.items.length })}
                 >
                   <ul className={REPO_LIST_CLASS}>
                     {group.items.map((card) => (
@@ -549,7 +555,7 @@ export function MySkillsPage() {
                         footerAction={
                           <RepoEnableSwitch
                             names={card.items.map((row) => row.skill.name)}
-                            label={card.repo || LOCAL_SOURCE_LABEL}
+                            label={card.repo || t("common.localInstall")}
                           />
                         }
                       />

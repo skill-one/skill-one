@@ -1,11 +1,14 @@
 import { useEffect } from "react";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useTranslation } from "react-i18next";
 import { LoaderCircle, Sparkles } from "lucide-react";
 
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
+import { skillDescription } from "../lib/i18n-content";
+import { useAppLocale } from "../i18n/use-language";
 import { errorMessage } from "../lib/utils";
 import { isTauri } from "../lib/tauri";
 import {
@@ -33,6 +36,8 @@ import { useSkillsLiveSync } from "./use-skills-live-sync";
  */
 export function PopoverPage() {
   useSkillsLiveSync();
+  const { t } = useTranslation();
+  const locale = useAppLocale();
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -56,7 +61,7 @@ export function PopoverPage() {
         <h1 className="text-sm font-semibold">Skill One</h1>
         {!isLoading && !isError && (
           <span className="ml-auto text-xs text-muted-foreground">
-            {skills.length} 个技能
+            {t("popover.skillCount", { count: skills.length })}
           </span>
         )}
       </header>
@@ -64,7 +69,7 @@ export function PopoverPage() {
       <div className="min-h-0 flex-1 overflow-y-auto p-1">
         {isError ? (
           <Notice
-            title="技能列表加载失败"
+            title={t("popover.loadFailed")}
             detail={errorMessage(error)}
           />
         ) : isLoading ? (
@@ -72,7 +77,7 @@ export function PopoverPage() {
             <LoaderCircle className="animate-spin text-muted-foreground" />
           </div>
         ) : skills.length === 0 ? (
-          <Notice title="没有已启用的技能" detail="在主应用中安装或启用一个吧" />
+          <Notice title={t("popover.noneEnabled")} detail={t("popover.noneEnabledHint")} />
         ) : (
           <ul>
             {skills.map((skill) => (
@@ -88,9 +93,9 @@ export function PopoverPage() {
                   className="w-full rounded-md px-2 py-1.5 text-left hover:bg-accent"
                 >
                   <p className="truncate text-sm font-medium">{skill.name}</p>
-                  {skill.description && (
+                  {skillDescription(skill, locale) && (
                     <p className="truncate text-xs text-muted-foreground">
-                      {skill.description}
+                      {skillDescription(skill, locale)}
                     </p>
                   )}
                 </button>
@@ -107,7 +112,7 @@ export function PopoverPage() {
               void emit(POPOVER_NAVIGATE_EVENT, { path: MY_SKILLS_PATH });
           }}
         >
-          打开 Skill One
+          {t("popover.open")}
         </Button>
       </footer>
     </div>

@@ -37,6 +37,13 @@ export interface Skill {
    * Short human-readable description (shown on one truncated line in a row).
    */
   description: string;
+  /**
+   * Chinese translation of `description`, carried by the index as
+   * `description_zh`. Absent for rows the upstream has not translated (the
+   * UI then falls back to the English description), and for installed skills
+   * the dataset does not list.
+   */
+  descriptionZh?: string;
   /** GitHub star count of the source repo; 0 when the index entry lacks it. */
   stars: number;
   /** Lifetime install count recorded by skills.sh; 0 when absent. */

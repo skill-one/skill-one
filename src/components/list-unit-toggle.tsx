@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import type { ParseKeys } from "i18next";
 import { Boxes, Rows3, type LucideIcon } from "lucide-react";
 
 import { cn } from "../lib/utils";
@@ -5,10 +7,10 @@ import type { ListUnit } from "../lib/list-view";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
-/** The two readings: a mark each, and the words a hover says for it. */
-const UNITS: { unit: ListUnit; label: string; icon: LucideIcon }[] = [
-  { unit: "repo", label: "按仓库", icon: Boxes },
-  { unit: "skill", label: "按技能", icon: Rows3 },
+/** The two readings: a mark each, and the i18n key a hover says for it. */
+const UNITS: { unit: ListUnit; labelKey: ParseKeys; icon: LucideIcon }[] = [
+  { unit: "repo", labelKey: "unit.byRepo", icon: Boxes },
+  { unit: "skill", labelKey: "unit.bySkill", icon: Rows3 },
 ];
 
 /**
@@ -35,6 +37,7 @@ export function ListUnitToggle({
   onChange: (unit: ListUnit) => void;
   className?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <ToggleGroup
       className={cn("shrink-0", className)}
@@ -45,15 +48,15 @@ export function ListUnitToggle({
         const next = value[0];
         if (next && next !== unit) onChange(next as ListUnit);
       }}
-      aria-label="列表单位"
+      aria-label={t("common.listUnit")}
     >
-      {UNITS.map(({ unit: value, label, icon: Icon }) => (
+      {UNITS.map(({ unit: value, labelKey, icon: Icon }) => (
         <Tooltip key={value}>
           <TooltipTrigger
             render={
               <ToggleGroupItem
                 value={value}
-                aria-label={label}
+                aria-label={t(labelKey)}
                 className="px-2.5"
               />
             }
@@ -61,7 +64,7 @@ export function ListUnitToggle({
             <Icon aria-hidden />
           </TooltipTrigger>
           {/* Below the control: the row it lives in is the window's top edge. */}
-          <TooltipContent side="bottom">{label}</TooltipContent>
+          <TooltipContent side="bottom">{t(labelKey)}</TooltipContent>
         </Tooltip>
       ))}
     </ToggleGroup>

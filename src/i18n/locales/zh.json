@@ -1,0 +1,256 @@
+{
+  "time": {
+    "today": "今天",
+    "yesterday": "昨天",
+    "week": "近7天",
+    "month": "近30天",
+    "earlier": "更早",
+    "unknown": "时间未知"
+  },
+  "facet": {
+    "all": "全部",
+    "more": "更多",
+    "moreCategories": "更多分类",
+    "moreCategoriesSelected": "更多分类，已选 {{label}}"
+  },
+  "common": {
+    "unknown": "未知",
+    "unknownError": "未知错误",
+    "noDescription": "暂无描述",
+    "coverAria": "{{name}} 封面图",
+    "installsTitle": "{{count}} 次安装",
+    "installs": "安装量",
+    "searchSkills": "搜索 Skill",
+    "indexBuilding": "索引构建中…",
+    "listUnit": "列表单位",
+    "back": "返回",
+    "viewDetailAria": "查看 {{name}} 详情",
+    "expand": "展开",
+    "collapse": "收起",
+    "repository": "仓库",
+    "source": "来源",
+    "repoAria": "{{source}} {{repo}}",
+    "openAria": "打开 {{repo}}",
+    "openOnGitHubAria": "在 GitHub 中打开 {{repo}}",
+    "stars": "{{count}} Star",
+    "localInstall": "本地安装"
+  },
+  "nav": {
+    "mainAria": "主导航",
+    "store": "商店",
+    "my": "我的"
+  },
+  "unit": {
+    "byRepo": "按仓库",
+    "bySkill": "按技能"
+  },
+  "action": {
+    "install": "安装",
+    "installing": "安装中",
+    "installed": "已安装",
+    "retry": "重试",
+    "installFailed": "安装失败，请重试",
+    "removed": "已移除 {{name}}",
+    "remove": "移除",
+    "removeFailed": "移除失败",
+    "cancel": "取消",
+    "removeConfirmTitle": "移除 {{name}}？",
+    "removeConfirmDescription": "将从本机卸载该 skill。此操作无法从应用内撤销；之后可随时重新安装。",
+    "removeAll": "移除全部",
+    "removeAllAria": "移除全部（{{label}}）",
+    "removeRepoTitle": "移除整个仓库的 skill？",
+    "removeRepoDescription": "将从本机卸载 {{label}} 的 {{count}} 个 skill。此操作无法从应用内撤销；之后可随时重新安装。",
+    "removedRepoCount": "已移除 {{label}} 的 {{count}} 个 skill",
+    "turnOff": "关闭",
+    "turnOn": "开启",
+    "enableAria": "{{state}} {{name}}",
+    "toggleFailed": "切换失败",
+    "enableAll": "全部开启",
+    "disableAll": "全部关闭",
+    "partialOn": "部分开启 · 点击全部开启",
+    "enableAllAria": "全部开启（{{label}}）",
+    "disableAllAria": "全部关闭（{{label}}）",
+    "openOnGitHub": "在 GitHub 打开",
+    "operationFailed": "操作失败"
+  },
+  "settings": {
+    "title": "设置",
+    "appearance": "外观",
+    "repoPreviewCount": "仓库卡片预览数",
+    "repoPreviewAria": "仓库卡片预览数量",
+    "softwareUpdate": "软件更新",
+    "advanced": "高级设置"
+  },
+  "language": {
+    "label": "语言",
+    "en": "English",
+    "zh": "中文",
+    "system": "跟随系统"
+  },
+  "theme": {
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统"
+  },
+  "update": {
+    "newVersion": "有新版本",
+    "checking": "检查中…",
+    "upToDate": "已是最新",
+    "managed": "Homebrew 管理",
+    "failed": "检查失败",
+    "dialogTitle": "更新到 v{{version}}",
+    "readyHint": "新版本已准备就绪，安装过程中应用会短暂重启。",
+    "downloadingHint": "正在下载并安装更新，完成后应用会自动重启…",
+    "downloading": "正在下载…",
+    "failedLabel": "更新失败：{{message}}",
+    "later": "稍后再说",
+    "updating": "正在更新…",
+    "retryUpdate": "重试更新",
+    "updateNow": "立即更新"
+  },
+  "search": {
+    "installed": "本地已安装",
+    "store": "应用商店",
+    "skillsSh": "skills.sh 官方搜索",
+    "searching": "搜索中…",
+    "searchingLive": "正在搜索应用商店与 skills.sh 的实时结果…"
+  },
+  "link": {
+    "agentFailed": "{{name}} 失败",
+    "autoPartial": "自动链接部分 agent 失败：{{detail}}",
+    "autoFailed": "自动链接 agent 失败：{{message}}",
+    "adopted": "收编 {{count}} 个 skill",
+    "quarantined": "隔离 {{count}} 项文件",
+    "conflicts": "同名跳过 {{count}} 个",
+    "linked": "{{name}} 已链接",
+    "linkedWithDetail": "{{name}} 已链接（{{detail}}）",
+    "alreadyLinked": "{{name}} 已链接过",
+    "refused": "{{name}} 拒绝链接：{{message}}",
+    "noReason": "未提供原因",
+    "skipped": "{{name}} 已跳过",
+    "failed": "{{name}} 失败：{{message}}",
+    "unlinked": "{{name}} 已取消链接",
+    "notLinked": "{{name}} 未链接",
+    "listSeparator": "，",
+    "toastSeparator": "；"
+  },
+  "agent": {
+    "native": "原生",
+    "linked": "已链接",
+    "unlinked": "未链接"
+  },
+  "agentLink": {
+    "dialogTitle": "Agent 链接设置",
+    "dialogDescription": "已检测到的 agent 会自动链接到统一的 skills 目录，无需手动操作。链接时 agent 自带的内容会被收编进统一目录、其余文件隔离到 .misc，取消链接不会移回。在此可对个别 agent 取消链接，取消后不会再被自动链接。",
+    "noAgents": "未检测到可用的 agent",
+    "triggerAria": "管理 agent 链接（共 {{count}} 个）",
+    "menuHeader": "Agents · 共 {{count}} 个",
+    "skillsPending": "{{count}} 个 skill 待收编",
+    "filesPending": "{{count}} 项文件待隔离",
+    "toggleAria": "{{name}} 链接开关"
+  },
+  "migration": {
+    "migrated": "已迁移至商店版：{{repo}}",
+    "migrateFailed": "迁移失败",
+    "triggerAria": "将 {{name}} 迁移至商店版",
+    "badge": "可迁移",
+    "title": "发现同名商店条目",
+    "similarityTitle": "描述相似度（仅供参考，不作为迁移依据）",
+    "hint": "点击条目即完成迁移并永久记录来源，本地文件不会移动；相似度仅供参考。"
+  },
+  "refresh": {
+    "dataUpdated": "技能数据已更新到最新快照"
+  },
+  "state": {
+    "loadFailed": "加载失败：{{message}}",
+    "noMatch": "未找到匹配“{{query}}”的 Skill",
+    "noSkills": "暂无技能",
+    "repoCount": "{{count}} 个仓库",
+    "skillCount": "{{count}} 个 skill",
+    "viewRepoAria": "查看仓库 {{repo}}，{{count}} 个 skill",
+    "viewPoolAria": "查看{{name}}，{{count}} 个 skill",
+    "repoNotInIndex": "索引中没有仓库 {{repo}}",
+    "repoNoInstalled": "该仓库没有已安装的 skill",
+    "installedCount": "{{count}} 个已安装 skill",
+    "noInstalled": "还没有安装任何技能",
+    "noMatchSkill": "没有符合条件的 skill",
+    "noMatchRepo": "没有符合条件的仓库",
+    "noLocal": "没有本地安装的 skill"
+  },
+  "repo": {
+    "showOther": "查看同仓库其他 {{count}} 个 skill",
+    "showOtherInstalled": "查看同仓库其他 {{count}} 个已安装 skill",
+    "showOtherUninstalled": "查看同仓库其他 {{count}} 个未安装 skill",
+    "collapseOther": "收起其他 {{count}} 个 skill",
+    "collapseOtherInstalled": "收起其他 {{count}} 个已安装 skill",
+    "collapseUninstalled": "收起未安装的 {{count}} 个 skill"
+  },
+  "run": {
+    "moreFrom": "还有 {{count}} 个来自",
+    "moreFromAria": "还有 {{count}} 个来自 {{repo}}",
+    "total": "共 {{count}}"
+  },
+  "popover": {
+    "skillCount": "{{count}} 个技能",
+    "loadFailed": "技能列表加载失败",
+    "noneEnabled": "没有已启用的技能",
+    "noneEnabledHint": "在主应用中安装或启用一个吧",
+    "open": "打开 Skill One"
+  },
+  "detail": {
+    "source": "源",
+    "localFile": "本地文件",
+    "provenanceTitle": "查看版本与来源信息",
+    "provenanceTitleLocal": "查看来源信息",
+    "versionLabel": "版本 ",
+    "seenAtLabel": "收录时间 ",
+    "installedAtLabel": "安装于 ",
+    "installedAtHint": "技能目录的创建时间；从 agent 目录收编的技能保留其原始时间。",
+    "saved": "已保存 {{name}}",
+    "saveFailed": "保存失败",
+    "noBody": "（SKILL.md 无正文内容）",
+    "openSourceRepo": "在 GitHub 中打开源仓库",
+    "openOnSkillsSh": "在 skills.sh 中打开",
+    "unsavedChanges": "未保存的更改",
+    "cancel": "取消",
+    "save": "保存",
+    "edit": "编辑",
+    "editSkill": "编辑 SKILL.md",
+    "loadFailed": "加载失败：{{message}}",
+    "loadFailedHint": "该技能目录下可能没有可访问的 SKILL.md。"
+  },
+  "advanced": {
+    "title": "高级设置",
+    "description": "配置技能数据的下载源（索引、SKILL.md 详情、安装统一生效）。",
+    "cdnTitle": "CDN 基址",
+    "cdnSaved": "已保存",
+    "cdnHintBefore": "留空 = 优先直连 GitHub（",
+    "cdnHintAfter": "），连不上时回退到默认 CDN。填入自定义值后将优先使用它。",
+    "cdnExampleBefore": "示例：直连 GitHub 留空；默认 CDN 为 ",
+    "directGithub": "直连 GitHub",
+    "useDefaultCdn": "使用默认 CDN",
+    "save": "保存",
+    "dataSource": "数据源",
+    "dataSourceHint": "商店数据来自两个 GitHub 仓库发布的每日快照。启动时自动校验、之后每日静默更新，无需手动干预。",
+    "checkingNow": "正在检测…",
+    "checkUpdate": "检测更新",
+    "redownload": "立即重新下载",
+    "skillSource": "技能数据源",
+    "skillSourceNote": "（skills-profiles）",
+    "snapshot": "快照",
+    "publishedAt": "发布于",
+    "entryCount": "条目数",
+    "lastChecked": "上次校验",
+    "notReady": "数据尚未就绪",
+    "origin": {
+      "updated": "已下载最新索引",
+      "unchanged": "索引未更新，已复用本地缓存",
+      "cache": "正在校验本地缓存…"
+    },
+    "checkResult": {
+      "updated": "发现新快照，已在后台更新",
+      "current": "已是最新快照",
+      "unknown": "检测失败，请稍后重试"
+    }
+  }
+}

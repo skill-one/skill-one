@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Trash2 } from "lucide-react";
 
 import { removeInstalledSkills } from "../lib/local-skills";
@@ -52,6 +53,7 @@ export function RepoRemoveButton({
   const [removing, setRemoving] = useState(false);
 
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const { data: installed } = useInstalledSkills();
   const wanted = new Set(names);
   const onDisk = (installed ?? []).filter((s) => wanted.has(s.name));
@@ -65,13 +67,16 @@ export function RepoRemoveButton({
       // sidebar count and the menu bar popover all read this one signal.
       await markSkillsChanged(queryClient);
       toast.add({
-        title: `已移除 ${label} 的 ${names.length} 个 skill`,
+        title: t("action.removedRepoCount", {
+          label,
+          count: names.length,
+        }),
         type: "success",
       });
       setOpen(false);
       onRemoved?.();
     } catch (err) {
-      toast.add({ title: errorMessage(err, "移除失败"), type: "error" });
+      toast.add({ title: errorMessage(err, t("action.removeFailed")), type: "error" });
     } finally {
       setRemoving(false);
     }
@@ -90,7 +95,7 @@ export function RepoRemoveButton({
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label={`移除全部（${label}）`}
+              aria-label={t("action.removeAllAria", { label })}
               onClick={() => setOpen(true)}
               className="shrink-0 text-muted-foreground hover:text-destructive focus-visible:text-destructive"
             />
@@ -98,14 +103,17 @@ export function RepoRemoveButton({
         >
           <Trash2 aria-hidden />
         </TooltipTrigger>
-        <TooltipContent side="bottom">移除全部</TooltipContent>
+        <TooltipContent side="bottom">{t("action.removeAll")}</TooltipContent>
       </Tooltip>
 
       <RemoveConfirmDialog
         open={open}
         onOpenChange={setOpen}
-        title="移除整个仓库的 skill？"
-        description={`将从本机卸载 ${label} 的 ${names.length} 个 skill。此操作无法从应用内撤销；之后可随时重新安装。`}
+        title={t("action.removeRepoTitle")}
+        description={t("action.removeRepoDescription", {
+          label,
+          count: names.length,
+        })}
         names={names}
         pending={removing}
         onConfirm={() => void handleRemove()}
