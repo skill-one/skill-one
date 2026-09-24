@@ -45,17 +45,13 @@ describe("formatDayHeading", () => {
   // An afternoon in 2026, the year the "same year" cases live in.
   const now = day(2026, 9, 24) + 15 * 60 * 60 * 1000;
 
-  it("reads a day of the current year as month and day alone", () => {
-    expect(formatDayHeading(day(2026, 9, 22), "zh", now)).toBe("9月22日");
-    expect(formatDayHeading(day(2026, 1, 3), "zh", now)).toBe("1月3日");
-    expect(formatDayHeading(day(2026, 9, 22), "en", now)).toBe("September 22");
+  it("reads a day of the current year as a zero-padded month-day", () => {
+    expect(formatDayHeading(day(2026, 9, 22), now)).toBe("09-22");
+    expect(formatDayHeading(day(2026, 1, 3), now)).toBe("01-03");
   });
 
   it("carries the year on a day of another year", () => {
-    expect(formatDayHeading(day(2025, 12, 3), "zh", now)).toBe("2025年12月3日");
-    expect(formatDayHeading(day(2025, 12, 3), "en", now)).toBe(
-      "December 3, 2025",
-    );
+    expect(formatDayHeading(day(2025, 12, 3), now)).toBe("2025-12-03");
   });
 });
 

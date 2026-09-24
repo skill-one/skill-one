@@ -26,7 +26,6 @@ import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
 import { resetLinkSuggestions } from "../../lib/link-suggestions";
 import { dayFilingOf } from "../../lib/time-groups";
 import { formatDayHeading } from "../../lib/utils";
-import type { AppLocale } from "../../lib/i18n-content";
 import i18n from "../../i18n";
 
 /**
@@ -44,7 +43,7 @@ function dayTitle(daysAgo: number): string {
   if (!filing) return i18n.t("time.unknown");
   return filing.titleKey
     ? i18n.t(filing.titleKey as ParseKeys)
-    : formatDayHeading(filing.start ?? 0, i18n.language as AppLocale);
+    : formatDayHeading(filing.start ?? 0);
 }
 
 /** The page's search box debounces for real; 1 s is a contention flake. */
