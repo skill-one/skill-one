@@ -109,7 +109,6 @@ const versionedSkill: SkillView = {
 const SEEN_AT_LOCALE = new Date("2026-08-12T04:34:54Z").toLocaleDateString();
 
 const detail = {
-  name: "pdf",
   description: "Read and merge PDF documents.",
   license: "MIT",
   author: "Anthropic",
@@ -118,7 +117,6 @@ const detail = {
 };
 
 const localDetail = {
-  name: "my-tool",
   description: "",
   instructions: "Local skill body.",
   path: "/Users/me/.agents/skills/my-tool/SKILL.md",

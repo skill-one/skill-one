@@ -17,12 +17,7 @@ import { MIRROR, mirrorRef } from "./mirror";
  */
 
 /** Frontmatter fields surfaced in the detail view. */
-const FRONTMATTER_FIELDS = [
-  "name",
-  "description",
-  "license",
-  "author",
-] as const;
+const FRONTMATTER_FIELDS = ["description", "license", "author"] as const;
 
 type FrontmatterField = (typeof FRONTMATTER_FIELDS)[number];
 
@@ -55,7 +50,7 @@ export async function fetchSkillDetail(
     const { text } = await fetchFirstText(
       fileCandidates({ repo: MIRROR.repo, ref: mirrorRef(), path }),
     );
-    return toDetail(text, skillId, path);
+    return toDetail(text, path);
   } catch (err) {
     // A 404 on every candidate means the mirror no longer ships this
     // directory (a stale registry entry) — worth a precise "not found".
@@ -120,11 +115,16 @@ export function parseFrontmatter(raw: string): {
   };
 }
 
-/** Split a raw SKILL.md into the shape the detail view consumes. */
-export function toDetail(raw: string, skillId: string, path: string): SkillDetail {
+/**
+ * Split a raw SKILL.md into the shape the detail view consumes.
+ *
+ * The skill's identity is not part of this shape: the name everywhere in the
+ * app is the registry slug / on-disk directory name, so the frontmatter
+ * `name` is deliberately never read — callers that need it already hold it.
+ */
+export function toDetail(raw: string, path: string): SkillDetail {
   const { frontmatter, body } = parseFrontmatter(raw);
   return {
-    name: frontmatter.name ?? skillId,
     description: frontmatter.description ?? "",
     license: frontmatter.license,
     author: frontmatter.author,

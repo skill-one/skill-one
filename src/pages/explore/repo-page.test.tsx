@@ -132,7 +132,6 @@ describe("RepoPage", () => {
     harness.reset();
     vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
     vi.mocked(fetchSkillDetail).mockImplementation(async (_repo, id) => ({
-      name: id,
       description: `Description of ${id}.`,
       instructions: `Instructions for ${id}.`,
       path: `skills/${id}/SKILL.md`,
@@ -140,7 +139,6 @@ describe("RepoPage", () => {
     // An installed row carries no mirror path, so its panel reads the SKILL.md
     // off disk — the version the reader actually has.
     vi.mocked(fetchLocalSkillDetail).mockImplementation(async (name) => ({
-      name,
       description: `Description of ${name}.`,
       instructions: `Instructions for ${name}.`,
       path: `skills/${name}/SKILL.md`,

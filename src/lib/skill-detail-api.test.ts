@@ -37,11 +37,13 @@ Use this skill for PDFs.`;
 
     const { frontmatter, body } = parseFrontmatter(raw);
     expect(frontmatter).toEqual({
-      name: "pdf",
       description: "Read and merge PDF documents.",
       license: "MIT",
       author: "Anthropic",
     });
+    // The skill's identity is the registry slug / directory name, never the
+    // author-declared frontmatter `name` — so it is not surfaced at all.
+    expect(frontmatter).not.toHaveProperty("name");
     // Deliberate: the registry's content fingerprint, not the author's own
     // version string, is the version identity the detail view shows.
     expect(frontmatter).not.toHaveProperty("version");
@@ -71,7 +73,6 @@ Body`;
 
     const { frontmatter } = parseFrontmatter(raw);
     expect(frontmatter).toEqual({
-      name: "pdf",
       description: "Comprehensive PDF processing toolkit",
       license: "2",
     });
@@ -119,7 +120,6 @@ describe("fetchSkillDetail", () => {
     );
 
     expect(detail).toEqual({
-      name: "pdf",
       description: "",
       license: undefined,
       author: undefined,

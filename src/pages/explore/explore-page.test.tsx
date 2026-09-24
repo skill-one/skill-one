@@ -259,7 +259,6 @@ beforeEach(() => {
   mockSearchSkillsSh.mockResolvedValue([]);
   mockFetchSkillDetail.mockImplementation(
     async (_repo: string, id: string) => ({
-      name: id,
       description: `Description of ${id}.`,
       instructions: `Instructions for ${id}.`,
       path: `skills/${id}/SKILL.md`,

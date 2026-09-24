@@ -76,8 +76,6 @@ export interface Skill {
  * snapshot on demand when the detail sheet is opened.
  */
 export interface SkillDetail {
-  /** Frontmatter `name`, falling back to the registry skill id. */
-  name: string;
   /** Frontmatter `description`; empty when the file has none. */
   description: string;
   /** Frontmatter `license`, when present. */
