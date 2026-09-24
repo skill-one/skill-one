@@ -37,6 +37,7 @@ pub fn run() {
             skills::link_agents,
             skills::link_status,
             skills::read_skill_md,
+            skills::write_skill_md,
             skills::compute_skill_hash,
             provenance::read_provenance,
             provenance::write_provenance,

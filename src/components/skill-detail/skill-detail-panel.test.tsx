@@ -1,19 +1,22 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, fireEvent } from "@testing-library/react";
+import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import {
   fetchInstalledSkills,
   fetchLocalSkillDetail,
+  readLocalSkillRaw,
   removeInstalledSkill,
+  saveLocalSkillMd,
   setSkillEnabled,
 } from "../../lib/local-skills";
 import { openExternal } from "../../lib/open-external";
 import type { SkillView } from "../../lib/skill-view";
 import { Sheet } from "../ui/sheet";
+import { toast } from "../ui/toast";
 import {
   SkillDetailPanel,
   type SkillDetailSurface,
@@ -26,7 +29,9 @@ vi.mock("../../lib/skill-detail-api", () => ({
 vi.mock("../../lib/local-skills", () => ({
   fetchLocalSkillDetail: vi.fn(),
   fetchInstalledSkills: vi.fn(),
+  readLocalSkillRaw: vi.fn(),
   removeInstalledSkill: vi.fn(),
+  saveLocalSkillMd: vi.fn(),
   setSkillEnabled: vi.fn(),
 }));
 
@@ -34,9 +39,29 @@ vi.mock("../../lib/open-external", () => ({
   openExternal: vi.fn(),
 }));
 
+vi.mock("./skill-editor", () => ({
+  // A controlled textarea stands in for CodeMirror: the flow under test is the
+  // panel's edit session, not the editor widget itself.
+  SkillEditor: ({
+    value,
+    onChange,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+  }) => (
+    <textarea
+      aria-label="编辑器"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+}));
+
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 const mockFetchLocalSkillDetail = vi.mocked(fetchLocalSkillDetail);
+const mockReadLocalSkillRaw = vi.mocked(readLocalSkillRaw);
 const mockRemoveInstalledSkill = vi.mocked(removeInstalledSkill);
+const mockSaveLocalSkillMd = vi.mocked(saveLocalSkillMd);
 const mockSetSkillEnabled = vi.mocked(setSkillEnabled);
 const mockOpenExternal = vi.mocked(openExternal);
 
@@ -147,6 +172,8 @@ beforeEach(() => {
   });
   mockFetchSkillDetail.mockReset();
   mockFetchLocalSkillDetail.mockReset();
+  mockReadLocalSkillRaw.mockReset();
+  mockSaveLocalSkillMd.mockReset();
   mockSetSkillEnabled.mockReset();
   mockOpenExternal.mockReset();
   mockFetchSkillDetail.mockResolvedValue(detail);
@@ -524,5 +551,74 @@ describe("SkillDetailPanel", () => {
     expect(await screen.findByText(detail.description)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "展开" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "收起" })).not.toBeInTheDocument();
+  });
+});
+
+describe("SkillDetailPanel editing", () => {
+  /** A raw SKILL.md: the editor opens on the file, frontmatter included. */
+  const raw = "---\nname: pdf\n---\n\n# PDF\n\nBody.";
+
+  it("offers no edit affordance on the store surface", async () => {
+    renderDrawer({ surface: "store" });
+
+    await screen.findByText("Use this skill for PDFs.");
+    expect(
+      screen.queryByRole("button", { name: "编辑" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("edits an installed skill's raw file and saves it", async () => {
+    const user = userEvent.setup();
+    const toastSpy = vi.spyOn(toast, "add");
+    mockReadLocalSkillRaw.mockResolvedValue(raw);
+    renderDrawer({ surface: "installed" });
+
+    await user.click(await screen.findByRole("button", { name: "编辑" }));
+
+    const editor = await screen.findByLabelText("编辑器");
+    expect(editor).toHaveValue(raw);
+    // Nothing has changed yet, so there is nothing to save.
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+
+    fireEvent.change(editor, { target: { value: `${raw}\nMore.` } });
+    expect(screen.getByText("未保存的更改")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(mockSaveLocalSkillMd).toHaveBeenCalledWith("pdf", `${raw}\nMore.`);
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "已保存 pdf", type: "success" }),
+    );
+    // The panel drops back to the rendered view once the save lands.
+    await waitFor(() =>
+      expect(screen.queryByLabelText("编辑器")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("discards the draft on cancel", async () => {
+    const user = userEvent.setup();
+    mockReadLocalSkillRaw.mockResolvedValue(raw);
+    renderDrawer({ surface: "installed" });
+
+    await user.click(await screen.findByRole("button", { name: "编辑" }));
+    const editor = await screen.findByLabelText("编辑器");
+    fireEvent.change(editor, { target: { value: "changed" } });
+
+    await user.click(screen.getByRole("button", { name: "取消" }));
+
+    expect(mockSaveLocalSkillMd).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("编辑器")).not.toBeInTheDocument();
+  });
+
+  it("disables save for a blank document", async () => {
+    const user = userEvent.setup();
+    mockReadLocalSkillRaw.mockResolvedValue(raw);
+    renderDrawer({ surface: "installed" });
+
+    await user.click(await screen.findByRole("button", { name: "编辑" }));
+    const editor = await screen.findByLabelText("编辑器");
+    fireEvent.change(editor, { target: { value: "   " } });
+
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
   });
 });

@@ -149,6 +149,24 @@ fn read_skill_md_file(skill_dir: &std::path::Path) -> Result<SkillMdDto, String>
     })
 }
 
+/// Overwrite an installed skill's `SKILL.md` in place.
+///
+/// The write is atomic: the new text lands in a sibling temp file that is then
+/// renamed over `SKILL.md`, so an interrupted write can never leave a
+/// half-written file behind (a rename within one directory is atomic). The
+/// reader's error style is reused (`write <path>: <cause>`).
+fn write_skill_md_file(skill_dir: &std::path::Path, content: &str) -> Result<(), String> {
+    let file = skill_dir.join("SKILL.md");
+    let tmp = skill_dir.join("SKILL.md.tmp");
+    std::fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", tmp.display()))?;
+    if let Err(e) = std::fs::rename(&tmp, &file) {
+        // Never leave the temp file behind when the swap fails.
+        let _ = std::fs::remove_file(&tmp);
+        return Err(format!("write {}: {e}", file.display()));
+    }
+    Ok(())
+}
+
 /// Map a library link outcome to the flat DTO the frontend consumes. Every
 /// variant starts from the same empty base and fills only the fields it
 /// carries, so per-status field sets stay aligned with the DTO docs.
@@ -247,6 +265,31 @@ mod tests {
     fn read_skill_md_file_errors_when_missing() {
         let dir = tempdir().expect("tempdir");
         assert!(read_skill_md_file(dir.path()).is_err());
+    }
+
+    #[test]
+    fn write_skill_md_file_round_trips_through_the_reader() {
+        let dir = skill_dir_with("---\nname: pdf\n---\nold");
+        write_skill_md_file(dir.path(), "---\nname: pdf\n---\nnew").expect("write");
+        let dto = read_skill_md_file(dir.path()).expect("read");
+        assert!(dto.content.starts_with("---\n"));
+        assert!(dto.content.ends_with("new"));
+    }
+
+    #[test]
+    fn write_skill_md_file_creates_a_missing_file() {
+        let dir = tempdir().expect("tempdir");
+        write_skill_md_file(dir.path(), "fresh").expect("write");
+        let dto = read_skill_md_file(dir.path()).expect("read");
+        assert_eq!(dto.content, "fresh");
+    }
+
+    #[test]
+    fn write_skill_md_file_errors_when_the_dir_is_missing() {
+        // A missing directory (not a permissions problem) fails portably.
+        let dir = tempdir().expect("tempdir");
+        let missing = dir.path().join("nope");
+        assert!(write_skill_md_file(&missing, "x").is_err());
     }
 
     #[test]
@@ -467,6 +510,25 @@ pub async fn read_skill_md(name: String) -> Result<SkillMdDto, String> {
             .find(|s| s.name == name)
             .ok_or_else(|| format!("skill {name} is not installed"))?;
         read_skill_md_file(&manager.skill_dir(&skill))
+    })
+    .await
+}
+
+/// Overwrite an installed skill's `SKILL.md` with `content` (frontmatter
+/// included — the editor edits the raw file).
+///
+/// The name is resolved through the same `list` `read_skill_md` uses, so no
+/// path is ever interpolated from the frontend and disabled (parked) skills
+/// stay writable. The write is atomic — see `write_skill_md_file`.
+#[tauri::command]
+pub async fn write_skill_md(name: String, content: String) -> Result<(), String> {
+    run_blocking("write skill md", move |manager| {
+        let listed = manager.list().map_err(|e| e.to_string())?;
+        let skill = listed
+            .into_iter()
+            .find(|s| s.name == name)
+            .ok_or_else(|| format!("skill {name} is not installed"))?;
+        write_skill_md_file(&manager.skill_dir(&skill), &content)
     })
     .await
 }

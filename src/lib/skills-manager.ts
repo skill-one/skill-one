@@ -160,6 +160,20 @@ export async function readSkillMd(name: string): Promise<SkillMd> {
   return invoke<SkillMd>("read_skill_md", { name });
 }
 
+/**
+ * Overwrite an installed skill's SKILL.md with `content` (frontmatter
+ * included — the editor edits the raw file). The backend resolves the name
+ * through its `list`, so no path is ever interpolated, and writes atomically
+ * so an interrupted save never leaves a half file.
+ */
+export async function writeSkillMd(
+  name: string,
+  content: string,
+): Promise<void> {
+  requireTauri();
+  await invoke("write_skill_md", { name, content });
+}
+
 /** Remove installed skills; resolves with the names that actually went. */
 export async function removeSkills(skills: string[]): Promise<string[]> {
   requireTauri();
