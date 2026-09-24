@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "./theme-provider";
+import { I18nProvider } from "../i18n/language-provider";
 import { SettingsMenu } from "./settings-popover";
 import { TooltipProvider } from "./ui/tooltip";
 import {
@@ -53,9 +54,11 @@ vi.mock("../hooks/use-registry-snapshot", () => ({
 function renderSettings() {
   return render(
     <ThemeProvider>
-      <TooltipProvider>
-        <SettingsMenu />
-      </TooltipProvider>
+      <I18nProvider>
+        <TooltipProvider>
+          <SettingsMenu />
+        </TooltipProvider>
+      </I18nProvider>
     </ThemeProvider>,
   );
 }
@@ -94,7 +97,8 @@ describe("SettingsMenu", () => {
     await openPopover(user);
 
     expect(screen.getByText("外观")).toBeInTheDocument();
-    expect(screen.getByText("跟随系统")).toBeInTheDocument();
+    // "Follow system" appears twice: the theme row and the language row.
+    expect(screen.getAllByText("跟随系统")).toHaveLength(2);
     expect(screen.getByText("仓库卡片预览数")).toBeInTheDocument();
     expect(screen.getByText("软件更新")).toBeInTheDocument();
     expect(screen.getByText("高级设置")).toBeInTheDocument();
@@ -133,7 +137,7 @@ describe("SettingsMenu", () => {
     await user.click(screen.getByRole("button", { name: /软件更新/ }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "自动更新仅在桌面应用内可用。",
+      "Automatic updates are only available in the desktop app.",
     );
   });
 

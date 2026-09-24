@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { cn } from "../lib/utils";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 
@@ -29,6 +31,7 @@ export function SkillCover({
   // The owner is the skill's author; a skill with no recorded source still
   // gets its own initial rather than an empty slot.
   const initial = (repo?.split("/")[0] || name || "?").charAt(0);
+  const { t } = useTranslation();
 
   return (
     // One accessible name for the whole slot. The square shape is the
@@ -37,7 +40,7 @@ export function SkillCover({
     // an owner avatar.
     <Avatar
       role="img"
-      aria-label={`${name ?? repo ?? "skill"} 封面图`}
+      aria-label={t("common.coverAria", { name: name ?? repo ?? "skill" })}
       data-slot="skill-cover"
       className={cn(
         "rounded-lg border border-border/60 bg-muted",

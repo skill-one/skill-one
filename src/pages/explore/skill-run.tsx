@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronDown } from "lucide-react";
 
 import { cn, formatCount } from "../../lib/utils";
@@ -127,6 +128,7 @@ export function SkillRun<T extends RankedSkill>({
   /** Folds or unfolds the run's hidden skills. */
   onToggle: () => void;
 }) {
+  const { t } = useTranslation();
   // A run folds only once hiding actually saves rows: below the threshold it is
   // listed whole — head and all — so there is no fold row and nothing to press.
   const foldable = group.items.length >= FOLD_MIN_RUN;
@@ -144,7 +146,14 @@ export function SkillRun<T extends RankedSkill>({
           <button
             type="button"
             aria-expanded={open}
-            aria-label={open ? "收起" : `还有 ${hidden.length} 个来自 ${group.repo}`}
+            aria-label={
+              open
+                ? t("common.collapse")
+                : t("run.moreFromAria", {
+                    count: hidden.length,
+                    repo: group.repo,
+                  })
+            }
             onClick={onToggle}
             className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-[12px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
           >
@@ -154,11 +163,11 @@ export function SkillRun<T extends RankedSkill>({
             <span aria-hidden="true" className="size-7 shrink-0" />
             <span className="flex min-w-0 items-center gap-1.5">
               {open ? (
-                <span className="truncate">收起</span>
+                <span className="truncate">{t("common.collapse")}</span>
               ) : (
                 <>
                   <span className="shrink-0">
-                    {`还有 ${hidden.length} 个来自`}
+                    {t("run.moreFrom", { count: hidden.length })}
                   </span>
                   {/* The owner's face right before the owner/repo it stands
                       for — the same face the folded rows carry, so the fold
@@ -180,7 +189,7 @@ export function SkillRun<T extends RankedSkill>({
                   rows above it, which show no figure either. */}
               {!open && group.total > 0 && (
                 <span className="shrink-0 tabular-nums opacity-70">
-                  共 {formatCount(group.total)}
+                  {t("run.total", { count: formatCount(group.total) })}
                 </span>
               )}
               <ChevronDown

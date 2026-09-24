@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ChevronRight,
   CircleCheck,
@@ -16,6 +17,7 @@ import {
 import { useAppUpdate } from "../hooks/use-app-update";
 import { useRepoCardLimit } from "../hooks/use-repo-card-limit";
 import { AdvancedSettingsDialog } from "./advanced-settings-dialog";
+import { LanguageToggle } from "./language-toggle";
 import { ThemeModeToggle } from "./theme-mode-toggle";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -48,6 +50,7 @@ const rowClassName =
  * would say the app is broken.
  */
 function UpdateBadge() {
+  const { t } = useTranslation();
   const { open } = useAppUpdate();
   return (
     <Badge
@@ -60,7 +63,7 @@ function UpdateBadge() {
           // meant for the row; this one is a button and wants them.
           className="pointer-events-auto cursor-pointer"
         >
-          有新版本
+          {t("update.newVersion")}
         </button>
       }
     />
@@ -69,27 +72,34 @@ function UpdateBadge() {
 
 /** Trailing status for the 软件更新 row, one shape per update phase. */
 function UpdateRowStatus({ phase }: { phase: ReturnType<typeof useAppUpdate>["phase"] }) {
+  const { t } = useTranslation();
   switch (phase) {
     case "checking":
       return (
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <LoaderCircle className="size-3.5 animate-spin" />
-          检查中…
+          {t("update.checking")}
         </span>
       );
     case "upToDate":
       return (
         <span className="flex items-center gap-1 text-xs text-primary">
           <CircleCheck className="size-3.5" />
-          已是最新
+          {t("update.upToDate")}
         </span>
       );
     case "available":
-      return <Badge variant="success">有新版本</Badge>;
+      return <Badge variant="success">{t("update.newVersion")}</Badge>;
     case "managed":
-      return <span className="text-xs text-muted-foreground">Homebrew 管理</span>;
+      return (
+        <span className="text-xs text-muted-foreground">
+          {t("update.managed")}
+        </span>
+      );
     case "error":
-      return <span className="text-xs text-destructive">检查失败</span>;
+      return (
+        <span className="text-xs text-destructive">{t("update.failed")}</span>
+      );
     default:
       return null;
   }
@@ -109,6 +119,7 @@ function UpdateRowStatus({ phase }: { phase: ReturnType<typeof useAppUpdate>["ph
  * do not fit.
  */
 export function SettingsMenu() {
+  const { t } = useTranslation();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const update = useAppUpdate();
@@ -151,7 +162,7 @@ export function SettingsMenu() {
                   <Button
                     variant="ghost"
                     size="icon-lg"
-                    aria-label="设置"
+                    aria-label={t("settings.title")}
                     // A mark on its own, not a third destination: the two entries
                     // above it are places, and settings is a control — naming it
                     // beside them would put it in their class. The tooltip says
@@ -165,25 +176,35 @@ export function SettingsMenu() {
           >
             <Settings className="size-5" />
           </TooltipTrigger>
-          <TooltipContent side="right">设置</TooltipContent>
+          <TooltipContent side="right">{t("settings.title")}</TooltipContent>
         </Tooltip>
         {/* Opens rightward: the entry sits against the window's left edge, with
             no room below it and nothing to cover above. */}
         <PopoverContent side="right" align="end" className="w-60 gap-0 p-0">
           <div className="flex items-baseline justify-between px-3 pt-2.5 pb-1">
-            <span className="text-sm font-medium text-foreground">设置</span>
+            <span className="text-sm font-medium text-foreground">
+              {t("settings.title")}
+            </span>
             <span className="text-[11px] text-muted-foreground">
               Skill One v{__APP_VERSION__}
             </span>
           </div>
           <div className="flex flex-col gap-3 px-3 pt-1 pb-2.5">
             <div>
-              <p className="mb-1.5 text-xs text-muted-foreground">外观</p>
+              <p className="mb-1.5 text-xs text-muted-foreground">
+                {t("settings.appearance")}
+              </p>
               <ThemeModeToggle />
             </div>
             <div>
               <p className="mb-1.5 text-xs text-muted-foreground">
-                仓库卡片预览数
+                {t("language.label")}
+              </p>
+              <LanguageToggle />
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs text-muted-foreground">
+                {t("settings.repoPreviewCount")}
               </p>
               <ToggleGroup
                 variant="outline"
@@ -193,7 +214,7 @@ export function SettingsMenu() {
                   const next = values[0];
                   if (next) setRepoCardLimit(Number(next) as RepoCardLimit);
                 }}
-                aria-label="仓库卡片预览数量"
+                aria-label={t("settings.repoPreviewAria")}
               >
                 {REPO_CARD_LIMITS.map((limit) => (
                   <ToggleGroupItem
@@ -218,7 +239,7 @@ export function SettingsMenu() {
               >
                 <span className="flex items-center gap-2">
                   <RefreshCw className="size-4" />
-                  软件更新
+                  {t("settings.softwareUpdate")}
                 </span>
                 <UpdateRowStatus phase={phase} />
               </button>
@@ -243,7 +264,7 @@ export function SettingsMenu() {
             <button type="button" className={rowClassName} onClick={openAdvanced}>
               <span className="flex items-center gap-2">
                 <SlidersHorizontal className="size-4" />
-                高级设置
+                {t("settings.advanced")}
               </span>
               <ChevronRight className="size-3.5 text-muted-foreground" />
             </button>

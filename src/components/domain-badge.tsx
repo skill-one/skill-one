@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 
 import { domainLabel, domainMeta, domainTooltip } from "../data/domains";
+import { useAppLocale } from "../i18n/use-language";
 import { Badge } from "./ui/badge";
 import {
   Tooltip,
@@ -37,11 +38,12 @@ export function DomainBadge({
   /** Badge chrome; `outline` by default, `ghost` for a flattened rail. */
   variant?: ComponentProps<typeof Badge>["variant"];
 }) {
+  const locale = useAppLocale();
   const key = domain[0];
   if (!key) return null;
   const meta = domainMeta(key);
-  const label = domainLabel(key);
-  const tooltip = domainTooltip(domain);
+  const label = domainLabel(key, locale);
+  const tooltip = domainTooltip(domain, locale);
   return (
     <Tooltip>
       <TooltipTrigger

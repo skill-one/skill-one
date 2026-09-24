@@ -136,7 +136,11 @@ export async function checkForUpdate(
   options: { force?: boolean } = {},
 ): Promise<void> {
   if (!isTauri()) {
-    emit({ ...INITIAL, phase: "error", error: "自动更新仅在桌面应用内可用。" });
+    emit({
+      ...INITIAL,
+      phase: "error",
+      error: "Automatic updates are only available in the desktop app.",
+    });
     return;
   }
   if (inFlight || installing || status.dialogOpen) return;

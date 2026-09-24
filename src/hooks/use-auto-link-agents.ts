@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { toast } from "../components/ui/toast";
 
 import {
@@ -32,6 +33,7 @@ import { formatLinkMessage } from "../pages/my-skills/link-notice";
 export function useAutoLinkAgents() {
   const queryClient = useQueryClient();
   const attemptedRef = useRef<Set<string>>(new Set());
+  const { t } = useTranslation();
 
   const { data: agents } = useQuery({
     queryKey: ["agent-status"],
@@ -52,17 +54,21 @@ export function useAutoLinkAgents() {
       );
       if (failures.length > 0) {
         const detail = failures
-          .map((r) => formatLinkMessage(r)?.text ?? `${r.display} 失败`)
-          .join("；");
+          .map(
+            (r) =>
+              formatLinkMessage(r)?.render(t) ??
+              t("link.agentFailed", { name: r.display }),
+          )
+          .join(t("link.toastSeparator"));
         toast.add({
-          title: `自动链接部分 agent 失败：${detail}`,
+          title: t("link.autoPartial", { detail }),
           type: "error",
         });
       }
     },
     onError: (err) =>
       toast.add({
-        title: `自动链接 agent 失败：${errorMessage(err)}`,
+        title: t("link.autoFailed", { message: errorMessage(err) }),
         type: "error",
       }),
   });

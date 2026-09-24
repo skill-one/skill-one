@@ -67,9 +67,12 @@ export async function fetchSkillDetail(
         cause: err,
       });
     }
-    throw new Error(`无法获取 ${skillId} 的 SKILL.md：${errorMessage(err)}`, {
-      cause: err,
-    });
+    throw new Error(
+      `Unable to fetch SKILL.md for ${skillId}: ${errorMessage(err)}`,
+      {
+        cause: err,
+      },
+    );
   }
 }
 

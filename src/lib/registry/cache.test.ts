@@ -64,6 +64,15 @@ describe("createRegistryCache", () => {
     await expect(createRegistryCache(fakeStore()).load()).resolves.toBeNull();
   });
 
+  it("tags saved records with the current schema version", async () => {
+    const store = fakeStore();
+    const cache = createRegistryCache(store);
+    await cache.save(skills);
+
+    const record = [...store.data.values()][0] as { schemaVersion: number };
+    expect(record.schemaVersion).toBe(5);
+  });
+
   it("drops records written by an older schema version", async () => {
     const store = fakeStore();
     const cache = createRegistryCache(store);

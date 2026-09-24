@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { ParseKeys } from "i18next";
 import { Check } from "lucide-react";
 
 import {
@@ -24,18 +26,18 @@ import {
 } from "./ui/dialog";
 import { Input } from "./ui/input";
 
-/** How the served snapshot got here, phrased for the advanced settings. */
-const INDEX_ORIGIN_LABEL: Record<IndexOrigin, string> = {
-  updated: "已下载最新索引",
-  unchanged: "索引未更新，已复用本地缓存",
-  cache: "正在校验本地缓存…",
+/** i18n keys for how the served snapshot got here. */
+const INDEX_ORIGIN_KEY: Record<IndexOrigin, ParseKeys> = {
+  updated: "advanced.origin.updated",
+  unchanged: "advanced.origin.unchanged",
+  cache: "advanced.origin.cache",
 };
 
-/** Outcome of a manual freshness check, phrased for the advanced settings. */
-const CHECK_LABEL: Record<RevalidateStatus, string> = {
-  updated: "发现新快照，已在后台更新",
-  current: "已是最新快照",
-  unknown: "检测失败，请稍后重试",
+/** i18n keys for the outcome of a manual freshness check. */
+const CHECK_KEY: Record<RevalidateStatus, ParseKeys> = {
+  updated: "advanced.checkResult.updated",
+  current: "advanced.checkResult.current",
+  unknown: "advanced.checkResult.unknown",
 };
 
 /**
@@ -63,6 +65,7 @@ export function AdvancedSettingsDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [value, setValue] = useState(getCdnBase());
+  const { t } = useTranslation();
   const [saved, setSaved] = useState(false);
   // Outcome of the last manual check, or "checking" while it is in flight.
   const [check, setCheck] = useState<RevalidateStatus | "checking" | null>(
@@ -93,22 +96,28 @@ export function AdvancedSettingsDialog({
   // against a release. A recorded tag (persisted by the registry client)
   // stands in until the live snapshot identity arrives, so a fresh session
   // still names its snapshot.
-  const indexRows = [
+  const indexRows: { termKey: ParseKeys; value: string }[] = [
     {
-      term: "快照",
-      value: index?.tag ?? (getIndexTag() || "未知"),
+      termKey: "advanced.snapshot",
+      value: index?.tag ?? (getIndexTag() || t("common.unknown")),
     },
-    { term: "发布于", value: formatIndexTime(index?.generatedAt) },
-    { term: "条目数", value: formatTotal(index?.total) },
+    {
+      termKey: "advanced.publishedAt",
+      value: formatIndexTime(index?.generatedAt, t("common.unknown")),
+    },
+    {
+      termKey: "advanced.entryCount",
+      value: formatTotal(index?.total, t("common.unknown")),
+    },
   ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>高级设置</DialogTitle>
+          <DialogTitle>{t("advanced.title")}</DialogTitle>
           <DialogDescription>
-            配置技能数据的下载源（索引、SKILL.md 详情、安装统一生效）。
+            {t("advanced.description")}
           </DialogDescription>
         </DialogHeader>
         <div className="-mr-2 flex max-h-[65vh] flex-col gap-4 overflow-y-auto pr-2">
@@ -118,19 +127,19 @@ export function AdvancedSettingsDialog({
                 htmlFor="cdn-base"
                 className="block text-[13px] font-medium text-foreground"
               >
-                CDN 基址
+                {t("advanced.cdnTitle")}
               </label>
               {saved && (
                 <span className="flex items-center gap-1 text-[12px] text-primary">
                   <Check className="h-3.5 w-3.5" />
-                  已保存
+                  {t("advanced.cdnSaved")}
                 </span>
               )}
             </div>
             <p className="mb-3 mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              留空 = 优先直连 GitHub（
+              {t("advanced.cdnHintBefore")}
               <span className="font-mono">raw.githubusercontent.com</span>
-              ），连不上时回退到默认 CDN。填入自定义值后将优先使用它。
+              {t("advanced.cdnHintAfter")}
             </p>
             <Input
               id="cdn-base"
@@ -142,22 +151,22 @@ export function AdvancedSettingsDialog({
               }}
             />
             <p className="mt-2 text-[12px] text-muted-foreground">
-              示例：直连 GitHub 留空；默认 CDN 为{" "}
+              {t("advanced.cdnExampleBefore")}
               <span className="font-mono">{DEFAULT_CDN_BASE}</span>
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => apply("")}>
-                直连 GitHub
+                {t("advanced.directGithub")}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => apply(DEFAULT_CDN_BASE)}
               >
-                使用默认 CDN
+                {t("advanced.useDefaultCdn")}
               </Button>
               <Button size="sm" onClick={() => apply(value)}>
-                保存
+                {t("advanced.save")}
               </Button>
             </div>
           </div>
@@ -166,11 +175,10 @@ export function AdvancedSettingsDialog({
             <div className="flex items-baseline justify-between gap-3">
               <div>
                 <h3 className="text-[13px] font-medium text-foreground">
-                  数据源
+                  {t("advanced.dataSource")}
                 </h3>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  商店数据来自两个 GitHub
-                  仓库发布的每日快照。启动时自动校验、之后每日静默更新，无需手动干预。
+                  {t("advanced.dataSourceHint")}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -180,39 +188,43 @@ export function AdvancedSettingsDialog({
                   disabled={check === "checking"}
                   onClick={() => void checkNow()}
                 >
-                  {check === "checking" ? "正在检测…" : "检测更新"}
+                  {check === "checking"
+                    ? t("advanced.checkingNow")
+                    : t("advanced.checkUpdate")}
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => reloadRegistry()}
                 >
-                  立即重新下载
+                  {t("advanced.redownload")}
                 </Button>
               </div>
             </div>
             <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
               <div className="contents">
                 <dt className="pt-1 font-medium text-foreground">
-                  技能数据源
+                  {t("advanced.skillSource")}
                   <span className="ml-1 font-normal text-muted-foreground">
-                    （skills-profiles）
+                    {t("advanced.skillSourceNote")}
                   </span>
                 </dt>
                 <dd className="pt-1" />
               </div>
-              {indexRows.map(({ term, value: detail }) => (
-                <div key={term} className="contents">
-                  <dt className="text-muted-foreground">{term}</dt>
+              {indexRows.map(({ termKey, value: detail }) => (
+                <div key={termKey} className="contents">
+                  <dt className="text-muted-foreground">{t(termKey)}</dt>
                   <dd className="min-w-0 break-all text-foreground">
                     {detail}
                   </dd>
                 </div>
               ))}
               <div className="contents">
-                <dt className="pt-2 text-muted-foreground">上次校验</dt>
+                <dt className="pt-2 text-muted-foreground">
+                  {t("advanced.lastChecked")}
+                </dt>
                 <dd className="pt-2 text-foreground">
-                  {formatCheckedAt(index?.checkedAt)}
+                  {formatCheckedAt(index?.checkedAt, t("common.unknown"))}
                 </dd>
               </div>
             </dl>
@@ -231,10 +243,10 @@ export function AdvancedSettingsDialog({
               }`}
             >
               {check && check !== "checking"
-                ? CHECK_LABEL[check]
+                ? t(CHECK_KEY[check])
                 : index
-                  ? INDEX_ORIGIN_LABEL[index.origin]
-                  : "数据尚未就绪"}
+                  ? t(INDEX_ORIGIN_KEY[index.origin])
+                  : t("advanced.notReady")}
             </p>
           </div>
         </div>
@@ -244,20 +256,20 @@ export function AdvancedSettingsDialog({
 }
 
 /** Upstream UTC stamp rendered in the user's locale and time zone. */
-function formatIndexTime(iso?: string): string {
-  if (!iso) return "未知";
+function formatIndexTime(iso: string | undefined, fallback: string): string {
+  if (!iso) return fallback;
   const ms = Date.parse(iso);
-  return Number.isNaN(ms) ? "未知" : new Date(ms).toLocaleString();
+  return Number.isNaN(ms) ? fallback : new Date(ms).toLocaleString();
 }
 
 /** A ms-epoch stamp rendered in the user's locale and time zone. */
-function formatCheckedAt(ms?: number): string {
-  return ms === undefined ? "未知" : new Date(ms).toLocaleString();
+function formatCheckedAt(ms: number | undefined, fallback: string): string {
+  return ms === undefined ? fallback : new Date(ms).toLocaleString();
 }
 
 /** Digits with thousands separators; a published count should not be fuzzy. */
-function formatTotal(total?: number): string {
+function formatTotal(total: number | undefined, fallback: string): string {
   return total === undefined
-    ? "未知"
+    ? fallback
     : new Intl.NumberFormat("en").format(total);
 }

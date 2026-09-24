@@ -1,3 +1,5 @@
+import type { ParseKeys } from "i18next";
+
 import type { AgentStatus } from "../../lib/skills-manager";
 
 /**
@@ -21,10 +23,12 @@ export function agentLinkState(agent: AgentStatus): AgentLinkState {
   return hasContent ? "warning" : "unlinked";
 }
 
-/** Short status label for tooltips; the canonical agent keeps its own word. */
-export function agentStateLabel(agent: AgentStatus): string {
-  if (agent.canonical) return "原生";
-  return agentLinkState(agent) === "linked" ? "已链接" : "未链接";
+/** Short status label key for tooltips; the canonical agent keeps its own word. */
+export function agentStateLabelKey(agent: AgentStatus): ParseKeys {
+  if (agent.canonical) return "agent.native";
+  return agentLinkState(agent) === "linked"
+    ? "agent.linked"
+    : "agent.unlinked";
 }
 
 /** Status dot color used in the menu rows' tooltips. */

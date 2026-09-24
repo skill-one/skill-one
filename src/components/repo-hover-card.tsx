@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ExternalLink, Star } from "lucide-react";
 
 import {
@@ -36,13 +37,14 @@ export function RepoHoverCard({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
   // The mirror only lists GitHub skills, so its sources are `owner/repo` and
   // the name is the owner. skills.sh also publishes "well-known" sources that
   // are a bare host — `smithery.ai`, `modelscope.cn` — where the host is both
   // who published the skill and the page that documents it: there is no
   // repository name to prefix with GitHub, the host *is* the address.
   const [owner, name] = repo.split("/");
-  const source = name ? "仓库" : "来源";
+  const source = name ? t("common.repository") : t("common.source");
   const href = name ? `https://github.com/${repo}` : `https://${repo}`;
 
   return (
@@ -53,7 +55,7 @@ export function RepoHoverCard({
         render={
           <button
             type="button"
-            aria-label={`${source} ${repo}`}
+            aria-label={t("common.repoAria", { source, repo })}
             onClick={(e) => {
               // Hover/focus already open the card; the click only makes sure it
               // is open (touch). It must not reach the card body behind it.
@@ -88,7 +90,9 @@ export function RepoHoverCard({
         <a
           href={href}
           aria-label={
-            name ? `在 GitHub 中打开 ${repo}` : `打开 ${repo}`
+            name
+              ? t("common.openOnGitHubAria", { repo })
+              : t("common.openAria", { repo })
           }
           onClick={(e) => {
             e.preventDefault();
@@ -110,7 +114,7 @@ export function RepoHoverCard({
             />
             {/* One text run: the unit belongs to the number, not beside it. */}
             <span className="font-medium tabular-nums">
-              {formatCount(stars)} Star
+              {t("common.stars", { count: formatCount(stars) })}
             </span>
           </p>
         )}

@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { toast } from "../components/ui/toast";
 
 import { checkForRegistryUpdate } from "../lib/registry/refresh";
@@ -17,11 +19,12 @@ import { useScheduledCheck } from "./use-scheduled-check";
  * actually landed — the list changing underfoot should not look like a glitch.
  */
 export function useRegistryRefresh() {
+  const { t } = useTranslation();
   useScheduledCheck(() => {
     void checkForRegistryUpdate()
       .then((result) => {
         if (result?.status === "updated") {
-          toast.add({ title: "技能数据已更新到最新快照" });
+          toast.add({ title: t("refresh.dataUpdated") });
         }
       })
       .catch(() => {

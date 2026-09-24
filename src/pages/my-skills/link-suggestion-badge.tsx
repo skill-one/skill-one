@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Store } from "lucide-react";
 
+import { useAppLocale } from "../../i18n/use-language";
+import { skillDescription } from "../../lib/i18n-content";
 import {
   HoverCard,
   HoverCardContent,
@@ -42,6 +45,8 @@ export function LinkSuggestionBadge({
   const [open, setOpen] = useState(false);
   const [pendingRepo, setPendingRepo] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const locale = useAppLocale();
 
   const pick = async (candidate: LinkCandidate) => {
     setPendingRepo(candidate.skill.repo);
@@ -51,12 +56,15 @@ export function LinkSuggestionBadge({
       await recordSkillProvenance(candidate.skill.repo, name);
       await markSkillsChanged(queryClient);
       toast.add({
-        title: `已迁移至商店版：${candidate.skill.repo}`,
+        title: t("migration.migrated", { repo: candidate.skill.repo }),
         type: "success",
       });
       setOpen(false);
     } catch (e) {
-      toast.add({ title: errorMessage(e, "迁移失败"), type: "error" });
+      toast.add({
+        title: errorMessage(e, t("migration.migrateFailed")),
+        type: "error",
+      });
     } finally {
       setPendingRepo(null);
     }
@@ -70,7 +78,7 @@ export function LinkSuggestionBadge({
         render={
           <button
             type="button"
-            aria-label={`将 ${name} 迁移至商店版`}
+            aria-label={t("migration.triggerAria", { name })}
             onClick={(e) => {
               e.stopPropagation();
               // Hover/focus already opens the popover; the click only makes
@@ -84,7 +92,7 @@ export function LinkSuggestionBadge({
             )}
           >
             <Store className="h-2.5 w-2.5" aria-hidden />
-            可迁移
+            {t("migration.badge")}
           </button>
         }
       />
@@ -102,14 +110,14 @@ export function LinkSuggestionBadge({
         )}
       >
           <p className="px-1.5 pb-1 text-[12px] font-medium">
-            发现同名商店条目
+            {t("migration.title")}
           </p>
           <ul className="max-h-56 overflow-y-auto">
             {candidates.map(({ skill, similarity }) => (
               <li key={skill.repo}>
                 <button
                   type="button"
-                  title={skill.description || undefined}
+                  title={skillDescription(skill, locale) || undefined}
                   disabled={pendingRepo != null}
                   onClick={() => void pick({ skill, similarity })}
                   className={cn(
@@ -128,7 +136,7 @@ export function LinkSuggestionBadge({
                   </span>
                   <span
                     className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
-                    title="描述相似度（仅供参考，不作为迁移依据）"
+                    title={t("migration.similarityTitle")}
                   >
                     {Math.round(similarity * 100)}%
                   </span>
@@ -137,7 +145,7 @@ export function LinkSuggestionBadge({
             ))}
           </ul>
           <p className="px-1.5 pt-1.5 text-[10px] leading-snug text-muted-foreground">
-            点击条目即完成迁移并永久记录来源，本地文件不会移动；相似度仅供参考。
+            {t("migration.hint")}
           </p>
       </HoverCardContent>
     </HoverCard>

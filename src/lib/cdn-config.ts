@@ -182,11 +182,11 @@ function sourceFetchError(
   return networkFailure
     ? new SourceFetchError(
         "network",
-        "无法连接数据源：已尝试直连 GitHub 与 CDN 镜像",
+        "Unable to reach the data source: tried GitHub directly and the CDN mirror",
       )
     : new SourceFetchError(
         "http",
-        `数据源请求失败（HTTP ${status ?? "未知"}）`,
+        `Data source request failed (HTTP ${status ?? "unknown"})`,
         status,
       );
 }

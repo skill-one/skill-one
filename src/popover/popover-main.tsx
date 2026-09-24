@@ -2,6 +2,7 @@ import ReactDOM from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 
 import { createQueryClient } from "../lib/query-client";
+import { I18nProvider } from "../i18n/language-provider";
 import { PopoverPage } from "./popover-page";
 import "./../index.css";
 import "./popover.css";
@@ -19,6 +20,8 @@ const queryClient = createQueryClient();
 
 ReactDOM.createRoot(document.getElementById("popover-root")!).render(
   <QueryClientProvider client={queryClient}>
-    <PopoverPage />
+    <I18nProvider>
+      <PopoverPage />
+    </I18nProvider>
   </QueryClientProvider>,
 );

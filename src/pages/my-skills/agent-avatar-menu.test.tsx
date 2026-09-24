@@ -3,6 +3,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithRouter } from "../../test/test-utils";
+import { LANGUAGE_STORAGE_KEY } from "../../lib/i18n-content";
 import {
   fetchAgentStatus,
   linkAgent,
@@ -62,6 +63,9 @@ const menuItem = (display: string, state: string) =>
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
+  // The global setup pins the UI language through the stored preference;
+  // clearing storage resets it, so re-pin after the clear.
+  window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "zh");
   fetchAgentStatusMock.mockResolvedValue([agent({})]);
 });
 

@@ -15,6 +15,9 @@ const KEY = "skills";
 /**
  * Bump when the stored Skill shape changes so stale records are dropped.
  *
+ * Version 5 flushes records written before the index carried Chinese
+ * descriptions: those rows have no `descriptionZh`, and the "unchanged"
+ * short-circuit would keep serving them for up to a day with no translation.
  * Version 4 flushes records written before the dataset consolidated: those
  * carry a second source's stamps (`profilesAt`/`profilesTag`) and skills whose
  * `profile.domain` is a single string, which the new grouping and badge code
@@ -23,7 +26,7 @@ const KEY = "skills";
  * could fail silently: those hold 0 stars yet carry a current run stamp, so
  * the "unchanged" short-circuit would keep serving them for up to a day.
  */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 /**
  * The same database and object store this module used before it delegated to

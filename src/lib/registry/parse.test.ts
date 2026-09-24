@@ -40,6 +40,22 @@ describe("parseSkillLine", () => {
     });
   });
 
+  it("maps the Chinese description when the line provides one", () => {
+    expect(
+      parseSkillLine(line({ description_zh: "处理 PDF。" })),
+    ).toMatchObject({
+      description: "Work with PDFs.",
+      descriptionZh: "处理 PDF。",
+    });
+  });
+
+  it("carries no Chinese description when the line omits it", () => {
+    expect(parseSkillLine(line({}))?.descriptionZh).toBeUndefined();
+    expect(
+      parseSkillLine(line({ description_zh: null }))?.descriptionZh,
+    ).toBeUndefined();
+  });
+
   it("joins stars by the id's repo, not the skill", () => {
     // Sibling skills of the same repo share one stars row.
     expect(

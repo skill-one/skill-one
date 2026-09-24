@@ -14,13 +14,6 @@ import type { Skill } from "../types/skill";
  */
 
 /**
- * What a skill surface calls a skill the app has no recorded source for:
- * installed by another tool, or placed into the global directory by hand.
- * Shared by the card's source line and the drawer's subtitle.
- */
-export const LOCAL_SOURCE_LABEL = "本地安装";
-
-/**
  * A `Skill` as the shared surfaces render it, plus the one fact the data cannot
  * express on its own: whether the registry actually backs it.
  *
@@ -109,6 +102,9 @@ export function installedSkillView(
     name: skill.name,
     repo: provenance?.[skill.name]?.repo ?? "",
     description: skill.description,
+    // The translated description comes from the registry entry; the on-disk
+    // record carries no translation.
+    ...(entry?.descriptionZh ? { descriptionZh: entry.descriptionZh } : {}),
     stars: entry?.stars ?? 0,
     downloads: entry?.downloads ?? 0,
     // The one fact only the on-disk record carries (agents-skills 0.16): when

@@ -1,5 +1,7 @@
 import { useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import type { ParseKeys } from "i18next";
 import { Check, Download, Loader2, RefreshCw } from "lucide-react";
 
 import { installSkillFromSource } from "../lib/local-skills";
@@ -34,7 +36,7 @@ export type InstallState = "idle" | "installing" | "installed" | "error";
 const INSTALL_BUTTON: Record<
   InstallState,
   {
-    label: string;
+    labelKey: ParseKeys;
     icon: ReactElement;
     variant: "default" | "secondary";
     className?: string;
@@ -43,20 +45,20 @@ const INSTALL_BUTTON: Record<
   // Idle is the resting state of every row in a grid, so it wears the muted
   // secondary chrome and stays out of the name's way. The states that do need
   // attention — installing, retry — keep the solid primary.
-  idle: { label: "安装", icon: <Download />, variant: "secondary" },
+  idle: { labelKey: "action.install", icon: <Download />, variant: "secondary" },
   installing: {
-    label: "安装中",
+    labelKey: "action.installing",
     icon: <Loader2 className="animate-spin" />,
     variant: "default",
   },
   installed: {
-    label: "已安装",
+    labelKey: "action.installed",
     icon: <Check />,
     variant: "secondary",
     className:
       "border-transparent bg-success/10 text-success hover:bg-success/15",
   },
-  error: { label: "重试", icon: <RefreshCw />, variant: "default" },
+  error: { labelKey: "action.retry", icon: <RefreshCw />, variant: "default" },
 };
 
 /**
@@ -86,6 +88,7 @@ export function SkillInstallButton({
   const [installState, setInstallState] = useState<InstallState>("idle");
 
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   // The install button reflects the persisted install state, not just this
   // session: skills already present in the global skills directory render as
@@ -138,7 +141,7 @@ export function SkillInstallButton({
       setInstallState("installed");
     } catch (err) {
       setInstallState("error");
-      toast.add({ title: errorMessage(err, "安装失败，请重试"), type: "error" });
+      toast.add({ title: errorMessage(err, t("action.installFailed")), type: "error" });
     }
   };
 
@@ -154,7 +157,7 @@ export function SkillInstallButton({
         className={cn("h-8 shrink-0 gap-1.5 px-3", installMeta.className, className)}
       >
         {installMeta.icon}
-        {installMeta.label}
+        {t(installMeta.labelKey)}
       </Button>
     );
   }
@@ -179,11 +182,11 @@ export function SkillInstallButton({
               )}
             >
               {installMeta.icon}
-              <span className="sr-only">{installMeta.label}</span>
+              <span className="sr-only">{t(installMeta.labelKey)}</span>
             </Button>
           }
         />
-        <TooltipContent>{installMeta.label}</TooltipContent>
+        <TooltipContent>{t(installMeta.labelKey)}</TooltipContent>
       </Tooltip>
   );
 }

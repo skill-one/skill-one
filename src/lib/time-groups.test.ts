@@ -85,7 +85,11 @@ describe("groupByInstallTime", () => {
       now,
     );
     expect(groups.map((g) => g.key)).toEqual(["today", "week", "earlier"]);
-    expect(groups.map((g) => g.title)).toEqual(["今天", "近7天", "更早"]);
+    expect(groups.map((g) => g.title)).toEqual([
+      "time.today",
+      "time.week",
+      "time.earlier",
+    ]);
   });
 
   it("orders the items inside a bucket newest-first", () => {

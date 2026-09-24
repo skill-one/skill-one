@@ -3,6 +3,7 @@ import { waitFor } from "@testing-library/react";
 import { toast } from "../components/ui/toast";
 
 import { renderWithRouter } from "../test/test-utils";
+import { LANGUAGE_STORAGE_KEY } from "../lib/i18n-content";
 import { fetchAgentStatus, linkAllAgents } from "../lib/local-skills";
 import { excludeAgent } from "../lib/agent-link-preferences";
 import type { AgentLinkResult, AgentStatus } from "../lib/skills-manager";
@@ -55,6 +56,8 @@ function Probe() {
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
+  // Re-pin the language preference the global setup set before this clear.
+  window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "zh");
   fetchAgentStatusMock.mockResolvedValue([agent({})]);
 });
 

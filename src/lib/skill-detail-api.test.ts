@@ -195,7 +195,9 @@ describe("fetchSkillDetail", () => {
 
     await expect(
       fetchSkillDetail("owner/repo", "pdf", "skills/pdf"),
-    ).rejects.toThrow(/无法获取 pdf 的 SKILL\.md.*无法连接数据源/);
+    ).rejects.toThrow(
+      /Unable to fetch SKILL\.md for pdf.*Unable to reach the data source/,
+    );
   });
 
   it("reports the underlying cause on a server error instead of 'not found'", async () => {
@@ -203,6 +205,8 @@ describe("fetchSkillDetail", () => {
 
     await expect(
       fetchSkillDetail("owner/repo", "pdf", "skills/pdf"),
-    ).rejects.toThrow(/无法获取 pdf 的 SKILL\.md.*HTTP 502/);
+    ).rejects.toThrow(
+      /Unable to fetch SKILL\.md for pdf.*HTTP 502/,
+    );
   });
 });

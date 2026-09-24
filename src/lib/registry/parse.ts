@@ -30,6 +30,8 @@ interface RawSkill {
   url?: string | null;
   /** From the SKILL.md frontmatter; null when it has none. */
   description?: string | null;
+  /** Chinese translation of `description`; null when untranslated. */
+  description_zh?: string | null;
   /** SHA-256 of the skill's files; null when unknown. */
   hash?: string | null;
   /** When the current content version was first fetched (ISO, UTC). */
@@ -85,6 +87,9 @@ function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
     // Upstream exposes descriptions; fall back to an empty placeholder
     // when an entry lacks one so the row layout stays stable.
     description: raw.description ?? "",
+    // The Chinese translation is optional: a missing one is resolved as an
+    // English fallback at the rendering layer, not here.
+    descriptionZh: raw.description_zh ?? undefined,
     // GitHub stars come from the joined repos.jsonl rows, not the skill row
     // itself; an unjoined repo (missing row, null count) normalizes to 0.
     stars: starsFor?.(repoId) ?? 0,

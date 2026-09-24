@@ -14,6 +14,7 @@
   "installs": 3474068,
   "url": "https://www.skills.sh/vercel-labs/skills/find-skills",
   "description": "Helps users discover and install agent skills …",
+  "description_zh": "帮助用户发现和安装 agent skills …",
   "hash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
   "fetchedAt": "2026-09-06T07:57:37.803Z",
   "domain": "development"
@@ -26,6 +27,7 @@
 | `installs` | `number` | skills.sh 记录的总安装量 |
 | `url` | `string` | 技能在 skills.sh 的页面 |
 | `description` | `string \| null` | 来自 SKILL.md frontmatter（缺失时为空） |
+| `description_zh` | `string \| null` | `description` 的中文翻译。中文模式下优先使用，缺失或为空白时回退到 `description`。 |
 | `hash` | `string \| null` | 技能文件的 SHA-256。上游任何文件变化都会使其改变，即**快照所描述的那个版本**。 |
 | `fetchedAt` | `string` | 抓取器首次取到当前内容版本的时间（ISO，UTC）：说的是*当前内容*发布了多久，不是技能最早何时出现 |
 | `domain` | `string \| string[]` | 分类，取自固定的英文枚举（`development`、`data-analysis`、…、`other`）。`dist` 快照当前把最贴合的那一个键作为裸字符串下发；该字段也曾承载 1–3 个键、最贴合的在前，因此应用两种形状都读、并统一存成列表。[data/domains.ts](../src/data/domains.ts) 负责把键映射为展示名与单色 lucide 图标。生成器尚未处理到的技能不含该字段。 |
@@ -59,7 +61,7 @@ GitHub star 数**不在**技能行里：它存放在下文的 `upstream/repos.js
 
 每个已分类的技能还会发布 `profiles/{id}/domain.json`——载荷与索引行里的分类完全一致——以及供人阅读的 `md/domain.md`。应用只读索引行、从不拉取这两个文件，它们作为数据集自己的可浏览副本存在。快照不再发布逐技能封面插图：详情抽屉的图片位显示作者首字母（见 [../src/components/skill-cover.tsx](../src/components/skill-cover.tsx)）。列表卡片则完全不放图片位——每张卡都重复一个首字母方块，只是 48px 不承载技能任何事实的装饰——因此每张卡由名称打头，来源则写在卡片的信息行上。
 
-索引行与 `skills/` 目录按 id 一一对应：`skills/{owner}/{repo}/{slug}/` 内正是上游技能自带的全部文件。应用把每行映射为 `Skill` 模型：`name = slug`、`repo = {owner}/{repo}`、`path = skills/{id}`（快照内目录，用于详情拉取与按目录名匹配）、`rev = hash`、`firstSeenAt = fetchedAt`、`profile = { domain }`——`stars` 则来自 join 到的 `repos.jsonl` 行（未 join 到时为 0）。
+索引行与 `skills/` 目录按 id 一一对应：`skills/{owner}/{repo}/{slug}/` 内正是上游技能自带的全部文件。应用把每行映射为 `Skill` 模型：`name = slug`、`repo = {owner}/{repo}`、`path = skills/{id}`（快照内目录，用于详情拉取与按目录名匹配）、`rev = hash`、`firstSeenAt = fetchedAt`、`descriptionZh = description_zh`、`profile = { domain }`——`stars` 则来自 join 到的 `repos.jsonl` 行（未 join 到时为 0）。
 
 技能详情抽屉将 `hash` 以「版本」呈现（`#b1460085`，完整值放 tooltip），`fetchedAt` 以「收录时间」呈现，分类则以分类标签呈现。作者自己在 frontmatter 写的 `version` 刻意不再并列展示：它是对另一件事的声明。
 

@@ -3,6 +3,8 @@ import { beforeEach } from "vitest";
 // Extend Vitest's `expect` with jest-dom matchers (toBeInTheDocument, etc.).
 import "@testing-library/jest-dom/vitest";
 
+import { LANGUAGE_STORAGE_KEY } from "../lib/i18n-content";
+import i18n from "../i18n/index";
 import { resetViewMemories } from "../lib/view-memory";
 import { resetListView } from "../lib/list-view";
 
@@ -120,6 +122,14 @@ if (typeof Element !== "undefined") {
 // still be in the header when the next one renders.
 beforeEach(() => {
   window.history.replaceState(null, "", window.location.href);
+  // Pin the UI to Chinese so existing assertions on Chinese copy pass without
+  // per-test wiring. Pinning the stored preference (rather than only the
+  // i18next language) keeps the provider's mount-time resolution in step: a
+  // bare changeLanguage call would be undone by the provider resolving the
+  // default `system` preference against jsdom's en-US navigator.
+  window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "zh");
+  void i18n.changeLanguage("zh");
+  document.documentElement.lang = "zh-CN";
   resetViewMemories();
   resetListView();
 });

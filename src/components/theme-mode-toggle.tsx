@@ -1,12 +1,13 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useTranslation } from "react-i18next";
 
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
 const OPTIONS = [
-  { value: "light", label: "浅色", icon: Sun },
-  { value: "dark", label: "深色", icon: Moon },
-  { value: "system", label: "跟随系统", icon: Monitor },
+  { value: "light", labelKey: "theme.light", icon: Sun },
+  { value: "dark", labelKey: "theme.dark", icon: Moon },
+  { value: "system", labelKey: "theme.system", icon: Monitor },
 ] as const;
 
 /**
@@ -17,6 +18,7 @@ const OPTIONS = [
  * leave no theme selected — the guard keeps the control radio-like.
  */
 export function ThemeModeToggle() {
+  const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
 
   return (
@@ -29,12 +31,12 @@ export function ThemeModeToggle() {
         const next = value[0];
         if (next) setTheme(next);
       }}
-      aria-label="外观"
+      aria-label={t("settings.appearance")}
     >
-      {OPTIONS.map(({ value, label, icon: Icon }) => (
+      {OPTIONS.map(({ value, labelKey, icon: Icon }) => (
         <ToggleGroupItem key={value} value={value} className="gap-1 px-2">
           <Icon />
-          <span>{label}</span>
+          <span>{t(labelKey)}</span>
         </ToggleGroupItem>
       ))}
     </ToggleGroup>

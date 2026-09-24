@@ -1,13 +1,15 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import { ChevronRight, Star } from "lucide-react";
 
+import { useAppLocale } from "../../i18n/use-language";
+import { skillDescription } from "../../lib/i18n-content";
 import { domainIcon } from "../../data/domains";
 import { DomainGlyph } from "../../components/domain-glyph";
 import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
 import {
   isLiveSkill,
-  LOCAL_SOURCE_LABEL,
   skillKey,
   type SkillView,
 } from "../../lib/skill-view";
@@ -208,13 +210,15 @@ export function RepoCard({
    */
   href?: string | null;
 }) {
+  const { t } = useTranslation();
+  const locale = useAppLocale();
   // The owner segment is what the dataset hosts an avatar for; a repository
   // group always has one (a bare-host source is its own owner).
   const [owner] = repo.split("/");
   const shown = hasQuery ? skills : skills.slice(0, maxSkills);
   // The bar's own name: the repository when there is one, and the label for the
   // installed list's pool of skills no source vouches for when there is not.
-  const name = repo || LOCAL_SOURCE_LABEL;
+  const name = repo || t("common.localInstall");
   // The door's destination; `null` leaves the bar a label (see `href`).
   const door = href === undefined ? `/repo/${repo}` : href;
   // A live skills.sh source has no in-app page: its door is an external URL
@@ -269,7 +273,7 @@ export function RepoCard({
           the repository's own — which is what lets a capped list read as
           "these of them": the reader counts the rows on screen and compares. */}
       <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
-        {skills.length} 个 skill
+        {t("state.skillCount", { count: skills.length })}
         <ChevronRight
           className="h-3 w-3 transition-transform group-hover/head:translate-x-0.5"
           aria-hidden
@@ -321,7 +325,7 @@ export function RepoCard({
                   <button
                     type="button"
                     onClick={() => onOpenSkill(key)}
-                    aria-label={`查看 ${skill.name} 详情`}
+                    aria-label={t("common.viewDetailAria", { name: skill.name })}
                     aria-current={isSelected ? "true" : undefined}
                     className={cn(
                       "flex min-w-0 flex-1 items-center gap-2 py-1 text-left focus-visible:outline-none",
@@ -356,7 +360,9 @@ export function RepoCard({
                       />
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                      {live ? null : skill.description || "暂无描述"}
+                      {live
+                        ? null
+                        : skillDescription(skill, locale) || t("common.noDescription")}
                     </span>
                   </button>
                   {/* The row's own additions sit beside the row button rather
@@ -430,7 +436,7 @@ export function RepoCard({
                 {name}
               </span>
               <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
-                {skills.length} 个 skill
+                {t("state.skillCount", { count: skills.length })}
               </span>
             </span>
           ) : externalDoor ? (
@@ -438,7 +444,17 @@ export function RepoCard({
               href={door}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`查看${repo ? `仓库 ${repo}` : name}，${skills.length} 个 skill`}
+              aria-label={
+                repo
+                  ? t("state.viewRepoAria", {
+                      repo,
+                      count: skills.length,
+                    })
+                  : t("state.viewPoolAria", {
+                      name,
+                      count: skills.length,
+                    })
+              }
               className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               {doorBar}
@@ -446,7 +462,17 @@ export function RepoCard({
           ) : (
             <Link
               to={door}
-              aria-label={`查看${repo ? `仓库 ${repo}` : name}，${skills.length} 个 skill`}
+              aria-label={
+                repo
+                  ? t("state.viewRepoAria", {
+                      repo,
+                      count: skills.length,
+                    })
+                  : t("state.viewPoolAria", {
+                      name,
+                      count: skills.length,
+                    })
+              }
               className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               {doorBar}

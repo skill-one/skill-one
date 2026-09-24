@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useOverflow } from "../../hooks/use-overflow";
 import { cn } from "../../lib/utils";
@@ -39,6 +40,7 @@ export function ExpandableDescription({ text }: { text: string }) {
   const [expandedText, setExpandedText] = useState<string | null>(null);
   const open = expandedText === text;
   const { ref, overflowing } = useOverflow<HTMLParagraphElement>(text);
+  const { t } = useTranslation();
 
   return (
     <Collapsible
@@ -79,7 +81,7 @@ export function ExpandableDescription({ text }: { text: string }) {
                       "ml-1 px-0",
                 )}
               >
-                {open ? "收起" : "展开"}
+                {open ? t("common.collapse") : t("common.expand")}
               </Button>
             }
           />

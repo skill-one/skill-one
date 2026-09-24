@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronUp, ExternalLink, Star } from "lucide-react";
 
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
@@ -131,6 +132,7 @@ export function RepoPage({
   // The repository is the route's splat rather than a path parameter: it is
   // `owner/repo`, and it carries a slash of its own.
   const repo = useParams()["*"] ?? "";
+  const { t } = useTranslation();
 
   const stats = useRegistryStats();
   const { data } = useRegistryGroups("");
@@ -363,8 +365,8 @@ export function RepoPage({
   // is the page's content instead); in the store's reading it is one the
   // completed index does not carry.
   const emptyMessage = absent
-    ? `索引中没有仓库 ${repo}`
-    : "该仓库没有已安装的 skill";
+    ? t("state.repoNotInIndex", { repo })
+    : t("state.repoNoInstalled");
   const isEmpty =
     (!fromInstalled && published.length === 0) ||
     (fromInstalled && onDisk.length === 0 && !hasRest);
@@ -373,8 +375,8 @@ export function RepoPage({
   // disk in the installed one — the same number the card's bar stated — and it
   // does not move when a fold opens: each fold states its own count.
   const headCount = fromInstalled
-    ? `${onDisk.length} 个已安装 skill`
-    : `${published.length} 个 skill`;
+    ? t("state.installedCount", { count: onDisk.length })
+    : t("state.skillCount", { count: published.length });
 
   // The drawer walks the rows on screen, and the panel's chrome follows the
   // section the open skill belongs to: an installed row offers the enable
@@ -442,7 +444,7 @@ export function RepoPage({
                   className="h-3 w-3 fill-amber-400 text-amber-400"
                   aria-hidden
                 />
-                {formatCount(group.stars)} Star
+                {t("common.stars", { count: formatCount(group.stars) })}
                 <span aria-hidden="true">·</span>
               </>
             )}
@@ -468,7 +470,8 @@ export function RepoPage({
               onClick={() => void openExternal(`https://github.com/${repo}`)}
               className="shrink-0"
             >
-              <ExternalLink />在 GitHub 打开
+              <ExternalLink />
+              {t("action.openOnGitHub")}
             </Button>
           </>
         }
@@ -476,14 +479,14 @@ export function RepoPage({
 
       <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5">
         {failure ? (
-          <Placeholder message={`加载失败：${failure}`}>
+          <Placeholder message={t("state.loadFailed", { message: failure })}>
             <Button
               variant="outline"
               size="sm"
               className="mt-2"
               onClick={stats.refetch}
             >
-              重试
+              {t("action.retry")}
             </Button>
           </Placeholder>
         ) : waiting ? (
@@ -516,12 +519,18 @@ export function RepoPage({
                 <RepoFoldRule
                   controls="repo-other-skills"
                   open={secondOpen}
-                  closedLabel={`查看同仓库其他 ${second.length} 个${
-                    fromInstalled ? "已安装" : ""
-                  } skill`}
-                  openLabel={`收起其他 ${second.length} 个${
-                    fromInstalled ? "已安装" : ""
-                  } skill`}
+                  closedLabel={
+                    fromInstalled
+                      ? t("repo.showOtherInstalled", { count: second.length })
+                      : t("repo.showOther", { count: second.length })
+                  }
+                  openLabel={
+                    fromInstalled
+                      ? t("repo.collapseOtherInstalled", {
+                          count: second.length,
+                        })
+                      : t("repo.collapseOther", { count: second.length })
+                  }
                   onToggle={() => {
                     setSecondOpen((open) => !open);
                     // Folding the search fold also folds the catalogue nested
@@ -554,8 +563,12 @@ export function RepoPage({
                 <RepoFoldRule
                   controls="repo-rest-skills"
                   open={thirdOpen}
-                  closedLabel={`查看同仓库其他 ${third.length} 个未安装 skill`}
-                  openLabel={`收起未安装的 ${third.length} 个 skill`}
+                  closedLabel={t("repo.showOtherUninstalled", {
+                    count: third.length,
+                  })}
+                  openLabel={t("repo.collapseUninstalled", {
+                    count: third.length,
+                  })}
                   onToggle={() => setThirdOpen((open) => !open)}
                 />
               </div>

@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   CalendarDays,
   ExternalLink,
@@ -7,6 +8,8 @@ import {
   Loader2,
   Pencil,
 } from "lucide-react";
+
+import { useAppLocale } from "../../i18n/use-language";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { MIRROR } from "../../lib/mirror";
@@ -18,7 +21,7 @@ import {
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
-import { LOCAL_SOURCE_LABEL, skillKey, type SkillView } from "../../lib/skill-view";
+import { skillKey, type SkillView } from "../../lib/skill-view";
 import {
   errorMessage,
   formatDate,
@@ -102,6 +105,7 @@ function ProvenanceTip({
   seenAt?: string;
   path?: string;
 }) {
+  const { t } = useTranslation();
   const className =
     "flex items-center gap-1 whitespace-nowrap text-muted-foreground/70 transition-colors hover:text-foreground";
   const body = (
@@ -109,13 +113,13 @@ function ProvenanceTip({
       <div className="flex flex-col gap-1">
         {rev && (
           <p>
-            <span className="text-background/55">版本 </span>
+            <span className="text-background/55">{t("detail.versionLabel")}</span>
             <span className="font-mono break-all">{rev}</span>
           </p>
         )}
         {seenAt && (
           <p>
-            <span className="text-background/55">收录时间 </span>
+            <span className="text-background/55">{t("detail.seenAtLabel")}</span>
             {seenAt}
           </p>
         )}
@@ -130,19 +134,19 @@ function ProvenanceTip({
             href ? (
               <a
                 href={href}
-                title="查看版本与来源信息"
+                title={t("detail.provenanceTitle")}
                 onClick={(e) => {
                   e.preventDefault();
                   void openExternal(href);
                 }}
                 className={className}
               >
-                源
+                {t("detail.source")}
                 <ExternalLink className="h-3 w-3 shrink-0" />
               </a>
             ) : (
-              <span title="查看来源信息" className={className}>
-                本地文件
+              <span title={t("detail.provenanceTitleLocal")} className={className}>
+                {t("detail.localFile")}
               </span>
             )
           }
@@ -163,13 +167,15 @@ function ProvenanceTip({
  * all, which is also exactly what the store's registry-only rows provide.
  */
 function InstalledAt({ installedAt }: { installedAt?: number | null }) {
+  const { t } = useTranslation();
+  const locale = useAppLocale();
   // Relative on the row — "3天前" answers "recently?" — with the exact date on
   // hover answering "exactly when", so neither rendering has to be both. Both
   // renderings share one guard, so `installedExact` is present whenever
   // `installedOn` is.
-  const installedOn = formatRelativeTime(installedAt);
+  const installedOn = formatRelativeTime(installedAt, locale);
   if (!installedOn) return null;
-  const installedExact = formatUnixDate(installedAt);
+  const installedExact = formatUnixDate(installedAt, locale);
   return (
     <Tooltip>
       <TooltipTrigger
@@ -186,11 +192,11 @@ function InstalledAt({ installedAt }: { installedAt?: number | null }) {
       <TooltipContent className="max-w-[260px] text-left normal-case">
         <div className="flex flex-col gap-1">
           <p>
-            <span className="text-background/55">安装于 </span>
+            <span className="text-background/55">{t("detail.installedAtLabel")}</span>
             {installedExact}
           </p>
           <p className="text-background/55">
-            技能目录的创建时间；从 agent 目录收编的技能保留其原始时间。
+            {t("detail.installedAtHint")}
           </p>
         </div>
       </TooltipContent>
@@ -264,6 +270,8 @@ export function SkillDetailPanel({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const locale = useAppLocale();
 
   // Leaving the current skill (or closing the drawer) drops any edit session, so
   // the next skill never opens on a stale draft.
@@ -354,13 +362,13 @@ export function SkillDetailPanel({
       await saveLocalSkillMd(shown.name, draft);
       // The file changed on disk: refresh the raw cache, the displayed detail
       // and the installed list (whose description is read from the file).
-      queryClient.invalidateQueries({ queryKey: ["skill-md-raw", shown.name] });
-      queryClient.invalidateQueries({ queryKey: ["skill-detail"] });
+      void queryClient.invalidateQueries({ queryKey: ["skill-md-raw", shown.name] });
+      void queryClient.invalidateQueries({ queryKey: ["skill-detail"] });
       await markSkillsChanged(queryClient);
       setEditing(false);
-      toast.add({ title: `已保存 ${shown.name}`, type: "success" });
+      toast.add({ title: t("detail.saved", { name: shown.name }), type: "success" });
     } catch (err) {
-      toast.add({ title: errorMessage(err, "保存失败"), type: "error" });
+      toast.add({ title: errorMessage(err, t("detail.saveFailed")), type: "error" });
     }
   };
 
@@ -388,7 +396,12 @@ export function SkillDetailPanel({
   // not know shows no figure rather than a hardcoded zero, the same rule its
   // card follows. An absent marker means backed (see `SkillView`).
   const showStats = shown?.storeBacked !== false;
-  const description = detail?.description || shown?.description;
+  // The registry's Chinese description wins for zh; the fetched frontmatter
+  // description otherwise keeps its original precedence over the index one.
+  const description =
+    locale === "zh"
+      ? (shown?.descriptionZh || detail?.description || shown?.description)
+      : (detail?.description || shown?.description);
   // The mirror-relative SKILL.md path, reused for the mirror's GitHub file
   // link and to resolve relative URLs inside the markdown body. Only a mirror
   // read has one — a local read's path is absolute and must never be resolved
@@ -412,7 +425,7 @@ export function SkillDetailPanel({
   // date the mirror first fetched that exact content. Provenance detail —
   // surfaced on hover via the header's 源 tip, not as permanent header rows.
   const rev = shown?.rev ?? null;
-  const seenAt = shown?.firstSeenAt ? formatDate(shown.firstSeenAt) : null;
+  const seenAt = shown?.firstSeenAt ? formatDate(shown.firstSeenAt, locale) : null;
 
   // The canonical SKILL.md body. Registry skills resolve relative links
   // against the snapshot the index was built from; a body read off disk has
@@ -430,7 +443,7 @@ export function SkillDetailPanel({
       </Suspense>
     ) : (
       <p className="text-[13px] leading-relaxed text-muted-foreground">
-        （SKILL.md 无正文内容）
+        {t("detail.noBody")}
       </p>
     )
   ) : null;
@@ -459,7 +472,7 @@ export function SkillDetailPanel({
                       e.preventDefault();
                       void openExternal(sourceHref);
                     }}
-                    title="在 GitHub 中打开源仓库"
+                    title={t("detail.openSourceRepo")}
                     className="inline-flex min-w-0 items-center gap-1"
                   >
                     {/* The repo's owner avatar leads the repo it belongs to:
@@ -476,7 +489,7 @@ export function SkillDetailPanel({
                 }
               />
             ) : (
-              <SheetDescription>{LOCAL_SOURCE_LABEL}</SheetDescription>
+              <SheetDescription>{t("common.localInstall")}</SheetDescription>
             )}
           </div>
           {/* The primary action lives in the header, like every store's
@@ -517,7 +530,7 @@ export function SkillDetailPanel({
               {skillsShHref && (
                 <a
                   href={skillsShHref}
-                  aria-label="在 skills.sh 中打开"
+                  aria-label={t("detail.openOnSkillsSh")}
                   onClick={(e) => {
                     e.preventDefault();
                     void openExternal(skillsShHref);
@@ -563,18 +576,18 @@ export function SkillDetailPanel({
           <div className="relative flex items-center gap-1.5 bg-popover pl-3">
             {dirty && (
               <span className="text-[12px] text-muted-foreground">
-                未保存的更改
+                {t("detail.unsavedChanges")}
               </span>
             )}
             <Button variant="ghost" size="sm" onClick={handleCancel}>
-              取消
+              {t("detail.cancel")}
             </Button>
             <Button
               size="sm"
               disabled={!dirty || draft == null || draft.trim() === ""}
               onClick={() => void handleSave()}
             >
-              保存
+              {t("detail.save")}
             </Button>
           </div>
         ) : (
@@ -583,8 +596,8 @@ export function SkillDetailPanel({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label="编辑"
-                title="编辑 SKILL.md"
+                aria-label={t("detail.edit")}
+                title={t("detail.editSkill")}
                 onClick={() => setEditing(true)}
               >
                 <Pencil />
@@ -616,10 +629,9 @@ export function SkillDetailPanel({
             ) : isError ? (
               <div className="flex flex-col items-center gap-3 py-16 text-center">
                 <p className="text-[13px] leading-relaxed text-muted-foreground">
-                  加载失败：
-                  {errorMessage(error)}
+                  {t("detail.loadFailed", { message: errorMessage(error) })}
                   <br />
-                  该技能目录下可能没有可访问的 SKILL.md。
+                  {t("detail.loadFailedHint")}
                 </p>
                 <Button
                   variant="outline"
@@ -627,7 +639,7 @@ export function SkillDetailPanel({
                   className="mt-1"
                   onClick={() => void refetch()}
                 >
-                  重试
+                  {t("action.retry")}
                 </Button>
               </div>
             ) : detail ? (

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import App from "./App";
+import { I18nProvider } from "./i18n/language-provider";
 
 // The routing tests never need registry data: hold the worker client at its
 // initial (empty, not-ready) snapshot so no async data reaches the UI.
@@ -67,7 +68,11 @@ describe("App routing", () => {
   });
 
   it("persists the query cache to localStorage", async () => {
-    render(<App />);
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
 
     // The sync-storage persister is wired up once at module load.
     expect(persisterWiring.calls).toBe(1);
@@ -77,7 +82,11 @@ describe("App routing", () => {
   });
 
   it("redirects the root route to /my-skills", async () => {
-    render(<App />);
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
 
     // MySkillsPage renders mock skill rows synchronously.
     expect(await screen.findByText("pdf")).toBeInTheDocument();
@@ -85,7 +94,11 @@ describe("App routing", () => {
 
   it("navigates between routes via the rail", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
 
     // 设置 is a popover trigger, not a route: it opens the quick-settings
     // flyout in place.
@@ -103,7 +116,11 @@ describe("App routing", () => {
     // The installed list's repository cards point here (see the card's own
     // test); this is the route existing at all, which only the shell can say.
     window.location.hash = "#/my-skills/repo/anthropics/skills";
-    render(<App />);
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
 
     // The page mounts rather than falling through to the catch-all redirect —
     // and it says which repository it is, the index it would list never landing
@@ -121,14 +138,22 @@ describe("App routing", () => {
 
   it("redirects unknown routes back to /my-skills", async () => {
     window.location.hash = "#/does-not-exist";
-    render(<App />);
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
 
     expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
 
   it("keeps one search across both lists", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(
+      <I18nProvider>
+        <App />
+      </I18nProvider>,
+    );
 
     // The field is the header's, and there is one of it: the question it holds
     // follows the reader instead of being emptied for them.

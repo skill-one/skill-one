@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useRepoSections } from "../../hooks/use-repo-sections";
 import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
@@ -63,6 +64,7 @@ interface ExploreView {
  * down while it is live.
  */
 export function ExplorePage() {
+  const { t } = useTranslation();
   // The page's own scrolling element: the list scrolls inside it, which is also
   // why the browser restores nothing for this page (see `view` below).
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -331,7 +333,7 @@ export function ExplorePage() {
             className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5"
           >
             {failure ? (
-              <Placeholder message={`加载失败：${failure}`}>
+              <Placeholder message={t("state.loadFailed", { message: failure })}>
                 <Button
                   variant="outline"
                   size="sm"
@@ -341,7 +343,7 @@ export function ExplorePage() {
                     void refetchSections();
                   }}
                 >
-                  重试
+                  {t("action.retry")}
                 </Button>
               </Placeholder>
             ) : isSearching ? (
@@ -378,7 +380,7 @@ export function ExplorePage() {
               />
             ) : itemCount === 0 ? (
               <Placeholder
-                message={query ? `未找到匹配“${query}”的 Skill` : "暂无技能"}
+                message={query ? t("state.noMatch", { query }) : t("state.noSkills")}
               />
             ) : (
               <div
@@ -448,7 +450,7 @@ export function ExplorePage() {
                         <CollapsibleSection
                           key={band.key}
                           title={band.title}
-                          count={`${band.items.length} 个仓库`}
+                          count={t("state.repoCount", { count: band.items.length })}
                         >
                           <ul className={REPO_LIST_CLASS}>
                             {revealed.map((group) => (

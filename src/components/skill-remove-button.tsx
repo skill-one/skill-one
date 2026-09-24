@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "./ui/toast";
 
@@ -43,6 +44,7 @@ export function SkillRemoveButton({
 
   const queryClient = useQueryClient();
   const { data: installed } = useInstalledSkills();
+  const { t } = useTranslation();
   const onDisk = installed?.some((s) => s.name === skill.name) ?? false;
 
   if (!onDisk) return null;
@@ -54,10 +56,10 @@ export function SkillRemoveButton({
       // Same broadcast the install button makes: the my-skills list, the
       // sidebar count and the menu bar popover all read this one signal.
       await markSkillsChanged(queryClient);
-      toast.add({ title: `已移除 ${skill.name}`, type: "success" });
+      toast.add({ title: t("action.removed", { name: skill.name }), type: "success" });
       onRemoved?.();
     } catch (err) {
-      toast.add({ title: errorMessage(err, "移除失败"), type: "error" });
+      toast.add({ title: errorMessage(err, t("action.removeFailed")), type: "error" });
     } finally {
       setRemoving(false);
     }
@@ -68,7 +70,7 @@ export function SkillRemoveButton({
       variant="outline"
       size="sm"
       disabled={removing}
-      title="移除"
+      title={t("action.remove")}
       onClick={(e) => {
         void handleRemove();
         e.stopPropagation();
@@ -80,7 +82,7 @@ export function SkillRemoveButton({
       ) : (
         <Trash2 className="h-3.5 w-3.5" />
       )}
-      移除
+      {t("action.remove")}
     </Button>
   );
 }
