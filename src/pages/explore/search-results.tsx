@@ -17,7 +17,7 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import type { SkillMatched } from "../../components/highlighted-text";
-import { SectionHeader } from "../../components/section-header";
+import { CollapsibleSection } from "../../components/collapsible-section";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
@@ -235,16 +235,15 @@ export function SearchResults({
         <>
           {/* 1 — 本地已安装: what this machine already has. */}
           {installed.length > 0 && (
-            <section aria-label="本地已安装">
-              <SectionHeader
-                icon={HardDrive}
-                title="本地已安装"
-                count={
-                  unit === "repo"
-                    ? `${installedCards.length} 个仓库`
-                    : `${installed.length} 个 skill`
-                }
-              />
+            <CollapsibleSection
+              icon={HardDrive}
+              title="本地已安装"
+              count={
+                unit === "repo"
+                  ? `${installedCards.length} 个仓库`
+                  : `${installed.length} 个 skill`
+              }
+            >
               {unit === "skill" ? (
                 <ul className={SKILL_ROW_LIST_CLASS}>
                   {installedRuns.map((group) => {
@@ -331,7 +330,7 @@ export function SearchResults({
                   ))}
                 </ul>
               )}
-            </section>
+            </CollapsibleSection>
           )}
 
           {/* 2 — 应用商店: what the registry's index carries. While its answer
@@ -339,18 +338,17 @@ export function SearchResults({
               three-section shape is visible from the first paint and the
               answer lands into it, not onto it. */}
           {(storeSkills.length > 0 || storeLoading) && (
-            <section aria-label="应用商店">
-              <SectionHeader
-                icon={Store}
-                title="应用商店"
-                count={
-                  storeLoading
-                    ? "搜索中…"
-                    : unit === "repo"
-                      ? `${storeGroups.length} 个仓库`
-                      : `${storeSkills.length} 个 skill`
-                }
-              />
+            <CollapsibleSection
+              icon={Store}
+              title="应用商店"
+              count={
+                storeLoading
+                  ? "搜索中…"
+                  : unit === "repo"
+                    ? `${storeGroups.length} 个仓库`
+                    : `${storeSkills.length} 个 skill`
+              }
+            >
               {storeLoading ? (
                 <SkeletonList
                   rows={3}
@@ -417,23 +415,22 @@ export function SearchResults({
                   ))}
                 </ul>
               )}
-            </section>
+            </CollapsibleSection>
           )}
 
           {/* 3 — skills.sh: what the live endpoint adds, minus what the store
               section already covers. Same shape per unit as the sections above
               it; its rows claim nothing their source does not carry. */}
           {liveSkills.length > 0 && (
-            <section aria-label="skills.sh 官方搜索">
-              <SectionHeader
-                icon={Globe}
-                title="skills.sh 官方搜索"
-                count={
-                  unit === "repo"
-                    ? `${liveRepoGroups.length} 个仓库`
-                    : `${liveSkills.length} 个 skill`
-                }
-              />
+            <CollapsibleSection
+              icon={Globe}
+              title="skills.sh 官方搜索"
+              count={
+                unit === "repo"
+                  ? `${liveRepoGroups.length} 个仓库`
+                  : `${liveSkills.length} 个 skill`
+              }
+            >
               {unit === "skill" ? (
                 <ul className={SKILL_ROW_LIST_CLASS}>
                   {liveSkills.map((skill, index) => (
@@ -477,7 +474,7 @@ export function SearchResults({
                   ))}
                 </ul>
               )}
-            </section>
+            </CollapsibleSection>
           )}
         </>
       )}
