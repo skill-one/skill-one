@@ -11,6 +11,9 @@ mod skills;
 mod tray;
 mod update_channel;
 
+#[cfg(target_os = "macos")]
+mod macos_drag_region;
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -41,6 +44,12 @@ pub fn run() {
         ])
         .setup(|app| {
             tray::create_tray(app.handle())?;
+            #[cfg(target_os = "macos")]
+            if let Some(main) = app.get_webview_window("main") {
+                let ns_window = main.ns_window()?;
+                let ns_window = unsafe { &*ns_window.cast() };
+                macos_drag_region::install(ns_window);
+            }
             // Native popover material, rounded to the CSS corner radius of the
             // content clip (see `POPOVER_MATERIAL_RADIUS` in `tray.rs`).
             #[cfg(target_os = "macos")]
