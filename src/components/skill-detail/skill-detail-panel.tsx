@@ -1,18 +1,24 @@
 import { Suspense, lazy, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
   ExternalLink,
   Globe,
   Loader2,
+  Pencil,
 } from "lucide-react";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { MIRROR } from "../../lib/mirror";
-import { fetchLocalSkillDetail } from "../../lib/local-skills";
+import {
+  fetchLocalSkillDetail,
+  readLocalSkillRaw,
+  saveLocalSkillMd,
+} from "../../lib/local-skills";
+import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
-import { LOCAL_SOURCE_LABEL, type SkillView } from "../../lib/skill-view";
+import { LOCAL_SOURCE_LABEL, skillKey, type SkillView } from "../../lib/skill-view";
 import {
   errorMessage,
   formatDate,
@@ -30,6 +36,7 @@ import {
   SheetTitle,
 } from "../ui/sheet";
 import { Skeleton } from "../ui/skeleton";
+import { toast } from "../ui/toast";
 import {
   Tooltip,
   TooltipContent,
@@ -51,6 +58,14 @@ import { ExpandableDescription } from "./expandable-description";
  */
 const LazyMarkdown = lazy(() =>
   import("../markdown").then((m) => ({ default: m.Markdown })),
+);
+
+/**
+ * The editor is the heaviest thing the drawer can mount, so it rides its own
+ * chunk: a reader who only browses never downloads CodeMirror.
+ */
+const LazySkillEditor = lazy(() =>
+  import("./skill-editor").then((m) => ({ default: m.SkillEditor })),
 );
 
 /** Placeholder for the code-split markdown body on the first drawer open. */
@@ -242,6 +257,22 @@ export function SkillDetailPanel({
     if (skill) setLastSkill(skill);
   }, [skill]);
   const shown = skill ?? lastSkill;
+
+  // Editing is a mode of the panel: the body swaps from rendered markdown to a
+  // CodeMirror view of the raw file. Only an installed skill has a writable
+  // file, so the mode is offered on the installed surface alone (see `editable`).
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // Leaving the current skill (or closing the drawer) drops any edit session, so
+  // the next skill never opens on a stale draft.
+  const skillIdentity = shown ? skillKey(shown) : null;
+  useEffect(() => {
+    setEditing(false);
+    setDraft(null);
+  }, [skillIdentity]);
+
   // Remote when the registry knows the skill's repo directory, local disk
   // otherwise (local installs, or store installs whose index entry is gone
   // or not loaded yet). The source is part of the key so both variants of
@@ -271,12 +302,72 @@ export function SkillDetailPanel({
   useEffect(() => {
     if (!skill) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      // While editing, ←/→ must move the caret, not switch skills.
+      if (editing) return;
       if (e.key === "ArrowLeft") onPrev();
       else if (e.key === "ArrowRight") onNext();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [skill, onPrev, onNext]);
+  }, [skill, onPrev, onNext, editing]);
+
+  // Escape dismisses the sheet, which would silently drop an unsaved draft.
+  // While editing it is swallowed in the capture phase, so the explicit 取消
+  // button stays the intended way out of the edit mode.
+  useEffect(() => {
+    const onKeyDownCapture = (e: KeyboardEvent) => {
+      if (editing && e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", onKeyDownCapture, true);
+    return () =>
+      window.removeEventListener("keydown", onKeyDownCapture, true);
+  }, [editing]);
+
+  // Editing is offered only where a writable file exists: an installed skill.
+  // A store row is remote mirror content with nothing to save to.
+  const editable = surface === "installed" && shown != null;
+
+  // The raw file (frontmatter included) is read only once editing starts, and
+  // kept apart from the display detail — a save must round-trip the file, which
+  // the display detail (body only) cannot.
+  const { data: raw, isPending: rawPending } = useQuery({
+    queryKey: ["skill-md-raw", shown?.name],
+    queryFn: () => readLocalSkillRaw(shown!.name),
+    enabled: editing && shown != null,
+  });
+
+  // Seed the draft from the file the first time its text lands.
+  useEffect(() => {
+    if (editing && raw != null) setDraft(raw);
+  }, [editing, raw]);
+
+  // The draft differs from what is on disk — the save button's enablement and
+  // the "未保存" hint both hinge on it.
+  const dirty = draft != null && raw != null && draft !== raw;
+
+  const handleSave = async () => {
+    if (!shown || draft == null || !dirty) return;
+    try {
+      await saveLocalSkillMd(shown.name, draft);
+      // The file changed on disk: refresh the raw cache, the displayed detail
+      // and the installed list (whose description is read from the file).
+      queryClient.invalidateQueries({ queryKey: ["skill-md-raw", shown.name] });
+      queryClient.invalidateQueries({ queryKey: ["skill-detail"] });
+      await markSkillsChanged(queryClient);
+      setEditing(false);
+      toast.add({ title: `已保存 ${shown.name}`, type: "success" });
+    } catch (err) {
+      toast.add({ title: errorMessage(err, "保存失败"), type: "error" });
+    }
+  };
+
+  const handleCancel = () => {
+    setEditing(false);
+    setDraft(null);
+  };
 
   // Always render the SheetContent — Base UI unmounts it with the sheet's
   // open state, keeping it alive through the close animation. With no skill
@@ -455,31 +546,95 @@ export function SkillDetailPanel({
           <InstalledAt installedAt={shown?.installedAt} />
         </div>
       </SheetHeader>
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
-        {isPending ? (
-          <div className="flex h-40 items-center justify-center text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        ) : isError ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
-              加载失败：
-              {errorMessage(error)}
-              <br />
-              该技能目录下可能没有可访问的 SKILL.md。
-            </p>
+      {/* A divider heads the body and carries the file's name: the rule runs the
+          full inset width behind a centered SKILL.md label, with the content
+          action pinned to its right end. The label and the action sit on the
+          popover surface, so they break the line — one divider, not a second
+          title bar. */}
+      <div className="relative flex min-h-9 items-center justify-end px-6">
+        <span
+          aria-hidden
+          className="absolute inset-x-6 top-1/2 h-px -translate-y-1/2 bg-border"
+        />
+        <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-popover px-3 text-[12px] text-muted-foreground">
+          SKILL.md
+        </span>
+        {editing ? (
+          <div className="relative flex items-center gap-1.5 bg-popover pl-3">
+            {dirty && (
+              <span className="text-[12px] text-muted-foreground">
+                未保存的更改
+              </span>
+            )}
+            <Button variant="ghost" size="sm" onClick={handleCancel}>
+              取消
+            </Button>
             <Button
-              variant="outline"
               size="sm"
-              className="mt-1"
-              onClick={() => void refetch()}
+              disabled={!dirty || draft == null || draft.trim() === ""}
+              onClick={() => void handleSave()}
             >
-              重试
+              保存
             </Button>
           </div>
-        ) : detail ? (
-          <div className="pt-3">{skillMdBody}</div>
-        ) : null}
+        ) : (
+          editable && (
+            <div className="relative bg-popover pl-3">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="编辑"
+                title="编辑 SKILL.md"
+                onClick={() => setEditing(true)}
+              >
+                <Pencil />
+              </Button>
+            </div>
+          )
+        )}
+      </div>
+      <div className="min-h-0 flex-1">
+        {editing ? (
+          // Edit mode fills the body with a full-height editor.
+          <div className="h-full px-4 pb-4">
+            {rawPending || draft == null ? (
+              <div className="flex h-full items-center justify-center text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : (
+              <Suspense fallback={<MarkdownSkeleton />}>
+                <LazySkillEditor value={draft} onChange={setDraft} />
+              </Suspense>
+            )}
+          </div>
+        ) : (
+          <div className="h-full overflow-y-auto px-6 pb-6">
+            {isPending ? (
+              <div className="flex h-40 items-center justify-center text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : isError ? (
+              <div className="flex flex-col items-center gap-3 py-16 text-center">
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  加载失败：
+                  {errorMessage(error)}
+                  <br />
+                  该技能目录下可能没有可访问的 SKILL.md。
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1"
+                  onClick={() => void refetch()}
+                >
+                  重试
+                </Button>
+              </div>
+            ) : detail ? (
+              <div className="pt-3">{skillMdBody}</div>
+            ) : null}
+          </div>
+        )}
       </div>
     </SheetContent>
   );

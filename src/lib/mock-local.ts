@@ -86,6 +86,14 @@ function buildMockSkills(): InstalledSkill[] {
 
 let mockSkills = buildMockSkills();
 
+/**
+ * Raw SKILL.md text the browser mock keeps per skill, standing in for the file
+ * on disk. Populated lazily by `getMockSkillMd` (a synthetic document) and
+ * overwritten by `setMockSkillMd` when the editor saves. The real file side is
+ * the backend's `read_skill_md` / `write_skill_md`.
+ */
+const mockRawMd = new Map<string, string>();
+
 /** All mock skills in the global skills directory. */
 export function getMockInstalledSkills(): InstalledSkill[] {
   return mockSkills;
@@ -94,6 +102,7 @@ export function getMockInstalledSkills(): InstalledSkill[] {
 /** Remove a skill by name. */
 export function removeMockSkill(name: string): void {
   mockSkills = mockSkills.filter((s) => s.name !== name);
+  mockRawMd.delete(name);
 }
 
 /**
@@ -126,8 +135,38 @@ export function setMockSkillEnabled(name: string, enabled: boolean): void {
   mockSkills = mockSkills.map((s) => (s.name === name ? { ...s, enabled } : s));
 }
 
+/**
+ * The raw SKILL.md text of a mock skill — what the editor loads. Returns the
+ * saved override when one exists, otherwise synthesizes a minimal document
+ * (frontmatter + a body) so a never-edited skill still opens for editing.
+ */
+export function getMockSkillMd(name: string): string {
+  const saved = mockRawMd.get(name);
+  if (saved != null) return saved;
+  const description = mockSkills.find((s) => s.name === name)?.description ?? "";
+  return [
+    "---",
+    `name: ${name}`,
+    `description: ${JSON.stringify(description)}`,
+    "---",
+    "",
+    `# ${name}`,
+    "",
+    `演示数据：${name} 的本地 SKILL.md 正文。`,
+    "",
+    "（浏览器演示数据：模拟的本地 SKILL.md）",
+    "",
+  ].join("\n");
+}
+
+/** Record an edited SKILL.md so the mock reads it back (in-memory only). */
+export function setMockSkillMd(name: string, content: string): void {
+  mockRawMd.set(name, content);
+}
+
 export function resetMockInstalledSkills(): void {
   mockSkills = buildMockSkills();
+  mockRawMd.clear();
 }
 
 // ---------------------------------------------------------------- agents

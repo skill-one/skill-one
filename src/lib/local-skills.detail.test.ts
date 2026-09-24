@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { fetchLocalSkillDetail } from "./local-skills";
+import {
+  fetchLocalSkillDetail,
+  readLocalSkillRaw,
+  saveLocalSkillMd,
+} from "./local-skills";
 
-const { isTauri, readSkillMd } = vi.hoisted(() => ({
+const { isTauri, readSkillMd, writeSkillMd } = vi.hoisted(() => ({
   isTauri: vi.fn(),
   readSkillMd: vi.fn(),
+  writeSkillMd: vi.fn(),
 }));
 
 vi.mock("./tauri", () => ({ isTauri }));
-vi.mock("./skills-manager", () => ({ readSkillMd }));
+vi.mock("./skills-manager", () => ({ readSkillMd, writeSkillMd }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -55,5 +60,50 @@ describe("fetchLocalSkillDetail", () => {
     await expect(fetchLocalSkillDetail("ghost")).rejects.toThrow(
       "本地未安装技能 ghost",
     );
+  });
+});
+
+describe("readLocalSkillRaw", () => {
+  it("reads the raw file through the backend (Tauri)", async () => {
+    isTauri.mockReturnValue(true);
+    readSkillMd.mockResolvedValue({
+      path: "/Users/me/.agents/skills/pdf/SKILL.md",
+      content: "---\nname: pdf\n---\nBODY",
+    });
+
+    await expect(readLocalSkillRaw("pdf")).resolves.toBe(
+      "---\nname: pdf\n---\nBODY",
+    );
+    expect(readSkillMd).toHaveBeenCalledWith("pdf");
+  });
+
+  it("returns the mock store's raw text (browser)", async () => {
+    isTauri.mockReturnValue(false);
+
+    const text = await readLocalSkillRaw("pdf");
+
+    // The synthesized document keeps the frontmatter, which a save must
+    // round-trip; the rendered detail drops it.
+    expect(text.startsWith("---\n")).toBe(true);
+    expect(text).toContain("name: pdf");
+  });
+});
+
+describe("saveLocalSkillMd", () => {
+  it("writes the file through the backend (Tauri)", async () => {
+    isTauri.mockReturnValue(true);
+    writeSkillMd.mockResolvedValue(undefined);
+
+    await saveLocalSkillMd("pdf", "next");
+
+    expect(writeSkillMd).toHaveBeenCalledWith("pdf", "next");
+  });
+
+  it("records the text in the mock store (browser) so it reads back", async () => {
+    isTauri.mockReturnValue(false);
+
+    await saveLocalSkillMd("pdf", "browser edit");
+
+    await expect(readLocalSkillRaw("pdf")).resolves.toBe("browser edit");
   });
 });

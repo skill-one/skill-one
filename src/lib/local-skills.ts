@@ -20,6 +20,7 @@ import {
   linkAgents,
   listInstalledSkills,
   readSkillMd,
+  writeSkillMd,
   removeSkills,
   setSkillsEnabled,
   unlinkAgents,
@@ -30,11 +31,13 @@ import {
 import {
   getMockAgentStatus,
   getMockInstalledSkills,
+  getMockSkillMd,
   installMockSkill,
   linkMockAgent,
   mockPathFor,
   removeMockSkill,
   setMockSkillEnabled,
+  setMockSkillMd,
   unlinkMockAgent,
 } from "./mock-local";
 import { recordSkillProvenance, removeSkillProvenance } from "./provenance";
@@ -79,6 +82,35 @@ export async function fetchLocalSkillDetail(
     instructions: `演示数据：${skill.name} 的本地 SKILL.md 正文。\n\n（浏览器演示数据：模拟的本地 SKILL.md）`,
     path: `${mockPathFor(skill.name)}/SKILL.md`,
   };
+}
+
+/**
+ * The raw SKILL.md text of an installed skill (frontmatter included) — what the
+ * editor loads and writes back. Unlike `fetchLocalSkillDetail`, this keeps the
+ * frontmatter, because a save must round-trip the file verbatim. In Tauri the
+ * file is read off disk; in the browser the mock store provides the text.
+ */
+export async function readLocalSkillRaw(name: string): Promise<string> {
+  if (isTauri()) {
+    return (await readSkillMd(name)).content;
+  }
+  return getMockSkillMd(name);
+}
+
+/**
+ * Overwrite an installed skill's SKILL.md with `content` (frontmatter
+ * included). In Tauri the backend writes the file atomically; in the browser
+ * the mock store records the new text in memory.
+ */
+export async function saveLocalSkillMd(
+  name: string,
+  content: string,
+): Promise<void> {
+  if (isTauri()) {
+    await writeSkillMd(name, content);
+    return;
+  }
+  setMockSkillMd(name, content);
 }
 
 /**
