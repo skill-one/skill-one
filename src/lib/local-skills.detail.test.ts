@@ -31,7 +31,6 @@ describe("fetchLocalSkillDetail", () => {
 
     expect(readSkillMd).toHaveBeenCalledWith("pdf");
     expect(detail).toMatchObject({
-      name: "pdf",
       description: "读取 PDF。",
       instructions: "BODY",
       path: "/Users/me/.agents/skills/pdf/SKILL.md",
@@ -46,7 +45,6 @@ describe("fetchLocalSkillDetail", () => {
 
     const detail = await fetchLocalSkillDetail("pdf");
 
-    expect(detail.name).toBe("pdf");
     expect(detail.description).toBe(
       "PDF 文档读取、生成、合并、拆分与标注。",
     );

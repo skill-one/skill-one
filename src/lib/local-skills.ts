@@ -69,7 +69,7 @@ export async function fetchLocalSkillDetail(
 ): Promise<SkillDetail> {
   if (isTauri()) {
     const { path, content } = await readSkillMd(name);
-    return toDetail(content, name, path);
+    return toDetail(content, path);
   }
   const skill = getMockInstalledSkills().find((s) => s.name === name);
   if (!skill) {
@@ -77,7 +77,6 @@ export async function fetchLocalSkillDetail(
   }
   const description = skill.description;
   return {
-    name: skill.name,
     description,
     instructions: `演示数据：${skill.name} 的本地 SKILL.md 正文。\n\n（浏览器演示数据：模拟的本地 SKILL.md）`,
     path: `${mockPathFor(skill.name)}/SKILL.md`,
