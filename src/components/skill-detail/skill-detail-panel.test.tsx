@@ -5,6 +5,7 @@ import { render, screen, within, fireEvent, waitFor } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 
 import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { formatDate } from "../../lib/utils";
 import {
   fetchInstalledSkills,
   fetchLocalSkillDetail,
@@ -106,8 +107,16 @@ const versionedSkill: SkillView = {
   firstSeenAt: "2026-08-12T04:34:54Z",
 };
 
-/** How the panel renders `versionedSkill.firstSeenAt` in the host's locale. */
-const SEEN_AT_LOCALE = new Date("2026-08-12T04:34:54Z").toLocaleDateString();
+/**
+ * How the panel renders `versionedSkill.firstSeenAt`: through the same
+ * `formatDate` call the panel makes, in the locale the suite pins the UI to
+ * (zh — see `src/test/setup.ts`). Deriving the expectation from the host's
+ * default locale instead (a bare `toLocaleDateString`) breaks wherever the
+ * host does not run in Chinese, which is exactly the mismatch the suite's
+ * language pin exists to remove; sharing the pipeline also keeps both sides
+ * on the same time zone, so the assertion cannot flip on one alone.
+ */
+const SEEN_AT_LOCALE = formatDate("2026-08-12T04:34:54Z", "zh") ?? "";
 
 const detail = {
   description: "Read and merge PDF documents.",
