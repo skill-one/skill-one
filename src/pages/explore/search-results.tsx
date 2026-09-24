@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Loader2 } from "lucide-react";
+import { Globe, HardDrive, Loader2, Store } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
@@ -210,7 +210,7 @@ export function SearchResults({
   const searching = storeLoading || liveSearching;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8 [&>section+section]:border-t [&>section+section]:border-border/60 [&>section+section]:pt-6">
       {empty ? (
         searching ? (
           <Placeholder
@@ -227,8 +227,8 @@ export function SearchResults({
           {installed.length > 0 && (
             <section aria-label="本地已安装">
               <SectionHeader
+                icon={HardDrive}
                 title="本地已安装"
-                note="你机器上匹配的安装"
                 count={
                   unit === "repo"
                     ? `${installedCards.length} 个仓库`
@@ -322,8 +322,8 @@ export function SearchResults({
           {(storeSkills.length > 0 || storeLoading) && (
             <section aria-label="应用商店">
               <SectionHeader
+                icon={Store}
                 title="应用商店"
-                note="索引收录的匹配"
                 count={
                   storeLoading
                     ? "搜索中…"
@@ -407,8 +407,8 @@ export function SearchResults({
           {liveSkills.length > 0 && (
             <section aria-label="skills.sh 官方搜索">
               <SectionHeader
+                icon={Globe}
                 title="skills.sh 官方搜索"
-                note="实时结果，本地索引未收录"
                 count={
                   unit === "repo"
                     ? `${liveRepoGroups.length} 个仓库`
