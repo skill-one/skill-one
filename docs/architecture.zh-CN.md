@@ -38,7 +38,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 ### 后端（写入）
 
 - **`src-tauri/src/skills.rs`**：暴露 8 个 Tauri 命令（`install_skill`、`list_installed_skills`、`remove_skills`、`set_skills_enabled`、`link_agents`、`link_status`、`read_skill_md`、`compute_skill_hash`），全部经由共享的 `spawn_blocking` 辅助函数把阻塞操作（GitHub 下载、install、link、哈希计算等）移出异步运行时。
-- 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。自 agents-skills 0.15 起链接是单向的：agent 自带的 skills 被收编进规范目录（同名冲突保留规范目录副本），其余文件被隔离到 `.misc/<agent>/`，取消链接只断开符号链接。`list` 还会报告每个技能的描述与安装时间，应用原样透传。自 0.21 起一次安装就是一个 source 对应一个技能——`owner/repo@<skill>`，经 GitHub API 解析，只下载匹配到的技能目录——失败即命令的 `Err`，因此 `install_skill` 只返回 `{ skill, skipped }`。
+- 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。自 agents-skills 0.15 起链接是单向的：agent 自带的 skills 被收编进规范目录（同名冲突保留规范目录副本），其余文件被隔离到 `.misc/<agent>/`，取消链接只断开符号链接。`list` 还会报告每个技能的描述与安装时间，应用原样透传。自 0.21 起一次安装就是一个 source 对应一个技能——`owner/repo@<skill>`；自 0.23 起后端从 codeload.github.com 下载整个仓库 tarball 并在本地匹配技能（不再走 GitHub REST API，也不受其匿名限流影响）——失败即命令的 `Err`，因此 `install_skill` 只返回 `{ skill, skipped }`。
 
 ### 前端写入封装
 
@@ -79,7 +79,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 1. 用户在探索页点击「安装」。
 2. `local-skills.installSkillFromSource(repo, name)` 判断环境，并拼出 source `owner/repo@<skill>`。
-3. Tauri 环境 → `skills-manager.installSkill` → `invoke("install_skill", ...)` → Rust `install_skill` 命令 → `agents-skills::Manager.add`（GitHub API 只下载匹配到的技能目录）。
+3. Tauri 环境 → `skills-manager.installSkill` → `invoke("install_skill", ...)` → Rust `install_skill` 命令 → `agents-skills::Manager.add`（自 0.23 起从 codeload.github.com 下载整个仓库 tarball，在本地匹配指定的技能目录）。
 4. 完成后前端刷新 `installed-skills` 查询缓存。
 5. 浏览器环境 → 写入 `mock-local.installMockSkill`。
 

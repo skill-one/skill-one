@@ -325,10 +325,12 @@ mod tests {
 ///
 /// `source` is one of the two forms agents-skills 0.21 accepts: a local skill
 /// directory (it must directly contain a `SKILL.md`), or `owner/repo@<skill>`
-/// for one skill on GitHub — resolved through the GitHub API, which downloads
-/// only the matched skill directory (the git clone / archive paths are gone).
-/// The app always sends the GitHub form; the store's skill name is the
-/// directory name the source matches on.
+/// for one skill on GitHub. Since 0.23 the whole repository tarball is
+/// downloaded from codeload.github.com, unpacked into a temp dir, and the
+/// named skill is matched locally — the GitHub REST API is never called, so
+/// its anonymous 60-requests-per-hour rate limit no longer applies (the git
+/// clone / per-file paths are gone). The app always sends the GitHub form;
+/// the store's skill name is the directory name the source matches on.
 ///
 /// One source resolves to exactly one skill, so there is no per-skill outcome
 /// list: a failure is this command's `Err`, and `skipped` reports the 0.17

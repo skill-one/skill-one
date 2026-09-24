@@ -87,11 +87,13 @@ export async function fetchLocalSkillDetail(
  * repo.
  *
  * In Tauri the source handed to the backend is `owner/repo@<skill>`: since
- * agents-skills 0.21 the source carries the skill, and it is resolved through
- * the GitHub API, which downloads only the matched skill directory rather than
- * cloning the repo (the store's skill name is the directory name the source
- * matches on). One source resolves to exactly one skill, so a failure is this
- * call's rejection and there is no outcome list to inspect — the store's Ok
+ * agents-skills 0.21 the source carries the skill. Since 0.23 the backend
+ * downloads the whole repository tarball from codeload.github.com and matches
+ * the named skill directory locally — the GitHub REST API is never called, so
+ * its anonymous rate limit does not apply (the store's skill name is the
+ * directory name the source matches on). One source resolves to exactly one
+ * skill, so a failure is this call's rejection and there is no outcome list
+ * to inspect — the store's Ok
  * response does mean the skill is installed, and a same-named skill already on
  * disk comes back as `skipped` (0.17's no-overwrite rule), which is a no-op,
  * not a failure. In the browser this records the install in the mock store
