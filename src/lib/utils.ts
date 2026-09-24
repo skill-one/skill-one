@@ -61,24 +61,22 @@ export function formatUnixDate(
 }
 
 /**
- * A calendar-day heading for a grouped list, e.g. 9月22日 / "September 22"; a
- * day of another year carries the year (2025年12月3日 / "December 3, 2025").
- * `ms` is the day's local midnight, as the time filing reports it (`DayFiling`
- * start); `now` is injectable purely so the year test is frozen-clock
- * testable.
+ * A calendar-day heading for a grouped list: `09-15` for a day of the current
+ * year, `2025-12-03` for a day of another year — numeric on purpose, so the
+ * header reads identically in every language and sorts the way the groups
+ * under it already do. `ms` is the day's local midnight, as the time filing
+ * reports it (`DayFiling` start); `now` is injectable purely so the year test
+ * is frozen-clock testable.
  */
 export function formatDayHeading(
   ms: number,
-  locale: AppLocale,
   now: number = Date.now(),
 ): string {
-  const sameYear =
-    new Date(ms).getFullYear() === new Date(now).getFullYear();
-  return new Intl.DateTimeFormat(bcp47(locale), {
-    month: "long",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
-  }).format(new Date(ms));
+  const day = new Date(ms);
+  const padded = (n: number) => String(n).padStart(2, "0");
+  const monthDay = `${padded(day.getMonth() + 1)}-${padded(day.getDate())}`;
+  const year = day.getFullYear();
+  return year === new Date(now).getFullYear() ? monthDay : `${year}-${monthDay}`;
 }
 
 /**

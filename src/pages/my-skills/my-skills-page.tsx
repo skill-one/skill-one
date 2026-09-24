@@ -2,9 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { ParseKeys, TFunction } from "i18next";
-
-import { useAppLocale } from "../../i18n/use-language";
-import type { AppLocale } from "../../lib/i18n-content";
 import { Boxes, Users } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
@@ -121,7 +118,7 @@ function starsOf(group: RepoGroup): number | undefined {
  *   same shape, with its bar stating 本地安装 in place of a repository it
  *   would have to make up, and opening the page that lists the pool whole.
  * - **按技能**: one row per install, filed newest-first into per-day
- *   groups — 今天 / 昨天, then one dated group per calendar day (9月22日,
+ *   groups — 今天 / 昨天, then one dated group per calendar day (09-15,
  *   a day of another year carrying the year), with installs no
  *   timestamp vouches for pooled last under 时间未知 (see
  *   `lib/time-groups`) — so "what did I add lately" reads top to bottom.
@@ -142,24 +139,21 @@ function starsOf(group: RepoGroup): number | undefined {
 
 /**
  * The header a time group renders: a named day (今天 / 昨天 / 时间未知)
- * speaks its i18n key, a dated day reads as a date in the locale the UI
- * renders in (9月22日; another year carries the year — see
- * `formatDayHeading`). `titleKey` null is exactly `start` set, so the pair
- * never half-applies.
+ * speaks its i18n key, a dated day reads as a number (09-15; another year
+ * carries the year, 2025-12-03 — see `formatDayHeading`). `titleKey` null is
+ * exactly `start` set, so the pair never half-applies.
  */
 function groupHeading<T>(
   group: TimeGroup<T>,
   t: TFunction<"translation", undefined>,
-  locale: AppLocale,
 ): string {
   return group.titleKey
     ? t(group.titleKey as ParseKeys)
-    : formatDayHeading(group.start ?? 0, locale);
+    : formatDayHeading(group.start ?? 0);
 }
 
 export function MySkillsPage() {
   const { t } = useTranslation();
-  const locale = useAppLocale();
   const { data: skills, isLoading, isError, error } = useInstalledSkills();
 
   // Install sources recorded by this app (the provenance ledger), reconciled
@@ -499,7 +493,7 @@ export function MySkillsPage() {
               {shownSkillGroups.map((group) => (
                 <CollapsibleSection
                   key={group.key}
-                  title={groupHeading(group, t, locale)}
+                  title={groupHeading(group, t)}
                   count={t("state.skillCount", { count: group.items.length })}
                 >
                   <ul className={SKILL_ROW_LIST_CLASS}>
@@ -540,7 +534,7 @@ export function MySkillsPage() {
               {shownRepoGroups.map((group) => (
                 <CollapsibleSection
                   key={group.key}
-                  title={groupHeading(group, t, locale)}
+                  title={groupHeading(group, t)}
                   count={t("state.repoCount", { count: group.items.length })}
                 >
                   <ul className={REPO_LIST_CLASS}>

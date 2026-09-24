@@ -4,8 +4,8 @@
  * Every installed skill carries when its directory landed on disk
  * (`SkillView.installedAt`, Unix seconds). The filing gives each calendar day
  * that holds an install its own group, listed newest-first — 今天 and 昨天
- * keep their relative names, every other day reads as a date (9月22日; a day
- * of another year carries the year, 2025年12月3日) — plus one trailing group,
+ * keep their relative names, every other day reads as a number (09-15; a day
+ * of another year carries the year, 2025-12-03) — plus one trailing group,
  * 时间未知, for installs the platform recorded no birth time for (some Linux
  * filesystems) or that another tool dropped on disk without one. The skill
  * unit files the skills themselves; the repository unit files each repository
