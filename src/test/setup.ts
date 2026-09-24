@@ -33,6 +33,14 @@ if (typeof window !== "undefined" && !window.matchMedia) {
 // jsdom does not implement IntersectionObserver. Provide a controllable
 // mock: instances are tracked so tests can fire intersection callbacks
 // manually if a component needs it.
+//
+// There is no layout in jsdom, so the mock cannot compute a real
+// intersection; instead one simulated viewport state is shared by every
+// instance and flipped with `trigger`. A real observer reports the observed
+// element's current state right after `observe()` — the initial report —
+// which is what lets a re-armed observer keep a progressive reveal going
+// while the sentinel still sits in view, so the mock delivers the same.
+let viewportIntersecting = false;
 class IntersectionObserverMock {
   static instances: IntersectionObserverMock[] = [];
   private readonly elements = new Set<Element>();
@@ -44,6 +52,8 @@ class IntersectionObserverMock {
   }
   observe(element: Element) {
     this.elements.add(element);
+    // The initial report, as a real observer delivers on observe.
+    this.report();
   }
   unobserve(element: Element) {
     this.elements.delete(element);
@@ -53,8 +63,14 @@ class IntersectionObserverMock {
   }
   /** Test-only: simulate the observed element entering/leaving the viewport. */
   trigger(intersecting = true) {
+    viewportIntersecting = intersecting;
+    this.report();
+  }
+  private report() {
+    if (this.elements.size === 0) return;
     const entries: IntersectionObserverEntry[] = [...this.elements].map(
-      () => ({ isIntersecting: intersecting }) as IntersectionObserverEntry,
+      () =>
+        ({ isIntersecting: viewportIntersecting }) as IntersectionObserverEntry,
     );
     this.callback(entries, this as unknown as IntersectionObserver);
   }
@@ -122,4 +138,8 @@ beforeEach(() => {
   window.history.replaceState(null, "", window.location.href);
   resetViewMemories();
   resetListView();
+  // The simulated viewport starts closed, and no observer from a previous
+  // test survives into this one.
+  viewportIntersecting = false;
+  IntersectionObserverMock.instances.length = 0;
 });

@@ -232,7 +232,11 @@ export function ExplorePage() {
   // Re-observing on every extension is what keeps the reveal going while the
   // sentinel still sits in view: observing fires the initial callback with
   // the current intersection, so a bottom edge that stays visible loads the
-  // next chunk without a further scroll, until everything is mounted.
+  // next chunk without a further scroll, until everything is mounted. The
+  // count is what changes on an extension, so it is what re-arms the
+  // observer — a folded band makes this load-bearing: the next chunk mounts
+  // inside the folded panel (no visible growth), so the sentinel never
+  // leaves the view and only a re-arm can keep the reveal moving.
   useEffect(() => {
     const node = sentinelRef.current;
     if (!node || allRendered) return;
@@ -246,7 +250,7 @@ export function ExplorePage() {
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [allRendered, itemCount, setView]);
+  }, [allRendered, itemCount, renderedCount, setView]);
 
   // The skill shown in the detail panel, by identity; null keeps the panel
   // closed. Clicking a row while the panel is open simply swaps the selection,
