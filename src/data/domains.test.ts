@@ -1,9 +1,10 @@
+import { CircleHelp, Code, Shapes } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
 import {
   DOMAINS,
   UNCLASSIFIED_DOMAIN,
-  domainEmoji,
+  domainIcon,
   domainLabel,
   domainMeta,
   domainTooltip,
@@ -17,14 +18,14 @@ import {
  * is the app's own, so no upstream value can ever mean "nobody classified this".
  */
 describe("the domain taxonomy's three states", () => {
-  it("marks 其他 with the leftovers box, never with the question mark", () => {
+  it("marks 其他 with the mixed shapes, never with the help icon", () => {
     expect(domainMeta("other")?.name).toBe("其他");
-    expect(domainEmoji(["other"])).toBe("📦");
+    expect(domainIcon(["other"])).toBe(Shapes);
     // The unknown mark belongs to the unknown state alone: a real domain wearing
     // it would make an answer read like a blank in a list's glyph column.
-    expect(DOMAINS.some((domain) => domain.emoji === "❓")).toBe(false);
+    expect(DOMAINS.some((domain) => domain.icon === CircleHelp)).toBe(false);
     // And no two domains share a glyph, for the same reason one dimension over.
-    expect(new Set(DOMAINS.map((domain) => domain.emoji)).size).toBe(
+    expect(new Set(DOMAINS.map((domain) => domain.icon)).size).toBe(
       DOMAINS.length,
     );
   });
@@ -41,20 +42,24 @@ describe("the domain taxonomy's three states", () => {
   it("answers for a skill nothing classified, whatever left it blank", () => {
     // No profile at all, an empty list, and a key this build does not know are
     // one state: nobody classified the skill.
-    expect(domainEmoji(undefined)).toBe("❓");
-    expect(domainEmoji([])).toBe("❓");
-    expect(domainEmoji(["future-domain"])).toBe("❓");
-    expect(domainTooltip([])).toMatch(/^❓ /);
-    expect(domainTooltip(["future-domain"])).toMatch(/^❓ /);
+    expect(domainIcon(undefined)).toBe(CircleHelp);
+    expect(domainIcon([])).toBe(CircleHelp);
+    expect(domainIcon(["future-domain"])).toBe(CircleHelp);
+    const blank = domainMeta(UNCLASSIFIED_DOMAIN)?.description;
+    // The tip carries the scope text, not the glyph the tip itself hangs off.
+    expect(domainTooltip([])).toBe(blank);
+    expect(domainTooltip(["future-domain"])).toBe(blank);
   });
 
   it("names the other domains beside the leading one", () => {
-    expect(domainEmoji(["development", "testing"])).toBe("💻");
+    expect(domainIcon(["development", "testing"])).toBe(Code);
     expect(domainTooltip(["development", "testing"])).toContain(
       "同时属于：测试与质量",
     );
     // The unclassified state is never one of several: it stands for a skill with
     // no classification at all.
-    expect(domainTooltip([UNCLASSIFIED_DOMAIN])).toMatch(/^❓ /);
+    expect(domainTooltip([UNCLASSIFIED_DOMAIN])).toBe(
+      domainMeta(UNCLASSIFIED_DOMAIN)?.description,
+    );
   });
 });

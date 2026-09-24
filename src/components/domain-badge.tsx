@@ -9,9 +9,9 @@ import {
 } from "./ui/tooltip";
 
 /**
- * A skill's profile-domain chip: the canonical emoji next to the domain's
- * label. Hovering answers the question a reader actually has — *why is this
- * skill in that category* — so the tooltip carries the taxonomy's scope
+ * A skill's profile-domain chip: the canonical monochrome icon next to the
+ * domain's label. Hovering answers the question a reader actually has — *why is
+ * this skill in that category* — so the tooltip carries the taxonomy's scope
  * description (falling back to the raw label for a key the taxonomy no
  * longer knows).
  *
@@ -23,7 +23,7 @@ import {
  * rail is a line of facts, so it wears the chip flattened to plain text
  * (`ghost` plus a caller-supplied `px-0 py-0`), while the detail panel states
  * the classification among its other badges and keeps the outline border. The
- * emoji, the label and the tooltip are the same either way — only the chrome
+ * icon, the label and the tooltip are the same either way — only the chrome
  * differs.
  */
 export function DomainBadge({
@@ -47,7 +47,7 @@ export function DomainBadge({
       <TooltipTrigger
         render={
           <Badge variant={variant} className={className}>
-            {meta && <span aria-hidden="true">{meta.emoji}</span>}
+            {meta && <meta.icon aria-hidden />}
             {label}
           </Badge>
         }

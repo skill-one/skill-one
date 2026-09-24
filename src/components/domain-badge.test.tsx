@@ -1,3 +1,4 @@
+import { Code } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
 
@@ -10,28 +11,31 @@ describe("domainMeta", () => {
     expect(DOMAINS).toHaveLength(13);
     for (const domain of DOMAINS) {
       expect(domain.key).toMatch(/^[a-z][a-z-]*$/);
-      expect(domain.emoji).toMatch(/\p{Extended_Pictographic}/u);
+      // A renderable lucide icon component (a forwardRef object in React 19),
+      // not a colourful emoji string.
+      expect(domain.icon).toEqual(expect.any(Object));
+      expect(domain.icon.displayName).toEqual(expect.any(String));
       expect(domain.description.length).toBeGreaterThan(4);
     }
   });
 
   it("resolves a key or a label, and returns undefined for an unknown one", () => {
-    expect(domainMeta("development")?.emoji).toBe("💻");
+    expect(domainMeta("development")?.icon).toBe(Code);
     expect(domainMeta("开发编程")?.key).toBe("development");
     expect(domainMeta("不存在的分类")).toBeUndefined();
   });
 });
 
 describe("DomainBadge", () => {
-  it("renders the canonical emoji next to the domain label", () => {
+  it("renders the canonical monochrome icon next to the domain label", () => {
     renderWithRouter(<DomainBadge domain={["design-media"]} />);
     expect(screen.getByText("设计多媒体")).toBeInTheDocument();
-    expect(screen.getByText("🎨")).toBeInTheDocument();
+    expect(document.querySelector("svg.lucide-palette")).toBeInTheDocument();
   });
 
-  it("renders the raw key and no emoji for a domain outside the taxonomy", () => {
+  it("renders the raw key and no icon for a domain outside the taxonomy", () => {
     renderWithRouter(<DomainBadge domain={["future-domain"]} />);
     expect(screen.getByText("future-domain")).toBeInTheDocument();
-    expect(screen.queryByText("❓")).not.toBeInTheDocument();
+    expect(document.querySelector("svg.lucide-circle-help")).toBeNull();
   });
 });

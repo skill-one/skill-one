@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { ChevronRight, Star } from "lucide-react";
 
-import { domainEmoji } from "../../data/domains";
+import { domainIcon } from "../../data/domains";
+import { DomainGlyph } from "../../components/domain-glyph";
 import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
 import {
   isLiveSkill,
@@ -293,13 +294,10 @@ export function RepoCard({
               const key = skillKey(skill);
               // A live skills.sh row claims only what its source carries —
               // which is no description and no classification at all — so it
-              // draws neither the 暂无描述 placeholder nor the ❓ mark (see
+              // draws neither the 暂无描述 placeholder nor the help mark (see
               // `isLiveSkill`); an installed row the store cannot resolve is a
               // local fact, and keeps both.
               const live = isLiveSkill(skill);
-              const emoji = live
-                ? undefined
-                : domainEmoji(skill.profile?.domain);
               const isSelected = selected != null && selected === key;
               // The caller's own row control, else the store's install button.
               // Either one only renders when this card carries row actions at
@@ -331,16 +329,21 @@ export function RepoCard({
                     )}
                   >
                     {/* The classification's glyph, in a fixed slot so the names
-                        line up whether the skill is classified or not: a box for
-                        the dataset's own 其他, the question mark for a skill
-                        nothing classified — the same mark the list rows wear
-                        (see `domainEmoji`). A live row draws nothing in the
+                        line up whether the skill is classified or not: mixed
+                        shapes for the dataset's own 其他, the help icon for a
+                        skill nothing classified — the same mark the list rows
+                        wear (see `domainIcon`). A live row draws nothing in the
                         slot, which stays fixed so the names still line up. */}
                     <span
                       aria-hidden="true"
-                      className="w-4 shrink-0 text-center text-[13px]"
+                      className="flex w-4 shrink-0 items-center justify-center text-muted-foreground"
                     >
-                      {emoji}
+                      {!live && (
+                        <DomainGlyph
+                          icon={domainIcon(skill.profile?.domain)}
+                          className="size-3.5"
+                        />
+                      )}
                     </span>
                     {/* The name is the identifier and the row's one strong
                         element — semibold where the description is plain — and

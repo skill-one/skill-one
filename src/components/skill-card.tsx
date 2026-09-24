@@ -207,7 +207,7 @@ export function SkillCard({
             <DomainBadge
               domain={domain}
               // Flattened to plain text: the rail is a line of facts, not a
-              // row of badges, so the chip keeps only its emoji, its name and
+              // row of badges, so the chip keeps only its icon, its name and
               // its tooltip — at the rail's own size, not the badge's.
               variant="ghost"
               className="px-0 py-0 text-[11px] font-normal"

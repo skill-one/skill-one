@@ -414,7 +414,9 @@ describe("ExplorePage", () => {
       screen.getByRole("button", { name: /测试与质量/ }),
     ).toBeInTheDocument();
     const unclassified = screen.getByRole("button", { name: /^未分类/ });
-    expect(within(unclassified).getByText("❓")).toBeInTheDocument();
+    expect(
+      unclassified.querySelector("svg.lucide-circle-help"),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^其他/ })).toBeNull();
 
     // Pressing a domain scopes the list to its repositories alone.
@@ -468,31 +470,39 @@ describe("ExplorePage", () => {
     harness.complete();
     renderExplorePage();
 
-    // An answer and a blank, told apart in the chip bar: the box for 其他, the
-    // question mark for 未分类, each counting its own.
+    // An answer and a blank, told apart in the chip bar: the mixed shapes for
+    // 其他, the help icon for 未分类, each counting its own.
     const other = await screen.findByRole("button", { name: /^其他/ });
     const unclassified = screen.getByRole("button", { name: /^未分类/ });
-    expect(within(other).getByText("📦")).toBeInTheDocument();
-    expect(within(unclassified).getByText("❓")).toBeInTheDocument();
+    expect(other.querySelector("svg.lucide-shapes")).toBeInTheDocument();
+    expect(
+      unclassified.querySelector("svg.lucide-circle-help"),
+    ).toBeInTheDocument();
     expect(other).toHaveTextContent("1");
     expect(unclassified).toHaveTextContent("1");
 
     // The repository unit's card rows mark them the same way …
     const strayCardRow = screen.getByRole("button", { name: "查看 stray 详情" });
-    expect(within(strayCardRow).getByText("📦")).toBeInTheDocument();
-    const orphanCardRow = screen.getByRole("button", { name: "查看 orphan 详情" });
-    expect(within(orphanCardRow).getByText("❓")).toBeInTheDocument();
+    expect(
+      strayCardRow.querySelector("svg.lucide-shapes"),
+    ).toBeInTheDocument();
+    const orphanCardRow = screen.getByRole("button", {
+      name: "查看 orphan 详情",
+    });
+    expect(
+      orphanCardRow.querySelector("svg.lucide-circle-help"),
+    ).toBeInTheDocument();
 
     // … and so do the skill unit's rows, which share the resolver.
     await user.click(screen.getByRole("button", { name: "按技能" }));
     const strayRow = await screen.findByRole("button", {
       name: "查看 stray 详情",
     });
-    expect(within(strayRow).getByText("📦")).toBeInTheDocument();
+    expect(strayRow.querySelector("svg.lucide-shapes")).toBeInTheDocument();
     expect(
-      within(screen.getByRole("button", { name: "查看 orphan 详情" })).getByText(
-        "❓",
-      ),
+      screen
+        .getByRole("button", { name: "查看 orphan 详情" })
+        .querySelector("svg.lucide-circle-help"),
     ).toBeInTheDocument();
   });
 
@@ -1161,10 +1171,12 @@ describe("ExplorePage", () => {
       }).map((el) => el.getAttribute("aria-label")),
     ).toEqual(["查看 cog 详情", "查看 sprocket 详情"]);
     // A live row claims nothing its source does not carry: no 暂无描述
-    // placeholder standing in for a description nobody published, and no ❓
-    // mark — nothing ever classified it, but nothing looked either.
+    // placeholder standing in for a description nobody published, and no
+    // help mark — nothing ever classified it, but nothing looked either.
     expect(within(fresh as HTMLElement).queryByText("暂无描述")).toBeNull();
-    expect(within(fresh as HTMLElement).queryByText("❓")).toBeNull();
+    expect(
+      fresh.querySelector("svg.lucide-circle-help"),
+    ).toBeNull();
     // The bar still knows its owner: the face rides the label, resolving
     // through the mirror and then GitHub's own endpoint.
     expect(
@@ -1273,7 +1285,7 @@ describe("ExplorePage", () => {
     // so it claims none rather than a placeholder — and no classification
     // mark, which stays an empty slot.
     expect(live).not.toHaveTextContent("暂无描述");
-    expect(live).not.toHaveTextContent("❓");
+    expect(live.querySelector("svg.lucide-circle-help")).toBeNull();
     // The indexed skill is on the page beside it, as a repository card's row:
     // that surface prints no per-skill figure either (the figure belongs to
     // the standalone skill card — see skill-card.test.tsx), so what this test
