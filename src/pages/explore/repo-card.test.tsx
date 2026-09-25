@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { RepoCard } from "./repo-card";
@@ -230,6 +230,31 @@ describe("RepoCard", () => {
     expect(
       screen.getByRole("button", { name: `查看仓库 ${REPO}，8 个 skill` }),
     ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("lands the opening focus on the panel, never on the first row", async () => {
+    const user = userEvent.setup();
+    renderCard();
+
+    await user.click(
+      screen.getByRole("button", { name: `查看仓库 ${REPO}，8 个 skill` }),
+    );
+
+    // Base UI hands focus to the popup's first tabbable element on open —
+    // which is the first skill's row. A focused row paints its focus
+    // highlight and keeps its install button revealed, reading as a
+    // selection the reader never made; the panel's row container takes the
+    // focus instead, leaving every row unpainted until the reader points or
+    // tabs at one.
+    const body = screen
+      .getByRole("dialog")
+      .querySelector('[data-slot="repo-card-panel-body"]');
+    await waitFor(() => expect(body).toHaveFocus());
+    expect(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "查看 canvas 详情",
+      }),
+    ).not.toHaveFocus();
   });
 
   it("keeps a live card's bar a door: an out-of-app page is not an expansion", () => {
