@@ -68,7 +68,9 @@
     "enableAllAria": "Enable all ({{label}})",
     "disableAllAria": "Disable all ({{label}})",
     "openOnGitHub": "Open on GitHub",
-    "operationFailed": "Operation failed"
+    "operationFailed": "Operation failed",
+    "openRepoPage": "Open repository page",
+    "openLocalPage": "Open installed-skills page"
   },
   "settings": {
     "title": "Settings",

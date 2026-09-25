@@ -138,14 +138,20 @@ describe("MySkillsPage", () => {
     // No install has a recorded source, so every skill lives in one pool card:
     // it lists the preview size, and its bar states the total.
     expect(await screen.findByText("本地安装")).toBeInTheDocument();
-    expect(screen.getByText("6 个 skill")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
     ).toHaveLength(5);
-    // The pool is not a repository, so its bar opens the page that lists it
-    // whole rather than a repository's page.
+    // The pool is not a repository, so its expansion's footer opens the page
+    // that lists it whole rather than a repository's page.
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "查看本地安装，6 个 skill" }),
+    );
     expect(
-      screen.getByRole("link", { name: "查看本地安装，6 个 skill" }),
+      within(screen.getByRole("dialog")).getByRole("link", {
+        name: /打开本地安装页/,
+      }),
     ).toHaveAttribute("href", "/my-skills/local");
   });
 
@@ -160,7 +166,7 @@ describe("MySkillsPage", () => {
     // The sixth is past the pool card's preview: the bar's own total accounts
     // for it, and the bar's door is where it is listed whole.
     expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
-    expect(screen.getByText("6 个 skill")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
   });
 
   it("caps a repository's card at the preview size and states its total", async () => {
@@ -181,18 +187,31 @@ describe("MySkillsPage", () => {
     );
     renderPage();
 
-    const bar = await screen.findByRole("link", {
+    const bar = await screen.findByRole("button", {
       name: "查看仓库 acme/tools，6 个 skill",
     });
-    expect(bar).toHaveTextContent("6 个 skill");
-    // The door leads to the repository as *this* list reads it — the installs
-    // on disk — and not to the store's page for the same repository, which is
-    // one deliberate step further in (see `RepoPage`).
-    expect(bar).toHaveAttribute("href", "/my-skills/repo/acme/tools");
+    expect(bar).toHaveTextContent("+1");
+    // The card lists the first five; the sixth is past the cap, accounted for
+    // by the bar's own remainder figure.
     expect(
       screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
     ).toHaveLength(5);
     expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
+    // The expansion leads to the repository as *this* list reads it — the
+    // installs on disk — and not to the store's page for the same repository,
+    // which is one deliberate step further in (see `RepoPage`); the panel's
+    // footer is the way on, and its row is the one skill the preview held
+    // back — the rest of the card, not a second card.
+    const user = userEvent.setup();
+    await user.click(bar);
+    const panel = screen.getByRole("dialog");
+    expect(
+      within(panel).getByRole("link", { name: /打开仓库页/ }),
+    ).toHaveAttribute("href", "/my-skills/repo/acme/tools");
+    expect(
+      within(panel).getAllByRole("button", { name: /查看 .+ 详情/ }),
+    ).toHaveLength(1);
+    expect(within(panel).getByText("frontend-design")).toBeInTheDocument();
   });
 
   it("removes a skill from its detail panel and updates the stats", async () => {
@@ -454,7 +473,7 @@ describe("MySkillsPage", () => {
     // the group without opening the drawer or walking through the door.
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "查看本地安装，6 个 skill" }),
+      screen.getByRole("button", { name: "查看本地安装，6 个 skill" }),
     ).toBeInTheDocument();
   });
 
@@ -1020,7 +1039,7 @@ describe("MySkillsPage", () => {
       await screen.findAllByRole("button", { name: /查看 .+ 详情/ }),
     ).toHaveLength(6);
     // No card, so no bar: nothing in this unit is a door to a repository.
-    expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^查看仓库 / })).toBeNull();
     expect(screen.queryByRole("link", { name: /^查看本地安装/ })).toBeNull();
     // The enable switch rides the row, so both units manage the same skills.
     expect(screen.getAllByRole("switch")).toHaveLength(6);

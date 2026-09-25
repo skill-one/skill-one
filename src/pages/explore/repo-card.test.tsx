@@ -85,18 +85,18 @@ describe("RepoCard", () => {
     expect(container.querySelector('[data-slot="card-header"]')).toBeNull();
     expect(container.querySelector('[data-slot="card-content"]')).not.toBeNull();
 
-    // The one bar carries what the repository is and the way into its page.
-    const bar = screen.getByRole("link", {
+    // The one bar carries what the repository is and the way into the rest of
+    // it — an expansion, so a button rather than a link.
+    const bar = screen.getByRole("button", {
       name: `查看仓库 ${REPO}，8 个 skill`,
     });
-    expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
     expect(within(bar).getByText(REPO)).toBeInTheDocument();
     expect(within(bar).getByText(formatCount(STARS))).toBeInTheDocument();
-    // The count is the door's *object*, not a second figure standing beside it
-    // with a separator between them: one phrase, in one element, carrying the
-    // noun the app uses for it everywhere else — so nothing has to disambiguate
-    // 「8 个」 from the rows on screen.
-    const door = within(bar).getByText("8 个 skill");
+    // The bar's right cluster states the remainder, not the total: the reader
+    // counts the rows on screen and adds, so the cap reads as "these of them"
+    // and the figure beside it reads as "and this many more" — the expansion's
+    // own object, in one element, pointing down.
+    const door = within(bar).getByText("+3");
     expect(door.tagName).toBe("SPAN");
     // ...and the repository's own figure rides the repository's own name, at
     // the front of the bar, rather than out in the door's cluster — where it
@@ -113,7 +113,9 @@ describe("RepoCard", () => {
     // The bar is the card's one repository-level control. A second link for the
     // same kind of choice — an "open on GitHub" button — used to sit beside it;
     // the repository page carries that action with a label instead.
-    expect(screen.getAllByRole("link")).toHaveLength(1);
+    // While the panel is closed the card draws no link at all: the one
+    // navigation left (the repository page) lives inside the panel.
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
   });
 
   it("lists the repository's skills in order, under a glyph and a description", () => {
@@ -127,20 +129,30 @@ describe("RepoCard", () => {
     expect(pdf).toHaveTextContent("pdf does something useful.");
   });
 
-  it("caps the list at the default five rows and states the repository's total", () => {
+  it("caps the list at the default five rows and states the repository's total", async () => {
+    const user = userEvent.setup();
     renderCard();
 
     // The default preview holds five rows; past the cap a skill is not rendered.
     expect(rowNames()).toEqual(["pdf", "docx", "pptx", "xlsx", "slides"]);
     expect(screen.queryByText("canvas")).not.toBeInTheDocument();
     // The bar's figure is the repository's total, not the five on screen: that
-    // is what makes a capped list read as "these of them", with the door beside
+    // is what makes a capped list read as "these of them", with the bar beside
     // it as the way to the rest.
-    const bar = screen.getByRole("link", {
+    const bar = screen.getByRole("button", {
       name: `查看仓库 ${REPO}，8 个 skill`,
     });
-    expect(within(bar).getByText("8 个 skill")).toBeInTheDocument();
-    expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
+    expect(within(bar).getByText("+3")).toBeInTheDocument();
+
+    // The bar expands the card in place; the panel's footer keeps the way to
+    // the repository's page, carrying the route the bar itself used to open.
+    await user.click(bar);
+    const panel = screen.getByRole("dialog", {
+      name: `查看仓库 ${REPO}，8 个 skill`,
+    });
+    expect(
+      within(panel).getByRole("link", { name: /打开仓库页/ }),
+    ).toHaveAttribute("href", `/repo/${REPO}`);
   });
 
   it("honours a smaller preview size", () => {
@@ -158,17 +170,78 @@ describe("RepoCard", () => {
     expect(screen.queryByText("notion")).not.toBeInTheDocument();
   });
 
-  it("renders a one-skill repository with the same body and the same bar", () => {
+  it("renders a one-skill repository with the same body, its bar a plain door", () => {
     renderCard({ skills: [skills[0]] });
 
     expect(rowNames()).toEqual(["pdf"]);
+    // Nothing is held back, so there is nothing to grow into: the bar keeps
+    // the door's own shape — a link, labelled with the total — without the
+    // bar having to change shape for the smallest repository there is.
     const bar = screen.getByRole("link", {
       name: `查看仓库 ${REPO}，1 个 skill`,
     });
-    // The door's label, not a bare count: it reads 「1 个 skill」 — this
-    // repository has one skill and this is the way to it — without the bar
-    // having to change shape for the smallest repository there is.
+    expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
     expect(within(bar).getByText("1 个 skill")).toBeInTheDocument();
+  });
+
+  it("expands in place: the panel lists the repository's skills uncapped", async () => {
+    const user = userEvent.setup();
+    renderCard();
+
+    await user.click(
+      screen.getByRole("button", { name: `查看仓库 ${REPO}，8 个 skill` }),
+    );
+
+    // The panel is the rest of the card, not a second card: only the skills
+    // the preview held back mount in it, in the same rows — the ones already
+    // on screen stay where they are.
+    const panel = screen.getByRole("dialog");
+    expect(
+      within(panel)
+        .getAllByRole("button", { name: /^查看 .+ 详情$/ })
+        .map((row) =>
+          row.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""),
+        ),
+    ).toEqual(["canvas", "figma", "notion"]);
+    expect(
+      within(panel).queryByRole("button", { name: "查看 pdf 详情" }),
+    ).toBeNull();
+    // And the expansion is announced: the trigger carries its open state.
+    expect(screen.getByRole("button", { name: `查看仓库 ${REPO}，8 个 skill` }))
+      .toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("opens the detail drawer from a panel row and folds the panel away", async () => {
+    const user = userEvent.setup();
+    const onOpenSkill = vi.fn();
+    renderCard({ onOpenSkill });
+
+    await user.click(
+      screen.getByRole("button", { name: `查看仓库 ${REPO}，8 个 skill` }),
+    );
+    const panel = screen.getByRole("dialog");
+    await user.click(
+      within(panel).getByRole("button", { name: "查看 figma 详情" }),
+    );
+
+    // The drawer is the panel's successor as the reading of one skill — a
+    // modal over the list — so the panel does not stay open under it.
+    expect(onOpenSkill).toHaveBeenCalledWith(skillKey(skills[6].skill));
+    expect(
+      screen.getByRole("button", { name: `查看仓库 ${REPO}，8 个 skill` }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("keeps a live card's bar a door: an out-of-app page is not an expansion", () => {
+    renderCard({ href: "https://skills.sh/anthropics/skills" });
+
+    // A live skills.sh source has no in-app page to expand into — its bar
+    // stays an ordinary external link, opening in the system browser.
+    const bar = screen.getByRole("link", {
+      name: `查看仓库 ${REPO}，8 个 skill`,
+    });
+    expect(bar).toHaveAttribute("href", "https://skills.sh/anthropics/skills");
+    expect(bar).toHaveAttribute("target", "_blank");
   });
 
   it("lists every match while a search is live, uncapped", () => {
@@ -271,12 +344,19 @@ describe("RepoCard", () => {
     expect(reveal).toHaveClass("has-data-[state=installed]:opacity-100");
   });
 
-  it("keeps the card's single door: the bar, and nothing beside it", () => {
+  it("keeps the card's single door: the bar, and nothing beside it", async () => {
+    const user = userEvent.setup();
     renderCard();
 
     // Every route out of the card is a row (a skill) or the bar (the
     // repository): no control of the same granularity competes with either.
     expect(screen.queryByRole("button", { name: /GitHub/ })).toBeNull();
+    // While the panel is closed the card draws no link at all; expanded, the
+    // panel's footer carries the one navigation link (the repository page).
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    await user.click(
+      screen.getByRole("button", { name: `查看仓库 ${REPO}，8 个 skill` }),
+    );
     expect(screen.getAllByRole("link")).toHaveLength(1);
   });
 
@@ -319,16 +399,19 @@ describe("RepoCard", () => {
       ),
     });
 
-    // The door still leads to the repository, and the footer action is its own
-    // control: a press on the action must not walk through the door, so the
-    // action is a sibling of the link rather than a child of it.
-    const door = screen.getByRole("link", {
+    // The bar still stands for the repository — its expansion is what it
+    // opens — and the footer action is its own control: a press on the action
+    // must not expand the card, so the action is a sibling of the trigger
+    // rather than a child of it.
+    const bar = screen.getByRole("button", {
       name: `查看仓库 ${REPO}，8 个 skill`,
     });
     const action = screen.getByRole("button", { name: "group" });
-    expect(door).toBeInTheDocument();
-    expect(door.contains(action)).toBe(false);
+    expect(bar).toBeInTheDocument();
+    expect(bar.contains(action)).toBe(false);
     await user.click(action);
     expect(onFooter).toHaveBeenCalledOnce();
+    // ...and the press did not expand the card: no panel opened.
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

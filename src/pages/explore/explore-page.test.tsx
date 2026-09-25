@@ -170,6 +170,28 @@ function liveSkill(name: string, repo: string, downloads: number): SkillView {
  * highlight may have split its name into several spans anyway, so that one is
  * addressed by its own text.
  */
+
+/**
+ * The repository cards' bars, in DOM order. A bar is the expansion's trigger
+ * (a button) while the card's preview holds skills back, and a plain door (a
+ * link) once the card already lists everything it has — so a count of cards
+ * reads both roles.
+ */
+function cardBars(
+  scope: {
+    queryAllByRole(
+      role: string,
+      options?: { name?: RegExp | string },
+    ): HTMLElement[];
+  },
+  name: RegExp | string,
+): HTMLElement[] {
+  return [
+    ...scope.queryAllByRole("button", { name }),
+    ...scope.queryAllByRole("link", { name }),
+  ];
+}
+
 function cardOf(name: string): HTMLElement {
   const card =
     screen.queryByRole("button", { name: `查看 ${name} 详情` }) ??
@@ -296,7 +318,7 @@ describe("ExplorePage", () => {
     // gone, because the card *is* the group. Its bottom bar is what signs the
     // card and what opens the repository's own page.
     expect(
-      screen.getByRole("link", { name: `查看仓库 ${BATCH_REPO}，50 个 skill` }),
+      screen.getByRole("button", { name: `查看仓库 ${BATCH_REPO}，50 个 skill` }),
     ).toBeInTheDocument();
     // The page answered one RPC; browsing never re-downloads the registry.
     expect(harness.downloads).toBe(1);
@@ -308,19 +330,33 @@ describe("ExplorePage", () => {
     harness.init();
     harness.pushAll(makeSkills(8, 0));
     harness.complete();
-    renderExplorePage();
+    const { container } = renderExplorePage();
 
     // The cap is what keeps one big repository from pushing every other card
     // off the screen; the bar carries the repository's *total*, so a capped list
-    // reads as "these of them" and its door leads to all of them.
+    // reads as "these of them" and its expansion opens all of them.
     expect(await screen.findByText("skill-4")).toBeInTheDocument();
     expect(screen.queryByText("skill-5")).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: `查看仓库 ${BATCH_REPO}，8 个 skill` }),
+    );
+    // The panel's footer keeps the way to the repository's page the bar itself
+    // used to open. The app is a hash router, so the rendered href carries the
+    // hash.
+    const panel = screen.getByRole("dialog", {
+      name: `查看仓库 ${BATCH_REPO}，8 个 skill`,
+    });
     expect(
-      screen.getByRole("link", { name: `查看仓库 ${BATCH_REPO}，8 个 skill` }),
-      // The app is a hash router, so the rendered href carries the hash.
+      within(panel).getByRole("link", { name: /打开仓库页/ }),
     ).toHaveAttribute("href", `#/repo/${BATCH_REPO}`);
+    // The card body keeps its preview of five; the panel carries the whole
+    // eight (counted within the card, so the open panel's rows stay out).
     expect(
-      screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
+      within(
+        container.querySelector('[data-slot="card-content"]') as HTMLElement,
+      )
+        .getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
     ).toHaveLength(5);
   });
 
@@ -405,7 +441,7 @@ describe("ExplorePage", () => {
     // domain that holds one — plus 未分类 for the repository nothing classified,
     // which is a different claim from the dataset's own 其他 and so takes a chip
     // of its own.
-    const cards = () => screen.getAllByRole("link", { name: /^查看仓库 / });
+    const cards = () => cardBars(screen, /^查看仓库 /);
     await screen.findByText("redis");
     expect(cards()).toHaveLength(3);
     expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
@@ -742,7 +778,7 @@ describe("ExplorePage", () => {
     expect(
       await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^查看仓库 / })).toBeNull();
   });
 
   it("renders the leading cards first and reveals more as the reader scrolls", async () => {
@@ -766,8 +802,7 @@ describe("ExplorePage", () => {
     // The first chunk is mounted, cards and all. The count reads the head
     // link's exact aria-label shape — one per rendered repository card.
     const renderedCards = () =>
-      screen
-        .getAllByRole("link", { name: /^查看仓库 repo-\d+\/skills，/ }).length;
+      cardBars(screen, /^查看仓库 repo-\d+\/skills，/).length;
     expect(renderedCards()).toBe(6);
     expect(screen.getByText("skill-5")).toBeInTheDocument();
     expect(screen.queryByText("skill-6")).not.toBeInTheDocument();
@@ -799,7 +834,7 @@ describe("ExplorePage", () => {
     bootGadgetRegistry();
     renderExplorePage();
 
-    const cardLinks = () => screen.getAllByRole("link", { name: /^查看仓库 / }).length;
+    const cardLinks = () => cardBars(screen, /^查看仓库 /).length;
     const triggerSentinel = () =>
       (
         globalThis.IntersectionObserver as unknown as {
@@ -824,7 +859,7 @@ describe("ExplorePage", () => {
     const tail = screen.getByRole("region", { name: "51–71" });
     expect(within(middle).getByText("25 个仓库")).toBeInTheDocument();
     expect(within(tail).getByText("21 个仓库")).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "Top 25" })).getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(25);
+    expect(cardBars(within(screen.getByRole("region", { name: "Top 25" })), /^查看仓库 /)).toHaveLength(25);
   });
 
   it("folds one rank band without touching the other bands", async () => {
@@ -840,20 +875,20 @@ describe("ExplorePage", () => {
     await screen.findByRole("region", { name: "Top 25" });
     await waitFor(() => {
       triggerSentinel();
-      expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(71);
+      expect(cardBars(screen, /^查看仓库 /)).toHaveLength(71);
     });
 
     // Folding the leading band removes just its 25 cards; the folded header
     // keeps its count, and the other bands stay put.
     await userEvent.click(screen.getByRole("button", { name: /Top\s*25\s*25 个仓库/ }));
-    expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(46);
+    expect(cardBars(screen, /^查看仓库 /)).toHaveLength(46);
     expect(screen.getByRole("region", { name: "26–50" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "51–71" })).toBeInTheDocument();
 
     // Unfolding restores the grid whole.
     await userEvent.click(screen.getByRole("button", { name: /Top\s*25\s*25 个仓库/ }));
     await waitFor(() =>
-      expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(71),
+      expect(cardBars(screen, /^查看仓库 /)).toHaveLength(71),
     );
   });
 
@@ -868,7 +903,7 @@ describe("ExplorePage", () => {
     renderExplorePage();
 
     const cardLinks = () =>
-      screen.queryAllByRole("link", { name: /^查看仓库 / }).length;
+      cardBars(screen, /^查看仓库 /).length;
     const triggerSentinel = () =>
       (
         globalThis.IntersectionObserver as unknown as {
@@ -923,8 +958,7 @@ describe("ExplorePage", () => {
     harness.complete();
     const { container } = renderExploreRoutes();
 
-    const renderedCards = () =>
-      screen.getAllByRole("link", { name: /^查看仓库 repo-\d+\/skills，/ });
+    const renderedCards = () => cardBars(screen, /^查看仓库 repo-\d+\/skills，/);
     const scroller = () =>
       (container.querySelector("ul.grid") as HTMLElement).closest(
         ".overflow-y-auto",
@@ -942,7 +976,9 @@ describe("ExplorePage", () => {
     scroller().scrollTop = 300;
     fireEvent.scroll(scroller());
 
-    // Into a repository's page, and back out of it.
+    // Into a repository's page, and back out of it. These repositories are
+    // one skill each, so their bars are plain doors again — the expansion is
+    // only for cards with something held back.
     await user.click(renderedCards()[0]);
     await user.click(
       await screen.findByRole("button", { name: "返回探索" }),
@@ -1093,9 +1129,7 @@ describe("ExplorePage", () => {
     // The count reads the head link's exact aria-label shape — one per
     // rendered repository card.
     const renderedGadgetCards = () =>
-      screen.getAllByRole("link", {
-        name: /^查看仓库 acme\/gadget-\d+，/,
-      });
+      cardBars(screen, /^查看仓库 acme\/gadget-\d+，/);
 
     // The reader has scrolled: the browsed list is fully mounted (the reveal
     // paces the browse answer).
@@ -1226,17 +1260,17 @@ describe("ExplorePage", () => {
     // nowhere further to go: it is a label, whatever the repository is — the
     // rows, which open skills.sh, are the only way out.
     expect(
-      screen.queryByRole("link", { name: /^查看仓库 acme\/fresh/ }),
+      screen.queryByRole("button", { name: /^查看仓库 acme\/fresh/ }),
     ).toBeNull();
     expect(
-      screen.queryByRole("link", { name: /^查看仓库 acme\/other/ }),
+      screen.queryByRole("button", { name: /^查看仓库 acme\/other/ }),
     ).toBeNull();
     expect(
-      screen.queryByRole("link", { name: /^查看仓库 smithery\.ai/ }),
+      screen.queryByRole("button", { name: /^查看仓库 smithery\.ai/ }),
     ).toBeNull();
     // The indexed repository's card keeps the store's own door — the only
-    // 查看仓库 link on the page.
-    expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(1);
+    // 查看仓库 bar on the page — holding the route to the repository's page.
+    expect(cardBars(screen, /^查看仓库 /)).toHaveLength(1);
     expect(
       screen.getByRole("link", { name: /^查看仓库 acme\/gadgets/ }),
     ).toHaveAttribute("href", "#/repo/acme/gadgets");
@@ -1760,7 +1794,7 @@ describe("ExplorePage streaming", () => {
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
     expect(screen.getByText("skill-3")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", {
+      screen.getByRole("button", {
         name: `查看仓库 ${BATCH_REPO}，${STREAM_BATCH + 5} 个 skill`,
       }),
     ).toBeInTheDocument();
@@ -1770,7 +1804,7 @@ describe("ExplorePage streaming", () => {
     // wait it out rather than racing the swap.
     await waitFor(() =>
       expect(
-        screen.getByRole("link", {
+        screen.getByRole("button", {
           name: `查看仓库 ${BATCH_REPO}，${STREAM_BATCH + 20} 个 skill`,
         }),
       ).toBeInTheDocument(),

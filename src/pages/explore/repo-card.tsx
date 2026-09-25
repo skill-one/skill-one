@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, Star } from "lucide-react";
+import { ChevronDown, ChevronRight, Star } from "lucide-react";
 
 import { useAppLocale } from "../../i18n/use-language";
 import { skillDescription } from "../../lib/i18n-content";
@@ -21,6 +21,11 @@ import {
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { Card, CardContent, CardFooter } from "../../components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../../components/ui/popover";
 
 /**
  * One row of a repository card: a skill, plus whatever its surface adds to it.
@@ -77,24 +82,36 @@ export interface RepoCardRow {
  * - a **row** opens that skill's detail panel — the reader was pointing at one
  *   skill, and that is where its SKILL.md, its classification and its install
  *   state live;
- * - the **bottom bar** opens the repository's page: uncapped, and read the way
- *   the list it was opened from reads that repository — the store's page lists
- *   everything the repository publishes, the installed list's opens on the
- *   skills of it that are on disk, the rest of the catalogue one control away
- *   from there (see `RepoPage`). A card with skills left over says so by
- *   carrying the count its own list knows inside the door's own label.
+ * - the **bottom bar** expands the card in place: a floating panel, anchored to
+ *   the card's own footprint and exactly its width, opens beneath it and lists
+ *   the skills the preview cap held back — the same rows, the same surface, so
+ *   the card reads as having grown downward rather than as a popup over it. The
+ *   rows already on screen stay put; the panel only adds to them. Its right
+ *   cluster is the remainder, 「+N」 beside a downward chevron that turns around
+ *   once the card has grown. A card with nothing held back (a short repository,
+ *   or a live search's uncapped answer) keeps the bar a plain door instead. The
+ *   panel floats (it is portaled and overlaying), so the grid's layout does not
+ *   move: the neighbours keep their places, and the panel dismisses on an
+ *   outside press or Esc. The reader who wants the full-page reading —
+ *   uncapped, and the way the list it was opened from reads that repository —
+ *   reaches it from the panel's own footer bar (see `RepoPage`); the store's
+ *   page lists everything the repository publishes, the installed list's opens
+ *   on the skills of it that are on disk, the rest of the catalogue one control
+ *   away from there. The accessible name keeps the repository-and-total
+ *   phrasing: it names the content the press reveals, whichever reading the
+ *   bar takes.
  *
  * The bar is the card's only repository-level control, and it deliberately does
  * not carry an "open on GitHub" button. That button is a second link for the
- * same granularity of choice, pointing somewhere the bar's own page already
- * offers with a label ("在 GitHub 打开") — and it is 28px tall, which is what the
- * whole bar was as tall as: removing it is what makes the bar a line of text
- * rather than a line of text beside a button. The source is still two clicks
- * away (a row's panel links to it, and the repository page has the labeled
- * button), while the list itself stays one target per card. The one companion
- * the bar admits is `footerAction` — the installed list's one-shot switch over
- * the card's skills, a sibling of the door rather than a child of it: a press
- * on the switch must never also walk through the door.
+ * same granularity of choice, pointing somewhere the repository page already
+ * offers with a label ("在 GitHub 打开") — and it is 28px tall, which is what
+ * the whole bar was as tall as: removing it is what makes the bar a line of
+ * text rather than a line of text beside a button. The source is still two
+ * clicks away (a row's panel links to it, and the repository page has the
+ * labeled button), while the list itself stays one target per card. The one
+ * companion the bar admits is `footerAction` — the installed list's one-shot
+ * switch over the card's skills, a sibling of the bar rather than a child of
+ * it: a press on the switch must never also expand the card.
  *
  * The store rows' **install button** is the third destination: it installs
  * without either. It is a sibling of the row button rather than a child, so the
@@ -215,6 +232,15 @@ export function RepoCard({
   // The owner segment is what the dataset hosts an avatar for; a repository
   // group always has one (a bare-host source is its own owner).
   const [owner] = repo.split("/");
+  // Whether the card's expansion panel is open. The panel is the bar's own
+  // answer — the repository's skills, uncapped, floating under the card — so
+  // the state lives here, and a row press that opens the detail drawer closes
+  // it again (the drawer is modal; two stacked readings of one skill compete).
+  const [expanded, setExpanded] = useState(false);
+  // The card's own element, and the expansion panel's anchor: the panel is
+  // positioned against the whole card (not the bar) and takes its width, which
+  // is what makes it read as the card having grown downward.
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const shown = hasQuery ? skills : skills.slice(0, maxSkills);
   // The bar's own name: the repository when there is one, and the label for the
   // installed list's pool of skills no source vouches for when there is not.
@@ -224,9 +250,13 @@ export function RepoCard({
   // A live skills.sh source has no in-app page: its door is an external URL
   // that opens in the system browser.
   const externalDoor = door != null && door.startsWith("http");
-  // The door bar's content: who published this, and how many skills the card
-  // lists.
-  const doorBar = (
+  // The skills the bar can still reveal: what the preview cap holds back. The
+  // expansion exists for exactly these — a card whose body already lists the
+  // whole repository has nothing to grow into, and its bar stays a plain door.
+  const hiddenCount = hasQuery ? 0 : Math.max(0, skills.length - shown.length);
+  // The bar's identity cluster, shared by every reading of the bar: who
+  // published this, and how much the repository weighs.
+  const doorIdentity = (
     <>
       {/* The identity is a size step above the rows: a 24px face and a
           14px name against the rows' 13px names and 13px glyphs. The bar
@@ -259,163 +289,181 @@ export function RepoCard({
           {formatCount(stars)}
         </span>
       )}
-      {/* The door, labelled with what it opens: the count is the door's
-          *object*, so it is written inside the door's own phrase rather
-          than standing beside it as a second figure with a separator
-          between them — one phrase, one entity, and no bare 「N 个」 for
-          the reader to disambiguate against the rows on screen. The noun
-          comes from the app's own voice (`N 个 skill`, the same words the
-          bar's own accessible name and the repository page's header use),
-          which is also what settles 全部: 「全部 1 个」 reads badly for a
-          repository with one skill, while 「1 个 skill」 reads the same as
-          every other count. The chevron carries the "go" the way every
-          other deeper affordance in the app does, and the total is always
-          the repository's own — which is what lets a capped list read as
-          "these of them": the reader counts the rows on screen and compares. */}
-      <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
-        {t("state.skillCount", { count: skills.length })}
-        <ChevronRight
-          className="h-3 w-3 transition-transform group-hover/head:translate-x-0.5"
-          aria-hidden
-        />
-      </span>
     </>
+  );
+  // The right cluster of a *navigating* bar — an external door, or the plain
+  // door a card falls back to when nothing is held back: the count is the
+  // door's *object*, written inside the door's own phrase (the app's own
+  // 「N 个 skill」), and the chevron carries the "go" the way every other
+  // deeper affordance in the app does.
+  const doorCount = (
+    <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
+      {t("state.skillCount", { count: skills.length })}
+      <ChevronRight
+        className="h-3 w-3 transition-transform group-hover/head:translate-x-0.5"
+        aria-hidden
+      />
+    </span>
+  );
+  // The right cluster of the *expanding* bar: what is still hidden, and the
+  // way down. 「+N」 states the remainder rather than the total — the reader
+  // counts the rows on screen and adds — and the chevron points at where the
+  // card grows, rotating once it has. The accessible name keeps the
+  // repository-and-total phrasing: it names the content the press reveals.
+  const doorMore = (
+    <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
+      +{hiddenCount}
+      <ChevronDown
+        className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")}
+        aria-hidden
+      />
+    </span>
+  );
+
+  // The card's rows, shared by the body and the expansion panel: the same
+  // markup, so a skill reads the same whether the card is showing its preview
+  // or the whole of itself. `openSkill` is handed in rather than closed over,
+  // because the panel's copy closes the panel on its way to the detail drawer.
+  const renderRows = (rows: RepoCardRow[], openSkill: (key: string) => void) => (
+    <ul className="-mx-1.5 flex flex-col">
+      {rows.map(({ skill, matched, muted, extra, action }) => {
+        const key = skillKey(skill);
+        // A live skills.sh row claims only what its source carries —
+        // which is no description and no classification at all — so it
+        // draws neither the 暂无描述 placeholder nor the help mark (see
+        // `isLiveSkill`); an installed row the store cannot resolve is a
+        // local fact, and keeps both.
+        const live = isLiveSkill(skill);
+        const isSelected = selected != null && selected === key;
+        // The caller's own row control, else the store's install button.
+        // Either one only renders when this card carries row actions at
+        // all (`rowActions={false}` leaves the bar's group switch the
+        // one control).
+        const control = action ?? (
+          <SkillInstallButton skill={skill} className="h-7 w-7" />
+        );
+        return (
+          <li
+            key={key}
+            data-skill={skill.name}
+            className={cn(
+              "group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent",
+              muted && "opacity-60",
+            )}
+          >
+            {/* The row's clickable area is the skill itself; the install
+                button beside it is a sibling, so a row is never a button
+                inside a button. */}
+            <button
+              type="button"
+              onClick={() => openSkill(key)}
+              aria-label={t("common.viewDetailAria", { name: skill.name })}
+              aria-current={isSelected ? "true" : undefined}
+              className={cn(
+                "flex min-w-0 flex-1 items-center gap-2 py-1 text-left focus-visible:outline-none",
+                isSelected && "text-primary",
+              )}
+            >
+              {/* The classification's glyph, in a fixed slot so the names
+                  line up whether the skill is classified or not: mixed
+                  shapes for the dataset's own 其他, the help icon for a
+                  skill nothing classified — the same mark the list rows
+                  wear (see `domainIcon`). A live row draws nothing in the
+                  slot, which stays fixed so the names still line up. */}
+              <span
+                aria-hidden="true"
+                className="flex w-4 shrink-0 items-center justify-center text-muted-foreground"
+              >
+                {!live && (
+                  <DomainGlyph
+                    icon={domainIcon(skill.profile?.domain)}
+                    className="size-3.5"
+                  />
+                )}
+              </span>
+              {/* The name is the identifier and the row's one strong
+                  element — semibold where the description is plain — and
+                  it shrinks only up to half the row, so a long
+                  description can never truncate it away. */}
+              <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
+                <HighlightedText
+                  text={skill.name}
+                  terms={matched?.name}
+                />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                {live
+                  ? null
+                  : skillDescription(skill, locale) || t("common.noDescription")}
+              </span>
+            </button>
+            {/* The row's own additions sit beside the row button rather
+                than inside it: a control nested in a control is invalid,
+                and a click must never mean both. */}
+            {extra}
+            {/* The installed list's rows carry no corner control: the
+                group switch on the bar owns enablement, and an
+                individual switch waits on the repository's own page. */}
+            {rowActions ? (
+              hoverAction ? (
+                /* Floating, not laid out: the button is absolutely placed
+                over the row's right edge, so the name and the description
+                own the row's whole width and the reader sees more of them
+                in the state every row spends nearly all of its time in. It
+                is revealed on hover and on focus (the row's or its own)
+                and floats over the text it makes room for, dissolving it
+                with a gradient of the row's own hover surface — the same
+                treatment the detail panel's clipped description uses. The
+                reveal sits on this wrapper rather than on the button
+                because the button already owns `opacity` for its own
+                states: `disabled:opacity-50` on an installed or installing
+                button is more specific than a bare `opacity-0` and would
+                win, drawing the button the reader did not ask for. A
+                button that carries a state instead of an invitation —
+                installed above all — is what the `has-data` rule keeps on
+                screen; it reads the button's own `data-state`, so this
+                wrapper never has to know the state itself. */
+                <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100">
+                  {control}
+                </span>
+              ) : (
+                /* A fact rather than an invitation — drawn always, in
+                normal flow (the installed list's per-row switch used to
+                live here; now a caller that still wants a per-row control
+                hands it over explicitly). */
+                <span className="ml-1 flex shrink-0 items-center">
+                  {control}
+                </span>
+              )
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 
   return (
     <li className="flex flex-col">
       {/* `flex-1` is the one thing the card cannot know: under the plain-grid
           fallback the lane's items are stretched to the tallest card in the
-          row, and the card is what fills that height. */}
-      <Card size="sm" data-repo={repo} className="group flex-1">
+          row, and the card is what fills that height. The ref is the
+          expansion panel's anchor. */}
+      <Card size="sm" data-repo={repo} className="group flex-1" ref={cardRef}>
         <CardContent>
           {/* A row is the unit of the body, and it is deliberately not a card:
               the repository is the card, and a skill inside it is one line of
               its content. The horizontal bleed lets the hover highlight read as
               a row band rather than as a box inside the card's padding. */}
-          <ul className="-mx-1.5 flex flex-col">
-            {shown.map(({ skill, matched, muted, extra, action }) => {
-              const key = skillKey(skill);
-              // A live skills.sh row claims only what its source carries —
-              // which is no description and no classification at all — so it
-              // draws neither the 暂无描述 placeholder nor the help mark (see
-              // `isLiveSkill`); an installed row the store cannot resolve is a
-              // local fact, and keeps both.
-              const live = isLiveSkill(skill);
-              const isSelected = selected != null && selected === key;
-              // The caller's own row control, else the store's install button.
-              // Either one only renders when this card carries row actions at
-              // all (`rowActions={false}` leaves the bar's group switch the
-              // one control).
-              const control = action ?? (
-                <SkillInstallButton skill={skill} className="h-7 w-7" />
-              );
-              return (
-                <li
-                  key={key}
-                  data-skill={skill.name}
-                  className={cn(
-                    "group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent",
-                    muted && "opacity-60",
-                  )}
-                >
-                  {/* The row's clickable area is the skill itself; the install
-                      button beside it is a sibling, so a row is never a button
-                      inside a button. */}
-                  <button
-                    type="button"
-                    onClick={() => onOpenSkill(key)}
-                    aria-label={t("common.viewDetailAria", { name: skill.name })}
-                    aria-current={isSelected ? "true" : undefined}
-                    className={cn(
-                      "flex min-w-0 flex-1 items-center gap-2 py-1 text-left focus-visible:outline-none",
-                      isSelected && "text-primary",
-                    )}
-                  >
-                    {/* The classification's glyph, in a fixed slot so the names
-                        line up whether the skill is classified or not: mixed
-                        shapes for the dataset's own 其他, the help icon for a
-                        skill nothing classified — the same mark the list rows
-                        wear (see `domainIcon`). A live row draws nothing in the
-                        slot, which stays fixed so the names still line up. */}
-                    <span
-                      aria-hidden="true"
-                      className="flex w-4 shrink-0 items-center justify-center text-muted-foreground"
-                    >
-                      {!live && (
-                        <DomainGlyph
-                          icon={domainIcon(skill.profile?.domain)}
-                          className="size-3.5"
-                        />
-                      )}
-                    </span>
-                    {/* The name is the identifier and the row's one strong
-                        element — semibold where the description is plain — and
-                        it shrinks only up to half the row, so a long
-                        description can never truncate it away. */}
-                    <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
-                      <HighlightedText
-                        text={skill.name}
-                        terms={matched?.name}
-                      />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                      {live
-                        ? null
-                        : skillDescription(skill, locale) || t("common.noDescription")}
-                    </span>
-                  </button>
-                  {/* The row's own additions sit beside the row button rather
-                      than inside it: a control nested in a control is invalid,
-                      and a click must never mean both. */}
-                  {extra}
-                  {/* The installed list's rows carry no corner control: the
-                      group switch on the bar owns enablement, and an
-                      individual switch waits on the repository's own page. */}
-                  {rowActions ? (
-                    hoverAction ? (
-                      /* Floating, not laid out: the button is absolutely placed
-                      over the row's right edge, so the name and the description
-                      own the row's whole width and the reader sees more of them
-                      in the state every row spends nearly all its time in. It
-                      is revealed on hover and on focus (the row's or its own)
-                      and floats over the text it makes room for, dissolving it
-                      with a gradient of the row's own hover surface — the same
-                      treatment the detail panel's clipped description uses. The
-                      reveal sits on this wrapper rather than on the button
-                      because the button already owns `opacity` for its own
-                      states: `disabled:opacity-50` on an installed or installing
-                      button is more specific than a bare `opacity-0` and would
-                      win, drawing the button the reader did not ask for. A
-                      button that carries a state instead of an invitation —
-                      installed above all — is what the `has-data` rule keeps on
-                      screen; it reads the button's own `data-state`, so this
-                      wrapper never has to know the state itself. */
-                      <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100">
-                        {control}
-                      </span>
-                    ) : (
-                      /* A fact rather than an invitation — drawn always, in
-                      normal flow (the installed list's per-row switch used to
-                      live here; now a caller that still wants a per-row control
-                      hands it over explicitly). */
-                      <span className="ml-1 flex shrink-0 items-center">
-                        {control}
-                      </span>
-                    )
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+          {renderRows(shown, onOpenSkill)}
         </CardContent>
 
         {/* The card's one bar: what this repository is, how big it is, and the
-            way in. `mt-auto` keeps it on the bottom edge when the plain-grid
-            fallback stretches a short card to its neighbour's height. An
-            external door (a live source the store has no page for) opens in
-            the system browser — the same bar, the same label, one step
-            further out. */}
+            way in — an in-place expansion of the card for an in-app page, and
+            an external link for a live source. `mt-auto` keeps it on the bottom
+            edge when the plain-grid fallback stretches a short card to its
+            neighbour's height. An external door (a live source the store has no
+            page for) opens in the system browser — the same bar, the same
+            label, one step further out. */}
         <CardFooter className="mt-auto min-w-0 gap-2 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
           {door == null ? (
             /* A bar with nowhere to lead — the local pool's own page, which is
@@ -457,9 +505,108 @@ export function RepoCard({
               }
               className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              {doorBar}
+              {doorIdentity}
+              {doorCount}
             </a>
+          ) : hiddenCount > 0 ? (
+            /* The bar is the expansion's trigger, not a route: pressing it
+                opens the panel anchored to the card — the skills the preview
+                held back, in the same rows — and the panel's footer bar is the
+                way to the repository's page, so the navigation the bar used to
+                do is one press further in rather than gone. The accessible
+                name keeps the Link's phrasing (repository, and the total it
+                holds); the visible cluster is the remainder, 「+N」, pointing
+                down. */
+            <Popover
+              open={expanded}
+              onOpenChange={(open) => setExpanded(open)}
+            >
+              <PopoverTrigger
+                aria-label={
+                  repo
+                    ? t("state.viewRepoAria", {
+                        repo,
+                        count: skills.length,
+                      })
+                    : t("state.viewPoolAria", {
+                        name,
+                        count: skills.length,
+                      })
+                }
+                className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {doorIdentity}
+                {doorMore}
+              </PopoverTrigger>
+              {/* The panel reads as the card grown downward, and everything
+                  about it is pointed at that illusion: anchored to the card
+                  itself (not the bar), exactly the card's width (`--anchor-width`),
+                  flush against its bottom edge (`sideOffset={-1}` rides over
+                  the card's own ring so the two read as one hairline), the
+                  card's surface and ring, square corners where the two meet
+                  and the card's rounded bottom below. It floats — portaled,
+                  over the grid — so nothing under it moves. */}
+              <PopoverContent
+                anchor={cardRef}
+                align="start"
+                sideOffset={-1}
+                /* The panel always grows downward, whatever the viewport has
+                    below the card: collision avoidance stands down on the side
+                    axis (no flipping above or sideways), and the panel's height
+                    is capped at the space the viewport actually has below the
+                    anchor (`--available-height`, set by the positioner) — the
+                    rows scroll inside it. As the list scrolls the card upward,
+                    the space grows and the panel with it. */
+                collisionAvoidance={{ side: "none", align: "shift", fallbackAxisSide: "none" }}
+                style={{
+                  width: "var(--anchor-width)",
+                  maxHeight: "min(var(--available-height), 40rem)",
+                }}
+                aria-label={
+                  repo
+                    ? t("state.viewRepoAria", {
+                        repo,
+                        count: skills.length,
+                      })
+                    : t("state.viewPoolAria", {
+                        name,
+                        count: skills.length,
+                      })
+                }
+                className="min-w-0 gap-0 overflow-hidden rounded-t-none rounded-b-xl bg-card p-0 text-popover-foreground shadow-lg ring-foreground/10"
+              >
+                {/* The skills the card's preview held back — the panel is the
+                    rest of the card, not a second card: the rows already on
+                    screen stay where they are, and the panel adds to them. The
+                    panel scrolls when the remainder is taller than the viewport
+                    allows; the footer bar stays pinned under it. A row press
+                    here closes the panel on its way to the detail drawer. */}
+                <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-2">
+                  {renderRows(skills.slice(shown.length), (key) => {
+                    setExpanded(false);
+                    onOpenSkill(key);
+                  })}
+                </div>
+                <Link
+                  to={door}
+                  className="group/door flex items-center gap-2 rounded-b-xl border-t border-border/60 bg-muted/50 px-3 py-2.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <span className="truncate">
+                    {repo
+                      ? t("action.openRepoPage")
+                      : t("action.openLocalPage")}
+                  </span>
+                  <ChevronRight
+                    className="ml-auto h-3 w-3 shrink-0 transition-transform group-hover/door:translate-x-0.5"
+                    aria-hidden
+                  />
+                </Link>
+              </PopoverContent>
+            </Popover>
           ) : (
+            /* Nothing held back: the card already lists the whole repository
+                (a short one, or a live search's uncapped answer), so there is
+                nothing to grow into and the bar stays the plain door it was. */
             <Link
               to={door}
               aria-label={
@@ -475,11 +622,12 @@ export function RepoCard({
               }
               className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              {doorBar}
+              {doorIdentity}
+              {doorCount}
             </Link>
           )}
           {/* The bar's one companion control: a sibling of the door, never a
-              child, so a press on it cannot also open the page. The installed
+              child, so a press on it cannot also expand the card. The installed
               list mounts the group switch here; the store mounts nothing. */}
           {footerAction && (
             <span className="flex shrink-0 items-center">{footerAction}</span>
