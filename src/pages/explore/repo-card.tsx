@@ -241,13 +241,6 @@ export function RepoCard({
   // positioned against the whole card (not the bar) and takes its width, which
   // is what makes it read as the card having grown downward.
   const cardRef = useRef<HTMLDivElement | null>(null);
-  // The panel's row container, and the popover's initial focus target. Base UI
-  // moves focus to the popup's first tabbable element on open — the first
-  // skill's row, which then paints its focus highlight and keeps its install
-  // button revealed, reading as a selection the reader never made. Focusing
-  // the row container instead lands on nothing in particular; Tab then walks
-  // into the first row as usual.
-  const panelBodyRef = useRef<HTMLDivElement | null>(null);
   const shown = hasQuery ? skills : skills.slice(0, maxSkills);
   // The bar's own name: the repository when there is one, and the label for the
   // installed list's pool of skills no source vouches for when there is not.
@@ -581,23 +574,14 @@ export function RepoCard({
                       })
                 }
                 className="min-w-0 gap-0 overflow-hidden rounded-t-none rounded-b-xl bg-card p-0 text-popover-foreground shadow-lg ring-foreground/10"
-                initialFocus={panelBodyRef}
               >
                 {/* The skills the card's preview held back — the panel is the
                     rest of the card, not a second card: the rows already on
                     screen stay where they are, and the panel adds to them. The
                     panel scrolls when the remainder is taller than the viewport
                     allows; the footer bar stays pinned under it. A row press
-                    here closes the panel on its way to the detail drawer. The
-                    container is the popover's initial focus target (see
-                    `panelBodyRef`); `tabIndex={-1}` lets it take that focus
-                    without becoming a Tab stop. */}
-                <div
-                  ref={panelBodyRef}
-                  tabIndex={-1}
-                  data-slot="repo-card-panel-body"
-                  className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-2 focus-visible:outline-none"
-                >
+                    here closes the panel on its way to the detail drawer. */}
+                <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-2">
                   {renderRows(skills.slice(shown.length), (key) => {
                     setExpanded(false);
                     onOpenSkill(key);
