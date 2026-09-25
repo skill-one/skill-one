@@ -6,6 +6,8 @@ import { useTheme } from "next-themes";
 
 import { cn } from "cn";
 
+import { createSkillEditorTheme } from "./skill-editor-theme";
+
 interface SkillEditorProps {
   /** Raw SKILL.md source (frontmatter included). */
   value: string;
@@ -20,46 +22,41 @@ interface SkillEditorProps {
  * the CodeMirror chunk only rides in once a skill is actually opened for
  * editing — the boot cost of a read-only viewer is unchanged.
  *
- * Theming rides the existing shadcn CSS variables instead of a bundled theme
- * package, so light/dark follow the app's `next-themes` mode for free. The
- * feature set is trimmed to what editing markdown needs — highlighting,
- * history and search — with line numbers, folding and completion switched off.
+ * Colors come from `createSkillEditorTheme`, which derives both the surface
+ * and the markdown token palette from the shadcn CSS variables, so light/dark
+ * follow the app's `next-themes` mode. Only layout rules that the theme
+ * factory doesn't cover (content padding, line height) stay here.
  */
 export function SkillEditor({ value, onChange, className }: SkillEditorProps) {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
 
-  const theme = useMemo(
+  const theme = useMemo(() => createSkillEditorTheme(dark), [dark]);
+
+  const layout = useMemo(
     () =>
-      EditorView.theme(
-        {
-          "&": {
-            backgroundColor: "transparent",
-            color: "var(--foreground)",
-            fontSize: "13px",
-          },
-          ".cm-content": {
-            fontFamily:
-              "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)",
-            padding: "12px 0",
-          },
-          ".cm-scroller": { lineHeight: "1.7" },
-          ".cm-activeLine": { backgroundColor: "var(--muted)" },
-          ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--foreground)" },
-          "&.cm-focused": { outline: "none" },
-        },
-        { dark },
-      ),
-    [dark],
+      EditorView.theme({
+        ".cm-content": { padding: "12px 0" },
+        ".cm-scroller": { lineHeight: "1.7" },
+        "&.cm-focused": { outline: "none" },
+      }),
+    [],
   );
 
-  const extensions = useMemo(() => [markdown(), theme], [theme]);
+  const extensions = useMemo(
+    () => [markdown(), theme, layout],
+    [theme, layout],
+  );
 
   return (
     <CodeMirror
       value={value}
       onChange={onChange}
       height="100%"
+      // "none" opts out of the wrapper's built-in light surface (a hard
+      // `#fff` background) — the surface colors come solely from
+      // `createSkillEditorTheme`, so dark mode keeps a dark editor.
+      theme="none"
       className={cn("h-full text-[13px]", className)}
       extensions={extensions}
       basicSetup={{

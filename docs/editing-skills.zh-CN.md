@@ -32,9 +32,11 @@ English: [editing-skills.md](./editing-skills.md)
 ## 编辑器集成
 
 编辑器是基于 `@uiw/react-codemirror` + `@codemirror/lang-markdown` 的 CodeMirror 6，
-采用懒加载，只有真正开启编辑时才加载 CodeMirror 代码块。它复用应用已有的 shadcn
-CSS 变量而非引入主题包，因此明暗主题随 `next-themes` 自动切换；功能裁剪为高亮、
-历史与查找（不显示行号、折叠与自动补全）。
+采用懒加载，只有真正开启编辑时才加载 CodeMirror 代码块。编辑面配色（表面、光标、
+选区、当前行）与 markdown 语法着色均取自应用已有的 shadcn CSS 变量（经由
+`@uiw/codemirror-themes` 的 `createTheme` 组装，见 `skill-editor-theme.ts`），因此
+明暗主题随 `next-themes` 自动切换；组件的 `theme` 固定为 `"none"`，以屏蔽包装组件
+自带的白底浅色表面。功能裁剪为高亮、历史与查找（不显示行号、折叠与自动补全）。
 
 ## 守卫与已知限制
 
