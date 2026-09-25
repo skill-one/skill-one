@@ -43,10 +43,13 @@ description is read from the file, so it refreshes with the edit.
 
 The editor is CodeMirror 6 through `@uiw/react-codemirror` with
 `@codemirror/lang-markdown`, loaded lazily so the CodeMirror chunk only rides in
-once a skill is opened for editing. It rides the app's existing shadcn CSS
-variables rather than a bundled theme package, so light/dark follow
-`next-themes` for free; the feature set is trimmed to highlighting, history and
-search (no line numbers, folding or completion).
+once a skill is opened for editing. Both the editing surface (background,
+caret, selection, active line) and the markdown token colors derive from the
+app's existing shadcn CSS variables — assembled via `@uiw/codemirror-themes`'
+`createTheme` in `skill-editor-theme.ts` — so light/dark follow `next-themes`
+for free. The component's `theme` is pinned to `"none"` to opt out of the
+wrapper's built-in white light-mode surface. The feature set is trimmed to
+highlighting, history and search (no line numbers, folding or completion).
 
 ## Guardrails and known limits
 
