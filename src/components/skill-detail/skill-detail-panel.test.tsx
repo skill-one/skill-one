@@ -280,7 +280,7 @@ describe("SkillDetailPanel", () => {
     expect(within(tip).getByText(detail.path)).toBeInTheDocument();
   });
 
-  it("links the source repo, its skills.sh page and the mirror SKILL.md", async () => {
+  it("links the source repo and the mirror SKILL.md, and nothing else", async () => {
     mockFetchSkillDetail.mockResolvedValue(detail);
     renderDrawer({ skill: { ...skill, path: "skills/anthropics/skills/pdf" } });
 
@@ -290,12 +290,11 @@ describe("SkillDetailPanel", () => {
     expect(
       screen.getByRole("link", { name: "anthropics/skills" }),
     ).toHaveAttribute("href", "https://github.com/anthropics/skills");
-    // The skills.sh page is the deepest upstream link that survives; the
-    // header keeps it as an icon-only control next to the stats.
-    expect(screen.getByRole("link", { name: /skills\.sh/ })).toHaveAttribute(
-      "href",
-      "https://www.skills.sh/anthropics/skills/pdf",
-    );
+    // The skills.sh page is gone from the drawer: the repo link is the one
+    // external door the header offers.
+    expect(
+      screen.queryByRole("link", { name: /skills\.sh/ }),
+    ).not.toBeInTheDocument();
     // The mirror SKILL.md is the 源 link's target; its path text hides in
     // the link's tooltip.
     expect(screen.getByRole("link", { name: "源" })).toHaveAttribute(

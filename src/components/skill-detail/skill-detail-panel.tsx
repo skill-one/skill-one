@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import {
   CalendarDays,
   ExternalLink,
-  Globe,
   Languages,
   Loader2,
   Pencil,
@@ -426,9 +425,6 @@ export function SkillDetailPanel({
   // The owner segment of that repo — the author's face, which the mirror
   // hosts an avatar for and which leads the repo name.
   const [owner] = (shown?.repo ?? "").split("/");
-  // The skill's page on skills.sh, when the index carries one — the deepest
-  // upstream link that survives without the repo-internal path.
-  const skillsShHref = shown?.url ?? "";
   // The link's href and its open-externally handler point at the same place.
   const skillBlobUrl = githubBlobUrl(MIRROR.repo, filePath, MIRROR.ref);
   // Version identity as the scraper sees it: the full content hash, and the
@@ -555,8 +551,8 @@ export function SkillDetailPanel({
           </div>
         )}
         {/* One meta row, in priority order: author, usage stats,
-            external links, provenance, and the profile chip. Everything
-            provenance-shaped (hash, date, file path) hides behind 源. */}
+            provenance, and the profile chip. Everything provenance-shaped
+            (hash, date, file path) hides behind 源. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] text-muted-foreground">
           {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
           {/* The same install figure the list rows show. Shown for exactly
@@ -564,30 +560,13 @@ export function SkillDetailPanel({
               the row the reader clicked and the drawer it opened can never
               disagree about it. */}
           {showStats && shown && <SkillInstalls skill={shown} />}
-          {shown && !fromDisk && (
-            <>
-              {skillsShHref && (
-                <a
-                  href={skillsShHref}
-                  aria-label={t("detail.openOnSkillsSh")}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void openExternal(skillsShHref);
-                  }}
-                  className="flex items-center text-muted-foreground/70 transition-colors hover:text-foreground"
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                </a>
-              )}
-              {(rev || seenAt || detail) && (
-                <ProvenanceTip
-                  href={detail ? skillBlobUrl : undefined}
-                  rev={rev ?? undefined}
-                  seenAt={seenAt ?? undefined}
-                  path={detail?.path}
-                />
-              )}
-            </>
+          {shown && !fromDisk && (rev || seenAt || detail) && (
+            <ProvenanceTip
+              href={detail ? skillBlobUrl : undefined}
+              rev={rev ?? undefined}
+              seenAt={seenAt ?? undefined}
+              path={detail?.path}
+            />
           )}
           {fromDisk && detail && <ProvenanceTip path={detail.path} />}
           {shown?.profile && (
