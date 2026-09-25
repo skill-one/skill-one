@@ -225,13 +225,15 @@ describe("SkillDetailPanel", () => {
       screen.queryByRole("img", { name: "pdf 封面图" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("pdf")).toBeInTheDocument();
-    // The author's avatar rides the repo line: who published the skill, next
-    // to where it lives. It is decoration, so it never joins the link's name.
+    // The enlarged owner avatar leads the identity block — the name and the
+    // repo line it spans — outside the repo link, which keeps only the text.
+    // It is decoration, so it still never joins the link's name.
     expect(
       screen
         .getByRole("link", { name: "anthropics/skills" })
         .querySelector('[data-slot="avatar"]'),
-    ).not.toBeNull();
+    ).toBeNull();
+    expect(document.querySelector('[data-slot="avatar"]')).not.toBeNull();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
     // The meta line is quiet dot-separated text: no author badge (the repo
     // line's avatar and repo already say who published it) and no license.

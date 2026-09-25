@@ -498,7 +498,16 @@ export function SkillDetailPanel({
     // chain and twMerge drops the default narrow cap.
     <SheetContent className="data-[side=right]:sm:max-w-[min(48rem,55vw)]">
       <SheetHeader className="gap-2 px-6 pt-5">
-        <div className="flex items-start gap-3">
+        <div className="flex items-center gap-3">
+          {/* The repo's owner avatar leads the whole identity block: it stands
+              as tall as the two text lines it belongs to — the skill's name
+              above, the owner/repo it was published under below. A skill with
+              no known source has no owner to show, so its name stays flush
+              left; the initials stand-in is the cover's job, and the cover
+              is gone. */}
+          {hasSource && owner && (
+            <OwnerAvatar owner={owner} className="h-12 w-12 shrink-0 text-lg" />
+          )}
           <div className="min-w-0 flex-1">
             <SheetTitle className="truncate text-lg font-bold tracking-tight">
               {shown?.name}
@@ -515,14 +524,6 @@ export function SkillDetailPanel({
                     title={t("detail.openSourceRepo")}
                     className="inline-flex min-w-0 items-center gap-1"
                   >
-                    {/* The repo's owner avatar leads the repo it belongs to:
-                        who published the skill, next to where it lives. */}
-                    {owner && (
-                      <OwnerAvatar
-                        owner={owner}
-                        className="h-3.5 w-3.5 text-[8px]"
-                      />
-                    )}
                     <span className="truncate">{shown?.repo}</span>
                     <ExternalLink className="h-3 w-3 shrink-0" />
                   </a>
