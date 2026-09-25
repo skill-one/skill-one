@@ -496,7 +496,13 @@ export function SkillDetailPanel({
     // The default width rides the `data-[side=right]` variant, whose attribute
     // selector out-specifies a bare `sm:` override — so this one wears the same
     // chain and twMerge drops the default narrow cap.
-    <SheetContent className="data-[side=right]:sm:max-w-[min(48rem,55vw)]">
+    // The corner ✕ is omitted: it crowds the same corner the install button,
+    // enable switch and uninstall already occupy, and Escape plus an overlay
+    // click close the sheet on every surface.
+    <SheetContent
+      showCloseButton={false}
+      className="data-[side=right]:sm:max-w-[min(48rem,55vw)]"
+    >
       <SheetHeader className="gap-2 px-6 pt-5">
         <div className="flex items-center gap-3">
           {/* The repo's owner avatar leads the whole identity block: it stands
