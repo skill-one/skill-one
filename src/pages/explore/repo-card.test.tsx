@@ -92,11 +92,11 @@ describe("RepoCard", () => {
     });
     expect(within(bar).getByText(REPO)).toBeInTheDocument();
     expect(within(bar).getByText(formatCount(STARS))).toBeInTheDocument();
-    // The count is the door's *object*, not a second figure standing beside it
-    // with a separator between them: one phrase, in one element, carrying the
-    // noun the app uses for it everywhere else — so nothing has to disambiguate
-    // 「8 个」 from the rows on screen.
-    const door = within(bar).getByText("8 个 skill");
+    // The bar's right cluster states the remainder, not the total: the reader
+    // counts the rows on screen and adds, so the cap reads as "these of them"
+    // and the figure beside it reads as "and this many more" — the expansion's
+    // own object, in one element, pointing down.
+    const door = within(bar).getByText("+3");
     expect(door.tagName).toBe("SPAN");
     // ...and the repository's own figure rides the repository's own name, at
     // the front of the bar, rather than out in the door's cluster — where it
@@ -142,7 +142,7 @@ describe("RepoCard", () => {
     const bar = screen.getByRole("button", {
       name: `查看仓库 ${REPO}，8 个 skill`,
     });
-    expect(within(bar).getByText("8 个 skill")).toBeInTheDocument();
+    expect(within(bar).getByText("+3")).toBeInTheDocument();
 
     // The bar expands the card in place; the panel's footer keeps the way to
     // the repository's page, carrying the route the bar itself used to open.
@@ -170,16 +170,17 @@ describe("RepoCard", () => {
     expect(screen.queryByText("notion")).not.toBeInTheDocument();
   });
 
-  it("renders a one-skill repository with the same body and the same bar", () => {
+  it("renders a one-skill repository with the same body, its bar a plain door", () => {
     renderCard({ skills: [skills[0]] });
 
     expect(rowNames()).toEqual(["pdf"]);
-    const bar = screen.getByRole("button", {
+    // Nothing is held back, so there is nothing to grow into: the bar keeps
+    // the door's own shape — a link, labelled with the total — without the
+    // bar having to change shape for the smallest repository there is.
+    const bar = screen.getByRole("link", {
       name: `查看仓库 ${REPO}，1 个 skill`,
     });
-    // The door's label, not a bare count: it reads 「1 个 skill」 — this
-    // repository has one skill and this is the way to it — without the bar
-    // having to change shape for the smallest repository there is.
+    expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
     expect(within(bar).getByText("1 个 skill")).toBeInTheDocument();
   });
 
@@ -191,9 +192,9 @@ describe("RepoCard", () => {
       screen.getByRole("button", { name: `查看仓库 ${REPO}，8 个 skill` }),
     );
 
-    // The panel is the card's own answer to "and the rest?": the same rows,
-    // uncapped, so a skill reads the same whether the card is showing its
-    // preview or the whole of itself.
+    // The panel is the rest of the card, not a second card: only the skills
+    // the preview held back mount in it, in the same rows — the ones already
+    // on screen stay where they are.
     const panel = screen.getByRole("dialog");
     expect(
       within(panel)
@@ -201,16 +202,10 @@ describe("RepoCard", () => {
         .map((row) =>
           row.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""),
         ),
-    ).toEqual([
-      "pdf",
-      "docx",
-      "pptx",
-      "xlsx",
-      "slides",
-      "canvas",
-      "figma",
-      "notion",
-    ]);
+    ).toEqual(["canvas", "figma", "notion"]);
+    expect(
+      within(panel).queryByRole("button", { name: "查看 pdf 详情" }),
+    ).toBeNull();
     // And the expansion is announced: the trigger carries its open state.
     expect(screen.getByRole("button", { name: `查看仓库 ${REPO}，8 个 skill` }))
       .toHaveAttribute("aria-expanded", "true");
