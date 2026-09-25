@@ -296,7 +296,7 @@ describe("ExplorePage", () => {
     // gone, because the card *is* the group. Its bottom bar is what signs the
     // card and what opens the repository's own page.
     expect(
-      screen.getByRole("button", { name: `查看仓库 ${BATCH_REPO}，50 个 skill` }),
+      screen.getByRole("link", { name: `查看仓库 ${BATCH_REPO}，50 个 skill` }),
     ).toBeInTheDocument();
     // The page answered one RPC; browsing never re-downloads the registry.
     expect(harness.downloads).toBe(1);
@@ -308,33 +308,19 @@ describe("ExplorePage", () => {
     harness.init();
     harness.pushAll(makeSkills(8, 0));
     harness.complete();
-    const { container } = renderExplorePage();
+    renderExplorePage();
 
     // The cap is what keeps one big repository from pushing every other card
     // off the screen; the bar carries the repository's *total*, so a capped list
-    // reads as "these of them" and its expansion opens all of them.
+    // reads as "these of them" and its door leads to all of them.
     expect(await screen.findByText("skill-4")).toBeInTheDocument();
     expect(screen.queryByText("skill-5")).not.toBeInTheDocument();
-    const user = userEvent.setup();
-    await user.click(
-      screen.getByRole("button", { name: `查看仓库 ${BATCH_REPO}，8 个 skill` }),
-    );
-    // The panel's footer keeps the way to the repository's page the bar itself
-    // used to open. The app is a hash router, so the rendered href carries the
-    // hash.
-    const panel = screen.getByRole("dialog", {
-      name: `查看仓库 ${BATCH_REPO}，8 个 skill`,
-    });
     expect(
-      within(panel).getByRole("link", { name: /打开仓库页/ }),
+      screen.getByRole("link", { name: `查看仓库 ${BATCH_REPO}，8 个 skill` }),
+      // The app is a hash router, so the rendered href carries the hash.
     ).toHaveAttribute("href", `#/repo/${BATCH_REPO}`);
-    // The card body keeps its preview of five; the panel carries the whole
-    // eight (counted within the card, so the open panel's rows stay out).
     expect(
-      within(
-        container.querySelector('[data-slot="card-content"]') as HTMLElement,
-      )
-        .getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
+      screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
     ).toHaveLength(5);
   });
 
@@ -419,7 +405,7 @@ describe("ExplorePage", () => {
     // domain that holds one — plus 未分类 for the repository nothing classified,
     // which is a different claim from the dataset's own 其他 and so takes a chip
     // of its own.
-    const cards = () => screen.getAllByRole("button", { name: /^查看仓库 / });
+    const cards = () => screen.getAllByRole("link", { name: /^查看仓库 / });
     await screen.findByText("redis");
     expect(cards()).toHaveLength(3);
     expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
@@ -598,14 +584,14 @@ describe("ExplorePage", () => {
     const { container } = renderExplorePage();
 
     // The repository unit leads with one card per repository...
-    await screen.findByRole("button", { name: /^查看仓库 o\/one/ });
+    await screen.findByRole("link", { name: /^查看仓库 o\/one/ });
     await user.click(screen.getByRole("button", { name: "按技能" }));
 
     // ...and the skill unit with one row per skill, most installed first. o/one's
     // three skills are a run, but below the fold threshold it is listed whole —
     // every row stands on its own, and no fold row appears.
     await waitFor(() => expect(cardOrder()).toEqual(["r1", "r2", "r3", "z1"]));
-    expect(screen.queryByRole("button", { name: /^查看仓库 / })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
     expect(
       screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
     ).toBeNull();
@@ -756,7 +742,7 @@ describe("ExplorePage", () => {
     expect(
       await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^查看仓库 / })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
   });
 
   it("renders the leading cards first and reveals more as the reader scrolls", async () => {
@@ -781,7 +767,7 @@ describe("ExplorePage", () => {
     // link's exact aria-label shape — one per rendered repository card.
     const renderedCards = () =>
       screen
-        .getAllByRole("button", { name: /^查看仓库 repo-\d+\/skills，/ }).length;
+        .getAllByRole("link", { name: /^查看仓库 repo-\d+\/skills，/ }).length;
     expect(renderedCards()).toBe(6);
     expect(screen.getByText("skill-5")).toBeInTheDocument();
     expect(screen.queryByText("skill-6")).not.toBeInTheDocument();
@@ -813,7 +799,7 @@ describe("ExplorePage", () => {
     bootGadgetRegistry();
     renderExplorePage();
 
-    const cardLinks = () => screen.getAllByRole("button", { name: /^查看仓库 / }).length;
+    const cardLinks = () => screen.getAllByRole("link", { name: /^查看仓库 / }).length;
     const triggerSentinel = () =>
       (
         globalThis.IntersectionObserver as unknown as {
@@ -838,7 +824,7 @@ describe("ExplorePage", () => {
     const tail = screen.getByRole("region", { name: "51–71" });
     expect(within(middle).getByText("25 个仓库")).toBeInTheDocument();
     expect(within(tail).getByText("21 个仓库")).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "Top 25" })).getAllByRole("button", { name: /^查看仓库 / })).toHaveLength(25);
+    expect(within(screen.getByRole("region", { name: "Top 25" })).getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(25);
   });
 
   it("folds one rank band without touching the other bands", async () => {
@@ -854,20 +840,20 @@ describe("ExplorePage", () => {
     await screen.findByRole("region", { name: "Top 25" });
     await waitFor(() => {
       triggerSentinel();
-      expect(screen.getAllByRole("button", { name: /^查看仓库 / })).toHaveLength(71);
+      expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(71);
     });
 
     // Folding the leading band removes just its 25 cards; the folded header
     // keeps its count, and the other bands stay put.
     await userEvent.click(screen.getByRole("button", { name: /Top\s*25\s*25 个仓库/ }));
-    expect(screen.getAllByRole("button", { name: /^查看仓库 / })).toHaveLength(46);
+    expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(46);
     expect(screen.getByRole("region", { name: "26–50" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "51–71" })).toBeInTheDocument();
 
     // Unfolding restores the grid whole.
     await userEvent.click(screen.getByRole("button", { name: /Top\s*25\s*25 个仓库/ }));
     await waitFor(() =>
-      expect(screen.getAllByRole("button", { name: /^查看仓库 / })).toHaveLength(71),
+      expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(71),
     );
   });
 
@@ -882,7 +868,7 @@ describe("ExplorePage", () => {
     renderExplorePage();
 
     const cardLinks = () =>
-      screen.queryAllByRole("button", { name: /^查看仓库 / }).length;
+      screen.queryAllByRole("link", { name: /^查看仓库 / }).length;
     const triggerSentinel = () =>
       (
         globalThis.IntersectionObserver as unknown as {
@@ -938,7 +924,7 @@ describe("ExplorePage", () => {
     const { container } = renderExploreRoutes();
 
     const renderedCards = () =>
-      screen.getAllByRole("button", { name: /^查看仓库 repo-\d+\/skills，/ });
+      screen.getAllByRole("link", { name: /^查看仓库 repo-\d+\/skills，/ });
     const scroller = () =>
       (container.querySelector("ul.grid") as HTMLElement).closest(
         ".overflow-y-auto",
@@ -956,14 +942,8 @@ describe("ExplorePage", () => {
     scroller().scrollTop = 300;
     fireEvent.scroll(scroller());
 
-    // Into a repository's page, and back out of it: the bar expands the card,
-    // and the panel's footer is the way on to the page.
+    // Into a repository's page, and back out of it.
     await user.click(renderedCards()[0]);
-    await user.click(
-      await within(screen.getByRole("dialog")).findByRole("link", {
-        name: /打开仓库页/,
-      }),
-    );
     await user.click(
       await screen.findByRole("button", { name: "返回探索" }),
     );
@@ -1010,7 +990,7 @@ describe("ExplorePage", () => {
 
     // The most-starred repository leads the list.
     expect(await screen.findByText("widget-core")).toBeInTheDocument();
-    const bar = screen.getByRole("button", {
+    const bar = screen.getByRole("link", {
       name: "查看仓库 acme/widgets，2 个 skill",
     });
     // The figures a group header used to carry now ride the card's bottom bar:
@@ -1113,7 +1093,7 @@ describe("ExplorePage", () => {
     // The count reads the head link's exact aria-label shape — one per
     // rendered repository card.
     const renderedGadgetCards = () =>
-      screen.getAllByRole("button", {
+      screen.getAllByRole("link", {
         name: /^查看仓库 acme\/gadget-\d+，/,
       });
 
@@ -1246,25 +1226,19 @@ describe("ExplorePage", () => {
     // nowhere further to go: it is a label, whatever the repository is — the
     // rows, which open skills.sh, are the only way out.
     expect(
-      screen.queryByRole("button", { name: /^查看仓库 acme\/fresh/ }),
+      screen.queryByRole("link", { name: /^查看仓库 acme\/fresh/ }),
     ).toBeNull();
     expect(
-      screen.queryByRole("button", { name: /^查看仓库 acme\/other/ }),
+      screen.queryByRole("link", { name: /^查看仓库 acme\/other/ }),
     ).toBeNull();
     expect(
-      screen.queryByRole("button", { name: /^查看仓库 smithery\.ai/ }),
+      screen.queryByRole("link", { name: /^查看仓库 smithery\.ai/ }),
     ).toBeNull();
-    // The indexed repository's card keeps the store's own expansion — the only
-    // 查看仓库 bar on the page — whose panel footer carries the one way on to
-    // the repository's page.
-    expect(screen.getAllByRole("button", { name: /^查看仓库 / })).toHaveLength(1);
-    await user.click(
-      screen.getByRole("button", { name: /^查看仓库 acme\/gadgets/ }),
-    );
+    // The indexed repository's card keeps the store's own door — the only
+    // 查看仓库 link on the page.
+    expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(1);
     expect(
-      within(screen.getByRole("dialog")).getByRole("link", {
-        name: /打开仓库页/,
-      }),
+      screen.getByRole("link", { name: /^查看仓库 acme\/gadgets/ }),
     ).toHaveAttribute("href", "#/repo/acme/gadgets");
   });
 
@@ -1786,7 +1760,7 @@ describe("ExplorePage streaming", () => {
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
     expect(screen.getByText("skill-3")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", {
+      screen.getByRole("link", {
         name: `查看仓库 ${BATCH_REPO}，${STREAM_BATCH + 5} 个 skill`,
       }),
     ).toBeInTheDocument();
@@ -1796,7 +1770,7 @@ describe("ExplorePage streaming", () => {
     // wait it out rather than racing the swap.
     await waitFor(() =>
       expect(
-        screen.getByRole("button", {
+        screen.getByRole("link", {
           name: `查看仓库 ${BATCH_REPO}，${STREAM_BATCH + 20} 个 skill`,
         }),
       ).toBeInTheDocument(),
