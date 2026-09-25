@@ -199,6 +199,17 @@ describe("SkillDetailPanel", () => {
     expect(mockFetchSkillDetail).not.toHaveBeenCalled();
   });
 
+  it("opens wider than the default sheet, capped relative to the window", async () => {
+    renderDrawer({});
+    // The default `sm:max-w-sm` sheet cannot hold the SKILL.md prose; the
+    // panel overrides it (under the same `data-[side=right]` variant the
+    // default cap rides, so twMerge drops it) with a min() cap that follows
+    // the window width.
+    expect(await screen.findByRole("dialog")).toHaveClass(
+      "data-[side=right]:sm:max-w-[min(60rem,85vw)]",
+    );
+  });
+
   it("shows skill info and the fetched SKILL.md", async () => {
     mockFetchSkillDetail.mockResolvedValue(detail);
     renderDrawer({});

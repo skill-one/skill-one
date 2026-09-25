@@ -449,7 +449,13 @@ export function SkillDetailPanel({
   ) : null;
 
   return (
-    <SheetContent>
+    // The detail body is prose the reader scans, so the default `sm:max-w-sm`
+    // sheet is too narrow to hold it. Cap the sheet at the smaller of 60rem
+    // and 85% of the window, so it grows with the window and never covers it.
+    // The default width rides the `data-[side=right]` variant, whose attribute
+    // selector out-specifies a bare `sm:` override — so this one wears the same
+    // chain and twMerge drops the default narrow cap.
+    <SheetContent className="data-[side=right]:sm:max-w-[min(60rem,85vw)]">
       <SheetHeader className="gap-2 px-6 pt-5">
         <div className="flex items-start gap-3">
           {/* The same image the row leads with, at the drawer's size: the
