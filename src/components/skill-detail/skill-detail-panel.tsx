@@ -30,7 +30,6 @@ import {
 } from "../../lib/utils";
 import { DomainBadge } from "../domain-badge";
 import { SkillInstalls } from "../skill-installs";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
   Popover,
@@ -433,6 +432,42 @@ export function SkillDetailPanel({
   const rev = shown?.rev ?? null;
   const seenAt = shown?.firstSeenAt ? formatDate(shown.firstSeenAt, locale) : null;
 
+  // The meta line's facts in reading order. Nulls drop out and the renderer
+  // interleaves the interpunct separators, so any combination of present
+  // facts — a registry-backed store row, an unindexed local install, a disk
+  // read with no rev — leaves no dangling separator.
+  const metaItems = [
+    // The same install figure the list rows show. Shown for exactly the
+    // skills whose card shows it — the registry-backed ones.
+    showStats && shown ? <SkillInstalls key="installs" skill={shown} /> : null,
+    shown && !fromDisk && (rev || seenAt || detail) ? (
+      <ProvenanceTip
+        key="provenance"
+        href={detail ? skillBlobUrl : undefined}
+        rev={rev ?? undefined}
+        seenAt={seenAt ?? undefined}
+        path={detail?.path}
+      />
+    ) : null,
+    fromDisk && detail ? <ProvenanceTip key="local-provenance" path={detail.path} /> : null,
+    // The domain rides the meta line flattened to text (`ghost`), one quiet
+    // fact among the others rather than a chip that out-weights them.
+    shown?.profile ? (
+      <DomainBadge
+        key="domain"
+        domain={shown.profile.domain}
+        variant="ghost"
+        className="px-0 py-0"
+      />
+    ) : null,
+    // Installed skills only — the on-disk fact the registry cannot report.
+    // The same guard the component applies, so an unformattable timestamp
+    // leaves no separator behind.
+    shown?.installedAt != null && formatRelativeTime(shown.installedAt, locale) ? (
+      <InstalledAt key="installed-at" installedAt={shown.installedAt} />
+    ) : null,
+  ].filter((item) => item !== null);
+
   // The canonical SKILL.md body. Registry skills resolve relative links
   // against the snapshot the index was built from; a body read off disk has
   // no repo view to resolve against, so it goes without one.
@@ -550,31 +585,23 @@ export function SkillDetailPanel({
             )}
           </div>
         )}
-        {/* One meta row, in priority order: author, usage stats,
-            provenance, and the profile chip. Everything provenance-shaped
-            (hash, date, file path) hides behind 源. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] text-muted-foreground">
-          {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
-          {/* The same install figure the list rows show. Shown for exactly
-              the skills whose card shows it — the registry-backed ones — so
-              the row the reader clicked and the drawer it opened can never
-              disagree about it. */}
-          {showStats && shown && <SkillInstalls skill={shown} />}
-          {shown && !fromDisk && (rev || seenAt || detail) && (
-            <ProvenanceTip
-              href={detail ? skillBlobUrl : undefined}
-              rev={rev ?? undefined}
-              seenAt={seenAt ?? undefined}
-              path={detail?.path}
-            />
-          )}
-          {fromDisk && detail && <ProvenanceTip path={detail.path} />}
-          {shown?.profile && (
-            <DomainBadge domain={shown.profile.domain} />
-          )}
-          {/* Installed skills only — the on-disk fact the registry cannot
-              report. A store row has no local install, so nothing renders. */}
-          <InstalledAt installedAt={shown?.installedAt} />
+        {/* One quiet meta line under the summary: the install figure, the 源
+            provenance tip, the domain and — for installed skills — the
+            install date, separated by interpuncts instead of chips. The
+            author's name is already the repo line's avatar and repo, so a
+            badge would say it twice. Everything provenance-shaped (hash,
+            date, file path) hides behind 源. */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
+          {metaItems.map((item, index) => (
+            <span key={index} className="flex items-center gap-2">
+              {index > 0 && (
+                <span aria-hidden className="text-muted-foreground/40">
+                  ·
+                </span>
+              )}
+              {item}
+            </span>
+          ))}
         </div>
       </SheetHeader>
       {/* A divider heads the body and carries the file's name: the rule runs the

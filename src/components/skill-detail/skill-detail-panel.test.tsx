@@ -233,9 +233,9 @@ describe("SkillDetailPanel", () => {
         .querySelector('[data-slot="avatar"]'),
     ).not.toBeNull();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
-    // The author badge stays; the license is frontmatter detail the drawer
-    // no longer spends a meta chip on.
-    expect(screen.getByText("Anthropic")).toBeInTheDocument();
+    // The meta line is quiet dot-separated text: no author badge (the repo
+    // line's avatar and repo already say who published it) and no license.
+    expect(screen.queryByText("Anthropic")).not.toBeInTheDocument();
     expect(screen.queryByText("MIT")).not.toBeInTheDocument();
     // One install figure, exactly like the list rows: the skill's own count,
     // compacted, with the exact number on the title and the wording for
