@@ -206,7 +206,7 @@ describe("SkillDetailPanel", () => {
     // default cap rides, so twMerge drops it) with a min() cap that follows
     // the window width.
     expect(await screen.findByRole("dialog")).toHaveClass(
-      "data-[side=right]:sm:max-w-[min(60rem,85vw)]",
+      "data-[side=right]:sm:max-w-[min(60rem,70vw)]",
     );
   });
 
