@@ -23,6 +23,7 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import type { InstalledSkill } from "../../lib/skills-manager";
+import { compareByInstalledTime } from "../../lib/time-groups";
 import { formatCount } from "../../lib/utils";
 import { DrillDownHead } from "../../components/drill-down-head";
 import { OwnerAvatar } from "../../components/owner-avatar";
@@ -174,12 +175,14 @@ export function RepoPage({
     return placed;
   }, [fromInstalled, installed, linked, repo]);
 
-  // What is on disk, in the repository's own order, plus any install the index
-  // no longer publishes — a skill the reader has does not disappear from the
-  // repository it came from just because the store moved on. Each row is the
-  // shared installed view, so it carries the store facts the registry entry
-  // holds (classification, install count) exactly as the installed list's rows
-  // do.
+  // What is on disk, newest install first — the same order the repository card
+  // on the installed list reads its skills in, so opening the card cannot
+  // reshuffle what it showed. An install the index no longer publishes joins
+  // the same ordering rather than trailing it; only the absence of a recorded
+  // birth time parks a row at the end (ties by name, as on the card). Each row
+  // is the shared installed view, so it carries the store facts the registry
+  // entry holds (classification, install count) exactly as the installed
+  // list's rows do.
   const onDisk = useMemo<SkillView[]>(() => {
     if (!fromInstalled) return [];
     const listed = published.flatMap((skill) => {
@@ -189,9 +192,13 @@ export function RepoPage({
     const named = new Set(listed.map((skill) => skill.name));
     const unpublished = Array.from(records.values())
       .filter((record) => !named.has(record.name))
-      .toSorted((a, b) => a.name.localeCompare(b.name))
       .map((record) => installedSkillView(record, linked));
-    return [...listed, ...unpublished];
+    return [...listed, ...unpublished].toSorted(
+      compareByInstalledTime(
+        (skill) => skill.installedAt,
+        (a, b) => a.name.localeCompare(b.name),
+      ),
+    );
   }, [fromInstalled, published, records, linked]);
 
   // What the repository publishes but this machine does not have — the

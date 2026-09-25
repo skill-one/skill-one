@@ -389,8 +389,9 @@ describe("RepoPage", () => {
       );
       expect(figures).toHaveTextContent(formatCount(STARS));
 
-      // Only the installs are listed, in the repository's own order — the other
-      // two are not on this machine and wait below the fold.
+      // Only the installs are listed — the helper's records carry no birth
+      // time, so they settle name-ordered — and the other two are not on this
+      // machine and wait below the fold.
       await waitFor(() => expect(rows()).toHaveLength(2));
       expect(rowNames()).toEqual(["skill-0", "skill-2"]);
       expect(
@@ -448,6 +449,55 @@ describe("RepoPage", () => {
       ).toBeNull();
       expect(fold).toHaveAttribute("aria-expanded", "false");
       expect(figures).toHaveTextContent("2 个已安装 skill");
+    });
+
+    it("lists the installs newest-first, the order the card showed them in", async () => {
+      bootRegistry(skillsOf(4));
+      // Installs the registry's own ranking would have ordered skill-0,
+      // skill-2, skill-3 (downloads) — but the card on the installed list
+      // reads them by install time, so the page does too, and an install the
+      // index no longer publishes (skill-9) joins the same ordering rather
+      // than trailing it.
+      vi.mocked(fetchInstalledSkills).mockResolvedValue([
+        {
+          name: "skill-0",
+          enabled: true,
+          description: "skill-0 on disk.",
+          installedAt: 1_000,
+        },
+        {
+          name: "skill-2",
+          enabled: true,
+          description: "skill-2 on disk.",
+          installedAt: 3_000,
+        },
+        {
+          name: "skill-3",
+          enabled: true,
+          description: "skill-3 on disk.",
+          installedAt: null,
+        },
+        {
+          name: "skill-9",
+          enabled: true,
+          description: "skill-9 on disk.",
+          installedAt: 2_000,
+        },
+      ]);
+      seedMockProvenance(
+        Object.fromEntries(
+          ["skill-0", "skill-2", "skill-3", "skill-9"].map((name) => [
+            name,
+            { repo: REPO, slug: name },
+          ]),
+        ),
+      );
+      renderInstalledRepoPage();
+
+      // Install time desc: skill-2 newest, then skill-9, then skill-0; the
+      // stampless skill-3 trails, exactly as it would trail on the card.
+      await waitFor(() => expect(rows()).toHaveLength(4));
+      expect(rowNames()).toEqual(["skill-2", "skill-9", "skill-0", "skill-3"]);
     });
 
     it("still offers the fold when nothing is installed yet", async () => {
