@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight, Star } from "lucide-react";
+import { ChevronRight, Star } from "lucide-react";
 
 import { useAppLocale } from "../../i18n/use-language";
 import { skillDescription } from "../../lib/i18n-content";
@@ -84,12 +84,8 @@ export interface RepoCardRow {
  *   state live;
  * - the **bottom bar** expands the card in place: a floating panel, anchored to
  *   the card's own footprint and exactly its width, opens beneath it and lists
- *   the skills the preview cap held back — the same rows, the same surface, so
- *   the card reads as having grown downward rather than as a popup over it. The
- *   rows already on screen stay put; the panel only adds to them. Its right
- *   cluster is the remainder, 「+N」 beside a downward chevron that turns around
- *   once the card has grown. A card with nothing held back (a short repository,
- *   or a live search's uncapped answer) keeps the bar a plain door instead. The
+ *   the repository's skills uncapped — the same rows, the same surface, so the
+ *   card reads as having grown downward rather than as a popup over it. The
  *   panel floats (it is portaled and overlaying), so the grid's layout does not
  *   move: the neighbours keep their places, and the panel dismisses on an
  *   outside press or Esc. The reader who wants the full-page reading —
@@ -97,9 +93,8 @@ export interface RepoCardRow {
  *   reaches it from the panel's own footer bar (see `RepoPage`); the store's
  *   page lists everything the repository publishes, the installed list's opens
  *   on the skills of it that are on disk, the rest of the catalogue one control
- *   away from there. The accessible name keeps the repository-and-total
- *   phrasing: it names the content the press reveals, whichever reading the
- *   bar takes.
+ *   away from there. A card with skills left over says so by carrying the count
+ *   its own list knows inside the bar's label.
  *
  * The bar is the card's only repository-level control, and it deliberately does
  * not carry an "open on GitHub" button. That button is a second link for the
@@ -250,13 +245,9 @@ export function RepoCard({
   // A live skills.sh source has no in-app page: its door is an external URL
   // that opens in the system browser.
   const externalDoor = door != null && door.startsWith("http");
-  // The skills the bar can still reveal: what the preview cap holds back. The
-  // expansion exists for exactly these — a card whose body already lists the
-  // whole repository has nothing to grow into, and its bar stays a plain door.
-  const hiddenCount = hasQuery ? 0 : Math.max(0, skills.length - shown.length);
-  // The bar's identity cluster, shared by every reading of the bar: who
-  // published this, and how much the repository weighs.
-  const doorIdentity = (
+  // The door bar's content: who published this, and how many skills the card
+  // lists.
+  const doorBar = (
     <>
       {/* The identity is a size step above the rows: a 24px face and a
           14px name against the rows' 13px names and 13px glyphs. The bar
@@ -289,35 +280,27 @@ export function RepoCard({
           {formatCount(stars)}
         </span>
       )}
+      {/* The door, labelled with what it opens: the count is the door's
+          *object*, so it is written inside the door's own phrase rather
+          than standing beside it as a second figure with a separator
+          between them — one phrase, one entity, and no bare 「N 个」 for
+          the reader to disambiguate against the rows on screen. The noun
+          comes from the app's own voice (`N 个 skill`, the same words the
+          bar's own accessible name and the repository page's header use),
+          which is also what settles 全部: 「全部 1 个」 reads badly for a
+          repository with one skill, while 「1 个 skill」 reads the same as
+          every other count. The chevron carries the "go" the way every
+          other deeper affordance in the app does, and the total is always
+          the repository's own — which is what lets a capped list read as
+          "these of them": the reader counts the rows on screen and compares. */}
+      <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
+        {t("state.skillCount", { count: skills.length })}
+        <ChevronRight
+          className="h-3 w-3 transition-transform group-hover/head:translate-x-0.5"
+          aria-hidden
+        />
+      </span>
     </>
-  );
-  // The right cluster of a *navigating* bar — an external door, or the plain
-  // door a card falls back to when nothing is held back: the count is the
-  // door's *object*, written inside the door's own phrase (the app's own
-  // 「N 个 skill」), and the chevron carries the "go" the way every other
-  // deeper affordance in the app does.
-  const doorCount = (
-    <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
-      {t("state.skillCount", { count: skills.length })}
-      <ChevronRight
-        className="h-3 w-3 transition-transform group-hover/head:translate-x-0.5"
-        aria-hidden
-      />
-    </span>
-  );
-  // The right cluster of the *expanding* bar: what is still hidden, and the
-  // way down. 「+N」 states the remainder rather than the total — the reader
-  // counts the rows on screen and adds — and the chevron points at where the
-  // card grows, rotating once it has. The accessible name keeps the
-  // repository-and-total phrasing: it names the content the press reveals.
-  const doorMore = (
-    <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
-      +{hiddenCount}
-      <ChevronDown
-        className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")}
-        aria-hidden
-      />
-    </span>
   );
 
   // The card's rows, shared by the body and the expansion panel: the same
@@ -505,18 +488,16 @@ export function RepoCard({
               }
               className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              {doorIdentity}
-              {doorCount}
+              {doorBar}
             </a>
-          ) : hiddenCount > 0 ? (
+          ) : (
             /* The bar is the expansion's trigger, not a route: pressing it
-                opens the panel anchored to the card — the skills the preview
-                held back, in the same rows — and the panel's footer bar is the
+                opens the panel anchored to the card — the repository's skills
+                uncapped, in the same rows — and the panel's footer bar is the
                 way to the repository's page, so the navigation the bar used to
-                do is one press further in rather than gone. The accessible
-                name keeps the Link's phrasing (repository, and the total it
-                holds); the visible cluster is the remainder, 「+N」, pointing
-                down. */
+                do is one press further in rather than gone. The trigger keeps
+                the Link's accessible name and classes; only the element and
+                the behaviour change. */
             <Popover
               open={expanded}
               onOpenChange={(open) => setExpanded(open)}
@@ -535,8 +516,7 @@ export function RepoCard({
                 }
                 className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                {doorIdentity}
-                {doorMore}
+                {doorBar}
               </PopoverTrigger>
               {/* The panel reads as the card grown downward, and everything
                   about it is pointed at that illusion: anchored to the card
@@ -575,14 +555,14 @@ export function RepoCard({
                 }
                 className="min-w-0 gap-0 overflow-hidden rounded-t-none rounded-b-xl bg-card p-0 text-popover-foreground shadow-lg ring-foreground/10"
               >
-                {/* The skills the card's preview held back — the panel is the
-                    rest of the card, not a second card: the rows already on
-                    screen stay where they are, and the panel adds to them. The
-                    panel scrolls when the remainder is taller than the viewport
-                    allows; the footer bar stays pinned under it. A row press
-                    here closes the panel on its way to the detail drawer. */}
+                {/* The repository's rows, uncapped — the cap governs the
+                    card's preview, not the panel, which is the card's own
+                    answer to "and the rest?". The panel scrolls when the list
+                    is taller than the viewport allows; the footer bar stays
+                    pinned under it. A row press here closes the panel on its
+                    way to the detail drawer. */}
                 <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-1 pb-2">
-                  {renderRows(skills.slice(shown.length), (key) => {
+                  {renderRows(skills, (key) => {
                     setExpanded(false);
                     onOpenSkill(key);
                   })}
@@ -603,28 +583,6 @@ export function RepoCard({
                 </Link>
               </PopoverContent>
             </Popover>
-          ) : (
-            /* Nothing held back: the card already lists the whole repository
-                (a short one, or a live search's uncapped answer), so there is
-                nothing to grow into and the bar stays the plain door it was. */
-            <Link
-              to={door}
-              aria-label={
-                repo
-                  ? t("state.viewRepoAria", {
-                      repo,
-                      count: skills.length,
-                    })
-                  : t("state.viewPoolAria", {
-                      name,
-                      count: skills.length,
-                    })
-              }
-              className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              {doorIdentity}
-              {doorCount}
-            </Link>
           )}
           {/* The bar's one companion control: a sibling of the door, never a
               child, so a press on it cannot also expand the card. The installed

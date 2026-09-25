@@ -138,7 +138,7 @@ describe("MySkillsPage", () => {
     // No install has a recorded source, so every skill lives in one pool card:
     // it lists the preview size, and its bar states the total.
     expect(await screen.findByText("本地安装")).toBeInTheDocument();
-    expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.getByText("6 个 skill")).toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
     ).toHaveLength(5);
@@ -166,7 +166,7 @@ describe("MySkillsPage", () => {
     // The sixth is past the pool card's preview: the bar's own total accounts
     // for it, and the bar's door is where it is listed whole.
     expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
-    expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.getByText("6 个 skill")).toBeInTheDocument();
   });
 
   it("caps a repository's card at the preview size and states its total", async () => {
@@ -190,9 +190,9 @@ describe("MySkillsPage", () => {
     const bar = await screen.findByRole("button", {
       name: "查看仓库 acme/tools，6 个 skill",
     });
-    expect(bar).toHaveTextContent("+1");
+    expect(bar).toHaveTextContent("6 个 skill");
     // The card lists the first five; the sixth is past the cap, accounted for
-    // by the bar's own remainder figure.
+    // by the bar's own total.
     expect(
       screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
     ).toHaveLength(5);
@@ -200,8 +200,7 @@ describe("MySkillsPage", () => {
     // The expansion leads to the repository as *this* list reads it — the
     // installs on disk — and not to the store's page for the same repository,
     // which is one deliberate step further in (see `RepoPage`); the panel's
-    // footer is the way on, and its row is the one skill the preview held
-    // back — the rest of the card, not a second card.
+    // footer is the way on, and its rows are the whole six, uncapped.
     const user = userEvent.setup();
     await user.click(bar);
     const panel = screen.getByRole("dialog");
@@ -210,8 +209,7 @@ describe("MySkillsPage", () => {
     ).toHaveAttribute("href", "/my-skills/repo/acme/tools");
     expect(
       within(panel).getAllByRole("button", { name: /查看 .+ 详情/ }),
-    ).toHaveLength(1);
-    expect(within(panel).getByText("frontend-design")).toBeInTheDocument();
+    ).toHaveLength(6);
   });
 
   it("removes a skill from its detail panel and updates the stats", async () => {
@@ -512,7 +510,7 @@ describe("MySkillsPage", () => {
 
     // The sourced skill gets a card of its own, and its bar is the door to the
     // repository: the owner's face, the repo path, and the count.
-    const bar = await screen.findByRole("link", {
+    const bar = await screen.findByRole("button", {
       name: /^查看仓库 anthropics\/skills/,
     });
     expect(bar).toHaveTextContent("anthropics/skills");
@@ -533,7 +531,7 @@ describe("MySkillsPage", () => {
     // The provenance query lands asynchronously and moves pdf into its own
     // repository card; wait for that reshuffle to settle before clicking, so
     // the row is not detached mid-press.
-    await screen.findByRole("link", {
+    await screen.findByRole("button", {
       name: /^查看仓库 anthropics\/skills/,
     });
 
@@ -554,7 +552,7 @@ describe("MySkillsPage", () => {
     renderPage();
     // Same wait: the provenance-driven regroup settles before the click.
     await screen.findByText("pdf");
-    await screen.findByRole("link", {
+    await screen.findByRole("button", {
       name: /^查看仓库 anthropics\/skills/,
     });
 
@@ -627,7 +625,7 @@ describe("MySkillsPage", () => {
     renderPage();
 
     expect(
-      await screen.findByRole("link", {
+      await screen.findByRole("button", {
         name: /^查看仓库 anthropics\/skills/,
       }),
     ).toBeInTheDocument();
@@ -676,7 +674,7 @@ describe("MySkillsPage", () => {
     // lives in its own repository card, whose bar names the source, and the
     // affordance is gone.
     expect(
-      await screen.findByRole("link", {
+      await screen.findByRole("button", {
         name: /^查看仓库 anthropics\/skills/,
       }),
     ).toBeInTheDocument();
@@ -725,7 +723,7 @@ describe("MySkillsPage", () => {
       ).toBe("anthropics/skills"),
     );
     // And pdf's card now names the source it was linked to on its own.
-    await screen.findByRole("link", {
+    await screen.findByRole("button", {
       name: /^查看仓库 anthropics\/skills/,
     });
   });
@@ -905,17 +903,17 @@ describe("MySkillsPage", () => {
     ]);
 
     expect(
-      within(sections[0]).getByRole("link", {
+      within(sections[0]).getByRole("button", {
         name: "查看仓库 zoo/new，1 个 skill",
       }),
     ).toBeInTheDocument();
     expect(
-      within(sections[1]).getByRole("link", {
+      within(sections[1]).getByRole("button", {
         name: "查看本地安装，2 个 skill",
       }),
     ).toBeInTheDocument();
     expect(
-      within(sections[2]).getByRole("link", {
+      within(sections[2]).getByRole("button", {
         name: "查看仓库 acme/tools，3 个 skill",
       }),
     ).toBeInTheDocument();
@@ -944,7 +942,7 @@ describe("MySkillsPage", () => {
 
     const today = sections[0];
     expect(
-      within(today).getByRole("link", {
+      within(today).getByRole("button", {
         name: "查看仓库 acme/tools，2 个 skill",
       }),
     ).toBeInTheDocument();
@@ -1040,7 +1038,7 @@ describe("MySkillsPage", () => {
     ).toHaveLength(6);
     // No card, so no bar: nothing in this unit is a door to a repository.
     expect(screen.queryByRole("button", { name: /^查看仓库 / })).toBeNull();
-    expect(screen.queryByRole("link", { name: /^查看本地安装/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^查看本地安装/ })).toBeNull();
     // The enable switch rides the row, so both units manage the same skills.
     expect(screen.getAllByRole("switch")).toHaveLength(6);
   });
