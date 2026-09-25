@@ -68,7 +68,9 @@
     "enableAllAria": "全部开启（{{label}}）",
     "disableAllAria": "全部关闭（{{label}}）",
     "openOnGitHub": "在 GitHub 打开",
-    "operationFailed": "操作失败"
+    "operationFailed": "操作失败",
+    "openRepoPage": "打开仓库页",
+    "openLocalPage": "打开本地安装页"
   },
   "settings": {
     "title": "设置",
