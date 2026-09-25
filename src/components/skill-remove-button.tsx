@@ -72,10 +72,14 @@ export function SkillRemoveButton({
 
   return (
     <>
+      {/* Icon-only: the drawer header is an action strip where every control
+          keeps its label on hover, and the confirm dialog spells the action
+          out before anything destructive happens. */}
       <Button
         variant="outline"
-        size="sm"
+        size="icon-sm"
         title={t("action.remove")}
+        aria-label={t("action.remove")}
         onClick={(e) => {
           setOpen(true);
           e.stopPropagation();
@@ -83,7 +87,6 @@ export function SkillRemoveButton({
         className={className}
       >
         <Trash2 className="h-3.5 w-3.5" />
-        {t("action.remove")}
       </Button>
 
       <RemoveConfirmDialog

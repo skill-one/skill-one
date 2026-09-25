@@ -213,6 +213,8 @@
     "save": "保存",
     "edit": "编辑",
     "editSkill": "编辑 SKILL.md",
+    "viewOriginal": "查看原文",
+    "originalDescription": "原文",
     "loadFailed": "加载失败：{{message}}",
     "loadFailedHint": "该技能目录下可能没有可访问的 SKILL.md。"
   },

@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ExternalLink,
   Globe,
+  Languages,
   Loader2,
   Pencil,
 } from "lucide-react";
@@ -33,6 +34,12 @@ import { SkillInstalls } from "../skill-installs";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  PopoverTitle,
+} from "../ui/popover";
+import {
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -46,7 +53,6 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { OwnerAvatar } from "../owner-avatar";
-import { SkillCover } from "../skill-cover";
 import { SkillEnableSwitch } from "../skill-enable-switch";
 import { SkillInstallButton } from "../skill-install-button";
 import { SkillRemoveButton } from "../skill-remove-button";
@@ -398,10 +404,14 @@ export function SkillDetailPanel({
   const showStats = shown?.storeBacked !== false;
   // The registry's Chinese description wins for zh; the fetched frontmatter
   // description otherwise keeps its original precedence over the index one.
-  const description =
-    locale === "zh"
-      ? (shown?.descriptionZh || detail?.description || shown?.description)
-      : (detail?.description || shown?.description);
+  // When a translation is what the reader sees, the English original stays
+  // one click away behind the header's 查看原文 popover.
+  const translated = shown?.descriptionZh?.trim() || "";
+  const originalDescription = detail?.description || shown?.description || "";
+  const showingTranslation = locale === "zh" && translated !== "";
+  const description = showingTranslation
+    ? translated
+    : originalDescription;
   // The mirror-relative SKILL.md path, reused for the mirror's GitHub file
   // link and to resolve relative URLs inside the markdown body. Only a mirror
   // read has one — a local read's path is absolute and must never be resolved
@@ -458,13 +468,6 @@ export function SkillDetailPanel({
     <SheetContent className="data-[side=right]:sm:max-w-[min(48rem,55vw)]">
       <SheetHeader className="gap-2 px-6 pt-5">
         <div className="flex items-start gap-3">
-          {/* The same image the row leads with, at the drawer's size: the
-              skill's own slot, `SkillCover`'s letter standing in. */}
-          <SkillCover
-            repo={shown?.repo}
-            name={shown?.name}
-            className="h-14 w-14 shrink-0 text-2xl"
-          />
           <div className="min-w-0 flex-1">
             <SheetTitle className="truncate text-lg font-bold tracking-tight">
               {shown?.name}
@@ -516,15 +519,45 @@ export function SkillDetailPanel({
             is open. Served from the index immediately, refined by the
             fetched SKILL.md frontmatter once it lands. Long summaries clamp
             to three lines with an inline 展开, so a verbose description can
-            never push the tabs and the body out of the fixed header. */}
-        {description && <ExpandableDescription text={description} />}
-        {/* One meta row, in priority order: license/author, usage stats,
+            never push the tabs and the body out of the fixed header. When
+            zh shows the registry's translation, the English original stays
+            one click away behind a quiet 查看-原文 popover. */}
+        {description && (
+          <div className="flex items-start gap-1.5">
+            <div className="min-w-0 flex-1">
+              <ExpandableDescription text={description} />
+            </div>
+            {showingTranslation && originalDescription && (
+              <Popover>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t("detail.viewOriginal")}
+                      title={t("detail.viewOriginal")}
+                      className="mt-0.5 shrink-0 text-muted-foreground"
+                    >
+                      <Languages />
+                    </Button>
+                  }
+                />
+                <PopoverContent align="end" className="w-80">
+                  <PopoverTitle>
+                    {t("detail.originalDescription")}
+                  </PopoverTitle>
+                  <p className="max-h-72 overflow-y-auto text-[13px] leading-relaxed text-muted-foreground">
+                    {originalDescription}
+                  </p>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
+        )}
+        {/* One meta row, in priority order: author, usage stats,
             external links, provenance, and the profile chip. Everything
             provenance-shaped (hash, date, file path) hides behind 源. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] text-muted-foreground">
-          {detail?.license && (
-            <Badge variant="secondary">{detail.license}</Badge>
-          )}
           {detail?.author && <Badge variant="secondary">{detail.author}</Badge>}
           {/* The same install figure the list rows show. Shown for exactly
               the skills whose card shows it — the registry-backed ones — so

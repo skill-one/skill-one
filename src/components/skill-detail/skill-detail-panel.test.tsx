@@ -219,11 +219,11 @@ describe("SkillDetailPanel", () => {
       await screen.findByText("Use this skill for PDFs."),
     ).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    // The header leads with the skill's own image, not the author's avatar.
-    expect(screen.getByRole("img", { name: "pdf 封面图" })).toHaveAttribute(
-      "data-slot",
-      "skill-cover",
-    );
+    // The header leads with the skill's name itself; no cover slot stands
+    // in front of it.
+    expect(
+      screen.queryByRole("img", { name: "pdf 封面图" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("pdf")).toBeInTheDocument();
     // The author's avatar rides the repo line: who published the skill, next
     // to where it lives. It is decoration, so it never joins the link's name.
@@ -233,8 +233,10 @@ describe("SkillDetailPanel", () => {
         .querySelector('[data-slot="avatar"]'),
     ).not.toBeNull();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
-    expect(screen.getByText("MIT")).toBeInTheDocument();
+    // The author badge stays; the license is frontmatter detail the drawer
+    // no longer spends a meta chip on.
     expect(screen.getByText("Anthropic")).toBeInTheDocument();
+    expect(screen.queryByText("MIT")).not.toBeInTheDocument();
     // One install figure, exactly like the list rows: the skill's own count,
     // compacted, with the exact number on the title and the wording for
     // assistive tech hidden inside it.
@@ -322,14 +324,13 @@ describe("SkillDetailPanel", () => {
     expect(await screen.findByText("Local skill body.")).toBeInTheDocument();
     expect(mockFetchLocalSkillDetail).toHaveBeenCalledWith("my-tool");
     expect(mockFetchSkillDetail).not.toHaveBeenCalled();
-    // No repo → no links at all, a 本地安装 caption and a cover slot with no
-    // id to address a real image with (the skill's initial stands in); the
-    // disk path sits behind 本地文件, and no stats.
+    // No repo → no links at all and a 本地安装 caption; the disk path sits
+    // behind 本地文件, and no stats.
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("本地安装")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "my-tool 封面图" })).toHaveTextContent(
-      "m",
-    );
+    expect(
+      screen.queryByRole("img", { name: "my-tool 封面图" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(localDetail.path)).not.toBeInTheDocument();
     await user.hover(screen.getByText("本地文件"));
     const tip = await screen.findByRole("tooltip");
@@ -576,6 +577,33 @@ describe("SkillDetailPanel", () => {
     expect(await screen.findByText(detail.description)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "展开" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "收起" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the English original one popover away when a zh translation is shown", async () => {
+    const user = userEvent.setup();
+    renderDrawer({ skill: { ...skill, descriptionZh: "读取并合并 PDF 文档。" } });
+
+    // The zh suite locale shows the registry's translation in the header.
+    expect(
+      await screen.findByText("读取并合并 PDF 文档。"),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "查看原文" }));
+
+    // The popover carries the English original the translation replaced.
+    expect(
+      await screen.findByText("Read and merge PDF documents."),
+    ).toBeInTheDocument();
+  });
+
+  it("offers no original-description popover without a translation", async () => {
+    renderDrawer({});
+
+    // The header already shows the original text; a 查看原文 control would
+    // be an affordance to the very text on screen.
+    await screen.findByText("Read and merge PDF documents.");
+    expect(
+      screen.queryByRole("button", { name: "查看原文" }),
+    ).not.toBeInTheDocument();
   });
 });
 
