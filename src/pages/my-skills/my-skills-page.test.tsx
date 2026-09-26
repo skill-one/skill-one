@@ -1087,6 +1087,26 @@ describe("MySkillsPage", () => {
     ).toBeNull();
   });
 
+  it("labels each day group with quiet text, not a control", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("pdf");
+
+    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
+
+    // A day group only names the order — nothing to act on — so today's
+    // boundary is a small muted divider line, not a header to press: no fold,
+    // no count badge, no control anywhere on the label.
+    const today = screen.getByRole("region", { name: "今天" });
+    expect(within(today).queryByRole("button", { name: /今天/ })).toBeNull();
+    expect(within(today).queryByText(/个 skill/)).toBeNull();
+    expect(within(today).getByText("今天")).toHaveClass(
+      "text-xs",
+      "text-muted-foreground",
+    );
+  });
+
   it("files one source's several installs by time instead of folding them", async () => {
     const user = userEvent.setup();
     // Four installs share one source the registry still lists: where the old

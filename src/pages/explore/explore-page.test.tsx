@@ -807,90 +807,49 @@ describe("ExplorePage", () => {
         }
       ).instances.at(-1)?.trigger(true);
 
-    // Only the leading band mounts at first, and only with the first chunk:
-    // its header already states the band's full count.
+    // Only the leading band mounts at first, and only with the first chunk.
     const leading = await screen.findByRole("region", { name: "Top 25" });
-    expect(within(leading).getByText("25 个仓库")).toBeInTheDocument();
     expect(cardLinks()).toBe(6);
     expect(screen.queryByRole("region", { name: "26–50" })).not.toBeInTheDocument();
 
-    // Revealing to the bottom mounts the other bands with their true ranges
-    // and counts, keeping every card once.
+    // Revealing to the bottom mounts the other bands with their true ranges,
+    // keeping every card once.
     await waitFor(() => {
       triggerSentinel();
       expect(cardLinks()).toBe(71);
     });
-    const middle = screen.getByRole("region", { name: "26–50" });
-    const tail = screen.getByRole("region", { name: "51–71" });
-    expect(within(middle).getByText("25 个仓库")).toBeInTheDocument();
-    expect(within(tail).getByText("21 个仓库")).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "Top 25" })).getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(25);
+    expect(
+      within(screen.getByRole("region", { name: "26–50" })).getAllByRole("link", {
+        name: /^查看仓库 /,
+      }),
+    ).toHaveLength(25);
+    expect(
+      within(screen.getByRole("region", { name: "51–71" })).getAllByRole("link", {
+        name: /^查看仓库 /,
+      }),
+    ).toHaveLength(21);
+    expect(within(leading).getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(25);
   });
 
-  it("folds one rank band without touching the other bands", async () => {
+  it("labels each rank band with quiet text, not a control", async () => {
+    // A rank range only names the order — nothing to act on — so its caption
+    // is small muted text above the grid: no fold to press, no count badge,
+    // and no control anywhere in the caption row.
     bootGadgetRegistry();
     renderExplorePage();
 
-    const triggerSentinel = () =>
-      (
-        globalThis.IntersectionObserver as unknown as {
-          instances: Array<{ trigger(intersecting?: boolean): void }>;
-        }
-      ).instances.at(-1)?.trigger(true);
-    await screen.findByRole("region", { name: "Top 25" });
-    await waitFor(() => {
-      triggerSentinel();
-      expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(71);
-    });
-
-    // Folding the leading band removes just its 25 cards; the folded header
-    // keeps its count, and the other bands stay put.
-    await userEvent.click(screen.getByRole("button", { name: /Top\s*25\s*25 个仓库/ }));
-    expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(46);
-    expect(screen.getByRole("region", { name: "26–50" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "51–71" })).toBeInTheDocument();
-
-    // Unfolding restores the grid whole.
-    await userEvent.click(screen.getByRole("button", { name: /Top\s*25\s*25 个仓库/ }));
-    await waitFor(() =>
-      expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(71),
+    const leading = await screen.findByRole("region", { name: "Top 25" });
+    // The caption carries no interactive element: there is nothing to fold.
+    expect(
+      within(leading).queryByRole("button", { name: /Top 25/ }),
+    ).toBeNull();
+    expect(within(leading).queryByText(/个仓库/)).toBeNull();
+    // The caption reads as the quiet line the design promises: small, muted,
+    // no badge.
+    expect(within(leading).getByText("Top 25")).toHaveClass(
+      "text-xs",
+      "text-muted-foreground",
     );
-  });
-
-  it("keeps revealing past a band folded partway down the answer", async () => {
-    // The regression: folding a band shrinks the list around the sentinel —
-    // the next revealed chunk mounts inside the folded panel, so nothing
-    // visibly grows and the sentinel never leaves the view. Only the
-    // observer re-arming on every extension keeps the reveal moving; the
-    // stall it answers used to strand the list one chunk past the fold,
-    // dead to further scrolling too.
-    bootGadgetRegistry();
-    renderExplorePage();
-
-    const cardLinks = () =>
-      screen.queryAllByRole("link", { name: /^查看仓库 / }).length;
-    const triggerSentinel = () =>
-      (
-        globalThis.IntersectionObserver as unknown as {
-          instances: Array<{ trigger(intersecting?: boolean): void }>;
-        }
-      ).instances.at(-1)?.trigger(true);
-
-    await screen.findByRole("region", { name: "Top 25" });
-    expect(cardLinks()).toBe(6);
-
-    // Folding the leading band takes its cards off the screen.
-    await userEvent.click(screen.getByRole("button", { name: /Top\s*25\s*25 个仓库/ }));
-    expect(cardLinks()).toBe(0);
-
-    // The fold leaves the sentinel in view. One intersection event must be
-    // enough: the reveal carries on by itself — through the chunk hidden in
-    // the folded panel — until the open bands below are fully mounted
-    // (25 + 21 cards; the folded band's 25 stay hidden).
-    triggerSentinel();
-    await waitFor(() => expect(cardLinks()).toBe(46));
-    expect(screen.getByRole("region", { name: "51–71" })).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "26–50" })).getByText("25 个仓库")).toBeInTheDocument();
   });
 
   it("keeps a repository answer of 25 or fewer as one flat grid", async () => {
