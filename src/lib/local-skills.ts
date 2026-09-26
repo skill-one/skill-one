@@ -129,6 +129,19 @@ export async function openInstalledSkillDir(name: string): Promise<void> {
 }
 
 /**
+ * Raised when an install cannot proceed because a same-named skill already
+ * exists locally (agents-skills' no-overwrite rule). Internal errors are
+ * English; the UI maps this class onto a localized message via its `code`.
+ */
+export class SkillAlreadyInstalledError extends Error {
+  readonly code = "SKILL_ALREADY_INSTALLED";
+  constructor(readonly skillName: string) {
+    super(`A skill named '${skillName}' is already installed.`);
+    this.name = "SkillAlreadyInstalledError";
+  }
+}
+
+/**
  * Install a single skill from its source GitHub repo (`owner/repo`) into the
  * global skills directory. Only the named skill is installed, never the entire
  * repo.
@@ -140,11 +153,10 @@ export async function openInstalledSkillDir(name: string): Promise<void> {
  * its anonymous rate limit does not apply (the store's skill name is the
  * directory name the source matches on). One source resolves to exactly one
  * skill, so a failure is this call's rejection and there is no outcome list
- * to inspect — the store's Ok
- * response does mean the skill is installed, and a same-named skill already on
- * disk comes back as `skipped` (0.17's no-overwrite rule), which is a no-op,
- * not a failure. In the browser this records the install in the mock store
- * instead.
+ * to inspect. A same-named skill already on disk comes back as `skipped`
+ * (0.17's no-overwrite rule), which this call surfaces as
+ * `SkillAlreadyInstalledError` — the existing skill is never re-labelled. In
+ * the browser this records the install in the mock store instead.
  *
  * `options.rev` is the store entry's content hash at install time (from the
  * registry index). It is recorded in the provenance ledger as the version
@@ -162,16 +174,16 @@ export async function installSkillFromSource(
 ): Promise<void> {
   if (isTauri()) {
     // The source carries the skill (`owner/repo@<skill>`), and a failure is
-    // this call's rejection — the backend has no outcome list to inspect. An
-    // install that comes back `skipped` is the no-overwrite no-op, and it is
-    // already the state the caller is driving the button to.
-    await installSkill(`${repo}@${name}`);
+    // this call's rejection — the backend has no outcome list to inspect. The
+    // no-overwrite outcome is an explicit error so no provenance is written.
+    const result = await installSkill(`${repo}@${name}`);
+    if (result.skipped) throw new SkillAlreadyInstalledError(name);
   } else {
     // Simulate a realistic download duration so the installing state is
     // observable in the browser demo; the real Tauri install fetches the skill
     // directory from GitHub.
     await new Promise((resolve) => setTimeout(resolve, MOCK_INSTALL_DELAY_MS));
-    installMockSkill(name);
+    if (installMockSkill(name)) throw new SkillAlreadyInstalledError(name);
   }
   // Record the install source in the app's provenance ledger — the only
   // store↔install association that survives (agents-skills keeps no install

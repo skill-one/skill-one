@@ -47,6 +47,7 @@
     "installed": "Installed",
     "retry": "Retry",
     "installFailed": "Install failed, please try again",
+    "alreadyInstalled": "A skill named {{name}} is already installed.",
     "removed": "Removed {{name}}",
     "remove": "Remove",
     "removeFailed": "Removal failed",
@@ -147,13 +148,16 @@
     "toggleAria": "{{name}} link switch"
   },
   "migration": {
-    "migrated": "Migrated to store version: {{repo}}",
-    "migrateFailed": "Migration failed",
-    "triggerAria": "Migrate {{name}} to its store version",
-    "badge": "Migratable",
-    "title": "Store entries with the same name",
-    "similarityTitle": "Description similarity (reference only, not a basis for migration)",
-    "hint": "Clicking an entry completes the migration and records the source permanently; local files never move. Similarity is for reference only."
+    "migrated": "Source linked: {{repo}}",
+    "migrateFailed": "Failed to link source",
+    "triggerAria": "Link {{name}} to its store source",
+    "badge": "Link source",
+    "subtitle": "Choose the source repository for {{name}}",
+    "tooltip": "Link source — local files unchanged",
+    "localLabel": "Local description",
+    "starsTitle": "Repository stars",
+    "similarity": "{{percent}}% similar description",
+    "footnote": "Only the source is recorded; local files stay unchanged."
   },
   "refresh": {
     "dataUpdated": "Skill data updated to the latest snapshot"

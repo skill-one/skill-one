@@ -73,6 +73,20 @@ export const MAX_CANDIDATES = 5;
 export const SIMILARITY_AUTO_LINK_THRESHOLD = 0.9;
 
 /**
+ * Best description similarity a skill can offer: the local wording may be in
+ * either language, so compare against the entry's English description and its
+ * Chinese translation (when present) and take the higher score. The displayed
+ * percentage and the ranking both read from this.
+ */
+function bestSimilarity(localDescription: string, skill: Skill): number {
+  const byEnglish = descriptionSimilarity(localDescription, skill.description);
+  const byChinese = skill.descriptionZh
+    ? descriptionSimilarity(localDescription, skill.descriptionZh)
+    : 0;
+  return Math.max(byEnglish, byChinese);
+}
+
+/**
  * Rank prepared namesakes by description similarity, most similar first,
  * capped. No similarity floor: a low score hides nothing — candidates sort
  * to the bottom of the list, and dropping them could hide the one correct
@@ -85,7 +99,7 @@ export function rankNamesakes(
   return namesakes
     .map((skill) => ({
       skill,
-      similarity: descriptionSimilarity(localDescription, skill.description),
+      similarity: bestSimilarity(localDescription, skill),
     }))
     .toSorted((a, b) => b.similarity - a.similarity)
     .slice(0, MAX_CANDIDATES);

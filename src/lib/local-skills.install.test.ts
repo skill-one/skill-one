@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   installSkillFromSource,
   MOCK_INSTALL_DELAY_MS,
+  SkillAlreadyInstalledError,
 } from "./local-skills";
 
 const { isTauri, installSkill, installMockSkill, recordSkillProvenance } =
@@ -19,7 +20,9 @@ vi.mock("./mock-local", () => ({ installMockSkill }));
 vi.mock("./provenance", () => ({ recordSkillProvenance }));
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  // resetAllMocks (not clearAllMocks): a mockReturnValue(true) set in one
+  // test must not leak into the next test's default undefined return.
+  vi.resetAllMocks();
 });
 
 afterEach(() => {
@@ -86,20 +89,18 @@ describe("installSkillFromSource", () => {
     ).rejects.toThrow("no directory named missing");
   });
 
-  it("treats an already-installed skill as a no-op, not a failure", async () => {
+  it("fails when a same-named skill is already installed (skipped outcome)", async () => {
     // Since agents-skills 0.17 `add` never overwrites: a same-named skill comes
-    // back as `skipped`, which must not read as a failure.
+    // back as `skipped`. It is surfaced as an error so the existing skill's
+    // provenance is never overwritten by the store row the user clicked.
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({ skill: "pdf", skipped: true });
 
-    await installSkillFromSource("anthropics/skills", "pdf", { rev: "rev-1" });
+    await expect(
+      installSkillFromSource("anthropics/skills", "pdf", { rev: "rev-1" }),
+    ).rejects.toBeInstanceOf(SkillAlreadyInstalledError);
 
-    // The skill is on disk, so its install source is still worth recording.
-    expect(recordSkillProvenance).toHaveBeenCalledWith(
-      "anthropics/skills",
-      "pdf",
-      "rev-1",
-    );
+    expect(recordSkillProvenance).not.toHaveBeenCalled();
   });
 
   it("records the install in the mock store outside Tauri", async () => {
@@ -119,6 +120,23 @@ describe("installSkillFromSource", () => {
       "pdf",
       undefined,
     );
+  });
+
+  it("fails when the mock store already holds the same name", async () => {
+    vi.useFakeTimers();
+    isTauri.mockReturnValue(false);
+    installMockSkill.mockReturnValue(true);
+
+    const pending = installSkillFromSource("anthropics/skills", "pdf");
+    // Attach the rejection handler before advancing timers, so the rejection
+    // is not momentarily unhandled.
+    const expectation = expect(pending).rejects.toBeInstanceOf(
+      SkillAlreadyInstalledError,
+    );
+    await vi.advanceTimersByTimeAsync(MOCK_INSTALL_DELAY_MS);
+    await expectation;
+
+    expect(recordSkillProvenance).not.toHaveBeenCalled();
   });
 
   it("does not record provenance when the install fails", async () => {

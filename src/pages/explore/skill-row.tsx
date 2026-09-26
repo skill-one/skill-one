@@ -213,13 +213,14 @@ export function SkillRow({
               className="size-5 shrink-0 text-[9px]"
             />
           )}
-          {showSource && !owner && (
-            <span className="truncate">{t("common.localInstall")}</span>
-          )}
+          {/* A source-less row: the extra owns the label (text + icon merged
+              into one trigger, or a plain statement with no candidates). */}
+          {showSource && !owner
+            ? extra ?? <span className="truncate">{t("common.localInstall")}</span>
+            : extra}
           {storeBacked && (
             <SkillInstalls skill={skill} className="w-16 justify-end" />
           )}
-          {extra}
         </div>
 
         {/* The corner action. Clicks on the slot stop here: the row body opens

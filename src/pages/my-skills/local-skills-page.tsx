@@ -204,7 +204,9 @@ export function LocalSkillsPage() {
         row.suggestion?.length ? (
           <LinkSuggestionBadge
             name={row.view.name}
+            localDescription={row.view.description}
             candidates={row.suggestion}
+            variant="icon"
           />
         ) : undefined
       }
