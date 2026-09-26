@@ -74,13 +74,14 @@ export function AppHeader() {
   const { pathname } = useLocation();
   const route = headerRoute(pathname);
 
-  // `h-12` is half of the alignment above: the window config's traffic-light
-  // `y` is this height over two, plus wry's 2px offset (48 / 2 + 2 = 26).
+  // `h-header` (3rem) is half of the alignment above: the window config's
+  // traffic-light `y` is this height over two, plus wry's 2px offset
+  // (48 / 2 + 2 = 26).
   return (
     <header
       data-tauri-drag-region="deep"
       className={cn(
-        "relative flex h-12 shrink-0 items-center gap-3 border-b border-border bg-background pr-8",
+        "relative flex h-header shrink-0 items-center gap-3 border-b border-border bg-background pr-8",
         isTauri() ? "pl-24" : "pl-8",
       )}
     >
