@@ -19,6 +19,7 @@ import {
   installSkill,
   linkAgents,
   listInstalledSkills,
+  openSkillDir,
   readSkillMd,
   writeSkillMd,
   removeSkills,
@@ -113,6 +114,18 @@ export async function saveLocalSkillMd(
     return;
   }
   setMockSkillMd(name, content);
+}
+
+/**
+ * Open an installed skill's directory in the system file manager. In Tauri the
+ * backend opens the real directory (resolved through its own `list`); a plain
+ * browser has no filesystem behind the mock store, so the call resolves as a
+ * no-op there.
+ */
+export async function openInstalledSkillDir(name: string): Promise<void> {
+  if (isTauri()) {
+    await openSkillDir(name);
+  }
 }
 
 /**

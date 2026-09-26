@@ -174,6 +174,17 @@ export async function writeSkillMd(
   await invoke("write_skill_md", { name, content });
 }
 
+/**
+ * Open an installed skill's directory in the system file manager. The backend
+ * resolves the name through its `list` and does the opening itself, so no
+ * path is ever interpolated from the frontend, disabled (parked) skills stay
+ * reachable, and the webview needs no general "open any path" permission.
+ */
+export async function openSkillDir(name: string): Promise<void> {
+  requireTauri();
+  await invoke("open_skill_dir", { name });
+}
+
 /** Remove installed skills; resolves with the names that actually went. */
 export async function removeSkills(skills: string[]): Promise<string[]> {
   requireTauri();

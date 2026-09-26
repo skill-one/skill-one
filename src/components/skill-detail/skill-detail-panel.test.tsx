@@ -12,6 +12,7 @@ import { formatDate } from "../../lib/utils";
 import {
   fetchInstalledSkills,
   fetchLocalSkillDetail,
+  openInstalledSkillDir,
   readLocalSkillRaw,
   removeInstalledSkill,
   saveLocalSkillMd,
@@ -35,6 +36,7 @@ vi.mock("../../lib/skill-detail-api", () => ({
 vi.mock("../../lib/local-skills", () => ({
   fetchLocalSkillDetail: vi.fn(),
   fetchInstalledSkills: vi.fn(),
+  openInstalledSkillDir: vi.fn(),
   readLocalSkillRaw: vi.fn(),
   removeInstalledSkill: vi.fn(),
   saveLocalSkillMd: vi.fn(),
@@ -66,6 +68,7 @@ vi.mock("./skill-editor", () => ({
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
 const mockFetchSkillZhDetail = vi.mocked(fetchSkillZhDetail);
 const mockFetchLocalSkillDetail = vi.mocked(fetchLocalSkillDetail);
+const mockOpenInstalledSkillDir = vi.mocked(openInstalledSkillDir);
 const mockReadLocalSkillRaw = vi.mocked(readLocalSkillRaw);
 const mockRemoveInstalledSkill = vi.mocked(removeInstalledSkill);
 const mockSaveLocalSkillMd = vi.mocked(saveLocalSkillMd);
@@ -187,6 +190,7 @@ beforeEach(() => {
   });
   mockFetchSkillDetail.mockReset();
   mockFetchLocalSkillDetail.mockReset();
+  mockOpenInstalledSkillDir.mockReset();
   mockReadLocalSkillRaw.mockReset();
   mockSaveLocalSkillMd.mockReset();
   mockSetSkillEnabled.mockReset();
@@ -761,5 +765,39 @@ describe("SkillDetailPanel editing", () => {
     fireEvent.change(editor, { target: { value: "   " } });
 
     expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+  });
+
+  it("opens the installed skill's directory next to the edit button", async () => {
+    const user = userEvent.setup();
+    mockOpenInstalledSkillDir.mockResolvedValue(undefined);
+    renderDrawer({ surface: "installed" });
+
+    await user.click(await screen.findByRole("button", { name: "打开文件夹" }));
+
+    expect(mockOpenInstalledSkillDir).toHaveBeenCalledWith("pdf");
+  });
+
+  it("reports a failed open as an error toast", async () => {
+    const user = userEvent.setup();
+    const toastSpy = vi.spyOn(toast, "add");
+    mockOpenInstalledSkillDir.mockRejectedValue(new Error("nope"));
+    renderDrawer({ surface: "installed" });
+
+    await user.click(await screen.findByRole("button", { name: "打开文件夹" }));
+
+    await waitFor(() =>
+      expect(toastSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "error" }),
+      ),
+    );
+  });
+
+  it("offers no open-folder affordance on the store surface", async () => {
+    renderDrawer({ surface: "store" });
+
+    await screen.findByText("Use this skill for PDFs.");
+    expect(
+      screen.queryByRole("button", { name: "打开文件夹" }),
+    ).not.toBeInTheDocument();
   });
 });

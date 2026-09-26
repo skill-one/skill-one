@@ -38,6 +38,7 @@ pub fn run() {
             skills::link_status,
             skills::read_skill_md,
             skills::write_skill_md,
+            skills::open_skill_dir,
             skills::compute_skill_hash,
             provenance::read_provenance,
             provenance::write_provenance,

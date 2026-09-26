@@ -533,6 +533,28 @@ pub async fn write_skill_md(name: String, content: String) -> Result<(), String>
     .await
 }
 
+/// Open an installed skill's directory in the system file manager.
+///
+/// The name is resolved through the same `list` the read/write commands use,
+/// so no path is ever interpolated from the frontend and disabled (parked)
+/// skills stay reachable. The opening itself happens here on the Rust side
+/// through the opener plugin, so the webview never gains a general "open any
+/// path" permission.
+#[tauri::command]
+pub async fn open_skill_dir(name: String) -> Result<(), String> {
+    run_blocking("open skill dir", move |manager| {
+        let listed = manager.list().map_err(|e| e.to_string())?;
+        let skill = listed
+            .into_iter()
+            .find(|s| s.name == name)
+            .ok_or_else(|| format!("skill {name} is not installed"))?;
+        let dir = manager.skill_dir(&skill);
+        tauri_plugin_opener::open_path(&dir, None::<&str>)
+            .map_err(|e| format!("open {}: {e}", dir.display()))
+    })
+    .await
+}
+
 /// Compute the skills.sh upstream content hash of a locally installed skill
 /// (see `skill_hash.rs` for the algorithm).
 ///
