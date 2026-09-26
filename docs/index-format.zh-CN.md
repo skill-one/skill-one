@@ -103,6 +103,6 @@ GitHub star 数**不在**技能行里：它存放在下文的 `upstream/repos.js
 
 技能详情 `SKILL.md` 从快照按 `skills/{id}/SKILL.md` 拉取，存在已记录标签时定址到该快照（否则用可变的 `dist` 分支），见 [../src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。
 
-快照还为部分 skill 附带中文页面，路径为 `profiles/{id}/skill_zh.md`（索引行没有对应标记，文件是否存在是唯一信号）。中文模式下详情抽屉的正文以该页面为主，英文 `SKILL.md` 只在读者通过「查看原文」切换时才拉取；未翻译的 skill 则立即拉取英文正文（磁盘读取始终只读英文文件）。这次中文页拉取与 repos 旁车一样是装饰性的：页面缺失、网络故障或服务端错误都会把正文交还给英文原文。
+快照还为部分 skill 附带中文页面，路径为 `profiles/{id}/skill_zh.md`（索引行没有对应标记，文件是否存在是唯一信号）。中文模式下详情抽屉的正文以该页面为主，英文 `SKILL.md` 只在读者通过头部的「查看原文」开关把整个抽屉切回原文（描述与正文由同一个开关一起切换）时才拉取；未翻译的 skill 则立即拉取英文正文（磁盘读取始终只读英文文件）。这次中文页拉取与 repos 旁车一样是装饰性的：页面缺失、网络故障或服务端错误都会把正文交还给英文原文。
 
 Owner 头像（skill 卡片元信息行上的作者头像，以及详情抽屉仓库行上的仓库所有者头像）从快照按 `upstream/avatars/{owner}.png` 拉取，走同一条下载源回退链，存在已记录标签时定址到该快照，见 [../src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx)。头像本身只是装饰：详情抽屉的仓库行与卡片的信息行都会把仓库名以文本形式紧邻显示，头像自带的浮窗（见 [../src/components/repo-hover-card.tsx](../src/components/repo-hover-card.tsx)）则额外给出其 Star 数，因此头像对辅助技术隐藏。

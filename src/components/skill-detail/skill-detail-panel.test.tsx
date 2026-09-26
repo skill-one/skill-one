@@ -595,30 +595,42 @@ describe("SkillDetailPanel", () => {
     expect(screen.queryByRole("button", { name: "收起" })).not.toBeInTheDocument();
   });
 
-  it("keeps the English original one popover away when a zh translation is shown", async () => {
+  it("flips the header description to the original through the unified toggle", async () => {
     const user = userEvent.setup();
     renderDrawer({ skill: { ...skill, descriptionZh: "读取并合并 PDF 文档。" } });
 
-    // The zh suite locale shows the registry's translation in the header.
+    // The zh suite locale shows the registry's translation in the header, and
+    // the drawer's one toggle sits in the header's action row.
     expect(
       await screen.findByText("读取并合并 PDF 文档。"),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "查看原文" }));
 
-    // The popover carries the English original the translation replaced.
+    // The English original replaces the translation in place — no popover
+    // layer; the toggle now offers the way back.
     expect(
-      await screen.findByText("Read and merge PDF documents."),
+      screen.getByText("Read and merge PDF documents."),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText("读取并合并 PDF 文档。"),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "查看译文" }));
+    expect(screen.getByText("读取并合并 PDF 文档。")).toBeInTheDocument();
   });
 
-  it("offers no original-description popover without a translation", async () => {
+  it("offers no translation toggle without any translation", async () => {
     renderDrawer({});
 
-    // The header already shows the original text; a 查看原文 control would
-    // be an affordance to the very text on screen.
+    // The header already shows the original text and the snapshot ships no
+    // Chinese page, so a toggle would be an affordance to the very content
+    // on screen.
     await screen.findByText("Read and merge PDF documents.");
     expect(
       screen.queryByRole("button", { name: "查看原文" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "查看译文" }),
     ).not.toBeInTheDocument();
   });
 });
@@ -697,6 +709,36 @@ describe("SkillDetailPanel Chinese page", () => {
     await user.click(screen.getByRole("button", { name: "查看原文" }));
     expect(screen.getByText("Use this skill for PDFs.")).toBeInTheDocument();
     expect(mockFetchSkillDetail).toHaveBeenCalledTimes(1);
+  });
+
+  it("swaps the description and the body together on one toggle", async () => {
+    const user = userEvent.setup();
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    renderDrawer({ skill: { ...skill, descriptionZh: "读取并合并 PDF 文档。" } });
+
+    // Both parts start on the snapshot's translations: the registry's
+    // description in the header, the Chinese page in the body (which lands
+    // with its own fetch, hence the async find).
+    expect(
+      await screen.findByText("读取并合并 PDF 文档。"),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("使用此技能处理 PDF。")).toBeInTheDocument();
+
+    // One flip moves both to the originals — the drawer never mixes
+    // languages.
+    await user.click(screen.getByRole("button", { name: "查看原文" }));
+    expect(screen.getByText("Read and merge PDF documents.")).toBeInTheDocument();
+    expect(
+      screen.queryByText("读取并合并 PDF 文档。"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Use this skill for PDFs.")).toBeInTheDocument();
+    expect(screen.getByText("SKILL.md")).toBeInTheDocument();
+
+    // And one flip back restores both.
+    await user.click(screen.getByRole("button", { name: "查看译文" }));
+    expect(screen.getByText("读取并合并 PDF 文档。")).toBeInTheDocument();
+    expect(await screen.findByText("使用此技能处理 PDF。")).toBeInTheDocument();
+    expect(screen.getByText("skill_zh.md")).toBeInTheDocument();
   });
 
   it("falls back to the English body, fetched on the spot, when the snapshot ships no Chinese page", async () => {
