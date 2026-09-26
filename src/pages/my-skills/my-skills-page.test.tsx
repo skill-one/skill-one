@@ -1103,7 +1103,7 @@ describe("MySkillsPage", () => {
     expect(within(today).queryByText(/个 skill/)).toBeNull();
     expect(within(today).getByText("今天")).toHaveClass(
       "text-xs",
-      "text-muted-foreground",
+      "text-muted-foreground/70",
     );
   });
 

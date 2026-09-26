@@ -38,7 +38,7 @@ export function GroupSection({
     <section aria-label={label}>
       <p
         aria-hidden="true"
-        className="py-0.5 text-xs leading-none text-muted-foreground"
+        className="py-0.5 text-xs leading-none text-muted-foreground/70"
       >
         {label}
       </p>

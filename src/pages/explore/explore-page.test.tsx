@@ -848,7 +848,7 @@ describe("ExplorePage", () => {
     // no badge.
     expect(within(leading).getByText("Top 25")).toHaveClass(
       "text-xs",
-      "text-muted-foreground",
+      "text-muted-foreground/70",
     );
   });
 
