@@ -411,8 +411,8 @@ export function RepoCard({
         </CardContent>
 
         {/* The card's one bar: what this repository is, how big it is, and the
-            way in. `mt-auto` keeps it on the bottom edge when the plain-grid
-            fallback stretches a short card to its neighbour's height. An
+            way in. `mt-auto` keeps it on the bottom edge when the grid
+            stretches a short card to its neighbour's height. An
             external door (a live source the store has no page for) opens in
             the system browser — the same bar, the same label, one step
             further out. */}
