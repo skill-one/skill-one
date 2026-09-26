@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-import { fetchSkillDetail, parseFrontmatter } from "./skill-detail-api";
+import {
+  fetchSkillDetail,
+  fetchSkillZhDetail,
+  parseFrontmatter,
+  zhSkillPath,
+} from "./skill-detail-api";
 import { setIndexTag } from "./cdn-config";
 
 const fetchMock = vi.fn();
@@ -208,5 +213,89 @@ describe("fetchSkillDetail", () => {
     ).rejects.toThrow(
       /Unable to fetch SKILL\.md for pdf.*HTTP 502/,
     );
+  });
+});
+
+describe("zhSkillPath", () => {
+  it("maps the index directory to the snapshot's Chinese page path", () => {
+    expect(zhSkillPath("skills/vercel-labs/skills/find-skills")).toBe(
+      "profiles/vercel-labs/skills/find-skills/skill_zh.md",
+    );
+  });
+
+  it("tolerates a trailing slash on the index directory", () => {
+    expect(zhSkillPath("skills/vercel-labs/skills/find-skills/")).toBe(
+      "profiles/vercel-labs/skills/find-skills/skill_zh.md",
+    );
+  });
+
+  it("answers null for a path the snapshot cannot have a translation for", () => {
+    expect(zhSkillPath("profiles/a/b/c")).toBeNull();
+    expect(zhSkillPath(undefined)).toBeNull();
+  });
+});
+
+describe("fetchSkillZhDetail", () => {
+  it("fetches the Chinese page from the profiles directory of the snapshot", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).endsWith("profiles/vercel-labs/skills/find-skills/skill_zh.md")
+        ? ok("# 查找技能\n\n中文正文。")
+        : notFound(),
+    );
+
+    const detail = await fetchSkillZhDetail(
+      "vercel-labs/skills",
+      "find-skills",
+      "skills/vercel-labs/skills/find-skills",
+    );
+
+    // The Chinese page ships without frontmatter, so the parsed description
+    // is empty and the whole file is the body.
+    expect(detail).toEqual({
+      description: "",
+      license: undefined,
+      author: undefined,
+      instructions: "# 查找技能\n\n中文正文。",
+      path: "profiles/vercel-labs/skills/find-skills/skill_zh.md",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/profiles/vercel-labs/skills/find-skills/skill_zh.md",
+      { signal: expect.anything() },
+    );
+  });
+
+  it("pins the fetch to the recorded snapshot tag", async () => {
+    setIndexTag("dist-2026-09-25-9");
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).endsWith("profiles/a/b/c/skill_zh.md") ? ok("正文") : notFound(),
+    );
+
+    await fetchSkillZhDetail("a/b", "c", "skills/a/b/c");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://raw.githubusercontent.com/skill-one/skills-profiles/dist-2026-09-25-9/profiles/a/b/c/skill_zh.md",
+      { signal: expect.anything() },
+    );
+  });
+
+  it("answers null when the snapshot ships no Chinese page", async () => {
+    fetchMock.mockResolvedValue(notFound());
+
+    await expect(
+      fetchSkillZhDetail("a/b", "c", "skills/a/b/c"),
+    ).resolves.toBeNull();
+  });
+
+  it("answers null on a network failure instead of throwing", async () => {
+    fetchMock.mockRejectedValue(new TypeError("network down"));
+
+    await expect(
+      fetchSkillZhDetail("a/b", "c", "skills/a/b/c"),
+    ).resolves.toBeNull();
+  });
+
+  it("answers null when there is no index path to derive the page from", async () => {
+    await expect(fetchSkillZhDetail("a/b", "c")).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

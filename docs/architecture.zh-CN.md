@@ -30,7 +30,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 - **`src/lib/registry/`**：把注册表当作一个服务来访问——`client.ts` 是 `worker.ts` 在主线程的代理，`index-stream.ts` 先探测已发布快照再流式拉取并解析 `skills.jsonl`（逐行解析，下载进行中即可逐步拿到 skill），`worker-controller.ts` 应答分组浏览、搜索与元数据查询，`cache.ts` 持久化解析结果。调用方经由它完成过滤与分组，自身不持有全量注册表。
 - **`src/lib/search-index.ts`**：整个商店唯一的搜索入口——基于 MiniSearch，对技能名称建索引，技能注册表与已安装技能列表共用。它定义了什么算命中（见「浏览技能列表」第 9 条），直接用 MiniSearch 自带的分词；`src/lib/search-skills.ts` 在它之上叠加注册表自己的排序（名称分层、安装量）。仓库与描述都不是搜索字段。注册表的大索引在 worker 里构建，条目很少的页面级列表在 `useMemo` 里构建。
-- **`src/lib/skill-detail-api.ts`**：按需拉取单个 skill 的 `SKILL.md`，解析 frontmatter 与正文。
+- **`src/lib/skill-detail-api.ts`**：按需拉取单个 skill 的 `SKILL.md`，解析 frontmatter 与正文；同时拉取快照可选的中文页面（`profiles/{id}/skill_zh.md`），中文模式下详情正文以它为主。
 - **`src/lib/cdn-config.ts`**：管理下载源。默认直连 `raw.githubusercontent.com`，失败后回退到 CDN 镜像（`cdn.jsdmirror.com`），并支持用户在「设置」中配置自定义 CDN。候选地址按优先级依次尝试——包括响应体中途失败时——配置持久化到 localStorage。
 
 读取数据通过 TanStack Query 缓存（`staleTime` 10 分钟、`gcTime` 无限），重启后可先从缓存渲染再后台刷新。每个候选请求带 10 秒超时，仅守护响应头；流式响应体另有分块间的停滞超时（数 MB 的下载本就可能超过任何固定上限）。注册表索引还有两层专属持久化，都在 worker 内部：IndexedDB 里的解析结果，以及它所定址的标签（见「浏览 skill 列表」）；两者合起来让一次启动在「上游没有新发布」时完全跳过下载。已安装列表、agent 状态等小体量查询由 TanStack Query 落盘；解析后的索引体积远超 WebView localStorage 配额，刻意排除在外。
