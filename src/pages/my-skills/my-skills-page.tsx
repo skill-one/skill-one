@@ -486,15 +486,14 @@ export function MySkillsPage() {
             // newest first. The same row a repository's own page lists, so a
             // skill reads the same wherever it is found. A day group only
             // names the order — nothing to act on — so its boundary is one
-            // quiet divider line between the rows, not a header over them;
-            // the drawer still walks every row in the same flat newest-first
-            // order.
+            // small muted line at the group's start, not a header over the
+            // rows; the drawer still walks every row in the same flat
+            // newest-first order.
             <div className="flex flex-col gap-6">
               {shownSkillGroups.map((group) => (
                 <GroupSection
                   key={group.key}
                   label={groupHeading(group, t)}
-                  variant="divider"
                 >
                   <ul className={SKILL_ROW_LIST_CLASS}>
                     {group.items.map((row) => {
@@ -535,7 +534,6 @@ export function MySkillsPage() {
                 <GroupSection
                   key={group.key}
                   label={groupHeading(group, t)}
-                  variant="caption"
                 >
                   <ul className={REPO_LIST_CLASS}>
                     {group.items.map((card) => (
