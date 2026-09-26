@@ -4,10 +4,12 @@ import userEvent from "@testing-library/user-event";
 
 import { LocalSkillsPage } from "./local-skills-page";
 import { renderWithRouter } from "../../test/test-utils";
+import { resetListView, setQuery } from "../../lib/list-view";
 import {
   resetMockAgentStatus,
   resetMockInstalledSkills,
   setMockSkillEnabled,
+  setMockSkillInstalledAt,
 } from "../../lib/mock-local";
 import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
 import { resetLinkSuggestions } from "../../lib/link-suggestions";
@@ -51,8 +53,15 @@ describe("LocalSkillsPage", () => {
     resetMockInstalledSkills();
     resetMockAgentStatus();
     resetMockProvenance();
+    resetListView();
     window.localStorage.clear();
   });
+
+  /** The pool's rows, as their detail buttons read, in document order. */
+  const rowNames = async () =>
+    (
+      await screen.findAllByRole("button", { name: /查看 .+ 详情/ })
+    ).map((button) => button.getAttribute("aria-label"));
 
   it("lists the pool whole, with the source stated once in the head", async () => {
     renderWithRouter(<LocalSkillsPage />, { route: "/my-skills/local" });
@@ -71,6 +80,98 @@ describe("LocalSkillsPage", () => {
     ).toHaveLength(6);
     // An enumeration, not a ranking: the first row's number carries no medal.
     expect(screen.getByText("1").className).not.toContain("text-amber-500");
+  });
+
+  it("lists the pool newest install first, the order the card showed it in", async () => {
+    // Stamp the installs so disk order (the mock's own listing) and install
+    // time disagree — the card on the installed list reads them by time, so
+    // the page does too, and a stampless record trails rather than keeping
+    // its disk position.
+    setMockSkillInstalledAt("pdf", 1_000);
+    setMockSkillInstalledAt("docx", null);
+    setMockSkillInstalledAt("pptx", 5_000);
+    setMockSkillInstalledAt("mcp-builder", 3_000);
+    setMockSkillInstalledAt("code-review", 4_000);
+    setMockSkillInstalledAt("frontend-design", 2_000);
+    renderWithRouter(<LocalSkillsPage />, { route: "/my-skills/local" });
+
+    await waitFor(async () =>
+      expect(await rowNames()).toHaveLength(NAMES.length),
+    );
+    // Install time desc: pptx, code-review, mcp-builder, frontend-design,
+    // pdf; the stampless docx trails — exactly as it would trail on the card.
+    expect(await rowNames()).toEqual([
+      "查看 pptx 详情",
+      "查看 code-review 详情",
+      "查看 mcp-builder 详情",
+      "查看 frontend-design 详情",
+      "查看 pdf 详情",
+      "查看 docx 详情",
+    ]);
+  });
+
+  it("opens on the matches and folds the pool's other rows beneath a rule", async () => {
+    const user = userEvent.setup();
+    // The query is set before the page mounts, exactly the state the shared
+    // search box is in when the pool card's door walks through to this page.
+    setQuery("pdf");
+    renderWithRouter(<LocalSkillsPage />, { route: "/my-skills/local" });
+
+    // Only the match is listed, with the matched term highlighted.
+    await waitFor(async () =>
+      expect(await rowNames()).toEqual(["查看 pdf 详情"]),
+    );
+    const match = screen
+      .getByRole("button", { name: "查看 pdf 详情" })
+      .closest("li") as HTMLElement;
+    expect(match.querySelector("mark")).not.toBeNull();
+
+    // The fold names exactly what unfolding adds.
+    const fold = screen.getByRole("button", {
+      name: "查看其他 5 个已安装 skill",
+    });
+    expect(fold).toHaveAttribute("aria-expanded", "false");
+    expect(fold).toHaveAttribute("aria-controls", "pool-other-skills");
+
+    // One press continues the pool beneath the match, in its own order
+    // (newest install first), numbering on rather than starting over.
+    await user.click(fold);
+    await waitFor(async () => expect(await rowNames()).toHaveLength(6));
+    expect(await rowNames()).toEqual([
+      "查看 pdf 详情",
+      "查看 docx 详情",
+      "查看 pptx 详情",
+      "查看 mcp-builder 详情",
+      "查看 code-review 详情",
+      "查看 frontend-design 详情",
+    ]);
+    expect(fold).toHaveTextContent("收起其他 5 个已安装 skill");
+
+    // A second press folds the others away; the match is exactly as it was.
+    await user.click(fold);
+    await waitFor(async () =>
+      expect(await rowNames()).toEqual(["查看 pdf 详情"]),
+    );
+  });
+
+  it("widens to the ordinary pool when the query answers nothing", async () => {
+    setQuery("nothing-the-pool-has");
+    renderWithRouter(<LocalSkillsPage />, { route: "/my-skills/local" });
+
+    // No matches here: rather than opening on an empty answer, the page is
+    // the pool whole, newest install first, with nothing folded.
+    await waitFor(async () => expect(await rowNames()).toHaveLength(6));
+    expect(await rowNames()).toEqual([
+      "查看 pdf 详情",
+      "查看 docx 详情",
+      "查看 pptx 详情",
+      "查看 mcp-builder 详情",
+      "查看 code-review 详情",
+      "查看 frontend-design 详情",
+    ]);
+    expect(
+      screen.queryByRole("button", { name: /已安装 skill$/ }),
+    ).toBeNull();
   });
 
   it("leaves a placed install to the installed list", async () => {

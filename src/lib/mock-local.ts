@@ -136,6 +136,20 @@ export function setMockSkillEnabled(name: string, enabled: boolean): void {
 }
 
 /**
+ * Overwrite a mock skill's install time (Unix seconds), standing in for the
+ * birth time a real directory carries — or `null` for a filesystem that
+ * records none.
+ */
+export function setMockSkillInstalledAt(
+  name: string,
+  installedAt: number | null,
+): void {
+  mockSkills = mockSkills.map((s) =>
+    s.name === name ? { ...s, installedAt } : s,
+  );
+}
+
+/**
  * The raw SKILL.md text of a mock skill — what the editor loads. Returns the
  * saved override when one exists, otherwise synthesizes a minimal document
  * (frontmatter + a body) so a never-edited skill still opens for editing.

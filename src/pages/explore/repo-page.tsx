@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronUp, ExternalLink, Star } from "lucide-react";
+import { ExternalLink, Star } from "lucide-react";
+
+import { FoldRule } from "../../components/fold-rule";
 
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
@@ -23,8 +25,8 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import type { InstalledSkill } from "../../lib/skills-manager";
-import { compareByInstalledTime } from "../../lib/time-groups";
 import { formatCount } from "../../lib/utils";
+import { compareByInstalledTime } from "../../lib/time-groups";
 import { DrillDownHead } from "../../components/drill-down-head";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { Placeholder } from "../../components/placeholder";
@@ -559,7 +561,7 @@ export function RepoPage({
                 stacked under it: widen within the matches first. */}
             {second != null && (
               <div className={firstShownRows.length > 0 ? "py-4" : "pt-1"}>
-                <RepoFoldRule
+                <FoldRule
                   controls="repo-other-skills"
                   open={secondOpen}
                   closedLabel={
@@ -603,7 +605,7 @@ export function RepoPage({
                     : "pt-1"
                 }
               >
-                <RepoFoldRule
+                <FoldRule
                   controls="repo-rest-skills"
                   open={thirdOpen}
                   closedLabel={t("repo.showOtherUninstalled", {
@@ -646,61 +648,3 @@ export function RepoPage({
   );
 }
 
-/**
- * A fold between two sections of one repository, drawn as a rule across the
- * list rather than a button beneath it: one section ends where the rule
- * begins, the next begins where it ends. One press unfolds the next section
- * beneath; a second folds it away again, and the rule stays exactly where it
- * was. The two hairlines flank the rule's own label, which states exactly what
- * unfolding adds.
- */
-function RepoFoldRule({
-  controls,
-  open,
-  closedLabel,
-  openLabel,
-  onToggle,
-}: {
-  /** The folded list this rule governs (for `aria-controls`). */
-  controls: string;
-  /** Whether the section it folds is currently mounted. */
-  open: boolean;
-  /** The rule's label while the section is folded away. */
-  closedLabel: string;
-  /** The rule's label while the section is unfolded. */
-  openLabel: string;
-  /** Toggle the fold. */
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-expanded={open}
-      aria-controls={controls}
-      onClick={onToggle}
-      className="group flex w-full items-center gap-3 rounded-md px-1 py-1 text-[12px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-    >
-      <span
-        aria-hidden
-        className="h-px flex-1 bg-border transition-colors group-hover:bg-foreground/30"
-      />
-      <span className="flex shrink-0 items-center gap-1.5">
-        {open ? (
-          <>
-            <ChevronUp className="size-3.5" aria-hidden />
-            {openLabel}
-          </>
-        ) : (
-          <>
-            <ChevronDown className="size-3.5" aria-hidden />
-            {closedLabel}
-          </>
-        )}
-      </span>
-      <span
-        aria-hidden
-        className="h-px flex-1 bg-border transition-colors group-hover:bg-foreground/30"
-      />
-    </button>
-  );
-}
