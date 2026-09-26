@@ -15,6 +15,7 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import { errorMessage } from "../../lib/utils";
+import { compareByInstalledTime } from "../../lib/time-groups";
 import { DrillDownHead } from "../../components/drill-down-head";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
@@ -69,7 +70,10 @@ export function LocalSkillsPage() {
 
   // No store entry is looked up: a source-less record has no source to resolve
   // one for, so the views carry no classification and no figure — which is
-  // exactly what the pool's card rows show.
+  // exactly what the pool's card rows show. The rows read newest install first,
+  // the order the pool card lists them in (see `my-skills-page`), so opening
+  // the card cannot reshuffle what it showed; a record with no birth time
+  // trails (ties by name, as on the card).
   const rows = useMemo<Row[]>(
     () =>
       list
@@ -78,7 +82,13 @@ export function LocalSkillsPage() {
           view: installedSkillView(skill, linked),
           enabled: skill.enabled,
           suggestion: suggestions?.[skill.name],
-        })),
+        }))
+        .toSorted(
+          compareByInstalledTime(
+            (row) => row.view.installedAt,
+            (a, b) => a.view.name.localeCompare(b.view.name),
+          ),
+        ),
     [list, linked, suggestions],
   );
 

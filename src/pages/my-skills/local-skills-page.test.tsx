@@ -8,6 +8,7 @@ import {
   resetMockAgentStatus,
   resetMockInstalledSkills,
   setMockSkillEnabled,
+  setMockSkillInstalledAt,
 } from "../../lib/mock-local";
 import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
 import { resetLinkSuggestions } from "../../lib/link-suggestions";
@@ -71,6 +72,38 @@ describe("LocalSkillsPage", () => {
     ).toHaveLength(6);
     // An enumeration, not a ranking: the first row's number carries no medal.
     expect(screen.getByText("1").className).not.toContain("text-amber-500");
+  });
+
+  it("lists the pool newest install first, the order the card showed it in", async () => {
+    // Stamp the installs so disk order (the mock's own listing) and install
+    // time disagree — the card on the installed list reads them by time, so
+    // the page does too, and a stampless record trails rather than keeping
+    // its disk position.
+    setMockSkillInstalledAt("pdf", 1_000);
+    setMockSkillInstalledAt("docx", null);
+    setMockSkillInstalledAt("pptx", 5_000);
+    setMockSkillInstalledAt("mcp-builder", 3_000);
+    setMockSkillInstalledAt("code-review", 4_000);
+    setMockSkillInstalledAt("frontend-design", 2_000);
+    renderWithRouter(<LocalSkillsPage />, { route: "/my-skills/local" });
+
+    const rowNames = async () =>
+      (
+        await screen.findAllByRole("button", { name: /查看 .+ 详情/ })
+      ).map((button) => button.getAttribute("aria-label") ?? "");
+    await waitFor(async () =>
+      expect(await rowNames()).toHaveLength(NAMES.length),
+    );
+    // Install time desc: pptx, code-review, mcp-builder, frontend-design,
+    // pdf; the stampless docx trails — exactly as it would trail on the card.
+    expect(await rowNames()).toEqual([
+      "查看 pptx 详情",
+      "查看 code-review 详情",
+      "查看 mcp-builder 详情",
+      "查看 frontend-design 详情",
+      "查看 pdf 详情",
+      "查看 docx 详情",
+    ]);
   });
 
   it("leaves a placed install to the installed list", async () => {
