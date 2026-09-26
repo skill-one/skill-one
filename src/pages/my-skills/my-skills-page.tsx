@@ -488,8 +488,9 @@ export function MySkillsPage() {
             // names the order — nothing to act on — so its boundary is one
             // small muted line at the group's start, not a header over the
             // rows; the drawer still walks every row in the same flat
-            // newest-first order.
-            <div className="flex flex-col gap-6">
+            // newest-first order. The sections carry no gap of their own —
+            // the group label is the boundary, sized like one row gap.
+            <div className="flex flex-col">
               {shownSkillGroups.map((group) => (
                 <GroupSection
                   key={group.key}
@@ -528,8 +529,9 @@ export function MySkillsPage() {
             // itself lists its installs newest-first. Like in the skill unit,
             // a bucket only names the order: a quiet caption above the card
             // grid marks the boundary, and the drawer still walks every card's
-            // rows in the same flat order.
-            <div className="flex flex-col gap-6">
+            // rows in the same flat order. The sections carry no gap of their
+            // own — the group label is the boundary, sized like one row gap.
+            <div className="flex flex-col">
               {shownRepoGroups.map((group) => (
                 <GroupSection
                   key={group.key}
