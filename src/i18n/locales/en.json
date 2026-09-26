@@ -213,6 +213,7 @@
     "edit": "Edit",
     "editSkill": "Edit SKILL.md",
     "viewOriginal": "View original",
+    "viewTranslation": "View translation",
     "originalDescription": "Original description",
     "loadFailed": "Failed to load: {{message}}",
     "loadFailedHint": "The skill directory may not contain an accessible SKILL.md."

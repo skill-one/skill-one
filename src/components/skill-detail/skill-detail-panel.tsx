@@ -11,7 +11,7 @@ import {
 
 import { useAppLocale } from "../../i18n/use-language";
 
-import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { fetchSkillDetail, fetchSkillZhDetail } from "../../lib/skill-detail-api";
 import { MIRROR } from "../../lib/mirror";
 import {
   fetchLocalSkillDetail,
@@ -273,16 +273,22 @@ export function SkillDetailPanel({
   // file, so the mode is offered on the installed surface alone (see `editable`).
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
+  // Body language within the drawer: zh mode leads with the snapshot's
+  // Chinese page when it has one, and this flips back to the English
+  // original (and forth again) without refetching either file.
+  const [showOriginalBody, setShowOriginalBody] = useState(false);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const locale = useAppLocale();
 
   // Leaving the current skill (or closing the drawer) drops any edit session, so
-  // the next skill never opens on a stale draft.
+  // the next skill never opens on a stale draft. The body language resets with
+  // it, so the next skill opens on the locale's default body.
   const skillIdentity = shown ? skillKey(shown) : null;
   useEffect(() => {
     setEditing(false);
     setDraft(null);
+    setShowOriginalBody(false);
   }, [skillIdentity]);
 
   // Remote when the registry knows the skill's repo directory, local disk
@@ -308,6 +314,16 @@ export function SkillDetailPanel({
         ? fetchLocalSkillDetail(shown!.name)
         : fetchSkillDetail(shown!.repo, shown!.name, shown!.path),
     enabled: shown != null,
+  });
+
+  // The snapshot's Chinese page (skill_zh.md), fetched only in zh mode and
+  // only for a mirror read — mirroring how descriptionZh serves the header.
+  // A null answer (this snapshot ships no translation) and a failed fetch
+  // look the same: the English body shows, with no toggle to offer.
+  const { data: zhDetail } = useQuery({
+    queryKey: ["skill-detail-zh", shown?.repo, shown?.name],
+    queryFn: () => fetchSkillZhDetail(shown!.repo, shown!.name, shown!.path),
+    enabled: shown != null && !fromDisk && locale === "zh",
   });
 
   // ←/→ switch skills (delegated to the page); Escape is the sheet's dismiss.
@@ -417,6 +433,18 @@ export function SkillDetailPanel({
   const filePath = fromDisk
     ? ""
     : (detail?.path.replace(/^\/+|\/+$/g, "") ?? "");
+  // Whether the Chinese page can lead the body: zh mode, a mirror read, and
+  // a translation actually fetched with a body. The English body keeps
+  // leading everywhere else (en mode, local disk reads, untranslated skills).
+  const zhBodyAvailable =
+    !fromDisk && locale === "zh" && zhDetail != null && zhDetail.instructions !== "";
+  const showingZhBody = zhBodyAvailable && !showOriginalBody;
+  // The detail the body renders from: the Chinese page when it leads, the
+  // English SKILL.md otherwise (including disk reads, which never have a
+  // translation on disk).
+  const bodyDetail = showingZhBody ? zhDetail : detail;
+  const bodyFilePath =
+    fromDisk || !bodyDetail ? "" : bodyDetail.path.replace(/^\/+|\/+$/g, "");
   // The upstream repo the skill ships in; without a known path inside it,
   // the link lands on the repo root.
   const sourceHref =
@@ -468,18 +496,21 @@ export function SkillDetailPanel({
     ) : null,
   ].filter((item) => item !== null);
 
-  // The canonical SKILL.md body. Registry skills resolve relative links
-  // against the snapshot the index was built from; a body read off disk has
-  // no repo view to resolve against, so it goes without one.
-  const skillMdBody = detail ? (
-    detail.instructions ? (
+  // The canonical SKILL.md body — the snapshot's Chinese page when zh mode
+  // has one and the reader has not switched back to the original. Registry
+  // skills resolve relative links against the snapshot the index was built
+  // from, at whichever file is shown (the Chinese page lives under a
+  // different directory, so its links resolve against its own path); a body
+  // read off disk has no repo view to resolve against, so it goes without one.
+  const skillMdBody = bodyDetail ? (
+    bodyDetail.instructions ? (
       <Suspense fallback={<MarkdownSkeleton />}>
         <LazyMarkdown
           repo={fromDisk ? "" : MIRROR.repo}
           gitRef={fromDisk ? undefined : MIRROR.ref}
-          filePath={filePath}
+          filePath={bodyFilePath}
         >
-          {detail.instructions}
+          {bodyDetail.instructions}
         </LazyMarkdown>
       </Suspense>
     ) : (
@@ -612,18 +643,37 @@ export function SkillDetailPanel({
         </div>
       </SheetHeader>
       {/* A divider heads the body and carries the file's name: the rule runs the
-          full inset width behind a centered SKILL.md label, with the content
-          action pinned to its right end. The label and the action sit on the
-          popover surface, so they break the line — one divider, not a second
-          title bar. */}
+          full inset width behind a centered SKILL.md label (skill_zh.md while
+          the Chinese page leads), with the content actions pinned to the
+          divider's ends. The label and the actions sit on the popover surface,
+          so they break the line — one divider, not a second title bar. */}
       <div className="relative flex min-h-9 items-center justify-end px-6">
         <span
           aria-hidden
           className="absolute inset-x-6 top-1/2 h-px -translate-y-1/2 bg-border"
         />
         <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-popover px-3 text-[12px] text-muted-foreground">
-          SKILL.md
+          {showingZhBody ? "skill_zh.md" : "SKILL.md"}
         </span>
+        {/* Body language toggle, mirroring the header's 查看原文 for the
+            description: zh mode leads with the Chinese page when the snapshot
+            ships one, and this flips the body to the English original and
+            back. Both files are already fetched and cached, so it is a pure
+            render switch. Hidden while editing — the editor always shows the
+            local file, which has no translation on disk. */}
+        {zhBodyAvailable && !editing && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="relative mr-auto bg-popover pl-3 text-[12px] text-muted-foreground"
+            onClick={() => setShowOriginalBody((v) => !v)}
+          >
+            <Languages />
+            {showingZhBody
+              ? t("detail.viewOriginal")
+              : t("detail.viewTranslation")}
+          </Button>
+        )}
         {editing ? (
           <div className="relative flex items-center gap-1.5 bg-popover pl-3">
             {dirty && (

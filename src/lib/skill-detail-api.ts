@@ -72,6 +72,52 @@ export async function fetchSkillDetail(
 }
 
 /**
+ * Derive the mirror path of the snapshot's Chinese skill page from the
+ * skill's index directory ("skills/{owner}/{repo}/{slug}"). The snapshot
+ * writes the Chinese translation beside the index metadata under `profiles/`
+ * as `skill_zh.md` (lowercase), and ships it for a subset of skills — about
+ * 87% at the time of writing; the index row carries no marker for it, so the
+ * file's presence is the only signal. Returns null for a path the snapshot
+ * cannot have a translation for.
+ */
+export function zhSkillPath(knownPath?: string): string | null {
+  if (!knownPath) return null;
+  const dir = knownPath.replace(/\/+$/, "");
+  if (!dir.startsWith("skills/")) return null;
+  return `${dir.replace(/^skills\//, "profiles/")}/skill_zh.md`;
+}
+
+/**
+ * Fetch a skill's Chinese page (skill_zh.md) from the skills-profiles
+ * snapshot, or null when this snapshot does not ship one.
+ *
+ * Unlike `fetchSkillDetail`, absence is not an error — the translation is
+ * optional garnish, and the caller falls back to the English SKILL.md. The
+ * same rule covers every other failure (network, timeout, server error):
+ * the primary SKILL.md fetch reports those itself, so this fetch stays
+ * silent rather than surfacing a second, redundant error.
+ */
+export async function fetchSkillZhDetail(
+  _repo: string,
+  _skillId: string,
+  knownPath?: string,
+): Promise<SkillDetail | null> {
+  // The repo and skillId arguments mirror `fetchSkillDetail`'s signature so
+  // callers can hand all three through unchanged; a garnish fetch that must
+  // stay silent never needs to name them in a message.
+  const path = zhSkillPath(knownPath);
+  if (!path) return null;
+  try {
+    const { text } = await fetchFirstText(
+      fileCandidates({ repo: MIRROR.repo, ref: mirrorRef(), path }),
+    );
+    return toDetail(text, path);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Split a SKILL.md into frontmatter fields and the markdown body.
  *
  * The frontmatter block is parsed with the `yaml` package, so block scalars

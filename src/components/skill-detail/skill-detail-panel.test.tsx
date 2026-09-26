@@ -4,7 +4,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import {
+  fetchSkillDetail,
+  fetchSkillZhDetail,
+} from "../../lib/skill-detail-api";
 import { formatDate } from "../../lib/utils";
 import {
   fetchInstalledSkills,
@@ -26,6 +29,7 @@ import {
 
 vi.mock("../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
+  fetchSkillZhDetail: vi.fn(),
 }));
 
 vi.mock("../../lib/local-skills", () => ({
@@ -60,6 +64,7 @@ vi.mock("./skill-editor", () => ({
 }));
 
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
+const mockFetchSkillZhDetail = vi.mocked(fetchSkillZhDetail);
 const mockFetchLocalSkillDetail = vi.mocked(fetchLocalSkillDetail);
 const mockReadLocalSkillRaw = vi.mocked(readLocalSkillRaw);
 const mockRemoveInstalledSkill = vi.mocked(removeInstalledSkill);
@@ -187,6 +192,10 @@ beforeEach(() => {
   mockSetSkillEnabled.mockReset();
   mockOpenExternal.mockReset();
   mockFetchSkillDetail.mockResolvedValue(detail);
+  // The suite's pinned zh locale turns the Chinese-page query on for every
+  // mirror read; most snapshots rows ship no translation, so null is the
+  // baseline and the English body keeps leading unless a test says otherwise.
+  mockFetchSkillZhDetail.mockResolvedValue(null);
   // The header install button reads the installed list; nothing is
   // installed unless a test says otherwise.
   vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
@@ -605,6 +614,84 @@ describe("SkillDetailPanel", () => {
     expect(
       screen.queryByRole("button", { name: "查看原文" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("SkillDetailPanel Chinese page", () => {
+  /** The snapshot's Chinese page for the drawer's fixture skill. */
+  const zhDetail = {
+    description: "",
+    instructions: "使用此技能处理 PDF。",
+    path: "profiles/anthropics/skills/pdf/skill_zh.md",
+  };
+
+  it("leads the body with the snapshot's Chinese page in zh mode", async () => {
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    renderDrawer({});
+
+    // The Chinese page replaces the English body, and the divider names the
+    // file actually shown.
+    expect(await screen.findByText("使用此技能处理 PDF。")).toBeInTheDocument();
+    expect(screen.queryByText("Use this skill for PDFs.")).not.toBeInTheDocument();
+    expect(screen.getByText("skill_zh.md")).toBeInTheDocument();
+    expect(mockFetchSkillZhDetail).toHaveBeenCalledWith(
+      "anthropics/skills",
+      "pdf",
+      "skills/anthropics/skills/pdf",
+    );
+  });
+
+  it("keeps the 源 provenance pinned to the English SKILL.md", async () => {
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    renderDrawer({});
+
+    await screen.findByText("使用此技能处理 PDF。");
+    // The translation is garnish; provenance still describes the indexed
+    // original, whatever body currently leads.
+    expect(screen.getByRole("link", { name: "源" })).toHaveAttribute(
+      "href",
+      "https://github.com/skill-one/skills-profiles/blob/dist/skills/anthropics/skills/pdf/SKILL.md",
+    );
+  });
+
+  it("flips between the Chinese page and the English original without refetching", async () => {
+    const user = userEvent.setup();
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    renderDrawer({});
+
+    await screen.findByText("使用此技能处理 PDF。");
+    await user.click(screen.getByRole("button", { name: "查看原文" }));
+
+    // The original body leads again, the divider names it, and the toggle
+    // offers the way back.
+    expect(screen.getByText("Use this skill for PDFs.")).toBeInTheDocument();
+    expect(screen.queryByText("使用此技能处理 PDF。")).not.toBeInTheDocument();
+    expect(screen.getByText("SKILL.md")).toBeInTheDocument();
+    expect(mockFetchSkillDetail).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "查看译文" }));
+    expect(screen.getByText("使用此技能处理 PDF。")).toBeInTheDocument();
+  });
+
+  it("keeps the English body with no toggle when the snapshot ships no Chinese page", async () => {
+    renderDrawer({});
+
+    await screen.findByText("Use this skill for PDFs.");
+    expect(screen.queryByText("skill_zh.md")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "查看原文" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the English body for a disk read even when the snapshot has a Chinese page", async () => {
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({ skill: { ...skill, path: undefined } });
+
+    // The disk copy is what the user actually has; the mirror's translation
+    // is not part of it, so the body never switches files for it.
+    expect(await screen.findByText("Use this skill for PDFs.")).toBeInTheDocument();
+    expect(mockFetchSkillZhDetail).not.toHaveBeenCalled();
   });
 });
 
