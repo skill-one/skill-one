@@ -53,10 +53,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Home directory resolution for the provenance ledger path
 # (`<home>/.agents/skills/.skill-one.json`).
-dirs = "6"
+dirs = "7"
 # The skills.sh upstream content hash (see skill_hash.rs): SHA-256 plus the
 # base-strength ICU collation that orders the hashed file paths.
-sha2 = "0.10"
+sha2 = "0.11"
 icu_collator = { version = "2", features = ["compiled_data"] }
 # Menu bar popover material: real Liquid Glass (NSGlassEffectView) on macOS
 # 26+, automatic NSVisualEffectView fallback on older macOS, no-op elsewhere.

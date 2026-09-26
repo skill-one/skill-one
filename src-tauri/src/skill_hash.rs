@@ -86,7 +86,13 @@ pub fn hash_skill_dir(root: &Path) -> Result<String, String> {
         hasher.update(bytes);
         hasher.update([0x00]);
     }
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(hex(&hasher.finalize()))
+}
+
+/// Lowercase hex encoding: `sha2` 0.11's digest output no longer implements
+/// `LowerHex`, so `format!("{:x}", ...)` from 0.10 is unavailable.
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 #[cfg(test)]
@@ -149,7 +155,7 @@ mod tests {
     fn empty_dir_hashes_the_empty_input() {
         let dir = tempfile::tempdir().expect("tempdir");
         let empty = Sha256::digest([] as [u8; 0]);
-        assert_eq!(hash_skill_dir(dir.path()).unwrap(), format!("{empty:x}"));
+        assert_eq!(hash_skill_dir(dir.path()).unwrap(), hex(&empty));
     }
 
     #[test]
