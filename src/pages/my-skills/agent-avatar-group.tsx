@@ -6,17 +6,22 @@ import { AvatarGroup, AvatarGroupCount } from "../../components/ui/avatar";
 export const AVATAR_GROUP_MAX = 2;
 
 /**
- * The agent link strip: overlapping shadcn avatars (brand icon, Bot fallback,
- * ring-background separation) plus a +N count once more agents exist than fit
- * inline. Link state is not encoded here — the dropdown menu the strip opens
- * carries each agent's state label.
+ * The agent avatar strip: overlapping shadcn avatars (brand icon, Bot
+ * fallback, ring-background separation) plus a +N count once more agents exist
+ * than fit inline. Link state is not encoded here — the surface that embeds
+ * the strip carries each agent's state elsewhere.
  *
- * Purely presentational: the strip is the trigger of the dropdown menu that
- * carries every action, so it owns no click target and no styling beyond what
- * shadcn's avatar group already provides.
+ * Purely presentational. `max` lets a roomier surface (the my-skills entry
+ * card) show more faces than the old header strip could.
  */
-export function AgentAvatarGroup({ agents }: { agents: AgentStatus[] }) {
-  const visible = agents.slice(0, AVATAR_GROUP_MAX);
+export function AgentAvatarGroup({
+  agents,
+  max = AVATAR_GROUP_MAX,
+}: {
+  agents: AgentStatus[];
+  max?: number;
+}) {
+  const visible = agents.slice(0, max);
   const hiddenCount = agents.length - visible.length;
 
   return (

@@ -1,18 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
-import { toast } from "../../components/ui/toast";
 
-import { INSTALLED_SKILLS_QUERY_KEY } from "../../hooks/use-installed-skills";
-import {
-  excludeAgent,
-  includeAgent,
-} from "../../lib/agent-link-preferences";
-import {
-  fetchAgentStatus,
-  linkAgent,
-  unlinkAgent,
-} from "../../lib/local-skills";
+import { useAgentLinkToggle } from "../../hooks/use-agent-link-toggle";
+import { fetchAgentStatus } from "../../lib/local-skills";
 import { cn, errorMessage } from "../../lib/utils";
 import { AgentIcon } from "../../components/agent-icon";
 import {
@@ -23,11 +14,10 @@ import {
   DialogTitle,
 } from "../../components/ui/dialog";
 import { Switch } from "../../components/ui/switch";
-import { agentStateDotClass, agentLinkState } from "./agent-link-state";
-import { formatLinkMessage } from "./link-notice";
+import { agentStateDotClass, agentLinkState } from "../../lib/agent-link-state";
 
 /**
- * Per-agent link control, opened from the avatar menu's settings gear.
+ * Per-agent link control, opened from the agents page's settings button.
  *
  * Linking is automatic everywhere else — this dialog is the one place a user
  * can opt an agent out. A switch off unlinks the agent and records the
@@ -49,10 +39,9 @@ export function AgentLinkSettingsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const queryClient = useQueryClient();
   const { t } = useTranslation();
 
-  // Shared cache with the avatar menu; fetching is gated on open so the
+  // Shared cache with the graph; fetching is gated on open so the
   // dialog costs nothing while closed.
   const {
     data: agents,
@@ -65,44 +54,7 @@ export function AgentLinkSettingsDialog({
     enabled: open,
   });
 
-  const toggle = useMutation({
-    mutationFn: ({ name, link }: { name: string; link: boolean }) =>
-      link ? linkAgent(name) : unlinkAgent(name),
-    onMutate: ({ name, link }) => {
-      // The switch is the user's intent: record the exclusion before the
-      // disk action so the auto-link pass honors it regardless of the
-      // action's outcome.
-      if (link) {
-        includeAgent(name);
-      } else {
-        excludeAgent(name);
-      }
-    },
-    onSuccess: (results) => {
-      void queryClient.invalidateQueries({ queryKey: ["agent-status"] });
-      void queryClient.invalidateQueries({
-        queryKey: INSTALLED_SKILLS_QUERY_KEY,
-      });
-      const notice = formatLinkMessage(results[0]);
-      if (notice) {
-        const type =
-          notice.kind === "error"
-            ? "error"
-            : notice.kind === "warning"
-              ? "warning"
-              : "success";
-        toast.add({ title: notice.render(t), type });
-      }
-    },
-    onError: (err) =>
-      toast.add({
-        title: errorMessage(err, t("action.operationFailed")),
-        type: "error",
-      }),
-  });
-
-  const busyFor = (name: string) =>
-    toggle.isPending && toggle.variables?.name === name;
+  const { toggle, busyFor } = useAgentLinkToggle();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

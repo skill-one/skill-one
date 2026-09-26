@@ -10,7 +10,7 @@ import {
 import { getExcludedAgents } from "../lib/agent-link-preferences";
 import { errorMessage } from "../lib/utils";
 import { INSTALLED_SKILLS_QUERY_KEY } from "./use-installed-skills";
-import { formatLinkMessage } from "../pages/my-skills/link-notice";
+import { formatLinkMessage } from "../lib/link-notice";
 
 /**
  * Link every detected agent automatically — the default state is the desired

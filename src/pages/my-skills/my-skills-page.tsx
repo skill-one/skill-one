@@ -25,7 +25,7 @@ import {
 } from "../../lib/skill-list-layout";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { SearchResults } from "../explore/search-results";
-import { AgentAvatarMenu } from "./agent-avatar-menu";
+import { AgentLinkCard } from "./agent-link-card";
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage, formatDayHeading } from "../../lib/utils";
 import { buildSearchIndex } from "../../lib/search-index";
@@ -403,13 +403,21 @@ export function MySkillsPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
+      {/* The doorway to the agents graph: one status card over the list —
+          detected faces, linked/attention counts — and the whole card opens
+          the page that draws every agent into the SkillOne hub. It is the
+          app's core job made visible, so it leads this page regardless of
+          what the list below holds. */}
+      <div className="mb-3">
+        <AgentLinkCard />
+      </div>
+
       {/* The list's own first row: the classifications that hold an install
           (one press to scope the list; 全部 clears it), and — closing the row —
-          the unit switch next to the agent strip, this page's own status.
-          The chips are a browse control — a search re-orders the list by
-          relevance and ignores them — so they stand down while a search is
-          live; the switch and the strip stay, because a status the reader is
-          owed, and the shape the search answer reads in, do not depend on what
+          the unit switch, this page's own status control. The chips are a
+          browse control — a search re-orders the list by relevance and ignores
+          them — so they stand down while a search is live; the switch stays,
+          because the shape the search answer reads in does not depend on what
           they happen to be looking at. The chips count what the unit lists, so
           the figures and the list they scope can never disagree. */}
       <div className="mb-3 flex min-w-0 items-center gap-3">
@@ -426,7 +434,6 @@ export function MySkillsPage() {
             unit={unit}
             onChange={(next) => setUnit("installed", next)}
           />
-          <AgentAvatarMenu />
         </div>
       </div>
 

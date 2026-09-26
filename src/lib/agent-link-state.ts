@@ -1,19 +1,19 @@
 import type { ParseKeys } from "i18next";
 
-import type { AgentStatus } from "../../lib/skills-manager";
+import type { AgentStatus } from "./skills-manager";
 
 /**
- * The three link states an agent can present, derived once for the menu rows
- * that carry every action. The collapsed avatar strip is deliberately not a
- * consumer: it shows no state, leaving the menu it opens to report it.
+ * The three link states an agent can present, derived once wherever state is
+ * shown — the agents graph's ribbons and node cards, the my-skills entry
+ * card, and the link settings dialog.
  */
 export type AgentLinkState = "linked" | "warning" | "unlinked";
 
 /**
  * Classify an agent for display. The canonical dir reports linked=false, but
  * to users it is effectively linked; unlinked agents whose own directory
- * already holds skills or other files surface the warning state (their
- * pending counts appear in the menu rows and the settings dialog).
+ * already holds skills or other files surface the warning state (the graph
+ * draws them in amber and their pending counts ride the node card).
  */
 export function agentLinkState(agent: AgentStatus): AgentLinkState {
   if (agent.linked || agent.canonical) return "linked";
@@ -23,7 +23,7 @@ export function agentLinkState(agent: AgentStatus): AgentLinkState {
   return hasContent ? "warning" : "unlinked";
 }
 
-/** Short status label key for tooltips; the canonical agent keeps its own word. */
+/** Short status label key for the graph's node cards; the canonical agent keeps its own word. */
 export function agentStateLabelKey(agent: AgentStatus): ParseKeys {
   if (agent.canonical) return "agent.native";
   return agentLinkState(agent) === "linked"
@@ -31,7 +31,7 @@ export function agentStateLabelKey(agent: AgentStatus): ParseKeys {
     : "agent.unlinked";
 }
 
-/** Status dot color used in the menu rows' tooltips. */
+/** Status dot color used on the node cards (and as the ribbon-state reference). */
 export const agentStateDotClass: Record<AgentLinkState, string> = {
   linked: "bg-emerald-500",
   warning: "bg-amber-500",

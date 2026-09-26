@@ -38,6 +38,11 @@ const LocalSkillsPage = lazy(() =>
     default: m.LocalSkillsPage,
   })),
 );
+const AgentsPage = lazy(() =>
+  import("./pages/agents/agents-page").then((m) => ({
+    default: m.AgentsPage,
+  })),
+);
 
 const queryClient = createQueryClient();
 
@@ -113,6 +118,13 @@ export default function App() {
                   <Route
                     path="/my-skills/local"
                     element={<LocalSkillsPage />}
+                  />
+                  {/* The agents graph: every detected agent drawn into the
+                    SkillOne hub. Hangs off the installed list, reached through
+                    its entry card, so the 我的 segment stays lit here. */}
+                  <Route
+                    path="/my-skills/agents"
+                    element={<AgentsPage />}
                   />
                   <Route
                     path="*"

@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 
-import type { AgentLinkResult, AgentLinkStatus } from "../../lib/skills-manager";
+import type { AgentLinkResult, AgentLinkStatus } from "./skills-manager";
 
 export type NoticeKind = "success" | "warning" | "error";
 
