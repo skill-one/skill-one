@@ -659,20 +659,31 @@ export function SkillDetailPanel({
             description: zh mode leads with the Chinese page when the snapshot
             ships one, and this flips the body to the English original and
             back. Both files are already fetched and cached, so it is a pure
-            render switch. Hidden while editing — the editor always shows the
-            local file, which has no translation on disk. */}
+            render switch. Icon-only and parked beside the edit action at the
+            divider's right end — the centered divider label already names the
+            file shown, so the wording lives in the accessible name and hover
+            title. Hidden while editing — the editor always shows the local
+            file, which has no translation on disk. */}
         {zhBodyAvailable && !editing && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="relative mr-auto bg-popover pl-3 text-[12px] text-muted-foreground"
-            onClick={() => setShowOriginalBody((v) => !v)}
-          >
-            <Languages />
-            {showingZhBody
-              ? t("detail.viewOriginal")
-              : t("detail.viewTranslation")}
-          </Button>
+          <div className="relative bg-popover pl-3">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={
+                showingZhBody
+                  ? t("detail.viewOriginal")
+                  : t("detail.viewTranslation")
+              }
+              title={
+                showingZhBody
+                  ? t("detail.viewOriginal")
+                  : t("detail.viewTranslation")
+              }
+              onClick={() => setShowOriginalBody((v) => !v)}
+            >
+              <Languages />
+            </Button>
+          </div>
         )}
         {editing ? (
           <div className="relative flex items-center gap-1.5 bg-popover pl-3">
