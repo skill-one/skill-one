@@ -225,7 +225,6 @@
     "openFolderFailed": "打开文件夹失败",
     "viewOriginal": "查看原文",
     "viewTranslation": "查看译文",
-    "originalDescription": "原文",
     "loadFailed": "加载失败：{{message}}",
     "loadFailedHint": "该技能目录下可能没有可访问的 SKILL.md。"
   },

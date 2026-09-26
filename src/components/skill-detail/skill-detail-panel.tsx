@@ -34,12 +34,6 @@ import { DomainBadge } from "../domain-badge";
 import { SkillInstalls } from "../skill-installs";
 import { Button } from "../ui/button";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  PopoverTitle,
-} from "../ui/popover";
-import {
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -278,24 +272,25 @@ export function SkillDetailPanel({
   // file, so the mode is offered on the installed surface alone (see `editable`).
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
-  // Body language within the drawer: zh mode leads with the snapshot's
-  // Chinese page when it has one, and this flips back to the English
-  // original (and forth again). The first flip carries the English file's
-  // one-time fetch — the request a zh-mode open deferred — and every later
-  // flip is a cached render switch.
-  const [showOriginalBody, setShowOriginalBody] = useState(false);
+  // The drawer's one language state, shared by the header description and the
+  // SKILL.md body: zh mode leads with the snapshot's translations when it has
+  // them, and this flips the whole drawer — description and body together —
+  // back to the English original (and forth again). The first flip carries the
+  // English file's one-time fetch — the request a zh-mode open deferred — and
+  // every later flip is a cached render switch.
+  const [showOriginal, setShowOriginal] = useState(false);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const locale = useAppLocale();
 
   // Leaving the current skill (or closing the drawer) drops any edit session, so
-  // the next skill never opens on a stale draft. The body language resets with
-  // it, so the next skill opens on the locale's default body.
+  // the next skill never opens on a stale draft. The drawer language resets with
+  // it, so the next skill opens on the locale's default.
   const skillIdentity = shown ? skillKey(shown) : null;
   useEffect(() => {
     setEditing(false);
     setDraft(null);
-    setShowOriginalBody(false);
+    setShowOriginal(false);
   }, [skillIdentity]);
 
   // Remote when the registry knows the skill's repo directory, local disk
@@ -316,13 +311,13 @@ export function SkillDetailPanel({
 
   // The English original — or the local disk read, which has no mirror copy.
   // In zh mode a translated skill never needs it on open, so it is fetched
-  // lazily: when the reader flips the body to 查看原文, or when the Chinese
+  // lazily: when the reader flips the drawer to 查看原文, or when the Chinese
   // page came back empty and the original is the only body there is. En mode,
   // disk reads and untranslated skills need it straight away. A zh-mode open
   // therefore costs one request instead of two; the deferred one rides the
   // toggle's first flip (cached ever after — see `lib/query-client.ts`).
   const originalNeeded =
-    fromDisk || locale !== "zh" || showOriginalBody || zhDetail === null;
+    fromDisk || locale !== "zh" || showOriginal || zhDetail === null;
   const {
     data: detail,
     isPending: detailPending,
@@ -448,13 +443,13 @@ export function SkillDetailPanel({
   // not know shows no figure rather than a hardcoded zero, the same rule its
   // card follows. An absent marker means backed (see `SkillView`).
   const showStats = shown?.storeBacked !== false;
-  // The registry's Chinese description wins for zh; the fetched frontmatter
-  // description otherwise keeps its original precedence over the index one.
-  // When a translation is what the reader sees, the English original stays
-  // one click away behind the header's 查看原文 popover.
+  // The registry's Chinese description wins for zh — until the reader flips
+  // the drawer to the original, which swaps the description and the body in
+  // one move.
   const translated = shown?.descriptionZh?.trim() || "";
   const originalDescription = detail?.description || shown?.description || "";
-  const showingTranslation = locale === "zh" && translated !== "";
+  const showingTranslation =
+    locale === "zh" && translated !== "" && !showOriginal;
   const description = showingTranslation
     ? translated
     : originalDescription;
@@ -477,7 +472,17 @@ export function SkillDetailPanel({
   // leading everywhere else (en mode, local disk reads, untranslated skills).
   const zhBodyAvailable =
     !fromDisk && locale === "zh" && zhDetail != null && zhDetail.instructions !== "";
-  const showingZhBody = zhBodyAvailable && !showOriginalBody;
+  const showingZhBody = zhBodyAvailable && !showOriginal;
+  // The drawer's single language toggle, parked in the header's action row
+  // beside the install/uninstall actions: one control for the whole drawer,
+  // flipping the description and the SKILL.md body between the snapshot's
+  // translations and the originals together. Rendered only in zh mode when
+  // some part of the drawer actually has a translation — the description from
+  // the index row, the body from the fetched Chinese page. Hidden while
+  // editing: the editor always shows the local file, which has no translation
+  // on disk.
+  const translateToggleVisible =
+    locale === "zh" && !editing && (translated !== "" || zhBodyAvailable);
   // The detail the body renders from: the Chinese page when it leads, the
   // English SKILL.md otherwise (including disk reads, which never have a
   // translation on disk).
@@ -616,6 +621,30 @@ export function SkillDetailPanel({
               The installed list installs nothing — its skills are already on
               disk — so it carries its own action instead: the enable switch
               that the store's drawer cannot offer. */}
+          {/* The drawer's language toggle shares the action row: one control
+              flips the description and the SKILL.md body to the original and
+              back together, so the drawer never mixes languages. It sits
+              ahead of the primary actions — a view control, quieter than the
+              store's install CTA beside it. */}
+          {translateToggleVisible && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={
+                showOriginal
+                  ? t("detail.viewTranslation")
+                  : t("detail.viewOriginal")
+              }
+              title={
+                showOriginal
+                  ? t("detail.viewTranslation")
+                  : t("detail.viewOriginal")
+              }
+              onClick={() => setShowOriginal((v) => !v)}
+            >
+              <Languages />
+            </Button>
+          )}
           {isStore && (
             <SkillInstallButton skill={shown!} labeled />
           )}
@@ -629,41 +658,11 @@ export function SkillDetailPanel({
             is open. Served from the index immediately, refined by the
             fetched SKILL.md frontmatter once it lands. Long summaries clamp
             to three lines with an inline 展开, so a verbose description can
-            never push the tabs and the body out of the fixed header. When
-            zh shows the registry's translation, the English original stays
-            one click away behind a quiet 查看-原文 popover. */}
-        {description && (
-          <div className="flex items-start gap-1.5">
-            <div className="min-w-0 flex-1">
-              <ExpandableDescription text={description} />
-            </div>
-            {showingTranslation && originalDescription && (
-              <Popover>
-                <PopoverTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={t("detail.viewOriginal")}
-                      title={t("detail.viewOriginal")}
-                      className="mt-0.5 shrink-0 text-muted-foreground"
-                    >
-                      <Languages />
-                    </Button>
-                  }
-                />
-                <PopoverContent align="end" className="w-80">
-                  <PopoverTitle>
-                    {t("detail.originalDescription")}
-                  </PopoverTitle>
-                  <p className="max-h-72 overflow-y-auto text-[13px] leading-relaxed text-muted-foreground">
-                    {originalDescription}
-                  </p>
-                </PopoverContent>
-              </Popover>
-            )}
-          </div>
-        )}
+            never push the tabs and the body out of the fixed header. Which
+            language the summary shows follows the header's one toggle: the
+            registry's translation in zh mode, the English original once the
+            reader flips the drawer to the original. */}
+        {description && <ExpandableDescription text={description} />}
         {/* One quiet meta line under the summary: the install figure, the 源
             provenance tip, the domain and — for installed skills — the
             install date, separated by interpuncts instead of chips. The
@@ -696,37 +695,8 @@ export function SkillDetailPanel({
         <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-popover px-3 text-[12px] text-muted-foreground">
           {showingZhBody ? "skill_zh.md" : "SKILL.md"}
         </span>
-        {/* Body language toggle, mirroring the header's 查看原文 for the
-            description: zh mode leads with the Chinese page when the snapshot
-            ships one, and this flips the body to the English original and
-            back. The first flip fetches the English file — the one request a
-            zh-mode open deferred — and every later flip is a cached render
-            switch. Icon-only and parked beside the edit action at the
-            divider's right end — the centered divider label already names the
-            file shown, so the wording lives in the accessible name and hover
-            title. Hidden while editing — the editor always shows the local
-            file, which has no translation on disk. */}
-        {zhBodyAvailable && !editing && (
-          <div className="relative bg-popover pl-3">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={
-                showingZhBody
-                  ? t("detail.viewOriginal")
-                  : t("detail.viewTranslation")
-              }
-              title={
-                showingZhBody
-                  ? t("detail.viewOriginal")
-                  : t("detail.viewTranslation")
-              }
-              onClick={() => setShowOriginalBody((v) => !v)}
-            >
-              <Languages />
-            </Button>
-          </div>
-        )}
+        {/* Body language is the header toggle's concern, so the divider
+            carries the file's actions only. */}
         {editing ? (
           <div className="relative flex items-center gap-1.5 bg-popover pl-3">
             {dirty && (
