@@ -20,7 +20,7 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 
-import { CollapsibleSection } from "../../components/collapsible-section";
+import { GroupSection } from "../../components/group-section";
 import { Button } from "../../components/ui/button";
 import { ListFacets } from "../../components/list-facets";
 import { SkeletonList } from "../../components/skeleton-list";
@@ -138,10 +138,10 @@ export function ExplorePage() {
   }, [sectionsData, selectedDomain]);
 
   // The repository answer cut into rank bands (Top 25, 26–50, 51–100, …) for
-  // the grid's collapsible headers — null while the answer is short enough to
-  // stay one flat grid, since a lone "Top 25" header over the whole answer
+  // the grid's quiet captions — null while the answer is short enough to
+  // stay one flat grid, since a lone "Top 25" caption over the whole answer
   // would be noise. Cut from the full answer, not the revealed prefix: a band
-  // the reader has not reached still owns its true count and its range.
+  // the reader has not reached still owns its true range.
   const repoBands = useMemo(
     () =>
       unit === "repo" && browseRepos.length > FIRST_RANK_BAND
@@ -437,12 +437,13 @@ export function ExplorePage() {
                   </ul>
                 ) : repoBands ? (
                   // The repository unit, answer long enough to pace by rank:
-                  // one collapsible band per rank range, each carrying the
-                  // same card grid, styled like the installed list's time
-                  // buckets. Reveal stays global — a band mounts only once the
-                  // revealed prefix reaches its first rank, and then with just
-                  // the revealed slice — so the sentinel below paces the bands
-                  // exactly as it paced the flat grid.
+                  // one band per rank range, each carrying the same card grid.
+                  // A rank range only names the order — nothing to act on — so
+                  // its boundary is one quiet caption above the grid, not a
+                  // header over it. Reveal stays global — a band mounts only
+                  // once the revealed prefix reaches its first rank, and then
+                  // with just the revealed slice — so the sentinel below paces
+                  // the bands exactly as it paced the flat grid.
                   <div className="flex flex-col gap-6">
                     {repoBands.map((band) => {
                       const revealed = band.items.slice(
@@ -451,10 +452,10 @@ export function ExplorePage() {
                       );
                       if (revealed.length === 0) return null;
                       return (
-                        <CollapsibleSection
+                        <GroupSection
                           key={band.key}
-                          title={band.title}
-                          count={t("state.repoCount", { count: band.items.length })}
+                          label={band.title}
+                          variant="caption"
                         >
                           <ul className={REPO_LIST_CLASS}>
                             {revealed.map((group) => (
@@ -469,7 +470,7 @@ export function ExplorePage() {
                               />
                             ))}
                           </ul>
-                        </CollapsibleSection>
+                        </GroupSection>
                       );
                     })}
                   </div>
