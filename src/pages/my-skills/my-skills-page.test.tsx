@@ -8,9 +8,6 @@ import {
   configure,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { toast } from "../../components/ui/toast";
-
-import { getExcludedAgents } from "../../lib/agent-link-preferences";
 
 import { MySkillsPage } from "./my-skills-page";
 import { AppHeader } from "../../components/app-header";
@@ -83,21 +80,6 @@ beforeEach(() => {
 // The page reads installed skills through local-skills, which falls back to
 // the mutable mock store in the browser (this test env), so mutations below
 // actually change the data the page re-fetches after invalidate.
-
-/** The agent strip is one avatar group; its dropdown menu carries the actions. */
-async function openAgentMenu(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(
-    await screen.findByRole("button", { name: /^管理 agent 链接/ }),
-  );
-}
-
-/**
- * Menu items read as "<display> [pending counts] <state>" — the status dot
- * holds no text, and agents with content in their dir carry badge text between
- * the display name and the state.
- */
-const menuItem = (display: string, state: string) =>
-  screen.findByRole("menuitem", { name: new RegExp(`${display}.*${state}`) });
 
 /**
  * The page as the app mounts it: inside the shell, under the route the deep link
@@ -1232,96 +1214,16 @@ describe("MySkillsPage", () => {
     );
   });
 
-  it("lists every detected agent in the strip's dropdown menu", async () => {
-    const user = userEvent.setup();
+  it("leads with the agent connections card into the agents graph", async () => {
     renderPage();
 
-    await openAgentMenu(user);
-
-    // The strip only ever shows a prefix inline (the mock detects 5 agents);
-    // the menu carries all of them, each with its link state.
-    expect(await screen.findAllByRole("menuitem")).toHaveLength(5);
-    expect(await menuItem("Claude Code", "已链接")).toBeInTheDocument();
-    expect(await menuItem("Codex", "已链接")).toBeInTheDocument();
-    expect(await menuItem("Cursor", "未链接")).toBeInTheDocument();
-    expect(await menuItem("Gemini CLI", "未链接")).toBeInTheDocument();
-    expect(await menuItem("Windsurf", "原生")).toBeInTheDocument();
-  });
-
-  it("keeps the menu rows inert — linking is automatic", async () => {
-    const user = userEvent.setup();
-    renderPage();
-    await openAgentMenu(user);
-
-    // Selecting a row changes nothing: the menu is a status view, and the
-    // settings dialog is the only place links are made or broken.
-    await user.click(await menuItem("Gemini CLI", "未链接"));
-    await user.click(await menuItem("Windsurf", "原生"));
-
-    expect(await menuItem("Gemini CLI", "未链接")).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(getExcludedAgents()).toEqual([]);
-  });
-
-  it("unlinks a linked agent from the settings dialog and remembers it", async () => {
-    const user = userEvent.setup();
-    const successSpy = vi.spyOn(toast, "add");
-    renderPage();
-    await openAgentMenu(user);
-    await user.click(
-      await screen.findByRole("button", { name: "Agent 链接设置" }),
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    await user.click(
-      await within(dialog).findByRole("switch", {
-        name: "Claude Code 链接开关",
-      }),
-    );
-
-    expect(successSpy).toHaveBeenCalledWith({
-      title: "Claude Code 已取消链接",
-      type: "success",
+    // The old header avatar strip is now a full-width status card: it states
+    // the detected/linked counts and the whole thing routes to the graph.
+    const entry = await screen.findByRole("link", {
+      name: "打开 agents 页面",
     });
-    expect(getExcludedAgents()).toEqual(["claude-code"]);
-  });
-
-  it("re-links an unlinked agent from the settings dialog", async () => {
-    const user = userEvent.setup();
-    const successSpy = vi.spyOn(toast, "add");
-    renderPage();
-    await openAgentMenu(user);
-    await user.click(
-      await screen.findByRole("button", { name: "Agent 链接设置" }),
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    await user.click(
-      await within(dialog).findByRole("switch", {
-        name: "Gemini CLI 链接开关",
-      }),
-    );
-
-    expect(successSpy).toHaveBeenCalledWith({
-      title: "Gemini CLI 已链接",
-      type: "success",
-    });
-    expect(getExcludedAgents()).toEqual([]);
-  });
-
-  it("pins a canonical agent's switch in the settings dialog", async () => {
-    const user = userEvent.setup();
-    renderPage();
-    await openAgentMenu(user);
-    await user.click(
-      await screen.findByRole("button", { name: "Agent 链接设置" }),
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    const switchEl = await within(dialog).findByRole("switch", {
-      name: "Windsurf 链接开关",
-    });
-    expect(switchEl).toHaveAttribute("aria-disabled", "true");
-    expect(switchEl).toHaveAttribute("aria-checked", "true");
+    expect(entry).toHaveAttribute("href", "/my-skills/agents");
+    expect(screen.getByText("Agent 连接")).toBeInTheDocument();
+    expect(screen.getByText("已连接 3/5")).toBeInTheDocument();
   });
 });

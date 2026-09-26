@@ -137,6 +137,20 @@
     "linked": "已链接",
     "unlinked": "未链接"
   },
+  "agents": {
+    "title": "Agents",
+    "connected": "已连接 {{linked}}/{{total}} 个 agent",
+    "attention": "{{count}} 个待处理",
+    "openAria": "打开 agents 页面",
+    "cardTitle": "Agent 连接",
+    "cardSummary": "已连接 {{linked}}/{{total}}",
+    "cardAttention": "{{count}} 个待处理",
+    "nodeSkills": "{{count}} 个 skill",
+    "nodeFiles": "{{count}} 项文件",
+    "connect": "连接到 Skill One",
+    "nodeHint": "链接后该 agent 使用 SkillOne 的统一 skills 目录；取消链接不会移回已收编的 skill。",
+    "nativeHint": "该 agent 使用原生 skills 目录，始终保持连接。"
+  },
   "agentLink": {
     "dialogTitle": "Agent 链接设置",
     "dialogDescription": "已检测到的 agent 会自动链接到统一的 skills 目录，无需手动操作。链接时 agent 自带的内容会被收编进统一目录、其余文件隔离到 .misc，取消链接不会移回。在此可对个别 agent 取消链接，取消后不会再被自动链接。",

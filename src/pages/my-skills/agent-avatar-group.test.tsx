@@ -64,7 +64,15 @@ describe("AgentAvatarGroup", () => {
     ).toEqual(["avatar", "avatar"]);
   });
 
-  it("keeps the avatars plain — link state lives in the menu, not on dots", () => {
+  it("lets a roomier surface show more faces inline through max", () => {
+    const { container } = render(
+      <AgentAvatarGroup agents={agents(7)} max={5} />,
+    );
+    expect(slots(container, "avatar")).toHaveLength(5);
+    expect(slots(container, "avatar-group-count")[0]).toHaveTextContent("+2");
+  });
+
+  it("keeps the avatars plain — link state is never encoded on the faces", () => {
     const { container } = render(
       <AgentAvatarGroup
         agents={[
