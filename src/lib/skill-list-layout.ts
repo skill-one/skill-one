@@ -51,28 +51,19 @@ export const SKILL_ROW_LIST_CLASS = "flex flex-col gap-4";
 export const SKILL_ROW_SKELETON_CLASS = "h-[58px] rounded-xl";
 
 /**
- * The store's repository view: one card per repository, so a lane is sized for
- * a repository rather than for a single skill. 440px is the narrowest lane that
- * still prints a skill's name, its one-line description and its install button
- * on one row — measured, not guessed: at 440px every row of `RepoCard` fits
- * without overflowing, and a long name truncates rather than pushing the
- * description out. Two 440px lanes plus their gap need 896px, and the page's
- * content is at most 1336px (1400 minus its own padding), so the repository
- * view is two lanes across the whole range the window can produce — one when
- * the window is narrow enough to fall under 896px.
+ * The store's repository view: one card per repository, so a column is sized
+ * for a repository rather than for a single skill. 440px is the narrowest
+ * column that still prints a skill's name, its one-line description and its
+ * install button on one row — measured, not guessed: at 440px every row of
+ * `RepoCard` fits without overflowing, and a long name truncates rather than
+ * pushing the description out.
  *
- * On a browser with CSS Grid Lanes (Safari 26.4+, and therefore the WKWebView
- * this app ships in) the same track definition becomes a masonry layout: every
- * card takes its own height — a one-skill repository measures 98px, a
- * repository at the largest preview cap 257px — instead of being stretched to
- * its neighbour. A
- * browser without it drops the unsupported `display` (the declaration sits
- * behind `@supports`, so the plain `grid` above still applies) and the row is
- * equal-height: the short card then wears its neighbour's height as space above
- * its footer, which `mt-auto` is what keeps at the bottom edge.
+ * The rows are equal height: a short card wears its neighbour's height as
+ * space above its footer, which `mt-auto` keeps at the bottom edge. This plain
+ * grid renders identically on every platform — no masonry feature to gate on.
  */
 export const REPO_LIST_CLASS =
-  "grid gap-4 grid-cols-[repeat(auto-fill,minmax(440px,1fr))] supports-[display:grid-lanes]:[display:grid-lanes]";
+  "grid gap-4 grid-cols-[repeat(auto-fill,minmax(440px,1fr))]";
 
 /**
  * Placeholder standing in for one repository card while a list loads, at the
