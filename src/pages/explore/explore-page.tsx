@@ -455,7 +455,6 @@ export function ExplorePage() {
                         <GroupSection
                           key={band.key}
                           label={band.title}
-                          variant="caption"
                         >
                           <ul className={REPO_LIST_CLASS}>
                             {revealed.map((group) => (
