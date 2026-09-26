@@ -16,7 +16,7 @@
         "title": "Skill One",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 20, "y": 30 },
+        "trafficLightPosition": { "x": 20, "y": 26 },
         "width": 1280,
         "height": 800,
         "minWidth": 960,
