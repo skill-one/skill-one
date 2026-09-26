@@ -20,7 +20,7 @@ import {
 
 import { AppHeader } from "../../components/app-header";
 
-import { fetchSkillDetail } from "../../lib/skill-detail-api";
+import { fetchSkillDetail, fetchSkillZhDetail } from "../../lib/skill-detail-api";
 import { searchSkillsSh } from "../../lib/skills-sh";
 import {
   REPO_CARD_SKELETON_CLASS,
@@ -63,6 +63,10 @@ const harness = (
 
 vi.mock("../../lib/skill-detail-api", () => ({
   fetchSkillDetail: vi.fn(),
+  // The drawer probes the snapshot's Chinese page (in the suite's pinned zh
+  // locale) before it can decide which body leads; the null answer is a
+  // skill without a translation, which hands the body to the English fetch.
+  fetchSkillZhDetail: vi.fn(),
 }));
 
 const mockFetchSkillDetail = vi.mocked(fetchSkillDetail);
@@ -262,6 +266,10 @@ beforeEach(() => {
   // care about it sees the local answer alone.
   mockSearchSkillsSh.mockReset();
   mockSearchSkillsSh.mockResolvedValue([]);
+  // No fixture skill ships a Chinese page, so the drawer's zh probe answers
+  // null and the English body leads.
+  vi.mocked(fetchSkillZhDetail).mockReset();
+  vi.mocked(fetchSkillZhDetail).mockResolvedValue(null);
   mockFetchSkillDetail.mockImplementation(
     async (_repo: string, id: string) => ({
       description: `Description of ${id}.`,
