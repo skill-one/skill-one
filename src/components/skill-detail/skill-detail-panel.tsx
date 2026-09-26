@@ -236,8 +236,11 @@ interface SkillDetailPanelProps {
  * opening or closing the sheet leaves its layout and scroll position
  * untouched. The sheet is modal (dimmed overlay, focus trap, scroll lock); Escape,
  * clicking the overlay closes it, and ←/→
- * switch skills. Each skill's SKILL.md is fetched through TanStack Query and
- * cached independently, so revisits are instant. The source is picked per
+ * switch skills. Each skill's body file is fetched through TanStack Query and
+ * cached independently, so revisits are instant. In zh mode the drawer opens
+ * on the snapshot's Chinese page alone and fetches the English SKILL.md only
+ * when the reader flips to it (or when the skill ships no translation); en
+ * mode reads the English SKILL.md alone. The source is picked per
  * skill: a registry-known `path` reads from the skills-profiles snapshot
  * (the same content the registry indexed), while an installed skill
  * without one — local skills included — is read from the local skills
@@ -277,7 +280,9 @@ export function SkillDetailPanel({
   const [draft, setDraft] = useState<string | null>(null);
   // Body language within the drawer: zh mode leads with the snapshot's
   // Chinese page when it has one, and this flips back to the English
-  // original (and forth again) without refetching either file.
+  // original (and forth again). The first flip carries the English file's
+  // one-time fetch — the request a zh-mode open deferred — and every later
+  // flip is a cached render switch.
   const [showOriginalBody, setShowOriginalBody] = useState(false);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -298,12 +303,32 @@ export function SkillDetailPanel({
   // or not loaded yet). The source is part of the key so both variants of
   // the same repo/name never share a cache entry.
   const fromDisk = shown != null && shown.path == null;
+
+  // The snapshot's Chinese page (skill_zh.md), fetched only in zh mode and
+  // only for a mirror read — mirroring how descriptionZh serves the header.
+  // A null answer (this snapshot ships no translation) and a failed fetch
+  // look the same: the English body takes over, with no toggle to offer.
+  const { data: zhDetail } = useQuery({
+    queryKey: ["skill-detail-zh", shown?.repo, shown?.name],
+    queryFn: () => fetchSkillZhDetail(shown!.repo, shown!.name, shown!.path),
+    enabled: shown != null && !fromDisk && locale === "zh",
+  });
+
+  // The English original — or the local disk read, which has no mirror copy.
+  // In zh mode a translated skill never needs it on open, so it is fetched
+  // lazily: when the reader flips the body to 查看原文, or when the Chinese
+  // page came back empty and the original is the only body there is. En mode,
+  // disk reads and untranslated skills need it straight away. A zh-mode open
+  // therefore costs one request instead of two; the deferred one rides the
+  // toggle's first flip (cached ever after — see `lib/query-client.ts`).
+  const originalNeeded =
+    fromDisk || locale !== "zh" || showOriginalBody || zhDetail === null;
   const {
     data: detail,
-    isPending,
-    isError,
-    error,
-    refetch,
+    isPending: detailPending,
+    isError: detailIsError,
+    error: detailError,
+    refetch: refetchDetail,
   } = useQuery({
     queryKey: [
       "skill-detail",
@@ -315,17 +340,7 @@ export function SkillDetailPanel({
       fromDisk
         ? fetchLocalSkillDetail(shown!.name)
         : fetchSkillDetail(shown!.repo, shown!.name, shown!.path),
-    enabled: shown != null,
-  });
-
-  // The snapshot's Chinese page (skill_zh.md), fetched only in zh mode and
-  // only for a mirror read — mirroring how descriptionZh serves the header.
-  // A null answer (this snapshot ships no translation) and a failed fetch
-  // look the same: the English body shows, with no toggle to offer.
-  const { data: zhDetail } = useQuery({
-    queryKey: ["skill-detail-zh", shown?.repo, shown?.name],
-    queryFn: () => fetchSkillZhDetail(shown!.repo, shown!.name, shown!.path),
-    enabled: shown != null && !fromDisk && locale === "zh",
+    enabled: shown != null && originalNeeded,
   });
 
   // ←/→ switch skills (delegated to the page); Escape is the sheet's dismiss.
@@ -444,12 +459,19 @@ export function SkillDetailPanel({
     ? translated
     : originalDescription;
   // The mirror-relative SKILL.md path, reused for the mirror's GitHub file
-  // link and to resolve relative URLs inside the markdown body. Only a mirror
-  // read has one — a local read's path is absolute and must never be resolved
-  // against GitHub — so a disk read renders the body with no base at all.
+  // link and to resolve relative URLs inside the markdown body. The index
+  // row carries the skill's snapshot directory, so the file's path is known
+  // before any fetch — the 源 link stays pinned to the SKILL.md even in zh
+  // mode, where the English file itself is fetched only on demand. Only a
+  // mirror read has one — a local read's path is absolute and must never be
+  // resolved against GitHub — so a disk read renders the body with no base
+  // at all.
   const filePath = fromDisk
     ? ""
-    : (detail?.path.replace(/^\/+|\/+$/g, "") ?? "");
+    : (
+        detail?.path ??
+        (shown?.path ? `${shown.path.replace(/\/+$/, "")}/SKILL.md` : "")
+      ).replace(/^\/+|\/+$/g, "");
   // Whether the Chinese page can lead the body: zh mode, a mirror read, and
   // a translation actually fetched with a body. The English body keeps
   // leading everywhere else (en mode, local disk reads, untranslated skills).
@@ -485,13 +507,15 @@ export function SkillDetailPanel({
     // The same install figure the list rows show. Shown for exactly the
     // skills whose card shows it — the registry-backed ones.
     showStats && shown ? <SkillInstalls key="installs" skill={shown} /> : null,
-    shown && !fromDisk && (rev || seenAt || detail) ? (
+    // Provenance reads the index row, not the fetched file, so the 源 tip
+    // renders before — and without — the English SKILL.md's fetch.
+    shown && !fromDisk && (rev || seenAt || filePath) ? (
       <ProvenanceTip
         key="provenance"
-        href={detail ? skillBlobUrl : undefined}
+        href={filePath ? skillBlobUrl : undefined}
         rev={rev ?? undefined}
         seenAt={seenAt ?? undefined}
-        path={detail?.path}
+        path={filePath || undefined}
       />
     ) : null,
     fromDisk && detail ? <ProvenanceTip key="local-provenance" path={detail.path} /> : null,
@@ -675,8 +699,9 @@ export function SkillDetailPanel({
         {/* Body language toggle, mirroring the header's 查看原文 for the
             description: zh mode leads with the Chinese page when the snapshot
             ships one, and this flips the body to the English original and
-            back. Both files are already fetched and cached, so it is a pure
-            render switch. Icon-only and parked beside the edit action at the
+            back. The first flip fetches the English file — the one request a
+            zh-mode open deferred — and every later flip is a cached render
+            switch. Icon-only and parked beside the edit action at the
             divider's right end — the centered divider label already names the
             file shown, so the wording lives in the accessible name and hover
             title. Hidden while editing — the editor always shows the local
@@ -761,14 +786,24 @@ export function SkillDetailPanel({
           </div>
         ) : (
           <div className="h-full overflow-y-auto px-6 pb-6">
-            {isPending ? (
+            {showingZhBody ? (
+              // The Chinese page leads and never pends (its fetch degrades
+              // to null), so the pane renders straight from it — the deferred
+              // English fetch has nothing to say here until the toggle.
+              <div className="pt-3">{skillMdBody}</div>
+            ) : detailPending ? (
+              // The English (or disk) file is loading: on open for en mode,
+              // disk reads and untranslated skills; on the toggle's first
+              // flip for a translated one. A disabled-but-unfetched query
+              // reports pending too — that is exactly the zh open whose
+              // Chinese page is still in flight.
               <div className="flex h-40 items-center justify-center text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
-            ) : isError ? (
+            ) : detailIsError ? (
               <div className="flex flex-col items-center gap-3 py-16 text-center">
                 <p className="text-[13px] leading-relaxed text-muted-foreground">
-                  {t("detail.loadFailed", { message: errorMessage(error) })}
+                  {t("detail.loadFailed", { message: errorMessage(detailError) })}
                   <br />
                   {t("detail.loadFailedHint")}
                 </p>
@@ -776,7 +811,7 @@ export function SkillDetailPanel({
                   variant="outline"
                   size="sm"
                   className="mt-1"
-                  onClick={() => void refetch()}
+                  onClick={() => void refetchDetail()}
                 >
                   {t("action.retry")}
                 </Button>

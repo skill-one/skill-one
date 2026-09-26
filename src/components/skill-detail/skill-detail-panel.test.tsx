@@ -20,6 +20,8 @@ import {
 } from "../../lib/local-skills";
 import { openExternal } from "../../lib/open-external";
 import type { SkillView } from "../../lib/skill-view";
+import { LANGUAGE_STORAGE_KEY } from "../../lib/i18n-content";
+import i18n from "../../i18n/index";
 import { Sheet } from "../ui/sheet";
 import { I18nProvider } from "../../i18n/language-provider";
 import { toast } from "../ui/toast";
@@ -629,12 +631,13 @@ describe("SkillDetailPanel Chinese page", () => {
     path: "profiles/anthropics/skills/pdf/skill_zh.md",
   };
 
-  it("leads the body with the snapshot's Chinese page in zh mode", async () => {
+  it("leads the body with the snapshot's Chinese page, without fetching the English file", async () => {
     mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
     renderDrawer({});
 
     // The Chinese page replaces the English body, and the divider names the
-    // file actually shown.
+    // file actually shown. The English SKILL.md stays unfetched — the
+    // deferred request only fires when the reader flips to it.
     expect(await screen.findByText("使用此技能处理 PDF。")).toBeInTheDocument();
     expect(screen.queryByText("Use this skill for PDFs.")).not.toBeInTheDocument();
     expect(screen.getByText("skill_zh.md")).toBeInTheDocument();
@@ -643,6 +646,7 @@ describe("SkillDetailPanel Chinese page", () => {
       "pdf",
       "skills/anthropics/skills/pdf",
     );
+    expect(mockFetchSkillDetail).not.toHaveBeenCalled();
   });
 
   it("keeps the 源 provenance pinned to the English SKILL.md", async () => {
@@ -651,39 +655,83 @@ describe("SkillDetailPanel Chinese page", () => {
 
     await screen.findByText("使用此技能处理 PDF。");
     // The translation is garnish; provenance still describes the indexed
-    // original, whatever body currently leads.
+    // original, whatever body currently leads. The link derives from the
+    // index row's directory, so it is pinned even with the English file
+    // unfetched.
+    expect(mockFetchSkillDetail).not.toHaveBeenCalled();
     expect(screen.getByRole("link", { name: "源" })).toHaveAttribute(
       "href",
       "https://github.com/skill-one/skills-profiles/blob/dist/skills/anthropics/skills/pdf/SKILL.md",
     );
   });
 
-  it("flips between the Chinese page and the English original without refetching", async () => {
+  it("fetches the English original on the first 查看原文 flip and caches it", async () => {
     const user = userEvent.setup();
+    // The suite's bare client has staleTime 0, under which every cached
+    // result is instantly stale and a re-render refetches — an artifact no
+    // real session sees (the app's client pins staleTime to 10 minutes, see
+    // `lib/query-client.ts`). Match it, so the assertion says what it means:
+    // the flip fetches once, and later flips ride the cache.
+    queryClient.setDefaultOptions({
+      queries: { retry: false, staleTime: 10 * 60 * 1000 },
+    });
     mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
     renderDrawer({});
 
     await screen.findByText("使用此技能处理 PDF。");
+    expect(mockFetchSkillDetail).not.toHaveBeenCalled();
+
     await user.click(screen.getByRole("button", { name: "查看原文" }));
 
     // The original body leads again, the divider names it, and the toggle
-    // offers the way back.
+    // offers the way back. The flip carried the English file's deferred
+    // fetch — one request.
     expect(screen.getByText("Use this skill for PDFs.")).toBeInTheDocument();
     expect(screen.queryByText("使用此技能处理 PDF。")).not.toBeInTheDocument();
     expect(screen.getByText("SKILL.md")).toBeInTheDocument();
     expect(mockFetchSkillDetail).toHaveBeenCalledTimes(1);
 
+    // Flipping back — and forth again — rides the cache: no second request.
     await user.click(screen.getByRole("button", { name: "查看译文" }));
     expect(screen.getByText("使用此技能处理 PDF。")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "查看原文" }));
+    expect(screen.getByText("Use this skill for PDFs.")).toBeInTheDocument();
+    expect(mockFetchSkillDetail).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the English body with no toggle when the snapshot ships no Chinese page", async () => {
+  it("falls back to the English body, fetched on the spot, when the snapshot ships no Chinese page", async () => {
     renderDrawer({});
 
+    // The null translation answer enables the English fetch right away, so
+    // the untranslated skill's body still arrives — one request, no toggle.
     await screen.findByText("Use this skill for PDFs.");
+    expect(mockFetchSkillDetail).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("skill_zh.md")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "查看原文" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("fetches only the English file in en mode, with no translation entry", async () => {
+    // Pin the stored preference before the provider mounts, the same way the
+    // suite's zh pin does (see `src/test/setup.ts`).
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "en");
+    void i18n.changeLanguage("en");
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    renderDrawer({});
+
+    // Even a skill the snapshot ships a Chinese page for reads the English
+    // file alone in en mode — the snapshot's page is never requested, and no
+    // language toggle exists to ask for it.
+    expect(await screen.findByText("Use this skill for PDFs.")).toBeInTheDocument();
+    expect(mockFetchSkillDetail).toHaveBeenCalledTimes(1);
+    expect(mockFetchSkillZhDetail).not.toHaveBeenCalled();
+    expect(screen.queryByText("skill_zh.md")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "查看原文" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "查看译文" }),
     ).not.toBeInTheDocument();
   });
 
