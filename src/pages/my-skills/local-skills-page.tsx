@@ -1,15 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Boxes } from "lucide-react";
 
+import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
-import { useSkillProvenance } from "../../hooks/use-skill-provenance";
+import { useListQuery } from "../../hooks/use-list-view";
 import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
+import { useSkillProvenance } from "../../hooks/use-skill-provenance";
+import { FoldRule } from "../../components/fold-rule";
 import {
   installedSkillView,
   skillKey,
   type SkillView,
 } from "../../lib/skill-view";
+import { buildSearchIndex } from "../../lib/search-index";
 import {
   SKILL_ROW_LIST_CLASS,
   SKILL_ROW_SKELETON_CLASS,
@@ -24,7 +28,7 @@ import { SkeletonList } from "../../components/skeleton-list";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { LinkSuggestionBadge } from "./link-suggestion-badge";
 import type { LinkCandidate } from "../../lib/link-suggestions";
-import { SkillRow } from "../explore/skill-row";
+import { SkillRow, type SkillMatched } from "../explore/skill-row";
 
 /** How many rows mount with the page, and how many more each scroll reveals. */
 const INITIAL_ROWS = 12;
@@ -38,6 +42,8 @@ interface Row {
   view: SkillView;
   enabled: boolean;
   suggestion?: LinkCandidate[];
+  /** Search-hit highlights; set only in the matches section. */
+  matched?: SkillMatched;
 }
 
 /**
@@ -48,13 +54,20 @@ interface Row {
  * card and caps it like any repository's; this is what that card's door opens,
  * exactly as a repository card's door opens the repository's own page. It is
  * the same list — the pool's rows, uncapped — so the two surfaces cannot
- * disagree about what the pool holds.
+ * disagree about what the pool holds, in what the rows read in either: newest
+ * install first (ties by name), the card's own order.
  *
  * The rows read like a repository page's: an enumeration (no podium — the pool
  * carries no order to win), each row carrying the enable switch and, on an
  * install the registry has a plausible namesake for, the migration badge that
  * records where it came from. The source is not repeated per row: the page's own
  * head already states it.
+ *
+ * A query the reader brought with them (the one search box both lists share,
+ * see `lib/list-view`) the page answers the way the card under that query did:
+ * matches first, in the index's relevance order — the same order the pool card
+ * reads its rows in while a search is live — and the pool rows the query ruled
+ * out behind one fold. A query nothing answers widens back to the whole pool.
  */
 export function LocalSkillsPage() {
   const { t } = useTranslation();
@@ -92,16 +105,113 @@ export function LocalSkillsPage() {
     [list, linked, suggestions],
   );
 
-  const [selected, setSelected] = useState<string | null>(null);
+  // The search the reader came here with. The search box is one control shared
+  // by both lists (see `lib/list-view`), so a query that opened the pool card
+  // is still live on the page the card opens — and that page answers it the
+  // same way the card did rather than silently ignoring it.
+  const search = useListQuery();
+  const query = useDebouncedValue(search).trim();
+  const searching = query.length > 0;
+
+  // The pool's own answer to that query, over the same rows in the same order
+  // the page reads them (the pool is short, so the index is cheap to build and
+  // rebuild — the same rule the installed list's index follows).
+  const poolSearch = useMemo(
+    () => buildSearchIndex(rows.map((row) => row.view)),
+    [rows],
+  );
+  const hits = useMemo(
+    () => (searching ? poolSearch(query) : null),
+    [searching, poolSearch, query],
+  );
+
+  // The matches, in the answer's own order (relevance) — the order the pool
+  // card reads its rows in while the same query is live. A query nothing
+  // answers widens to the ordinary page: an empty matches section would read
+  // as a dead end.
+  const matched = useMemo<Row[] | null>(() => {
+    if (!hits) return null;
+    if (hits.length === 0) return null;
+    const byName = new Map(rows.map((row) => [row.view.name, row]));
+    return hits.flatMap((hit) => {
+      const row = byName.get(hit.doc.name);
+      return row ? [{ ...row, matched: hit.matched }] : [];
+    });
+  }, [hits, rows]);
+
+  // The pool rows the query ruled out, folded behind the dividing rule — the
+  // same one fold the repository page draws under its matches.
+  const rest = useMemo<Row[] | null>(() => {
+    if (!matched) return null;
+    const names = new Set(matched.map((row) => row.view.name));
+    const ruled = rows.filter((row) => !names.has(row.view.name));
+    return ruled.length > 0 ? ruled : null;
+  }, [matched, rows]);
+
+  // The fold is the page's own state, not the shared list view's: it folds
+  // this pool under this query, nothing wider. It stands down when the
+  // question changes — a fold opened for one answer is not a place the reader
+  // stands under the next.
+  const [restOpen, setRestOpen] = useState(false);
+  const lastQuestion = useRef(query);
+  useEffect(() => {
+    if (lastQuestion.current === query) return;
+    lastQuestion.current = query;
+    setRestOpen(false);
+  }, [query]);
+
+  // What the page lists: the matches when a search led here, the pool whole
+  // when it did not — then, unfolded, what the search ruled out.
+  const first = matched ?? rows;
+  const restSection = restOpen ? rest : null;
+
+  // One reveal paces the page across both sections: folded, the count runs
+  // through the first section alone; a fold open runs it on into that
+  // section, numbering continuing rather than restarting.
   const { count, sentinelRef, done } = useProgressiveReveal({
-    total: rows.length,
+    total: first.length + (restSection?.length ?? 0),
     initial: INITIAL_ROWS,
     step: ROW_CHUNK,
+    resetKey: `${query}\u0000${restSection ? "open" : "folded"}`,
   });
-  const shown = rows.slice(0, count);
+  const firstShown = first.slice(0, count);
+  const restShown = restSection
+    ? restSection.slice(0, Math.max(0, count - first.length))
+    : [];
 
   // The drawer walks the same list the page renders, in the same order.
-  const allViews = useMemo(() => rows.map((row) => row.view), [rows]);
+  const allViews = useMemo(
+    () => [...first, ...(restSection ?? [])].map((row) => row.view),
+    [first, restSection],
+  );
+
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const renderRow = (row: Row, index: number) => (
+    <SkillRow
+      key={row.view.name}
+      skill={row.view}
+      matched={row.matched}
+      index={index}
+      // The pool carries no order to win, so its numbers merely count the
+      // list.
+      ranked={false}
+      // The head states the source once; every row here has the same one.
+      showSource={false}
+      muted={!row.enabled}
+      selected={selected === skillKey(row.view)}
+      extra={
+        row.suggestion?.length ? (
+          <LinkSuggestionBadge
+            name={row.view.name}
+            candidates={row.suggestion}
+          />
+        ) : undefined
+      }
+      action={<SkillEnableSwitch skill={row.view} />}
+      onSelect={() => setSelected(skillKey(row.view))}
+    />
+  );
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
@@ -111,7 +221,8 @@ export function LocalSkillsPage() {
           that would have to stand for one (see `DrillDownHead`). It keeps the
           card bar's one action: the switch that enables or disables the whole
           pool in one press, the same group switch a repository page carries —
-          per-skill switches stay on the rows below. */}
+          per-skill switches stay on the rows below. The figure stays the
+          pool's whole count: each fold states its own. */}
       <DrillDownHead
         back="/my-skills"
         title={t("common.localInstall")}
@@ -144,36 +255,43 @@ export function LocalSkillsPage() {
           <Placeholder icon={Boxes} message={t("state.noLocal")} />
         ) : (
           <>
-            <ul className={SKILL_ROW_LIST_CLASS}>
-              {shown.map((row, index) => (
-                <SkillRow
-                  key={row.view.name}
-                  skill={row.view}
-                  index={index}
-                  // The pool carries no order to win, so its numbers merely
-                  // count the list.
-                  ranked={false}
-                  // The head states the source once; every row here has the
-                  // same one.
-                  showSource={false}
-                  muted={!row.enabled}
-                  selected={selected === skillKey(row.view)}
-                  extra={
-                    row.suggestion?.length ? (
-                      <LinkSuggestionBadge
-                        name={row.view.name}
-                        candidates={row.suggestion}
-                      />
-                    ) : undefined
-                  }
-                  action={<SkillEnableSwitch skill={row.view} />}
-                  onSelect={() => setSelected(skillKey(row.view))}
+            {/* The first section: the matches when a search led here, the
+                pool whole when it did not. These rows never move or change
+                voice when the fold below opens — the whole point of folding
+                rather than swapping. */}
+            {firstShown.length > 0 && (
+              <ul className={SKILL_ROW_LIST_CLASS}>
+                {firstShown.map((row, index) => renderRow(row, index))}
+              </ul>
+            )}
+
+            {/* The search fold: the pool rows the query ruled out, drawn as a
+                dividing rule across the list — the matches end where the rule
+                begins, the rest begins where it ends. */}
+            {rest != null && (
+              <div className={firstShown.length > 0 ? "py-4" : "pt-1"}>
+                <FoldRule
+                  controls="pool-other-skills"
+                  open={restOpen}
+                  closedLabel={t("pool.showOtherInstalled", {
+                    count: rest.length,
+                  })}
+                  openLabel={t("pool.collapseOtherInstalled", {
+                    count: rest.length,
+                  })}
+                  onToggle={() => setRestOpen((open) => !open)}
                 />
-              ))}
-            </ul>
+              </div>
+            )}
+            {restShown.length > 0 && (
+              <ul id="pool-other-skills" className={SKILL_ROW_LIST_CLASS}>
+                {restShown.map((row, i) => renderRow(row, first.length + i))}
+              </ul>
+            )}
+
             {/* The sentinel ends the rendered run: while it is on screen the
                 observer extends the run, so scrolling down keeps revealing rows
-                until the pool is fully mounted. */}
+                until the list is fully mounted. */}
             {!done && <div ref={sentinelRef} aria-hidden="true" />}
           </>
         )}
