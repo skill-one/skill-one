@@ -21,8 +21,8 @@ anywhere in the pipeline.
 - **Requests are live** — the check is issued by Rust (`reqwest`), not the webview, so it never
   reads an HTTP cache. It reads GitHub's `releases/latest` pointer, which is edge-cached: a fresh
   release can take a minute or two to become visible.
-- **When an update is found** — no modal interrupts you. A green **有新版本** chip appears above the
-  rail's **设置** entry, and **clicking it opens the confirmation dialog from wherever the user is**
+- **When an update is found** — no modal interrupts you. A green **有新版本** chip appears beside the
+  header's **设置** entry, and **clicking it opens the confirmation dialog from wherever the user is**
   — nobody has to know the update is filed under settings. The 软件更新 row in the settings popover reports the other phases in place (up to date,
   check failed, Homebrew-managed) and, when a version is waiting, hands off to the confirmation
   dialog. One badge on an icon the user already knows, as in VS Code's gear, Chrome's ⋮ menu and

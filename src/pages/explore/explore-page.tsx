@@ -10,7 +10,7 @@ import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useInstalledSearchRows } from "../../hooks/use-installed-search";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
-import { setScope } from "../../lib/list-view";
+import { setScope, setUnit } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
 import { FIRST_RANK_BAND, rankBands } from "../../lib/registry/rank-bands";
 import {
@@ -23,6 +23,7 @@ import {
 import { GroupSection } from "../../components/group-section";
 import { Button } from "../../components/ui/button";
 import { ListFacets } from "../../components/list-facets";
+import { ListUnitToggle } from "../../components/list-unit-toggle";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
@@ -56,10 +57,11 @@ interface ExploreView {
 /**
  * The store's browse list, in either of two units: one card per repository (each
  * listing the skills it publishes), or one row per skill. The reader picks the
- * unit on the toolbar, scopes either to a single domain with the filter below,
- * and both share the same selection. There is no sort control: the repository
- * unit leads with the highest-starred repositories (their skills most-installed
- * first) and the skill unit with the most installed skills; a search re-answers
+ * unit on the list's own first row and scopes either to a single domain with
+ * the chips beside it, and both share the same selection. There is no sort
+ * control: the repository unit leads with the highest-starred repositories
+ * (their skills most-installed first) and the skill unit with the most
+ * installed skills; a search re-answers
  * either in relevance order across the whole registry, and the filter stands
  * down while it is live.
  */
@@ -175,7 +177,10 @@ export function ExplorePage() {
   // Consecutive skills from one repository, gathered into runs (see
   // `buildSkillRuns`): a repository that ships several close-ranked skills can
   // show its best and fold the rest behind a single "+N more" row.
-  const skillGroups = useMemo(() => buildSkillRuns(activeSkills), [activeSkills]);
+  const skillGroups = useMemo(
+    () => buildSkillRuns(activeSkills),
+    [activeSkills],
+  );
 
   // The filter's chips for the current unit — repositories per domain, or skills
   // per domain: the two units file the same data differently. Both lead with the
@@ -200,9 +205,11 @@ export function ExplorePage() {
   // A download failure only owns the screen while there is nothing to show;
   // with data on screen (cache / previous source) the error surfaces in the
   // footer count instead of blanking the page.
-  const activeError = isSearching ? null : sectionsError
-    ? sectionsErrorObj
-    : null;
+  const activeError = isSearching
+    ? null
+    : sectionsError
+      ? sectionsErrorObj
+      : null;
   const failure =
     stats.count === 0 && !stats.complete
       ? (stats.error ??
@@ -214,8 +221,7 @@ export function ExplorePage() {
   // into a single entry (see `skillGroups`), so the run, not the skill, is what
   // the reveal counts. A search does not reveal — the unified search view
   // renders its whole answer.
-  const itemCount =
-    unit === "skill" ? skillGroups.length : browseRepos.length;
+  const itemCount = unit === "skill" ? skillGroups.length : browseRepos.length;
   const renderedCount = Math.min(visibleCount, itemCount);
   const allRendered = renderedCount >= itemCount;
 
@@ -302,22 +308,28 @@ export function ExplorePage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
       {/* The list's own first row: the domains that hold rows, flat, one press
-          to scope the list (全部 clears it).
+          to scope the list (全部 clears it), and the unit switch closing it.
           The chips are a browse control — a search re-orders the whole registry
           by relevance and ignores the scope — so they stand down while a search
-          is live, and the list opens the content on its own then.
-          Their counts follow the unit: the repository unit weighs a domain by
-          repositories, the skill unit by skills. */}
-      {!isSearching && (
-        <div className="mb-3 flex min-w-0 items-center">
+          is live; the switch stays, because the search answer reads in either
+          unit too (see `SearchResults`). Their counts follow the unit: the
+          repository unit weighs a domain by repositories, the skill unit by
+          skills. */}
+      <div className="mb-3 flex min-w-0 items-center gap-3">
+        {!isSearching && (
           <ListFacets
             facets={chips}
             total={totalCount}
             selected={selectedDomain}
             onSelect={(key) => setScope("store", key)}
           />
-        </div>
-      )}
+        )}
+        <ListUnitToggle
+          className="ml-auto"
+          unit={unit}
+          onChange={(next) => setUnit("store", next)}
+        />
+      </div>
 
       {/* The list; the modal detail drawer overlays it without reflowing it or
           moving its scroll position. */}
@@ -337,7 +349,9 @@ export function ExplorePage() {
             className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5"
           >
             {failure ? (
-              <Placeholder message={t("state.loadFailed", { message: failure })}>
+              <Placeholder
+                message={t("state.loadFailed", { message: failure })}
+              >
                 <Button
                   variant="outline"
                   size="sm"
@@ -384,7 +398,9 @@ export function ExplorePage() {
               />
             ) : itemCount === 0 ? (
               <Placeholder
-                message={query ? t("state.noMatch", { query }) : t("state.noSkills")}
+                message={
+                  query ? t("state.noMatch", { query }) : t("state.noSkills")
+                }
               />
             ) : (
               <div
@@ -454,10 +470,7 @@ export function ExplorePage() {
                       );
                       if (revealed.length === 0) return null;
                       return (
-                        <GroupSection
-                          key={band.key}
-                          label={band.title}
-                        >
+                        <GroupSection key={band.key} label={band.title}>
                           <ul className={REPO_LIST_CLASS}>
                             {revealed.map((group) => (
                               <RepoCard
@@ -518,4 +531,3 @@ export function ExplorePage() {
     </div>
   );
 }
-

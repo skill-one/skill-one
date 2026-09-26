@@ -54,18 +54,18 @@ skill-one/
 ├── src/                    # 前端（React + TypeScript）
 │   ├── components/         # 跨页面共享组件
 │   │   ├── ui/             # shadcn/ui 组件
-│   │   ├── app-header.tsx  # 应用外壳，单行：品牌居中 + 当前列表的控件
-│   │   ├── app-rail.tsx    # 应用导航：窄轨（两个入口、设置）
+│   │   ├── app-header.tsx  # 应用外壳，单行：行首品牌与入口导航，行尾搜索与设置
+│   │   ├── app-nav.tsx     # 应用导航：两个入口做成 header 里的分段控件
 │   │   ├── collapsible-section.tsx # 所有分组列表共用的吸顶可折叠分组头
 │   │   ├── drill-down-head.tsx # 列表内页面的头行：返回控件 + 实体身份
 │   │   ├── list-facets.tsx # 当前列表内容区首行的分类 chips（含「更多」浮层）
-│   │   ├── list-toolbar.tsx # 两个列表共用的搜索框（行首）与单位切换（行尾）
+│   │   ├── list-unit-toggle.tsx # 仓库/技能单位切换，位于列表首行行尾
 │   │   ├── agent-icon.tsx  # agent 品牌图标
 │   │   ├── owner-avatar.tsx# owner 头像（元信息行的作者头像）
 │   │   ├── repo-hover-card.tsx # 作者头像 + 其仓库信息浮窗
 │   │   ├── skill-cover.tsx # skill 自身的图片位（作者首字母；仅详情抽屉使用）
 │   │   ├── skill-detail/    # 共享的 skill 详情面板与模态抽屉
-│   │   ├── settings-popover.tsx # 锚定在窄轨底部的设置浮窗
+│   │   ├── settings-popover.tsx # 锚定在 header 行尾的设置浮窗
 │   │   ├── advanced-settings-dialog.tsx # 二级设置（CDN 基址 + 数据源）
 │   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）

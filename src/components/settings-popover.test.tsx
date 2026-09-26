@@ -43,9 +43,11 @@ const stats = vi.hoisted(() => ({
 }));
 
 vi.mock("../hooks/use-registry-snapshot", () => ({
-  useRegistrySnapshot: (selector: (snapshot: {
-    index: import("../lib/registry/protocol").IndexInfo | null;
-  }) => unknown) =>
+  useRegistrySnapshot: (
+    selector: (snapshot: {
+      index: import("../lib/registry/protocol").IndexInfo | null;
+    }) => unknown,
+  ) =>
     selector({
       index: stats.current,
     }),
@@ -63,7 +65,7 @@ function renderSettings() {
   );
 }
 
-/** Open the popover from the rail's settings entry. */
+/** Open the popover from the header's settings entry. */
 async function openPopover(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "设置" }));
   await screen.findByText("外观");
@@ -90,7 +92,7 @@ describe("SettingsMenu", () => {
     act(() => setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT));
   });
 
-  it("opens a popover with the quick settings from the rail entry", async () => {
+  it("opens a popover with the quick settings from the header entry", async () => {
     const user = userEvent.setup();
     renderSettings();
 
@@ -177,12 +179,14 @@ describe("SettingsMenu", () => {
 
     await user.click(screen.getByRole("button", { name: /软件更新/ }));
 
-    // Both the rail chip and the popover row flag the discovery: the chip
+    // Both the header chip and the popover row flag the discovery: the chip
     // is a button, the row's status is a plain badge span.
     expect(
       await screen.findByRole("button", { name: "有新版本" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("有新版本", { selector: "span" })).toBeInTheDocument();
+    expect(
+      screen.getByText("有新版本", { selector: "span" }),
+    ).toBeInTheDocument();
     // The second click on an available update opens the dialog instead of
     // re-checking, and dismisses the flyout so only one overlay is up.
     await user.click(screen.getByRole("button", { name: /软件更新/ }));

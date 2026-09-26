@@ -4,11 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ChevronLeft } from "lucide-react";
 
 import { useReturn } from "../hooks/use-return";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "./ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /**
  * A page inside a list, as its own head: the way back to the list, the thing
@@ -23,11 +19,12 @@ import {
  * that one control in one place serves every drill-down (see `AppHeader`); it
  * lives here instead because the page it leaves is where the rest of that
  * subject is said, and a reader who wants out of a repository looks at the
- * repository, not at the title bar above it. The rail still says which list the
- * page belongs to — it lights that list up for the whole time the page is
- * mounted — so the control names no destination, and it does not print the word
- * 返回 beside the mark either: on a row whose other half is a name the reader
- * is trying to read, a word whose meaning they can already see is noise. The
+ * repository, not at the title bar above it. The header's navigation still
+ * says which list the page belongs to — it keeps that list's segment lit for
+ * the whole time the page is mounted — so the control names no destination,
+ * and it does not print the word 返回 beside the mark either: on a row whose
+ * other half is a name the reader is trying to read, a word whose meaning they
+ * can already see is noise. The
  * word moves to where a mark that cannot say it itself says it — the control's
  * accessible name and its hover tip — which is the arrangement the list's own
  * tools use for the same reason (see `ListUnitToggle`).
