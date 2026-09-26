@@ -12,8 +12,8 @@ const isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform);
  * names what is being searched and doubles as the accessible label, so the
  * visible hint and the announced one can never drift apart.
  *
- * It opens the header's row, right after the corner the traffic lights keep, and
- * it is open all the time: a field that has to be asked for first is a field the
+ * It closes the header's row, just before the window's settings entry, and it
+ * is open all the time: a field that has to be asked for first is a field the
  * reader has to look for first, and searching is the first thing a reader does
  * to a list of eight thousand. The magnifier is decorative and never the click
  * target — the field under it is.

@@ -92,7 +92,7 @@ describe("App routing", () => {
     expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
 
-  it("navigates between routes via the rail", async () => {
+  it("navigates between routes via the header", async () => {
     const user = userEvent.setup();
     render(
       <I18nProvider>
@@ -106,7 +106,7 @@ describe("App routing", () => {
     expect(await screen.findByText("外观")).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
-    // Navigate back to the installed list, the rail's 我的.
+    // Navigate back to the installed list, the header's 我的 segment.
     await user.click(screen.getByRole("link", { name: /^我的$/ }));
 
     expect(await screen.findByText("pdf")).toBeInTheDocument();

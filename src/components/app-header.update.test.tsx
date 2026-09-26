@@ -2,13 +2,14 @@ import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AppRail } from "./app-rail";
+import { AppHeader } from "./app-header";
 import { TooltipProvider } from "./ui/tooltip";
 import { renderWithRouter } from "../test/test-utils";
 
-// The update chip only ever shows inside Tauri, so — unlike the navigation
+// The update chip only ever shows inside Tauri, so — unlike the header's own
 // tests — this file forces the desktop environment on. The mocks are scoped to
-// this module, leaving app-rail.test.tsx (which runs in browser mode) untouched.
+// this module, leaving app-header.test.tsx (which runs in browser mode)
+// untouched.
 const updateMocks = vi.hoisted(() => ({
   isTauri: true,
   check: vi.fn(),
@@ -27,10 +28,10 @@ import {
   resetUpdateState,
 } from "../lib/update-store";
 
-function renderRail() {
+function renderHeader() {
   return renderWithRouter(
-    <TooltipProvider>
-      <AppRail />
+    <TooltipProvider delay={300}>
+      <AppHeader />
     </TooltipProvider>,
     { route: "/" },
   );
@@ -49,10 +50,10 @@ beforeEach(() => {
   resetUpdateState();
 });
 
-describe("AppRail update chip", () => {
+describe("header update chip", () => {
   it("is absent until a check finds a newer release", async () => {
     updateMocks.check.mockResolvedValue(null);
-    renderRail();
+    renderHeader();
     await act(async () => {
       await checkForUpdate();
     });
@@ -61,15 +62,16 @@ describe("AppRail update chip", () => {
     expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
   });
 
-  it("sits above 设置 rather than adding a destination of its own", async () => {
+  it("sits beside 设置 rather than adding a destination of its own", async () => {
     updateMocks.check.mockResolvedValue(fakeRelease());
-    renderRail();
+    renderHeader();
     await act(async () => {
       await checkForUpdate();
     });
 
     const chip = await screen.findByRole("button", { name: "有新版本" });
-    // The chip shares the settings foot, so the rail gained no destination.
+    // The chip shares the header's trailing cluster, so the nav gained no
+    // destination.
     expect(chip.parentElement).toBe(
       screen.getByRole("button", { name: "设置" }).parentElement,
     );
@@ -80,7 +82,7 @@ describe("AppRail update chip", () => {
   it("opens the confirmation dialog from wherever the user is", async () => {
     const user = userEvent.setup();
     updateMocks.check.mockResolvedValue(fakeRelease());
-    renderRail();
+    renderHeader();
     await act(async () => {
       await checkForUpdate();
     });

@@ -5,7 +5,6 @@ import { listen } from "@tauri-apps/api/event";
 import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
 
 import { AppHeader } from "./components/app-header";
-import { AppRail } from "./components/app-rail";
 import { UpdateDialog } from "./components/update-dialog";
 import { Toaster } from "./components/ui/toast";
 import { TooltipProvider } from "./components/ui/tooltip";
@@ -78,19 +77,17 @@ export default function App() {
           breaks hover-open for every tooltip but the group's own. */}
       <TooltipProvider delay={300}>
         <HashRouter>
-        <PopoverNavigation />
-        <AppUpdateWatcher />
-        <RegistryAutoRefresh />
-        <AgentAutoLink />
-        <UpdateDialog />
-        <Toaster />
-        <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
-          <AppHeader />
-          <div className="flex min-h-0 flex-1">
-            <AppRail />
+          <PopoverNavigation />
+          <AppUpdateWatcher />
+          <RegistryAutoRefresh />
+          <AgentAutoLink />
+          <UpdateDialog />
+          <Toaster />
+          <div className="flex h-screen w-screen flex-col overflow-hidden bg-secondary text-foreground">
+            <AppHeader />
             {/* Each page owns the scroll container of its own list, so the shell
-                only has to hand the routes the remaining space. */}
-            <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+              only has to hand the routes the window's remaining space. */}
+            <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
               <Suspense fallback={null}>
                 <Routes>
                   <Route
@@ -99,20 +96,20 @@ export default function App() {
                   />
                   <Route path="/explore" element={<ExplorePage />} />
                   {/* One repository, every skill it publishes. The splat is
-                      `owner/repo` itself, which carries a slash. */}
+                    `owner/repo` itself, which carries a slash. */}
                   <Route path="/repo/*" element={<RepoPage />} />
                   <Route path="/my-skills" element={<MySkillsPage />} />
                   {/* One repository as the installed list reads it: the skills
-                      of it that are on disk, with the rest of the catalogue a
-                      step away. The store's own page for the same repository
-                      is `/repo/*`, and the two share one component. */}
+                    of it that are on disk, with the rest of the catalogue a
+                    step away. The store's own page for the same repository
+                    is `/repo/*`, and the two share one component. */}
                   <Route
                     path="/my-skills/repo/*"
                     element={<RepoPage origin="installed" />}
                   />
                   {/* The installed list's local pool, listed whole — the page
-                      the pool's card opens, as a repository's page is what a
-                      repository card's bar opens. */}
+                    the pool's card opens, as a repository's page is what a
+                    repository card's bar opens. */}
                   <Route
                     path="/my-skills/local"
                     element={<LocalSkillsPage />}
@@ -125,8 +122,7 @@ export default function App() {
               </Suspense>
             </main>
           </div>
-        </div>
-      </HashRouter>
+        </HashRouter>
       </TooltipProvider>
     </PersistQueryClientProvider>
   );

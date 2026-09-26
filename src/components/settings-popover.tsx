@@ -31,8 +31,8 @@ const rowClassName =
   "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-50";
 
 /**
- * The whole in-rail update affordance: one chip above 设置, and the chip itself
- * is the way in.
+ * The whole update affordance: one chip beside 设置, and the chip itself is
+ * the way in.
  *
  * Marking the control the user already knows — rather than adding a
  * destination of its own — is how the desktop apps this one lives next to do
@@ -44,7 +44,7 @@ const rowClassName =
  * Clicking it opens the confirmation dialog from wherever the user is, so
  * nobody has to know the update is filed under settings. It says its piece
  * instead of being a bare dot — a silent dot beside an icon reads as
- * decoration — and it is the only coloured thing in the rail, which is what
+ * decoration — and it is the only coloured thing in the header, which is what
  * makes it read as an action. Green (`success`) rather than the palette's
  * red: an available update is something to go and get, not a failure, and red
  * would say the app is broken.
@@ -71,7 +71,11 @@ function UpdateBadge() {
 }
 
 /** Trailing status for the 软件更新 row, one shape per update phase. */
-function UpdateRowStatus({ phase }: { phase: ReturnType<typeof useAppUpdate>["phase"] }) {
+function UpdateRowStatus({
+  phase,
+}: {
+  phase: ReturnType<typeof useAppUpdate>["phase"];
+}) {
   const { t } = useTranslation();
   switch (phase) {
     case "checking":
@@ -106,17 +110,16 @@ function UpdateRowStatus({ phase }: { phase: ReturnType<typeof useAppUpdate>["ph
 }
 
 /**
- * Settings entry: the rail's foot opens a small anchored popover with the
- * at-a-glance settings (appearance, repo-card preview size, software update).
- * Heavier sections — CDN base and the registry data source — live one click
- * deeper in a dialog, per the common desktop pattern (Linear, VS Code, GitHub):
- * a lightweight flyout for the frequent toggles, a full surface only when there
- * is real content to manage.
+ * Settings entry: the header's trailing edge opens a small anchored popover
+ * with the at-a-glance settings (appearance, repo-card preview size, software
+ * update). Heavier sections — CDN base and the registry data source — live one
+ * click deeper in a dialog, per the common desktop pattern (Linear, VS Code,
+ * GitHub): a lightweight flyout for the frequent toggles, a full surface only
+ * when there is real content to manage.
  *
  * The entry itself is the icon alone. It is a control, not a place, so it does
- * not wear the labelled tile the two destinations wear; the label it drops lives
- * in the tooltip instead, which is where a rail this narrow keeps the words that
- * do not fit.
+ * not wear the labelled segment the two destinations wear; the label it drops
+ * lives in the tooltip instead.
  */
 export function SettingsMenu() {
   const { t } = useTranslation();
@@ -149,9 +152,8 @@ export function SettingsMenu() {
 
   return (
     <>
-      {/* The chip sits above the entry, not on it: the rail is too narrow for a
-          label beside the icon, and a bare dot would be read as decoration
-          rather than as "an update is waiting". */}
+      {/* The chip sits beside the entry, not on it: a bare dot on the gear
+          would be read as decoration rather than as "an update is waiting". */}
       {hasUpdate && <UpdateBadge />}
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <Tooltip>
@@ -161,26 +163,26 @@ export function SettingsMenu() {
                 render={
                   <Button
                     variant="ghost"
-                    size="icon-lg"
+                    size="icon"
                     aria-label={t("settings.title")}
-                    // A mark on its own, not a third destination: the two entries
-                    // above it are places, and settings is a control — naming it
-                    // beside them would put it in their class. The tooltip says
-                    // the word the rail no longer spends a line on, and the hover
-                    // tile is the one the two destinations use.
+                    // A mark on its own, not a third destination: the two
+                    // segments beside the brand are places, and settings is a
+                    // control — naming it beside them would put it in their
+                    // class. The tooltip says the word the icon does not.
                     className="text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                   />
                 }
               />
             }
           >
-            <Settings className="size-5" />
+            <Settings className="size-[18px]" />
           </TooltipTrigger>
-          <TooltipContent side="right">{t("settings.title")}</TooltipContent>
+          {/* Below the control: the row it lives in is the window's top edge. */}
+          <TooltipContent side="bottom">{t("settings.title")}</TooltipContent>
         </Tooltip>
-        {/* Opens rightward: the entry sits against the window's left edge, with
-            no room below it and nothing to cover above. */}
-        <PopoverContent side="right" align="end" className="w-60 gap-0 p-0">
+        {/* Opens downward: the entry sits on the window's top edge, with no
+            room above it and the whole window below. */}
+        <PopoverContent side="bottom" align="end" className="w-60 gap-0 p-0">
           <div className="flex items-baseline justify-between px-3 pt-2.5 pb-1">
             <span className="text-sm font-medium text-foreground">
               {t("settings.title")}
@@ -261,7 +263,11 @@ export function SettingsMenu() {
                 </p>
               )}
             </div>
-            <button type="button" className={rowClassName} onClick={openAdvanced}>
+            <button
+              type="button"
+              className={rowClassName}
+              onClick={openAdvanced}
+            >
               <span className="flex items-center gap-2">
                 <SlidersHorizontal className="size-4" />
                 {t("settings.advanced")}
@@ -273,7 +279,10 @@ export function SettingsMenu() {
       </Popover>
       {/* Mounted outside the popover: its content unmounts on close and would
           take the dialog down with it. */}
-      <AdvancedSettingsDialog open={advancedOpen} onOpenChange={setAdvancedOpen} />
+      <AdvancedSettingsDialog
+        open={advancedOpen}
+        onOpenChange={setAdvancedOpen}
+      />
     </>
   );
 }

@@ -29,7 +29,7 @@ import { AgentAvatarMenu } from "./agent-avatar-menu";
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage, formatDayHeading } from "../../lib/utils";
 import { buildSearchIndex } from "../../lib/search-index";
-import { setQuery, setScope } from "../../lib/list-view";
+import { setQuery, setScope, setUnit } from "../../lib/list-view";
 import type { SkillMatched } from "../../components/skill-card";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
@@ -43,6 +43,7 @@ import {
 import { GroupSection } from "../../components/group-section";
 import { SkeletonList } from "../../components/skeleton-list";
 import { ListFacets } from "../../components/list-facets";
+import { ListUnitToggle } from "../../components/list-unit-toggle";
 import { LinkSuggestionBadge } from "./link-suggestion-badge";
 import type { LinkCandidate } from "../../lib/link-suggestions";
 import { RepoCard } from "../explore/repo-card";
@@ -105,7 +106,8 @@ function starsOf(group: RepoGroup): number | undefined {
 
 /**
  * The installed list — the management counterpart of the store's 全部 page, in
- * the same two units, switched on the toolbar exactly as the store's are:
+ * the same two units, switched on the list's own first row exactly as the
+ * store's are:
  *
  * - **按仓库**: one card per source repository, filed newest-first into the
  *   same relative-time groups as the skill unit — a repository sits in the
@@ -401,14 +403,15 @@ export function MySkillsPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The list's own first row: the classifications that hold an install (one
-          press to scope the list; 全部 clears it), and the agent strip — this
-          page's own status — out at the far edge.
+      {/* The list's own first row: the classifications that hold an install
+          (one press to scope the list; 全部 clears it), and — closing the row —
+          the unit switch next to the agent strip, this page's own status.
           The chips are a browse control — a search re-orders the list by
-          relevance and ignores them — so they stand down while a search is live;
-          the strip stays, because a status the reader is owed does not depend on
-          what they happen to be looking at. The chips count what the unit lists,
-          so the figures and the list they scope can never disagree. */}
+          relevance and ignores them — so they stand down while a search is
+          live; the switch and the strip stay, because a status the reader is
+          owed, and the shape the search answer reads in, do not depend on what
+          they happen to be looking at. The chips count what the unit lists, so
+          the figures and the list they scope can never disagree. */}
       <div className="mb-3 flex min-w-0 items-center gap-3">
         {!isSearching && rows.length > 0 && (
           <ListFacets
@@ -419,6 +422,10 @@ export function MySkillsPage() {
           />
         )}
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          <ListUnitToggle
+            unit={unit}
+            onChange={(next) => setUnit("installed", next)}
+          />
           <AgentAvatarMenu />
         </div>
       </div>
@@ -492,10 +499,7 @@ export function MySkillsPage() {
             // the group label is the boundary, sized like one row gap.
             <div className="flex flex-col">
               {shownSkillGroups.map((group) => (
-                <GroupSection
-                  key={group.key}
-                  label={groupHeading(group, t)}
-                >
+                <GroupSection key={group.key} label={groupHeading(group, t)}>
                   <ul className={SKILL_ROW_LIST_CLASS}>
                     {group.items.map((row) => {
                       const key = skillKey(row.skill);
@@ -533,10 +537,7 @@ export function MySkillsPage() {
             // own — the group label is the boundary, sized like one row gap.
             <div className="flex flex-col">
               {shownRepoGroups.map((group) => (
-                <GroupSection
-                  key={group.key}
-                  label={groupHeading(group, t)}
-                >
+                <GroupSection key={group.key} label={groupHeading(group, t)}>
                   <ul className={REPO_LIST_CLASS}>
                     {group.items.map((card) => (
                       <RepoCard
