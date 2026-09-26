@@ -443,8 +443,10 @@ export function ExplorePage() {
                   // header over it. Reveal stays global — a band mounts only
                   // once the revealed prefix reaches its first rank, and then
                   // with just the revealed slice — so the sentinel below paces
-                  // the bands exactly as it paced the flat grid.
-                  <div className="flex flex-col gap-6">
+                  // the bands exactly as it paced the flat grid. The bands
+                  // carry no gap of their own — the band label is the
+                  // boundary, sized like one row gap.
+                  <div className="flex flex-col">
                     {repoBands.map((band) => {
                       const revealed = band.items.slice(
                         0,
