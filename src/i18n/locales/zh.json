@@ -47,6 +47,7 @@
     "installed": "已安装",
     "retry": "重试",
     "installFailed": "安装失败，请重试",
+    "alreadyInstalled": "已存在同名 skill：{{name}}",
     "removed": "已移除 {{name}}",
     "remove": "移除",
     "removeFailed": "移除失败",
@@ -147,13 +148,16 @@
     "toggleAria": "{{name}} 链接开关"
   },
   "migration": {
-    "migrated": "已迁移至商店版：{{repo}}",
-    "migrateFailed": "迁移失败",
-    "triggerAria": "将 {{name}} 迁移至商店版",
-    "badge": "可迁移",
-    "title": "发现同名商店条目",
-    "similarityTitle": "描述相似度（仅供参考，不作为迁移依据）",
-    "hint": "点击条目即完成迁移并永久记录来源，本地文件不会移动；相似度仅供参考。"
+    "migrated": "已关联来源：{{repo}}",
+    "migrateFailed": "关联来源失败",
+    "triggerAria": "关联 {{name}} 的商店来源",
+    "badge": "关联来源",
+    "subtitle": "为「{{name}}」选择来源仓库",
+    "tooltip": "关联来源，不改动本地文件",
+    "localLabel": "本地描述",
+    "starsTitle": "仓库星标数",
+    "similarity": "描述相似 {{percent}}%",
+    "footnote": "仅记录来源，本地文件不变"
   },
   "refresh": {
     "dataUpdated": "技能数据已更新到最新快照"

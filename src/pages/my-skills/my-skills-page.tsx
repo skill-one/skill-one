@@ -392,13 +392,21 @@ export function MySkillsPage() {
     [unit, activeRows, repoGroups],
   );
 
-  // The migration affordance trails a row in either unit, and it is only
-  // meaningful while the source is unknown: an install the ledger placed has a
-  // repository to point at, so a route to the store would be a second answer to
-  // a question already answered.
-  const rowExtra = (row: Row) =>
-    !row.skill.repo && row.suggestion?.length ? (
-      <LinkSuggestionBadge name={row.skill.name} candidates={row.suggestion} />
+  // The link affordance is only meaningful while the source is unknown: an
+  // install the ledger placed has a repository to point at. In the skill unit
+  // the label and icon are merged into one trigger ("label"); a repo-card row
+  // takes the icon alone, since the card's bar already names the source.
+  const rowExtra = (
+    row: Row,
+    variant: "label" | "icon",
+  ) =>
+    !row.skill.repo ? (
+      <LinkSuggestionBadge
+        name={row.skill.name}
+        localDescription={row.skill.description}
+        candidates={row.suggestion ?? []}
+        variant={variant}
+      />
     ) : undefined;
 
   return (
@@ -474,7 +482,7 @@ export function MySkillsPage() {
                 skill: row.skill,
                 matched: row.matched,
                 muted: !row.enabled,
-                extra: rowExtra(row),
+                extra: rowExtra(row, "label"),
                 action: <SkillEnableSwitch skill={row.skill} />,
               }))}
               installedSurface
@@ -516,7 +524,7 @@ export function MySkillsPage() {
                           ranked={false}
                           selected={key === selectedKey}
                           muted={!row.enabled}
-                          extra={rowExtra(row)}
+                          extra={rowExtra(row, "label")}
                           action={<SkillEnableSwitch skill={row.skill} />}
                           onSelect={() => setSelectedKey(key)}
                         />
@@ -548,7 +556,7 @@ export function MySkillsPage() {
                           skill: row.skill,
                           matched: row.matched,
                           muted: !row.enabled,
-                          extra: rowExtra(row),
+                          extra: rowExtra(row, "icon"),
                         }))}
                         maxSkills={maxSkills}
                         hasQuery={isSearching}

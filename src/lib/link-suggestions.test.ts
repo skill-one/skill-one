@@ -86,6 +86,27 @@ describe("rankNamesakes", () => {
     expect(ranked[1].similarity).toBe(0);
   });
 
+  it("compares a Chinese local description against the entry's Chinese translation", () => {
+    const localDescription = "读取和处理 PDF 文件。";
+    const ranked = rankNamesakes(
+      [
+        namesake("a/skills", {
+          description: "Read and manipulate PDF files.",
+          descriptionZh: "读取和处理 PDF 文件。",
+        }),
+        namesake("b/skills", {
+          description: "Read and manipulate PDF files.",
+        }),
+      ],
+      localDescription,
+    );
+
+    // The entry carrying the matching Chinese translation wins over the
+    // English-only one despite identical English descriptions.
+    expect(ranked.map((c) => c.skill.repo)).toEqual(["a/skills", "b/skills"]);
+    expect(ranked[0].similarity).toBe(1);
+  });
+
   it("caps the candidate list", () => {
     const ranked = rankNamesakes(
       Array.from({ length: 10 }, (_, i) =>

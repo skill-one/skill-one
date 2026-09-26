@@ -4,7 +4,10 @@ import { useTranslation } from "react-i18next";
 import type { ParseKeys } from "i18next";
 import { Check, Download, Loader2, RefreshCw } from "lucide-react";
 
-import { installSkillFromSource } from "../lib/local-skills";
+import {
+  installSkillFromSource,
+  SkillAlreadyInstalledError,
+} from "../lib/local-skills";
 import {
   markSkillsChanged,
   useInstalledSkills,
@@ -141,7 +144,11 @@ export function SkillInstallButton({
       setInstallState("installed");
     } catch (err) {
       setInstallState("error");
-      toast.add({ title: errorMessage(err, t("action.installFailed")), type: "error" });
+      const title =
+        err instanceof SkillAlreadyInstalledError
+          ? t("action.alreadyInstalled", { name: err.skillName })
+          : errorMessage(err, t("action.installFailed"));
+      toast.add({ title, type: "error" });
     }
   };
 

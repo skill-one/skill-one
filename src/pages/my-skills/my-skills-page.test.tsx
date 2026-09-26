@@ -641,12 +641,12 @@ describe("MySkillsPage", () => {
     renderPage();
 
     const badge = await screen.findByRole("button", {
-      name: "将 pdf 迁移至商店版",
+      name: "关联 pdf 的商店来源",
     });
     await user.click(badge);
 
     // The popover lists the namesake candidates; clicking one confirms the
-    // migration right there — no second dialog.
+    // source link right there — no second dialog.
     const candidate = await screen.findByRole("button", {
       name: /anthropics\/skills/,
     });
@@ -662,7 +662,7 @@ describe("MySkillsPage", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "将 pdf 迁移至商店版" }),
+      screen.queryByRole("button", { name: "关联 pdf 的商店来源" }),
     ).not.toBeInTheDocument();
     // And the persisted ledger carries the pick.
     expect(
@@ -673,7 +673,7 @@ describe("MySkillsPage", () => {
 
   it("auto-links a tool-installed skill whose description matches a namesake", async () => {
     // Identical wording (≥ 90% similarity) is treated as the same skill and
-    // linked automatically — no 迁移 badge or confirm dialog ever appears.
+    // linked automatically — no 关联来源 badge or confirm dialog ever appears.
     searchSkills.mockResolvedValue({
       hits: [
         {
@@ -692,10 +692,10 @@ describe("MySkillsPage", () => {
     });
     renderPage();
 
-    // No migration affordance — it linked on its own.
+    // No link-source affordance — it linked on its own.
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: "将 pdf 迁移至商店版" }),
+        screen.queryByRole("button", { name: "关联 pdf 的商店来源" }),
       ).not.toBeInTheDocument(),
     );
     // The persisted ledger already carries the source the auto-link wrote.

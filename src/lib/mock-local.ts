@@ -106,16 +106,20 @@ export function removeMockSkill(name: string): void {
 }
 
 /**
- * Record a mock install of a single skill. Mirrors a successful install in
- * the browser without cloning a repo; a skill of the same name is left
- * untouched (since agents-skills 0.17 `add` never overwrites). No source is
- * kept — agents-skills 0.13 records none either — and the description is empty
- * because the mock has no SKILL.md to read it from.
+ * Record a mock install of a single skill. Mirrors an install in the browser
+ * without cloning a repo; a skill of the same name is left untouched (since
+ * agents-skills 0.17 `add` never overwrites). No source is kept — agents-skills
+ * 0.13 records none either — and the description is empty because the mock has
+ * no SKILL.md to read it from.
+ *
+ * @returns `true` when a same-named skill already existed (the install's
+ * "skipped" outcome), `false` when a skill was added.
  */
-export function installMockSkill(name: string): void {
-  if (mockSkills.some((s) => s.name === name)) return;
+export function installMockSkill(name: string): boolean {
+  if (mockSkills.some((s) => s.name === name)) return true;
   // A freshly installed directory: the creation time is the install time.
   mockSkills = [mockSkill(name, "", Date.now() / 1000), ...mockSkills];
+  return false;
 }
 
 /**
