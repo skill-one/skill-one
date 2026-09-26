@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   CalendarDays,
   ExternalLink,
+  FolderOpen,
   Languages,
   Loader2,
   Pencil,
@@ -15,6 +16,7 @@ import { fetchSkillDetail } from "../../lib/skill-detail-api";
 import { MIRROR } from "../../lib/mirror";
 import {
   fetchLocalSkillDetail,
+  openInstalledSkillDir,
   readLocalSkillRaw,
   saveLocalSkillMd,
 } from "../../lib/local-skills";
@@ -381,6 +383,21 @@ export function SkillDetailPanel({
     setDraft(null);
   };
 
+  // Open the installed copy's directory in the system file manager — the same
+  // directory the editor round-trips SKILL.md inside. Failures (an unlinked
+  // or vanished directory) surface as a toast, not a broken affordance.
+  const handleOpenFolder = async () => {
+    if (!shown) return;
+    try {
+      await openInstalledSkillDir(shown.name);
+    } catch (err) {
+      toast.add({
+        title: errorMessage(err, t("detail.openFolderFailed")),
+        type: "error",
+      });
+    }
+  };
+
   // Always render the SheetContent — Base UI unmounts it with the sheet's
   // open state, keeping it alive through the close animation. With no skill
   // (and no latch yet) the sheet is empty, which only happens before the
@@ -644,7 +661,16 @@ export function SkillDetailPanel({
           </div>
         ) : (
           editable && (
-            <div className="relative bg-popover pl-3">
+            <div className="relative flex items-center bg-popover pl-3">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("detail.openFolder")}
+                title={t("detail.openFolderHint")}
+                onClick={() => void handleOpenFolder()}
+              >
+                <FolderOpen />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon-sm"
