@@ -46,8 +46,10 @@ tauri-plugin-process = "2"
 # since 0.22 a skill's identity is its directory basename alone; since 0.23
 # remote installs download the repository tarball from codeload.github.com
 # and match the skill locally, so the GitHub REST API (its anonymous rate
-# limit) and GITHUB_TOKEN are no longer involved.
-agents-skills = "0.23"
+# limit) and GITHUB_TOKEN are no longer involved; since 0.24 a root-level
+# SKILL.md is the fallback when no skill directory matches, installing the
+# whole repository under the repository name.
+agents-skills = "0.24"
 serde = { version = "1", features = ["derive"] }
 # Required directly by the `tauri::generate_context!` macro (updater config).
 serde_json = "1"
