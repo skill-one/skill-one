@@ -145,4 +145,17 @@
   html {
     @apply font-sans;
   }
+
+  /* Web-standard click affordance: Tailwind v4 dropped the v3 preflight rule
+     that gave buttons a pointer cursor (it now follows the native default),
+     so restore it globally for every clickable element — native buttons,
+     shadcn/ui buttons, and role="button" cards alike. ARIA role selectors also
+     catch Base UI primitives that render non-button hosts (the Switch is a
+     span[role="switch"]). Disabled controls keep their non-interactive
+     cursor, matching the Tailwind v4 docs' snippet. */
+  button:not(:disabled),
+  [role='button']:not(:disabled),
+  [role='switch']:not([data-disabled]) {
+    cursor: pointer;
+  }
 }
