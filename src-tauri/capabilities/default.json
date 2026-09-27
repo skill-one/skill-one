@@ -10,6 +10,7 @@
     "opener:default",
     "updater:default",
     "process:allow-restart",
+    "core:window:allow-start-dragging",
     {
       "identifier": "http:default",
       "allow": [{ "url": "https://www.skills.sh/api/search*" }]
