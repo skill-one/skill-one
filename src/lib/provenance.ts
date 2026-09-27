@@ -1,173 +1,247 @@
 /**
- * Provenance ledger: the app's own record of where each installed skill came
- * from, restoring the store↔install association that agents-skills 0.13
- * dropped with its lockfile.
+ * Provenance ledger: the app's own record of what it knows about each
+ * installed skill, stored as `.skill-one.jsonl` inside the global skills
+ * directory (`~/.agents/skills`) — one JSON line per skill, last one wins.
  *
- * The ledger is a single JSON file — `.skill-one.json` inside the global
- * skills directory (`~/.agents/skills`) — written after every successful
- * install and pruned during reconciliation. It is keyed by skill name (the
- * directory name, which is unique in the global directory) and maps it to the
- * canonical store id: `repo` (`owner/repo`) + `slug`. The file is a hidden
- * dotfile without a SKILL.md, so the agents-skills directory scan ignores it.
+ * Two kinds of knowledge share the file, discriminated by the record's own
+ * fields (there is no kind tag; `repo` is the discriminator):
  *
- * The ledger is best-effort on both ends: install/remove never fail because
- * the ledger could not be written, and a missing or corrupt file degrades to
- * the pre-ledger behavior (name-only matching).
+ * - **Source** (`repo` present): where the skill came from — recorded at
+ *   install time, on a confirmed or auto link, or by hash auto-association.
+ *   `agents-skills` 0.13 dropped its lockfile; this restores the
+ *   store↔install association at the app level.
+ * - **Resolution** (`repo` absent): the cached outcome of failed source
+ *   matching for skills installed by other tools — the namesake verdict
+ *   against registry snapshot `epoch`, the computed content `hash` with the
+ *   `fingerprint` that says when it is still valid, and the ranked
+ *   `candidates` awaiting user confirmation. Persisting these keeps an app
+ *   restart from re-walking and re-hashing every unlinked skill directory.
+ *
+ * The file is a hidden dotfile without a SKILL.md, so the agents-skills
+ * directory scan ignores it and it never shows up as a skill. It is
+ * best-effort on both ends: install/remove never fail because the ledger
+ * could not be written, and a missing or corrupt file degrades to the
+ * pre-ledger behavior (name-only matching). Tolerance is per line — a broken
+ * line is skipped, the rest of the ledger survives. The pre-JSONL format (a
+ * single JSON document) is read transparently for migration.
  */
 
 import { isTauri } from "./tauri";
 import { storage } from "./storage";
 import { readProvenanceRaw, writeProvenanceRaw } from "./skills-manager";
 
-/** One installed skill's store identity: the canonical `{owner}/{repo}/{slug}` id. */
-export interface SkillProvenance {
+/** A stored source record: one installed skill's store identity. */
+export interface ProvenanceRecord {
+  /** The skill's name — the directory name, unique in the global directory. */
+  name: string;
   /** The GitHub repo the skill was installed from, as `owner/repo`. */
   repo: string;
-  /** The skill's slug — the name it is installed under (the directory name). */
-  slug: string;
   /** When the skill was installed (ISO 8601). Rewritten on reinstalls. */
-  installedAt: string;
+  installedAt?: string;
   /**
    * The store-side content hash recorded when the association was made —
-   * the registry entry's rev at install time (native installs) or the
-   * matched rev (hash auto-link; identical to the local content's hash by
-   * definition of the match). Absent for user-confirmed links. A future
-   * update check compares it against the index's latest rev: differ means
-   * the store published a new version. This is a version marker, NOT a
-   * description of the local files — local edits are invisible to it, by
-   * design.
+   * the registry entry's rev at install time or the matched rev (hash
+   * auto-link). A future update check compares it against the index's latest
+   * rev: differ means the store published a new version. This is a version
+   * marker, NOT a description of the local files — local edits are invisible
+   * to it, by design.
    */
   hash?: string;
 }
 
-/** The ledger document persisted as `.skill-one.json`. */
-export interface ProvenanceLedger {
-  version: 1;
-  /** Keyed by skill name; the name is unique in the global skills directory. */
-  skills: Record<string, SkillProvenance>;
-}
-
-/** Ledger schema version this build reads and writes. */
-const LEDGER_VERSION = 1;
-
-/** An empty, valid ledger. */
-export function emptyProvenanceLedger(): ProvenanceLedger {
-  return { version: LEDGER_VERSION, skills: {} };
+/** Stat-only change-detection identity of a skill directory. */
+export interface SkillFingerprint {
+  /** Latest file mtime in the directory, as Unix milliseconds. */
+  mtimeMs: number;
+  /** Total size in bytes of the directory's files. */
+  size: number;
 }
 
 /**
- * Parse raw ledger content into a ledger, tolerating everything a missing,
- * hand-edited or older file can throw at it: blank content, invalid JSON, a
- * wrong version, or entries that are not well-formed store ids. Anything
- * questionable degrades to an empty ledger (or drops the bad entries), which
- * is the pre-ledger behavior — never a broken UI.
+ * A stored candidate for user confirmation, carrying exactly the fields the
+ * suggestion UI reads plus the identity fields the ranking-input equality
+ * check compares — enough to revive the suggestion without the registry.
  */
-export function parseProvenanceLedger(raw: string | null | undefined): ProvenanceLedger {
-  if (!raw) return emptyProvenanceLedger();
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return emptyProvenanceLedger();
+export interface PersistedCandidate {
+  repo: string;
+  /** 0–1 description similarity against the installed skill's description. */
+  similarity: number;
+  stars: number;
+  downloads: number;
+  description: string;
+  descriptionZh?: string;
+  rev?: string;
+}
+
+/**
+ * A stored resolution: the cached outcome of failed source matching.
+ * `candidates` absent or empty means the dead end "no namesakes" — a
+ * content-independent fact. A non-empty list is the ranked suggestion, valid
+ * while `epoch` is the served snapshot and `fingerprint` still matches disk.
+ */
+export interface ResolutionRecord {
+  name: string;
+  /** The registry snapshot generation this outcome was verified against. */
+  epoch: number;
+  /** The computed content hash, valid while `fingerprint` matches the disk. */
+  hash?: string;
+  fingerprint?: SkillFingerprint;
+  /** Ranked candidates for user confirmation; absent/empty = dead end. */
+  candidates?: PersistedCandidate[];
+  /**
+   * Equality key of the ranking input (the full namesake list's identity
+   * fields): a matching fresh lookup skips the similarity math.
+   */
+  namesakesKey?: string;
+}
+
+/** One ledger line: a skill is either linked (source) or unresolved. */
+export type LedgerRecord = ProvenanceRecord | ResolutionRecord;
+
+/**
+ * The source view the UI consumes, derived from the stored records. The
+ * skill's name is the key it is stored under.
+ */
+export interface SkillProvenance {
+  repo: string;
+  installedAt: string;
+  hash?: string;
+}
+
+// ------------------------------------------------------------------- parsing
+
+/** Parse one ledger line (or legacy entry) into a record; null when invalid. */
+function parseRecord(value: unknown): LedgerRecord | null {
+  if (typeof value !== "object" || value === null) return null;
+  const entry = value as Record<string, unknown>;
+  if (typeof entry.name !== "string" || entry.name.length === 0) return null;
+  if (typeof entry.repo === "string" && entry.repo.length > 0) {
+    const record: ProvenanceRecord = { name: entry.name, repo: entry.repo };
+    if (typeof entry.installedAt === "string") record.installedAt = entry.installedAt;
+    if (typeof entry.hash === "string") record.hash = entry.hash;
+    return record;
   }
+  return parseResolutionRecord(entry.name, entry);
+}
+
+function parseResolutionRecord(
+  name: string,
+  entry: Record<string, unknown>,
+): ResolutionRecord | null {
+  if (typeof entry.epoch !== "number" || !Number.isFinite(entry.epoch)) return null;
+  const record: ResolutionRecord = { name, epoch: entry.epoch };
+  if (typeof entry.hash === "string") record.hash = entry.hash;
+  if (isFingerprint(entry.fingerprint)) record.fingerprint = entry.fingerprint;
+  if (typeof entry.namesakesKey === "string") record.namesakesKey = entry.namesakesKey;
+  if (Array.isArray(entry.candidates)) {
+    const candidates = entry.candidates
+      .map(parseCandidate)
+      .filter((c): c is PersistedCandidate => c !== null);
+    if (candidates.length > 0) record.candidates = candidates;
+  }
+  return record;
+}
+
+function isFingerprint(value: unknown): value is SkillFingerprint {
+  if (typeof value !== "object" || value === null) return false;
+  const f = value as Record<string, unknown>;
+  return (
+    typeof f.mtimeMs === "number" && Number.isFinite(f.mtimeMs) &&
+    typeof f.size === "number" && Number.isFinite(f.size)
+  );
+}
+
+function parseCandidate(value: unknown): PersistedCandidate | null {
+  if (typeof value !== "object" || value === null) return null;
+  const c = value as Record<string, unknown>;
   if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    (parsed as { version?: unknown }).version !== LEDGER_VERSION
+    typeof c.repo !== "string" || c.repo.length === 0 ||
+    typeof c.similarity !== "number" || !Number.isFinite(c.similarity) ||
+    typeof c.stars !== "number" || typeof c.downloads !== "number" ||
+    typeof c.description !== "string"
   ) {
-    return emptyProvenanceLedger();
+    return null;
   }
-  const skills = (parsed as { skills?: unknown }).skills;
-  if (typeof skills !== "object" || skills === null) {
-    return emptyProvenanceLedger();
-  }
-  const ledger = emptyProvenanceLedger();
-  for (const [name, entry] of Object.entries(skills as Record<string, unknown>)) {
-    const e = entry as Partial<SkillProvenance> | null;
-    if (
-      typeof name === "string" &&
-      name.length > 0 &&
-      typeof e?.repo === "string" &&
-      e.repo.length > 0 &&
-      typeof e?.slug === "string" &&
-      e.slug.length > 0
-    ) {
-      ledger.skills[name] = {
-        repo: e.repo,
-        slug: e.slug,
-        installedAt: typeof e.installedAt === "string" ? e.installedAt : "",
-        ...(typeof e.hash === "string" ? { hash: e.hash } : {}),
-      };
+  const candidate: PersistedCandidate = {
+    repo: c.repo,
+    similarity: c.similarity,
+    stars: c.stars,
+    downloads: c.downloads,
+    description: c.description,
+  };
+  if (typeof c.descriptionZh === "string") candidate.descriptionZh = c.descriptionZh;
+  if (typeof c.rev === "string") candidate.rev = c.rev;
+  return candidate;
+}
+
+/**
+ * Parse raw ledger content into records keyed by name, tolerating everything
+ * a missing, hand-edited or older file can throw at it: the legacy v1 JSON
+ * document is converted, a broken JSONL line is skipped (the rest survives),
+ * and duplicate names resolve last-wins. Anything questionable degrades to
+ * fewer records, which is the pre-ledger behavior — never a broken UI.
+ */
+export function parseLedger(raw: string | null | undefined): Map<string, LedgerRecord> {
+  const records = new Map<string, LedgerRecord>();
+  if (!raw) return records;
+  const text = raw.trim();
+  if (!text) return records;
+  if (text.startsWith("{")) {
+    try {
+      const doc = JSON.parse(text) as { skills?: unknown };
+      if (doc && typeof doc === "object" && doc.skills && typeof doc.skills === "object") {
+        // Legacy v1 document: `{version, skills: {name → source}}`.
+        for (const [name, entry] of Object.entries(doc.skills as Record<string, unknown>)) {
+          const record = parseRecord({ ...(entry as object), name });
+          if (record && "repo" in record) records.set(name, record);
+        }
+        return records;
+      }
+      // A single JSONL record parses as plain JSON.
+      const record = parseRecord(doc);
+      if (record) records.set(record.name, record);
+      return records;
+    } catch {
+      // Multi-line JSONL falls through to the line parser.
     }
   }
-  return ledger;
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const record = parseRecord(JSON.parse(trimmed));
+      if (record) records.set(record.name, record);
+    } catch {
+      // A broken line is skipped, not fatal.
+    }
+  }
+  return records;
 }
 
-/** Insert or replace one entry; the installedAt timestamp is set here. */
-export function upsertProvenanceEntry(
-  ledger: ProvenanceLedger,
-  entry: { repo: string; slug: string; hash?: string },
-): ProvenanceLedger {
-  return {
-    ...ledger,
-    skills: {
-      ...ledger.skills,
-      [entry.slug]: {
-        repo: entry.repo,
-        slug: entry.slug,
-        installedAt: new Date().toISOString(),
-        ...(entry.hash ? { hash: entry.hash } : {}),
-      },
-    },
-  };
+/** Serialize records back to JSONL, one line per skill. */
+export function serializeLedger(records: Iterable<LedgerRecord>): string {
+  let text = "";
+  for (const record of records) text += `${JSON.stringify(record)}\n`;
+  return text;
 }
 
-/** Drop one entry (after uninstall); a no-op when the name is unknown. */
-export function dropProvenanceEntry(
-  ledger: ProvenanceLedger,
-  name: string,
-): ProvenanceLedger {
-  if (!(name in ledger.skills)) return ledger;
-  const skills = { ...ledger.skills };
-  delete skills[name];
-  return { ...ledger, skills };
-}
-
-/**
- * Prune entries whose skill no longer exists on disk (removed outside the
- * app, or the whole directory replaced). Returns the pruned ledger and
- * whether anything changed, so callers skip the write when it is a no-op.
- */
-export function pruneProvenance(
-  ledger: ProvenanceLedger,
-  installedNames: readonly string[],
-): { ledger: ProvenanceLedger; changed: boolean } {
-  const installed = new Set(installedNames);
-  const skills = Object.fromEntries(
-    Object.entries(ledger.skills).filter(([name]) => installed.has(name)),
-  );
-  const changed = Object.keys(skills).length !== Object.keys(ledger.skills).length;
-  return { ledger: changed ? { ...ledger, skills } : ledger, changed };
-}
-
-// ---------------------------------------------------------------- persistence
+// --------------------------------------------------------------- persistence
 
 /** Storage key holding the ledger in the browser (dev server / tests). */
 const BROWSER_STORAGE_KEY = "skill-one.provenance";
 
-async function saveProvenanceLedger(ledger: ProvenanceLedger): Promise<void> {
-  if (isTauri()) {
-    await writeProvenanceRaw(JSON.stringify(ledger, null, 2));
-    return;
-  }
-  storage.setItem(BROWSER_STORAGE_KEY, JSON.stringify(ledger));
+async function loadLedger(): Promise<Map<string, LedgerRecord>> {
+  const raw = isTauri() ? await readProvenanceRaw() : storage.getItem(BROWSER_STORAGE_KEY);
+  return parseLedger(raw);
 }
 
-async function loadProvenanceLedger(): Promise<ProvenanceLedger> {
+async function saveLedger(records: Map<string, LedgerRecord>): Promise<void> {
+  const text = serializeLedger(records.values());
   if (isTauri()) {
-    return parseProvenanceLedger(await readProvenanceRaw());
+    await writeProvenanceRaw(text);
+    return;
   }
-  return parseProvenanceLedger(storage.getItem(BROWSER_STORAGE_KEY));
+  storage.setItem(BROWSER_STORAGE_KEY, text);
 }
 
 /**
@@ -177,47 +251,20 @@ async function loadProvenanceLedger(): Promise<ProvenanceLedger> {
  */
 export async function recordSkillProvenance(
   repo: string,
-  slug: string,
+  name: string,
   hash?: string,
 ): Promise<void> {
   try {
-    const ledger = await loadProvenanceLedger();
-    await saveProvenanceLedger(
-      upsertProvenanceEntry(ledger, { repo, slug, hash }),
-    );
+    const ledger = await loadLedger();
+    ledger.set(name, {
+      name,
+      repo,
+      installedAt: new Date().toISOString(),
+      ...(hash ? { hash } : {}),
+    });
+    await saveLedger(ledger);
   } catch (e) {
     console.warn("provenance: failed to record install source", e);
-  }
-}
-
-/**
- * Forget a skill's provenance after uninstall. Best-effort like recording:
- * the ledger must never turn a removal into an error.
- */
-export async function removeSkillProvenance(name: string): Promise<void> {
-  try {
-    const ledger = await loadProvenanceLedger();
-    await saveProvenanceLedger(dropProvenanceEntry(ledger, name));
-  } catch (e) {
-    console.warn("provenance: failed to forget install source", e);
-  }
-}
-
-/**
- * Forget several skills' provenance after one uninstall pass — the batch
- * removal of a whole repository is logically one ledger update, and calling
- * the single-name version per skill would be N reads + N writes for it.
- * Best-effort like recording: the ledger must never turn a removal into an
- * error.
- */
-export async function removeSkillProvenanceBatch(names: readonly string[]): Promise<void> {
-  try {
-    const ledger = await loadProvenanceLedger();
-    let next = ledger;
-    for (const name of names) next = dropProvenanceEntry(next, name);
-    if (next !== ledger) await saveProvenanceLedger(next);
-  } catch (e) {
-    console.warn("provenance: failed to forget install sources", e);
   }
 }
 
@@ -228,33 +275,124 @@ export async function removeSkillProvenanceBatch(names: readonly string[]): Prom
  * logically one ledger update.
  */
 export async function recordSkillProvenanceBatch(
-  entries: Array<{ repo: string; slug: string; hash?: string }>,
+  entries: Array<{ repo: string; name: string; hash?: string }>,
 ): Promise<void> {
   try {
-    const ledger = await loadProvenanceLedger();
-    let next = ledger;
-    for (const entry of entries) next = upsertProvenanceEntry(next, entry);
-    if (next !== ledger) await saveProvenanceLedger(next);
+    const ledger = await loadLedger();
+    for (const entry of entries) {
+      ledger.set(entry.name, {
+        name: entry.name,
+        repo: entry.repo,
+        installedAt: new Date().toISOString(),
+        ...(entry.hash ? { hash: entry.hash } : {}),
+      });
+    }
+    await saveLedger(ledger);
   } catch (e) {
     console.warn("provenance: failed to record install sources", e);
   }
 }
 
 /**
+ * Forget a skill's provenance after uninstall. Best-effort like recording:
+ * the ledger must never turn a removal into an error.
+ */
+export async function removeSkillProvenance(name: string): Promise<void> {
+  try {
+    const ledger = await loadLedger();
+    if (!ledger.delete(name)) return;
+    await saveLedger(ledger);
+  } catch (e) {
+    console.warn("provenance: failed to forget install source", e);
+  }
+}
+
+/**
+ * Forget several skills' provenance after one uninstall pass — the batch
+ * removal of a whole repository is logically one ledger update. Best-effort
+ * like recording.
+ */
+export async function removeSkillProvenanceBatch(names: readonly string[]): Promise<void> {
+  try {
+    const ledger = await loadLedger();
+    let changed = false;
+    for (const name of names) changed = ledger.delete(name) || changed;
+    if (changed) await saveLedger(ledger);
+  } catch (e) {
+    console.warn("provenance: failed to forget install sources", e);
+  }
+}
+
+/**
  * Reconcile the ledger with the on-disk truth and return the current
- * name→provenance map. Called whenever the installed list is (re)loaded, so
- * skills removed outside the app stop claiming a source, and so consumers —
- * the install buttons and the my-skills page — always read a fresh map.
+ * name→source map. Called whenever the installed list is (re)loaded: skills
+ * removed outside the app stop claiming a source, and stale resolution
+ * records for removed skills are pruned with them.
  */
 export async function reconcileProvenance(
   installedNames: readonly string[],
 ): Promise<Record<string, SkillProvenance>> {
-  const { ledger, changed } = pruneProvenance(
-    await loadProvenanceLedger(),
-    installedNames,
-  );
-  if (changed) await saveProvenanceLedger(ledger);
-  return ledger.skills;
+  const ledger = await loadLedger();
+  const installed = new Set(installedNames);
+  let changed = false;
+  // Deleting the current entry during a Map iteration is safe (and defined).
+  for (const name of ledger.keys()) {
+    if (!installed.has(name)) {
+      ledger.delete(name);
+      changed = true;
+    }
+  }
+  if (changed) await saveLedger(ledger);
+  const sources: Record<string, SkillProvenance> = {};
+  for (const record of ledger.values()) {
+    if ("repo" in record) {
+      sources[record.name] = {
+        repo: record.repo,
+        installedAt: record.installedAt ?? "",
+        ...(record.hash !== undefined ? { hash: record.hash } : {}),
+      };
+    }
+  }
+  return sources;
+}
+
+// ------------------------------------------------- resolution record storage
+
+/**
+ * Load every stored resolution (the failed-matching cache) keyed by name.
+ * A cheap single-file read; the reuse decisions live in `link-suggestions.ts`.
+ */
+export async function loadResolutionRecords(): Promise<Record<string, ResolutionRecord>> {
+  const ledger = await loadLedger();
+  const resolutions: Record<string, ResolutionRecord> = {};
+  for (const record of ledger.values()) {
+    if ("epoch" in record) resolutions[record.name] = record;
+  }
+  return resolutions;
+}
+
+/**
+ * Persist resolution upserts and drops in one read-modify-write pass. Neither
+ * touches a source record: a drop only removes resolution records, and an
+ * upsert never demotes a name that already carries a source (the auto-link
+ * write that usually accompanies them wins).
+ */
+export async function saveResolutionRecords(
+  upserts: readonly ResolutionRecord[],
+  drops: readonly string[],
+): Promise<void> {
+  if (upserts.length === 0 && drops.length === 0) return;
+  const ledger = await loadLedger();
+  const isResolution = (record: LedgerRecord | undefined): record is ResolutionRecord =>
+    record !== undefined && "epoch" in record;
+  for (const name of drops) {
+    if (isResolution(ledger.get(name))) ledger.delete(name);
+  }
+  for (const record of upserts) {
+    const existing = ledger.get(record.name);
+    if (existing === undefined || "epoch" in existing) ledger.set(record.name, record);
+  }
+  await saveLedger(ledger);
 }
 
 // ------------------------------------------------- browser mock hooks (tests)
@@ -264,14 +402,14 @@ export async function reconcileProvenance(
  * Tauri, where the real file is the only source of truth.
  */
 export function seedMockProvenance(
-  entries: Record<string, { repo: string; slug: string }>,
+  entries: Record<string, { repo: string }>,
 ): void {
   if (isTauri()) return;
-  const ledger = emptyProvenanceLedger();
+  const ledger: LedgerRecord[] = [];
   for (const [name, e] of Object.entries(entries)) {
-    ledger.skills[name] = { ...e, installedAt: new Date().toISOString() };
+    ledger.push({ name, repo: e.repo, installedAt: new Date().toISOString() });
   }
-  storage.setItem(BROWSER_STORAGE_KEY, JSON.stringify(ledger));
+  storage.setItem(BROWSER_STORAGE_KEY, serializeLedger(ledger));
 }
 
 /** Clear the browser ledger (test reset). No-op inside Tauri. */

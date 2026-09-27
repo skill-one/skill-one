@@ -17,36 +17,34 @@ distinguished from the installed one.
 
 ## Design: an app-level ledger
 
-The app keeps its own record — the **provenance ledger** — as a single JSON
-file:
+The app keeps its own record — the **provenance ledger** — as a JSONL file,
+one line per skill, last line wins:
 
 ```
-~/.agents/skills/.skill-one.json
+~/.agents/skills/.skill-one.jsonl
 ```
 
-```json
-{
-  "version": 1,
-  "skills": {
-    "pdf": {
-      "repo": "anthropics/skills",
-      "slug": "pdf",
-      "installedAt": "2026-09-13T08:00:00.000Z",
-      "hash": "9a1f…"
-    }
-  }
-}
+```jsonc
+// A source record (`repo` present): the skill is linked to its store entry.
+{"name":"pdf","repo":"anthropics/skills","installedAt":"2026-09-13T08:00:00.000Z","hash":"9a1f…"}
+
+// A resolution record (`repo` absent): the cached outcome of failed source
+// matching — see "Associating skills installed by other tools" below.
+{"name":"my-tool","epoch":42,"hash":"b2e0…","fingerprint":{"mtimeMs":1738022.4,"size":48213},"namesakesKey":"…","candidates":[…]}
 ```
 
-The optional `hash` is the **store-side** content hash recorded when the
-association was made: the registry entry's `rev` at install time (native
-installs) or the matched rev (hash auto-link). It is a version marker, not a
-description of the local files — the freshly installed clone tracks repo
-HEAD, which can be ahead of the indexed snapshot, so a computed directory
-hash would permanently disagree with the rev and poison the update signal.
-A future update check simply compares the recorded hash against the latest
-index rev: differ means the store published a new version since install.
-Local edits are invisible to it, by design.
+There is no kind tag and no version field: `repo` discriminates the two
+record shapes, unknown or broken lines are skipped (per-line tolerance), and
+a format change ships as a one-time whole-file migration rather than a
+version number. The optional `hash` on a source record is the **store-side**
+content hash recorded when the association was made: the registry entry's
+`rev` at install time (native installs) or the matched rev (hash auto-link).
+It is a version marker, not a description of the local files — the freshly
+installed clone tracks repo HEAD, which can be ahead of the indexed snapshot,
+so a computed directory hash would permanently disagree with the rev and
+poison the update signal. A future update check simply compares the recorded
+hash against the latest index rev: differ means the store published a new
+version since install. Local edits are invisible to it, by design.
 
 Key properties:
 
@@ -57,10 +55,13 @@ Key properties:
   the app stop claiming a source.
 - **Cleared on uninstall.**
 - **Best-effort on both ends.** Ledger failures never fail the install or
-  removal they document; a missing or corrupt file degrades to an empty
-  ledger (name-only matching, the pre-ledger behavior).
+  removal they document; a missing or corrupt file degrades to fewer records
+  (name-only matching, the pre-ledger behavior).
 - **Invisible to other tools.** The file is a hidden dotfile without a
   `SKILL.md`, so the `agents-skills` directory scan ignores it entirely.
+- **Migrated transparently.** The pre-JSONL format (`.skill-one.json`, a
+  single JSON document) is read while it exists; the first write of the new
+  format removes it.
 
 ### Storage choice
 
@@ -72,16 +73,19 @@ it and the ledger is rebuilt by future installs.
 
 ### Backend surface
 
-The Rust side stays thin — two fixed-path file commands, no ledger schema
-knowledge (parsing, merging and pruning live in `src/lib/provenance.ts`):
+The Rust side stays thin — fixed-path file commands plus the content-identity
+analysis, no ledger schema knowledge (parsing, merging and pruning live in
+`src/lib/provenance.ts`):
 
 | Command | Behavior |
 | --- | --- |
-| `read_provenance` | Raw file content; `null` when the ledger does not exist yet |
-| `write_provenance` | Full-document replace, atomic (temp file + rename) |
+| `read_provenance` | Raw ledger content; `null` when neither the JSONL file nor the legacy document exists |
+| `write_provenance` | Full-document replace, atomic (temp file + rename); removes a leftover legacy document |
+| `analyze_skill` | The skill's content identity in one walk: upstream hash + fingerprint |
+| `skill_fingerprint` | Stat-only fingerprint (no file bytes read), the cheap validity check for a stored hash |
 
-Both resolve the path internally (`<home>/.agents/skills/.skill-one.json`);
-no caller-controlled paths are accepted.
+All resolve paths internally (`<home>/.agents/skills/…`); no caller-controlled
+paths are accepted.
 
 ## Consumers
 
@@ -131,8 +135,9 @@ case-insensitive ICU collation order (`Intl.Collator("en", {sensitivity:
 "base"})` — *not* byte order, which reproduces only ~40% of hashes). The
 cheap filter runs first: a skill with no same-slug registry entries is
 skipped entirely — plain local skill, no disk walk. Otherwise the backend
-computes the same hash for the installed skill (`compute_skill_hash`,
-`skill_hash.rs`); equality with a namesake entry's `rev` is content-level
+computes the same hash for the installed skill (`analyze_skill`,
+`skill_hash.rs`, which also yields the change-detection fingerprint in the
+same walk); equality with a namesake entry's `rev` is content-level
 identity, so the association is written into the ledger exactly like a
 native install — no user interaction, and the card immediately shows the
 source repo.
@@ -141,8 +146,25 @@ Verified against the published snapshot: 51/51 sampled skills re-hashed
 locally match the index. Misses are expected and handled: the mirror snapshot
 may omit files the local clone has (media/binaries), `safeSegment` rewrites
 exotic path characters, and the local copy may simply be a different version
-than the indexed one. Misses are memoized per registry epoch so the
-reconcile query never re-hashes known dead ends.
+than the indexed one.
+
+**Misses are cached, not repeated.** Every outcome — dead end, hash, ranked
+candidates — is persisted as a resolution record (see the ledger format
+above), stamped with the registry snapshot's `epoch` and, where a hash was
+computed, guarded by a stat-only directory `fingerprint` (latest mtime +
+total size). Consequences:
+
+- **Same snapshot, unchanged content → no work at all.** An app restart
+  re-runs nothing: the ledger answers from disk, the session memo answers
+  within a run.
+- **New snapshot → cheap lookups only.** A fresh snapshot can carry the rev a
+  local hash was waiting for, or new namesakes, so the namesake lookup
+  re-runs — an in-memory index query, no disk. The stored hash is reused for
+  matching after the fingerprint revalidates the directory (stat-only);
+  re-ranking is skipped while the ranking input (namesake identity fields)
+  is unchanged.
+- **Edited content → one re-analysis.** A fingerprint mismatch re-runs the
+  single walk that recomputes hash and fingerprint together.
 
 ### Tier 2 — description auto-link, then ranked candidates (heuristic)
 

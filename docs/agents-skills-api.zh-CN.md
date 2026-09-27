@@ -28,7 +28,7 @@ agents-skills = "0.24"
 | 0.17 | `add` 不再覆盖（新增 `AddOutcome.skipped`）；移除项目级作用域 | `global` 系列字段、`ListRequest`、`Agent.skills_dir`、`is_universal()` 删除；`Manager::list` 不再接收请求 |
 | 0.18 | `list` 短暂新增 `estimated_tokens` | 在其存在的一天里，详情抽屉展示了描述常驻上下文的估算开销 |
 | 0.19 | 回退 0.18 的 token 估算：`ListedSkill.estimated_tokens` 与整个 `core::tokens` 模块删除 | `list` 回到 0.16 的形态，应用侧的镜像字段随之删除 |
-| 0.20 | `ListedSkill.name` 改为技能在磁盘上的目录名，且 `ListedSkill` / `list --json` 移除 `path`（改用新的 `Manager::skill_dir` 解析目录） | 应用的 DTO 随之删除 `path`；`read_skill_md` 与 `compute_skill_hash` 改经 `skill_dir` 解析目录 |
+| 0.20 | `ListedSkill.name` 改为技能在磁盘上的目录名，且 `ListedSkill` / `list --json` 移除 `path`（改用新的 `Manager::skill_dir` 解析目录） | 应用的 DTO 随之删除 `path`；`read_skill_md` 与 `analyze_skill` 改经 `skill_dir` 解析目录 |
 | 0.21 | 一个 source 只对应一个技能：`AddRequest` 缩减为 `{ source, reference }`，`AddOutcome` 缩减为 `{ source, skill, canonical_path, skipped }`，失败改为返回 `Err`（`InstallSuccess` / `InstallFailure` 删除）；source 只剩本地技能目录与 `owner/repo@<skill>` 两种形式，远程安装改走 GitHub API（git clone / zip / tar / URL 等 source 形式删除） | `install_skill` 只接收一个 `source` 字符串，返回 `{ skill, skipped }`；安装失败即命令的 `Err`，也就是前端的 rejection |
 | 0.22 | 技能的身份永远是目录 basename——`SKILL.md` frontmatter 的 `name` 不再被读取或参与匹配；`owner/repo@<skill>` 在仓库树中按 basename（不区分大小写）匹配最浅的目录，只下载该目录；缺失或无法解析的 `SKILL.md` 不再致命 | 商店的 skill slug 原样放进 source；其余无需改动 |
 | 0.23 | 远程安装改为向 `codeload.github.com` 发起一次 tarball 请求（下载到本地后解包匹配）：不再走 GitHub REST API，也就没有匿名限流；同时移除 `GITHUB_TOKEN`、Git LFS 解析与缩写 SHA ref | 无需改代码——本项目使用的公开类型（`AddRequest`、`Manager`）未变，仅更新了描述下载机制的注释与文档 |

@@ -235,18 +235,53 @@ export async function writeProvenanceRaw(content: string): Promise<void> {
   await invoke("write_provenance", { content });
 }
 
+/** Stat-only change-detection identity of an installed skill's directory. */
+export interface SkillFingerprint {
+  /** Latest file mtime in the directory, as Unix milliseconds. */
+  mtimeMs: number;
+  /** Total size in bytes of the directory's files. */
+  size: number;
+}
+
 /**
- * Compute the skills.sh upstream content hash of an installed skill's
- * directory (`lib/skill_hash.rs` on the backend). `null` when the name is
- * not installed; the frontend treats an error the same way — hashing is
- * always a best-effort signal, never a failure.
+ * The content identity of an installed skill: the skills.sh upstream hash
+ * (the exact identity matched against registry revs) plus the fingerprint
+ * that says when the hash can be reused without re-reading any bytes
+ * (`lib/skill_hash.rs` on the backend).
  */
-export async function computeSkillHash(name: string): Promise<string | null> {
+export interface SkillContent {
+  hash: string;
+  fingerprint: SkillFingerprint;
+}
+
+/**
+ * Compute the content identity of an installed skill's directory (a full walk
+ * that reads every file's bytes). `null` when the name is not installed; the
+ * frontend treats an error the same way — analysis is always a best-effort
+ * signal, never a failure.
+ */
+export async function analyzeSkill(name: string): Promise<SkillContent | null> {
   requireTauri();
   try {
-    return await invoke<string | null>("compute_skill_hash", { name });
+    return await invoke<SkillContent | null>("analyze_skill", { name });
   } catch (e) {
-    console.warn(`skill hash: failed to hash ${name}`, e);
+    console.warn(`skill hash: failed to analyze ${name}`, e);
+    return null;
+  }
+}
+
+/**
+ * Stat-only fingerprint of an installed skill's directory — the cheap
+ * validity check that lets the ledger reuse a stored hash across restarts.
+ * `null` when the name is not installed or the stat walk fails; the caller
+ * falls back to a full analysis, so this is never fatal.
+ */
+export async function skillFingerprint(name: string): Promise<SkillFingerprint | null> {
+  requireTauri();
+  try {
+    return await invoke<SkillFingerprint | null>("skill_fingerprint", { name });
+  } catch (e) {
+    console.warn(`skill hash: failed to fingerprint ${name}`, e);
     return null;
   }
 }

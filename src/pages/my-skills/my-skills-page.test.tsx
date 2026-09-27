@@ -54,6 +54,15 @@ beforeEach(() => {
   resetLinkSuggestions();
 });
 
+/** The persisted ledger's record for `name` (the store is JSONL). */
+function ledgerRecord(name: string): { name: string; repo?: string } | undefined {
+  return (localStorage.getItem("skill-one.provenance") ?? "")
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line))
+    .find((record) => record.name === name);
+}
+
 // The page reads installed skills through local-skills, which falls back to
 // the mutable mock store in the browser (this test env), so mutations below
 // actually change the data the page re-fetches after invalidate.
@@ -142,7 +151,7 @@ describe("MySkillsPage", () => {
           "mcp-builder",
           "code-review",
           "frontend-design",
-        ].map((name) => [name, { repo: "acme/tools", slug: name }]),
+        ].map((name) => [name, { repo: "acme/tools" }]),
       ),
     );
     renderPage();
@@ -317,7 +326,7 @@ describe("MySkillsPage", () => {
     const user = userEvent.setup();
     // pdf carries a recorded source and moves into its own repository card;
     // the other five stay pooled under 本地安装.
-    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
     const { container } = renderPage();
 
     const repoSwitch = await screen.findByRole("switch", {
@@ -460,7 +469,7 @@ describe("MySkillsPage", () => {
     const { container } = renderPage();
     // The ledger has a source for pdf (installed through this app); the other
     // five are tool installs with no entry.
-    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
 
     // The sourced skill gets a card of its own, and its bar names the
     // repository: the owner's face and the repo path. One skill, nothing to
@@ -477,7 +486,7 @@ describe("MySkillsPage", () => {
 
   it("links a sourced skill's detail drawer to its repo instead of 本地安装", async () => {
     const user = userEvent.setup();
-    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
     renderPage();
     await screen.findByText("pdf");
     // The provenance query lands asynchronously and moves pdf into its own
@@ -498,7 +507,7 @@ describe("MySkillsPage", () => {
 
   it("carries the enable switch, and no registry figures, into the drawer", async () => {
     const user = userEvent.setup();
-    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
     renderPage();
     // Same wait: the provenance-driven re-sort settles before the click.
     await screen.findByText("pdf");
@@ -531,7 +540,7 @@ describe("MySkillsPage", () => {
 
   it("shows the store's classification and install count for a resolved source", async () => {
     const user = userEvent.setup();
-    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
     // The registry still lists the source the ledger recorded, so the installed
     // list has the store facts an on-disk record never carries.
     lookupSkills.mockResolvedValue({
@@ -566,7 +575,7 @@ describe("MySkillsPage", () => {
   });
 
   it("shows no store facts for a source the registry no longer lists", async () => {
-    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
     // The lookup answers nothing for the ref (a fork the index dropped, say):
     // the card keeps the recorded source — its bar is what names it — and shows
     // no classification and no figure: an absent fact is not a zero one.
@@ -622,10 +631,7 @@ describe("MySkillsPage", () => {
       screen.queryByRole("button", { name: "关联 pdf 的商店来源" }),
     ).not.toBeInTheDocument();
     // And the persisted ledger carries the pick.
-    expect(
-      JSON.parse(localStorage.getItem("skill-one.provenance") ?? "{}").skills
-        .pdf?.repo,
-    ).toBe("anthropics/skills");
+    expect(ledgerRecord("pdf")?.repo).toBe("anthropics/skills");
   });
 
   it("auto-links a tool-installed skill whose description matches a namesake", async () => {
@@ -656,12 +662,7 @@ describe("MySkillsPage", () => {
       ).not.toBeInTheDocument(),
     );
     // The persisted ledger already carries the source the auto-link wrote.
-    await waitFor(() =>
-      expect(
-        JSON.parse(localStorage.getItem("skill-one.provenance") ?? "{}").skills
-          .pdf?.repo,
-      ).toBe("anthropics/skills"),
-    );
+    await waitFor(() => expect(ledgerRecord("pdf")?.repo).toBe("anthropics/skills"));
     // And pdf's card now names the source it was linked to on its own.
     await screen.findByText("anthropics/skills");
   });
@@ -773,7 +774,7 @@ describe("MySkillsPage", () => {
 
   it("scopes the list to a classification from the chip row", async () => {
     const user = userEvent.setup();
-    seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
     // The registry still lists the source the ledger recorded, so pdf wears a
     // store classification and a chip for it joins the filter bar.
     lookupSkills.mockResolvedValue({
@@ -829,10 +830,10 @@ describe("MySkillsPage", () => {
     // a one-skill repo fresh today, the pool (docx/pptx, newest 3 days), and a
     // repo whose skills are all old (newest 45 days).
     seedMockProvenance({
-      pdf: { repo: "zoo/new", slug: "pdf" },
-      "mcp-builder": { repo: "acme/tools", slug: "mcp-builder" },
-      "code-review": { repo: "acme/tools", slug: "code-review" },
-      "frontend-design": { repo: "acme/tools", slug: "frontend-design" },
+      pdf: { repo: "zoo/new" },
+      "mcp-builder": { repo: "acme/tools" },
+      "code-review": { repo: "acme/tools" },
+      "frontend-design": { repo: "acme/tools" },
     });
     renderPage();
 
@@ -849,8 +850,8 @@ describe("MySkillsPage", () => {
     // install's age — and the fresh install leads the card's preview instead
     // of hiding past the cap.
     seedMockProvenance({
-      pdf: { repo: "acme/tools", slug: "pdf" },
-      "frontend-design": { repo: "acme/tools", slug: "frontend-design" },
+      pdf: { repo: "acme/tools" },
+      "frontend-design": { repo: "acme/tools" },
     });
     renderPage();
 
@@ -870,10 +871,10 @@ describe("MySkillsPage", () => {
   it("walks the drawer in the cards' newest-first order", async () => {
     const user = userEvent.setup();
     seedMockProvenance({
-      pdf: { repo: "zoo/new", slug: "pdf" },
-      "mcp-builder": { repo: "acme/tools", slug: "mcp-builder" },
-      "code-review": { repo: "acme/tools", slug: "code-review" },
-      "frontend-design": { repo: "acme/tools", slug: "frontend-design" },
+      pdf: { repo: "zoo/new" },
+      "mcp-builder": { repo: "acme/tools" },
+      "code-review": { repo: "acme/tools" },
+      "frontend-design": { repo: "acme/tools" },
     });
     renderPage();
 
@@ -908,7 +909,7 @@ describe("MySkillsPage", () => {
   function seedRunSource(repo = "acme/tools") {
     seedMockProvenance(
       Object.fromEntries(
-        RUN_SOURCE.map((name) => [name, { repo, slug: name }]),
+        RUN_SOURCE.map((name) => [name, { repo }]),
       ),
     );
   }
@@ -1013,8 +1014,8 @@ describe("MySkillsPage", () => {
   it("counts skills rather than repositories in the skill unit's chips", async () => {
     const user = userEvent.setup();
     seedMockProvenance({
-      pdf: { repo: "anthropics/skills", slug: "pdf" },
-      docx: { repo: "anthropics/skills", slug: "docx" },
+      pdf: { repo: "anthropics/skills" },
+      docx: { repo: "anthropics/skills" },
     });
     seedStoreEntries({ pdf: 2991984, docx: 1991984 }, "content-creation");
     renderPage();

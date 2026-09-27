@@ -37,7 +37,7 @@ Read data is cached through TanStack Query (`staleTime` 10 minutes, `gcTime` inf
 
 ### Backend (writes)
 
-- **`src-tauri/src/skills.rs`**: Exposes 8 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `set_skills_enabled`, `link_agents`, `link_status`, `read_skill_md`, `compute_skill_hash`), all of which route their blocking work (GitHub downloads, install, link, hashing, etc.) through a shared `spawn_blocking` helper to keep it off the async runtime.
+- **`src-tauri/src/skills.rs`**: Exposes 10 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `set_skills_enabled`, `link_agents`, `link_status`, `read_skill_md`, `analyze_skill`, `skill_fingerprint`), all of which route their blocking work (GitHub downloads, install, link, hashing, etc.) through a shared `spawn_blocking` helper to keep it off the async runtime.
 - Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Since agents-skills 0.15 linking is one-way: an agent's own skills are adopted into the canonical dir (a name clash keeps the canonical copy), its other files are quarantined into `.misc/<agent>/`, and unlink only breaks the symlink. `list` also reports each skill's description and install time, which the app passes straight through. Since 0.21 an install is one source and one skill — `owner/repo@<skill>`; since 0.23 the backend downloads the repository tarball from codeload.github.com and matches the skill locally (the GitHub REST API and its anonymous rate limit are no longer involved) — and a failure is the command's `Err`, so `install_skill` returns just `{ skill, skipped }`.
 
 ### Frontend write wrapper
