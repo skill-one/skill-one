@@ -77,19 +77,21 @@ describe("App routing", () => {
     // The sync-storage persister is wired up once at module load.
     expect(persisterWiring.calls).toBe(1);
 
-    // Default route is /my-skills; wait for its content to settle.
-    await screen.findByText("pdf");
+    // The default route is the home, the agents graph; wait for it to settle.
+    await screen.findByRole("heading", { name: "Agents" });
   });
 
-  it("redirects the root route to /my-skills", async () => {
+  it("opens the agents graph at the root route", async () => {
     render(
       <I18nProvider>
         <App />
       </I18nProvider>,
     );
 
-    // MySkillsPage renders mock skill rows synchronously.
-    expect(await screen.findByText("pdf")).toBeInTheDocument();
+    // The home is the agents page: its head names it before any data lands.
+    expect(
+      await screen.findByRole("heading", { name: "Agents" }),
+    ).toBeInTheDocument();
   });
 
   it("navigates between routes via the header", async () => {
@@ -112,7 +114,7 @@ describe("App routing", () => {
     expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
 
-  it("redirects unknown routes back to /my-skills", async () => {
+  it("redirects unknown routes back to the home", async () => {
     window.location.hash = "#/does-not-exist";
     render(
       <I18nProvider>
@@ -120,7 +122,9 @@ describe("App routing", () => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("pdf")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Agents" }),
+    ).toBeInTheDocument();
   });
 
   it("keeps one search across both lists", async () => {
@@ -131,8 +135,10 @@ describe("App routing", () => {
       </I18nProvider>,
     );
 
-    // The field is the header's, and there is one of it: the question it holds
-    // follows the reader instead of being emptied for them.
+    // The home carries no list, so open one first: the field is the header's,
+    // and there is one of it — the question it holds follows the reader instead
+    // of being emptied for them.
+    await user.click(screen.getByRole("link", { name: /^我的$/ }));
     await user.type(await screen.findByLabelText("搜索 Skill"), "pdf");
 
     await user.click(screen.getByRole("link", { name: /商店/ }));

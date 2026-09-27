@@ -44,12 +44,23 @@ function header(): HTMLElement {
 }
 
 describe("AppHeader", () => {
-  it("leads with the brand and the two destinations", () => {
+  it("leads with the brand and the destinations", () => {
     renderHeader("/explore");
 
     expect(screen.getByText("Skill One")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "首页" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "商店" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "我的" })).toBeInTheDocument();
+  });
+
+  it("points the brand at the home, the agents graph", () => {
+    renderHeader("/explore");
+
+    // The mark names the window and is the window's way home.
+    expect(screen.getByRole("link", { name: "Skill One" })).toHaveAttribute(
+      "href",
+      "/",
+    );
   });
 
   it("closes the row with the search field, then the settings entry", () => {
@@ -138,9 +149,8 @@ describe("headerRoute", () => {
   it("maps each route to what the header holds", () => {
     expect(headerRoute("/explore")).toEqual({ destination: "store" });
     expect(headerRoute("/my-skills")).toEqual({ destination: "installed" });
-    // A page the header does not know — there are no drill-down routes left,
-    // every card expands in place — loses only the search field.
-    expect(headerRoute("/my-skills/agents")).toEqual({});
+    // The home is the agents graph: a picture, not a list, so no search field.
+    expect(headerRoute("/")).toEqual({});
   });
 
   it("leaves the row without a search field for a route it does not know", () => {

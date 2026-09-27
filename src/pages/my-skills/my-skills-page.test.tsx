@@ -1113,17 +1113,4 @@ describe("MySkillsPage", () => {
       ).not.toBeInTheDocument(),
     );
   });
-
-  it("leads with the agent connections card into the agents graph", async () => {
-    renderPage();
-
-    // The old header avatar strip is now a full-width status card: it states
-    // the detected/linked counts and the whole thing routes to the graph.
-    const entry = await screen.findByRole("link", {
-      name: "打开 agents 页面",
-    });
-    expect(entry).toHaveAttribute("href", "/my-skills/agents");
-    expect(screen.getByText("Agent 连接")).toBeInTheDocument();
-    expect(screen.getByText("已连接 3/5")).toBeInTheDocument();
-  });
 });
