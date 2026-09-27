@@ -3,7 +3,7 @@
 // the Rust side only exposes local skills install / agent management, plus the
 // menu bar tray and its popover window (see `tray.rs`).
 
-use tauri::{Listener, Manager};
+use tauri::Listener;
 
 mod provenance;
 mod skill_hash;
@@ -43,12 +43,10 @@ pub fn run() {
         ])
         .setup(|app| {
             tray::create_tray(app.handle())?;
-            // Native popover material, rounded to the CSS corner radius of the
-            // content clip (see `POPOVER_MATERIAL_RADIUS` in `tray.rs`).
-            #[cfg(target_os = "macos")]
-            if let Some(popover) = app.get_webview_window(tray::POPOVER_WINDOW_LABEL) {
-                tray::apply_popover_material(app.handle(), &popover);
-            }
+            // The popover window is NOT declared in `tauri.conf.json`; it is
+            // built on the first tray click (`tray::ensure_popover`), which
+            // also applies its native material (rounded to the CSS corner
+            // radius, see `POPOVER_MATERIAL_RADIUS` in `tray.rs`).
             // A popover navigation request shows + focuses the main window;
             // the main window's own listener performs the actual routing.
             let handle = app.handle().clone();
