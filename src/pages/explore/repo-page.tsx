@@ -26,7 +26,7 @@ import {
 } from "../../lib/skill-list-layout";
 import type { InstalledSkill } from "../../lib/skills-manager";
 import { formatCount } from "../../lib/utils";
-import { compareByInstalledTime } from "../../lib/time-groups";
+import { compareByInstalledTime } from "../../lib/install-time";
 import { DrillDownHead } from "../../components/drill-down-head";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { Placeholder } from "../../components/placeholder";

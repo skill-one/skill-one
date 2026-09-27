@@ -12,7 +12,6 @@ import { useInstalledSearchRows } from "../../hooks/use-installed-search";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import { setScope, setUnit } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
-import { FIRST_RANK_BAND, rankBands } from "../../lib/registry/rank-bands";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
@@ -20,7 +19,6 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 
-import { GroupSection } from "../../components/group-section";
 import { Button } from "../../components/ui/button";
 import { ListFacets } from "../../components/list-facets";
 import { ListUnitToggle } from "../../components/list-unit-toggle";
@@ -139,19 +137,6 @@ export function ExplorePage() {
     return all.flatMap((section) => section.repos).toSorted(byRepoRank);
   }, [sectionsData, selectedDomain]);
 
-  // The repository answer cut into rank bands (Top 25, 26–50, 51–100, …) for
-  // the grid's quiet captions — null while the answer is short enough to
-  // stay one flat grid, since a lone "Top 25" caption over the whole answer
-  // would be noise. Cut from the full answer, not the revealed prefix: a band
-  // the reader has not reached still owns its true range.
-  const repoBands = useMemo(
-    () =>
-      unit === "repo" && browseRepos.length > FIRST_RANK_BAND
-        ? rankBands(browseRepos)
-        : null,
-    [unit, browseRepos],
-  );
-
   // Every skill the browse answer holds, flattened once: the skill unit reads
   // this list, and the filter's chip counts derive from it. A repository's
   // leading domain is unique, so no skill is listed twice.
@@ -242,7 +227,7 @@ export function ExplorePage() {
   // the current intersection, so a bottom edge that stays visible loads the
   // next chunk without a further scroll, until everything is mounted. The
   // count is what changes on an extension, so it is what re-arms the
-  // observer — a folded band makes this load-bearing: the next chunk mounts
+  // observer — a folded run makes this load-bearing: the next chunk mounts
   // inside the folded panel (no visible growth), so the sentinel never
   // leaves the view and only a re-arm can keep the reveal moving.
   useEffect(() => {
@@ -341,9 +326,7 @@ export function ExplorePage() {
               sitting under it. The padding is offset by a matching negative
               margin, so content position and row widths are unchanged while the
               outside-painted ink — the selected ring and the focus outline —
-              stays unclipped. The top edge stays flush on purpose: the sticky
-              group headers pin exactly there, and any top padding would let
-              scrolled cards peek out above them. */}
+              stays unclipped. */}
           <div
             ref={listRef}
             className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5"
@@ -451,48 +434,10 @@ export function ExplorePage() {
                       );
                     })}
                   </ul>
-                ) : repoBands ? (
-                  // The repository unit, answer long enough to pace by rank:
-                  // one band per rank range, each carrying the same card grid.
-                  // A rank range only names the order — nothing to act on — so
-                  // its boundary is one quiet caption above the grid, not a
-                  // header over it. Reveal stays global — a band mounts only
-                  // once the revealed prefix reaches its first rank, and then
-                  // with just the revealed slice — so the sentinel below paces
-                  // the bands exactly as it paced the flat grid. The bands
-                  // carry no gap of their own — the band label is the
-                  // boundary, sized like one row gap.
-                  <div className="flex flex-col">
-                    {repoBands.map((band) => {
-                      const revealed = band.items.slice(
-                        0,
-                        Math.max(0, renderedCount - (band.start - 1)),
-                      );
-                      if (revealed.length === 0) return null;
-                      return (
-                        <GroupSection key={band.key} label={band.title}>
-                          <ul className={REPO_LIST_CLASS}>
-                            {revealed.map((group) => (
-                              <RepoCard
-                                key={group.key}
-                                repo={group.title}
-                                stars={group.stars}
-                                skills={group.skills}
-                                maxSkills={maxSkills}
-                                selected={selected}
-                                onOpenSkill={setSelected}
-                              />
-                            ))}
-                          </ul>
-                        </GroupSection>
-                      );
-                    })}
-                  </div>
                 ) : (
-                  // The repository unit with a short answer — a small registry
-                  // or a domain filter with few repositories: one flat grid,
-                  // the browse answer scoped by the domain filter, with no band
-                  // header over it.
+                  // The repository unit: one flat grid, the browse answer
+                  // scoped by the domain filter, in the ranking `byRepoRank`
+                  // defines.
                   <ul className={REPO_LIST_CLASS}>
                     {browseRepos.slice(0, renderedCount).map((group) => (
                       <RepoCard
@@ -520,7 +465,7 @@ export function ExplorePage() {
 
       {/* Modal detail drawer for the browse answer; the wiring (open/close,
           prev/next bounds) is shared with the my-skills page. It walks the
-          flat skill list over all groups, rendered or not yet rendered. A
+          flat skill list, rendered or not yet rendered. A
           search walks inside the unified search view instead, which owns its
           own drawer. */}
       <SkillDetailDrawer

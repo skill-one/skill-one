@@ -800,10 +800,11 @@ describe("ExplorePage", () => {
     expect(renderedCards()).toBe(12);
   });
 
-  it("files a long repository answer into rank bands, revealed like the grid", async () => {
-    // The gadget registry is one skill per repository: 71 repositories, so the
-    // ranking cuts into Top 25 / 26–50 and a 51–71 tail (a band keeps its real
-    // end, not the next boundary).
+  it("keeps a long repository answer one flat grid, revealed to the end", async () => {
+    // The gadget registry is one skill per repository: 71 repositories. The
+    // answer is one flat grid in the ranking `byRepoRank` defines — no band
+    // headers over it — and the reveal paces that grid: the first chunk mounts
+    // with the page, scrolling to the sentinel mounts the rest.
     bootGadgetRegistry();
     renderExplorePage();
 
@@ -815,63 +816,18 @@ describe("ExplorePage", () => {
         }
       ).instances.at(-1)?.trigger(true);
 
-    // Only the leading band mounts at first, and only with the first chunk.
-    const leading = await screen.findByRole("region", { name: "Top 25" });
+    // Only the first chunk mounts at first, in one flat grid.
+    await screen.findByText("gadget-master");
     expect(cardLinks()).toBe(6);
-    expect(screen.queryByRole("region", { name: "26–50" })).not.toBeInTheDocument();
+    expect(document.querySelector("ul.grid")).toBeInTheDocument();
+    // No group sections anywhere: the ranking is the only order.
+    expect(document.querySelector("section[aria-label]")).toBeNull();
 
-    // Revealing to the bottom mounts the other bands with their true ranges,
-    // keeping every card once.
+    // Revealing to the bottom mounts every card, keeping each one once.
     await waitFor(() => {
       triggerSentinel();
       expect(cardLinks()).toBe(71);
     });
-    expect(
-      within(screen.getByRole("region", { name: "26–50" })).getAllByRole("link", {
-        name: /^查看仓库 /,
-      }),
-    ).toHaveLength(25);
-    expect(
-      within(screen.getByRole("region", { name: "51–71" })).getAllByRole("link", {
-        name: /^查看仓库 /,
-      }),
-    ).toHaveLength(21);
-    expect(within(leading).getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(25);
-  });
-
-  it("labels each rank band with quiet text, not a control", async () => {
-    // A rank range only names the order — nothing to act on — so its caption
-    // is small muted text above the grid: no fold to press, no count badge,
-    // and no control anywhere in the caption row.
-    bootGadgetRegistry();
-    renderExplorePage();
-
-    const leading = await screen.findByRole("region", { name: "Top 25" });
-    // The caption carries no interactive element: there is nothing to fold.
-    expect(
-      within(leading).queryByRole("button", { name: /Top 25/ }),
-    ).toBeNull();
-    expect(within(leading).queryByText(/个仓库/)).toBeNull();
-    // The caption reads as the quiet line the design promises: small, muted,
-    // no badge.
-    expect(within(leading).getByText("Top 25")).toHaveClass(
-      "text-xs",
-      "text-muted-foreground/70",
-    );
-  });
-
-  it("keeps a repository answer of 25 or fewer as one flat grid", async () => {
-    // The first 25 one-skill repositories of the gadget registry: below the
-    // leading band's size, so no band header rides the grid.
-    harness.reset();
-    harness.init();
-    harness.pushAll(gadgetRegistry().slice(0, 25));
-    harness.complete();
-    renderExplorePage();
-
-    await screen.findByText("gadget-master");
-    expect(screen.queryByRole("region", { name: "Top 25" })).not.toBeInTheDocument();
-    expect(document.querySelector("ul.grid")).toBeInTheDocument();
   });
 
   it("keeps the reader's place across a repository's page and back", async () => {

@@ -19,7 +19,7 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import { errorMessage } from "../../lib/utils";
-import { compareByInstalledTime } from "../../lib/time-groups";
+import { compareByInstalledTime } from "../../lib/install-time";
 import { DrillDownHead } from "../../components/drill-down-head";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";

@@ -1,9 +1,4 @@
 {
-  "time": {
-    "today": "Today",
-    "yesterday": "Yesterday",
-    "unknown": "Time unknown"
-  },
   "facet": {
     "all": "All",
     "more": "More",

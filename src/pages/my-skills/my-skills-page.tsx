@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import type { ParseKeys, TFunction } from "i18next";
 import { Boxes, Users } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
@@ -27,7 +26,7 @@ import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-dr
 import { SearchResults } from "../explore/search-results";
 import { AgentLinkCard } from "./agent-link-card";
 import { Placeholder } from "../../components/placeholder";
-import { errorMessage, formatDayHeading } from "../../lib/utils";
+import { errorMessage } from "../../lib/utils";
 import { buildSearchIndex } from "../../lib/search-index";
 import { setQuery, setScope, setUnit } from "../../lib/list-view";
 import type { SkillMatched } from "../../components/skill-card";
@@ -35,12 +34,9 @@ import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillRow } from "../explore/skill-row";
 import {
-  groupByInstallTime,
   compareByInstalledTime,
   newestInstallTime,
-  type TimeGroup,
-} from "../../lib/time-groups";
-import { GroupSection } from "../../components/group-section";
+} from "../../lib/install-time";
 import { SkeletonList } from "../../components/skeleton-list";
 import { ListFacets } from "../../components/list-facets";
 import { ListUnitToggle } from "../../components/list-unit-toggle";
@@ -109,24 +105,19 @@ function starsOf(group: RepoGroup): number | undefined {
  * the same two units, switched on the list's own first row exactly as the
  * store's are:
  *
- * - **按仓库**: one card per source repository, filed newest-first into the
- *   same relative-time groups as the skill unit — a repository sits in the
- *   bucket its *newest* install belongs to, so a card reading 今天 has
- *   something new in it — and listing that repository's installed skills in
- *   the same newest-first order (up to the preview size set in Settings, 5 by
- *   default; that newest install is therefore always inside the preview).
- *   Installs no recorded source vouches for have no repository to belong to,
- *   so they pool into one card of their own rather than inventing one — the
- *   same shape, with its bar stating 本地安装 in place of a repository it
- *   would have to make up, and opening the page that lists the pool whole.
- * - **按技能**: one row per install, filed newest-first into per-day
- *   groups — 今天 / 昨天, then one dated group per calendar day (09-15,
- *   a day of another year carrying the year), with installs no
- *   timestamp vouches for pooled last under 时间未知 (see
- *   `lib/time-groups`) — so "what did I add lately" reads top to bottom.
- *   Either unit's search re-answers it in relevance order and stands the
- *   groups down. Nothing caps the skill rows: that unit is the whole list, so
- *   the unit that reads it one skill at a time reads all of them.
+ * - **按仓库**: one card per source repository, ordered by its *newest*
+ *   install (newest first, so a card near the top has something new in it),
+ *   listing that repository's installed skills in the same newest-first order
+ *   (up to the preview size set in Settings, 5 by default; that newest install
+ *   is therefore always inside the preview). Installs no recorded source
+ *   vouches for have no repository to belong to, so they pool into one card of
+ *   their own rather than inventing one — the same shape, with its bar stating
+ *   本地安装 in place of a repository it would have to make up, and opening
+ *   the page that lists the pool whole.
+ * - **按技能**: one row per install, newest first, so "what did I add
+ *   lately" reads top to bottom. Either unit's search re-answers it in
+ *   relevance order. Nothing caps the skill rows: that unit is the whole
+ *   list, so the unit that reads it one skill at a time reads all of them.
  *
  * What the page adds to the store's surfaces is what only an installed skill
  * has: enablement — as one group switch on each repository card's bar (a press
@@ -136,23 +127,8 @@ function starsOf(group: RepoGroup): number | undefined {
  * migration badge beside an install whose source the ledger cannot vouch for.
  * The skill unit carries its per-row switch, and both units feed the same
  * detail drawer, so what a skill looks like never depends on how the list is
- * grouped.
+ * ordered.
  */
-
-/**
- * The header a time group renders: a named day (今天 / 昨天 / 时间未知)
- * speaks its i18n key, a dated day reads as a number (09-15; another year
- * carries the year, 2025-12-03 — see `formatDayHeading`). `titleKey` null is
- * exactly `start` set, so the pair never half-applies.
- */
-function groupHeading<T>(
-  group: TimeGroup<T>,
-  t: TFunction<"translation", undefined>,
-): string {
-  return group.titleKey
-    ? t(group.titleKey as ParseKeys)
-    : formatDayHeading(group.start ?? 0);
-}
 
 export function MySkillsPage() {
   const { t } = useTranslation();
@@ -253,10 +229,9 @@ export function MySkillsPage() {
   // One card per source repository: the skills no recorded source vouches for
   // pool into the one card that stands for them, so every installed skill still
   // lives somewhere. Inside each card the installs read newest-first (the same
-  // order the time filing below puts the cards in, and the order the card's
-  // preview caps, so the newest install is the first row rather than hidden
-  // past the cap), and the cards themselves are name-ordered here purely as
-  // the stable base the time filing ties break against.
+  // order the card's preview caps, so the newest install is the first row
+  // rather than hidden past the cap), and the cards themselves are name-ordered
+  // here purely as the stable base the list's time ordering ties break against.
   const cards = useMemo<RepoGroup[]>(() => {
     const byRepo = new Map<string, Row[]>();
     for (const row of rows) {
@@ -275,34 +250,26 @@ export function MySkillsPage() {
     })).toSorted((a, b) => a.repo.localeCompare(b.repo));
   }, [rows]);
 
-  // The skill unit's filing: the same rows, grouped by the calendar day each
-  // install landed on (one group per day, newest first — see
-  // `lib/time-groups`) rather than ranked by the store's install count, and
-  // scoped to the chosen domain by membership, since a skill's own
-  // classification is what the chip row counts here. Installs the platform
-  // recorded no birth time for pool in the trailing 时间未知 group.
-  const timeGroups = useMemo<TimeGroup<Row>[]>(() => {
-    if (unit !== "skill" || isSearching) return [];
-    const scoped =
-      domain === null
-        ? rows
-        : rows.filter((row) => domainsOf(row.skill).includes(domain));
-    return groupByInstallTime(scoped, (row) => row.skill.installedAt);
-  }, [unit, rows, isSearching, domain]);
-
-  // The unit's flat order: groups in day order, skills newest-first within
-  // each one — the order the rows' ordinals enumerate and the drawer walks. A
+  // The skill unit's flat order: the installs newest-first by their recorded
+  // install time (see `lib/install-time`), scoped to the chosen domain by
+  // membership, since a skill's own classification is what the chip row counts
+  // here. Installs the platform recorded no birth time for settle last. A
   // search is left exactly as the index answered it: relevance is a ranking
   // too, and the better one while a query is live — the same order the store
   // keeps there.
   const activeRows = useMemo(
-    () =>
-      unit !== "skill"
-        ? []
-        : isSearching
+    () => {
+      if (unit !== "skill") return [];
+      if (isSearching) return rows;
+      const scoped =
+        domain === null
           ? rows
-          : timeGroups.flatMap((group) => group.items),
-    [unit, isSearching, rows, timeGroups],
+          : rows.filter((row) => domainsOf(row.skill).includes(domain));
+      return scoped.toSorted(
+        compareByInstalledTime((row) => row.skill.installedAt),
+      );
+    },
+    [unit, rows, isSearching, domain],
   );
 
   // Each row's ordinal in the flat order, so numbering runs continuously
@@ -335,13 +302,12 @@ export function MySkillsPage() {
     });
   }, [unit, rows, cards]);
 
-  // The repository unit's filing: the cards, grouped by when their *newest*
-  // install landed — a card reading 今天 has something new in it — ordered
-  // newest-first within every day (ties by name, set in `cards`), and
-  // scoped to the chosen domain by membership, since a card rides every domain
-  // its rows belong to. Cards whose installs all lack a birth time pool in the
-  // trailing 时间未知 bucket. A search leaves the filing to the index.
-  const repoGroups = useMemo<TimeGroup<RepoGroup>[]>(() => {
+  // The repository unit's flat order: the cards by their *newest* install —
+  // a card near the top has something new in it — newest first, ties broken by
+  // the name order `cards` was built in, and scoped to the chosen domain by
+  // membership, since a card rides every domain its rows belong to. Cards whose
+  // installs all lack a birth time settle last.
+  const activeCards = useMemo<RepoGroup[]>(() => {
     if (unit !== "repo" || isSearching) return [];
     const scoped =
       domain === null
@@ -349,15 +315,18 @@ export function MySkillsPage() {
         : cards.filter((card) =>
             card.items.some((row) => domainsOf(row.skill).includes(domain)),
           );
-    return groupByInstallTime(scoped, (card) =>
-      newestInstallTime(card.items, (row) => row.skill.installedAt),
+    return scoped.toSorted(
+      compareByInstalledTime(
+        (card) => newestInstallTime(card.items, (row) => row.skill.installedAt),
+        (a, b) => a.repo.localeCompare(b.repo),
+      ),
     );
   }, [unit, isSearching, cards, domain]);
 
-  // What the answer on screen is made of: one time bucket in either unit —
-  // a bucket, not a card or skill, is what the reveal counts, because a bucket
-  // is what both units list.
-  const itemCount = unit === "skill" ? timeGroups.length : repoGroups.length;
+  // What the answer on screen is made of: one row or one card per entry — the
+  // entry, not a bucket, is what the reveal counts, because an entry is what
+  // both units list.
+  const itemCount = unit === "skill" ? activeRows.length : activeCards.length;
   // What the 全部 chip counts, in the unit on screen: every repository, or every
   // skill.
   const totalCount = unit === "skill" ? rows.length : cards.length;
@@ -376,20 +345,20 @@ export function MySkillsPage() {
     step: CARD_CHUNK,
     resetKey: `${unit}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}`,
   });
-  const shownSkillGroups = timeGroups.slice(0, renderedCount);
-  const shownRepoGroups = repoGroups.slice(0, renderedCount);
+  const shownRows = activeRows.slice(0, renderedCount);
+  const shownCards = activeCards.slice(0, renderedCount);
 
   // The drawer walks every skill of the answer on screen, in the order the unit
-  // lists it: a card's preview cap and the groups' progressive reveal are
-  // rendering choices, not the list's extent.
+  // lists it: a card's preview cap and the progressive reveal are rendering
+  // choices, not the list's extent.
   const detailSkills = useMemo(
     () =>
       unit === "skill"
         ? activeRows.map((row) => row.skill)
-        : repoGroups.flatMap((group) =>
-            group.items.flatMap((card) => card.items.map((row) => row.skill)),
+        : activeCards.flatMap((card) =>
+            card.items.map((row) => row.skill),
           ),
-    [unit, activeRows, repoGroups],
+    [unit, activeRows, activeCards],
   );
 
   // The link affordance is only meaningful while the source is unknown: an
@@ -503,100 +472,77 @@ export function MySkillsPage() {
               }
             />
           ) : unit === "skill" ? (
-            // The skill unit: one section per calendar day — 今天 first,
-            // 时间未知 last — and within a section one row per install,
-            // newest first. The same row a repository's own page lists, so a
-            // skill reads the same wherever it is found. A day group only
-            // names the order — nothing to act on — so its boundary is one
-            // small muted line at the group's start, not a header over the
-            // rows; the drawer still walks every row in the same flat
-            // newest-first order. The sections carry no gap of their own —
-            // the group label is the boundary, sized like one row gap.
-            <div className="flex flex-col">
-              {shownSkillGroups.map((group) => (
-                <GroupSection key={group.key} label={groupHeading(group, t)}>
-                  <ul className={SKILL_ROW_LIST_CLASS}>
-                    {group.items.map((row) => {
-                      const key = skillKey(row.skill);
-                      return (
-                        <SkillRow
-                          key={key}
-                          skill={row.skill}
-                          matched={row.matched}
-                          index={rowOrdinals.get(key) ?? 0}
-                          // An installed list is not a leaderboard: the figures
-                          // it does carry come from the store, and the installs
-                          // it cannot place at all would leave the podium on
-                          // alphabetical order. The numbers merely count.
-                          ranked={false}
-                          selected={key === selectedKey}
-                          muted={!row.enabled}
-                          extra={rowExtra(row, "label")}
-                          action={<SkillEnableSwitch skill={row.skill} />}
-                          onSelect={() => setSelectedKey(key)}
-                        />
-                      );
-                    })}
-                  </ul>
-                </GroupSection>
-              ))}
-            </div>
+            // The skill unit: one row per install, newest first. The same row
+            // a repository's own page lists, so a skill reads the same
+            // wherever it is found.
+            <ul className={SKILL_ROW_LIST_CLASS}>
+              {shownRows.map((row) => {
+                const key = skillKey(row.skill);
+                return (
+                  <SkillRow
+                    key={key}
+                    skill={row.skill}
+                    matched={row.matched}
+                    index={rowOrdinals.get(key) ?? 0}
+                    // An installed list is not a leaderboard: the figures
+                    // it does carry come from the store, and the installs
+                    // it cannot place at all would leave the podium on
+                    // alphabetical order. The numbers merely count.
+                    ranked={false}
+                    selected={key === selectedKey}
+                    muted={!row.enabled}
+                    extra={rowExtra(row, "label")}
+                    action={<SkillEnableSwitch skill={row.skill} />}
+                    onSelect={() => setSelectedKey(key)}
+                  />
+                );
+              })}
+            </ul>
           ) : (
-            // The repository unit: one section per relative-time bucket — a
-            // card sits in the bucket its newest install belongs to — and
-            // within a section one card per repository, newest-first. The card
-            // itself lists its installs newest-first. Like in the skill unit,
-            // a bucket only names the order: a quiet caption above the card
-            // grid marks the boundary, and the drawer still walks every card's
-            // rows in the same flat order. The sections carry no gap of their
-            // own — the group label is the boundary, sized like one row gap.
-            <div className="flex flex-col">
-              {shownRepoGroups.map((group) => (
-                <GroupSection key={group.key} label={groupHeading(group, t)}>
-                  <ul className={REPO_LIST_CLASS}>
-                    {group.items.map((card) => (
-                      <RepoCard
-                        key={card.repo || LOCAL_POOL_KEY}
-                        repo={card.repo}
-                        stars={starsOf(card)}
-                        skills={card.items.map((row) => ({
-                          skill: row.skill,
-                          matched: row.matched,
-                          muted: !row.enabled,
-                          extra: rowExtra(row, "icon"),
-                        }))}
-                        maxSkills={maxSkills}
-                        hasQuery={isSearching}
-                        selected={selectedKey}
-                        onOpenSkill={setSelectedKey}
-                        // A repository card's bar opens the repository as this
-                        // list reads it — the installs on disk, with the rest
-                        // of the catalogue behind one control; the pool's bar
-                        // opens the installed list's own pool page, having no
-                        // repository to open.
-                        href={
-                          card.repo
-                            ? `${REPO_PAGE_PATH}${card.repo}`
-                            : LOCAL_POOL_PATH
-                        }
-                        // Card rows carry no per-skill switch: enablement is
-                        // one group action on the bar (below), and an
-                        // individual switch waits on the page the bar opens.
-                        // The disabled rows stay dimmed so the group switch's
-                        // state has its evidence.
-                        rowActions={false}
-                        footerAction={
-                          <RepoEnableSwitch
-                            names={card.items.map((row) => row.skill.name)}
-                            label={card.repo || t("common.localInstall")}
-                          />
-                        }
-                      />
-                    ))}
-                  </ul>
-                </GroupSection>
+            // The repository unit: one card per repository, ordered by each
+            // card's newest install. The card itself lists its installs
+            // newest-first.
+            <ul className={REPO_LIST_CLASS}>
+              {shownCards.map((card) => (
+                <RepoCard
+                  key={card.repo || LOCAL_POOL_KEY}
+                  repo={card.repo}
+                  stars={starsOf(card)}
+                  skills={card.items.map((row) => ({
+                    skill: row.skill,
+                    matched: row.matched,
+                    muted: !row.enabled,
+                    extra: rowExtra(row, "icon"),
+                  }))}
+                  maxSkills={maxSkills}
+                  hasQuery={isSearching}
+                  selected={selectedKey}
+                  onOpenSkill={setSelectedKey}
+                  // A repository card's bar opens the repository as this
+                  // list reads it — the installs on disk, with the rest
+                  // of the catalogue behind one control; the pool's bar
+                  // opens the installed list's own pool page, having no
+                  // repository to open.
+                  href={
+                    card.repo
+                      ? `${REPO_PAGE_PATH}${card.repo}`
+                      : LOCAL_POOL_PATH
+                  }
+                  // Card rows carry no per-skill switch: enablement is
+                  // one group action on the bar (below), and an
+                  // individual switch waits on the page the bar opens.
+                  // The disabled rows stay dimmed so the group switch's
+                  // state has its evidence.
+                  rowActions={false}
+                  footerAction={
+                    <RepoEnableSwitch
+                      names={card.items.map((row) => row.skill.name)}
+                      label={card.repo || t("common.localInstall")}
+                    />
+                  }
+                />
               ))}
-            </div>
+            </ul>
           )}
           {/* The sentinel ends the rendered run: while it is on screen the
               observer above extends the run, so scrolling down keeps revealing
