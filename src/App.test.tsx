@@ -135,9 +135,9 @@ describe("App routing", () => {
       </I18nProvider>,
     );
 
-    // The home carries no list, so open one first: the field is the header's,
-    // and there is one of it — the question it holds follows the reader instead
-    // of being emptied for them.
+    // The home's field is the store's, and the store's index is not ready in
+    // this test, so open the installed list — whose field is always open —
+    // and type there: the question follows the reader between the lists.
     await user.click(screen.getByRole("link", { name: /^我的$/ }));
     await user.type(await screen.findByLabelText("搜索 Skill"), "pdf");
 
