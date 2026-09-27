@@ -143,17 +143,19 @@ export class SkillAlreadyInstalledError extends Error {
 
 /**
  * Install a single skill from its source GitHub repo (`owner/repo`) into the
- * global skills directory. Only the named skill is installed, never the entire
- * repo.
+ * global skills directory. Normally only the named skill is installed; since
+ * agents-skills 0.24, when no skill directory matches and the repository root
+ * has a `SKILL.md`, the entire repo is installed under the repository name.
  *
  * In Tauri the source handed to the backend is `owner/repo@<skill>`: since
  * agents-skills 0.21 the source carries the skill. Since 0.23 the backend
  * downloads the whole repository tarball from codeload.github.com and matches
  * the named skill directory locally — the GitHub REST API is never called, so
  * its anonymous rate limit does not apply (the store's skill name is the
- * directory name the source matches on). One source resolves to exactly one
- * skill, so a failure is this call's rejection and there is no outcome list
- * to inspect. A same-named skill already on disk comes back as `skipped`
+ * directory name the source matches on; a root-level `SKILL.md` falls back to
+ * the whole repo, named after the repository). One source resolves to exactly
+ * one skill, so a failure is this call's rejection and there is no outcome
+ * list to inspect. A same-named skill already on disk comes back as `skipped`
  * (0.17's no-overwrite rule), which this call surfaces as
  * `SkillAlreadyInstalledError` — the existing skill is never re-labelled. In
  * the browser this records the install in the mock store instead.

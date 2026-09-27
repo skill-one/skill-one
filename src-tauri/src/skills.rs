@@ -372,7 +372,9 @@ mod tests {
 /// downloaded from codeload.github.com, unpacked into a temp dir, and the
 /// named skill is matched locally — the GitHub REST API is never called, so
 /// its anonymous 60-requests-per-hour rate limit no longer applies (the git
-/// clone / per-file paths are gone). The app always sends the GitHub form;
+/// clone / per-file paths are gone). Since 0.24, when no directory matches
+/// and the repository root has a `SKILL.md`, the whole repository is
+/// installed under the repository name. The app always sends the GitHub form;
 /// the store's skill name is the directory name the source matches on.
 ///
 /// One source resolves to exactly one skill, so there is no per-skill outcome
