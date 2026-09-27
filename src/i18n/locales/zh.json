@@ -156,7 +156,6 @@
     "dialogDescription": "已检测到的 agent 会自动链接到统一的 skills 目录，无需手动操作。链接时 agent 自带的内容会被收编进统一目录、其余文件隔离到 .misc，取消链接不会移回。在此可对个别 agent 取消链接，取消后不会再被自动链接。",
     "noAgents": "未检测到可用的 agent",
     "triggerAria": "管理 agent 链接（共 {{count}} 个）",
-    "menuHeader": "Agents · 共 {{count}} 个",
     "skillsPending": "{{count}} 个 skill 待收编",
     "filesPending": "{{count}} 项文件待隔离",
     "toggleAria": "{{name}} 链接开关"
@@ -182,27 +181,11 @@
     "noSkills": "暂无技能",
     "repoCount": "{{count}} 个仓库",
     "skillCount": "{{count}} 个 skill",
-    "viewRepoAria": "查看仓库 {{repo}}，{{count}} 个 skill",
-    "viewPoolAria": "查看{{name}}，{{count}} 个 skill",
-    "repoNotInIndex": "索引中没有仓库 {{repo}}",
-    "repoNoInstalled": "该仓库没有已安装的 skill",
-    "installedCount": "{{count}} 个已安装 skill",
+    "expandRepoAria": "展开 {{name}} 的全部 {{count}} 个 skill",
+    "collapseRepoAria": "收起 {{name}} 的 skill 列表",
     "noInstalled": "还没有安装任何技能",
     "noMatchSkill": "没有符合条件的 skill",
-    "noMatchRepo": "没有符合条件的仓库",
-    "noLocal": "没有本地安装的 skill"
-  },
-  "pool": {
-    "showOtherInstalled": "查看其他 {{count}} 个已安装 skill",
-    "collapseOtherInstalled": "收起其他 {{count}} 个已安装 skill"
-  },
-  "repo": {
-    "showOther": "查看同仓库其他 {{count}} 个 skill",
-    "showOtherInstalled": "查看同仓库其他 {{count}} 个已安装 skill",
-    "showOtherUninstalled": "查看同仓库其他 {{count}} 个未安装 skill",
-    "collapseOther": "收起其他 {{count}} 个 skill",
-    "collapseOtherInstalled": "收起其他 {{count}} 个已安装 skill",
-    "collapseUninstalled": "收起未安装的 {{count}} 个 skill"
+    "noMatchRepo": "没有符合条件的仓库"
   },
   "run": {
     "moreFrom": "还有 {{count}} 个来自",

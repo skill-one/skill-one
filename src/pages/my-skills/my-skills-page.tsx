@@ -65,17 +65,6 @@ const SKELETON_ROWS = 12;
 /** React-key identity of the pool card: skills no recorded source vouches for. */
 const LOCAL_POOL_KEY = "local";
 
-/** Where the pool card's bar leads: the page that lists the pool whole. */
-const LOCAL_POOL_PATH = "/my-skills/local";
-
-/**
- * Where a repository card's bar leads: that repository as *this* list reads it
- * — the skills of it that are on disk — rather than the store's full catalogue
- * of the same repository (`/repo/owner/repo`), which is one deliberate step
- * further from there (see `RepoPage`).
- */
-const REPO_PAGE_PATH = "/my-skills/repo/";
-
 /** One installed skill, precomputed where the list is built. */
 interface Row {
   skill: SkillView;
@@ -396,10 +385,7 @@ export function MySkillsPage() {
   // install the ledger placed has a repository to point at. In the skill unit
   // the label and icon are merged into one trigger ("label"); a repo-card row
   // takes the icon alone, since the card's bar already names the source.
-  const rowExtra = (
-    row: Row,
-    variant: "label" | "icon",
-  ) =>
+  const rowExtra = (row: Row, variant: "label" | "icon") =>
     !row.skill.repo ? (
       <LinkSuggestionBadge
         name={row.skill.name}
@@ -569,21 +555,11 @@ export function MySkillsPage() {
                         hasQuery={isSearching}
                         selected={selectedKey}
                         onOpenSkill={setSelectedKey}
-                        // A repository card's bar opens the repository as this
-                        // list reads it — the installs on disk, with the rest
-                        // of the catalogue behind one control; the pool's bar
-                        // opens the installed list's own pool page, having no
-                        // repository to open.
-                        href={
-                          card.repo
-                            ? `${REPO_PAGE_PATH}${card.repo}`
-                            : LOCAL_POOL_PATH
-                        }
                         // Card rows carry no per-skill switch: enablement is
                         // one group action on the bar (below), and an
-                        // individual switch waits on the page the bar opens.
-                        // The disabled rows stay dimmed so the group switch's
-                        // state has its evidence.
+                        // individual switch waits on the detail panel a row
+                        // opens. The disabled rows stay dimmed so the group
+                        // switch's state has its evidence.
                         rowActions={false}
                         footerAction={
                           <RepoEnableSwitch

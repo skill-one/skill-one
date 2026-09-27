@@ -41,7 +41,10 @@ function hit(name: string, extras: Partial<Skill> = {}): SearchHit {
 /** Eight skills, most installed first — one more than the card's cap, so the
  *  tail has something to account for. */
 const skills: SearchHit[] = [
-  hit("pdf", { downloads: 3_000, profile: { domain: ["office-productivity"] } }),
+  hit("pdf", {
+    downloads: 3_000,
+    profile: { domain: ["office-productivity"] },
+  }),
   hit("docx", { downloads: 2_000 }),
   hit("pptx", { downloads: 1_000 }),
   hit("xlsx", { downloads: 500 }),
@@ -70,36 +73,46 @@ function renderCard(overrides: Parameters<typeof RepoCard>[0] | object = {}) {
 const rowNames = () =>
   screen
     .getAllByRole("button", { name: /^查看 .+ 详情$/ })
-    .map((row) => row.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""));
+    .map((row) =>
+      row.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""),
+    );
 
 describe("RepoCard", () => {
   beforeEach(() => {
     vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
   });
 
-  it("leads with the skills and signs off with the repository's own bar", () => {
+  it("leads with the repository's own bar and signs the rows under it", () => {
     const { container } = renderCard();
 
-    // The skills are the card's content: no header stands between the reader
-    // and the things they are comparing.
-    expect(container.querySelector('[data-slot="card-header"]')).toBeNull();
-    expect(container.querySelector('[data-slot="card-content"]')).not.toBeNull();
+    // The bar leads the card: one line names the repository before any of its
+    // rows do, and the rows follow under the hairline the bar closes with.
+    const header = container.querySelector('[data-slot="card-header"]');
+    expect(header).not.toBeNull();
+    expect(
+      container.querySelector('[data-slot="card-content"]'),
+    ).not.toBeNull();
+    expect(header).toContainElement(
+      screen.getByRole("button", {
+        name: `展开 ${REPO} 的全部 8 个 skill`,
+      }),
+    );
 
-    // The one bar carries what the repository is and the way into its page.
-    const bar = screen.getByRole("link", {
-      name: `查看仓库 ${REPO}，8 个 skill`,
+    // This card's cap is holding rows back, so its one bar is the expansion
+    // toggle: what the repository is, how big it is, and the offer of the rest
+    // without leaving the list.
+    const bar = screen.getByRole("button", {
+      name: `展开 ${REPO} 的全部 8 个 skill`,
     });
-    expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
+    expect(bar).toHaveAttribute("aria-expanded", "false");
     expect(within(bar).getByText(REPO)).toBeInTheDocument();
     expect(within(bar).getByText(formatCount(STARS))).toBeInTheDocument();
-    // The count is the door's *object*, not a second figure standing beside it
-    // with a separator between them: one phrase, in one element, carrying the
-    // noun the app uses for it everywhere else — so nothing has to disambiguate
-    // 「8 个」 from the rows on screen.
-    const door = within(bar).getByText("8 个 skill");
-    expect(door.tagName).toBe("SPAN");
+    // The toggle's figure is the *increment* — the exact number of rows a
+    // press reveals, read straight off the five on screen.
+    const offer = within(bar).getByText("3");
+    expect(offer.tagName).toBe("SPAN");
     // ...and the repository's own figure rides the repository's own name, at
-    // the front of the bar, rather than out in the door's cluster — where it
+    // the front of the bar, rather than out in the offer's cluster — where it
     // mixed a fact about the repository with a fact about the list.
     const name = within(bar).getByText(REPO);
     const stars = within(bar).getByTitle(`${STARS} stars`);
@@ -108,12 +121,9 @@ describe("RepoCard", () => {
         Node.DOCUMENT_POSITION_FOLLOWING) !==
       0;
     expect(follows(name, stars)).toBe(true);
-    expect(follows(stars, door)).toBe(true);
+    expect(follows(stars, offer)).toBe(true);
     // The printed star figure is compacted; the raw one stays reachable.
-    // The bar is the card's one repository-level control. A second link for the
-    // same kind of choice — an "open on GitHub" button — used to sit beside it;
-    // the repository page carries that action with a label instead.
-    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
   });
 
   it("lists the repository's skills in order, under a glyph and a description", () => {
@@ -127,20 +137,18 @@ describe("RepoCard", () => {
     expect(pdf).toHaveTextContent("pdf does something useful.");
   });
 
-  it("caps the list at the default five rows and states the repository's total", () => {
+  it("caps the list at the default five rows and offers the rest on the bar", () => {
     renderCard();
 
     // The default preview holds five rows; past the cap a skill is not rendered.
     expect(rowNames()).toEqual(["pdf", "docx", "pptx", "xlsx", "slides"]);
     expect(screen.queryByText("canvas")).not.toBeInTheDocument();
-    // The bar's figure is the repository's total, not the five on screen: that
-    // is what makes a capped list read as "these of them", with the door beside
-    // it as the way to the rest.
-    const bar = screen.getByRole("link", {
-      name: `查看仓库 ${REPO}，8 个 skill`,
+    // The bar's figure is the *increment*: three rows behind the cap, which is
+    // exactly what a press on the toggle reveals.
+    const bar = screen.getByRole("button", {
+      name: `展开 ${REPO} 的全部 8 个 skill`,
     });
-    expect(within(bar).getByText("8 个 skill")).toBeInTheDocument();
-    expect(bar).toHaveAttribute("href", `/repo/${REPO}`);
+    expect(within(bar).getByText("3")).toBeInTheDocument();
   });
 
   it("honours a smaller preview size", () => {
@@ -162,13 +170,11 @@ describe("RepoCard", () => {
     renderCard({ skills: [skills[0]] });
 
     expect(rowNames()).toEqual(["pdf"]);
-    const bar = screen.getByRole("link", {
-      name: `查看仓库 ${REPO}，1 个 skill`,
-    });
-    // The door's label, not a bare count: it reads 「1 个 skill」 — this
-    // repository has one skill and this is the way to it — without the bar
-    // having to change shape for the smallest repository there is.
-    expect(within(bar).getByText("1 个 skill")).toBeInTheDocument();
+    // Nothing to reveal, so the bar is pure identity — and carries no figure:
+    // a count would answer "how many are here?" for a card whose every row is
+    // already on screen.
+    expect(screen.queryByText(/个 skill/)).toBeNull();
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
   });
 
   it("lists every match while a search is live, uncapped", () => {
@@ -195,10 +201,9 @@ describe("RepoCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "查看 docx 详情" }));
 
     expect(onOpenSkill).toHaveBeenCalledWith(skillKey(skills[1].skill));
-    expect(screen.getByRole("button", { name: "查看 docx 详情" })).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
+    expect(
+      screen.getByRole("button", { name: "查看 docx 详情" }),
+    ).toHaveAttribute("aria-current", "true");
     expect(
       screen.getByRole("button", { name: "查看 pdf 详情" }),
     ).not.toHaveAttribute("aria-current");
@@ -250,9 +255,9 @@ describe("RepoCard", () => {
     // the text it covers rather than pushing it aside.
     expect(reveal).toHaveClass("absolute");
     expect(reveal).toHaveClass("bg-gradient-to-l");
-    expect(screen.getAllByRole("button", { name: "查看 pdf 详情" })[0]).toHaveClass(
-      "flex-1",
-    );
+    expect(
+      screen.getAllByRole("button", { name: "查看 pdf 详情" })[0],
+    ).toHaveClass("flex-1");
   });
 
   it("keeps an installed skill's badge on screen without a hover", async () => {
@@ -271,23 +276,37 @@ describe("RepoCard", () => {
     expect(reveal).toHaveClass("has-data-[state=installed]:opacity-100");
   });
 
-  it("keeps the card's single door: the bar, and nothing beside it", () => {
-    renderCard();
+  it("keeps the card free of any route out of the list", () => {
+    // A card whose cap hides nothing is a label: every route out of it is a
+    // row (a skill, and the detail panel it opens), and no link competes with
+    // that.
+    renderCard({ skills: [skills[0]] });
 
-    // Every route out of the card is a row (a skill) or the bar (the
-    // repository): no control of the same granularity competes with either.
     expect(screen.queryByRole("button", { name: /GitHub/ })).toBeNull();
-    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
+  });
+
+  it("offers no expansion when the cap hides nothing", () => {
+    renderCard({ skills: [skills[0]] });
+
+    // A one-skill repository has no rest to reveal, so its bar stays a label —
+    // a toggle would only promise something it does not have.
+    expect(
+      screen.queryByRole("button", {
+        name: `展开 ${REPO} 的全部 1 个 skill`,
+      }),
+    ).toBeNull();
+    expect(screen.queryByText(/个 skill/)).toBeNull();
   });
 
   it("draws the owner face on a label bar whenever a repository stands behind it", () => {
-    // A label bar (a live card's rows are the whole answer) still knows its
-    // owner: the face rides the name, resolving through the mirror and then
-    // GitHub's own endpoint. The local pool — no repository at all — has no
-    // owner to draw.
-    const { container: live } = renderCard({ href: null });
+    // A label bar (a card with nothing behind its cap) still knows its owner:
+    // the face rides the name, resolving through the mirror and then GitHub's
+    // own endpoint. The local pool — no repository at all — has no owner to
+    // draw.
+    const { container: labeled } = renderCard({ skills: [skills[0]] });
     expect(
-      live.querySelector('[data-slot="card-footer"] [data-slot="avatar"]'),
+      labeled.querySelector('[data-slot="card-header"] [data-slot="avatar"]'),
     ).not.toBeNull();
 
     const { container: pool } = renderCard({
@@ -295,7 +314,7 @@ describe("RepoCard", () => {
       skills: skills.map((h) => ({ skill: h.skill })),
     });
     expect(
-      pool.querySelector('[data-slot="card-footer"] [data-slot="avatar"]'),
+      pool.querySelector('[data-slot="card-header"] [data-slot="avatar"]'),
     ).toBeNull();
   });
 
@@ -307,10 +326,13 @@ describe("RepoCard", () => {
     expect(screen.queryAllByRole("button", { name: "安装" })).toHaveLength(0);
   });
 
-  it("mounts the footer action beside the door, never inside it", async () => {
+  it("mounts the footer action beside the bar, never inside it", async () => {
     const user = userEvent.setup();
     const onFooter = vi.fn();
-    renderCard({
+    // One skill: no cap in play, so the bar stays a label and the test reads
+    // the bar/action relationship it is about.
+    const { container } = renderCard({
+      skills: [skills[0]],
       rowActions: false,
       footerAction: (
         <button type="button" onClick={onFooter}>
@@ -319,16 +341,92 @@ describe("RepoCard", () => {
       ),
     });
 
-    // The door still leads to the repository, and the footer action is its own
-    // control: a press on the action must not walk through the door, so the
-    // action is a sibling of the link rather than a child of it.
-    const door = screen.getByRole("link", {
-      name: `查看仓库 ${REPO}，8 个 skill`,
-    });
+    // The footer action is its own control: a press on it must not also act on
+    // the bar, so it is a sibling of the bar rather than a child of it.
+    const bar = container.querySelector('[data-slot="card-header"] > span')!;
     const action = screen.getByRole("button", { name: "group" });
-    expect(door).toBeInTheDocument();
-    expect(door.contains(action)).toBe(false);
+    expect(bar).toBeInTheDocument();
+    expect(bar.contains(action)).toBe(false);
     await user.click(action);
     expect(onFooter).toHaveBeenCalledOnce();
+  });
+
+  it("expands in place past its cap, spanning the row in two balanced columns", async () => {
+    const user = userEvent.setup();
+    const { container } = renderCard();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: `展开 ${REPO} 的全部 8 个 skill`,
+      }),
+    );
+
+    // The reveal: every skill the cap was holding, right here — no navigation.
+    expect(rowNames()).toEqual([
+      "pdf",
+      "docx",
+      "pptx",
+      "xlsx",
+      "slides",
+      "canvas",
+      "figma",
+      "notion",
+    ]);
+
+    // The open card takes the whole grid row, whatever the auto-fill came to.
+    const item = container.querySelector("ul > li") as HTMLElement;
+    expect(item).toHaveClass("col-span-full");
+
+    // The body is one list laid out column-major over ceil(8/2) rows, so the
+    // rows split evenly — four down the left, four down the right — and DOM
+    // order (the reading order) stays most-installed first. The count puts two
+    // columns on the grid; `auto-cols-fr` makes each half the card's width.
+    const body = container.querySelector('[data-slot="card-content"] ul')!;
+    expect(body).toHaveClass("grid");
+    expect(body).toHaveClass("grid-flow-col");
+    expect(body).toHaveClass("auto-cols-fr");
+    expect(body).not.toHaveClass("flex-col");
+    expect(body).toHaveStyle({ gridTemplateRows: "repeat(4, auto)" });
+
+    // The toggle reads its own state: the figure becomes the card's total —
+    // the fact the open card exists to show, beside the minus that folds it.
+    const bar = screen.getByRole("button", {
+      name: `收起 ${REPO} 的 skill 列表`,
+    });
+    expect(bar).toHaveAttribute("aria-expanded", "true");
+    expect(within(bar).getByText("8 个 skill")).toBeInTheDocument();
+    expect(within(bar).queryByText("3")).not.toBeInTheDocument();
+  });
+
+  it("folds back to the capped preview on a second press", async () => {
+    const user = userEvent.setup();
+    renderCard();
+
+    const bar = () =>
+      screen.getByRole("button", {
+        name: `展开 ${REPO} 的全部 8 个 skill`,
+      });
+    await user.click(bar());
+    await user.click(
+      screen.getByRole("button", { name: `收起 ${REPO} 的 skill 列表` }),
+    );
+
+    expect(rowNames()).toEqual(["pdf", "docx", "pptx", "xlsx", "slides"]);
+    expect(screen.queryByText("notion")).not.toBeInTheDocument();
+    expect(bar()).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("offers no expansion while a search is live — the cap already stands down", () => {
+    renderCard({ hasQuery: true });
+
+    // A search's rows are matches; hiding one behind a toggle would defeat it.
+    // With nothing held back the bar stays the plain label every
+    // nothing-to-reveal card wears.
+    expect(
+      screen.queryByRole("button", {
+        name: `展开 ${REPO} 的全部 8 个 skill`,
+      }),
+    ).toBeNull();
+    expect(screen.queryByText(/个 skill/)).toBeNull();
   });
 });

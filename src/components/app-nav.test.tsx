@@ -45,10 +45,10 @@ describe("AppNav", () => {
   });
 
   it("keeps a destination marked on its own sub-pages", () => {
-    renderNav("/my-skills/local");
+    renderNav("/my-skills/agents");
 
-    // The local pool is a sub-page of the installed list, so the destination it
-    // opened from stays lit.
+    // The agents graph is a sub-page of the installed list, so the destination
+    // it opened from stays lit.
     expect(screen.getByRole("link", { name: "我的" })).toHaveAttribute(
       "aria-current",
       "page",

@@ -10,17 +10,14 @@ import {
   fireEvent,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  HashRouter,
-  MemoryRouter,
-  Route,
-  Routes,
-  useNavigate,
-} from "react-router";
+import { HashRouter } from "react-router";
 
 import { AppHeader } from "../../components/app-header";
 
-import { fetchSkillDetail, fetchSkillZhDetail } from "../../lib/skill-detail-api";
+import {
+  fetchSkillDetail,
+  fetchSkillZhDetail,
+} from "../../lib/skill-detail-api";
 import { searchSkillsSh } from "../../lib/skills-sh";
 import {
   REPO_CARD_SKELETON_CLASS,
@@ -32,7 +29,10 @@ import { I18nProvider } from "../../i18n/language-provider";
 import type { SkillView } from "../../lib/skill-view";
 import type { Skill } from "../../types/skill";
 import type { RegistryHarness } from "../../test/registry-harness";
-import { installMockSkill, resetMockInstalledSkills } from "../../lib/mock-local";
+import {
+  installMockSkill,
+  resetMockInstalledSkills,
+} from "../../lib/mock-local";
 import { ExplorePage } from "./explore-page";
 
 /**
@@ -203,38 +203,6 @@ function renderExplorePage() {
 }
 
 /**
- * Where a repository card's bar leads. The page itself is stood in for —
- * `repo-page.test.tsx` owns its behaviour — because what the drill-down tests
- * here is what the *list* keeps while it is away.
- */
-function RepoStandIn() {
-  const navigate = useNavigate();
-  return (
-    <button type="button" onClick={() => navigate(-1)}>
-      返回探索
-    </button>
-  );
-}
-
-/** The list under the routes a drill-down needs: the list, and a page to land
- *  on. A memory router, so a "back" is a pop of the entry the list is on. */
-function renderExploreRoutes() {
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <MemoryRouter initialEntries={["/explore"]}>
-          <AppHeader />
-          <Routes>
-            <Route path="/explore" element={<ExplorePage />} />
-            <Route path="/repo/*" element={<RepoStandIn />} />
-          </Routes>
-        </MemoryRouter>
-      </I18nProvider>
-    </QueryClientProvider>,
-  );
-}
-
-/**
  * The search field, once the worker's index is ready to answer it. The field
  * stays locked until then, so every search case waits for the same unlock
  * instead of racing the index build.
@@ -250,6 +218,11 @@ const cardOrder = () =>
   screen
     .getAllByRole("button", { name: /查看 .+ 详情/ })
     .map((el) => el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""));
+
+/** The repository cards mounted under a scope, by the `data-repo` each Card
+ *  carries — the stable fact every card has, expandable or not. */
+const repoCards = (scope: ParentNode = document.body) =>
+  scope.querySelectorAll('[data-slot="card"][data-repo]');
 
 beforeEach(() => {
   // Fresh cache per test; retries are off so a rejected fetch surfaces an
@@ -302,15 +275,18 @@ describe("ExplorePage", () => {
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
     // One repository, one card: the group header the list used to lead with is
     // gone, because the card *is* the group. Its bottom bar is what signs the
-    // card and what opens the repository's own page.
+    // card — and with fifty skills behind the cap, what expands it in place.
     expect(
-      screen.getByRole("link", { name: `查看仓库 ${BATCH_REPO}，50 个 skill` }),
+      screen.getByRole("button", {
+        name: `展开 ${BATCH_REPO} 的全部 50 个 skill`,
+      }),
     ).toBeInTheDocument();
     // The page answered one RPC; browsing never re-downloads the registry.
     expect(harness.downloads).toBe(1);
   });
 
-  it("caps a repository's rows at the default preview and hands the rest to its page", async () => {
+  it("caps a repository's rows at the default preview and reveals the rest in place", async () => {
+    const user = userEvent.setup();
     // One repository with eight skills: five on the card (the default preview),
     // three behind it.
     harness.init();
@@ -320,16 +296,20 @@ describe("ExplorePage", () => {
 
     // The cap is what keeps one big repository from pushing every other card
     // off the screen; the bar carries the repository's *total*, so a capped list
-    // reads as "these of them" and its door leads to all of them.
+    // reads as "these of them" — and the rest is one press away in place.
     expect(await screen.findByText("skill-4")).toBeInTheDocument();
     expect(screen.queryByText("skill-5")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: `查看仓库 ${BATCH_REPO}，8 个 skill` }),
-      // The app is a hash router, so the rendered href carries the hash.
-    ).toHaveAttribute("href", `#/repo/${BATCH_REPO}`);
-    expect(
       screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
     ).toHaveLength(5);
+    await user.click(
+      screen.getByRole("button", {
+        name: `展开 ${BATCH_REPO} 的全部 8 个 skill`,
+      }),
+    );
+    expect(
+      screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
+    ).toHaveLength(8);
   });
 
   it("lets a search ignore the domain filter", async () => {
@@ -407,13 +387,13 @@ describe("ExplorePage", () => {
       },
     ]);
     harness.complete();
-    renderExplorePage();
+    const { container } = renderExplorePage();
 
     // The list opens on 全部: one card per repository, and a chip for every
     // domain that holds one — plus 未分类 for the repository nothing classified,
     // which is a different claim from the dataset's own 其他 and so takes a chip
     // of its own.
-    const cards = () => screen.getAllByRole("link", { name: /^查看仓库 / });
+    const cards = () => repoCards(container);
     await screen.findByText("redis");
     expect(cards()).toHaveLength(3);
     expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
@@ -494,10 +474,10 @@ describe("ExplorePage", () => {
     expect(unclassified).toHaveTextContent("1");
 
     // The repository unit's card rows mark them the same way …
-    const strayCardRow = screen.getByRole("button", { name: "查看 stray 详情" });
-    expect(
-      strayCardRow.querySelector("svg.lucide-shapes"),
-    ).toBeInTheDocument();
+    const strayCardRow = screen.getByRole("button", {
+      name: "查看 stray 详情",
+    });
+    expect(strayCardRow.querySelector("svg.lucide-shapes")).toBeInTheDocument();
     const orphanCardRow = screen.getByRole("button", {
       name: "查看 orphan 详情",
     });
@@ -540,9 +520,7 @@ describe("ExplorePage", () => {
     // rest — only the glyph shows.
     const chip = await screen.findByRole("button", { name: /开发编程/ });
     expect(chip.querySelector("span.grid")).toHaveClass("grid-cols-[0fr]");
-    expect(chip.querySelector("span.grid")).not.toHaveClass(
-      "grid-cols-[1fr]",
-    );
+    expect(chip.querySelector("span.grid")).not.toHaveClass("grid-cols-[1fr]");
 
     // Choosing the chip unfolds its label for good, so the scope always reads.
     await user.click(chip);
@@ -592,14 +570,14 @@ describe("ExplorePage", () => {
     const { container } = renderExplorePage();
 
     // The repository unit leads with one card per repository...
-    await screen.findByRole("link", { name: /^查看仓库 o\/one/ });
+    await screen.findByText("o/one");
     await user.click(screen.getByRole("button", { name: "按技能" }));
 
     // ...and the skill unit with one row per skill, most installed first. o/one's
     // three skills are a run, but below the fold threshold it is listed whole —
     // every row stands on its own, and no fold row appears.
     await waitFor(() => expect(cardOrder()).toEqual(["r1", "r2", "r3", "z1"]));
-    expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
+    expect(repoCards(container).length).toBe(0);
     expect(
       screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
     ).toBeNull();
@@ -750,7 +728,7 @@ describe("ExplorePage", () => {
     expect(
       await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
+    expect(repoCards().length).toBe(0);
   });
 
   it("renders the leading cards first and reveals more as the reader scrolls", async () => {
@@ -771,11 +749,8 @@ describe("ExplorePage", () => {
 
     await screen.findByText("skill-0");
 
-    // The first chunk is mounted, cards and all. The count reads the head
-    // link's exact aria-label shape — one per rendered repository card.
-    const renderedCards = () =>
-      screen
-        .getAllByRole("link", { name: /^查看仓库 repo-\d+\/skills，/ }).length;
+    // The first chunk is mounted, cards and all — one per rendered repository.
+    const renderedCards = () => repoCards().length;
     expect(renderedCards()).toBe(6);
     expect(screen.getByText("skill-5")).toBeInTheDocument();
     expect(screen.queryByText("skill-6")).not.toBeInTheDocument();
@@ -807,36 +782,36 @@ describe("ExplorePage", () => {
     bootGadgetRegistry();
     renderExplorePage();
 
-    const cardLinks = () => screen.getAllByRole("link", { name: /^查看仓库 / }).length;
+    const cardCount = () => repoCards().length;
     const triggerSentinel = () =>
       (
         globalThis.IntersectionObserver as unknown as {
           instances: Array<{ trigger(intersecting?: boolean): void }>;
         }
-      ).instances.at(-1)?.trigger(true);
+      ).instances
+        .at(-1)
+        ?.trigger(true);
 
     // Only the leading band mounts at first, and only with the first chunk.
     const leading = await screen.findByRole("region", { name: "Top 25" });
-    expect(cardLinks()).toBe(6);
-    expect(screen.queryByRole("region", { name: "26–50" })).not.toBeInTheDocument();
+    expect(cardCount()).toBe(6);
+    expect(
+      screen.queryByRole("region", { name: "26–50" }),
+    ).not.toBeInTheDocument();
 
     // Revealing to the bottom mounts the other bands with their true ranges,
     // keeping every card once.
     await waitFor(() => {
       triggerSentinel();
-      expect(cardLinks()).toBe(71);
+      expect(cardCount()).toBe(71);
     });
     expect(
-      within(screen.getByRole("region", { name: "26–50" })).getAllByRole("link", {
-        name: /^查看仓库 /,
-      }),
-    ).toHaveLength(25);
+      repoCards(screen.getByRole("region", { name: "26–50" })).length,
+    ).toBe(25);
     expect(
-      within(screen.getByRole("region", { name: "51–71" })).getAllByRole("link", {
-        name: /^查看仓库 /,
-      }),
-    ).toHaveLength(21);
-    expect(within(leading).getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(25);
+      repoCards(screen.getByRole("region", { name: "51–71" })).length,
+    ).toBe(21);
+    expect(repoCards(leading).length).toBe(25);
   });
 
   it("labels each rank band with quiet text, not a control", async () => {
@@ -870,61 +845,13 @@ describe("ExplorePage", () => {
     renderExplorePage();
 
     await screen.findByText("gadget-master");
-    expect(screen.queryByRole("region", { name: "Top 25" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Top 25" }),
+    ).not.toBeInTheDocument();
     expect(document.querySelector("ul.grid")).toBeInTheDocument();
   });
 
-  it("keeps the reader's place across a repository's page and back", async () => {
-    const user = userEvent.setup();
-    harness.init();
-    harness.pushAll(
-      Array.from({ length: 12 }, (_, i) => ({
-        name: `skill-${i}`,
-        repo: `repo-${String(i).padStart(2, "0")}/skills`,
-        description: "",
-        stars: 10,
-        downloads: 10,
-        path: `skills/skill-${i}`,
-      })),
-    );
-    harness.complete();
-    const { container } = renderExploreRoutes();
-
-    const renderedCards = () =>
-      screen.getAllByRole("link", { name: /^查看仓库 repo-\d+\/skills，/ });
-    const scroller = () =>
-      (container.querySelector("ul.grid") as HTMLElement).closest(
-        ".overflow-y-auto",
-      ) as HTMLElement;
-    await screen.findByText("skill-0");
-    expect(renderedCards()).toHaveLength(6);
-
-    // The reader searches — the answer mounts whole, no reveal to pace it —
-    // and leaves the list sitting partway down.
-    await user.type(await searchField(), "skill");
-    await waitFor(() => {
-      expect(document.querySelector("mark")).toBeInTheDocument();
-      expect(renderedCards()).toHaveLength(12);
-    });
-    scroller().scrollTop = 300;
-    fireEvent.scroll(scroller());
-
-    // Into a repository's page, and back out of it.
-    await user.click(renderedCards()[0]);
-    await user.click(
-      await screen.findByRole("button", { name: "返回探索" }),
-    );
-
-    // The reader is handed the page they left, not a reset one: their search,
-    // the depth they had revealed, and the position they were scrolled to.
-    expect(await screen.findByRole("textbox", { name: "搜索 Skill" })).toHaveValue(
-      "skill",
-    );
-    expect(renderedCards()).toHaveLength(12);
-    expect(scroller().scrollTop).toBe(300);
-  }, 15000);
-
-  it("shows a repository's stars and skill count on its card", async () => {
+  it("shows a repository's stars on its card", async () => {
     harness.init();
     harness.pushAll([
       {
@@ -957,18 +884,19 @@ describe("ExplorePage", () => {
 
     // The most-starred repository leads the list.
     expect(await screen.findByText("widget-core")).toBeInTheDocument();
-    const bar = screen.getByRole("link", {
-      name: "查看仓库 acme/widgets，2 个 skill",
-    });
-    // The figures a group header used to carry now ride the card's bottom bar:
-    // the repository's name, the stars compactly right behind it — where they
-    // say something about the repository — and the skill count, the
-    // repository's total, inside the label of the door at the far end.
+    const bar = cardOf("widget-core").querySelector(
+      '[data-slot="card-header"]',
+    ) as HTMLElement;
+    // The figures a group header used to carry now ride the card's top bar:
+    // the repository's name, and the stars compactly right behind it — where
+    // they say something about the repository. Both rows are already on
+    // screen, so no figure joins them: a count would answer a question the
+    // card no longer asks.
     expect(within(bar).getByText("acme/widgets")).toBeInTheDocument();
     expect(
       within(bar).getByText(new RegExp(formatCount(12_300))),
     ).toBeInTheDocument();
-    expect(within(bar).getByText("2 个 skill")).toBeInTheDocument();
+    expect(within(bar).queryByText(/个 skill/)).toBeNull();
     // Both of the repository's rows are inside the card.
     expect(
       screen.getByRole("button", { name: "查看 widget-core 详情" }),
@@ -1057,12 +985,11 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("gadget-00");
 
-    // The count reads the head link's exact aria-label shape — one per
-    // rendered repository card.
+    // The count reads the cards' own `data-repo` — one per rendered card.
     const renderedGadgetCards = () =>
-      screen.getAllByRole("link", {
-        name: /^查看仓库 acme\/gadget-\d+，/,
-      });
+      Array.from(repoCards()).filter((card) =>
+        card.getAttribute("data-repo")?.startsWith("acme/gadget-"),
+      );
 
     // The reader has scrolled: the browsed list is fully mounted (the reveal
     // paces the browse answer).
@@ -1073,9 +1000,7 @@ describe("ExplorePage", () => {
         }
       ).instances.at(-1)!;
     lastObserver().trigger(true);
-    await waitFor(() =>
-      expect(renderedGadgetCards()).toHaveLength(12),
-    );
+    await waitFor(() => expect(renderedGadgetCards()).toHaveLength(12));
 
     // A search answers whole: the unified search view mounts its sections
     // entire, no reveal to pace it and no observer to wait for.
@@ -1148,10 +1073,13 @@ describe("ExplorePage", () => {
     expect(
       screen.getAllByRole("button", { name: "查看 gadget-master 详情" }),
     ).toHaveLength(1);
-    expect(mockSearchSkillsSh).toHaveBeenCalledWith("gadget", expect.anything());
+    expect(mockSearchSkillsSh).toHaveBeenCalledWith(
+      "gadget",
+      expect.anything(),
+    );
   });
 
-  it("shapes the live answer as repository cards that are labels, not doors", async () => {
+  it("shapes the live answer as repository cards whose bars are labels", async () => {
     const user = userEvent.setup();
     bootGadgetRegistry();
     // Two live hits share one repository; a third lives elsewhere; a fourth
@@ -1173,40 +1101,28 @@ describe("ExplorePage", () => {
     expect(await screen.findByText("3 个仓库")).toBeInTheDocument();
     const fresh = document.querySelector('[data-repo="acme/fresh"]')!;
     expect(
-      within(fresh as HTMLElement).getAllByRole("button", {
-        name: /查看 .+ 详情/,
-      }).map((el) => el.getAttribute("aria-label")),
+      within(fresh as HTMLElement)
+        .getAllByRole("button", {
+          name: /查看 .+ 详情/,
+        })
+        .map((el) => el.getAttribute("aria-label")),
     ).toEqual(["查看 cog 详情", "查看 sprocket 详情"]);
     // A live row claims nothing its source does not carry: no 暂无描述
     // placeholder standing in for a description nobody published, and no
     // help mark — nothing ever classified it, but nothing looked either.
     expect(within(fresh as HTMLElement).queryByText("暂无描述")).toBeNull();
-    expect(
-      fresh.querySelector("svg.lucide-circle-help"),
-    ).toBeNull();
+    expect(fresh.querySelector("svg.lucide-circle-help")).toBeNull();
     // The bar still knows its owner: the face rides the label, resolving
     // through the mirror and then GitHub's own endpoint.
     expect(
-      fresh.querySelector('[data-slot="card-footer"] [data-slot="avatar"]'),
+      fresh.querySelector('[data-slot="card-header"] [data-slot="avatar"]'),
     ).not.toBeNull();
-    // A live card lists everything the endpoint answered, so its bar has
-    // nowhere further to go: it is a label, whatever the repository is — the
-    // rows, which open skills.sh, are the only way out.
+    // No card leads anywhere: a live card lists everything the endpoint
+    // answered, so its bar is a label, and the indexed card's bar is too —
+    // the rows are the only way out of any card.
     expect(
-      screen.queryByRole("link", { name: /^查看仓库 acme\/fresh/ }),
-    ).toBeNull();
-    expect(
-      screen.queryByRole("link", { name: /^查看仓库 acme\/other/ }),
-    ).toBeNull();
-    expect(
-      screen.queryByRole("link", { name: /^查看仓库 smithery\.ai/ }),
-    ).toBeNull();
-    // The indexed repository's card keeps the store's own door — the only
-    // 查看仓库 link on the page.
-    expect(screen.getAllByRole("link", { name: /^查看仓库 / })).toHaveLength(1);
-    expect(
-      screen.getByRole("link", { name: /^查看仓库 acme\/gadgets/ }),
-    ).toHaveAttribute("href", "#/repo/acme/gadgets");
+      Array.from(repoCards()).some((card) => card.querySelector("a")),
+    ).toBe(false);
   });
 
   it("lists a live repository whole, uncapped under the search", async () => {
@@ -1232,12 +1148,12 @@ describe("ExplorePage", () => {
         name: /查看 .+ 详情/,
       }),
     ).toHaveLength(7);
-    expect(within(fresh as HTMLElement).getByText("fresh-6")).toBeInTheDocument();
-    // The bar states the card's total as a label: the card is the whole
-    // answer.
     expect(
-      within(fresh as HTMLElement).getByText("7 个 skill"),
+      within(fresh as HTMLElement).getByText("fresh-6"),
     ).toBeInTheDocument();
+    // A search's rows are matches, uncapped — every one of them is already on
+    // screen, so the bar carries no figure.
+    expect(within(fresh as HTMLElement).queryByText(/个 skill/)).toBeNull();
   });
 
   it("opens a live row on skills.sh instead of the detail panel", async () => {
@@ -1246,9 +1162,7 @@ describe("ExplorePage", () => {
     mockSearchSkillsSh.mockResolvedValue([
       liveSkill("sprocket", "acme/fresh", 7),
     ]);
-    const open = vi
-      .spyOn(window, "open")
-      .mockImplementation(() => null);
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
     renderExplorePage();
     await screen.findByText("gadget-master");
 
@@ -1337,7 +1251,9 @@ describe("ExplorePage", () => {
   it("shows the live answer when the local index has no match", async () => {
     const user = userEvent.setup();
     bootGadgetRegistry();
-    mockSearchSkillsSh.mockResolvedValue([liveSkill("sprocket", "acme/fresh", 7)]);
+    mockSearchSkillsSh.mockResolvedValue([
+      liveSkill("sprocket", "acme/fresh", 7),
+    ]);
     renderExplorePage();
     await screen.findByText("gadget-master");
 
@@ -1410,13 +1326,15 @@ describe("ExplorePage", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      store.compareDocumentPosition(live) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      store.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    // Each section counts its own answer, in the unit the list is read in.
-    expect(within(installed).getByText("1 个 skill")).toBeInTheDocument();
-    expect(within(store).getByText("1 个 skill")).toBeInTheDocument();
-    expect(within(live).getByText("1 个 skill")).toBeInTheDocument();
+    // Each section counts its own answer in its header — one repository
+    // apiece — while the card bars stay clean: a one-skill card has nothing
+    // to offer, so no figure rides it.
+    expect(within(installed).getByText("1 个仓库")).toBeInTheDocument();
+    expect(within(store).getByText("1 个仓库")).toBeInTheDocument();
+    expect(within(live).getByText("1 个仓库")).toBeInTheDocument();
+    expect(within(installed).queryByText(/个 skill/)).toBeNull();
   });
 
   it("walks the drawer inside the section the skill was opened from", async () => {
@@ -1727,8 +1645,8 @@ describe("ExplorePage streaming", () => {
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
     expect(screen.getByText("skill-3")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", {
-        name: `查看仓库 ${BATCH_REPO}，${STREAM_BATCH + 5} 个 skill`,
+      screen.getByRole("button", {
+        name: `展开 ${BATCH_REPO} 的全部 ${STREAM_BATCH + 5} 个 skill`,
       }),
     ).toBeInTheDocument();
 
@@ -1737,8 +1655,8 @@ describe("ExplorePage streaming", () => {
     // wait it out rather than racing the swap.
     await waitFor(() =>
       expect(
-        screen.getByRole("link", {
-          name: `查看仓库 ${BATCH_REPO}，${STREAM_BATCH + 20} 个 skill`,
+        screen.getByRole("button", {
+          name: `展开 ${BATCH_REPO} 的全部 ${STREAM_BATCH + 20} 个 skill`,
         }),
       ).toBeInTheDocument(),
     );

@@ -138,11 +138,9 @@ describe("headerRoute", () => {
   it("maps each route to what the header holds", () => {
     expect(headerRoute("/explore")).toEqual({ destination: "store" });
     expect(headerRoute("/my-skills")).toEqual({ destination: "installed" });
-    // A page inside a list loses only the search field: it opens with its own
-    // head, way back and all.
-    expect(headerRoute("/repo/acme/tools")).toEqual({});
-    expect(headerRoute("/my-skills/repo/acme/tools")).toEqual({});
-    expect(headerRoute("/my-skills/local")).toEqual({});
+    // A page the header does not know — there are no drill-down routes left,
+    // every card expands in place — loses only the search field.
+    expect(headerRoute("/my-skills/agents")).toEqual({});
   });
 
   it("leaves the row without a search field for a route it does not know", () => {
