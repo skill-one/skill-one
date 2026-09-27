@@ -239,6 +239,7 @@
     "openFolderFailed": "Failed to open folder",
     "viewOriginal": "View original",
     "viewTranslation": "View translation",
+    "originalToggle": "Original",
     "loadFailed": "Failed to load: {{message}}",
     "loadFailedHint": "The skill directory may not contain an accessible SKILL.md."
   },

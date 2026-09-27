@@ -600,23 +600,28 @@ describe("SkillDetailPanel", () => {
     renderDrawer({ skill: { ...skill, descriptionZh: "读取并合并 PDF 文档。" } });
 
     // The zh suite locale shows the registry's translation in the header, and
-    // the drawer's one toggle sits in the header's action row.
+    // the drawer's one toggle sits in the header's action row, resting flat
+    // (aria-pressed=false) while the translation leads.
     expect(
       await screen.findByText("读取并合并 PDF 文档。"),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "查看原文" }));
+    const toggle = screen.getByRole("button", { name: "原文" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await user.click(toggle);
 
     // The English original replaces the translation in place — no popover
-    // layer; the toggle now offers the way back.
+    // layer — and the toggle lights up (aria-pressed=true) to mark the mode.
     expect(
       screen.getByText("Read and merge PDF documents."),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("读取并合并 PDF 文档。"),
     ).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
 
-    await user.click(screen.getByRole("button", { name: "查看译文" }));
+    await user.click(toggle);
     expect(screen.getByText("读取并合并 PDF 文档。")).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
   });
 
   it("offers no translation toggle without any translation", async () => {
@@ -627,10 +632,7 @@ describe("SkillDetailPanel", () => {
     // on screen.
     await screen.findByText("Read and merge PDF documents.");
     expect(
-      screen.queryByRole("button", { name: "查看原文" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "查看译文" }),
+      screen.queryByRole("button", { name: "原文" }),
     ).not.toBeInTheDocument();
   });
 });
@@ -677,7 +679,7 @@ describe("SkillDetailPanel Chinese page", () => {
     );
   });
 
-  it("fetches the English original on the first 查看原文 flip and caches it", async () => {
+  it("fetches the English original on the first flip to the original and caches it", async () => {
     const user = userEvent.setup();
     // The suite's bare client has staleTime 0, under which every cached
     // result is instantly stale and a re-render refetches — an artifact no
@@ -693,7 +695,7 @@ describe("SkillDetailPanel Chinese page", () => {
     await screen.findByText("使用此技能处理 PDF。");
     expect(mockFetchSkillDetail).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "查看原文" }));
+    await user.click(screen.getByRole("button", { name: "原文" }));
 
     // The original body leads again, the divider names it, and the toggle
     // offers the way back. The flip carried the English file's deferred
@@ -704,9 +706,9 @@ describe("SkillDetailPanel Chinese page", () => {
     expect(mockFetchSkillDetail).toHaveBeenCalledTimes(1);
 
     // Flipping back — and forth again — rides the cache: no second request.
-    await user.click(screen.getByRole("button", { name: "查看译文" }));
+    await user.click(screen.getByRole("button", { name: "原文" }));
     expect(screen.getByText("使用此技能处理 PDF。")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "查看原文" }));
+    await user.click(screen.getByRole("button", { name: "原文" }));
     expect(screen.getByText("Use this skill for PDFs.")).toBeInTheDocument();
     expect(mockFetchSkillDetail).toHaveBeenCalledTimes(1);
   });
@@ -726,7 +728,7 @@ describe("SkillDetailPanel Chinese page", () => {
 
     // One flip moves both to the originals — the drawer never mixes
     // languages.
-    await user.click(screen.getByRole("button", { name: "查看原文" }));
+    await user.click(screen.getByRole("button", { name: "原文" }));
     expect(screen.getByText("Read and merge PDF documents.")).toBeInTheDocument();
     expect(
       screen.queryByText("读取并合并 PDF 文档。"),
@@ -735,7 +737,7 @@ describe("SkillDetailPanel Chinese page", () => {
     expect(screen.getByText("SKILL.md")).toBeInTheDocument();
 
     // And one flip back restores both.
-    await user.click(screen.getByRole("button", { name: "查看译文" }));
+    await user.click(screen.getByRole("button", { name: "原文" }));
     expect(screen.getByText("读取并合并 PDF 文档。")).toBeInTheDocument();
     expect(await screen.findByText("使用此技能处理 PDF。")).toBeInTheDocument();
     expect(screen.getByText("skill_zh.md")).toBeInTheDocument();
@@ -750,7 +752,7 @@ describe("SkillDetailPanel Chinese page", () => {
     expect(mockFetchSkillDetail).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("skill_zh.md")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "查看原文" }),
+      screen.queryByRole("button", { name: "原文" }),
     ).not.toBeInTheDocument();
   });
 
@@ -770,10 +772,7 @@ describe("SkillDetailPanel Chinese page", () => {
     expect(mockFetchSkillZhDetail).not.toHaveBeenCalled();
     expect(screen.queryByText("skill_zh.md")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "查看原文" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "查看译文" }),
+      screen.queryByRole("button", { name: "原文" }),
     ).not.toBeInTheDocument();
   });
 

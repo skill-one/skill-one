@@ -41,6 +41,7 @@ import {
 } from "../ui/sheet";
 import { Skeleton } from "../ui/skeleton";
 import { toast } from "../ui/toast";
+import { Toggle } from "../ui/toggle";
 import {
   Tooltip,
   TooltipContent,
@@ -625,25 +626,27 @@ export function SkillDetailPanel({
               flips the description and the SKILL.md body to the original and
               back together, so the drawer never mixes languages. It sits
               ahead of the primary actions — a view control, quieter than the
-              store's install CTA beside it. */}
+              store's install CTA beside it. A toggle button, so the mode on
+              screen reads without a hover: the language mark fills (the
+              default aria-pressed wash) while the original leads and rests
+              flat on the translation. The name stays fixed the way a toggle
+              button's must — the state rides aria-pressed, not the label —
+              while the tooltip keeps naming the action. */}
           {translateToggleVisible && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={
-                showOriginal
-                  ? t("detail.viewTranslation")
-                  : t("detail.viewOriginal")
-              }
+            <Toggle
+              size="sm"
+              className="size-7 px-0"
+              pressed={showOriginal}
+              onPressedChange={(pressed) => setShowOriginal(pressed)}
+              aria-label={t("detail.originalToggle")}
               title={
                 showOriginal
                   ? t("detail.viewTranslation")
                   : t("detail.viewOriginal")
               }
-              onClick={() => setShowOriginal((v) => !v)}
             >
               <Languages />
-            </Button>
+            </Toggle>
           )}
           {isStore && (
             <SkillInstallButton skill={shown!} labeled />
