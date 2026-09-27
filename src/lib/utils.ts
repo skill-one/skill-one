@@ -61,25 +61,6 @@ export function formatUnixDate(
 }
 
 /**
- * A calendar-day heading for a grouped list: `09-15` for a day of the current
- * year, `2025-12-03` for a day of another year — numeric on purpose, so the
- * header reads identically in every language and sorts the way the groups
- * under it already do. `ms` is the day's local midnight, as the time filing
- * reports it (`DayFiling` start); `now` is injectable purely so the year test
- * is frozen-clock testable.
- */
-export function formatDayHeading(
-  ms: number,
-  now: number = Date.now(),
-): string {
-  const day = new Date(ms);
-  const padded = (n: number) => String(n).padStart(2, "0");
-  const monthDay = `${padded(day.getMonth() + 1)}-${padded(day.getDate())}`;
-  const year = day.getFullYear();
-  return year === new Date(now).getFullYear() ? monthDay : `${year}-${monthDay}`;
-}
-
-/**
  * Largest unit first: the first one at least a whole unit has elapsed in wins.
  * A table instead of a ladder of `if`s, so adding `week` or `quarter` is one
  * row. Seconds are the fallback below this table, not a row in it.

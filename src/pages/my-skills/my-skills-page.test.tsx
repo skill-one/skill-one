@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { ParseKeys } from "i18next";
 import {
   screen,
   fireEvent,
@@ -21,29 +20,7 @@ import {
 } from "../../lib/mock-local";
 import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
 import { resetLinkSuggestions } from "../../lib/link-suggestions";
-import { dayFilingOf } from "../../lib/time-groups";
-import { formatDayHeading } from "../../lib/utils";
-import i18n from "../../i18n";
 
-/**
- * The group header the installed list renders for an install `daysAgo` days
- * old. The page files by calendar day, so the expectation follows the stamp —
- * the same clock arithmetic the mock seeds with (`mockInstalledAt`) — rather
- * than a hardcoded date. The mirror walks the same two branches the page's
- * `groupHeading` does: a named day through i18n, a dated day through the
- * locale's own date format; the filing and the format each have their own
- * frozen-clock tests in `lib/time-groups` / `lib/utils`.
- */
-function dayTitle(daysAgo: number): string {
-  const stamp = Math.floor(Date.now() / 1000) - daysAgo * 24 * 60 * 60;
-  const filing = dayFilingOf(stamp);
-  if (!filing) return i18n.t("time.unknown");
-  return filing.titleKey
-    ? i18n.t(filing.titleKey as ParseKeys)
-    : formatDayHeading(filing.start ?? 0);
-}
-
-/** The page's search box debounces for real; 1 s is a contention flake. */
 configure({ asyncUtilTimeout: 5000 });
 
 // The provenance hook consults the registry for namesake candidates and the
@@ -515,7 +492,7 @@ describe("MySkillsPage", () => {
     const user = userEvent.setup();
     seedMockProvenance({ pdf: { repo: "anthropics/skills", slug: "pdf" } });
     renderPage();
-    // Same wait: the provenance-driven regroup settles before the click.
+    // Same wait: the provenance-driven re-sort settles before the click.
     await screen.findByText("pdf");
     await screen.findByRole("link", {
       name: /^查看仓库 anthropics\/skills/,
@@ -839,10 +816,21 @@ describe("MySkillsPage", () => {
     );
   });
 
-  // The repository unit (the default): one card per source, each card filed
-  // into the day group its newest install belongs to.
+  // The repository unit (the default): one card per source, the cards ordered
+  // by each card's newest install.
 
-  it("files the repository unit's cards by each card's newest install", async () => {
+  /** The card bars in list order, named by their aria-labels. */
+  function cardBarNames(): string[] {
+    return screen
+      .getAllByRole("link")
+      .map((node) => node.getAttribute("aria-label"))
+      .filter(
+        (label): label is string =>
+          !!label && /^查看(仓库|本地安装)/.test(label),
+      );
+  }
+
+  it("orders the repository unit's cards by each card's newest install", async () => {
     // Mock install ages: pdf today, docx 3 days, pptx 12, mcp-builder 45,
     // code-review 200, frontend-design 400. The ledgers split them three ways:
     // a one-skill repo fresh today, the pool (docx/pptx, newest 3 days), and a
@@ -853,73 +841,49 @@ describe("MySkillsPage", () => {
       "code-review": { repo: "acme/tools", slug: "code-review" },
       "frontend-design": { repo: "acme/tools", slug: "frontend-design" },
     });
-    const { container } = renderPage();
+    renderPage();
 
     await screen.findByText("zoo/new");
-    // The three cards land in three day groups, newest first — the middle name
-    // of each group names one repository, never a skill count.
-    const sections = [
-      ...container.querySelectorAll("section[aria-label]"),
-    ] as HTMLElement[];
-    expect(sections.map((node) => node.getAttribute("aria-label"))).toEqual([
-      "今天",
-      dayTitle(3),
-      dayTitle(45),
+    // One flat list, newest install first: the fresh repository leads, the
+    // pool follows on the age of its newest member, the all-old repository
+    // trails.
+    expect(cardBarNames()).toEqual([
+      "查看仓库 zoo/new，1 个 skill",
+      "查看本地安装，2 个 skill",
+      "查看仓库 acme/tools，3 个 skill",
     ]);
-
-    expect(
-      within(sections[0]).getByRole("link", {
-        name: "查看仓库 zoo/new，1 个 skill",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(sections[1]).getByRole("link", {
-        name: "查看本地安装，2 个 skill",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(sections[2]).getByRole("link", {
-        name: "查看仓库 acme/tools，3 个 skill",
-      }),
-    ).toBeInTheDocument();
   });
 
-  it("files a card by its newest install and lists that install first", async () => {
+  it("orders a card by its newest install and lists that install first", async () => {
     // One repository holds both a fresh install (pdf, today) and an ancient one
-    // (frontend-design, 400 days): the card reads 今天, not the day the old
-    // install landed — and the fresh install leads the card's preview instead
+    // (frontend-design, 400 days): the card leads the list on the fresh
+    // install's age — and the fresh install leads the card's preview instead
     // of hiding past the cap.
     seedMockProvenance({
       pdf: { repo: "acme/tools", slug: "pdf" },
       "frontend-design": { repo: "acme/tools", slug: "frontend-design" },
     });
-    const { container } = renderPage();
+    renderPage();
 
     await screen.findByText("acme/tools");
-    const sections = [
-      ...container.querySelectorAll("section[aria-label]"),
-    ] as HTMLElement[];
-    // The pool (newest docx, 3 days) is the other, older day.
-    expect(sections.map((node) => node.getAttribute("aria-label"))).toEqual([
-      "今天",
-      dayTitle(3),
+    // The pool (newest docx, 3 days) is the other, older card.
+    expect(cardBarNames()).toEqual([
+      "查看仓库 acme/tools，2 个 skill",
+      "查看本地安装，4 个 skill",
     ]);
 
-    const today = sections[0];
-    expect(
-      within(today).getByRole("link", {
-        name: "查看仓库 acme/tools，2 个 skill",
-      }),
-    ).toBeInTheDocument();
     // Inside the card, newest first.
+    const card = screen
+      .getByRole("link", { name: "查看仓库 acme/tools，2 个 skill" })
+      .closest("li");
     expect(
-      within(today)
+      within(card as HTMLElement)
         .getAllByRole("button", { name: /查看 .+ 详情/ })
         .map((node) => node.getAttribute("aria-label")),
     ).toEqual(["查看 pdf 详情", "查看 frontend-design 详情"]);
   });
 
-  it("walks the drawer across the day groups in newest-first order", async () => {
+  it("walks the drawer in the cards' newest-first order", async () => {
     const user = userEvent.setup();
     seedMockProvenance({
       pdf: { repo: "zoo/new", slug: "pdf" },
@@ -930,9 +894,9 @@ describe("MySkillsPage", () => {
     renderPage();
 
     await screen.findByText("zoo/new");
-    // pdf is the only row of today's card; the next thing the walk reaches is
-    // the pool's own newest row (docx, 3 days back) — the day boundary does not
-    // interrupt the walk.
+    // pdf is the only row of the freshest card; the next thing the walk reaches
+    // is the pool's own newest row (docx, 3 days back) — the card boundary does
+    // not interrupt the walk.
     const pdfButton = await screen.findByRole("button", {
       name: "查看 pdf 详情",
     });
@@ -950,8 +914,8 @@ describe("MySkillsPage", () => {
   });
 
   // The skill unit: the store's second reading of the same installs — one row
-  // per skill rather than one card per source, filed newest-first into
-  // per-day groups. The page's own mocks serve it.
+  // per skill rather than one card per source, ordered newest-first. The
+  // page's own mocks serve it.
 
   /** The four installs the one-source tests gather into one source. */
   const RUN_SOURCE = ["pdf", "docx", "pptx", "mcp-builder"];
@@ -1008,92 +972,44 @@ describe("MySkillsPage", () => {
     expect(screen.getAllByRole("switch")).toHaveLength(6);
   });
 
-  it("files the skill unit's installs into one group per day, newest first", async () => {
+  it("orders the skill unit's installs newest first", async () => {
     const user = userEvent.setup();
     // Every install is a tool install here; their mock ages spread across six
-    // distinct days (0 / 3 / 12 / 45 / 200 / 400 days ago), so each lands in a
-    // group of its own.
-    const { container } = renderPage();
-    await screen.findByText("pdf");
-
-    await user.click(screen.getByRole("button", { name: "按技能" }));
-    await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
-
-    // One group per day that holds an install, newest first; a day without an
-    // install (昨天, say) renders nothing.
-    const sections = [
-      ...container.querySelectorAll("section[aria-label]"),
-    ] as HTMLElement[];
-    expect(sections.map((node) => node.getAttribute("aria-label"))).toEqual([
-      "今天",
-      dayTitle(3),
-      dayTitle(12),
-      dayTitle(45),
-      dayTitle(200),
-      dayTitle(400),
-    ]);
-
-    // One row in its own day: pdf landed today, docx three days ago, pptx
-    // twelve.
-    expect(
-      within(sections[0]).getByRole("button", { name: "查看 pdf 详情" }),
-    ).toBeInTheDocument();
-    expect(
-      within(sections[1]).getByRole("button", {
-        name: "查看 docx 详情",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(sections[2]).getByRole("button", {
-        name: "查看 pptx 详情",
-      }),
-    ).toBeInTheDocument();
-
-    // The old installs each head their own day, newest first: 45, then 200,
-    // then 400 days ago.
-    const rows = sections
-      .slice(3)
-      .map((section) =>
-        within(section).getByRole("button", { name: /查看 .+ 详情/ }),
-      )
-      .map((node) => node.getAttribute("aria-label"));
-    expect(rows).toEqual([
-      "查看 mcp-builder 详情",
-      "查看 code-review 详情",
-      "查看 frontend-design 详情",
-    ]);
-
-    // Time groups replace the store-style run fold: no row hides behind one.
-    expect(
-      screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
-    ).toBeNull();
-  });
-
-  it("labels each day group with quiet text, not a control", async () => {
-    const user = userEvent.setup();
+    // distinct days (0 / 3 / 12 / 45 / 200 / 400 days ago), so each has a
+    // distinct place in the ordering.
     renderPage();
     await screen.findByText("pdf");
 
     await user.click(screen.getByRole("button", { name: "按技能" }));
     await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
 
-    // A day group only names the order — nothing to act on — so today's
-    // boundary is a small muted divider line, not a header to press: no fold,
-    // no count badge, no control anywhere on the label.
-    const today = screen.getByRole("region", { name: "今天" });
-    expect(within(today).queryByRole("button", { name: /今天/ })).toBeNull();
-    expect(within(today).queryByText(/个 skill/)).toBeNull();
-    expect(within(today).getByText("今天")).toHaveClass(
-      "text-xs",
-      "text-muted-foreground/70",
-    );
+    // One flat list, newest first: pdf landed today, docx three days ago,
+    // pptx twelve, then the old installs — 45, 200, then 400 days ago.
+    expect(
+      screen
+        .getAllByRole("button", { name: /查看 .+ 详情/ })
+        .map((node) => node.getAttribute("aria-label")),
+    ).toEqual([
+      "查看 pdf 详情",
+      "查看 docx 详情",
+      "查看 pptx 详情",
+      "查看 mcp-builder 详情",
+      "查看 code-review 详情",
+      "查看 frontend-design 详情",
+    ]);
+
+    // The installed list carries no run fold of its own: no row hides behind
+    // one.
+    expect(
+      screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
+    ).toBeNull();
   });
 
-  it("files one source's several installs by time instead of folding them", async () => {
+  it("orders one source's several installs by time instead of folding them", async () => {
     const user = userEvent.setup();
     // Four installs share one source the registry still lists: where the old
-    // install-count ranking folded them behind one row, time filing lists every
-    // one — they simply land in different days.
+    // install-count ranking folded them behind one row, the time order lists
+    // every one.
     seedRunSource();
     seedStoreEntries({ pdf: 30, docx: 20, pptx: 10, "mcp-builder": 5 });
     renderPage();
@@ -1182,9 +1098,9 @@ describe("MySkillsPage", () => {
     renderPage();
     await user.click(await screen.findByRole("button", { name: "按技能" }));
 
-    // The walk follows the time filing: after today the order is mcp-builder
-    // (45 days), code-review (200), frontend-design (400) — so one press from
-    // code-review lands on frontend-design, never back on a newer install.
+    // The walk follows the newest-first time order: after code-review (200
+    // days) the next install is frontend-design (400) — one press lands there,
+    // never back on a newer install.
     await user.click(
       await screen.findByRole("button", { name: "查看 code-review 详情" }),
     );
