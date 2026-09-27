@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { isTauri, searchSkills, getRegistrySnapshot, computeSkillHash } = vi.hoisted(
+const { isTauri, searchSkills, getRegistrySnapshot, analyzeSkill } = vi.hoisted(
   () => ({
     isTauri: vi.fn(),
     searchSkills: vi.fn(),
     getRegistrySnapshot: vi.fn(),
-    computeSkillHash: vi.fn(),
+    analyzeSkill: vi.fn(),
   }),
 );
 
@@ -28,7 +28,8 @@ const { readProvenanceRaw, writeProvenanceRaw, resetLedgerFile } = vi.hoisted(
   },
 );
 vi.mock("../lib/skills-manager", () => ({
-  computeSkillHash,
+  analyzeSkill,
+  skillFingerprint: vi.fn(async () => null),
   readProvenanceRaw,
   writeProvenanceRaw,
 }));
@@ -78,7 +79,7 @@ beforeEach(() => {
 describe("fetchProvenanceState", () => {
   it("auto-links a tool-installed skill whose hash matches a namesake", async () => {
     mockRegistry();
-    computeSkillHash.mockResolvedValue("hash-a");
+    analyzeSkill.mockResolvedValue({ hash: "hash-a", fingerprint: null });
 
     const state = await runQueryFn([installed("pdf", "Read PDF files.")]);
 
@@ -87,12 +88,12 @@ describe("fetchProvenanceState", () => {
     const rerun = await runQueryFn([installed("pdf", "Read PDF files.")]);
     expect(rerun.linked.pdf?.repo).toBe("anthropics/skills");
     // The second run skips the hash work entirely (ledger has it now).
-    expect(computeSkillHash).toHaveBeenCalledTimes(1);
+    expect(analyzeSkill).toHaveBeenCalledTimes(1);
   });
 
   it("offers ranked suggestions when the hash tier misses", async () => {
     mockRegistry();
-    computeSkillHash.mockResolvedValue("hash-other");
+    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
 
     // A description below the 90% auto-link threshold keeps the skill in the
     // confirmable pool.
@@ -110,7 +111,7 @@ describe("fetchProvenanceState", () => {
     // the hash tier.
     const state = await runQueryFn([installed("pdf", "Convert PDF files.")]);
 
-    expect(computeSkillHash).not.toHaveBeenCalled();
+    expect(analyzeSkill).not.toHaveBeenCalled();
     // Suggestions still work — they are registry lookups only.
     expect(state.suggestions.pdf).toHaveLength(1);
   });
@@ -121,7 +122,7 @@ describe("fetchProvenanceState", () => {
     const state = await runQueryFn([installed("pdf", "Read PDF files.")]);
     expect(state.linked).toEqual({});
     expect(state.suggestions).toEqual({});
-    expect(computeSkillHash).not.toHaveBeenCalled();
+    expect(analyzeSkill).not.toHaveBeenCalled();
     expect(searchSkills).not.toHaveBeenCalled();
   });
 });

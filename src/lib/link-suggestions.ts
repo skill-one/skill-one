@@ -10,15 +10,24 @@
  * 2. **Hash auto-link** — compute the skills.sh upstream content hash of the
  *    local directory and compare it against the namesakes' `rev`s. Equality
  *    is content-level identity, so the association is written into the
- *    ledger exactly like a native install. Computed-but-unmatched hashes
- *    are memoized per registry epoch, so repeated reconcile passes never
- *    re-walk the same directories for nothing.
+ *    ledger exactly like a native install.
  * 3. **Description auto-link or candidate suggestions** — the namesakes are
  *    ranked by description similarity. At/above `SIMILARITY_AUTO_LINK_THRESHOLD`
  *    the wording is close enough to call it the same skill, so the association
  *    is written automatically (no prompt). Below the threshold the decision is
  *    left to the user: the ranked candidates are surfaced for confirmation and
  *    nothing is written until they pick one.
+ *
+ * Every outcome is cached at two levels so the work is paid once, not per
+ * reconcile pass or app restart:
+ *
+ * - **Session memo** (`resolved`): cleared when the served snapshot changes.
+ * - **Ledger** (`ResolutionRecord` in `.skill-one.jsonl`, persisted): the
+ *   namesake verdict is stamped with the snapshot `epoch`, the computed hash
+ *   is guarded by a stat-only directory `fingerprint`, and the ranked
+ *   candidates carry the equality key of their ranking input. A restart thus
+ *   re-runs nothing while snapshot and content are unchanged; a new snapshot
+ *   only re-runs the cheap lookup, reusing the stored hash for matching.
  *
  * Namesake lookup goes through the registry worker's search (`searchSkills`,
  * filtered to exact slug equality client-side). When the registry is not ready
@@ -28,10 +37,19 @@
 
 import type { Skill } from "../types/skill";
 import { getRegistrySnapshot, searchSkills } from "./registry/client";
-import { computeSkillHash } from "./skills-manager";
+import { analyzeSkill, skillFingerprint } from "./skills-manager";
 import { isTauri } from "./tauri";
 import { descriptionSimilarity } from "./description-similarity";
-import { recordSkillProvenanceBatch } from "./provenance";
+import {
+  loadResolutionRecords,
+  recordSkillProvenanceBatch,
+  saveResolutionRecords,
+} from "./provenance";
+import type {
+  PersistedCandidate,
+  ResolutionRecord,
+  SkillFingerprint,
+} from "./provenance";
 
 /**
  * Candidates offered for a skill, ranked: any hash-identical entry first
@@ -106,74 +124,178 @@ export function rankNamesakes(
 }
 
 /**
+ * Equality key of a ranking input: the full namesake list's identity fields
+ * (`rev` covers content, the descriptions the wording the similarity reads).
+ * A fresh lookup with the same key ranks identically over unchanged content.
+ */
+function namesakesKey(namesakes: Skill[]): string {
+  return namesakes
+    .map((s) => [s.repo, s.rev ?? "", s.description, s.descriptionZh ?? ""].join("\u0000"))
+    .toSorted()
+    .join("\u0001");
+}
+
+function toPersisted(candidate: LinkCandidate): PersistedCandidate {
+  const { skill, similarity } = candidate;
+  return {
+    repo: skill.repo,
+    similarity,
+    stars: skill.stars,
+    downloads: skill.downloads,
+    description: skill.description,
+    ...(skill.descriptionZh !== undefined ? { descriptionZh: skill.descriptionZh } : {}),
+    ...(skill.rev !== undefined ? { rev: skill.rev } : {}),
+  };
+}
+
+function reviveCandidates(name: string, candidates: PersistedCandidate[]): LinkCandidate[] {
+  return candidates.map((candidate) => ({
+    similarity: candidate.similarity,
+    skill: {
+      name,
+      repo: candidate.repo,
+      description: candidate.description,
+      stars: candidate.stars,
+      downloads: candidate.downloads,
+      ...(candidate.descriptionZh !== undefined ? { descriptionZh: candidate.descriptionZh } : {}),
+      ...(candidate.rev !== undefined ? { rev: candidate.rev } : {}),
+    },
+  }));
+}
+
+function sameFingerprint(a: SkillFingerprint, b: SkillFingerprint): boolean {
+  return a.mtimeMs === b.mtimeMs && a.size === b.size;
+}
+
+/**
  * Resolve every unlinked skill in one pass. Returns the names that were
- * auto-linked (a batched ledger write covers all of them) and the
- * confirmable suggestions for the rest.
+ * auto-linked (batched ledger writes cover all of them) and the confirmable
+ * suggestions for the rest.
  *
- * Per-skill outcomes are memoized for the session (`resolved`): both
- * "no namesakes" and "computed but unmatched" are dead ends until the
- * served snapshot changes, and re-running the pipeline (every install,
- * removal or confirmation) must not re-hash the same directories.
+ * Per-skill outcomes are memoized for the session (`resolved`) and persisted
+ * in the ledger, so repeated reconcile passes — and app restarts — neither
+ * re-query the worker nor re-walk skill directories until the served snapshot
+ * or the skill's content changes.
  */
 export async function resolveAssociations(
   unlinked: Array<{ name: string; description?: string }>,
 ): Promise<{ linked: string[]; suggestions: LinkSuggestions }> {
+  const epoch = getRegistrySnapshot().epoch;
+  const stored = await loadResolutionRecords();
   const linked: string[] = [];
-  const matched: Array<{ repo: string; slug: string; hash?: string }> = [];
+  const matched: Array<{ repo: string; name: string; hash?: string }> = [];
+  const upserts = new Map<string, ResolutionRecord>();
+  const drops = new Set<string>();
 
-  // Namesake lookups run in parallel; per-skill outcomes are memoized for
-  // the session (`resolved`), so repeated reconcile passes neither re-query
-  // the worker nor re-walk skill directories until the snapshot changes.
   await Promise.all(
     unlinked.map(async (skill) => {
       if (resolved.has(skill.name)) return; // dead end or cached candidates
+
+      const cached = stored[skill.name];
+      if (cached && cached.epoch === epoch) {
+        // Already verified against this snapshot. A dead end is
+        // content-independent — "no namesakes" cannot change until the
+        // snapshot does. Candidates are content-dependent (the ranking reads
+        // the local description), so their reuse revalidates the fingerprint.
+        if (!cached.candidates?.length) {
+          resolved.set(skill.name, []);
+          return;
+        }
+        if (!isTauri()) {
+          resolved.set(skill.name, reviveCandidates(skill.name, cached.candidates));
+          return;
+        }
+        if (cached.fingerprint) {
+          const fingerprint = await skillFingerprint(skill.name);
+          if (fingerprint && sameFingerprint(fingerprint, cached.fingerprint)) {
+            resolved.set(skill.name, reviveCandidates(skill.name, cached.candidates));
+            return;
+          }
+        }
+        // Stale content or no fingerprint to check — fall through and redo.
+      }
 
       // Step 1 — the cheap filter: without same-slug entries there is no
       // association to make and no reason to walk the skill's directory.
       const namesakes = await findNamesakes(skill.name);
       if (namesakes.length === 0) {
         resolved.set(skill.name, []);
+        upserts.set(skill.name, { name: skill.name, epoch, candidates: [] });
         return;
       }
 
       // Step 2 — content identity. The computed hash is only meaningful for
       // the match itself; a matched hash equals the matched rev by
-      // definition. Hashing needs the native shell (the browser mock has no
-      // real files), so outside Tauri the tier degrades to suggestions only.
-      const localHash = !isTauri()
-        ? null
-        : await computeSkillHash(skill.name).catch(() => null);
+      // definition. A stored hash is reused while the stat-only fingerprint
+      // says the directory is unchanged; otherwise the directory is analyzed
+      // (hash + fingerprint in one walk). Hashing needs the native shell (the
+      // browser mock has no real files), so outside Tauri the tier degrades
+      // to suggestions only.
+      let hash: string | null = null;
+      let fingerprint: SkillFingerprint | null = null;
+      let contentVerified = false;
+      if (isTauri()) {
+        if (cached?.hash && cached?.fingerprint) {
+          const stat = await skillFingerprint(skill.name);
+          if (stat && sameFingerprint(stat, cached.fingerprint)) {
+            hash = cached.hash;
+            fingerprint = cached.fingerprint;
+            contentVerified = true;
+          }
+        }
+        if (hash == null) {
+          const analyzed = await analyzeSkill(skill.name);
+          hash = analyzed?.hash ?? null;
+          fingerprint = analyzed?.fingerprint ?? null;
+        }
+      }
       const match =
-        localHash != null
-          ? namesakes.find((s) => s.rev != null && s.rev === localHash)
+        hash != null
+          ? namesakes.find((s) => s.rev != null && s.rev === hash)
           : undefined;
-      if (localHash != null && match) {
-        matched.push({ repo: match.repo, slug: skill.name, hash: localHash });
+      if (hash != null && match) {
+        matched.push({ repo: match.repo, name: skill.name, hash });
         linked.push(skill.name);
         // Linked — the entry leaves the candidate pool for good.
         resolved.set(skill.name, []);
+        drops.add(skill.name);
         return;
       }
 
       // Step 3 — ranked candidates. A near-identical description (≥ threshold)
       // is treated as the same skill and linked without asking; only below the
-      // threshold is the decision left to the user, with the candidates cached
-      // so the next pass reuses them without another worker round-trip.
-      const ranked = rankNamesakes(namesakes, skill.description ?? "");
+      // threshold is the decision left to the user. Re-ranking is skipped when
+      // the ranking input is unchanged (same namesakes over verified-unchanged
+      // content) — the stored ranking is revived instead.
+      const key = namesakesKey(namesakes);
+      const ranked =
+        contentVerified && cached?.namesakesKey === key && cached.candidates?.length
+          ? reviveCandidates(skill.name, cached.candidates)
+          : rankNamesakes(namesakes, skill.description ?? "");
       const top = ranked[0];
       if (top && top.similarity >= SIMILARITY_AUTO_LINK_THRESHOLD) {
         // No content hash is verified by a description match, so the version
         // marker stays unset — same as a user-confirmed link.
-        matched.push({ repo: top.skill.repo, slug: skill.name });
+        matched.push({ repo: top.skill.repo, name: skill.name });
         linked.push(skill.name);
         resolved.set(skill.name, []);
+        drops.add(skill.name);
         return;
       }
       resolved.set(skill.name, ranked);
+      upserts.set(skill.name, {
+        name: skill.name,
+        epoch,
+        ...(hash != null ? { hash } : {}),
+        ...(fingerprint ? { fingerprint } : {}),
+        namesakesKey: key,
+        candidates: ranked.map(toPersisted),
+      });
     }),
   );
 
   if (matched.length > 0) await recordSkillProvenanceBatch(matched);
+  await saveResolutionRecords([...upserts.values()], [...drops]);
 
   // Assemble suggestions from the memoized candidates (linked names were
   // parked with an empty list, so they never appear here).
@@ -192,7 +314,8 @@ export async function resolveAssociations(
  * dead end (no namesakes, hashing unavailable) or a linked skill; a
  * non-empty array holds the cached candidates. Cleared when the served
  * snapshot changes — a fresh snapshot can carry the rev a local hash was
- * waiting for, or new namesakes.
+ * waiting for, or new namesakes. Across restarts the persisted ledger takes
+ * over this role.
  */
 const resolved = new Map<string, LinkCandidate[]>();
 
@@ -207,4 +330,5 @@ export function noteRegistryEpoch(epoch: number): void {
 /** Test hook: clear the memoization between tests. */
 export function resetLinkSuggestions(): void {
   resolved.clear();
+  lastEpoch = -1;
 }

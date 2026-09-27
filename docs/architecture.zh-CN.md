@@ -37,8 +37,10 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 ### 后端（写入）
 
-- **`src-tauri/src/skills.rs`**：暴露 8 个 Tauri 命令（`install_skill`、`list_installed_skills`、`remove_skills`、`set_skills_enabled`、`link_agents`、`link_status`、`read_skill_md`、`compute_skill_hash`），全部经由共享的 `spawn_blocking` 辅助函数把阻塞操作（GitHub 下载、install、link、哈希计算等）移出异步运行时。
+- **`src-tauri/src/skills.rs`**：暴露 10 个 Tauri 命令（`install_skill`、`list_installed_skills`、`remove_skills`、`set_skills_enabled`、`link_agents`、`link_status`、`read_skill_md`、`analyze_skill`、`skill_fingerprint`），全部经由共享的 `spawn_blocking` 辅助函数把阻塞操作（GitHub 下载、install、link、哈希计算等）移出异步运行时。
 - 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。自 agents-skills 0.15 起链接是单向的：agent 自带的 skills 被收编进规范目录（同名冲突保留规范目录副本），其余文件被隔离到 `.misc/<agent>/`，取消链接只断开符号链接。`list` 还会报告每个技能的描述与安装时间，应用原样透传。自 0.21 起一次安装就是一个 source 对应一个技能——`owner/repo@<skill>`；自 0.23 起后端从 codeload.github.com 下载整个仓库 tarball 并在本地匹配技能（不再走 GitHub REST API，也不受其匿名限流影响）——失败即命令的 `Err`，因此 `install_skill` 只返回 `{ skill, skipped }`。
+- **`src-tauri/src/skill_hash.rs`**：技能目录的内容身份——skills.sh 上游哈希 + 仅 stat 的变更检测指纹，由同一次递归遍历产出（见 `docs/skill-provenance.zh-CN.md`）。`analyze_skill` 一次返回两者；`skill_fingerprint` 是其中仅 stat 的那一半，即让账本跨重启复用已存哈希的廉价有效性检查。
+- **`src-tauri/src/provenance.rs`**：来源账本 `~/.agents/skills/.skill-one.jsonl` 的两个固定路径文件命令（`read_provenance`/`write_provenance`）——原子写入，且在旧版 JSON 文档被首次 JSONL 写入转换并移除之前，透明地读取它。全部 schema 知识都在前端（`src/lib/provenance.ts`）。
 
 ### 前端写入封装
 

@@ -18,6 +18,10 @@
 //! Used to auto-associate a locally installed skill (which carries no
 //! install-source metadata) with its registry entry, whose `rev` is exactly
 //! this hash for the indexed snapshot.
+//!
+//! The same walk also yields a [`DirFingerprint`] (latest mtime + total size):
+//! the cheap change detector that lets the provenance ledger reuse a computed
+//! hash across restarts without re-reading any bytes.
 
 use std::path::Path;
 
@@ -35,14 +39,14 @@ fn collator() -> icu_collator::CollatorBorrowed<'static> {
         .expect("collator with compiled data is always constructible")
 }
 
-/// Recursively collect `(relative path, bytes)` for every regular file under
-/// `root`, relative paths separated by `/`. Symlinks are skipped (neither
-/// followed nor hashed): install layouts may link between agent dirs, and a
-/// cycle would loop forever.
-fn collect_files(
+/// Recursively walk every regular file under `root`, calling `visit` with the
+/// `/`-separated path relative to `root` and the directory entry. Symlinks are
+/// skipped (neither followed nor visited): install layouts may link between
+/// agent dirs, and a cycle would loop forever.
+fn visit_files(
     root: &Path,
     prefix: &str,
-    out: &mut Vec<(String, Vec<u8>)>,
+    visit: &mut dyn FnMut(String, &std::fs::DirEntry) -> Result<(), String>,
 ) -> Result<(), String> {
     let entries = std::fs::read_dir(root.join(prefix))
         .map_err(|e| format!("read {}: {e}", root.join(prefix).display()))?;
@@ -60,21 +64,80 @@ fn collect_files(
             continue;
         }
         if file_type.is_dir() {
-            collect_files(root, &rel, out)?;
+            visit_files(root, &rel, visit)?;
         } else {
-            let bytes = std::fs::read(entry.path())
-                .map_err(|e| format!("read {}: {e}", entry.path().display()))?;
-            out.push((rel, bytes));
+            visit(rel, &entry)?;
         }
     }
     Ok(())
 }
 
-/// Compute the upstream hash of the skill directory at `root`. Fails when the
+/// Cheap content identity of a skill directory, accumulated during the same
+/// walk that reads the hash's bytes: the latest file mtime (Unix ms) and the
+/// total file size. A mismatch proves the content changed; a match *assumes*
+/// it did not — mtime+size is a heuristic, which is exactly why the ledger
+/// never trusts a fingerprint alone for linking (the hash still decides).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DirFingerprint {
+    pub mtime_ms: f64,
+    pub size: u64,
+}
+
+/// The content identity of one skill directory: the upstream hash (the exact
+/// identity) plus the fingerprint (the cheap change detector for reusing it).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SkillContent {
+    pub hash: String,
+    pub fingerprint: DirFingerprint,
+}
+
+/// Accumulate one file's stat into the fingerprint. Both walkers (the hashing
+/// one and the stat-only one) share this so the two can never drift apart.
+fn accumulate(meta: &std::fs::Metadata, fp: &mut DirFingerprint) -> Result<(), String> {
+    fp.size += meta.len();
+    if let Ok(modified) = meta.modified() {
+        if let Ok(age) = modified.duration_since(std::time::UNIX_EPOCH) {
+            fp.mtime_ms = fp.mtime_ms.max(age.as_secs_f64() * 1000.0);
+        }
+    }
+    Ok(())
+}
+
+/// Stat-only fingerprint of the skill directory at `root` — no file bytes are
+/// read. This is the cheap validity check for a stored [`SkillContent`].
+pub fn fingerprint_skill_dir(root: &Path) -> Result<DirFingerprint, String> {
+    let mut fingerprint = DirFingerprint {
+        mtime_ms: 0.0,
+        size: 0,
+    };
+    visit_files(root, "", &mut |_rel, entry| {
+        let meta = entry
+            .metadata()
+            .map_err(|e| format!("stat {}: {e}", entry.path().display()))?;
+        accumulate(&meta, &mut fingerprint)
+    })?;
+    Ok(fingerprint)
+}
+
+/// Compute the content identity of the skill directory at `root`: the upstream
+/// hash plus the change-detection fingerprint, in one walk. Fails when the
 /// directory cannot be read; an empty directory hashes the empty input.
-pub fn hash_skill_dir(root: &Path) -> Result<String, String> {
+pub fn analyze_skill_dir(root: &Path) -> Result<SkillContent, String> {
     let mut files = Vec::new();
-    collect_files(root, "", &mut files)?;
+    let mut fingerprint = DirFingerprint {
+        mtime_ms: 0.0,
+        size: 0,
+    };
+    visit_files(root, "", &mut |rel, entry| {
+        let meta = entry
+            .metadata()
+            .map_err(|e| format!("stat {}: {e}", entry.path().display()))?;
+        accumulate(&meta, &mut fingerprint)?;
+        let bytes = std::fs::read(entry.path())
+            .map_err(|e| format!("read {}: {e}", entry.path().display()))?;
+        files.push((rel, bytes));
+        Ok(())
+    })?;
     let collator = collator();
     files.sort_by(|a, b| {
         collator.compare(&a.0, &b.0).then_with(|| a.0.cmp(&b.0)) // stable tiebreak for collation-equal paths
@@ -86,7 +149,10 @@ pub fn hash_skill_dir(root: &Path) -> Result<String, String> {
         hasher.update(bytes);
         hasher.update([0x00]);
     }
-    Ok(hex(&hasher.finalize()))
+    Ok(SkillContent {
+        hash: hex(&hasher.finalize()),
+        fingerprint,
+    })
 }
 
 /// Lowercase hex encoding: `sha2` 0.11's digest output no longer implements
@@ -123,14 +189,14 @@ mod tests {
     #[test]
     fn matches_the_reference_collation_order_and_digest() {
         let dir = fixture();
-        assert_eq!(hash_skill_dir(dir.path()).unwrap(), EXPECTED);
+        assert_eq!(analyze_skill_dir(dir.path()).unwrap().hash, EXPECTED);
     }
 
     #[test]
     fn hash_is_content_sensitive() {
         let dir = fixture();
         fs::write(dir.path().join("a.txt"), "changed").expect("rewrite");
-        assert_ne!(hash_skill_dir(dir.path()).unwrap(), EXPECTED);
+        assert_ne!(analyze_skill_dir(dir.path()).unwrap().hash, EXPECTED);
     }
 
     #[test]
@@ -139,7 +205,7 @@ mod tests {
         // content, so two differently-laid-out skills never collide.
         let dir = fixture();
         fs::rename(dir.path().join("B.txt"), dir.path().join("Z.txt")).expect("rename");
-        assert_ne!(hash_skill_dir(dir.path()).unwrap(), EXPECTED);
+        assert_ne!(analyze_skill_dir(dir.path()).unwrap().hash, EXPECTED);
     }
 
     #[test]
@@ -148,14 +214,14 @@ mod tests {
         // path bytes fed into the digest differ, so the hash must change.
         let dir = fixture();
         fs::rename(dir.path().join("a.txt"), dir.path().join("A.txt")).expect("rename");
-        assert_ne!(hash_skill_dir(dir.path()).unwrap(), EXPECTED);
+        assert_ne!(analyze_skill_dir(dir.path()).unwrap().hash, EXPECTED);
     }
 
     #[test]
     fn empty_dir_hashes_the_empty_input() {
         let dir = tempfile::tempdir().expect("tempdir");
         let empty = Sha256::digest([] as [u8; 0]);
-        assert_eq!(hash_skill_dir(dir.path()).unwrap(), hex(&empty));
+        assert_eq!(analyze_skill_dir(dir.path()).unwrap().hash, hex(&empty));
     }
 
     #[test]
@@ -164,12 +230,41 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(dir.path().join("a.txt"), dir.path().join("link.txt"))
             .expect("symlink");
-        assert_eq!(hash_skill_dir(dir.path()).unwrap(), EXPECTED);
+        assert_eq!(analyze_skill_dir(dir.path()).unwrap().hash, EXPECTED);
     }
 
     #[test]
     fn missing_dir_is_an_error() {
         let dir = tempfile::tempdir().expect("tempdir");
-        assert!(hash_skill_dir(&dir.path().join("nope")).is_err());
+        assert!(analyze_skill_dir(&dir.path().join("nope")).is_err());
+    }
+
+    #[test]
+    fn fingerprint_is_stable_while_content_is_unchanged() {
+        let dir = fixture();
+        let first = analyze_skill_dir(dir.path()).unwrap().fingerprint;
+        let second = analyze_skill_dir(dir.path()).unwrap().fingerprint;
+        assert_eq!(first, second);
+        assert!(first.size > 0);
+        assert!(first.mtime_ms > 0.0);
+    }
+
+    #[test]
+    fn fingerprint_changes_on_edit_and_delete() {
+        let dir = fixture();
+        let before = analyze_skill_dir(dir.path()).unwrap().fingerprint;
+
+        // An edit bumps the file's mtime (or, at equal mtime granularity, the
+        // total size); a deletion changes the size either way.
+        let file = dir.path().join("a.txt");
+        let mut longer = fs::read(&file).expect("read a.txt");
+        longer.extend_from_slice(b" and more");
+        fs::write(&file, &longer).expect("rewrite a.txt");
+        let edited = analyze_skill_dir(dir.path()).unwrap().fingerprint;
+        assert_ne!(edited.size, before.size);
+
+        fs::remove_file(&file).expect("remove a.txt");
+        let deleted = analyze_skill_dir(dir.path()).unwrap().fingerprint;
+        assert_ne!(deleted.size, edited.size);
     }
 }
