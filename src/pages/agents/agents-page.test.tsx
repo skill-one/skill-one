@@ -36,14 +36,12 @@ describe("AgentsPage", () => {
     expect(screen.getByText("Windsurf")).toBeInTheDocument();
   });
 
-  it("flags the agent whose own directory already holds content", async () => {
+  it("flags, in the head, the agent whose own directory already holds content", async () => {
     renderPage();
     expect(await screen.findByText("已连接 3/5 个 agent")).toBeInTheDocument();
-    // The head carries the attention count, and the node card carries the
-    // pending adoption/quarantine counts.
+    // The head carries the attention count; the agent's own card holds only its
+    // name — its warning state rides on the amber, still ribbon.
     expect(screen.getByText(/1 个待处理/)).toBeInTheDocument();
-    expect(screen.getByText("2 个 skill")).toBeInTheDocument();
-    expect(screen.getByText("1 项文件")).toBeInTheDocument();
   });
 
   it("links an agent straight from its node card and re-renders the graph", async () => {

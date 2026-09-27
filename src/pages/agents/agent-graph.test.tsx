@@ -98,17 +98,25 @@ describe("AgentGraph", () => {
     expect(hub.querySelectorAll("g rect")).toHaveLength(2);
   });
 
-  it("lists every agent as a node card with its state and pending counts", () => {
-    const { getByText } = renderWithRouter(<AgentGraph agents={agents} />);
+  it("lists every agent as a bare name card — the ribbon carries the state", () => {
+    const { getByText, queryByText } = renderWithRouter(
+      <AgentGraph agents={agents} />,
+    );
 
     expect(getByText("Claude Code")).toBeInTheDocument();
     expect(getByText("Cursor")).toBeInTheDocument();
-    // Warning agents still read "未链接" — the amber dot and border carry the
-    // distinction — and their pending adoption/quarantine counts ride the card.
-    expect(getByText("2 个 skill")).toBeInTheDocument();
-    expect(getByText("1 项文件")).toBeInTheDocument();
-    // The canonical agent keeps its own word.
-    expect(getByText("原生")).toBeInTheDocument();
+    // The card says only the agent's name: the link state is not spelled out
+    // (nor are the pending adoption/quarantine counts) — the ribbon's colour and
+    // motion own that distinction.
+    for (const label of [
+      "已链接",
+      "未链接",
+      "原生",
+      "2 个 skill",
+      "1 项文件",
+    ]) {
+      expect(queryByText(label)).toBeNull();
+    }
   });
 
   it("links an unlinked agent from its node popover", async () => {

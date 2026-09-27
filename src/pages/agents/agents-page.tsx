@@ -43,7 +43,7 @@ export function AgentsPage() {
   ).length;
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1200px] flex-col px-8 pt-3 pb-5">
+    <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
       <DrillDownHead
         back="/my-skills"
         title={t("agents.title")}

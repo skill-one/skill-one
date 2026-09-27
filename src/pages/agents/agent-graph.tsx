@@ -27,13 +27,16 @@ import {
   resolveGraphWidth,
   ribbonColor,
   type GraphLayout,
+  type GraphSide,
   type NodeLayout,
 } from "./agent-graph-layout";
 
 /**
  * The agents graph: a live rendition of the brand mark — every detected agent
- * is a card in a vertical column on the left, and a ribbon draws from it into
- * the SkillOne hub on the right. The ribbon's look is the agent's link state:
+ * is a card in a column beside the SkillOne hub, balanced across its left and
+ * right and packing outward so a long roster stays on one screen, and a ribbon
+ * draws from each card into the hub. The ribbon's look is the agent's link
+ * state:
  * a linked agent's brand-hued ribbon carries a slow shimmer running into the
  * hub, while unlinked agents stay as quiet static lines — amber dashes when
  * the agent's own directory already holds content a link would adopt, gray
@@ -45,19 +48,21 @@ import {
  * file is animation and presentation only.
  */
 export function AgentGraph({ agents }: { agents: AgentStatus[] }) {
-  const [ref, width] = useElementWidth();
+  const [ref, size] = useElementSize();
   const [active, setActive] = useState<string | null>(null);
   const { toggle, busyFor } = useAgentLinkToggle();
   // The canvas never renders narrower than the card-column/hub clearance;
-  // below the window width the outer scroller carries the overflow.
-  const graphWidth = resolveGraphWidth(width);
+  // below the window width the outer scroller carries the overflow. Its height
+  // is measured too, so the columns can be sized to keep the whole roster on one
+  // screen instead of a single column scrolling off the bottom.
+  const graphWidth = resolveGraphWidth(size.width);
   const layout = useMemo(
-    () => layoutAgents(agents, graphWidth),
-    [agents, graphWidth],
+    () => layoutAgents(agents, graphWidth, size.height),
+    [agents, graphWidth, size.height],
   );
 
   return (
-    <div ref={ref} className="w-full overflow-x-auto">
+    <div ref={ref} className="h-full w-full overflow-x-auto">
       <div className="relative" style={{ width: layout.width }}>
         <svg
           width={layout.width}
@@ -288,11 +293,12 @@ function Hub({ hub }: { hub: GraphLayout["hub"] }) {
 }
 
 /**
- * One agent's card: brand face, name, and the link state line with any
- * pending adoption/quarantine counts. The card is a button: clicking it opens
- * the popover whose switch links or unlinks this one agent (the same action
- * the settings dialog runs). Hovering it lifts the agent's own ribbon and dims
- * the rest.
+ * One agent's card: its brand face and name. The link state is deliberately
+ * not spelled out here — the ribbon joining the card to the hub carries it (a
+ * bright, animated brand-hued ribbon when linked; a dim, still line otherwise).
+ * The card is a button: clicking it opens the popover whose switch links or
+ * unlinks this one agent. Hovering it lifts the agent's own ribbon and dims the
+ * rest.
  */
 function AgentNode({
   agent,
@@ -311,18 +317,16 @@ function AgentNode({
   onHover: (name: string | null) => void;
   onToggleLink: (link: boolean) => void;
 }) {
-  const { t } = useTranslation();
   const reduceMotion = useReducedMotion();
-  const state = agentLinkState(agent);
-  const skillsCount = agent.internalSkills?.length ?? 0;
-  const othersCount = agent.internalOthers?.length ?? 0;
   const pinned = agent.canonical;
 
   return (
     <motion.div
       className="absolute"
       style={{ left: node.x, top: node.y, width: node.width }}
-      initial={reduceMotion ? undefined : { opacity: 0, x: -12 }}
+      initial={
+        reduceMotion ? undefined : { opacity: 0, x: node.side === "left" ? -12 : 12 }
+      }
       animate={{ opacity: dimmed ? 0.55 : 1, x: 0 }}
       transition={
         reduceMotion
@@ -339,48 +343,18 @@ function AgentNode({
               onMouseLeave={() => onHover(null)}
               aria-label={agent.display}
               className={cn(
-                "pointer-events-auto flex w-full cursor-pointer items-center gap-3 rounded-xl border bg-card px-3 text-left",
-                "outline-none transition-colors hover:bg-accent/40",
+                "pointer-events-auto flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card px-3 text-left",
+                "outline-none transition-colors hover:border-primary/30 hover:bg-accent/40",
                 "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
                 "data-[popup-open]:border-primary/50 data-[popup-open]:bg-accent/40",
-                state === "warning"
-                  ? "border-amber-500/40"
-                  : "border-border hover:border-primary/30",
               )}
-              style={{ ["--node-height" as string]: `${NODE_HEIGHT}px`, height: NODE_HEIGHT }}
+              style={{ height: NODE_HEIGHT }}
             />
           }
         >
-          <AgentIcon agentName={agent.name} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-medium">
-              {agent.display}
-            </div>
-            <div className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
-              <span
-                className={cn(
-                  "h-1.5 w-1.5 shrink-0 rounded-full",
-                  agentStateDotClass[state],
-                )}
-              />
-              <span className="shrink-0">{t(agentStateLabelKey(agent))}</span>
-              {skillsCount > 0 && (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <span className="truncate">
-                    {t("agents.nodeSkills", { count: skillsCount })}
-                  </span>
-                </>
-              )}
-              {othersCount > 0 && (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <span className="truncate">
-                    {t("agents.nodeFiles", { count: othersCount })}
-                  </span>
-                </>
-              )}
-            </div>
+          <AgentIcon agentName={agent.name} size="sm" />
+          <div className="min-w-0 flex-1 truncate text-[13px] font-medium">
+            {agent.display}
           </div>
           {busy && (
             <Loader2
@@ -392,6 +366,7 @@ function AgentNode({
 
         <AgentNodePopover
           agent={agent}
+          side={node.side}
           busy={busy}
           pinned={pinned}
           onToggleLink={onToggleLink}
@@ -408,11 +383,13 @@ function AgentNode({
  */
 function AgentNodePopover({
   agent,
+  side,
   busy,
   pinned,
   onToggleLink,
 }: {
   agent: AgentStatus;
+  side: GraphSide;
   busy: boolean;
   pinned: boolean;
   onToggleLink: (link: boolean) => void;
@@ -423,7 +400,12 @@ function AgentNodePopover({
   const othersCount = agent.internalOthers?.length ?? 0;
 
   return (
-    <PopoverContent side="right" align="start" sideOffset={10} className="w-64">
+    <PopoverContent
+      side={side === "left" ? "right" : "left"}
+      align="start"
+      sideOffset={10}
+      className="w-64"
+    >
       <div className="flex items-center gap-2.5">
         <AgentIcon agentName={agent.name} />
         <PopoverTitle className="truncate text-[13px]">
@@ -466,20 +448,29 @@ function AgentNodePopover({
   );
 }
 
-/** Observe an element's content-box width; 0 until the first measurement. */
-function useElementWidth() {
+/** Observe an element's content-box size; 0 until the first measurement. */
+function useElementSize() {
   const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const update = () => setWidth(el.clientWidth);
+    const update = () => {
+      const width = el.clientWidth;
+      const height = el.clientHeight;
+      // An unchanged size must not re-render, or the observer re-arms forever.
+      setSize((prev) =>
+        prev.width === width && prev.height === height
+          ? prev
+          : { width, height },
+      );
+    };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
-  return [ref, width] as const;
+  return [ref, size] as const;
 }
