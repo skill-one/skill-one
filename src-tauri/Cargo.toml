@@ -69,5 +69,4 @@ tempfile = "3"
 # previous frontmost app reclaims key focus and the popover blur-dismisses.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSEvent", "NSView"] }
-objc2-foundation = { version = "0.3", features = ["NSGeometry"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication"] }
