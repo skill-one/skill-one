@@ -5,10 +5,7 @@ import { Globe, HardDrive, Loader2, Store } from "lucide-react";
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { openExternal } from "../../lib/open-external";
-import {
-  skillKey,
-  type SkillView,
-} from "../../lib/skill-view";
+import { skillKey, type SkillView } from "../../lib/skill-view";
 import type { ListUnit } from "../../lib/list-view";
 import {
   REPO_CARD_SKELETON_CLASS,
@@ -77,10 +74,6 @@ export interface SearchRow {
   action?: ReactNode;
 }
 
-/** Where an installed section's repository card leads. */
-const INSTALLED_REPO_PATH = "/my-skills/repo/";
-/** Where the pool card leads: skills no recorded source vouches for. */
-const LOCAL_POOL_PATH = "/my-skills/local";
 /** React-key identity of the pool card. */
 const LOCAL_POOL_KEY = "local";
 
@@ -307,14 +300,6 @@ export function SearchResults({
                       onOpenSkill={(key) =>
                         setSelected({ section: "installed", key })
                       }
-                      // A repository card's bar opens the repository as the
-                      // installed list reads it — the installs on disk — the
-                      // pool's opens the pool page, having no repository.
-                      href={
-                        card.repo
-                          ? `${INSTALLED_REPO_PATH}${card.repo}`
-                          : LOCAL_POOL_PATH
-                      }
                       // On the my-skills surface the card rows stay
                       // control-less: one group switch on the bar owns the
                       // card's skills, matching the list behind the search.
@@ -461,10 +446,9 @@ export function SearchResults({
                       // whole live answer, not a summary of one.
                       hasQuery
                       // The card lists everything the endpoint answered, so
-                      // its bar has nowhere further to go: it stays a label.
-                      // The rows are the way out — each opens its skills.sh
-                      // page in the system browser.
-                      href={null}
+                      // its bar has nothing to reveal: it stays a label. The
+                      // rows are the way out — each opens its skills.sh page
+                      // in the system browser.
                       onOpenSkill={(key) => {
                         const live = liveSkills.find(
                           (s) => skillKey(s) === key,

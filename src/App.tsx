@@ -28,16 +28,6 @@ const ExplorePage = lazy(() =>
     default: m.ExplorePage,
   })),
 );
-const RepoPage = lazy(() =>
-  import("./pages/explore/repo-page").then((m) => ({
-    default: m.RepoPage,
-  })),
-);
-const LocalSkillsPage = lazy(() =>
-  import("./pages/my-skills/local-skills-page").then((m) => ({
-    default: m.LocalSkillsPage,
-  })),
-);
 const AgentsPage = lazy(() =>
   import("./pages/agents/agents-page").then((m) => ({
     default: m.AgentsPage,
@@ -100,25 +90,7 @@ export default function App() {
                     element={<Navigate to="/my-skills" replace />}
                   />
                   <Route path="/explore" element={<ExplorePage />} />
-                  {/* One repository, every skill it publishes. The splat is
-                    `owner/repo` itself, which carries a slash. */}
-                  <Route path="/repo/*" element={<RepoPage />} />
                   <Route path="/my-skills" element={<MySkillsPage />} />
-                  {/* One repository as the installed list reads it: the skills
-                    of it that are on disk, with the rest of the catalogue a
-                    step away. The store's own page for the same repository
-                    is `/repo/*`, and the two share one component. */}
-                  <Route
-                    path="/my-skills/repo/*"
-                    element={<RepoPage origin="installed" />}
-                  />
-                  {/* The installed list's local pool, listed whole — the page
-                    the pool's card opens, as a repository's page is what a
-                    repository card's bar opens. */}
-                  <Route
-                    path="/my-skills/local"
-                    element={<LocalSkillsPage />}
-                  />
                   {/* The agents graph: every detected agent drawn into the
                     SkillOne hub. Hangs off the installed list, reached through
                     its entry card, so the 我的 segment stays lit here. */}

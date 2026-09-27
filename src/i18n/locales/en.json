@@ -151,7 +151,6 @@
     "dialogDescription": "Detected agents are linked to the unified skills directory automatically, with no manual action needed. When an agent is linked, its own content is adopted into the unified directory and other files are quarantined to .misc; unlinking does not move them back. Here you can unlink individual agents, and they will not be linked automatically again.",
     "noAgents": "No available agents detected",
     "triggerAria": "Manage agent links ({{count}} total)",
-    "menuHeader": "Agents · {{count}} total",
     "skillsPending": "{{count}} skills pending adoption",
     "filesPending": "{{count}} files pending quarantine",
     "toggleAria": "{{name}} link switch"
@@ -177,27 +176,11 @@
     "noSkills": "No skills yet",
     "repoCount": "{{count}} repositories",
     "skillCount": "{{count}} skills",
-    "viewRepoAria": "View repository {{repo}}, {{count}} skills",
-    "viewPoolAria": "View {{name}}, {{count}} skills",
-    "repoNotInIndex": "Repository {{repo}} is not in the index",
-    "repoNoInstalled": "No installed skills from this repository",
-    "installedCount": "{{count}} installed skills",
+    "expandRepoAria": "Show all {{count}} skills from {{name}}",
+    "collapseRepoAria": "Collapse the skill list of {{name}}",
     "noInstalled": "No skills installed yet",
     "noMatchSkill": "No skills match the filters",
-    "noMatchRepo": "No repositories match the filters",
-    "noLocal": "No locally installed skills"
-  },
-  "pool": {
-    "showOtherInstalled": "Show {{count}} more installed skills",
-    "collapseOtherInstalled": "Collapse {{count}} more installed skills"
-  },
-  "repo": {
-    "showOther": "Show {{count}} more skills in this repository",
-    "showOtherInstalled": "Show {{count}} more installed skills in this repository",
-    "showOtherUninstalled": "Show {{count}} more uninstalled skills in this repository",
-    "collapseOther": "Collapse {{count}} more skills",
-    "collapseOtherInstalled": "Collapse {{count}} more installed skills",
-    "collapseUninstalled": "Collapse {{count}} uninstalled skills"
+    "noMatchRepo": "No repositories match the filters"
   },
   "run": {
     "moreFrom": "{{count}} more from",

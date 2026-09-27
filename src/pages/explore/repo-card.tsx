@@ -1,26 +1,40 @@
-import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { useState, type ReactNode } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, Star } from "lucide-react";
+import { Minus, Plus, Star } from "lucide-react";
 
 import { useAppLocale } from "../../i18n/use-language";
 import { skillDescription } from "../../lib/i18n-content";
 import { domainIcon } from "../../data/domains";
 import { DomainGlyph } from "../../components/domain-glyph";
 import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
-import {
-  isLiveSkill,
-  skillKey,
-  type SkillView,
-} from "../../lib/skill-view";
+import { isLiveSkill, skillKey, type SkillView } from "../../lib/skill-view";
 import { cn, formatCount } from "../../lib/utils";
+
 import {
   HighlightedText,
   type SkillMatched,
 } from "../../components/highlighted-text";
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { SkillInstallButton } from "../../components/skill-install-button";
-import { Card, CardContent, CardFooter } from "../../components/ui/card";
+import { Card, CardContent, CardHeader } from "../../components/ui/card";
+
+/**
+ * One shared transition for the expansion choreography — the card surface and
+ * every text-bearing element inside it move on the same clock, so nothing
+ * leads or lags.
+ */
+const EXPAND_TRANSITION = { duration: 0.25, ease: "easeOut" } as const;
+
+/**
+ * The card surface and its header as projection nodes. The surface is what
+ * scales during the expansion — making it the projection node lets motion
+ * correct the one thing that cannot survive scaling (the rounded corners,
+ * which it reads from computed style); the header is position-only, so its
+ * hairline divider keeps its one pixel instead of thinning with the scale.
+ */
+const MotionCard = motion.create(Card);
+const MotionCardHeader = motion.create(CardHeader);
 
 /**
  * One row of a repository card: a skill, plus whatever its surface adds to it.
@@ -32,7 +46,7 @@ import { Card, CardContent, CardFooter } from "../../components/ui/card";
  * row's corner control is the store's install button; the installed list draws
  * no per-row control at all — a card manages its skills as one group, from the
  * bar (`footerAction`), and per-skill switching waits one level deeper, on the
- * repository's own page.
+ * detail panel a row opens.
  */
 export interface RepoCardRow {
   /** The skill the row renders. */
@@ -54,47 +68,50 @@ export interface RepoCardRow {
  * card's skills instead of the rows carrying one switch each (see
  * `RepoEnableSwitch`).
  *
- * The card is a repository with its skills inside it, and it is read skills
- * first: the body lists them (most-installed first, the repository's own
- * leaders), and the single bar along the bottom signs the card while being the
- * door to the repository's page. The bar reads left to right as two clusters,
- * split by what each fact is *about*: the repository — avatar, `owner/repo`, its
- * star count — and then, at the far end, the way into its page, labelled with
- * the total skill count that page holds. Everything in the left cluster answers
- * "which repository is this", everything in the right one answers "how do I see
- * all of it", and the count sits inside the door's own phrase (「12 个 skill」)
- * rather than beside it, because the count is the door's object, not a second
- * fact next to it. Keeping the identity at the *bottom* is what makes the
- * skills the card's content instead of an attachment to a header: a card whose
- * first line is a repository name reads as a repository with a list under it,
- * and the reader who is comparing skills has to look past the name of every
- * card to reach the thing they are choosing between. It also merges what used
- * to be two bars — the header, and the tail whose only job was to lead to the
- * page — into the one line that has to exist anyway.
+ * The card is a repository with its skills inside it, and the single bar along
+ * the top names the card; the body under it lists the skills (most-installed
+ * first, the repository's own leaders). The bar reads left to right as two
+ * clusters, split by what each fact is *about*: the repository — avatar,
+ * `owner/repo`, its star count — and then, on an expandable card, the offer
+ * (「＋ 3」): a plus drawn as an icon over the exact number of rows a press
+ * reveals. Everything in the left cluster answers "which repository is this",
+ * the offer answers "what happens if I press", as one mark rather than as
+ * arithmetic to parse. A card whose every row is already on screen shows no
+ * figure at all. Leading with the identity is what makes a scan of the grid
+ * read as a scan of repositories — one line per card answers "which one is
+ * this" before any of its rows do — with the skills folded under the name they
+ * belong to.
  *
- * Two destinations, at the two granularities a reader chooses at:
+ * Two controls, at the two granularities a reader chooses at:
  *
  * - a **row** opens that skill's detail panel — the reader was pointing at one
  *   skill, and that is where its SKILL.md, its classification and its install
  *   state live;
- * - the **bottom bar** opens the repository's page: uncapped, and read the way
- *   the list it was opened from reads that repository — the store's page lists
- *   everything the repository publishes, the installed list's opens on the
- *   skills of it that are on disk, the rest of the catalogue one control away
- *   from there (see `RepoPage`). A card with skills left over says so by
- *   carrying the count its own list knows inside the door's own label.
+ * - the **top bar** expands the card in place when the cap is holding rows
+ *   back (see below); on a card with nothing to reveal it is a plain label.
+ *
+ * **Expansion** answers the commonest question the card leaves open ("what
+ * else is in here?") without leaving the list: a card whose cap is hiding rows
+ * turns its bar into a toggle, and a press reveals every row in place — the
+ * card spans the full grid row (`col-span-full`) and its body splits into two
+ * balanced columns, so the reveal reads at the width of the list rather than of
+ * one lane. Auto-placement drops an opened right-lane card at the next row
+ * start, and the whole reflow — the card's glide into its new footprint, the
+ * row-mates stepping aside — runs as one motion layout transition, so the
+ * move reads as motion rather than as a teleport (and is skipped entirely for
+ * readers who ask for reduced motion). A second press folds the card back. A
+ * card with nothing behind its cap — or one under a live search, whose cap
+ * already stands down — keeps the bar as a plain label: a toggle is worth a
+ * press only when it would reveal something.
  *
  * The bar is the card's only repository-level control, and it deliberately does
- * not carry an "open on GitHub" button. That button is a second link for the
- * same granularity of choice, pointing somewhere the bar's own page already
- * offers with a label ("在 GitHub 打开") — and it is 28px tall, which is what the
- * whole bar was as tall as: removing it is what makes the bar a line of text
- * rather than a line of text beside a button. The source is still two clicks
- * away (a row's panel links to it, and the repository page has the labeled
- * button), while the list itself stays one target per card. The one companion
- * the bar admits is `footerAction` — the installed list's one-shot switch over
- * the card's skills, a sibling of the door rather than a child of it: a press
- * on the switch must never also walk through the door.
+ * not carry an "open on GitHub" button or any route out of the list: the card
+ * is the reading surface, the rows and the detail panel are where a choice
+ * resolves, and a second destination for the same granularity of choice would
+ * only compete with them. The one companion the bar admits is `footerAction` —
+ * the installed list's one-shot switch over the card's skills, a sibling of the
+ * toggle rather than a child of it: a press on the switch must never also fold
+ * the card.
  *
  * The store rows' **install button** is the third destination: it installs
  * without either. It is a sibling of the row button rather than a child, so the
@@ -112,7 +129,7 @@ export interface RepoCardRow {
  * the same install through the detail panel, which the row opens. The installed
  * list asks for no row control at all (`rowActions={false}`): comparing and
  * grouping installed skills is what its cards are for, and enablement is one
- * group action on the bar until the reader deliberately enters the repository.
+ * group action on the bar.
  *
  * Because the button is only ever *shown* on intent, it does not take part in
  * the row's layout: it floats over the row's right edge, so a name and a
@@ -125,8 +142,8 @@ export interface RepoCardRow {
  *
  * The bar's identity is a deliberate size step above the rows — a 24px face and
  * a 14px name against the rows' 13px names and 13px glyphs. The bar sits under a
- * hairline at the card's bottom edge, and the step is what keeps it from reading
- * as one more row of the list it signs.
+ * hairline at the card's top edge, and the step is what keeps it from reading as
+ * one more row of the list it names.
  *
  * The body is the same for every repository, including the ones with a single
  * skill: one row per skill, never a promoted or specially-shaped first entry, so
@@ -155,7 +172,6 @@ export function RepoCard({
   rowActions = true,
   hoverAction = true,
   footerAction,
-  href,
 }: {
   /** `owner/repo` — the repository the card stands for; empty for the installed
    *  list's pool of skills no recorded source vouches for. */
@@ -166,13 +182,12 @@ export function RepoCard({
    *  installed first). */
   skills: RepoCardRow[];
   /**
-   * How many of the repository's skills to list before the footer's door is the
-   * only way to the rest — the reader's own choice, set in Settings (see
+   * How many of the repository's skills to list before the bar's toggle is the
+   * way to the rest — the reader's own choice, set in Settings (see
    * `lib/repo-card-preview`). The figure bounds the card's height: a repository
    * with one skill and one with fifty have to read as the same kind of object,
    * so the list grows with the repository only up to a point and then stops —
-   * the footer always states the repository's total, so a capped list reads as
-   * "these of them" rather than as "all of them".
+   * past it, the bar's plus figure states exactly how many rows a press adds.
    */
   maxSkills?: number;
   /** Whether a search is live; see the note above about the cap. */
@@ -195,58 +210,88 @@ export function RepoCard({
    */
   hoverAction?: boolean;
   /**
-   * A control at the bar's far end, a sibling of the door rather than a child
+   * A control at the bar's far end, a sibling of the bar rather than a child
    * of it. The installed list hands over the one-shot enable switch over the
-   * card's skills; absent (the store) leaves the bar one unbroken door.
+   * card's skills; absent (the store) leaves the bar alone with its toggle.
    */
   footerAction?: ReactNode;
-  /**
-   * Where the bar leads. Absent means the repository's own page
-   * (`/repo/owner/repo`, the store's full catalogue of it); the installed list
-   * hands over its own reading of the same repository instead
-   * (`/my-skills/repo/owner/repo`, the installs on disk); `null` makes the bar
-   * a label rather than a door — for a listing that already is the whole thing
-   * and has nowhere further to go.
-   */
-  href?: string | null;
 }) {
   const { t } = useTranslation();
   const locale = useAppLocale();
+  // Expansion is the card's own fact: a press on the bar reveals the rows the
+  // cap is holding back, right where the card stands, instead of sending the
+  // reader through the door for them. It stays local — no surface needs to
+  // know which of its cards is open, and the grid reflows around it on its own
+  // (the open card spans the full row; see the note on the list item below).
+  const [expanded, setExpanded] = useState(false);
   // The owner segment is what the dataset hosts an avatar for; a repository
   // group always has one (a bare-host source is its own owner).
   const [owner] = repo.split("/");
-  const shown = hasQuery ? skills : skills.slice(0, maxSkills);
+  const shown = hasQuery || expanded ? skills : skills.slice(0, maxSkills);
+  // A card can only expand past its cap when the cap is actually holding
+  // something back: a search already lists everything (the cap stands down,
+  // see the note on `hasQuery`), and a card within its cap has no rest to
+  // reveal — both keep the bar as the plain door it was. Expanding is worth a
+  // press only when the alternative was walking through the door.
+  const canExpand = !hasQuery && skills.length > maxSkills;
+  // The toggle is also a transition. Opening a right-lane card re-plumbs the
+  // whole grid — the card jumps to a full row start, every card after it
+  // shifts, the open card's box doubles in width — and a hard cut between the
+  // two layouts reads as teleporting. So the card is a `motion` layout
+  // element: the reflow becomes one shared transition, the open card gliding
+  // into its full-row footprint while its old row-mates step aside, all off
+  // one FLIP pass (cheap — transforms only, measured once per reflow, and
+  // nothing animates until a layout actually changes). Motion is dropped
+  // entirely for readers who ask for reduced motion: they get the cut.
+  const reducedMotion = useReducedMotion();
+  // A transitioning card rides above its neighbours. During collapse the
+  // cards after it step back up while its box is still shrinking — and since
+  // every one of them animates, DOM order would paint a later card *over*
+  // the shrinking one, reading as the list covering the card the reader just
+  // folded. Elevating the card for the length of its own transition flips
+  // that: it glides home on top, the way a lifted card settles back into a
+  // deck. (The flag is only ever set on the card being toggled — neighbours
+  // that merely shift never raise themselves. Without layout animations
+  // there is no complete event to clear it, so reduced-motion readers never
+  // set it either.) The lift is split in two: the z-order covers the whole
+  // transition — it is what keeps the shrinking card on top — while the
+  // shadow rides `expanded` alone and eases through `transition-shadow`, so
+  // neither the lift nor the light pops in a single frame (a shadow that
+  // materialises at 2× scale on the first collapse frame is exactly the
+  // flash a fold used to start with).
+  const [collapsing, setCollapsing] = useState(false);
+  const lifted = canExpand && !reducedMotion && (expanded || collapsing);
+  const toggleExpanded = () => {
+    if (expanded && !reducedMotion) setCollapsing(true);
+    setExpanded((value) => !value);
+  };
   // The bar's own name: the repository when there is one, and the label for the
   // installed list's pool of skills no source vouches for when there is not.
   const name = repo || t("common.localInstall");
-  // The door's destination; `null` leaves the bar a label (see `href`).
-  const door = href === undefined ? `/repo/${repo}` : href;
-  // A live skills.sh source has no in-app page: its door is an external URL
-  // that opens in the system browser.
-  const externalDoor = door != null && door.startsWith("http");
-  // The door bar's content: who published this, and how many skills the card
-  // lists.
-  const doorBar = (
+  // The bar's identity: the face, the name, the repository's weight. Shared by
+  // the toggle and the plain label — who this is and how big it is read the
+  // same whichever state the card is in. (The hover underline only arms inside
+  // the toggle's `group/head`; a label never underlines.)
+  const barIdentity = (
     <>
       {/* The identity is a size step above the rows: a 24px face and a
           14px name against the rows' 13px names and 13px glyphs. The bar
-          sits under a hairline at the bottom of the card, so the step is
+          sits under a hairline at the top of the card, so the step is
           what stops it from reading as one more row of the list. A pool
           of source-less installs has no owner to draw, so its name leads
           the bar alone. */}
       {repo ? (
         <OwnerAvatar owner={owner} className="size-6 shrink-0 text-[11px]" />
       ) : null}
-      <span className="truncate text-sm font-semibold text-foreground group-hover/head:underline">
+      {/* No hover underline here: the name is not what a press acts on. The
+          toggle's figure carries the hover feedback instead (see below), so
+          the highlight lands on the control, never on a label. */}
+      <span className="truncate text-sm font-semibold text-foreground">
         {name}
       </span>
       {/* The repository's weight rides its name, because that is what the
           figure is about: a fact about the repository, next to the
           repository, the way a follower count sits next to an account.
-          It used to sit out in the right-hand cluster with the count and
-          the door, which mixed two different kinds of fact on one side of
-          the bar — and it was never aligned there anyway: the digits are
-          as wide as they are, so only the glyphs looked like a column.
           The amber star is separator enough; a `·` after it punctuated a
           group that had already ended. The raw figure stays reachable as
           the title, since the printed one is compacted. */}
@@ -259,41 +304,163 @@ export function RepoCard({
           {formatCount(stars)}
         </span>
       )}
-      {/* The door, labelled with what it opens: the count is the door's
-          *object*, so it is written inside the door's own phrase rather
-          than standing beside it as a second figure with a separator
-          between them — one phrase, one entity, and no bare 「N 个」 for
-          the reader to disambiguate against the rows on screen. The noun
-          comes from the app's own voice (`N 个 skill`, the same words the
-          bar's own accessible name and the repository page's header use),
-          which is also what settles 全部: 「全部 1 个」 reads badly for a
-          repository with one skill, while 「1 个 skill」 reads the same as
-          every other count. The chevron carries the "go" the way every
-          other deeper affordance in the app does, and the total is always
-          the repository's own — which is what lets a capped list read as
-          "these of them": the reader counts the rows on screen and compares. */}
-      <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
-        {t("state.skillCount", { count: skills.length })}
-        <ChevronRight
-          className="h-3 w-3 transition-transform group-hover/head:translate-x-0.5"
-          aria-hidden
-        />
-      </span>
     </>
+  );
+  // The toggle's own figure — a chip: icon and number as one block, the one
+  // thing that answers for the whole interaction. Folded, a plus over the
+  // *increment*: 「＋ 3」, the exact number of rows a press reveals, read
+  // straight off the card (five rows on screen, three more behind the cap).
+  // Open, a minus beside the count the card now holds — 「− 15 个 skill」 —
+  // which is both the fact the open card exists to show (its full size, no
+  // counting rows across two columns) and the way back: the minus is the
+  // fold. The chip is what carries the hover feedback — a quiet surface that
+  // fills on point-over, the way every control in the app answers the
+  // pointer — because the press acts on this mark, never on the repository's
+  // name. A card that cannot expand shows no chip at all — and no hover of
+  // any kind; its bar is a label, not a control.
+  const toggleCount = expanded ? (
+    <span className="ml-auto flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-foreground transition-colors group-hover/head:bg-accent">
+      <Minus className="size-3" aria-hidden />
+      {t("state.skillCount", { count: skills.length })}
+    </span>
+  ) : (
+    <span className="ml-auto flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium text-foreground tabular-nums transition-colors group-hover/head:bg-accent">
+      <Plus className="size-3" aria-hidden />
+      {skills.length - maxSkills}
+    </span>
   );
 
   return (
-    <li className="flex flex-col">
+    <li
+      className={cn(
+        "relative flex flex-col",
+        // An open card takes the whole row the grid offers — every track of
+        // it, whatever the auto-fill came to (`1 / -1` is what `col-span-full`
+        // means), so the revealed rows read at the width of the list rather
+        // than of one lane. Auto-flow then lays the cards that follow under
+        // the open one; a card that was the open one's row-mate moves down
+        // with them.
+        expanded && canExpand && "col-span-full",
+        // While transitioning, the card rides above the neighbours it glides
+        // over (its own transform already lifts it into a stacking context;
+        // this raises it past the ones that merely shift).
+        lifted && "z-10",
+      )}
+    >
       {/* `flex-1` is the one thing the card cannot know: under the plain-grid
           fallback the lane's items are stretched to the tallest card in the
           row, and the card is what fills that height. */}
-      <Card size="sm" data-repo={repo} className="group flex-1">
+      <MotionCard
+        size="sm"
+        data-repo={repo}
+        layout={!reducedMotion}
+        transition={reducedMotion ? undefined : EXPAND_TRANSITION}
+        onLayoutAnimationComplete={() => setCollapsing(false)}
+        className={cn(
+          "group flex-1 transition-shadow",
+          expanded && "shadow-lg shadow-black/10",
+        )}
+      >
+        {/* The card's one bar, leading the card: what this repository is and
+            how big it is — read first, so a scan of the grid reads as a scan
+            of repositories with their skills folded under each. A hairline
+            closes the bar off from the rows it names. On an expandable card
+            the bar is the toggle that reveals the rest in place; on every
+            other card it is a plain label — the rows, and the detail panel a
+            row opens, are the only routes a card offers. */}
+        <MotionCardHeader
+          layout={!reducedMotion && "position"}
+          transition={reducedMotion ? undefined : EXPAND_TRANSITION}
+          className="min-w-0 flex items-center gap-2 border-b border-border/60 text-[11px] text-muted-foreground"
+        >
+          {canExpand ? (
+            /* The expandable card's bar is a toggle: pressing it reveals (or
+               folds away) the rows the cap was holding, right here — the
+               shortest path from "this card" to "all of it". The button is
+               stretched over the header's whole height, its padding bleeding
+               into the card's own, so every pixel a reader aims at the bar
+               presses the toggle — a hit area the size of the text alone
+               would make the bar's edges dead. `layout="position"` keeps the
+               bar's text at its own size while the card surface scales
+               around it — only the bar's spot in the card animates. */
+            <motion.button
+              type="button"
+              onClick={toggleExpanded}
+              aria-expanded={expanded}
+              aria-label={
+                expanded
+                  ? t("state.collapseRepoAria", { name })
+                  : t("state.expandRepoAria", { name, count: skills.length })
+              }
+              layout={!reducedMotion && "position"}
+              transition={reducedMotion ? undefined : EXPAND_TRANSITION}
+              className="group/head -my-(--card-spacing) flex min-w-0 flex-1 cursor-pointer items-center gap-2 self-stretch rounded-md py-(--card-spacing) text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {barIdentity}
+              {toggleCount}
+            </motion.button>
+          ) : (
+            /* A bar with nothing to reveal is pure identity — the face, the
+               name, the stars. No figure rides it: a count would answer "how
+               many are here?" for a card whose every row is already on
+               screen. The face rides the name whenever a repository stands
+               behind it: a live card's owner is known (and the avatar
+               resolves through the mirror, then GitHub's own endpoint — see
+               `avatarCandidates`), while the local pool has no owner to
+               draw. */
+            <motion.span
+              layout={!reducedMotion && "position"}
+              transition={reducedMotion ? undefined : EXPAND_TRANSITION}
+              className="flex min-w-0 flex-1 items-center gap-2"
+            >
+              {barIdentity}
+            </motion.span>
+          )}
+          {/* The bar's one companion control: a sibling of the toggle, never a
+              child, so a press on it cannot also fold the card. The installed
+              list mounts the group switch here; the store mounts nothing. */}
+          {footerAction && (
+            <motion.span
+              layout={!reducedMotion && "position"}
+              transition={reducedMotion ? undefined : EXPAND_TRANSITION}
+              className="flex shrink-0 items-center"
+            >
+              {footerAction}
+            </motion.span>
+          )}
+        </MotionCardHeader>
+
         <CardContent>
           {/* A row is the unit of the body, and it is deliberately not a card:
               the repository is the card, and a skill inside it is one line of
               its content. The horizontal bleed lets the hover highlight read as
-              a row band rather than as a box inside the card's padding. */}
-          <ul className="-mx-1.5 flex flex-col">
+              a row band rather than as a box inside the card's padding. Once
+              the card is open, the rows run in two balanced columns — the
+              upper half of the list down the left, the rest down the right, so
+              a full-width card does not turn every row into a full-width
+              sweep. `grid-flow-col` over `ceil(n/2)` rows is what balances
+              them: the items fill column-major, so the split is by count and
+              stays put no matter how tall the individual rows run. Each row
+              carries `layout="position"`: while the surface scales up around
+              them, the rows themselves never stretch — they keep their size,
+              glide into the two-column arrangement, and the region beyond
+              them simply shows up as the surface grows past it (the card's
+              own overflow clipping is the reveal mask). */}
+          <ul
+            className={cn(
+              "-mx-1.5",
+              expanded && canExpand
+                ? "grid grid-flow-col auto-cols-fr gap-x-8"
+                : "flex flex-col",
+            )}
+            style={
+              expanded && canExpand
+                ? {
+                    gridTemplateRows: `repeat(${Math.ceil(shown.length / 2)}, auto)`,
+                  }
+                : undefined
+            }
+          >
             {shown.map(({ skill, matched, muted, extra, action }) => {
               const key = skillKey(skill);
               // A live skills.sh row claims only what its source carries —
@@ -311,9 +478,11 @@ export function RepoCard({
                 <SkillInstallButton skill={skill} className="h-7 w-7" />
               );
               return (
-                <li
+                <motion.li
                   key={key}
                   data-skill={skill.name}
+                  layout={!reducedMotion && "position"}
+                  transition={reducedMotion ? undefined : EXPAND_TRANSITION}
                   className={cn(
                     "group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent",
                     muted && "opacity-60",
@@ -325,7 +494,9 @@ export function RepoCard({
                   <button
                     type="button"
                     onClick={() => onOpenSkill(key)}
-                    aria-label={t("common.viewDetailAria", { name: skill.name })}
+                    aria-label={t("common.viewDetailAria", {
+                      name: skill.name,
+                    })}
                     aria-current={isSelected ? "true" : undefined}
                     className={cn(
                       "flex min-w-0 flex-1 items-center gap-2 py-1 text-left focus-visible:outline-none",
@@ -362,7 +533,8 @@ export function RepoCard({
                     <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
                       {live
                         ? null
-                        : skillDescription(skill, locale) || t("common.noDescription")}
+                        : skillDescription(skill, locale) ||
+                          t("common.noDescription")}
                     </span>
                   </button>
                   {/* The row's own additions sit beside the row button rather
@@ -404,88 +576,12 @@ export function RepoCard({
                       </span>
                     )
                   ) : null}
-                </li>
+                </motion.li>
               );
             })}
           </ul>
         </CardContent>
-
-        {/* The card's one bar: what this repository is, how big it is, and the
-            way in. `mt-auto` keeps it on the bottom edge when the grid
-            stretches a short card to its neighbour's height. An
-            external door (a live source the store has no page for) opens in
-            the system browser — the same bar, the same label, one step
-            further out. */}
-        <CardFooter className="mt-auto min-w-0 gap-2 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
-          {door == null ? (
-            /* A bar with nowhere to lead — the local pool's own page, which is
-               already the whole list, or a live card whose rows are the whole
-               answer — states the name and the total instead. The face rides
-               the name whenever a repository stands behind it: a live card's
-               owner is known (and the avatar resolves through the mirror, then
-               GitHub's own endpoint — see `avatarCandidates`), while the local
-               pool has no owner to draw. */
-            <span className="flex min-w-0 flex-1 items-center gap-2">
-              {repo ? (
-                <OwnerAvatar
-                  owner={owner}
-                  className="size-6 shrink-0 text-[11px]"
-                />
-              ) : null}
-              <span className="truncate text-sm font-semibold text-foreground">
-                {name}
-              </span>
-              <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium text-foreground tabular-nums">
-                {t("state.skillCount", { count: skills.length })}
-              </span>
-            </span>
-          ) : externalDoor ? (
-            <a
-              href={door}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={
-                repo
-                  ? t("state.viewRepoAria", {
-                      repo,
-                      count: skills.length,
-                    })
-                  : t("state.viewPoolAria", {
-                      name,
-                      count: skills.length,
-                    })
-              }
-              className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              {doorBar}
-            </a>
-          ) : (
-            <Link
-              to={door}
-              aria-label={
-                repo
-                  ? t("state.viewRepoAria", {
-                      repo,
-                      count: skills.length,
-                    })
-                  : t("state.viewPoolAria", {
-                      name,
-                      count: skills.length,
-                    })
-              }
-              className="group/head flex min-w-0 flex-1 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              {doorBar}
-            </Link>
-          )}
-          {/* The bar's one companion control: a sibling of the door, never a
-              child, so a press on it cannot also open the page. The installed
-              list mounts the group switch here; the store mounts nothing. */}
-          {footerAction && (
-            <span className="flex shrink-0 items-center">{footerAction}</span>
-          )}
-        </CardFooter>
-      </Card>
+      </MotionCard>
     </li>
   );
 }
