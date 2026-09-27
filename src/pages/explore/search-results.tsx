@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Globe, HardDrive, Loader2, Store } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
+import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { openExternal } from "../../lib/open-external";
 import { skillKey, type SkillView } from "../../lib/skill-view";
@@ -98,6 +99,11 @@ export function SearchResults({
   installedSurface?: boolean;
 }) {
   const { t } = useTranslation();
+  // The reader's preview cap, the same figure the store's browse list reads
+  // (Settings, reactive). Under a search the cap never hides rows — it is only
+  // the measure of "big": a card holding more skills than it takes the open
+  // card's own full-row, two-column layout (see `RepoCard`).
+  const maxSkills = useRepoCardLimit();
   // The store's answer: matched groups in the worker's relevance order. The
   // component only ever renders under a live search, so the query enables
   // itself.
@@ -293,6 +299,7 @@ export function SearchResults({
                           : undefined
                       }
                       skills={card.items}
+                      maxSkills={maxSkills}
                       hasQuery
                       selected={
                         selected?.section === "installed" ? selected.key : null
@@ -390,6 +397,7 @@ export function SearchResults({
                         skill: hit.skill,
                         matched: hit.matched,
                       }))}
+                      maxSkills={maxSkills}
                       hasQuery
                       selected={
                         selected?.section === "store" ? selected.key : null
@@ -441,6 +449,7 @@ export function SearchResults({
                       key={group.key}
                       repo={group.title}
                       skills={group.skills.map((skill) => ({ skill }))}
+                      maxSkills={maxSkills}
                       // A search's rows are matches: uncapped, like the
                       // indexed cards under the same query — the card is the
                       // whole live answer, not a summary of one.

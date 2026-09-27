@@ -20,6 +20,10 @@ import {
 } from "../../lib/skill-detail-api";
 import { searchSkillsSh } from "../../lib/skills-sh";
 import {
+  DEFAULT_REPO_CARD_LIMIT,
+  setRepoCardLimit,
+} from "../../lib/repo-card-preview";
+import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
   SKILL_ROW_LIST_CLASS,
@@ -243,6 +247,10 @@ beforeEach(() => {
   // null and the English body leads.
   vi.mocked(fetchSkillZhDetail).mockReset();
   vi.mocked(fetchSkillZhDetail).mockResolvedValue(null);
+  // The preview cap is the reader's own setting; a test that changes it puts
+  // it back, so no other test inherits the change (act() because the reset
+  // notifies live readers — see the settings-popover suite's note).
+  act(() => setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT));
   mockFetchSkillDetail.mockImplementation(
     async (_repo: string, id: string) => ({
       description: `Description of ${id}.`,
@@ -1110,6 +1118,50 @@ describe("ExplorePage", () => {
     // A search's rows are matches, uncapped — every one of them is already on
     // screen, so the bar carries no figure.
     expect(within(fresh as HTMLElement).queryByText(/个 skill/)).toBeNull();
+    // Uncapped is not narrow: seven rows outrun the preview cap, so the card
+    // takes the open card's own footprint on its own — full grid row, body in
+    // two balanced columns — exactly the layout the store's expansion gives.
+    const item = (fresh as HTMLElement).closest("li")!;
+    expect(item).toHaveClass("col-span-full");
+    const body = (fresh as HTMLElement).querySelector(
+      '[data-slot="card-content"] ul',
+    )!;
+    expect(body).toHaveClass("grid-flow-col");
+    expect(body).toHaveStyle({ gridTemplateRows: "repeat(4, auto)" });
+  });
+
+  it("measures a search card's width by the reader's own preview cap", async () => {
+    const user = userEvent.setup();
+    // Four skills in one repository: within the default cap of five, over the
+    // reader's own choice of three — the setting, not a fixed figure, is the
+    // threshold the wide footprint reads.
+    setRepoCardLimit(3);
+    harness.init();
+    harness.pushAll(makeSkills(4, 0));
+    harness.complete();
+    renderExplorePage();
+    await screen.findByText("skill-0");
+
+    await user.type(await searchField(), "skill-");
+
+    const card = await waitFor(() => {
+      const el = document.querySelector(
+        '[data-repo="acme/batch"]',
+      ) as HTMLElement | null;
+      expect(el).not.toBeNull();
+      // The browse card under this cap holds three rows; only the search
+      // answer lists the repository whole, so four rows mean the swap landed.
+      expect(el!.querySelectorAll('button[aria-label^="查看"]')).toHaveLength(
+        4,
+      );
+      return el!;
+    });
+    // Past the cap, the search card takes the open card's own footprint —
+    // full grid row, body in two balanced columns over ceil(4/2) rows.
+    expect(card.closest("li")).toHaveClass("col-span-full");
+    const body = card.querySelector('[data-slot="card-content"] ul')!;
+    expect(body).toHaveClass("grid-flow-col");
+    expect(body).toHaveStyle({ gridTemplateRows: "repeat(2, auto)" });
   });
 
   it("opens a live row on skills.sh instead of the detail panel", async () => {

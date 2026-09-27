@@ -416,17 +416,53 @@ describe("RepoCard", () => {
     expect(bar()).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("offers no expansion while a search is live — the cap already stands down", () => {
-    renderCard({ hasQuery: true });
+  it("takes the store's expanded layout on its own when a search outruns the cap", () => {
+    const { container } = renderCard({ hasQuery: true });
 
-    // A search's rows are matches; hiding one behind a toggle would defeat it.
-    // With nothing held back the bar stays the plain label every
-    // nothing-to-reveal card wears.
+    // Every match is on screen — no toggle, because nothing is held back.
+    expect(rowNames()).toEqual([
+      "pdf",
+      "docx",
+      "pptx",
+      "xlsx",
+      "slides",
+      "canvas",
+      "figma",
+      "notion",
+    ]);
     expect(
       screen.queryByRole("button", {
         name: `展开 ${REPO} 的全部 8 个 skill`,
       }),
     ).toBeNull();
     expect(screen.queryByText(/个 skill/)).toBeNull();
+
+    // But "uncapped" is not "narrow": past the cap the card takes the open
+    // card's own footprint — the whole grid row (two lanes at the default
+    // window) with the body split into two balanced columns, exactly the
+    // layout the store's expansion reveals.
+    const item = container.querySelector("ul > li") as HTMLElement;
+    expect(item).toHaveClass("col-span-full");
+    const card = item.querySelector('[data-slot="card"]') as HTMLElement;
+    expect(card).toHaveClass("shadow-lg");
+    const body = container.querySelector('[data-slot="card-content"] ul')!;
+    expect(body).toHaveClass("grid");
+    expect(body).toHaveClass("grid-flow-col");
+    expect(body).toHaveClass("auto-cols-fr");
+    expect(body).toHaveStyle({ gridTemplateRows: "repeat(4, auto)" });
+  });
+
+  it("keeps the plain lane under a search while the card fits within the cap", () => {
+    const { container } = renderCard({ hasQuery: true, maxSkills: 8 });
+
+    // A search card no bigger than the cap reads like any other card: one
+    // lane, rows stacked, no open-card footprint to carry.
+    expect(rowNames()).toHaveLength(8);
+    const item = container.querySelector("ul > li") as HTMLElement;
+    expect(item).not.toHaveClass("col-span-full");
+    const body = container.querySelector('[data-slot="card-content"] ul')!;
+    expect(body).toHaveClass("flex");
+    expect(body).toHaveClass("flex-col");
+    expect(body).not.toHaveStyle({ gridTemplateRows: "repeat(4, auto)" });
   });
 });

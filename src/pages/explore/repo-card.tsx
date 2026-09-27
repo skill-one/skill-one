@@ -100,9 +100,11 @@ export interface RepoCardRow {
  * row-mates stepping aside — runs as one motion layout transition, so the
  * move reads as motion rather than as a teleport (and is skipped entirely for
  * readers who ask for reduced motion). A second press folds the card back. A
- * card with nothing behind its cap — or one under a live search, whose cap
- * already stands down — keeps the bar as a plain label: a toggle is worth a
- * press only when it would reveal something.
+ * card with nothing behind its cap — or one under a live search, whose every
+ * row is already on screen — keeps the bar as a plain label: a toggle is worth
+ * a press only when it would reveal something. Under a search the wide
+ * footprint is not a toggle's work at all: a card holding more rows than the
+ * cap simply *is* open, and takes the full-row, two-column layout on its own.
  *
  * The bar is the card's only repository-level control, and it deliberately does
  * not carry an "open on GitHub" button or any route out of the list: the card
@@ -153,8 +155,12 @@ export interface RepoCardRow {
  *
  * `hasQuery` is the one thing a search changes: a repository's rows are then
  * *matches*, and hiding a match behind the cap would defeat the search, so the
- * list stops capping itself while a query is live — leaving the cap off is the
- * whole of what the query does here.
+ * list stops capping itself while a query is live — every match is on screen.
+ * But "uncapped" is not "narrow": a big repository would otherwise read as one
+ * tall lane, so under a search the cap keeps a second job — it is the measure
+ * of *big*. A card holding more rows than the cap takes the open card's own
+ * footprint on its own (spanning the full grid row, body in two balanced
+ * columns), with no toggle, because nothing is held back to reveal.
  *
  * The selected row (the skill in the detail panel) is marked in place. A skill
  * past the cap cannot be marked — it has no row to mark — which is a fact about
@@ -234,6 +240,13 @@ export function RepoCard({
   // reveal — both keep the bar as the plain door it was. Expanding is worth a
   // press only when the alternative was walking through the door.
   const canExpand = !hasQuery && skills.length > maxSkills;
+  // The wide footprint, from either source: the reader's own toggle in browse,
+  // or — under a search — the card's own count. The cap stands down there
+  // (every match is on screen), so a card that outruns it takes the open
+  // card's layout on its own: full row, two-column body. Nothing is held
+  // back, so there is nothing to toggle — the bar stays the plain label.
+  const wide =
+    (canExpand && expanded) || (hasQuery && skills.length > maxSkills);
   // The toggle is also a transition. Opening a right-lane card re-plumbs the
   // whole grid — the card jumps to a full row start, every card after it
   // shifts, the open card's box doubles in width — and a hard cut between the
@@ -340,7 +353,7 @@ export function RepoCard({
         // than of one lane. Auto-flow then lays the cards that follow under
         // the open one; a card that was the open one's row-mate moves down
         // with them.
-        expanded && canExpand && "col-span-full",
+        wide && "col-span-full",
         // While transitioning, the card rides above the neighbours it glides
         // over (its own transform already lifts it into a stacking context;
         // this raises it past the ones that merely shift).
@@ -358,7 +371,7 @@ export function RepoCard({
         onLayoutAnimationComplete={() => setCollapsing(false)}
         className={cn(
           "group flex-1 transition-shadow",
-          expanded && "shadow-lg shadow-black/10",
+          wide && "shadow-lg shadow-black/10",
         )}
       >
         {/* The card's one bar, leading the card: what this repository is and
@@ -434,8 +447,9 @@ export function RepoCard({
           {/* A row is the unit of the body, and it is deliberately not a card:
               the repository is the card, and a skill inside it is one line of
               its content. The horizontal bleed lets the hover highlight read as
-              a row band rather than as a box inside the card's padding. Once
-              the card is open, the rows run in two balanced columns — the
+              a row band rather than as a box inside the card's padding. On a
+              wide card — toggled open in browse, or wide by its own count
+              under a search — the rows run in two balanced columns — the
               upper half of the list down the left, the rest down the right, so
               a full-width card does not turn every row into a full-width
               sweep. `grid-flow-col` over `ceil(n/2)` rows is what balances
@@ -449,12 +463,12 @@ export function RepoCard({
           <ul
             className={cn(
               "-mx-1.5",
-              expanded && canExpand
+              wide
                 ? "grid grid-flow-col auto-cols-fr gap-x-8"
                 : "flex flex-col",
             )}
             style={
-              expanded && canExpand
+              wide
                 ? {
                     gridTemplateRows: `repeat(${Math.ceil(shown.length / 2)}, auto)`,
                   }
