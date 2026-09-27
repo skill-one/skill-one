@@ -1,12 +1,12 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { screen, within } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 
 import { renderWithRouter } from "../../test/test-utils";
 import type { AgentStatus } from "../../lib/skills-manager";
 import { resetMockAgentStatus } from "../../lib/mock-local";
 import { fetchAgentStatus } from "../../lib/local-skills";
-import { AgentGraph } from "./agent-graph";
+import { AgentGraph, HOVER_MS } from "./agent-graph";
 
 function agent(overrides: Partial<AgentStatus>): AgentStatus {
   return {
@@ -86,6 +86,81 @@ describe("AgentGraph", () => {
     expect(geminiGroup.querySelectorAll("path")).toHaveLength(1);
   });
 
+  it("flows out of the hub by default and reverses only the hovered ribbon", async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithRouter(<AgentGraph agents={agents} />);
+    const flow = (name: string) =>
+      container
+        .querySelector(`g[data-agent="${name}"]`)
+        ?.getAttribute("data-flow");
+
+    // Every live ribbon carries skills from the hub out to its agent.
+    expect(flow("claude-code")).toBe("out");
+    expect(flow("windsurf")).toBe("out");
+
+    // The pointer on one agent reverses just that ribbon — it installs into the
+    // hub while everyone else keeps receiving.
+    await user.hover(screen.getByRole("button", { name: "Claude Code" }));
+    expect(flow("claude-code")).toBe("in");
+    expect(flow("windsurf")).toBe("out");
+  });
+
+  it("stages the hover pulse: collect, then broadcast, then idle on leave", () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = renderWithRouter(<AgentGraph agents={agents} />);
+      const root = container.querySelector("[data-pulse]")!;
+      const card = screen.getByRole("button", { name: "Claude Code" });
+
+      expect(root).toHaveAttribute("data-pulse", "idle");
+
+      // Hovering one agent opens the collect phase — its shimmer into the hub.
+      fireEvent.mouseEnter(card);
+      expect(root).toHaveAttribute("data-pulse", "collect");
+
+      // Once it lands, the hub broadcasts the skill back out to the rest.
+      act(() => vi.advanceTimersByTime(HOVER_MS + 50));
+      expect(root).toHaveAttribute("data-pulse", "broadcast");
+
+      // ... then it collects again, looping while the pointer stays.
+      act(() => vi.advanceTimersByTime(HOVER_MS + 50));
+      expect(root).toHaveAttribute("data-pulse", "collect");
+
+      // Leaving settles every ribbon back to the plain outward flow.
+      fireEvent.mouseLeave(card);
+      expect(root).toHaveAttribute("data-pulse", "idle");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels every other ribbon's shimmer while one agent collects", () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = renderWithRouter(<AgentGraph agents={agents} />);
+      const paths = (name: string) =>
+        container.querySelectorAll(`g[data-agent="${name}"] path`).length;
+      const card = screen.getByRole("button", { name: "Claude Code" });
+
+      // Idle: glow + core + one shimmer on every live ribbon.
+      expect(paths("claude-code")).toBe(3);
+      expect(paths("windsurf")).toBe(3);
+
+      // Hover one: only its shimmer survives; the rest drop to glow + core,
+      // their shimmer cancelled outright rather than left gliding on.
+      fireEvent.mouseEnter(card);
+      expect(paths("claude-code")).toBe(3);
+      expect(paths("windsurf")).toBe(2);
+
+      // Broadcast: the hovered one goes quiet and the rest take over.
+      act(() => vi.advanceTimersByTime(HOVER_MS + 50));
+      expect(paths("claude-code")).toBe(2);
+      expect(paths("windsurf")).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("renders the brand-mark black hub the ribbons converge on", () => {
     const { getByTestId } = renderWithRouter(<AgentGraph agents={agents} />);
     const hub = getByTestId("agent-hub");
@@ -119,23 +194,47 @@ describe("AgentGraph", () => {
     }
   });
 
-  it("links an unlinked agent from its node popover", async () => {
+  it("echoes the link state on the card's edge, not in words", () => {
+    renderWithRouter(<AgentGraph agents={agents} />);
+    const card = (label: string) =>
+      screen.getByRole("button", { name: label });
+
+    // Unlinked: a dashed edge plus a styling hook.
+    expect(card("Gemini CLI")).toHaveAttribute("data-link-state", "unlinked");
+    expect(card("Gemini CLI").className).toContain("border-dashed");
+    // Content a link would adopt: an amber edge.
+    expect(card("Cursor")).toHaveAttribute("data-link-state", "warning");
+    expect(card("Cursor").className).toContain("border-amber-500/40");
+    // Linked: the plain edge, never dashed.
+    expect(card("Claude Code")).toHaveAttribute("data-link-state", "linked");
+    expect(card("Claude Code").className).not.toContain("border-dashed");
+  });
+
+  it("dims an unlinked agent's card so it reads as switched off", () => {
+    renderWithRouter(<AgentGraph agents={agents} />);
+    const face = (label: string) =>
+      screen
+        .getByRole("button", { name: label })
+        .querySelector('[data-slot="avatar"]')!;
+
+    // Unlinked: a greyed face and a dimmed name.
+    expect(face("Gemini CLI").className).toContain("grayscale");
+    expect(screen.getByText("Gemini CLI").className).toContain(
+      "text-muted-foreground",
+    );
+    // Linked: the face keeps its colour and the name stays plain.
+    expect(face("Claude Code").className).not.toContain("grayscale");
+    expect(screen.getByText("Claude Code").className).not.toContain(
+      "text-muted-foreground",
+    );
+  });
+
+  it("links an unlinked agent by clicking its card", async () => {
     const user = userEvent.setup();
     renderWithRouter(<AgentGraph agents={agents} />);
 
-    // The card is the popover trigger; the agent name is its accessible name.
+    // The card itself is the toggle; the agent name is its accessible name.
     await user.click(screen.getByRole("button", { name: "Gemini CLI" }));
-
-    const popover = await screen.findByRole("dialog");
-    expect(
-      within(popover).getByText("连接到 Skill One"),
-    ).toBeInTheDocument();
-    const switchEl = within(popover).getByRole("switch", {
-      name: "Gemini CLI 链接开关",
-    });
-    expect(switchEl).toHaveAttribute("aria-checked", "false");
-
-    await user.click(switchEl);
 
     // The toggle writes through to the backend (the browser mock here): the
     // agent is linked at the source, which is what the page's query would
@@ -144,19 +243,19 @@ describe("AgentGraph", () => {
     expect(status.find((a) => a.name === "gemini-cli")?.linked).toBe(true);
   });
 
-  it("pins the canonical agent's switch in its node popover", async () => {
+  it("leaves the canonical agent's card inert", async () => {
     const user = userEvent.setup();
     renderWithRouter(<AgentGraph agents={agents} />);
 
-    await user.click(screen.getByRole("button", { name: "Windsurf" }));
-    const popover = await screen.findByRole("dialog");
-    const switchEl = within(popover).getByRole("switch", {
-      name: "Windsurf 链接开关",
-    });
-    expect(switchEl).toHaveAttribute("aria-disabled", "true");
-    expect(switchEl).toHaveAttribute("aria-checked", "true");
-    expect(
-      within(popover).getByText(/原生 skills 目录/),
-    ).toBeInTheDocument();
+    // A canonical agent uses its native skills directory, so its card cannot be
+    // switched off: the button is disabled and reads as pressed.
+    const card = screen.getByRole("button", { name: "Windsurf" });
+    expect(card).toBeDisabled();
+    expect(card).toHaveAttribute("aria-pressed", "true");
+
+    // Clicking it writes nothing through.
+    await user.click(card);
+    const status = await fetchAgentStatus();
+    expect(status.find((a) => a.name === "windsurf")?.linked).toBe(false);
   });
 });

@@ -22,7 +22,7 @@ beforeEach(() => {
 describe("AgentsPage edge states", () => {
   it("shows the empty state when no agent is detected", async () => {
     fetchMock.mockResolvedValue([]);
-    renderWithRouter(<AgentsPage />, { route: "/my-skills/agents" });
+    renderWithRouter(<AgentsPage />, { route: "/" });
     expect(
       await screen.findByText("未检测到可用的 agent"),
     ).toBeInTheDocument();
@@ -30,7 +30,7 @@ describe("AgentsPage edge states", () => {
 
   it("shows why the agent list could not be loaded", async () => {
     fetchMock.mockRejectedValue(new Error("boom"));
-    renderWithRouter(<AgentsPage />, { route: "/my-skills/agents" });
+    renderWithRouter(<AgentsPage />, { route: "/" });
     expect(await screen.findByText(/加载失败/)).toBeInTheDocument();
   });
 });

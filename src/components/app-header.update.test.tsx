@@ -75,8 +75,8 @@ describe("header update chip", () => {
     expect(chip.parentElement).toBe(
       screen.getByRole("button", { name: "设置" }).parentElement,
     );
-    // 商店 · 我的 — and nothing else.
-    expect(screen.getAllByRole("link")).toHaveLength(2);
+    // The brand and the three destinations — and nothing else.
+    expect(screen.getAllByRole("link")).toHaveLength(4);
   });
 
   it("opens the confirmation dialog from wherever the user is", async () => {

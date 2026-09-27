@@ -12,12 +12,11 @@ import { formatLinkMessage } from "../lib/link-notice";
 import { toast } from "../components/ui/toast";
 
 /**
- * The one link/unlink action every agent surface uses (the agents graph's
- * node popover and the link settings dialog). The switch is the user's intent:
- * the exclusion is recorded before the disk action, so the auto-link pass
- * honors an opt-out even if the action fails. Every outcome invalidates the
- * agent status and installed skills, and lands as the same toast the dialog
- * has always reported.
+ * The one link/unlink action the agent surfaces use (the agents graph's node
+ * cards). The click is the user's intent: the exclusion is recorded before the
+ * disk action, so the auto-link pass honors an opt-out even if the action
+ * fails. Every outcome invalidates the agent status and installed skills, and
+ * lands as a toast.
  */
 export function useAgentLinkToggle() {
   const queryClient = useQueryClient();

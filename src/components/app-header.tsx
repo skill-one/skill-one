@@ -1,4 +1,4 @@
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "../lib/utils";
@@ -65,10 +65,10 @@ export function headerRoute(pathname: string): HeaderRoute {
  * itself does in a unified toolbar.
  *
  * The row is also the window's drag region, and it claims the whole subtree:
- * `"deep"` covers every descendant, so the brand and the empty stretches all
- * move the window. Tauri walks up from whatever was clicked, and a clickable
- * element without the attribute — a button, a link, the search field — stops
- * the walk there, so nothing inside loses its own click.
+ * `"deep"` covers every descendant, so its empty stretches move the window.
+ * Tauri walks up from whatever was clicked, and a clickable element without the
+ * attribute — the brand, a button, a link, the search field — stops the walk
+ * there, so nothing inside loses its own click.
  */
 export function AppHeader() {
   const { pathname } = useLocation();
@@ -97,10 +97,16 @@ export function AppHeader() {
   );
 }
 
-/** The brand mark: the logo and the word, at rest — not a link to anywhere. */
+/**
+ * The brand mark: the logo and the word, and the window's way home — the agents
+ * graph at `/` (see the app's routes), which is what the mark stands for.
+ */
 function Brand() {
   return (
-    <div className="flex shrink-0 items-center gap-2">
+    <Link
+      to="/"
+      className="flex shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
       <img
         src="/skill-one-transparent.png"
         alt=""
@@ -109,7 +115,7 @@ function Brand() {
       <span className="text-[13px] font-semibold text-foreground">
         Skill One
       </span>
-    </div>
+    </Link>
   );
 }
 

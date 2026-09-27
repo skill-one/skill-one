@@ -29,6 +29,7 @@
   },
   "nav": {
     "mainAria": "Main navigation",
+    "home": "Home",
     "store": "Store",
     "my": "My"
   },
@@ -135,26 +136,10 @@
   "agents": {
     "title": "Agents",
     "connected": "{{linked}} of {{total}} agents connected",
-    "attention": "{{count}} need attention",
-    "openAria": "Open the agents page",
-    "cardTitle": "Agent connections",
-    "cardSummary": "{{linked}} of {{total}} connected",
-    "cardAttention": "{{count}} need attention",
-    "nodeSkills": "{{count}} skills",
-    "nodeFiles": "{{count}} files",
-    "connect": "Connect to SkillOne",
-    "nodeHint": "A linked agent shares SkillOne's unified skills directory. Unlinking does not move adopted skills back.",
-    "nativeHint": "This agent uses its native skills directory, so it stays connected."
+    "attention": "{{count}} need attention"
   },
   "agentLink": {
-    "dialogTitle": "Agent link settings",
-    "dialogDescription": "Detected agents are linked to the unified skills directory automatically, with no manual action needed. When an agent is linked, its own content is adopted into the unified directory and other files are quarantined to .misc; unlinking does not move them back. Here you can unlink individual agents, and they will not be linked automatically again.",
-    "noAgents": "No available agents detected",
-    "triggerAria": "Manage agent links ({{count}} total)",
-    "menuHeader": "Agents · {{count}} total",
-    "skillsPending": "{{count}} skills pending adoption",
-    "filesPending": "{{count}} files pending quarantine",
-    "toggleAria": "{{name}} link switch"
+    "noAgents": "No available agents detected"
   },
   "migration": {
     "migrated": "Source linked: {{repo}}",

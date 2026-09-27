@@ -95,10 +95,11 @@ export default function App() {
             <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
               <Suspense fallback={null}>
                 <Routes>
-                  <Route
-                    path="/"
-                    element={<Navigate to="/my-skills" replace />}
-                  />
+                  {/* The home is the agents graph: every detected agent drawn
+                      into the SkillOne hub — the app's core job made visible,
+                      which is what its mark stands for and where the brand in
+                      the header leads. */}
+                  <Route path="/" element={<AgentsPage />} />
                   <Route path="/explore" element={<ExplorePage />} />
                   {/* One repository, every skill it publishes. The splat is
                     `owner/repo` itself, which carries a slash. */}
@@ -119,17 +120,7 @@ export default function App() {
                     path="/my-skills/local"
                     element={<LocalSkillsPage />}
                   />
-                  {/* The agents graph: every detected agent drawn into the
-                    SkillOne hub. Hangs off the installed list, reached through
-                    its entry card, so the 我的 segment stays lit here. */}
-                  <Route
-                    path="/my-skills/agents"
-                    element={<AgentsPage />}
-                  />
-                  <Route
-                    path="*"
-                    element={<Navigate to="/my-skills" replace />}
-                  />
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
             </main>
