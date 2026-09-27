@@ -1,12 +1,12 @@
 // Menu bar tray + popover window management.
 //
 // The tray icon lives in the macOS menu bar: left click toggles a small
-// frameless popover window (declared in `tauri.conf.json`, created hidden at
-// startup) anchored below the icon; right click opens a native menu with
-// open/quit. The popover dismisses itself on focus loss (with a short grace
-// window so the toggle click's own blur cannot race the show) and the main
-// window hides on close instead of quitting — the tray menu's quit item is
-// the only exit.
+// frameless popover window anchored below the icon; right click opens a
+// native menu with open/quit. The popover is built lazily on the first click
+// (`ensure_popover`) so app startup does not pay for a second webview; it
+// dismisses itself on focus loss (with a short grace window so the toggle
+// click's own blur cannot race the show) and the main window hides on close
+// instead of quitting — the tray menu's quit item is the only exit.
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -15,8 +15,8 @@ use tauri::{
     image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Rect, Runtime, Size, Window,
-    WindowEvent,
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Rect, Runtime, Size, WebviewUrl,
+    WebviewWindow, Window, WindowEvent,
 };
 
 pub const MAIN_WINDOW_LABEL: &str = "main";
@@ -32,8 +32,9 @@ pub const NAVIGATE_EVENT: &str = "popover-navigate";
 const BLUR_GRACE: Duration = Duration::from_millis(250);
 /// Gap between the menu bar and the popover's top edge.
 const POPOVER_GAP: f64 = 6.0;
-/// Popover logical size, mirroring `tauri.conf.json` (`width`/`height`).
-/// Only used as a fallback when reading the real window size fails.
+/// Popover logical size. Single source of truth: the window is built with it
+/// (`ensure_popover`) and it doubles as the fallback when reading the real
+/// window size fails.
 const POPOVER_LOGICAL_SIZE: (f64, f64) = (320.0, 400.0);
 
 /// Timestamp of the last popover show, shared so the blur handler can apply
@@ -139,10 +140,42 @@ pub fn handle_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) 
     }
 }
 
+/// Get the popover window, building it on first use. Everything it does at
+/// startup in the declarative config (second webview, JS bundle parse, React
+/// tree) is deferred to the first tray click; the one-off build cost lands on
+/// that click instead of app launch. Tray click handlers run on the main
+/// thread, which is where the webview must be created.
+fn ensure_popover<R: Runtime>(app: &AppHandle<R>) -> Option<WebviewWindow<R>> {
+    if let Some(popover) = app.get_webview_window(POPOVER_WINDOW_LABEL) {
+        return Some(popover);
+    }
+    let (width, height) = POPOVER_LOGICAL_SIZE;
+    let popover = tauri::WebviewWindowBuilder::new(
+        app,
+        POPOVER_WINDOW_LABEL,
+        WebviewUrl::App("popover.html".into()),
+    )
+    .title("Skill One")
+    .inner_size(width, height)
+    .visible(false)
+    .focused(false)
+    .decorations(false)
+    .transparent(true)
+    .shadow(true)
+    .resizable(false)
+    .skip_taskbar(true)
+    .always_on_top(true)
+    .build()
+    .ok()?;
+    #[cfg(target_os = "macos")]
+    apply_popover_material(app, &popover);
+    Some(popover)
+}
+
 /// Show the popover anchored below the tray icon, or hide it when already
 /// visible (toggle).
 fn toggle_popover<R: Runtime>(app: &AppHandle<R>, rect: &Rect, cursor: PhysicalPosition<f64>) {
-    let Some(popover) = app.get_webview_window(POPOVER_WINDOW_LABEL) else {
+    let Some(popover) = ensure_popover(app) else {
         return;
     };
     if popover.is_visible().unwrap_or(false) {
