@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useLocation } from "react-router";
 
 import { AppHeader, headerRoute } from "./app-header";
 import { TooltipProvider } from "./ui/tooltip";
@@ -26,11 +27,23 @@ beforeEach(() => {
   resetListView();
 });
 
-/** The header as the app mounts it, under the route the shell resolves. */
+/**
+ * The header as the app mounts it, under the route the shell resolves, plus a
+ * probe that records where the router ended up — navigation is part of what
+ * the header does now.
+ */
+let currentPath: string;
+
+function LocationProbe() {
+  currentPath = useLocation().pathname;
+  return null;
+}
+
 function renderHeader(route = "/") {
   return renderWithRouter(
     <TooltipProvider>
       <AppHeader />
+      <LocationProbe />
     </TooltipProvider>,
     { route },
   );
@@ -87,17 +100,53 @@ describe("AppHeader", () => {
     expect(screen.queryByRole("button", { name: "按技能" })).toBeNull();
   });
 
-  it("keeps the navigation and settings on a page inside a list", () => {
+  it("keeps the navigation, search and settings on a page inside a list", async () => {
+    const user = userEvent.setup();
     renderHeader("/repo/acme/tools");
 
     // The way out of a drill-down is that page's own head, not the window's
     // chrome (see `DrillDownHead`); the destinations stay, so the reader can
-    // see which list the page belongs to and leave for the other one.
+    // see which list the page belongs to and leave for the other one. The
+    // search field stays too: typing here is a search of the store.
     expect(screen.getByText("Skill One")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "商店" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "返回" })).toBeNull();
-    expect(screen.queryByLabelText("搜索 Skill")).toBeNull();
+    expect(screen.getByLabelText("搜索 Skill")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+    // And it lands in the store's list, the same place a search from any
+    // other non-list page lands.
+    expect(currentPath).toBe("/explore");
+  });
+
+  it("carries the reader into the store's list from the home, on the first keystroke", async () => {
+    const user = userEvent.setup();
+    renderHeader("/");
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "p");
+
+    expect(currentPath).toBe("/explore");
+    expect(getListView().query).toBe("p");
+  });
+
+  it("does not navigate the store's list onto itself", async () => {
+    const user = userEvent.setup();
+    renderHeader("/explore");
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+    expect(currentPath).toBe("/explore");
+  });
+
+  it("filters the installed list in place instead of leaving it", async () => {
+    const user = userEvent.setup();
+    renderHeader("/my-skills");
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+    expect(currentPath).toBe("/my-skills");
   });
 
   it("shows what the other list was searched for: one field, both lists", async () => {
@@ -128,6 +177,15 @@ describe("AppHeader", () => {
     expect(screen.getByLabelText("搜索 Skill")).toBeEnabled();
   });
 
+  it("holds the same lock on the home, whose searches land in the store", () => {
+    registrySnapshot.ready = false;
+    renderHeader("/");
+
+    // The first keystroke navigates into the store's list, so the home's
+    // field is the store's field and waits for the index like it does.
+    expect(screen.getByLabelText("搜索 Skill")).toBeDisabled();
+  });
+
   it("hands the raw field value to the store, leaving the debounce to the list", async () => {
     const user = userEvent.setup();
     renderHeader("/my-skills");
@@ -146,14 +204,15 @@ describe("AppHeader", () => {
 });
 
 describe("headerRoute", () => {
-  it("maps each route to what the header holds", () => {
+  it("maps each route to the list its field answers to", () => {
     expect(headerRoute("/explore")).toEqual({ destination: "store" });
     expect(headerRoute("/my-skills")).toEqual({ destination: "installed" });
-    // The home is the agents graph: a picture, not a list, so no search field.
-    expect(headerRoute("/")).toEqual({});
+    // The home is the agents graph: a picture, not a list — but the field is
+    // on every route now, and a search started there lands in the store.
+    expect(headerRoute("/")).toEqual({ destination: "store" });
   });
 
-  it("leaves the row without a search field for a route it does not know", () => {
-    expect(headerRoute("/somewhere-else")).toEqual({});
+  it("answers an unknown route with the store, where every search ends", () => {
+    expect(headerRoute("/somewhere-else")).toEqual({ destination: "store" });
   });
 });

@@ -18,9 +18,9 @@ const isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform);
  * to a list of eight thousand. The magnifier is decorative and never the click
  * target — the field under it is.
  *
- * Cmd/Ctrl+K calls the field from anywhere on the list pages. The listener
- * lives with the field, so the shortcut exists exactly where the field does:
- * on a detail page there is nothing to summon, and the keystroke falls through.
+ * Cmd/Ctrl+K calls the field from anywhere: the field is on every route, so
+ * the shortcut is too. The listener lives with the field, so the shortcut
+ * exists exactly where the field does.
  */
 export function SearchInput({
   value,

@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "../lib/utils";
@@ -12,26 +12,26 @@ import { setQuery, type Destination } from "../lib/list-view";
 
 /** What a route puts in the header. */
 export interface HeaderRoute {
-  /** The list this route shows, when it shows one. */
-  destination?: Destination;
+  /** The list the route's search field answers to. */
+  destination: Destination;
 }
 
 /**
- * The one decision the header makes: which route is on screen, and what its row
- * therefore holds.
+ * The one decision the header makes: which list the search field answers to on
+ * this route.
  *
- * A route either shows a list — and then the row carries that list's search
- * field — or it is a page inside one, and then the field stands down: those
- * pages carry their own head, way back and all (see `DrillDownHead`). The
- * header is the window's chrome, so it holds what both lists answer to and
- * nothing a single page has an opinion about.
+ * The field is on every route now: the two list pages search their own list,
+ * and everywhere else — the home and the pages inside a list (see
+ * `DrillDownHead`) — it answers to the store, because typing there lands the
+ * reader in the store's list, where the results live (the header navigates on
+ * the first keystroke; see `AppHeader`). One question, one answer, wherever it
+ * is asked from.
  *
  * Pure, so the mapping can be read off directly in a test.
  */
 export function headerRoute(pathname: string): HeaderRoute {
-  if (pathname === "/explore") return { destination: "store" };
   if (pathname === "/my-skills") return { destination: "installed" };
-  return {};
+  return { destination: "store" };
 }
 
 /**
@@ -41,10 +41,11 @@ export function headerRoute(pathname: string): HeaderRoute {
  *
  * One row and no more. It opens with the brand and the segmented navigation
  * (see `AppNav`) — the mark names the window, the control says which of its
- * two lists is on screen — and it closes with the actions. The search field
- * answers to whichever list is mounted, which is why it stands down on a page
- * inside one rather than searching a list the reader is not looking at;
- * settings stay, because they are the window's and answer on every route.
+ * two lists is on screen — and it closes with the actions. The search field is
+ * on every route: on the installed list's own page it filters that list, and
+ * anywhere else the first keystroke carries the reader into the store's list,
+ * so a search started anywhere ends in the same place with the same answer.
+ * Settings stay, because they are the window's and answer on every route.
  * Everything else a page needs belongs to that page, including the way out of
  * a drill-down, which is drawn by the page it leaves (see `DrillDownHead`).
  * The leading edge is kept clear of the lights by the padding (`pl-24`: the
@@ -72,6 +73,7 @@ export function headerRoute(pathname: string): HeaderRoute {
  */
 export function AppHeader() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const route = headerRoute(pathname);
 
   // `h-header` (3rem) is half of the alignment above: the window config's
@@ -88,9 +90,19 @@ export function AppHeader() {
       <Brand />
       <AppNav />
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        {route.destination != null && (
-          <HeaderSearch destination={route.destination} />
-        )}
+        <HeaderSearch
+          destination={route.destination}
+          onQuery={(query) => {
+            setQuery(query);
+            // Typing on any page but the installed list's own is a search of
+            // the store: carry the reader into the store's list, where the
+            // results live. The header sits outside the routed subtree, so
+            // this never remounts the field mid-word.
+            if (route.destination === "store" && pathname !== "/explore") {
+              navigate("/explore");
+            }
+          }}
+        />
         <SettingsMenu />
       </div>
     </header>
@@ -122,13 +134,22 @@ function Brand() {
 /**
  * The list's search field, bound to the shared view (see `lib/list-view`): one
  * field to type in, one query to answer, wherever the reader happens to be.
+ * Where each keystroke lands — this list, or the store's — is the header's
+ * call (see `AppHeader`).
  *
  * The field stays enabled on the installed list and is locked on the store's
  * until the index over the registry exists: the installed list is already in
  * memory, while a query over a partially downloaded registry would answer
- * wrongly.
+ * wrongly. Routes that search the store (the home, a drill-down) hold the same
+ * lock, because the first keystroke lands there.
  */
-function HeaderSearch({ destination }: { destination: Destination }) {
+function HeaderSearch({
+  destination,
+  onQuery,
+}: {
+  destination: Destination;
+  onQuery: (value: string) => void;
+}) {
   const { t } = useTranslation();
   const query = useListQuery();
 
@@ -139,7 +160,7 @@ function HeaderSearch({ destination }: { destination: Destination }) {
   return (
     <SearchInput
       value={query}
-      onChange={setQuery}
+      onChange={onQuery}
       label={t("common.searchSkills")}
       disabled={waiting}
       placeholder={waiting ? t("common.indexBuilding") : undefined}
