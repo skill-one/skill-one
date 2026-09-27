@@ -219,17 +219,18 @@ export async function unlinkAgents(agents: string[]): Promise<LinkResult> {
 }
 
 /**
- * Read the raw provenance ledger (`.skill-one.json` inside the global skills
- * directory). Returns `null` when the file does not exist yet; parsing is the
- * frontend's job (see `lib/provenance.ts`), which also owns the tolerance
- * policy for corrupt or outdated content.
+ * Read the raw provenance ledger (`.skill-one.jsonl` inside the global skills
+ * directory; the legacy JSON document is returned while it still exists).
+ * Returns `null` when neither file exists yet; parsing is the frontend's job
+ * (see `lib/provenance.ts`), which also owns the tolerance policy for corrupt
+ * or outdated content.
  */
 export async function readProvenanceRaw(): Promise<string | null> {
   requireTauri();
   return invoke<string | null>("read_provenance");
 }
 
-/** Replace the provenance ledger file with the given JSON content. */
+/** Replace the provenance ledger file with the given JSONL content. */
 export async function writeProvenanceRaw(content: string): Promise<void> {
   requireTauri();
   await invoke("write_provenance", { content });
