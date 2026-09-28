@@ -1,17 +1,19 @@
 import type { AgentStatus } from "../../lib/skills-manager";
 
 /**
- * The geometry of the agents page's hub-and-spoke graph — a pure mapping from
- * the agent list and the canvas size to node cards, the SkillOne hub and the
+ * The geometry of the agents page's constellation — a pure mapping from the
+ * agent list and the canvas size to icon nodes, the SkillOne hub and the
  * ribbon paths that join them. One set of coordinates drives both the
- * absolutely-positioned HTML cards and the SVG ribbons behind them, so the two
- * can never disagree, and the layout stays deterministic and unit testable
- * without a DOM.
+ * absolutely-positioned HTML nodes and the SVG ribbons behind them, so the
+ * two can never disagree, and the layout stays deterministic and unit
+ * testable without a DOM.
  *
- * The hub sits at the centre; agents are split into balanced columns on its
- * left and right, so a long roster grows sideways instead of off the bottom of
- * one tall column. Columns pack from the outer edge inward and every ribbon
- * crosses the clear central lane to reach the hub.
+ * Nodes are placed by Vogel's phyllotaxis — the sunflower formula: each
+ * agent steps the golden angle (~137.5°) around the hub while drifting out
+ * with √index. The result looks casually scattered to every side of the hub
+ * while staying evenly spaced and never overlapping; the same agent always
+ * lands in the same place. A long roster shrinks the tile size before it
+ * grows the canvas, so the constellation keeps fitting one screen.
  */
 
 export interface Point {
@@ -19,26 +21,28 @@ export interface Point {
   y: number;
 }
 
-/** Which side of the hub a card column stands on. */
-export type GraphSide = "left" | "right";
+/** Where the node's name tooltip opens, in screen-side terms. */
+export type NodeTipSide = "left" | "right" | "top" | "bottom";
 
 export interface NodeLayout {
   /** Agent id (`AgentStatus.name`). */
   name: string;
-  /** The hub side the card belongs to. */
-  side: GraphSide;
-  /** Card box, in canvas coordinates. */
+  /** Square tile box, in canvas coordinates. */
   x: number;
   y: number;
   width: number;
   height: number;
-  /** Center of the card's hub-facing edge — where its ribbon leaves. */
+  /** Point on the tile edge the ribbon leaves from, facing the hub. */
   anchor: Point;
+  /** The side its name tooltip opens toward — always away from the hub. */
+  tipSide: NodeTipSide;
+  /** This node's polar angle around the hub (radians, 0 = east). */
+  angle: number;
 }
 
 export interface RibbonLayout {
   name: string;
-  /** SVG path from the node's anchor to the hub's tip on its side. */
+  /** SVG path from the node's anchor to the hub's rim. */
   d: string;
 }
 
@@ -50,40 +54,45 @@ export interface GraphLayout {
   hub: { x: number; y: number; radius: number };
 }
 
-/** Card column geometry. */
-export const NODE_WIDTH = 200;
-export const NODE_HEIGHT = 40;
-export const NODE_GAP = 12;
-/** Vertical pitch of a card column — one card plus the gap below it. */
-export const NODE_PITCH = NODE_HEIGHT + NODE_GAP;
-/** Horizontal gap between the columns of one side. */
-export const COLUMN_GAP = NODE_GAP;
+/** Tile size bounds: the constellation shrinks toward the floor to fit. */
+export const NODE_SIZE_MAX = 48;
+export const NODE_SIZE_MIN = 30;
+/** Gap between neighbouring tiles at the largest size; scales down slightly. */
+export const NODE_GAP_MAX = 6;
+export const NODE_GAP_MIN = 4;
 
-/** Outer margin of the canvas. */
-export const GRAPH_PAD_X = 8;
-export const GRAPH_PAD_TOP = 28;
-export const GRAPH_PAD_BOTTOM = 28;
-
-/** Hub geometry: the circle every ribbon converges on. */
-export const HUB_RADIUS = 46;
+/** Hub geometry: the disk every ribbon converges on. */
+export const HUB_RADIUS = 48;
 export const HUB_TIP_GAP = 10;
 /**
- * The narrowest central lane kept clear of cards for the hub. Columns pack
- * outward from the canvas edges, so a wider canvas only ever widens this gap.
+ * The shortest ribbon, between the hub rim and the innermost tile. Kept long
+ * enough to read as a spoke, not a stub — the first node sits a full tile's
+ * breath away from the disk.
  */
-export const HUB_LANE_MIN = HUB_RADIUS + HUB_TIP_GAP + 24;
+export const RIBBON_MIN = 34;
+/** Clearance kept between the outermost tile and the canvas edge. */
+export const OUTER_PAD = 14;
 
 /** Canvas size used until the first real measurement lands. */
 export const DEFAULT_GRAPH_WIDTH = 720;
 export const DEFAULT_GRAPH_HEIGHT = 520;
 
 /**
- * The narrowest the canvas renders at: below it a single column per side would
- * collide with the hub lane, so the canvas keeps this width and lets the page
- * scroll sideways instead.
+ * The golden angle — π(3−√5) ≈ 137.508°. Each node rotates by it around the
+ * hub, which is what makes consecutive nodes land in fresh directions while
+ * the packing as a whole stays even.
  */
-export const MIN_GRAPH_WIDTH =
-  2 * (HUB_LANE_MIN + NODE_WIDTH) + 2 * GRAPH_PAD_X;
+export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+/**
+ * Phyllotaxis density: with `r = r0 + k·spacing·√index` a square tile needs
+ * k ≈ 0.62 for axis-aligned neighbours never to overlap (verified across up
+ * to 35 nodes).
+ */
+const DENSITY_K = 0.62;
+/** Where the spiral starts — one tile above the hub (angle 0 points east). */
+const ANGLE_OFFSET = -Math.PI / 2;
+/** Canvas room an outward name tooltip needs before it is diverted up/down. */
+const TIP_SIDE_REQUIRE = 96;
 
 /**
  * The five ribbon hues of the Skill One mark, in its top-to-bottom order.
@@ -117,134 +126,140 @@ export function ribbonColor(name: string): string {
 }
 
 /**
- * One ribbon: a cubic bezier between two points with horizontal tangents — the
- * same S-curve family the brand mark's ribbons use. The control-point pull is
- * clamped so very short ribbons still read as curves rather than kinks, and its
- * sign follows the run's direction so a right-hand card's ribbon curves into
- * the hub the way its mirror on the left does.
+ * One ribbon: a cubic that bows tangentially as it approaches the hub, every
+ * ribbon curling the same handedness — a quiet galaxy swirl rather than a
+ * fan of straight spokes. Control points run along the chord with a fixed
+ * perpendicular bow, so the curve stays gentle on short spokes and never
+ * kinks.
  */
 export function ribbonPath(from: Point, to: Point): string {
   const dx = to.x - from.x;
-  const pull = Math.max(48, Math.abs(dx) * 0.52) * (dx >= 0 ? 1 : -1);
-  return `M ${from.x} ${from.y} C ${from.x + pull} ${from.y}, ${to.x - pull} ${to.y}, ${to.x} ${to.y}`;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  // 90° counterclockwise normal: one shared handedness for every spoke.
+  const nx = -uy;
+  const ny = ux;
+  const pull = Math.min(Math.max(len * 0.42, 14), 64);
+  const bow = pull * 0.42;
+  const c1x = from.x + ux * pull + nx * bow;
+  const c1y = from.y + uy * pull + ny * bow;
+  const c2x = to.x - ux * pull + nx * bow;
+  const c2y = to.y - uy * pull + ny * bow;
+  return `M ${from.x} ${from.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${to.x} ${to.y}`;
+}
+
+/** The gap that pairs with a tile size (slightly tighter as tiles shrink). */
+function gapFor(size: number): number {
+  if (size <= NODE_SIZE_MIN) return NODE_GAP_MIN;
+  const t = (size - NODE_SIZE_MIN) / (NODE_SIZE_MAX - NODE_SIZE_MIN);
+  return NODE_GAP_MIN + t * (NODE_GAP_MAX - NODE_GAP_MIN);
+}
+
+/** Radius of the outermost tile's centre for a given roster and tile size. */
+function outerRadius(agentCount: number, size: number): number {
+  const spacing = size + gapFor(size);
+  const r0 = HUB_RADIUS + HUB_TIP_GAP + size / 2 + RIBBON_MIN;
+  const last = agentCount > 0 ? Math.sqrt(agentCount - 1) : 0;
+  return r0 + DENSITY_K * spacing * last;
 }
 
 /**
- * The canvas width for a measured container: the measured width itself once it
- * is wide enough to keep the hub clear of the cards, the minimum canvas width
- * below that (the page scrolls the overflow), and the default before any
- * measurement exists.
+ * The largest tile size that keeps the whole constellation inside
+ * `availableRadius`; the floor, when even it cannot fit, lets the canvas grow.
+ */
+function resolveTileSize(agentCount: number, availableRadius: number): number {
+  for (let size = NODE_SIZE_MAX; size >= NODE_SIZE_MIN; size -= 1) {
+    if (outerRadius(agentCount, size) + size / 2 <= availableRadius) {
+      return size;
+    }
+  }
+  return NODE_SIZE_MIN;
+}
+
+/**
+ * The canvas width for a measured container: the measured width once it
+ * exists (the constellation is circular and fits the smaller dimension), the
+ * default before any measurement.
  */
 export function resolveGraphWidth(measuredWidth: number): number {
-  if (measuredWidth <= 0) return DEFAULT_GRAPH_WIDTH;
-  return Math.max(measuredWidth, MIN_GRAPH_WIDTH);
+  return measuredWidth > 0 ? measuredWidth : DEFAULT_GRAPH_WIDTH;
 }
 
-/** The height of a column holding `count` cards, before the top/bottom pad. */
-function columnHeight(count: number): number {
-  return count > 0 ? count * NODE_HEIGHT + (count - 1) * NODE_GAP : 0;
-}
-
-/**
- * How many cards one column can hold without the canvas overflowing `height`:
- * the pad and the half-pitch stagger between the two sides are subtracted
- * first, then as many whole pitches as fit.
- */
-function rowsThatFit(height: number): number {
-  const usable = height - GRAPH_PAD_TOP - GRAPH_PAD_BOTTOM - NODE_PITCH / 2;
-  return Math.max(1, Math.floor((usable + NODE_GAP) / NODE_PITCH));
-}
-
-/** How many card columns fit on each side of the hub for a canvas `width`. */
-function columnsPerSide(width: number): number {
-  const half = width / 2 - GRAPH_PAD_X - HUB_LANE_MIN + COLUMN_GAP;
-  return Math.max(1, Math.floor(half / (NODE_WIDTH + COLUMN_GAP)));
+/** Where one node's tooltip opens: outward while the canvas edge holds it. */
+function resolveTipSide(angle: number, cx: number, width: number): NodeTipSide {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const outwardX = cos >= 0 ? width - cx : cx;
+  if (Math.abs(cos) >= Math.abs(sin)) {
+    // Facing horizontally: keep it outward when there is room, otherwise flip
+    // it vertically so it never folds back over the ribbon.
+    if (outwardX >= TIP_SIDE_REQUIRE) return cos >= 0 ? "right" : "left";
+  }
+  return sin >= 0 ? "bottom" : "top";
 }
 
 /**
- * Lay every agent out around the SkillOne hub: the hub sits at the canvas
- * centre, agents fill balanced columns on its left and right (packing from the
- * outer edge inward, the two sides offset by half a pitch), and each ribbon
- * runs from the card's hub-facing edge into the hub's tip on its own side.
- *
- * The column count is driven by the measured height — enough columns are opened
- * to keep every column within it, capped by how many the width can hold — so a
- * long roster stays on one screen instead of growing a single column past the
- * bottom. The canvas keeps the measured height when the cards fit and only
- * grows (letting the page scroll) when they cannot.
+ * Lay every agent out around the SkillOne hub on a Vogel spiral: the hub
+ * sits at the canvas centre, node 0 rests one spoke above it, and every
+ * further node steps the golden angle and drifts outward with √index. The
+ * tile size shrinks (down to a floor) to keep a long roster inside the
+ * measured canvas; only when the floor cannot fit does the canvas grow and
+ * the page scroll.
  */
 export function layoutAgents(
   agents: readonly AgentStatus[],
   measuredWidth: number,
   measuredHeight: number,
 ): GraphLayout {
-  const width = measuredWidth > 0 ? measuredWidth : DEFAULT_GRAPH_WIDTH;
-  const height = measuredHeight > 0 ? measuredHeight : DEFAULT_GRAPH_HEIGHT;
+  const measuredW = measuredWidth > 0 ? measuredWidth : DEFAULT_GRAPH_WIDTH;
+  const measuredH = measuredHeight > 0 ? measuredHeight : DEFAULT_GRAPH_HEIGHT;
 
-  const maxColumns = 2 * columnsPerSide(width);
-  const needed = Math.max(1, Math.ceil(agents.length / rowsThatFit(height)));
-  let columnCount = Math.max(1, Math.min(needed, maxColumns));
-  // Keep the hub centred: beyond a lone card, always fill both sides evenly.
-  if (agents.length > 1 && columnCount % 2 === 1 && columnCount < maxColumns) {
-    columnCount += 1;
-  }
+  const availableRadius = Math.min(measuredW, measuredH) / 2 - OUTER_PAD;
+  const size = resolveTileSize(agents.length, availableRadius);
 
-  // Split the agents into balanced, contiguous columns — earlier columns take
-  // the odd remainder so the reading order runs top-to-bottom, left to right.
-  const perColumn = Math.floor(agents.length / columnCount);
-  const remainder = agents.length % columnCount;
-  const columns: AgentStatus[][] = [];
-  let cursor = 0;
-  for (let c = 0; c < columnCount; c += 1) {
-    const size = perColumn + (c < remainder ? 1 : 0);
-    columns.push(agents.slice(cursor, cursor + size));
-    cursor += size;
-  }
+  // The constellation is circular: once the floor tile size still cannot fit
+  // the measured box, grow a square canvas enough to hold it.
+  const needed = (outerRadius(agents.length, size) + size / 2 + OUTER_PAD) * 2;
+  const width = Math.max(measuredW, needed);
+  const height = Math.max(measuredH, needed);
+  const hub = { x: width / 2, y: height / 2, radius: HUB_RADIUS };
 
-  const tallest = columns.reduce((max, col) => Math.max(max, col.length), 0);
-  const canvasHeight = Math.max(
-    height,
-    columnHeight(tallest) + NODE_PITCH / 2 + GRAPH_PAD_TOP + GRAPH_PAD_BOTTOM,
-  );
-  const hub = { x: width / 2, y: canvasHeight / 2, radius: HUB_RADIUS };
-  const tipLeft: Point = { x: hub.x - HUB_RADIUS - HUB_TIP_GAP, y: hub.y };
-  const tipRight: Point = { x: hub.x + HUB_RADIUS + HUB_TIP_GAP, y: hub.y };
+  const spacing = size + gapFor(size);
+  const r0 = HUB_RADIUS + HUB_TIP_GAP + size / 2 + RIBBON_MIN;
 
-  const byName = new Map<string, NodeLayout>();
-  columns.forEach((column, c) => {
-    const side: GraphSide = c % 2 === 0 ? "left" : "right";
-    // Rank counts columns outward from the hub: 0 is the innermost pair.
-    const rank = Math.floor(c / 2);
-    const x =
-      side === "left"
-        ? GRAPH_PAD_X + rank * (NODE_WIDTH + COLUMN_GAP)
-        : width - GRAPH_PAD_X - NODE_WIDTH - rank * (NODE_WIDTH + COLUMN_GAP);
-    // The two sides sit half a pitch apart, so their rows interlock instead of
-    // marching in lockstep.
-    const stagger = side === "left" ? -NODE_PITCH / 4 : NODE_PITCH / 4;
-    const top = hub.y - columnHeight(column.length) / 2 + stagger;
-    column.forEach((agent, row) => {
-      const y = top + row * NODE_PITCH;
-      byName.set(agent.name, {
-        name: agent.name,
-        side,
-        x,
-        y,
-        width: NODE_WIDTH,
-        height: NODE_HEIGHT,
-        anchor: {
-          x: side === "left" ? x + NODE_WIDTH : x,
-          y: y + NODE_HEIGHT / 2,
-        },
-      });
-    });
+  const nodes: NodeLayout[] = agents.map((agent, i) => {
+    const angle = ANGLE_OFFSET + i * GOLDEN_ANGLE;
+    const radius = r0 + DENSITY_K * spacing * Math.sqrt(i);
+    const cx = hub.x + radius * Math.cos(angle);
+    const cy = hub.y + radius * Math.sin(angle);
+    // The ribbon leaves from the tile edge facing the hub and arrives at the
+    // hub rim on the same ray, so the spoke is one straight radial line the
+    // curve gently bows along.
+    const ux = -Math.cos(angle);
+    const uy = -Math.sin(angle);
+    const anchor = { x: cx + ux * (size / 2), y: cy + uy * (size / 2) };
+    return {
+      name: agent.name,
+      x: cx - size / 2,
+      y: cy - size / 2,
+      width: size,
+      height: size,
+      anchor,
+      tipSide: resolveTipSide(angle, cx, width),
+      angle,
+    };
   });
 
-  const nodes = agents.map((agent) => byName.get(agent.name)!);
-  const ribbons = nodes.map((node) => ({
-    name: node.name,
-    d: ribbonPath(node.anchor, node.side === "left" ? tipLeft : tipRight),
-  }));
+  const ribbons: RibbonLayout[] = nodes.map((node, i) => {
+    const angle = ANGLE_OFFSET + i * GOLDEN_ANGLE;
+    const tip = {
+      x: hub.x + (HUB_RADIUS + HUB_TIP_GAP) * Math.cos(angle),
+      y: hub.y + (HUB_RADIUS + HUB_TIP_GAP) * Math.sin(angle),
+    };
+    return { name: node.name, d: ribbonPath(node.anchor, tip) };
+  });
 
-  return { width, height: canvasHeight, nodes, ribbons, hub };
+  return { width, height, nodes, ribbons, hub };
 }

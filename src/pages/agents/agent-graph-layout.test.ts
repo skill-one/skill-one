@@ -4,13 +4,12 @@ import type { AgentStatus } from "../../lib/skills-manager";
 import {
   DEFAULT_GRAPH_HEIGHT,
   DEFAULT_GRAPH_WIDTH,
-  GRAPH_PAD_X,
+  GOLDEN_ANGLE,
   HUB_RADIUS,
   HUB_TIP_GAP,
-  MIN_GRAPH_WIDTH,
-  NODE_HEIGHT,
-  NODE_PITCH,
-  NODE_WIDTH,
+  NODE_SIZE_MAX,
+  NODE_SIZE_MIN,
+  OUTER_PAD,
   RIBBON_COLORS,
   layoutAgents,
   resolveGraphWidth,
@@ -23,14 +22,8 @@ function agent(name: string): AgentStatus {
   return { name, display: name, linked: false, canonical: false };
 }
 
-/** The distinct card-column x positions on one side of the hub. */
-function columnXs(
-  layout: ReturnType<typeof layoutAgents>,
-  side: "left" | "right",
-): Set<number> {
-  return new Set(
-    layout.nodes.filter((n) => n.side === side).map((n) => n.x),
-  );
+function roster(n: number): AgentStatus[] {
+  return Array.from({ length: n }, (_, i) => agent(`a${i}`));
 }
 
 describe("ribbonColor", () => {
@@ -45,13 +38,7 @@ describe("ribbonColor", () => {
   });
 
   it("covers every palette slot across the mock agent names", () => {
-    const names = [
-      "claude-code",
-      "codex",
-      "cursor",
-      "gemini-cli",
-      "windsurf",
-    ];
+    const names = ["claude-code", "codex", "cursor", "gemini-cli", "windsurf"];
     const used = new Set(names.map(ribbonColorIndex));
     // Weak but meaningful: the five mock agents must not all collapse onto
     // one hue, or the graph loses the logo's multicolour read.
@@ -60,34 +47,31 @@ describe("ribbonColor", () => {
 });
 
 describe("ribbonPath", () => {
-  it("draws a horizontal-tangent cubic bezier from one point to the other", () => {
-    const d = ribbonPath({ x: 100, y: 0 }, { x: 400, y: 200 });
+  it("is one cubic bezier from the anchor to the hub tip", () => {
+    const d = ribbonPath({ x: 200, y: 300 }, { x: 300, y: 300 });
     const nums = d.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
+    expect(d).toMatch(/^M 200 300 C /);
     // M from, C c1, c2, to — eight coordinates.
-    expect(d).toMatch(/^M 100 0 C /);
     expect(nums).toHaveLength(8);
-    // The first control point leaves on the start's horizontal tangent; the
-    // second arrives on the end's horizontal tangent.
-    expect(nums[3]).toBe(0);
-    expect(nums[5]).toBe(200);
-    expect(nums[6]).toBe(400);
-    expect(nums[7]).toBe(200);
+    expect(nums[6]).toBe(300);
+    expect(nums[7]).toBe(300);
   });
 
-  it("keeps a minimum control pull on short ribbons", () => {
-    const d = ribbonPath({ x: 100, y: 0 }, { x: 130, y: 0 });
-    expect(d).toContain("148 0");
-  });
-
-  it("mirrors the pull when the ribbon runs right-to-left", () => {
-    // A right-hand card's ribbon leaves leftward and arrives from the near
-    // side, so it curves into the hub exactly as its mirror on the left does.
-    const d = ribbonPath({ x: 400, y: 0 }, { x: 100, y: 0 });
-    const nums = d.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
-    expect(d).toMatch(/^M 400 0 C /);
-    expect(nums[2]).toBeLessThan(400); // c1 pulled toward the hub
-    expect(nums[4]).toBeGreaterThan(100); // c2 arrives from the near side
-    expect(nums[6]).toBe(100);
+  it("bows both controls to the same side — one shared swirl handedness", () => {
+    // A spoke running east into the hub bows to one side of the chord; the
+    // mirrored spoke bows with the same (counterclockwise) handedness.
+    const east = ribbonPath({ x: 300, y: 300 }, { x: 200, y: 300 });
+    const west = ribbonPath({ x: 100, y: 300 }, { x: 200, y: 300 });
+    const eastNums = east.match(/-?\d+(\.\d+)?/g)!.map(Number);
+    const westNums = west.match(/-?\d+(\.\d+)?/g)!.map(Number);
+    // Coordinate order is M(from) C(c1x,c1y c2x,c2y to): the bow shows on the
+    // control points' y (indices 3 and 5), not the endpoints (1 and 7).
+    // East-side spoke travels west; its CCW normal is north (negative y); the
+    // west-side spoke mirrors it, normal south.
+    expect(eastNums[3]).toBeLessThan(300);
+    expect(eastNums[5]).toBeLessThan(300);
+    expect(westNums[3]).toBeGreaterThan(300);
+    expect(westNums[5]).toBeGreaterThan(300);
   });
 });
 
@@ -96,12 +80,8 @@ describe("resolveGraphWidth", () => {
     expect(resolveGraphWidth(0)).toBe(DEFAULT_GRAPH_WIDTH);
   });
 
-  it("keeps a measured width when it clears the hub", () => {
+  it("keeps the measured width once measured", () => {
     expect(resolveGraphWidth(900)).toBe(900);
-  });
-
-  it("floors narrow windows at the minimum canvas width", () => {
-    expect(resolveGraphWidth(480)).toBe(MIN_GRAPH_WIDTH);
   });
 });
 
@@ -109,102 +89,147 @@ describe("layoutAgents", () => {
   it("falls back to the default canvas without a measurement", () => {
     const layout = layoutAgents([agent("a")], 0, 0);
     expect(layout.width).toBe(DEFAULT_GRAPH_WIDTH);
-    expect(layout.height).toBeGreaterThanOrEqual(DEFAULT_GRAPH_HEIGHT);
-    expect(layout.hub.x).toBe(DEFAULT_GRAPH_WIDTH / 2);
-    expect(layout.hub.y).toBeCloseTo(layout.height / 2);
+    expect(layout.height).toBe(DEFAULT_GRAPH_HEIGHT);
+    expect(layout.hub).toEqual({
+      x: DEFAULT_GRAPH_WIDTH / 2,
+      y: DEFAULT_GRAPH_HEIGHT / 2,
+      radius: HUB_RADIUS,
+    });
   });
 
-  it("centres the hub and keeps the measured height when the cards fit", () => {
-    const layout = layoutAgents([agent("a"), agent("b")], 800, 600);
-    expect(layout.hub).toMatchObject({ x: 400, y: 300 });
-    // Two cards fit well within 600px, so the canvas keeps the measured height
-    // rather than growing to the column.
-    expect(layout.height).toBe(600);
+  it("centres the hub on the canvas", () => {
+    const layout = layoutAgents(roster(8), 900, 700);
+    expect(layout.hub.x).toBe(450);
+    expect(layout.hub.y).toBe(350);
   });
 
-  it("splits the agents into balanced columns on the hub's left and right", () => {
-    const layout = layoutAgents(
-      [agent("a"), agent("b"), agent("c"), agent("d")],
-      1200,
-      600,
+  it("is deterministic — the same roster lands in the same places", () => {
+    const a = layoutAgents(roster(12), 900, 700);
+    const b = layoutAgents(roster(12), 900, 700);
+    expect(a.nodes).toEqual(b.nodes);
+    expect(a.ribbons).toEqual(b.ribbons);
+  });
+
+  it("steps each node the golden angle around the hub, starting on top", () => {
+    const layout = layoutAgents(roster(6), 900, 700);
+    // Node 0 starts one spoke above the hub.
+    expect(layout.nodes[0].angle).toBeCloseTo(-Math.PI / 2, 10);
+    for (let i = 1; i < layout.nodes.length; i += 1) {
+      const turn = layout.nodes[i].angle - layout.nodes[i - 1].angle;
+      expect(turn).toBeCloseTo(GOLDEN_ANGLE, 10);
+    }
+  });
+
+  it("scatters a roster to every side of the hub", () => {
+    const layout = layoutAgents(roster(12), 900, 700);
+    const { hub } = layout;
+    const quadrants = new Set(
+      layout.nodes.map((n) => {
+        const dx = n.x + n.width / 2 - hub.x;
+        const dy = n.y + n.height / 2 - hub.y;
+        return `${dy < 0 ? "t" : "b"}${dx < 0 ? "l" : "r"}`;
+      }),
     );
-    const left = layout.nodes.filter((n) => n.side === "left");
-    const right = layout.nodes.filter((n) => n.side === "right");
-    expect(left.map((n) => n.name)).toEqual(["a", "b"]);
-    expect(right.map((n) => n.name)).toEqual(["c", "d"]);
-    // Columns pack from the outer edge inward.
-    expect(left[0].x).toBe(GRAPH_PAD_X);
-    expect(right[0].x).toBe(1200 - GRAPH_PAD_X - NODE_WIDTH);
+    // Twelve golden-angle steps visit all four quadrants — not a left/right
+    // column layout.
+    expect(quadrants.size).toBe(4);
   });
 
-  it("stacks a column at a fixed pitch on the hub-facing edge", () => {
-    const layout = layoutAgents(
-      [agent("a"), agent("b"), agent("c"), agent("d")],
-      1200,
-      600,
-    );
-    const [a, b] = layout.nodes; // a and b share the left column
-    expect(b.y - a.y).toBe(NODE_PITCH);
-    expect(a.width).toBe(NODE_WIDTH);
-    expect(a.height).toBe(NODE_HEIGHT);
-    expect(a.anchor).toEqual({ x: a.x + NODE_WIDTH, y: a.y + NODE_HEIGHT / 2 });
+  it("keeps square tiles from overlapping for a full roster", () => {
+    const N = 35;
+    const layout = layoutAgents(roster(N), 1400, 1100);
+    expect(layout.nodes).toHaveLength(N);
+    expect(layout.nodes[0].width).toBe(NODE_SIZE_MAX);
+    for (let i = 0; i < N; i += 1) {
+      for (let j = i + 1; j < N; j += 1) {
+        const a = layout.nodes[i];
+        const b = layout.nodes[j];
+        // Axis-aligned square overlap needs BOTH axes to close in.
+        const overlapX = Math.abs(a.x - b.x) < a.width;
+        const overlapY = Math.abs(a.y - b.y) < a.height;
+        expect(overlapX && overlapY).toBe(false);
+      }
+    }
   });
 
-  it("offsets the two sides by half a pitch so their rows interlock", () => {
-    const layout = layoutAgents([agent("a"), agent("b")], 1200, 600);
-    const [left, right] = layout.nodes;
-    expect(left.side).toBe("left");
-    expect(right.side).toBe("right");
-    expect(right.y - left.y).toBe(NODE_PITCH / 2);
-  });
-
-  it("opens more columns to keep a long roster inside the measured height", () => {
-    const many = Array.from({ length: 20 }, (_, i) => agent(`a${i}`));
-    const short = layoutAgents(many, 1200, 400);
-    const tall = layoutAgents(many, 1200, 1400);
-
-    // A short canvas needs two columns per side; a tall one needs a single
-    // column per side.
-    expect(columnXs(short, "left").size).toBe(2);
-    expect(columnXs(tall, "left").size).toBe(1);
-    expect(short.nodes).toHaveLength(20);
-    expect(tall.nodes).toHaveLength(20);
-  });
-
-  it("keeps every card inside the canvas it reports", () => {
-    const many = Array.from({ length: 12 }, (_, i) => agent(`a${i}`));
-    const layout = layoutAgents(many, 1200, 400);
-    const lowest = Math.max(...layout.nodes.map((n) => n.y + n.height));
-    expect(lowest).toBeLessThanOrEqual(layout.height);
-  });
-
-  it("ends every ribbon at the hub tip on its own side", () => {
-    const layout = layoutAgents(
-      [agent("a"), agent("b"), agent("c"), agent("d")],
-      1200,
-      600,
-    );
-    const tipLeft = layout.hub.x - HUB_RADIUS - HUB_TIP_GAP;
-    const tipRight = layout.hub.x + HUB_RADIUS + HUB_TIP_GAP;
+  it("keeps every tile inside the canvas and clear of the hub rim", () => {
+    const layout = layoutAgents(roster(20), 900, 700);
     for (const node of layout.nodes) {
-      const d = layout.ribbons.find((r) => r.name === node.name)!.d;
-      const tipX = node.side === "left" ? tipLeft : tipRight;
-      expect(d.endsWith(`${tipX} ${layout.hub.y}`)).toBe(true);
-      expect(node.anchor.x).toBe(
-        node.side === "left" ? node.x + NODE_WIDTH : node.x,
+      expect(node.x).toBeGreaterThanOrEqual(OUTER_PAD - 0.001);
+      expect(node.y).toBeGreaterThanOrEqual(OUTER_PAD - 0.001);
+      expect(node.x + node.width).toBeLessThanOrEqual(
+        layout.width - OUTER_PAD + 0.001,
+      );
+      expect(node.y + node.height).toBeLessThanOrEqual(
+        layout.height - OUTER_PAD + 0.001,
+      );
+      const cx = node.x + node.width / 2;
+      const cy = node.y + node.height / 2;
+      expect(Math.hypot(cx - layout.hub.x, cy - layout.hub.y)).toBeGreaterThan(
+        HUB_RADIUS + HUB_TIP_GAP + node.width / 2,
       );
     }
   });
 
-  it("keeps the ribbon order aligned with the node order", () => {
-    const agents = [agent("a"), agent("b"), agent("c")];
-    const layout = layoutAgents(agents, 1200, 600);
-    expect(layout.ribbons.map((r) => r.name)).toEqual(["a", "b", "c"]);
+  it("runs each ribbon from the tile's hub-facing edge to the hub rim", () => {
+    const layout = layoutAgents(roster(6), 900, 700);
+    for (const [i, ribbon] of layout.ribbons.entries()) {
+      const node = layout.nodes[i];
+      const nums = ribbon.d.match(/-?\d+(\.\d+)?/g)!.map(Number);
+      // Starts exactly at the node anchor.
+      expect(nums[0]).toBeCloseTo(node.anchor.x, 6);
+      expect(nums[1]).toBeCloseTo(node.anchor.y, 6);
+      // Ends on the hub rim circle, on the node's own ray.
+      const tipX = nums[6];
+      const tipY = nums[7];
+      expect(Math.hypot(tipX - layout.hub.x, tipY - layout.hub.y)).toBeCloseTo(
+        HUB_RADIUS + HUB_TIP_GAP,
+        6,
+      );
+    }
+  });
+
+  it("shrinks the tiles before growing the canvas when the roster is long", () => {
+    const roomy = layoutAgents(roster(35), 1400, 1100);
+    const tight = layoutAgents(roster(35), 700, 460);
+    expect(roomy.nodes[0].width).toBe(NODE_SIZE_MAX);
+    expect(tight.nodes[0].width).toBeLessThan(NODE_SIZE_MAX);
+    // Even shrunk, the constellation still fits the box it reports.
+    for (const node of tight.nodes) {
+      expect(node.x).toBeGreaterThanOrEqual(0);
+      expect(node.y).toBeGreaterThanOrEqual(0);
+      expect(node.x + node.width).toBeLessThanOrEqual(tight.width);
+      expect(node.y + node.height).toBeLessThanOrEqual(tight.height);
+    }
+  });
+
+  it("grows the canvas (never below the floor tile) when it truly cannot fit", () => {
+    const layout = layoutAgents(roster(40), 300, 300);
+    expect(layout.nodes[0].width).toBe(NODE_SIZE_MIN);
+    expect(layout.width).toBeGreaterThan(300);
+    expect(layout.height).toBeGreaterThan(300);
+  });
+
+  it("points the name tooltip away from the hub", () => {
+    const layout = layoutAgents(roster(8), 900, 700);
+    const { hub } = layout;
+    for (const node of layout.nodes) {
+      const cx = node.x + node.width / 2;
+      const cy = node.y + node.height / 2;
+      const dx = cx - hub.x;
+      const dy = cy - hub.y;
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        expect(node.tipSide).toBe(dx >= 0 ? "right" : "left");
+      } else {
+        expect(node.tipSide).toBe(dy >= 0 ? "bottom" : "top");
+      }
+    }
   });
 
   it("lays out an empty roster as a hub-only canvas", () => {
     const layout = layoutAgents([], 800, 600);
     expect(layout.width).toBe(800);
+    expect(layout.height).toBe(600);
     expect(layout.nodes).toEqual([]);
     expect(layout.ribbons).toEqual([]);
   });
