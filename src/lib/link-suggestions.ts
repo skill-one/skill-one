@@ -50,6 +50,7 @@ import type {
   ResolutionRecord,
   SkillFingerprint,
 } from "./provenance";
+import type { SourceLinkReason } from "./activity";
 
 /**
  * Candidates offered for a skill, ranked: any hash-identical entry first
@@ -183,7 +184,12 @@ export async function resolveAssociations(
   const epoch = getRegistrySnapshot().epoch;
   const stored = await loadResolutionRecords();
   const linked: string[] = [];
-  const matched: Array<{ repo: string; name: string; hash?: string }> = [];
+  const matched: Array<{
+    repo: string;
+    name: string;
+    hash?: string;
+    reason: SourceLinkReason;
+  }> = [];
   const upserts = new Map<string, ResolutionRecord>();
   const drops = new Set<string>();
 
@@ -254,7 +260,7 @@ export async function resolveAssociations(
           ? namesakes.find((s) => s.rev != null && s.rev === hash)
           : undefined;
       if (hash != null && match) {
-        matched.push({ repo: match.repo, name: skill.name, hash });
+        matched.push({ repo: match.repo, name: skill.name, hash, reason: "hash" });
         linked.push(skill.name);
         // Linked — the entry leaves the candidate pool for good.
         resolved.set(skill.name, []);
@@ -276,7 +282,7 @@ export async function resolveAssociations(
       if (top && top.similarity >= SIMILARITY_AUTO_LINK_THRESHOLD) {
         // No content hash is verified by a description match, so the version
         // marker stays unset — same as a user-confirmed link.
-        matched.push({ repo: top.skill.repo, name: skill.name });
+        matched.push({ repo: top.skill.repo, name: skill.name, reason: "description" });
         linked.push(skill.name);
         resolved.set(skill.name, []);
         drops.add(skill.name);

@@ -257,5 +257,55 @@
       "current": "Already on the latest snapshot",
       "unknown": "Check failed, please try again later"
     }
+  },
+  "activity": {
+    "title": "Activity log",
+    "description": "Every change Skill One has made to your skills and agents.",
+    "empty": "No activity recorded yet",
+    "reveal": "Show in folder",
+    "clear": "Clear log",
+    "clearConfirmTitle": "Clear the activity log?",
+    "clearConfirmDescription": "Every recorded action is deleted. This cannot be undone.",
+    "clearConfirmAction": "Clear",
+    "filterAria": "Filter activity",
+    "filter": {
+      "all": "All",
+      "skill": "Skills",
+      "agent": "Agents",
+      "source": "Sources"
+    },
+    "autoToggle": "Include automatic actions",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "summary": {
+      "skillInstall": "Installed {{name}} from {{repo}}",
+      "skillRemoveSingle": "Removed {{name}}",
+      "skillRemove": "Removed {{count}} skills",
+      "skillEnableSingle": "Enabled {{name}}",
+      "skillEnable": "Enabled {{count}} skills",
+      "skillDisableSingle": "Disabled {{name}}",
+      "skillDisable": "Disabled {{count}} skills",
+      "skillEdit": "Edited {{name}}",
+      "skillDiscover": "Found {{name}}",
+      "agentLink": "Linked {{name}}",
+      "agentLinkFailed": "Failed to link {{name}}",
+      "agentUnlink": "Unlinked {{name}}",
+      "agentUnlinkFailed": "Failed to unlink {{name}}",
+      "sourceLink": "Linked {{name}} to {{repo}}"
+    },
+    "origin": {
+      "store": "Found in the store",
+      "external": "Found on disk"
+    },
+    "reason": {
+      "install": "Recorded at install",
+      "hash": "Auto-linked by content match",
+      "description": "Auto-linked by description",
+      "confirm": "Confirmed by you"
+    },
+    "actor": {
+      "auto": "Automatic",
+      "scan": "Scan"
+    }
   }
 }

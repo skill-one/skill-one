@@ -41,6 +41,7 @@ Read data is cached through TanStack Query (`staleTime` 10 minutes, `gcTime` inf
 - Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Since agents-skills 0.15 linking is one-way: an agent's own skills are adopted into the canonical dir (a name clash keeps the canonical copy), its other files are quarantined into `.misc/<agent>/`, and unlink only breaks the symlink. `list` also reports each skill's description and install time, which the app passes straight through. Since 0.21 an install is one source and one skill — `owner/repo@<skill>`; since 0.23 the backend downloads the repository tarball from codeload.github.com and matches the skill locally (the GitHub REST API and its anonymous rate limit are no longer involved) — and a failure is the command's `Err`, so `install_skill` returns just `{ skill, skipped }`.
 - **`src-tauri/src/skill_hash.rs`**: The content identity of a skill directory — the skills.sh upstream hash plus a stat-only change-detection fingerprint, produced by one recursive walk (see `docs/skill-provenance.md`). `analyze_skill` returns both; `skill_fingerprint` is the stat-only half, the cheap validity check that lets the ledger reuse a stored hash across restarts.
 - **`src-tauri/src/provenance.rs`**: Two fixed-path file commands (`read_provenance`/`write_provenance`) over the provenance ledger at `~/.agents/skills/.skill-one.jsonl` — atomic writes, plus a transparent read of the legacy JSON document until the first JSONL write converts and removes it. All schema knowledge lives in the frontend (`src/lib/provenance.ts`).
+- **`src-tauri/src/activity.rs`**: The append-only activity log at `<app_log_dir>/activity.jsonl` — `append_activity` (rotating at 2 MiB), `read_activity` (the newest `limit` lines across the active file and its backup), `clear_activity`, and `open_activity_dir`. Thin like `provenance.rs`: the schema and the discovery baseline live in the frontend (`src/lib/activity.ts`; see `docs/activity-log.md`).
 
 ### Frontend write wrapper
 
@@ -71,6 +72,7 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 | `src/lib/avatar-source.ts` | The single answer to where an owner's avatar lives: the dataset mirror at the pinned snapshot tag, then its mutable branch, then GitHub's own endpoint — every surface draws from this one chain |
 | `src/lib/tauri.ts` | Detects whether the app runs inside the Tauri WebView |
 | `src/lib/open-external.ts` | Opens external links in the system browser (Tauri needs the opener plugin) |
+| `src/lib/activity.ts` / `src/components/activity-dialog.tsx` | The append-only activity log — what the app did to the user's skills and agents — and its viewer, reached from the settings popover (see `docs/activity-log.md`) |
 | `src-tauri/tauri.conf.json` | Window, build, and packaging configuration |
 | `src-tauri/capabilities/default.json` | Permission declarations for the main window (`core:default`, `opener:default`, `updater:default`, `process:allow-restart`, and the skills.sh search origin for `http:default`) |
 

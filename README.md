@@ -57,7 +57,8 @@ After launching the app, use the 商店 / 我的 switch in the window header to 
 2. **My Skills**: Update or uninstall installed skills.
 3. **Agent Linking**: Manage skill-directory links and migration for each agent.
 4. **Settings**: Switch the registry download source (direct GitHub or a CDN mirror), and check for app updates.
+5. **Activity Log**: Review what the app has done to your skills and agents — installs, removals, enablement, agent links, and source associations.
 
 ## Development
 
-For developer-facing build, architecture, and testing docs, see [docs/development.md](docs/development.md). The updater pipeline is documented in [docs/auto-update.md](docs/auto-update.md).
+For developer-facing build, architecture, and testing docs, see [docs/development.md](docs/development.md). The updater pipeline is documented in [docs/auto-update.md](docs/auto-update.md). The activity log is documented in [docs/activity-log.md](docs/activity-log.md).

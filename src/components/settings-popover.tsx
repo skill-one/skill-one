@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   ChevronRight,
   CircleCheck,
+  History,
   LoaderCircle,
   RefreshCw,
   Settings,
@@ -17,6 +18,7 @@ import {
 import { useAppUpdate } from "../hooks/use-app-update";
 import { useRepoCardLimit } from "../hooks/use-repo-card-limit";
 import { AdvancedSettingsDialog } from "./advanced-settings-dialog";
+import { ActivityDialog } from "./activity-dialog";
 import { LanguageToggle } from "./language-toggle";
 import { ThemeModeToggle } from "./theme-mode-toggle";
 import { Badge } from "./ui/badge";
@@ -125,6 +127,7 @@ export function SettingsMenu() {
   const { t } = useTranslation();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const update = useAppUpdate();
   const { phase, open: openUpdateDialog, check } = update;
   const hasUpdate = phase === "available" && update.version !== null;
@@ -148,6 +151,11 @@ export function SettingsMenu() {
   const openAdvanced = () => {
     setPopoverOpen(false);
     setAdvancedOpen(true);
+  };
+
+  const openActivity = () => {
+    setPopoverOpen(false);
+    setActivityOpen(true);
   };
 
   return (
@@ -274,6 +282,17 @@ export function SettingsMenu() {
               </span>
               <ChevronRight className="size-3.5 text-muted-foreground" />
             </button>
+            <button
+              type="button"
+              className={rowClassName}
+              onClick={openActivity}
+            >
+              <span className="flex items-center gap-2">
+                <History className="size-4" />
+                {t("activity.title")}
+              </span>
+              <ChevronRight className="size-3.5 text-muted-foreground" />
+            </button>
           </div>
         </PopoverContent>
       </Popover>
@@ -283,6 +302,7 @@ export function SettingsMenu() {
         open={advancedOpen}
         onOpenChange={setAdvancedOpen}
       />
+      <ActivityDialog open={activityOpen} onOpenChange={setActivityOpen} />
     </>
   );
 }

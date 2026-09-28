@@ -45,6 +45,7 @@ import {
   recordSkillProvenance,
   removeSkillProvenanceBatch,
 } from "./provenance";
+import { logActivity } from "./activity";
 
 /** Simulated download duration for browser mock installs, in milliseconds. */
 export const MOCK_INSTALL_DELAY_MS = 1200;
@@ -111,9 +112,15 @@ export async function saveLocalSkillMd(
 ): Promise<void> {
   if (isTauri()) {
     await writeSkillMd(name, content);
-    return;
+  } else {
+    setMockSkillMd(name, content);
   }
-  setMockSkillMd(name, content);
+  await logActivity({
+    event: "skill.edit",
+    actor: "user",
+    kind: "skill",
+    names: [name],
+  });
 }
 
 /**
@@ -190,7 +197,14 @@ export async function installSkillFromSource(
   // Record the install source in the app's provenance ledger — the only
   // store↔install association that survives (agents-skills keeps no install
   // metadata). Best-effort: it never fails the install itself.
-  await recordSkillProvenance(repo, name, options.rev);
+  await logActivity({
+    event: "skill.install",
+    actor: "user",
+    kind: "skill",
+    names: [name],
+    detail: { repo, skipped: false },
+  });
+  await recordSkillProvenance(repo, name, options.rev, "install");
 }
 
 /** Remove an installed skill from the global skills directory. */
@@ -205,10 +219,17 @@ export async function removeInstalledSkills(names: readonly string[]): Promise<v
     // ledger update is one read-modify-write for all of them.
     await removeSkills([...names]);
     await removeSkillProvenanceBatch(names);
-    return;
+  } else {
+    for (const name of names) removeMockSkill(name);
+    await removeSkillProvenanceBatch(names);
   }
-  for (const name of names) removeMockSkill(name);
-  await removeSkillProvenanceBatch(names);
+  await logActivity({
+    event: "skill.remove",
+    actor: "user",
+    kind: "skill",
+    names: [...names],
+    detail: { count: names.length },
+  });
 }
 
 /**
@@ -258,6 +279,50 @@ function mockLinkResult(
   ];
 }
 
+/** Link outcomes worth a log line: only real changes speak. */
+const LOGGED_LINK_STATUSES: Record<
+  "agent.link" | "agent.unlink",
+  ReadonlySet<string>
+> = {
+  "agent.link": new Set(["linked", "refused", "failed"]),
+  "agent.unlink": new Set(["unlinked", "refused", "failed"]),
+};
+
+/**
+ * Record the link/unlink results that changed something. `linked`/`unlinked`
+ * are success, `refused`/`failed` the failure mode worth keeping; a no-op
+ * outcome (`alreadyLinked`, `notLinked`, `skipped`) says nothing — the log
+ * records what actually happened, not every poll of it.
+ */
+async function logAgentChange(
+  results: readonly AgentLinkResult[],
+  actor: "user" | "auto",
+  event: "agent.link" | "agent.unlink",
+): Promise<void> {
+  const logged = LOGGED_LINK_STATUSES[event];
+  const okStatus = event === "agent.link" ? "linked" : "unlinked";
+  for (const result of results) {
+    if (!logged.has(result.status)) continue;
+    await logActivity({
+      event,
+      actor,
+      kind: "agent",
+      names: [result.agent],
+      detail:
+        event === "agent.link"
+          ? {
+              status: result.status,
+              adopted: result.adopted.length,
+              quarantined: result.quarantined.length,
+              conflicts: result.conflicts.length,
+            }
+          : { status: result.status },
+      result: result.status === okStatus ? "ok" : "failed",
+      ...(result.message ? { error: result.message } : {}),
+    });
+  }
+}
+
 /**
  * Link one agent's skills dir (backend in Tauri, mock store in the browser).
  *
@@ -268,40 +333,39 @@ function mockLinkResult(
  * `remove`/`disable` from then on.
  */
 export async function linkAgent(name: string): Promise<AgentLinkResult[]> {
-  if (isTauri()) {
-    const result = await linkAgents([name]);
-    return result.results;
-  }
-  return mockLinkResult(name, "linked", linkMockAgent(name));
+  const results = isTauri()
+    ? (await linkAgents([name])).results
+    : mockLinkResult(name, "linked", linkMockAgent(name));
+  await logAgentChange(results, "user", "agent.link");
+  return results;
 }
 
 /**
  * Link several agents in one go. Same one-way adoption as `linkAgent`, applied
  * to a batch; reruns are safe — already linked agents come back as
  * `alreadyLinked` and are left untouched. This is the auto-link pass's entry
- * point (`useAutoLinkAgents`).
+ * point (`useAutoLinkAgents`), so its log lines carry the `auto` actor.
  */
 export async function linkAllAgents(
   names: string[],
 ): Promise<AgentLinkResult[]> {
   if (names.length === 0) return [];
-  if (isTauri()) {
-    const result = await linkAgents(names);
-    return result.results;
-  }
-  return names.flatMap((name) =>
-    mockLinkResult(name, "linked", linkMockAgent(name)),
-  );
+  const results = isTauri()
+    ? (await linkAgents(names)).results
+    : names.flatMap((name) =>
+        mockLinkResult(name, "linked", linkMockAgent(name)),
+      );
+  await logAgentChange(results, "auto", "agent.link");
+  return results;
 }
 
 /** Unlink one agent's skills dir (backend in Tauri, mock store in the browser). */
 export async function unlinkAgent(name: string): Promise<AgentLinkResult[]> {
-  if (isTauri()) {
-    const result = await unlinkAgents([name]);
-    return result.results;
-  }
-  unlinkMockAgent(name);
-  return mockLinkResult(name, "unlinked");
+  const results = isTauri()
+    ? (await unlinkAgents([name])).results
+    : (unlinkMockAgent(name), mockLinkResult(name, "unlinked"));
+  await logAgentChange(results, "user", "agent.unlink");
+  return results;
 }
 
 function mockDisplayOf(name: string): string {
@@ -321,9 +385,16 @@ export async function setSkillEnabled(
 ): Promise<void> {
   if (isTauri()) {
     await setSkillsEnabled(enabled, [name]);
-    return;
+  } else {
+    setMockSkillEnabled(name, enabled);
   }
-  setMockSkillEnabled(name, enabled);
+  await logActivity({
+    event: enabled ? "skill.enable" : "skill.disable",
+    actor: "user",
+    kind: "skill",
+    names: [name],
+    detail: { count: 1 },
+  });
 }
 
 /** Enable or disable several installed skills in one backend write. */
@@ -333,7 +404,14 @@ export async function setManySkillsEnabled(
 ): Promise<void> {
   if (isTauri()) {
     await setSkillsEnabled(enabled, names);
-    return;
+  } else {
+    names.forEach((name) => setMockSkillEnabled(name, enabled));
   }
-  names.forEach((name) => setMockSkillEnabled(name, enabled));
+  await logActivity({
+    event: enabled ? "skill.enable" : "skill.disable",
+    actor: "user",
+    kind: "skill",
+    names: [...names],
+    detail: { count: names.length },
+  });
 }

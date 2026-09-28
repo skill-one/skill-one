@@ -62,7 +62,7 @@ export function LinkSuggestionBadge({
     try {
       // A confirmed pick is recorded into the ledger like a native install;
       // the user's choice is the act of identification.
-      await recordSkillProvenance(candidate.skill.repo, name);
+      await recordSkillProvenance(candidate.skill.repo, name, undefined, "confirm");
       await markSkillsChanged(queryClient);
       toast.add({
         title: t("migration.migrated", { repo: candidate.skill.repo }),

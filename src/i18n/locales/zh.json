@@ -257,5 +257,55 @@
       "current": "已是最新快照",
       "unknown": "检测失败，请稍后重试"
     }
+  },
+  "activity": {
+    "title": "活动日志",
+    "description": "Skill One 对技能与 Agent 做过的每一次改动。",
+    "empty": "暂无活动记录",
+    "reveal": "在文件夹中显示",
+    "clear": "清空日志",
+    "clearConfirmTitle": "清空活动日志？",
+    "clearConfirmDescription": "所有已记录的操作都会被删除，且无法恢复。",
+    "clearConfirmAction": "清空",
+    "filterAria": "筛选活动",
+    "filter": {
+      "all": "全部",
+      "skill": "技能",
+      "agent": "Agent",
+      "source": "来源"
+    },
+    "autoToggle": "包含自动操作",
+    "today": "今天",
+    "yesterday": "昨天",
+    "summary": {
+      "skillInstall": "从 {{repo}} 安装了 {{name}}",
+      "skillRemoveSingle": "卸载了 {{name}}",
+      "skillRemove": "卸载了 {{count}} 个技能",
+      "skillEnableSingle": "启用了 {{name}}",
+      "skillEnable": "启用了 {{count}} 个技能",
+      "skillDisableSingle": "停用了 {{name}}",
+      "skillDisable": "停用了 {{count}} 个技能",
+      "skillEdit": "编辑了 {{name}}",
+      "skillDiscover": "发现了 {{name}}",
+      "agentLink": "已关联 {{name}}",
+      "agentLinkFailed": "关联 {{name}} 失败",
+      "agentUnlink": "已断开 {{name}}",
+      "agentUnlinkFailed": "断开 {{name}} 失败",
+      "sourceLink": "已将 {{name}} 关联到 {{repo}}"
+    },
+    "origin": {
+      "store": "来自应用商店",
+      "external": "来自本地磁盘"
+    },
+    "reason": {
+      "install": "安装时记录",
+      "hash": "按内容匹配自动关联",
+      "description": "按描述自动关联",
+      "confirm": "由你确认"
+    },
+    "actor": {
+      "auto": "自动",
+      "scan": "扫描"
+    }
   }
 }

@@ -48,6 +48,7 @@ describe("installSkillFromSource", () => {
       "anthropics/skills",
       "pdf",
       "rev-at-install",
+      "install",
     );
   });
 
@@ -61,6 +62,7 @@ describe("installSkillFromSource", () => {
       "anthropics/skills",
       "pdf",
       undefined,
+      "install",
     );
   });
 
@@ -119,6 +121,7 @@ describe("installSkillFromSource", () => {
       "anthropics/skills",
       "pdf",
       undefined,
+      "install",
     );
   });
 
