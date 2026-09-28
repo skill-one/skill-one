@@ -387,16 +387,13 @@ export function RepoCard({
         lifted && "z-10",
       )}
     >
-      {/* `flex-1` is the one thing the card cannot know: under the plain-grid
-          fallback the lane's items are stretched to the tallest card in the
-          row, and the card is what fills that height. */}
       <MotionCard
         size="sm"
         data-repo={repo}
         layout={!reducedMotion}
         transition={reducedMotion ? undefined : EXPAND_TRANSITION}
         onLayoutAnimationComplete={() => setCollapsing(false)}
-        className="group flex-1"
+        className="group"
       >
         {/* The card's one bar, leading the card: what this repository is and
             how big it is — read first, so a scan of the grid reads as a scan
@@ -625,16 +622,23 @@ export function RepoCard({
           </ul>
 
           {/* The uninstalled group: the repository's registry skills the
-              reader does not have, behind a hairline so the two groups never
-              read as one list. Folded, it is one quiet row — a plus over the
-              exact count, the same offer the bar's 「＋ N」 makes for the
-              rows behind the cap. A press unfolds the rows in place; each
-              carries the store's hover-revealed install button, and none
-              opens the detail panel (this surface's drawer walks the
-              *installed* list — an uninstalled row's destination is the
-              install itself). */}
+              reader does not have. Folded, it is one quiet row — a plus over
+              the exact count, the same offer the bar's 「＋ N」 makes for the
+              rows behind the cap — held off the installed rows by spacing
+              alone, since there is no second list yet to tell apart. The
+              hairline arrives with the group itself: while the rows are open
+              it keeps the two lists from reading as one. A press unfolds the
+              rows in place; each carries the store's hover-revealed install
+              button, and none opens the detail panel (this surface's drawer
+              walks the *installed* list — an uninstalled row's destination is
+              the install itself). */}
           {uninstalled && uninstalled.length > 0 && (
-            <div className="mt-1 border-t border-border/60 pt-1">
+            <div
+              className={cn(
+                "mt-1",
+                uninstalledOpen && "border-t border-border/60 pt-1",
+              )}
+            >
               <button
                 type="button"
                 onClick={() => setUninstalledOpen((value) => !value)}
