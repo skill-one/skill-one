@@ -234,12 +234,13 @@ describe("MySkillsPage", () => {
     renderPage();
 
     // All six installs pool into one card: its bar carries the one switch that
-    // governs them all, checked because the pool is fully enabled.
+    // governs them all, checked because the pool is fully enabled. The five
+    // previewed rows carry their own hover-revealed switches alongside it.
     const groupSwitch = await screen.findByRole("switch", {
       name: "全部关闭（本地安装）",
     });
     expect(groupSwitch).toHaveAttribute("aria-checked", "true");
-    expect(screen.getAllByRole("switch")).toHaveLength(1);
+    expect(screen.getAllByRole("switch")).toHaveLength(6);
   });
 
   it("disables every skill of a card with one press, and re-enables them", async () => {
@@ -300,16 +301,19 @@ describe("MySkillsPage", () => {
     expect(row).not.toHaveClass("opacity-60");
   });
 
-  it("keeps enablement on the bar rather than on each row", async () => {
+  it("carries a hover-revealed switch on each installed row", async () => {
     const { container } = renderPage();
 
     await screen.findByRole("switch", { name: "全部关闭（本地安装）" });
 
-    // No row carries a switch: per-skill switching waits for the repository's
-    // own page, so a card reads as a list rather than as a row of controls.
+    // Every row now owns its enable switch in the card's floating hover slot
+    // (the store's install button takes the same slot), while the bar's group
+    // switch stays the one control that answers "all of them at once".
     const row = container.querySelector('[data-skill="pdf"]');
     expect(row).not.toBeNull();
-    expect(row?.querySelector('[role="switch"]')).toBeNull();
+    const rowSwitch = row?.querySelector('[role="switch"]');
+    expect(rowSwitch).not.toBeNull();
+    expect(rowSwitch).toHaveAttribute("aria-checked", "true");
   });
 
   it("dims a disabled row behind the bar's group switch", async () => {
@@ -335,7 +339,8 @@ describe("MySkillsPage", () => {
     const poolSwitch = screen.getByRole("switch", {
       name: "全部关闭（本地安装）",
     });
-    expect(screen.getAllByRole("switch")).toHaveLength(2);
+    // Two bars, plus every previewed row's own switch (5 pool rows, 1 repo row).
+    expect(screen.getAllByRole("switch")).toHaveLength(8);
 
     await user.click(repoSwitch);
 
@@ -353,6 +358,82 @@ describe("MySkillsPage", () => {
     expect(container.querySelector('[data-skill="docx"]')).not.toHaveClass(
       "opacity-60",
     );
+  });
+
+  it("offers the repository's uninstalled skills behind one folded row", async () => {
+    const user = userEvent.setup();
+    // pdf carries a recorded source and moves into its own repository card;
+    // the registry's grouping answers the same repository with one skill the
+    // machine does not have.
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
+    getGroups.mockResolvedValue({
+      groups: [
+        {
+          key: "anthropics/skills",
+          title: "anthropics/skills",
+          skills: [
+            {
+              skill: {
+                name: "pdf",
+                repo: "anthropics/skills",
+                description: "PDF 文档读取、生成、合并、拆分与标注。",
+                stars: 1,
+                downloads: 1,
+              },
+              matched: {},
+            },
+            {
+              skill: {
+                name: "pdf-annotate",
+                repo: "anthropics/skills",
+                description: "为 PDF 添加批注。",
+                stars: 1,
+                downloads: 1,
+              },
+              matched: {},
+            },
+          ],
+        },
+      ],
+      total: 2,
+    });
+    renderPage();
+
+    // The repository card states how many of its skills are missing, folded
+    // under the installed group; the uninstalled skill itself stays hidden.
+    const offer = await screen.findByRole("button", {
+      name: "展开或收起 anthropics/skills 的 1 个未安装 skill",
+    });
+    expect(offer).toHaveTextContent("还有 1 个未安装");
+    expect(screen.queryByText("pdf-annotate")).not.toBeInTheDocument();
+
+    // One press unfolds the uninstalled group in place, below the divider,
+    // with the store's install CTA on the row — no switch, and no drawer:
+    // an uninstalled row's destination is the install itself. The installed
+    // group is untouched: pdf keeps its own row and its switch.
+    await user.click(offer);
+    const section = screen.getByRole("list", {
+      name: "anthropics/skills 的未安装 skill",
+    });
+    expect(within(section).getByText("pdf-annotate")).toBeInTheDocument();
+    expect(
+      within(section).getByRole("button", { name: "安装" }),
+    ).toBeInTheDocument();
+    expect(within(section).queryByRole("switch")).toBeNull();
+
+    // A second press folds it back.
+    await user.click(offer);
+    expect(screen.queryByText("pdf-annotate")).not.toBeInTheDocument();
+  });
+
+  it("draws no uninstalled section on the pool card", async () => {
+    renderPage();
+
+    // The registry answers nothing for the source-less pool (the mock's
+    // grouped answer is empty here): the card lists its installs and offers
+    // no repository section at all.
+    await screen.findByText("pdf");
+    expect(screen.queryByText(/未安装/)).not.toBeInTheDocument();
   });
 
   it("shows each skill's description", async () => {

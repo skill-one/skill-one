@@ -164,6 +164,9 @@
     "skillCount": "{{count}} skills",
     "expandRepoAria": "Show all {{count}} skills from {{name}}",
     "collapseRepoAria": "Collapse the skill list of {{name}}",
+    "uninstalledCount": "{{count}} more uninstalled",
+    "uninstalledToggleAria": "Show or hide the {{count}} uninstalled skills of {{name}}",
+    "uninstalledListAria": "Uninstalled skills of {{name}}",
     "noInstalled": "No skills installed yet",
     "noMatchSkill": "No skills match the filters",
     "noMatchRepo": "No repositories match the filters"

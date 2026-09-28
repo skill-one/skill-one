@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Boxes, Users } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
+import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
@@ -29,6 +30,7 @@ import { errorMessage } from "../../lib/utils";
 import { buildSearchIndex } from "../../lib/search-index";
 import { setQuery, setScope, setUnit } from "../../lib/list-view";
 import type { SkillMatched } from "../../components/skill-card";
+import type { Skill } from "../../types/skill";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillRow } from "../explore/skill-row";
@@ -108,11 +110,15 @@ function starsOf(group: RepoGroup): number | undefined {
  *   list, so the unit that reads it one skill at a time reads all of them.
  *
  * What the page adds to the store's surfaces is what only an installed skill
- * has: enablement — as one group switch on each repository card's bar (a press
- * enables or disables every skill of that card; a mixed card reads as half on)
- * rather than one switch per row, since per-skill switching waits one level
- * deeper, on the repository's own page — the dimming of a disabled row, and the
- * migration badge beside an install whose source the ledger cannot vouch for.
+ * has: enablement — at two granularities, one per repository card: the bar's
+ * group switch (a press enables or disables every skill of that card; a mixed
+ * card reads as half on) and each row's own switch, revealed on hover in the
+ * same floating slot the store's install buttons live in — the dimming of a
+ * disabled row, and the migration badge beside an install whose source the
+ * ledger cannot vouch for. A card also names what its repository still has
+ * that this machine does not: one folded row beneath the installed group
+ * states the count of uninstalled siblings, and a press unfolds them (each
+ * with the store's install button) as their own group under the divider.
  * The skill unit carries its per-row switch, and both units feed the same
  * detail drawer, so what a skill looks like never depends on how the list is
  * ordered.
@@ -311,6 +317,32 @@ export function MySkillsPage() {
     );
   }, [unit, isSearching, cards, domain]);
 
+  // The registry's own grouping — every skill it lists, per repository — so
+  // each card can also name the repository's skills this machine does not
+  // have. The answer is the same cached one the store's browse list reads
+  // (an empty query means "browse the registry in order"), so this page adds
+  // no download of its own; it only runs while the repository unit browses.
+  // A registry skill not in the installed list is uninstalled, matched by
+  // name — the same identity the install button and the enable switch
+  // resolve by. The source-less pool has no repository to ask about.
+  const { data: registryGroups } = useRegistryGroups(
+    "",
+    unit === "repo" && !isSearching && list.length > 0,
+  );
+
+  const uninstalledByRepo = useMemo(() => {
+    const map = new Map<string, Skill[]>();
+    if (!registryGroups) return map;
+    const installed = new Set(list.map((skill) => skill.name));
+    for (const group of registryGroups.groups) {
+      const rest = group.skills
+        .map((hit) => hit.skill)
+        .filter((skill) => !installed.has(skill.name));
+      if (rest.length > 0) map.set(group.title, rest);
+    }
+    return map;
+  }, [registryGroups, list]);
+
   // What the answer on screen is made of: one row or one card per entry — the
   // entry, not a bucket, is what the reveal counts, because an entry is what
   // both units list.
@@ -489,17 +521,18 @@ export function MySkillsPage() {
                     matched: row.matched,
                     muted: !row.enabled,
                     extra: rowExtra(row, "icon"),
+                    // Each row's own enable switch, in the card's floating
+                    // hover slot; the disabled rows stay dimmed so the group
+                    // switch's state has its evidence.
+                    action: <SkillEnableSwitch skill={row.skill} />,
                   }))}
                   maxSkills={maxSkills}
                   hasQuery={isSearching}
                   selected={selectedKey}
                   onOpenSkill={setSelectedKey}
-                  // Card rows carry no per-skill switch: enablement is
-                  // one group action on the bar (below), and an
-                  // individual switch waits on the detail panel a row
-                  // opens. The disabled rows stay dimmed so the group
-                  // switch's state has its evidence.
-                  rowActions={false}
+                  uninstalled={
+                    card.repo ? uninstalledByRepo.get(card.repo) : undefined
+                  }
                   footerAction={
                     <RepoEnableSwitch
                       names={card.items.map((row) => row.skill.name)}

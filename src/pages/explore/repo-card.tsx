@@ -9,6 +9,7 @@ import { domainIcon } from "../../data/domains";
 import { DomainGlyph } from "../../components/domain-glyph";
 import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
 import { isLiveSkill, skillKey, type SkillView } from "../../lib/skill-view";
+import type { Skill } from "../../types/skill";
 import { cn, formatCount } from "../../lib/utils";
 
 import {
@@ -43,10 +44,9 @@ const MotionCardHeader = motion.create(CardHeader);
  * and the installed list hands over the same shape with the one fact only it
  * knows: whether the skill is enabled (a disabled row is dimmed), plus the
  * migration badge for an install whose source the ledger cannot vouch for. The
- * row's corner control is the store's install button; the installed list draws
- * no per-row control at all — a card manages its skills as one group, from the
- * bar (`footerAction`), and per-skill switching waits one level deeper, on the
- * detail panel a row opens.
+ * row's corner control is the store's install button; the installed list hands
+ * over the skill's enable switch in the same slot — hover-revealed like the
+ * install button, while the bar (`footerAction`) keeps the one group switch.
  */
 export interface RepoCardRow {
   /** The skill the row renders. */
@@ -128,10 +128,21 @@ export interface RepoCardRow {
  * standalone skill card, whose idle install button stays visible: there, one
  * card carries one skill, so the button is that card's own action rather than a
  * repeated glyph. A pointer that never hovers (a touch surface) still reaches
- * the same install through the detail panel, which the row opens. The installed
- * list asks for no row control at all (`rowActions={false}`): comparing and
- * grouping installed skills is what its cards are for, and enablement is one
- * group action on the bar.
+ * the same install through the detail panel, which the row opens. The
+ * installed list puts its per-row enable switch in the same floating slot
+ * (`hoverAction` with the switch as the row's `action`): enablement of one
+ * skill is a point-in-time action like installing, while the bar's group
+ * switch (`footerAction`) remains the control that answers "all of them".
+ *
+ * **Uninstalled siblings** — the optional `uninstalled` prop — give an
+ * installed card its repository's missing skills: a hairline closes the
+ * installed rows off, and one quiet row states how many skills of the same
+ * repository are *not* installed yet. A press unfolds them in place as rows
+ * of their own group (each with the store's hover-revealed install button),
+ * the same offer the store's repository view makes, so "what else is in
+ * here?" reads without leaving the list. The two groups never mix: the
+ * installed rows keep their order and the fold, the uninstalled ones live
+ * below the divider and stay folded until asked for.
  *
  * Because the button is only ever *shown* on intent, it does not take part in
  * the row's layout: it floats over the row's right edge, so a name and a
@@ -178,6 +189,7 @@ export function RepoCard({
   rowActions = true,
   hoverAction = true,
   footerAction,
+  uninstalled,
 }: {
   /** `owner/repo` — the repository the card stands for; empty for the installed
    *  list's pool of skills no recorded source vouches for. */
@@ -204,9 +216,9 @@ export function RepoCard({
   onOpenSkill: (key: string) => void;
   /**
    * Whether the rows carry their corner control (the store's hover-revealed
-   * install button). The installed list passes `false`: its cards carry no
-   * per-skill control — the group switch on the bar and the per-skill switches
-   * on the repository's page split that job.
+   * install button, or whatever `action` the caller hands over — the installed
+   * list's per-row enable switch). The bar's group switch stays the control
+   * that answers "all of them at once" either way.
    */
   rowActions?: boolean;
   /**
@@ -221,6 +233,12 @@ export function RepoCard({
    * card's skills; absent (the store) leaves the bar alone with its toggle.
    */
   footerAction?: ReactNode;
+  /**
+   * The repository's registry skills that are not installed — the installed
+   * list's offer, folded under the card's rows until asked for. Absent (the
+   * store, whose rows *are* the repository) draws no section at all.
+   */
+  uninstalled?: Skill[];
 }) {
   const { t } = useTranslation();
   const locale = useAppLocale();
@@ -230,6 +248,11 @@ export function RepoCard({
   // know which of its cards is open, and the grid reflows around it on its own
   // (the open card spans the full row; see the note on the list item below).
   const [expanded, setExpanded] = useState(false);
+  // The uninstalled section's own fold, independent of the card's: it starts
+  // closed (the count row is the offer) and only the section's own press
+  // moves it, so revealing the card's rows never drags the uninstalled ones
+  // along.
+  const [uninstalledOpen, setUninstalledOpen] = useState(false);
   // The owner segment is what the dataset hosts an avatar for; a repository
   // group always has one (a bare-host source is its own owner).
   const [owner] = repo.split("/");
@@ -594,6 +617,85 @@ export function RepoCard({
               );
             })}
           </ul>
+
+          {/* The uninstalled group: the repository's registry skills the
+              reader does not have, behind a hairline so the two groups never
+              read as one list. Folded, it is one quiet row — a plus over the
+              exact count, the same offer the bar's 「＋ N」 makes for the
+              rows behind the cap. A press unfolds the rows in place; each
+              carries the store's hover-revealed install button, and none
+              opens the detail panel (this surface's drawer walks the
+              *installed* list — an uninstalled row's destination is the
+              install itself). */}
+          {uninstalled && uninstalled.length > 0 && (
+            <div className="mt-1 border-t border-border/60 pt-1">
+              <button
+                type="button"
+                onClick={() => setUninstalledOpen((value) => !value)}
+                aria-expanded={uninstalledOpen}
+                aria-label={t("state.uninstalledToggleAria", {
+                  name,
+                  count: uninstalled.length,
+                })}
+                className="group/uninstalled -mx-1.5 flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex w-4 shrink-0 items-center justify-center"
+                >
+                  {uninstalledOpen ? (
+                    <Minus className="size-3" />
+                  ) : (
+                    <Plus className="size-3" />
+                  )}
+                </span>
+                <span className="truncate font-medium">
+                  {t("state.uninstalledCount", { count: uninstalled.length })}
+                </span>
+              </button>
+              {uninstalledOpen && (
+                <ul
+                  aria-label={t("state.uninstalledListAria", { name })}
+                  className="-mx-1.5 flex flex-col"
+                >
+                  {uninstalled.map((skill) => (
+                    <li
+                      key={skill.name}
+                      data-skill={skill.name}
+                      className="group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent"
+                    >
+                      <span className="flex min-w-0 flex-1 items-center gap-2 py-1">
+                        <span
+                          aria-hidden="true"
+                          className="flex w-4 shrink-0 items-center justify-center text-muted-foreground"
+                        >
+                          <DomainGlyph
+                            icon={domainIcon(skill.profile?.domain)}
+                            className="size-3.5"
+                          />
+                        </span>
+                        <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
+                          {skill.name}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                          {skillDescription(skill, locale) ||
+                            t("common.noDescription")}
+                        </span>
+                      </span>
+                      {/* The same floating slot the installed rows' controls
+                          live in: revealed on hover or focus, floating over a
+                          gradient of the row's own hover surface. After an
+                          install the button settles into its 已安装 badge and
+                          the wrapper keeps it on screen. */}
+                      <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100">
+                        <SkillInstallButton skill={skill} className="h-7 w-7" />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </CardContent>
       </MotionCard>
     </li>
