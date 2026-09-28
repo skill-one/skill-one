@@ -444,7 +444,7 @@ describe("RepoCard", () => {
     const item = container.querySelector("ul > li") as HTMLElement;
     expect(item).toHaveClass("col-span-full");
     const card = item.querySelector('[data-slot="card"]') as HTMLElement;
-    expect(card).toHaveClass("shadow-lg");
+    expect(card.className).not.toMatch(/shadow-/);
     const body = container.querySelector('[data-slot="card-content"] ul')!;
     expect(body).toHaveClass("grid");
     expect(body).toHaveClass("grid-flow-col");

@@ -295,12 +295,10 @@ export function RepoCard({
   // deck. (The flag is only ever set on the card being toggled — neighbours
   // that merely shift never raise themselves. Without layout animations
   // there is no complete event to clear it, so reduced-motion readers never
-  // set it either.) The lift is split in two: the z-order covers the whole
-  // transition — it is what keeps the shrinking card on top — while the
-  // shadow rides `expanded` alone and eases through `transition-shadow`, so
-  // neither the lift nor the light pops in a single frame (a shadow that
-  // materialises at 2× scale on the first collapse frame is exactly the
-  // flash a fold used to start with).
+  // set it either.) The lift is the z-order alone: no shadow rides the open
+  // card, so the card reads on the shared `ring` every card wears and the
+  // only thing that changes is what is on top — nothing can pop in a single
+  // frame when the card folds.
   const [collapsing, setCollapsing] = useState(false);
   const lifted = canExpand && !reducedMotion && (expanded || collapsing);
   const toggleExpanded = () => {
@@ -398,10 +396,7 @@ export function RepoCard({
         layout={!reducedMotion}
         transition={reducedMotion ? undefined : EXPAND_TRANSITION}
         onLayoutAnimationComplete={() => setCollapsing(false)}
-        className={cn(
-          "group flex-1 transition-shadow",
-          wide && "shadow-lg shadow-black/10",
-        )}
+        className="group flex-1"
       >
         {/* The card's one bar, leading the card: what this repository is and
             how big it is — read first, so a scan of the grid reads as a scan
