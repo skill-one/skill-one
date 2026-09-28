@@ -1,12 +1,33 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Loader2, Users } from "lucide-react";
+import { Columns2, Loader2, Orbit, Users } from "lucide-react";
 
 import { fetchAgentStatus } from "../../lib/local-skills";
 import { agentLinkState } from "../../lib/agent-link-state";
+import {
+  getAgentsLayout,
+  setAgentsLayout,
+  type AgentsLayoutMode,
+} from "../../lib/agents-layout-preference";
 import { errorMessage } from "../../lib/utils";
 import { Placeholder } from "../../components/placeholder";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import { AgentGraph } from "./agent-graph";
+
+/** The two graph presentations, with their icons and label keys. */
+const LAYOUT_OPTIONS: ReadonlyArray<{
+  mode: AgentsLayoutMode;
+  icon: typeof Orbit;
+  labelKey: "agents.layout.constellation" | "agents.layout.columns";
+}> = [
+  { mode: "constellation", icon: Orbit, labelKey: "agents.layout.constellation" },
+  { mode: "columns", icon: Columns2, labelKey: "agents.layout.columns" },
+];
 
 /**
  * The agents page — the app's home. Every agent this machine detects is drawn
@@ -18,6 +39,15 @@ import { AgentGraph } from "./agent-graph";
  */
 export function AgentsPage() {
   const { t } = useTranslation();
+  // The presentation choice is the user's, persisted across launches.
+  const [layoutMode, setLayoutMode] = useState<AgentsLayoutMode>(() =>
+    getAgentsLayout(),
+  );
+
+  const chooseLayout = (mode: AgentsLayoutMode) => {
+    setLayoutMode(mode);
+    setAgentsLayout(mode);
+  };
   const {
     data: agents,
     isLoading,
@@ -61,6 +91,39 @@ export function AgentsPage() {
             )}
           </p>
         </div>
+
+        {/* Presentation switch: constellation scatter vs. balanced columns. */}
+        <div
+          role="group"
+          aria-label={t("agents.layout.groupAria")}
+          className="flex shrink-0 items-center gap-0.5 rounded-lg border border-border bg-card p-0.5"
+        >
+          {LAYOUT_OPTIONS.map(({ mode, icon: Icon, labelKey }) => {
+            const active = layoutMode === mode;
+            return (
+              <Tooltip key={mode}>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      aria-pressed={active}
+                      aria-label={t(labelKey)}
+                      onClick={() => chooseLayout(mode)}
+                      className={
+                        active
+                          ? "flex size-7 items-center justify-center rounded-md bg-muted text-foreground outline-none"
+                          : "flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                      }
+                    >
+                      <Icon className="size-4" />
+                    </button>
+                  }
+                />
+                <TooltipContent side="bottom">{t(labelKey)}</TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -78,7 +141,7 @@ export function AgentsPage() {
         ) : list.length === 0 ? (
           <Placeholder icon={Users} message={t("agentLink.noAgents")} />
         ) : (
-          <AgentGraph agents={list} />
+          <AgentGraph agents={list} mode={layoutMode} />
         )}
       </div>
     </div>

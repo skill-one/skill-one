@@ -24,6 +24,15 @@ export interface Point {
 /** Where the node's name tooltip opens, in screen-side terms. */
 export type NodeTipSide = "left" | "right" | "top" | "bottom";
 
+/** Which hub side a column-mode tile stands on. */
+export type GraphSide = "left" | "right";
+
+/**
+ * The graph presentation: a Vogel scatter or the original balanced columns
+ * on the hub's two sides.
+ */
+export type AgentsLayoutMode = "constellation" | "columns";
+
 export interface NodeLayout {
   /** Agent id (`AgentStatus.name`). */
   name: string;
@@ -36,8 +45,10 @@ export interface NodeLayout {
   anchor: Point;
   /** The side its name tooltip opens toward — always away from the hub. */
   tipSide: NodeTipSide;
-  /** This node's polar angle around the hub (radians, 0 = east). */
-  angle: number;
+  /** Constellation mode: this node's polar angle around the hub (0 = east). */
+  angle?: number;
+  /** Columns mode: which side of the hub the tile stands on. */
+  side?: GraphSide;
 }
 
 export interface RibbonLayout {
@@ -126,13 +137,13 @@ export function ribbonColor(name: string): string {
 }
 
 /**
- * One ribbon: a cubic that bows tangentially as it approaches the hub, every
- * ribbon curling the same handedness — a quiet galaxy swirl rather than a
- * fan of straight spokes. Control points run along the chord with a fixed
- * perpendicular bow, so the curve stays gentle on short spokes and never
- * kinks.
+ * One constellation ribbon: a cubic that bows tangentially as it approaches
+ * the hub, every ribbon curling the same handedness — a quiet galaxy swirl
+ * rather than a fan of straight spokes. Control points run along the chord
+ * with a fixed perpendicular bow, so the curve stays gentle on short spokes
+ * and never kinks.
  */
-export function ribbonPath(from: Point, to: Point): string {
+export function swirlPath(from: Point, to: Point): string {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const len = Math.hypot(dx, dy) || 1;
@@ -148,6 +159,18 @@ export function ribbonPath(from: Point, to: Point): string {
   const c2x = to.x - ux * pull + nx * bow;
   const c2y = to.y - uy * pull + ny * bow;
   return `M ${from.x} ${from.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${to.x} ${to.y}`;
+}
+
+/**
+ * One columns-mode ribbon: a cubic with horizontal tangents — the original
+ * S-curve. The control-point pull is clamped so short ribbons still read as
+ * curves, and its sign follows the run's direction so a right-hand tile
+ * curves into the hub the way its mirror on the left does.
+ */
+export function sCurvePath(from: Point, to: Point): string {
+  const dx = to.x - from.x;
+  const pull = Math.max(48, Math.abs(dx) * 0.52) * (dx >= 0 ? 1 : -1);
+  return `M ${from.x} ${from.y} C ${from.x + pull} ${from.y}, ${to.x - pull} ${to.y}, ${to.x} ${to.y}`;
 }
 
 /** The gap that pairs with a tile size (slightly tighter as tiles shrink). */
@@ -200,6 +223,135 @@ function resolveTipSide(angle: number, cx: number, width: number): NodeTipSide {
   return sin >= 0 ? "bottom" : "top";
 }
 
+/** Column-mode geometry: one bare icon tile per row. */
+const COL_TILE = NODE_SIZE_MAX;
+const COL_GAP = 14;
+const COL_PITCH = COL_TILE + COL_GAP;
+/** Vertical pad and the clear central lane for the hub. */
+const COL_PAD_TOP = 28;
+const COL_PAD_BOTTOM = 28;
+const COL_HUB_LANE = HUB_RADIUS + HUB_TIP_GAP + 24;
+/** Gutter outside the outermost column, holding the outward name tooltip. */
+const COL_TIP_GUTTER = 104;
+/** The narrowest the columns canvas renders; below it the page scrolls. */
+const COL_MIN_WIDTH =
+  2 * (COL_HUB_LANE + COL_TILE) + 2 * COL_TIP_GUTTER;
+
+/** The height of an icon column holding `count` tiles. */
+function columnHeight(count: number): number {
+  return count > 0 ? count * COL_TILE + (count - 1) * COL_GAP : 0;
+}
+
+/**
+ * The original presentation: balanced icon columns on the hub's left and
+ * right, opening more columns outward as the roster grows or the canvas
+ * shortens. Ribbons cross the clear central lane on horizontal S-curves.
+ */
+function layoutColumns(
+  agents: readonly AgentStatus[],
+  measuredWidth: number,
+  measuredHeight: number,
+): GraphLayout {
+  const measuredW = measuredWidth > 0 ? measuredWidth : DEFAULT_GRAPH_WIDTH;
+  const measuredH = measuredHeight > 0 ? measuredHeight : DEFAULT_GRAPH_HEIGHT;
+
+  const rowsThatFit = () => {
+    const usable =
+      measuredH - COL_PAD_TOP - COL_PAD_BOTTOM - COL_PITCH / 2;
+    return Math.max(1, Math.floor((usable + COL_GAP) / COL_PITCH));
+  };
+  const columnsPerSide = () => {
+    const half =
+      measuredW / 2 - COL_TIP_GUTTER - COL_HUB_LANE + COL_GAP;
+    return Math.max(1, Math.floor(half / (COL_TILE + COL_GAP)));
+  };
+
+  const maxColumns = 2 * columnsPerSide();
+  const needed = Math.max(1, Math.ceil(agents.length / rowsThatFit()));
+  let columnCount = Math.max(1, Math.min(needed, maxColumns));
+  // Keep the hub centred: beyond a lone tile, always fill both sides evenly.
+  if (agents.length > 1 && columnCount % 2 === 1 && columnCount < maxColumns) {
+    columnCount += 1;
+  }
+
+  // Balanced, contiguous columns — earlier columns take the odd remainder so
+  // the reading order runs top-to-bottom, left to right.
+  const perColumn = Math.floor(agents.length / columnCount);
+  const remainder = agents.length % columnCount;
+  const columns: AgentStatus[][] = [];
+  let cursor = 0;
+  for (let c = 0; c < columnCount; c += 1) {
+    const size = perColumn + (c < remainder ? 1 : 0);
+    columns.push(agents.slice(cursor, cursor + size));
+    cursor += size;
+  }
+
+  const tallest = columns.reduce((max, col) => Math.max(max, col.length), 0);
+  const height = Math.max(
+    measuredH,
+    columnHeight(tallest) + COL_PITCH / 2 + COL_PAD_TOP + COL_PAD_BOTTOM,
+  );
+  const width = Math.max(measuredW, COL_MIN_WIDTH);
+  const hub = { x: width / 2, y: height / 2, radius: HUB_RADIUS };
+  const tipLeft: Point = { x: hub.x - HUB_RADIUS - HUB_TIP_GAP, y: hub.y };
+  const tipRight: Point = { x: hub.x + HUB_RADIUS + HUB_TIP_GAP, y: hub.y };
+
+  const byName = new Map<string, NodeLayout>();
+  columns.forEach((column, c) => {
+    const side: GraphSide = c % 2 === 0 ? "left" : "right";
+    // Rank counts columns inward from the gutter: 0 is the outermost pair.
+    const rank = Math.floor(c / 2);
+    const x =
+      side === "left"
+        ? COL_TIP_GUTTER + rank * (COL_TILE + COL_GAP)
+        : width - COL_TIP_GUTTER - COL_TILE - rank * (COL_TILE + COL_GAP);
+    // The two sides sit half a pitch apart, so their rows interlock.
+    const stagger = side === "left" ? -COL_PITCH / 4 : COL_PITCH / 4;
+    const top = hub.y - columnHeight(column.length) / 2 + stagger;
+    column.forEach((agent, row) => {
+      const y = top + row * COL_PITCH;
+      byName.set(agent.name, {
+        name: agent.name,
+        side,
+        x,
+        y,
+        width: COL_TILE,
+        height: COL_TILE,
+        anchor: {
+          x: side === "left" ? x + COL_TILE : x,
+          y: y + COL_TILE / 2,
+        },
+        tipSide: side === "left" ? "left" : "right",
+      });
+    });
+  });
+
+  const nodes = agents.map((agent) => byName.get(agent.name)!);
+  const ribbons = nodes.map((node) => ({
+    name: node.name,
+    d: sCurvePath(node.anchor, node.side === "left" ? tipLeft : tipRight),
+  }));
+
+  return { width, height, nodes, ribbons, hub };
+}
+
+/**
+ * Lay every agent out around the SkillOne hub. `mode` picks the
+ * presentation: the Vogel constellation (default) or the original balanced
+ * columns.
+ */
+export function layoutAgents(
+  agents: readonly AgentStatus[],
+  measuredWidth: number,
+  measuredHeight: number,
+  mode: AgentsLayoutMode = "constellation",
+): GraphLayout {
+  if (mode === "columns") {
+    return layoutColumns(agents, measuredWidth, measuredHeight);
+  }
+  return layoutConstellation(agents, measuredWidth, measuredHeight);
+}
+
 /**
  * Lay every agent out around the SkillOne hub on a Vogel spiral: the hub
  * sits at the canvas centre, node 0 rests one spoke above it, and every
@@ -208,7 +360,7 @@ function resolveTipSide(angle: number, cx: number, width: number): NodeTipSide {
  * measured canvas; only when the floor cannot fit does the canvas grow and
  * the page scroll.
  */
-export function layoutAgents(
+function layoutConstellation(
   agents: readonly AgentStatus[],
   measuredWidth: number,
   measuredHeight: number,
@@ -258,7 +410,7 @@ export function layoutAgents(
       x: hub.x + (HUB_RADIUS + HUB_TIP_GAP) * Math.cos(angle),
       y: hub.y + (HUB_RADIUS + HUB_TIP_GAP) * Math.sin(angle),
     };
-    return { name: node.name, d: ribbonPath(node.anchor, tip) };
+    return { name: node.name, d: swirlPath(node.anchor, tip) };
   });
 
   return { width, height, nodes, ribbons, hub };

@@ -137,6 +137,11 @@
     "title": "Agents",
     "connected": "{{linked}} of {{total}} agents connected",
     "attention": "{{count}} need attention",
+    "layout": {
+      "groupAria": "Graph layout",
+      "constellation": "Constellation",
+      "columns": "Columns"
+    },
     "hub": {
       "diskAria": "Manage skills ({{total}} installed)",
       "previewTitle": "Enabled skills",
