@@ -29,6 +29,7 @@
 import { isTauri } from "./tauri";
 import { storage } from "./storage";
 import { readProvenanceRaw, writeProvenanceRaw } from "./skills-manager";
+import { logActivity, type SourceLinkReason } from "./activity";
 
 /** A stored source record: one installed skill's store identity. */
 export interface ProvenanceRecord {
@@ -245,6 +246,25 @@ async function saveLedger(records: Map<string, LedgerRecord>): Promise<void> {
 }
 
 /**
+ * Note the association in the activity log. An `install` and a user-confirmed
+ * link are the user's doing; the hash and description tiers decide on their
+ * own, so their lines carry the `auto` actor.
+ */
+async function logSkillSourceLink(
+  repo: string,
+  name: string,
+  reason: SourceLinkReason,
+): Promise<void> {
+  await logActivity({
+    event: "source.link",
+    actor: reason === "hash" || reason === "description" ? "auto" : "user",
+    kind: "skill",
+    names: [name],
+    detail: { repo, reason },
+  });
+}
+
+/**
  * Record where a freshly installed skill came from. Best-effort by contract:
  * a ledger write failure is logged and swallowed so it can never fail (or
  * slow down feedback for) the install it documents.
@@ -253,6 +273,7 @@ export async function recordSkillProvenance(
   repo: string,
   name: string,
   hash?: string,
+  reason: SourceLinkReason = "install",
 ): Promise<void> {
   try {
     const ledger = await loadLedger();
@@ -263,6 +284,7 @@ export async function recordSkillProvenance(
       ...(hash ? { hash } : {}),
     });
     await saveLedger(ledger);
+    await logSkillSourceLink(repo, name, reason);
   } catch (e) {
     console.warn("provenance: failed to record install source", e);
   }
@@ -275,7 +297,12 @@ export async function recordSkillProvenance(
  * logically one ledger update.
  */
 export async function recordSkillProvenanceBatch(
-  entries: Array<{ repo: string; name: string; hash?: string }>,
+  entries: Array<{
+    repo: string;
+    name: string;
+    hash?: string;
+    reason?: SourceLinkReason;
+  }>,
 ): Promise<void> {
   try {
     const ledger = await loadLedger();
@@ -288,6 +315,9 @@ export async function recordSkillProvenanceBatch(
       });
     }
     await saveLedger(ledger);
+    for (const entry of entries) {
+      await logSkillSourceLink(entry.repo, entry.name, entry.reason ?? "hash");
+    }
   } catch (e) {
     console.warn("provenance: failed to record install sources", e);
   }

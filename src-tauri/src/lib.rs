@@ -5,6 +5,7 @@
 
 use tauri::Listener;
 
+mod activity;
 mod provenance;
 mod skill_hash;
 mod skills;
@@ -40,6 +41,10 @@ pub fn run() {
             skills::skill_fingerprint,
             provenance::read_provenance,
             provenance::write_provenance,
+            activity::append_activity,
+            activity::read_activity,
+            activity::clear_activity,
+            activity::open_activity_dir,
             update_channel::is_homebrew_install,
         ])
         .setup(|app| {

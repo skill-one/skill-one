@@ -147,6 +147,8 @@ describe("LinkSuggestionBadge — label variant (default)", () => {
     expect(recordSkillProvenance).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
+      undefined,
+      "confirm",
     );
     expect(markSkillsChanged).toHaveBeenCalledTimes(1);
 

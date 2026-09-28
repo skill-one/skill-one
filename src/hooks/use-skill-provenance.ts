@@ -10,6 +10,7 @@ import {
 } from "./use-installed-skills";
 import { reconcileProvenance } from "../lib/provenance";
 import type { SkillProvenance } from "../lib/provenance";
+import { logSkillDiscoveries } from "../lib/activity";
 import {
   noteRegistryEpoch,
   resolveAssociations,
@@ -68,6 +69,11 @@ export async function fetchProvenanceState(
     }
     suggestions = resolved.suggestions;
   }
+
+  // Report skills the app has never accounted for — the "scan" events. A
+  // no-op after the first pass (which adopts the current set as the baseline)
+  // and for anything the app itself installed.
+  await logSkillDiscoveries(names, (name) => linked[name] != null);
 
   return { linked, suggestions };
 }

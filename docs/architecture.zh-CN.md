@@ -41,6 +41,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 - 命令内部委托给 `agents-skills` 库的 `Manager` 门面，返回 camelCase 的 DTO 给前端。自 agents-skills 0.15 起链接是单向的：agent 自带的 skills 被收编进规范目录（同名冲突保留规范目录副本），其余文件被隔离到 `.misc/<agent>/`，取消链接只断开符号链接。`list` 还会报告每个技能的描述与安装时间，应用原样透传。自 0.21 起一次安装就是一个 source 对应一个技能——`owner/repo@<skill>`；自 0.23 起后端从 codeload.github.com 下载整个仓库 tarball 并在本地匹配技能（不再走 GitHub REST API，也不受其匿名限流影响）——失败即命令的 `Err`，因此 `install_skill` 只返回 `{ skill, skipped }`。
 - **`src-tauri/src/skill_hash.rs`**：技能目录的内容身份——skills.sh 上游哈希 + 仅 stat 的变更检测指纹，由同一次递归遍历产出（见 `docs/skill-provenance.zh-CN.md`）。`analyze_skill` 一次返回两者；`skill_fingerprint` 是其中仅 stat 的那一半，即让账本跨重启复用已存哈希的廉价有效性检查。
 - **`src-tauri/src/provenance.rs`**：来源账本 `~/.agents/skills/.skill-one.jsonl` 的两个固定路径文件命令（`read_provenance`/`write_provenance`）——原子写入，且在旧版 JSON 文档被首次 JSONL 写入转换并移除之前，透明地读取它。全部 schema 知识都在前端（`src/lib/provenance.ts`）。
+- **`src-tauri/src/activity.rs`**：位于 `<app_log_dir>/activity.jsonl` 的 append-only 活动日志——`append_activity`（2 MiB 时轮转）、`read_activity`（跨当前文件与备份读取最新的 `limit` 行）、`clear_activity` 与 `open_activity_dir`。与 `provenance.rs` 一样保持“薄”：schema 与发现基线都在前端（`src/lib/activity.ts`，见 `docs/activity-log.md`）。
 
 ### 前端写入封装
 
@@ -71,6 +72,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 | `src/lib/avatar-source.ts` | 「owner 头像在哪里」的唯一答案：数据集镜像（定址到已记录的快照标签）、它的可变分支、最后是 GitHub 自己的端点——所有界面都从这一条链取图 |
 | `src/lib/tauri.ts` | 判断是否运行在 Tauri WebView 中 |
 | `src/lib/open-external.ts` | 在系统浏览器中打开外链（Tauri 需 opener 插件） |
+| `src/lib/activity.ts` / `src/components/activity-dialog.tsx` | append-only 活动日志——应用对用户技能与 Agent 做过什么——及其查看器，从设置 popover 进入（见 `docs/activity-log.md`） |
 | `src-tauri/tauri.conf.json` | 窗口、构建与打包配置 |
 | `src-tauri/capabilities/default.json` | 主窗口权限声明（`core:default`、`opener:default`、`updater:default`、`process:allow-restart`，以及 `http:default` 允许的 skills.sh 搜索来源） |
 

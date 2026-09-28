@@ -236,6 +236,37 @@ export async function writeProvenanceRaw(content: string): Promise<void> {
   await invoke("write_provenance", { content });
 }
 
+/**
+ * Append one activity record (a single JSON line) to the activity log in the
+ * OS log directory. The backend owns rotation; the frontend owns the schema
+ * (see `lib/activity.ts`).
+ */
+export async function appendActivityRaw(line: string): Promise<void> {
+  requireTauri();
+  await invoke("append_activity", { line });
+}
+
+/**
+ * Read the newest activity lines (oldest-first), at most `limit` (the backend
+ * defaults to 500). Parsing is the frontend's job; this returns raw lines.
+ */
+export async function readActivityRaw(limit?: number): Promise<string[]> {
+  requireTauri();
+  return invoke<string[]>("read_activity", { limit });
+}
+
+/** Delete the activity log and its rotated backup. */
+export async function clearActivityRaw(): Promise<void> {
+  requireTauri();
+  await invoke("clear_activity");
+}
+
+/** Reveal the activity log's directory in the system file manager. */
+export async function openActivityDirRaw(): Promise<void> {
+  requireTauri();
+  await invoke("open_activity_dir");
+}
+
 /** Stat-only change-detection identity of an installed skill's directory. */
 export interface SkillFingerprint {
   /** Latest file mtime in the directory, as Unix milliseconds. */

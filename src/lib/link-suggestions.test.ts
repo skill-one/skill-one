@@ -34,7 +34,13 @@ const {
 
 vi.mock("./registry/client", () => ({ searchSkills, getRegistrySnapshot }));
 vi.mock("./tauri", () => ({ isTauri }));
-vi.mock("./skills-manager", () => ({ analyzeSkill, skillFingerprint }));
+vi.mock("./skills-manager", () => ({
+  analyzeSkill,
+  skillFingerprint,
+  // The activity log's append path: this module links skills, which records an
+  // event; the write itself is not under test here.
+  appendActivityRaw: vi.fn(),
+}));
 vi.mock("./provenance", () => ({
   recordSkillProvenanceBatch,
   loadResolutionRecords,
@@ -147,7 +153,7 @@ describe("resolveAssociations", () => {
     expect(suggestions).toEqual({});
     // A description match does not verify content, so no version marker.
     expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
-      { repo: "anthropics/skills", name: "pdf" },
+      { repo: "anthropics/skills", name: "pdf", reason: "description" },
     ]);
   });
 
@@ -197,7 +203,7 @@ describe("resolveAssociations", () => {
     expect(suggestions).toEqual({});
     // The matched hash is stored as the installed version marker.
     expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
-      { repo: "fork/skills", name: "pdf", hash: "hash-fork" },
+      { repo: "fork/skills", name: "pdf", hash: "hash-fork", reason: "hash" },
     ]);
   });
 
