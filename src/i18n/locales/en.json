@@ -136,7 +136,14 @@
   "agents": {
     "title": "Agents",
     "connected": "{{linked}} of {{total}} agents connected",
-    "attention": "{{count}} need attention"
+    "attention": "{{count}} need attention",
+    "hub": {
+      "diskAria": "Manage skills ({{total}} installed)",
+      "previewTitle": "Enabled skills",
+      "noneEnabled": "No enabled skills yet",
+      "browseStore": "Store",
+      "manage": "Manage"
+    }
   },
   "agentLink": {
     "noAgents": "No available agents detected"

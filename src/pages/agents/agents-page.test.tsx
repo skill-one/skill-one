@@ -24,43 +24,43 @@ describe("AgentsPage", () => {
 
     // Three of the five mock agents are effectively linked (two linked plus
     // the canonical one); the summary in the head states it.
-    expect(
-      await screen.findByText("已连接 3/5 个 agent"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("已连接 3/5 个 agent")).toBeInTheDocument();
 
-    // Every agent is a node card, each with its link state.
-    expect(screen.getByText("Claude Code")).toBeInTheDocument();
-    expect(screen.getByText("Codex")).toBeInTheDocument();
-    expect(screen.getByText("Cursor")).toBeInTheDocument();
-    expect(screen.getByText("Gemini CLI")).toBeInTheDocument();
-    expect(screen.getByText("Windsurf")).toBeInTheDocument();
+    // Every agent is one bare icon, reachable by its name.
+    for (const name of [
+      "Claude Code",
+      "Codex",
+      "Cursor",
+      "Gemini CLI",
+      "Windsurf",
+    ]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
   });
 
   it("flags, in the head, the agent whose own directory already holds content", async () => {
     renderPage();
     expect(await screen.findByText("已连接 3/5 个 agent")).toBeInTheDocument();
-    // The head carries the attention count; the agent's own card holds only its
-    // name — its warning state rides on the amber, still ribbon.
+    // The head carries the attention count; the icon's edge and ribbon carry
+    // the warning itself.
     expect(screen.getByText(/1 个待处理/)).toBeInTheDocument();
   });
 
-  it("links an agent straight from its card and re-renders the graph", async () => {
+  it("links an agent by clicking its icon and re-renders the graph", async () => {
     const user = userEvent.setup();
     const { container } = renderPage();
     expect(await screen.findByText("已连接 3/5 个 agent")).toBeInTheDocument();
 
-    // The card is the toggle: one click links the agent.
+    // The icon is the toggle: one click links the agent.
     await user.click(screen.getByRole("button", { name: "Gemini CLI" }));
 
     // The head summary flips to 4/5 and the ribbon joins the linked set.
-    expect(
-      await screen.findByText("已连接 4/5 个 agent"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("已连接 4/5 个 agent")).toBeInTheDocument();
     const group = container.querySelector('g[data-agent="gemini-cli"]')!;
     expect(group.getAttribute("data-state")).toBe("linked");
   });
 
-  it("unlinks a linked agent from its card and remembers it", async () => {
+  it("unlinks a linked agent by clicking its icon and remembers it", async () => {
     const user = userEvent.setup();
     const successSpy = vi.spyOn(toast, "add");
     renderPage();
@@ -76,14 +76,12 @@ describe("AgentsPage", () => {
     expect(getExcludedAgents()).toEqual(["claude-code"]);
   });
 
-  it("re-links an unlinked agent from its card", async () => {
+  it("re-links an unlinked agent by clicking its icon", async () => {
     const user = userEvent.setup();
     const successSpy = vi.spyOn(toast, "add");
     renderPage();
 
-    await user.click(
-      await screen.findByRole("button", { name: "Gemini CLI" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "Gemini CLI" }));
 
     expect(successSpy).toHaveBeenCalledWith({
       title: "Gemini CLI 已链接",
@@ -92,11 +90,11 @@ describe("AgentsPage", () => {
     expect(getExcludedAgents()).toEqual([]);
   });
 
-  it("leaves a canonical agent's card inert", async () => {
+  it("leaves a canonical agent's icon inert", async () => {
     renderPage();
 
-    // A canonical agent uses its native skills directory, so its card cannot be
-    // switched off — the button is disabled and reads as pressed.
+    // A canonical agent uses its native skills directory, so it cannot be
+    // switched off: the icon is disabled and reads as pressed.
     const card = await screen.findByRole("button", { name: "Windsurf" });
     expect(card).toBeDisabled();
     expect(card).toHaveAttribute("aria-pressed", "true");

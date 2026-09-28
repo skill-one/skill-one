@@ -136,7 +136,14 @@
   "agents": {
     "title": "Agents",
     "connected": "已连接 {{linked}}/{{total}} 个 agent",
-    "attention": "{{count}} 个待处理"
+    "attention": "{{count}} 个待处理",
+    "hub": {
+      "diskAria": "管理技能（已安装 {{total}} 个）",
+      "previewTitle": "已启用的技能",
+      "noneEnabled": "还没有启用的技能",
+      "browseStore": "商店",
+      "manage": "管理"
+    }
   },
   "agentLink": {
     "noAgents": "未检测到可用的 agent"
