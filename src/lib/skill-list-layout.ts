@@ -58,12 +58,13 @@ export const SKILL_ROW_SKELETON_CLASS = "h-[58px] rounded-xl";
  * `RepoCard` fits without overflowing, and a long name truncates rather than
  * pushing the description out.
  *
- * The rows are equal height: a short card wears its neighbour's height as
- * space above its footer, which `mt-auto` keeps at the bottom edge. This plain
- * grid renders identically on every platform — no masonry feature to gate on.
+ * The cards are top-aligned and take their own height: a repository with two
+ * skills is a short card, not a tall one wearing its row-mate's blank space.
+ * (`items-start` is all it is — still one plain grid, still rendering
+ * identically on every platform; no masonry feature to gate on.)
  */
 export const REPO_LIST_CLASS =
-  "grid gap-4 grid-cols-[repeat(auto-fill,minmax(440px,1fr))]";
+  "grid gap-4 grid-cols-[repeat(auto-fill,minmax(440px,1fr))] items-start";
 
 /**
  * Placeholder standing in for one repository card while a list loads, at the
