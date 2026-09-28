@@ -14,7 +14,8 @@ function renderPage() {
 
 afterEach(() => {
   resetMockAgentStatus();
-  // Link exclusions live in localStorage; one test's opt-out must not leak.
+  // Link exclusions and the layout choice live in localStorage; neither must
+  // leak across tests.
   window.localStorage.clear();
 });
 
@@ -98,5 +99,28 @@ describe("AgentsPage", () => {
     const card = await screen.findByRole("button", { name: "Windsurf" });
     expect(card).toBeDisabled();
     expect(card).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("defaults to the constellation and switches to the columns layout", async () => {
+    const user = userEvent.setup();
+    const { container } = renderPage();
+    await screen.findByText("已连接 3/5 个 agent");
+
+    // Default presentation: the Vogel scatter (nodes carry an angle, no side).
+    const ribbonGroup = () =>
+      container.querySelector('svg g[data-agent="claude-code"]')!;
+    expect(ribbonGroup()).toBeInTheDocument();
+
+    // Switching to columns re-lays the graph out (the mode persists, but this
+    // test only asserts the control swaps the pressed presentation).
+    const columnsButton = screen.getByRole("button", { name: "分列" });
+    expect(
+      screen.getByRole("button", { name: "星座" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await user.click(columnsButton);
+    expect(columnsButton).toHaveAttribute("aria-pressed", "true");
+    expect(window.localStorage.getItem("skill-one.agentsLayout")).toBe(
+      "columns",
+    );
   });
 });

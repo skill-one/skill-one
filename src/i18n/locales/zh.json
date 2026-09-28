@@ -137,6 +137,11 @@
     "title": "Agents",
     "connected": "已连接 {{linked}}/{{total}} 个 agent",
     "attention": "{{count}} 个待处理",
+    "layout": {
+      "groupAria": "图谱布局",
+      "constellation": "星座",
+      "columns": "分列"
+    },
     "hub": {
       "diskAria": "管理技能（已安装 {{total}} 个）",
       "previewTitle": "已启用的技能",

@@ -25,6 +25,7 @@ import {
   layoutAgents,
   resolveGraphWidth,
   ribbonColor,
+  type AgentsLayoutMode,
   type GraphLayout,
   type NodeLayout,
 } from "./agent-graph-layout";
@@ -40,7 +41,7 @@ import {
  * fades in and out, so the slider always completes and never starts a second
  * round it cannot finish.
  */
-export const HOVER_MS = 1100;
+export const HOVER_MS = 750;
 const HOVER_SECONDS = HOVER_MS / 1000;
 /** The dash's travel, in path-normalised units (see `pathLength`). */
 const SHIMMER_TRAVEL = 1;
@@ -86,7 +87,13 @@ interface ShimmerFlow {
  * SVG ribbons and the absolutely-positioned HTML above it — so this file is
  * presentation only.
  */
-export function AgentGraph({ agents }: { agents: AgentStatus[] }) {
+export function AgentGraph({
+  agents,
+  mode = "constellation",
+}: {
+  agents: AgentStatus[];
+  mode?: AgentsLayoutMode;
+}) {
   const [ref, size] = useElementSize();
   const [active, setActive] = useState<string | null>(null);
   const [pulse, setPulse] = useState<Pulse>("idle");
@@ -121,8 +128,8 @@ export function AgentGraph({ agents }: { agents: AgentStatus[] }) {
   // one screen instead of a single column scrolling off the bottom.
   const graphWidth = resolveGraphWidth(size.width);
   const layout = useMemo(
-    () => layoutAgents(agents, graphWidth, size.height),
-    [agents, graphWidth, size.height],
+    () => layoutAgents(agents, graphWidth, size.height, mode),
+    [agents, graphWidth, size.height, mode],
   );
 
   return (
@@ -408,7 +415,10 @@ function HubDisk({
           {enabled.length > 0 ? (
             // Two compact columns, capped in height and scrolled: the list can
             // run past a hundred names without growing the card unbounded.
-            <ul className="mt-2 grid max-h-56 grid-cols-2 gap-x-3 gap-y-0.5 overflow-y-auto pr-1">
+            // Capped at 224px, and never taller than the viewport minus room
+            // for the card's own header/footer: a hundred-plus names scroll
+            // inside the list while the whole card stays on screen.
+            <ul className="mt-2 grid max-h-[min(14rem,calc(100dvh-13rem))] grid-cols-2 gap-x-3 gap-y-0.5 overflow-y-auto pr-1">
               {enabled.map((skill) => (
                 <li
                   key={skill.name}
@@ -494,15 +504,17 @@ function AgentNode({
       // events to — its ribbon must still lift on hover.
       onMouseEnter={() => onHover(agent.name)}
       onMouseLeave={() => onHover(null)}
-      // Entrance drift comes from the node's outward direction on the spiral.
+      // Entrance drift: outward along the spiral ray, or sideways in columns.
       initial={
         reduceMotion
           ? undefined
-          : {
-              opacity: 0,
-              x: Math.cos(node.angle) * 10,
-              y: Math.sin(node.angle) * 10,
-            }
+          : node.side
+            ? { opacity: 0, x: node.side === "left" ? -10 : 10 }
+            : {
+                opacity: 0,
+                x: Math.cos(node.angle ?? 0) * 10,
+                y: Math.sin(node.angle ?? 0) * 10,
+              }
       }
       animate={{ opacity: 1, x: 0 }}
       transition={
@@ -568,7 +580,7 @@ function AgentNode({
           sideOffset={8}
           align={
             node.tipSide === "top" || node.tipSide === "bottom"
-              ? Math.cos(node.angle) >= 0
+              ? Math.cos(node.angle ?? 0) >= 0
                 ? "end"
                 : "start"
               : "center"

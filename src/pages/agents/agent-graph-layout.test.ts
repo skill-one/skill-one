@@ -15,7 +15,8 @@ import {
   resolveGraphWidth,
   ribbonColor,
   ribbonColorIndex,
-  ribbonPath,
+  sCurvePath,
+  swirlPath,
 } from "./agent-graph-layout";
 
 function agent(name: string): AgentStatus {
@@ -46,9 +47,9 @@ describe("ribbonColor", () => {
   });
 });
 
-describe("ribbonPath", () => {
+describe("swirlPath", () => {
   it("is one cubic bezier from the anchor to the hub tip", () => {
-    const d = ribbonPath({ x: 200, y: 300 }, { x: 300, y: 300 });
+    const d = swirlPath({ x: 200, y: 300 }, { x: 300, y: 300 });
     const nums = d.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
     expect(d).toMatch(/^M 200 300 C /);
     // M from, C c1, c2, to — eight coordinates.
@@ -60,8 +61,8 @@ describe("ribbonPath", () => {
   it("bows both controls to the same side — one shared swirl handedness", () => {
     // A spoke running east into the hub bows to one side of the chord; the
     // mirrored spoke bows with the same (counterclockwise) handedness.
-    const east = ribbonPath({ x: 300, y: 300 }, { x: 200, y: 300 });
-    const west = ribbonPath({ x: 100, y: 300 }, { x: 200, y: 300 });
+    const east = swirlPath({ x: 300, y: 300 }, { x: 200, y: 300 });
+    const west = swirlPath({ x: 100, y: 300 }, { x: 200, y: 300 });
     const eastNums = east.match(/-?\d+(\.\d+)?/g)!.map(Number);
     const westNums = west.match(/-?\d+(\.\d+)?/g)!.map(Number);
     // Coordinate order is M(from) C(c1x,c1y c2x,c2y to): the bow shows on the
@@ -72,6 +73,19 @@ describe("ribbonPath", () => {
     expect(eastNums[5]).toBeLessThan(300);
     expect(westNums[3]).toBeGreaterThan(300);
     expect(westNums[5]).toBeGreaterThan(300);
+  });
+});
+
+describe("sCurvePath", () => {
+  it("keeps both tangents horizontal into the hub tip", () => {
+    const d = sCurvePath({ x: 100, y: 300 }, { x: 400, y: 200 });
+    const nums = d.match(/-?\d+(\.\d+)?/g)!.map(Number);
+    // The first control leaves horizontally from the anchor and the second
+    // arrives horizontally at the tip.
+    expect(nums[3]).toBe(300);
+    expect(nums[5]).toBe(200);
+    expect(nums[6]).toBe(400);
+    expect(nums[7]).toBe(200);
   });
 });
 
@@ -115,7 +129,7 @@ describe("layoutAgents", () => {
     // Node 0 starts one spoke above the hub.
     expect(layout.nodes[0].angle).toBeCloseTo(-Math.PI / 2, 10);
     for (let i = 1; i < layout.nodes.length; i += 1) {
-      const turn = layout.nodes[i].angle - layout.nodes[i - 1].angle;
+      const turn = layout.nodes[i]!.angle! - layout.nodes[i - 1]!.angle!;
       expect(turn).toBeCloseTo(GOLDEN_ANGLE, 10);
     }
   });
@@ -232,5 +246,71 @@ describe("layoutAgents", () => {
     expect(layout.height).toBe(600);
     expect(layout.nodes).toEqual([]);
     expect(layout.ribbons).toEqual([]);
+  });
+});
+
+describe("layoutAgents columns mode", () => {
+  it("splits a roster into balanced columns on the hub's two sides", () => {
+    const layout = layoutAgents(
+      [agent("a"), agent("b"), agent("c"), agent("d")],
+      1200,
+      600,
+      "columns",
+    );
+    const left = layout.nodes.filter((n) => n.side === "left");
+    const right = layout.nodes.filter((n) => n.side === "right");
+    expect(left.map((n) => n.name)).toEqual(["a", "b"]);
+    expect(right.map((n) => n.name)).toEqual(["c", "d"]);
+  });
+
+  it("anchors each ribbon on the tile's hub-facing edge and names it outward", () => {
+    const layout = layoutAgents(
+      [agent("a"), agent("b"), agent("c"), agent("d")],
+      1200,
+      600,
+      "columns",
+    );
+    for (const node of layout.nodes) {
+      expect(node.angle).toBeUndefined();
+      if (node.side === "left") {
+        expect(node.anchor.x).toBe(node.x + node.width);
+        expect(node.tipSide).toBe("left");
+      } else {
+        expect(node.anchor.x).toBe(node.x);
+        expect(node.tipSide).toBe("right");
+      }
+    }
+  });
+
+  it("ends every ribbon at the horizontal hub tip on its own side", () => {
+    const layout = layoutAgents(
+      [agent("a"), agent("b"), agent("c"), agent("d")],
+      1200,
+      600,
+      "columns",
+    );
+    const tipX = (side: string) =>
+      side === "left"
+        ? layout.hub.x - HUB_RADIUS - HUB_TIP_GAP
+        : layout.hub.x + HUB_RADIUS + HUB_TIP_GAP;
+    for (const [i, node] of layout.nodes.entries()) {
+      const nums = layout.ribbons[i].d
+        .match(/-?\d+(\.\d+)?/g)!
+        .map(Number);
+      expect(nums[6]).toBeCloseTo(tipX(node.side!), 6);
+      expect(nums[7]).toBe(layout.hub.y);
+    }
+  });
+
+  it("keeps square tiles aligned on a fixed pitch within a column", () => {
+    const layout = layoutAgents(
+      [agent("a"), agent("b"), agent("c"), agent("d")],
+      1200,
+      600,
+      "columns",
+    );
+    const [a, b] = layout.nodes.filter((n) => n.side === "left");
+    expect(b.y - a.y).toBe(a.height + 14);
+    expect(a.width).toBe(a.height);
   });
 });
