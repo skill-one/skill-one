@@ -404,7 +404,7 @@ describe("MySkillsPage", () => {
     const offer = await screen.findByRole("button", {
       name: "展开或收起 anthropics/skills 的 1 个未安装 skill",
     });
-    expect(offer).toHaveTextContent("还有 1 个未安装");
+    expect(offer).toHaveTextContent("发现 1 个未安装");
     expect(screen.queryByText("pdf-annotate")).not.toBeInTheDocument();
 
     // One press unfolds the uninstalled group in place, below the divider,
