@@ -99,7 +99,7 @@ export function AppHeader() {
             // results live. The header sits outside the routed subtree, so
             // this never remounts the field mid-word.
             if (route.destination === "store" && pathname !== "/explore") {
-              navigate("/explore");
+              void navigate("/explore");
             }
           }}
         />

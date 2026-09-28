@@ -120,13 +120,13 @@ describe("AgentGraph", () => {
       expect(paths("windsurf")).toBe(1);
 
       // Once it lands, the hub broadcasts the skill back out to the rest.
-      act(() => vi.advanceTimersByTime(HOVER_MS + 50));
+      void act(() => vi.advanceTimersByTime(HOVER_MS + 50));
       expect(root.getAttribute("data-pulse")).toBe("broadcast");
       expect(paths("claude-code")).toBe(1);
       expect(paths("windsurf")).toBe(2);
 
       // ... then it collects again, looping while the pointer stays.
-      act(() => vi.advanceTimersByTime(HOVER_MS + 50));
+      void act(() => vi.advanceTimersByTime(HOVER_MS + 50));
       expect(root.getAttribute("data-pulse")).toBe("collect");
       expect(paths("claude-code")).toBe(2);
       expect(paths("windsurf")).toBe(1);
