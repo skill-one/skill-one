@@ -176,7 +176,7 @@
     "skillCount": "{{count}} skills",
     "expandRepoAria": "Show all {{count}} skills from {{name}}",
     "collapseRepoAria": "Collapse the skill list of {{name}}",
-    "uninstalledCount": "Discover {{count}} uninstalled",
+    "uninstalledCount": "{{count}} uninstalled",
     "uninstalledToggleAria": "Show or hide the {{count}} uninstalled skills of {{name}}",
     "uninstalledListAria": "Uninstalled skills of {{name}}",
     "noInstalled": "No skills installed yet",

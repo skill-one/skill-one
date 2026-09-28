@@ -421,17 +421,22 @@ describe("InstalledPage", () => {
 
     // The repository card states how many of its skills are missing, folded
     // under the installed group; the uninstalled skill itself stays hidden.
+    // Folded, the offer is held off the installed rows by spacing alone —
+    // no hairline, since there is no second list yet to tell apart.
     const offer = await screen.findByRole("button", {
       name: "展开或收起 anthropics/skills 的 1 个未安装 skill",
     });
-    expect(offer).toHaveTextContent("发现 1 个未安装");
+    expect(offer).toHaveTextContent("1 个未安装");
+    expect(offer.parentElement).not.toHaveClass("border-t");
     expect(screen.queryByText("pdf-annotate")).not.toBeInTheDocument();
 
-    // One press unfolds the uninstalled group in place, below the divider,
-    // with the store's install CTA on the row — no switch, and no drawer:
-    // an uninstalled row's destination is the install itself. The installed
+    // One press unfolds the uninstalled group in place, and the hairline
+    // arrives with it — now there are two lists to keep apart — with the
+    // store's install CTA on the row: no switch, and no drawer: an
+    // uninstalled row's destination is the install itself. The installed
     // group is untouched: pdf keeps its own row and its switch.
     await user.click(offer);
+    expect(offer.parentElement).toHaveClass("border-t");
     const section = screen.getByRole("list", {
       name: "anthropics/skills 的未安装 skill",
     });
@@ -441,8 +446,9 @@ describe("InstalledPage", () => {
     ).toBeInTheDocument();
     expect(within(section).queryByRole("switch")).toBeNull();
 
-    // A second press folds it back.
+    // A second press folds it back, hairline and all.
     await user.click(offer);
+    expect(offer.parentElement).not.toHaveClass("border-t");
     expect(screen.queryByText("pdf-annotate")).not.toBeInTheDocument();
   });
 
