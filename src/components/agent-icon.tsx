@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { Bot } from "lucide-react";
 
-import { getAgentIconUrl, isMonochromeAgentIcon } from "../lib/agent-icons";
+import { agentIconGround, getAgentIconUrl, isMonochromeAgentIcon } from "../lib/agent-icons";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "../lib/utils";
 
@@ -36,6 +36,14 @@ export function AgentIcon({
   const darkFixClass = isMonochromeAgentIcon(agentName)
     ? "dark:invert"
     : undefined;
+  // Surface-bound artwork (white glyph / black-dominant art on a transparent
+  // background) is painted on a fixed contrasting ground in both modes.
+  const groundClass =
+    agentIconGround(agentName) === "dark"
+      ? "bg-neutral-900"
+      : agentIconGround(agentName) === "light"
+        ? "bg-white"
+        : undefined;
 
   if (shape === "squircle") {
     // A plain span instead of the round Avatar primitives, so no circular
@@ -56,7 +64,7 @@ export function AgentIcon({
           <img
             src={iconUrl}
             alt=""
-            className={cn("h-full w-full object-contain", darkFixClass)}
+            className={cn("h-full w-full object-contain", darkFixClass, groundClass)}
           />
         ) : (
           <Bot className="size-3/4 text-muted-foreground" aria-hidden="true" />
@@ -67,7 +75,13 @@ export function AgentIcon({
 
   return (
     <Avatar size={size} className={className} {...props}>
-      {iconUrl && <AvatarImage src={iconUrl} alt="" className={darkFixClass} />}
+      {iconUrl && (
+        <AvatarImage
+          src={iconUrl}
+          alt=""
+          className={cn(darkFixClass, groundClass)}
+        />
+      )}
       <AvatarFallback>
         <Bot aria-hidden="true" />
       </AvatarFallback>
