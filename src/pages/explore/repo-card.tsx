@@ -142,7 +142,11 @@ export interface RepoCardRow {
  * the same offer the store's repository view makes, so "what else is in
  * here?" reads without leaving the list. The two groups never mix: the
  * installed rows keep their order and the fold, the uninstalled ones live
- * below the divider and stay folded until asked for.
+ * below the divider and stay folded until asked for. An open group widens the
+ * card — the same full-row, two-column footprint the bar's expansion takes,
+ * with the uninstalled rows splitting into balanced columns like the
+ * installed ones — so the reveal reads at the width of the list, and the two
+ * offers (more of the card's rows, more of the repository) land identically.
  *
  * Because the button is only ever *shown* on intent, it does not take part in
  * the row's layout: it floats over the row's right edge, so a name and a
@@ -263,13 +267,15 @@ export function RepoCard({
   // reveal — both keep the bar as the plain door it was. Expanding is worth a
   // press only when the alternative was walking through the door.
   const canExpand = !hasQuery && skills.length > maxSkills;
-  // The wide footprint, from either source: the reader's own toggle in browse,
-  // or — under a search — the card's own count. The cap stands down there
-  // (every match is on screen), so a card that outruns it takes the open
-  // card's layout on its own: full row, two-column body. Nothing is held
-  // back, so there is nothing to toggle — the bar stays the plain label.
+  // The wide footprint, from any of the three sources: the reader's own
+  // toggle in browse, a search answer that outruns the cap, or an open
+  // uninstalled group — a press that reveals more skills is a press that
+  // earns the room, and the wide layout is the same one the bar's expansion
+  // uses (full grid row, two-column body), so both offers land identically.
   const wide =
-    (canExpand && expanded) || (hasQuery && skills.length > maxSkills);
+    (canExpand && expanded) ||
+    (hasQuery && skills.length > maxSkills) ||
+    uninstalledOpen;
   // The toggle is also a transition. Opening a right-lane card re-plumbs the
   // whole grid — the card jumps to a full row start, every card after it
   // shifts, the open card's box doubles in width — and a hard cut between the
@@ -656,7 +662,23 @@ export function RepoCard({
               {uninstalledOpen && (
                 <ul
                   aria-label={t("state.uninstalledListAria", { name })}
-                  className="-mx-1.5 flex flex-col"
+                  className={cn(
+                    "-mx-1.5",
+                    // The same body the installed rows use on a wide card:
+                    // column-major fill over a balanced row count, so a
+                    // full-width card never turns every row into a
+                    // full-width sweep — whichever press widened the card.
+                    wide
+                      ? "grid grid-flow-col auto-cols-fr gap-x-8"
+                      : "flex flex-col",
+                  )}
+                  style={
+                    wide
+                      ? {
+                          gridTemplateRows: `repeat(${Math.ceil(uninstalled.length / 2)}, auto)`,
+                        }
+                      : undefined
+                  }
                 >
                   {uninstalled.map((skill) => (
                     <li

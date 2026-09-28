@@ -436,6 +436,84 @@ describe("MySkillsPage", () => {
     expect(screen.queryByText(/未安装/)).not.toBeInTheDocument();
   });
 
+  it("widens the card to the full row while the uninstalled group is open", async () => {
+    const user = userEvent.setup();
+    // pdf carries a recorded source; the registry answers the same repository
+    // with two skills the machine does not have.
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
+    getGroups.mockResolvedValue({
+      groups: [
+        {
+          key: "anthropics/skills",
+          title: "anthropics/skills",
+          skills: [
+            {
+              skill: {
+                name: "pdf",
+                repo: "anthropics/skills",
+                description: "PDF documents.",
+                stars: 1,
+                downloads: 1,
+              },
+              matched: {},
+            },
+            {
+              skill: {
+                name: "pdf-annotate",
+                repo: "anthropics/skills",
+                description: "Annotate PDFs.",
+                stars: 1,
+                downloads: 1,
+              },
+              matched: {},
+            },
+            {
+              skill: {
+                name: "pdf-merge",
+                repo: "anthropics/skills",
+                description: "Merge PDFs.",
+                stars: 1,
+                downloads: 1,
+              },
+              matched: {},
+            },
+          ],
+        },
+      ],
+      total: 3,
+    });
+    const { container } = renderPage();
+
+    const card = () =>
+      container.querySelector('[data-repo="anthropics/skills"]')?.closest(
+        "li",
+      ) ?? null;
+    const offer = () =>
+      screen.getByRole("button", {
+        name: "展开或收起 anthropics/skills 的 2 个未安装 skill",
+      });
+    await screen.findByRole("button", {
+      name: "展开或收起 anthropics/skills 的 2 个未安装 skill",
+    });
+
+    // Folded, the card sits in its grid lane like every other card.
+    expect(card()).not.toHaveClass("col-span-full");
+
+    // Opening the uninstalled group is a reveal, so the card takes the same
+    // wide footprint the bar's expansion uses — and the uninstalled rows
+    // split into the same balanced columns the installed ones do.
+    await user.click(offer());
+    expect(card()).toHaveClass("col-span-full");
+    const section = screen.getByRole("list", {
+      name: "anthropics/skills 的未安装 skill",
+    });
+    expect(section).toHaveClass("grid-flow-col");
+
+    // Folding the group hands the lane back.
+    await user.click(offer());
+    expect(card()).not.toHaveClass("col-span-full");
+  });
+
   it("shows each skill's description", async () => {
     renderPage();
 
