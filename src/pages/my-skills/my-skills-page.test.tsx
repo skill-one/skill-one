@@ -316,6 +316,26 @@ describe("MySkillsPage", () => {
     expect(rowSwitch).toHaveAttribute("aria-checked", "true");
   });
 
+  it("keeps a disabled skill's switch on screen without the pointer", async () => {
+    // A disabled skill is a fact, not an invitation: the dimmed row needs its
+    // remedy visible, so its unchecked switch joins the always-on rule beside
+    // the store's installed badge — the wrapper keeps the rule and the switch
+    // renders the state the rule reads. An enabled switch stays
+    // hover-revealed, so a healthy card stays a list rather than a control row.
+    setMockSkillEnabled("pdf", false);
+    const { container } = renderPage();
+
+    await screen.findByRole("switch", { name: "全部开启（本地安装）" });
+    const row = container.querySelector('[data-skill="pdf"]');
+    const wrapper = row?.querySelector("span.absolute");
+    expect(wrapper).toHaveClass("has-data-unchecked:opacity-100");
+    const rowSwitch = row?.querySelector('[role="switch"]');
+    // The Base UI switch carries its state as a boolean attribute — exactly
+    // what the wrapper's always-on rule reads.
+    expect(rowSwitch).toHaveAttribute("data-unchecked");
+    expect(rowSwitch).toHaveAttribute("aria-checked", "false");
+  });
+
   it("dims a disabled row behind the bar's group switch", async () => {
     // The dimmed row is the evidence the group switch's half state explains.
     setMockSkillEnabled("pdf", false);

@@ -602,11 +602,16 @@ export function RepoCard({
                       states: `disabled:opacity-50` on an installed or installing
                       button is more specific than a bare `opacity-0` and would
                       win, drawing the button the reader did not ask for. A
-                      button that carries a state instead of an invitation —
-                      installed above all — is what the `has-data` rule keeps on
-                      screen; it reads the button's own `data-state`, so this
-                      wrapper never has to know the state itself. */
-                      <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100">
+                      control that carries a state instead of an invitation —
+                      the store's 已安装 badge, and the installed list's
+                      disabled switch — is what the `has-data` rules keep on
+                      screen: a fact does not wait for the pointer, because
+                      the dimmed row (like the installed one) needs its
+                      remedy visible. Each rule reads the control's own
+                      state attribute (the install button's `data-state`,
+                      the Base UI switch's boolean `data-unchecked`), so
+                      this wrapper never has to know the state itself. */
+                      <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100 has-data-unchecked:opacity-100">
                         {control}
                       </span>
                     ) : (
@@ -709,7 +714,7 @@ export function RepoCard({
                           gradient of the row's own hover surface. After an
                           install the button settles into its 已安装 badge and
                           the wrapper keeps it on screen. */}
-                      <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100">
+                      <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100 has-data-unchecked:opacity-100">
                         <SkillInstallButton skill={skill} className="h-7 w-7" />
                       </span>
                     </li>
