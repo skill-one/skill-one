@@ -219,6 +219,8 @@
     "viewOriginal": "查看原文",
     "viewTranslation": "查看译文",
     "originalToggle": "原文",
+    "translationStaleNotice": "译文对应安装时记录的版本，原文此后已有更新。译文仅供阅读参考，不会随原文更新而同步。",
+    "translationReferenceNotice": "译文仅供参考，原文更新后不会自动同步。",
     "loadFailed": "加载失败：{{message}}",
     "loadFailedHint": "该技能目录下可能没有可访问的 SKILL.md。"
   },

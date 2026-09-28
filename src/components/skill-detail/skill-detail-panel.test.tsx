@@ -776,15 +776,132 @@ describe("SkillDetailPanel Chinese page", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the English body for a disk read even when the snapshot has a Chinese page", async () => {
+  it("keeps the English body for a disk read whose snapshot directory is unknown", async () => {
     mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
     mockFetchLocalSkillDetail.mockResolvedValue(detail);
     renderDrawer({ skill: { ...skill, path: undefined } });
 
-    // The disk copy is what the user actually has; the mirror's translation
-    // is not part of it, so the body never switches files for it.
+    // Without the entry's snapshot directory (`snapshotPath`) the Chinese
+    // page is unreachable, so the disk copy is all there is and the
+    // translation fetch never fires.
     expect(await screen.findByText("Use this skill for PDFs.")).toBeInTheDocument();
     expect(mockFetchSkillZhDetail).not.toHaveBeenCalled();
+  });
+});
+
+describe("SkillDetailPanel installed translation", () => {
+  /** The snapshot's Chinese page for the drawer's fixture skill. */
+  const zhDetail = {
+    description: "",
+    instructions: "使用此技能处理 PDF。",
+    path: "profiles/anthropics/skills/pdf/skill_zh.md",
+  };
+
+  /**
+   * An installed skill the registry still backs: the body reads off disk
+   * (`path` undefined) while the entry's snapshot directory rides
+   * `snapshotPath`, and the registry's translated description leads the
+   * header in zh mode.
+   */
+  const installedBacked: SkillView = {
+    ...skill,
+    path: undefined,
+    snapshotPath: "skills/anthropics/skills/pdf",
+    descriptionZh: "读取并合并 PDF 文档。",
+  };
+
+  it("leads an installed skill's body with the snapshot's Chinese page", async () => {
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({ skill: installedBacked, surface: "installed" });
+
+    // The Chinese page replaces the local body and the divider names the
+    // file actually shown; the local English file stays unfetched until the
+    // reader flips to it.
+    expect(await screen.findByText("使用此技能处理 PDF。")).toBeInTheDocument();
+    expect(screen.getByText("skill_zh.md")).toBeInTheDocument();
+    expect(mockFetchSkillZhDetail).toHaveBeenCalledWith(
+      "anthropics/skills",
+      "pdf",
+      "skills/anthropics/skills/pdf",
+    );
+    expect(mockFetchLocalSkillDetail).not.toHaveBeenCalled();
+  });
+
+  it("flips an installed skill back to the local file with the toggle", async () => {
+    const user = userEvent.setup();
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({ skill: installedBacked, surface: "installed" });
+
+    const toggle = await screen.findByRole("button", { name: "原文" });
+    await user.click(toggle);
+
+    // The original is the copy on disk — the file the user actually has.
+    expect(await screen.findByText("Use this skill for PDFs.")).toBeInTheDocument();
+    expect(mockFetchLocalSkillDetail).toHaveBeenCalledWith("pdf");
+    expect(screen.getByText("SKILL.md")).toBeInTheDocument();
+  });
+
+  it("warns that a stale translation does not follow the original's updates", async () => {
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    renderDrawer({
+      skill: { ...installedBacked, translationFreshness: "stale" },
+      surface: "installed",
+    });
+
+    const toggle = await screen.findByRole("button", { name: "原文" });
+    expect(
+      toggle.querySelector('[data-slot="translation-warning"]'),
+    ).toBeInTheDocument();
+    // Focus (the a11y path) instead of hover: hover-open inside the modal
+    // drawer is unreliable under jsdom.
+    toggle.focus();
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("原文此后已有更新");
+  });
+
+  it("falls back to the reference-only caveat when freshness is unverifiable", async () => {
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    renderDrawer({
+      skill: { ...installedBacked, translationFreshness: "unknown" },
+      surface: "installed",
+    });
+
+    const toggle = await screen.findByRole("button", { name: "原文" });
+    expect(
+      toggle.querySelector('[data-slot="translation-warning"]'),
+    ).toBeInTheDocument();
+    toggle.focus();
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("译文仅供参考");
+  });
+
+  it("shows no warning when the translation matches the installed version", async () => {
+    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
+    renderDrawer({
+      skill: { ...installedBacked, translationFreshness: "fresh" },
+      surface: "installed",
+    });
+
+    const toggle = await screen.findByRole("button", { name: "原文" });
+    expect(
+      toggle.querySelector('[data-slot="translation-warning"]'),
+    ).not.toBeInTheDocument();
+    toggle.focus();
+    // A fresh match needs no caveat, so no tooltip opens on the toggle.
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("never warns on the store surface, whose translation is the indexed content", async () => {
+    renderDrawer({
+      skill: { ...skill, descriptionZh: "读取并合并 PDF 文档。", translationFreshness: "stale" },
+    });
+
+    const toggle = await screen.findByRole("button", { name: "原文" });
+    expect(
+      toggle.querySelector('[data-slot="translation-warning"]'),
+    ).not.toBeInTheDocument();
   });
 });
 

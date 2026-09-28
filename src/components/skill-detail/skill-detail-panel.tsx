@@ -300,25 +300,31 @@ export function SkillDetailPanel({
   // the same repo/name never share a cache entry.
   const fromDisk = shown != null && shown.path == null;
 
-  // The snapshot's Chinese page (skill_zh.md), fetched only in zh mode and
-  // only for a mirror read — mirroring how descriptionZh serves the header.
-  // A null answer (this snapshot ships no translation) and a failed fetch
-  // look the same: the English body takes over, with no toggle to offer.
+  // The snapshot's Chinese page (skill_zh.md), fetched only in zh mode. For a
+  // mirror read the path rides the row itself; an installed skill carries the
+  // entry's snapshot directory as `snapshotPath` — the Chinese page is the one
+  // file a disk install has no local counterpart for, so it still reads from
+  // the snapshot the translation belongs to. A null answer (this snapshot
+  // ships no translation) and a failed fetch look the same: the English body
+  // takes over, with no toggle to offer.
+  const zhPath = shown?.path ?? shown?.snapshotPath;
   const { data: zhDetail } = useQuery({
     queryKey: ["skill-detail-zh", shown?.repo, shown?.name],
-    queryFn: () => fetchSkillZhDetail(shown!.repo, shown!.name, shown!.path),
-    enabled: shown != null && !fromDisk && locale === "zh",
+    queryFn: () => fetchSkillZhDetail(shown!.repo, shown!.name, zhPath),
+    enabled: shown != null && zhPath != null && locale === "zh",
   });
 
   // The English original — or the local disk read, which has no mirror copy.
-  // In zh mode a translated skill never needs it on open, so it is fetched
-  // lazily: when the reader flips the drawer to 查看原文, or when the Chinese
-  // page came back empty and the original is the only body there is. En mode,
-  // disk reads and untranslated skills need it straight away. A zh-mode open
-  // therefore costs one request instead of two; the deferred one rides the
-  // toggle's first flip (cached ever after — see `lib/query-client.ts`).
+  // In zh mode a skill whose Chinese page can lead never needs it on open,
+  // so it is fetched lazily: when the reader flips the drawer to 查看原文,
+  // or when the Chinese page came back empty and the original is the only
+  // body there is. A body with no reachable Chinese page — en mode, a local
+  // skill without a snapshot directory, an untranslated skill — needs it
+  // straight away. A zh-mode open therefore costs one request instead of
+  // two; the deferred one rides the toggle's first flip (cached ever after —
+  // see `lib/query-client.ts`).
   const originalNeeded =
-    fromDisk || locale !== "zh" || showOriginal || zhDetail === null;
+    zhPath == null || locale !== "zh" || showOriginal || zhDetail === null;
   const {
     data: detail,
     isPending: detailPending,
@@ -468,11 +474,12 @@ export function SkillDetailPanel({
         detail?.path ??
         (shown?.path ? `${shown.path.replace(/\/+$/, "")}/SKILL.md` : "")
       ).replace(/^\/+|\/+$/g, "");
-  // Whether the Chinese page can lead the body: zh mode, a mirror read, and
-  // a translation actually fetched with a body. The English body keeps
-  // leading everywhere else (en mode, local disk reads, untranslated skills).
+  // Whether the Chinese page can lead the body: zh mode and a translation
+  // actually fetched with a body — store rows and installed skills alike.
+  // The English body keeps leading everywhere else (en mode, untranslated
+  // skills, installs whose snapshot has no Chinese page).
   const zhBodyAvailable =
-    !fromDisk && locale === "zh" && zhDetail != null && zhDetail.instructions !== "";
+    locale === "zh" && zhDetail != null && zhDetail.instructions !== "";
   const showingZhBody = zhBodyAvailable && !showOriginal;
   // The drawer's single language toggle, parked in the header's action row
   // beside the install/uninstall actions: one control for the whole drawer,
@@ -484,12 +491,31 @@ export function SkillDetailPanel({
   // on disk.
   const translateToggleVisible =
     locale === "zh" && !editing && (translated !== "" || zhBodyAvailable);
+  // The translation's freshness, meaningful on the installed surface only: a
+  // store row's translation *is* the indexed content, so it never needs the
+  // caveat. When the installed copy's version cannot be matched against the
+  // snapshot's current one (stale or unverifiable), the toggle wears a
+  // warning dot and the hover notice says what the translation can and
+  // cannot be trusted for; a fresh match needs no warning at all.
+  const freshness =
+    surface === "installed" ? shown?.translationFreshness : undefined;
+  const freshnessNotice =
+    freshness === "stale"
+      ? t("detail.translationStaleNotice")
+      : freshness === "unknown"
+        ? t("detail.translationReferenceNotice")
+        : null;
   // The detail the body renders from: the Chinese page when it leads, the
   // English SKILL.md otherwise (including disk reads, which never have a
   // translation on disk).
   const bodyDetail = showingZhBody ? zhDetail : detail;
+  // The Chinese page lives in the snapshot even for an installed skill (its
+  // body is snapshot content), so a disk read only suppresses the path for
+  // the English original.
   const bodyFilePath =
-    fromDisk || !bodyDetail ? "" : bodyDetail.path.replace(/^\/+|\/+$/g, "");
+    !bodyDetail || (fromDisk && !showingZhBody)
+      ? ""
+      : bodyDetail.path.replace(/^\/+|\/+$/g, "");
   // The upstream repo the skill ships in; without a known path inside it,
   // the link lands on the repo root.
   const sourceHref =
@@ -547,14 +573,17 @@ export function SkillDetailPanel({
   // has one and the reader has not switched back to the original. Registry
   // skills resolve relative links against the snapshot the index was built
   // from, at whichever file is shown (the Chinese page lives under a
-  // different directory, so its links resolve against its own path); a body
-  // read off disk has no repo view to resolve against, so it goes without one.
+  // different directory, so its links resolve against its own path) — an
+  // installed skill's Chinese page included, since that page is snapshot
+  // content; a body read off disk has no repo view to resolve against, so it
+  // goes without one.
+  const bodyFromMirror = !fromDisk || showingZhBody;
   const skillMdBody = bodyDetail ? (
     bodyDetail.instructions ? (
       <Suspense fallback={<MarkdownSkeleton />}>
         <LazyMarkdown
-          repo={fromDisk ? "" : MIRROR.repo}
-          gitRef={fromDisk ? undefined : MIRROR.ref}
+          repo={bodyFromMirror ? MIRROR.repo : ""}
+          gitRef={bodyFromMirror ? MIRROR.ref : undefined}
           filePath={bodyFilePath}
         >
           {bodyDetail.instructions}
@@ -631,22 +660,43 @@ export function SkillDetailPanel({
               default aria-pressed wash) while the original leads and rests
               flat on the translation. The name stays fixed the way a toggle
               button's must — the state rides aria-pressed, not the label —
-              while the tooltip keeps naming the action. */}
+              while the tooltip keeps naming the action. On the installed
+              surface a translation whose version does not match the copy on
+              disk (or cannot be checked) adds an amber dot and swaps the
+              tooltip's payload to the freshness caveat. */}
           {translateToggleVisible && (
-            <Toggle
-              size="sm"
-              className="size-7 px-0"
-              pressed={showOriginal}
-              onPressedChange={(pressed) => setShowOriginal(pressed)}
-              aria-label={t("detail.originalToggle")}
-              title={
-                showOriginal
-                  ? t("detail.viewTranslation")
-                  : t("detail.viewOriginal")
-              }
-            >
-              <Languages />
-            </Toggle>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Toggle
+                    size="sm"
+                    className="relative size-7 px-0"
+                    pressed={showOriginal}
+                    onPressedChange={(pressed) => setShowOriginal(pressed)}
+                    aria-label={t("detail.originalToggle")}
+                    title={
+                      showOriginal
+                        ? t("detail.viewTranslation")
+                        : t("detail.viewOriginal")
+                    }
+                  >
+                    <Languages />
+                    {freshnessNotice && (
+                      <span
+                        aria-hidden
+                        data-slot="translation-warning"
+                        className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-amber-500"
+                      />
+                    )}
+                  </Toggle>
+                }
+              />
+              {freshnessNotice && (
+                <TooltipContent className="max-w-[260px] text-left normal-case">
+                  {freshnessNotice}
+                </TooltipContent>
+              )}
+            </Tooltip>
           )}
           {isStore && (
             <SkillInstallButton skill={shown!} labeled />
