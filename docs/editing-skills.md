@@ -11,7 +11,7 @@ Only **installed** skills can be edited. A skill's file lives at
 `~/.agents/skills/<name>/SKILL.md` — or `disabled-skills/<name>/SKILL.md` while
 it is parked. A store row that is not installed is remote mirror content with
 nothing local to write to, so the edit affordance is offered on the installed
-surface alone (the my-skills and local-skills lists, and any installed section
+surface alone (the installed and local-skills lists, and any installed section
 of the store).
 
 The body is headed by a divider that carries the file's name: the rule runs the

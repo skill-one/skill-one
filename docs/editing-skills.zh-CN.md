@@ -8,7 +8,7 @@ English: [editing-skills.md](./editing-skills.md)
 
 只有**已安装**的技能可以编辑。技能文件位于 `~/.agents/skills/<name>/SKILL.md`
 （被停用时位于 `disabled-skills/<name>/SKILL.md`）。商店里未安装的条目是远端镜像
-内容，本地没有可写文件，因此编辑入口只在已安装表面提供（my-skills 与 local-skills
+内容，本地没有可写文件，因此编辑入口只在已安装表面提供（installed 与 local-skills
 列表，以及商店中标记为已安装的分区）。
 
 正文区以一条“承载文件名”的分隔线开头：线沿内缩宽度贯穿，居中的 `SKILL.md` 标签与右端

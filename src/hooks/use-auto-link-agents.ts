@@ -17,7 +17,7 @@ import { formatLinkMessage } from "../lib/link-notice";
  * state, so the user never has to understand or act on "linking".
  *
  * Mounted once at the app root. It shares the `["agent-status"]` query with
- * the my-skills avatar menu, and every time a scan lands it links the
+ * the installed avatar menu, and every time a scan lands it links the
  * unlinked, non-canonical agents that the user has not explicitly excluded
  * (see `agent-link-preferences`). A successful run is silent — the toast on
  * the linked agents' own surface would only repeat what the green dots already

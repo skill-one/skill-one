@@ -57,7 +57,7 @@ export function SkillRemoveButton({
     setRemoving(true);
     try {
       await removeInstalledSkill(skill.name);
-      // Same broadcast the batch removal makes: the my-skills list, the
+      // Same broadcast the batch removal makes: the installed list, the
       // sidebar count and the menu bar popover all read this one signal.
       await markSkillsChanged(queryClient);
       toast.add({ title: t("action.removed", { name: skill.name }), type: "success" });

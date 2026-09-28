@@ -464,7 +464,7 @@ export function ExplorePage() {
       </div>
 
       {/* Modal detail drawer for the browse answer; the wiring (open/close,
-          prev/next bounds) is shared with the my-skills page. It walks the
+          prev/next bounds) is shared with the installed page. It walks the
           flat skill list, rendered or not yet rendered. A
           search walks inside the unified search view instead, which owns its
           own drawer. */}

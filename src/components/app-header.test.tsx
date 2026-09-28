@@ -63,7 +63,7 @@ describe("AppHeader", () => {
     expect(screen.getByText("Skill One")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "首页" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "商店" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "我的" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "已安装" })).toBeInTheDocument();
   });
 
   it("points the brand at the home, the agents graph", () => {
@@ -142,11 +142,11 @@ describe("AppHeader", () => {
 
   it("filters the installed list in place instead of leaving it", async () => {
     const user = userEvent.setup();
-    renderHeader("/my-skills");
+    renderHeader("/installed");
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
-    expect(currentPath).toBe("/my-skills");
+    expect(currentPath).toBe("/installed");
   });
 
   it("shows what the other list was searched for: one field, both lists", async () => {
@@ -157,7 +157,7 @@ describe("AppHeader", () => {
 
     // The installed list reads the same field, so the reader keeps the question
     // they were asking instead of finding the box emptied for them.
-    renderHeader("/my-skills");
+    renderHeader("/installed");
     expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
   });
 
@@ -172,7 +172,7 @@ describe("AppHeader", () => {
 
   it("leaves the installed list's field open — that list is already in memory", () => {
     registrySnapshot.ready = false;
-    renderHeader("/my-skills");
+    renderHeader("/installed");
 
     expect(screen.getByLabelText("搜索 Skill")).toBeEnabled();
   });
@@ -188,7 +188,7 @@ describe("AppHeader", () => {
 
   it("hands the raw field value to the store, leaving the debounce to the list", async () => {
     const user = userEvent.setup();
-    renderHeader("/my-skills");
+    renderHeader("/installed");
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pd");
 
@@ -206,7 +206,7 @@ describe("AppHeader", () => {
 describe("headerRoute", () => {
   it("maps each route to the list its field answers to", () => {
     expect(headerRoute("/explore")).toEqual({ destination: "store" });
-    expect(headerRoute("/my-skills")).toEqual({ destination: "installed" });
+    expect(headerRoute("/installed")).toEqual({ destination: "installed" });
     // The home is the agents graph: a picture, not a list — but the field is
     // on every route now, and a search started there lands in the store.
     expect(headerRoute("/")).toEqual({ destination: "store" });

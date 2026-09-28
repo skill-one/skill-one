@@ -31,7 +31,7 @@
     "mainAria": "Main navigation",
     "home": "Home",
     "store": "Store",
-    "my": "My"
+    "installed": "Installed"
   },
   "unit": {
     "byRepo": "By repository",

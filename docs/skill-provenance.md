@@ -94,7 +94,7 @@ paths are accepted.
   `repo` matches the store entry's (or when there is no ledger entry — unknown
   source falls back to name-only). A same-named skill from a different repo
   stays installable.
-- **My-skills page** (`my-skills-page.tsx`): the page lists the same installs in
+- **Installed page** (`installed-page.tsx`): the page lists the same installs in
   either unit — the repository cards (按仓库) and the skill rows (按技能) — and
   both present a skill identically, so a skill reads the same either way. A row
   with a ledger entry carries
@@ -114,7 +114,7 @@ paths are accepted.
   vouches for the repo even when the registry does not. And a card's image slot
   falls back to the skill's own initial whenever no cover can be addressed.
   A repository card's bar opens that repository as *this* list reads it
-  (`/my-skills/repo/owner/repo`): the installs the ledger placed there, listed
+  (`/installed/repo/owner/repo`): the installs the ledger placed there, listed
   with the installed list's own chrome, and the rest of the store's catalogue
   for the same repository behind one control at the foot of the list. The
   store's own page for it (`/repo/owner/repo`) stays one step further away,

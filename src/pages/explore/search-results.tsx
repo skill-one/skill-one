@@ -91,7 +91,7 @@ export function SearchResults({
   /** The installed answer, render-ready; empty hides the section. */
   installed: SearchRow[];
   /**
-   * Whether the answer is read from the my-skills surface. There, installed
+   * Whether the answer is read from the installed surface. There, installed
    * repository cards carry no per-row control: one group switch on the bar
    * manages the card's skills, the same as the list behind the search. The
    * store leaves installed cards their hover-revealed install buttons.
@@ -307,7 +307,7 @@ export function SearchResults({
                       onOpenSkill={(key) =>
                         setSelected({ section: "installed", key })
                       }
-                      // On the my-skills surface the card rows stay
+                      // On the installed surface the card rows stay
                       // control-less: one group switch on the bar owns the
                       // card's skills, matching the list behind the search.
                       rowActions={!installedSurface}

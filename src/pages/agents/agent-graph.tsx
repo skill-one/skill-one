@@ -448,7 +448,7 @@ function HubDisk({
               {t("agents.hub.browseStore")}
             </Link>
             <Link
-              to="/my-skills"
+              to="/installed"
               className={buttonVariants({
                 variant: "outline",
                 size: "sm",

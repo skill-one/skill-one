@@ -23,7 +23,7 @@ export const PROVENANCE_QUERY_KEY = ["skill-provenance", "v2"] as const;
 
 /**
  * The installed-skills list for the global skills directory. Shared by the
- * my-skills page, the sidebar badge, the install buttons, and the popover —
+ * installed page, the sidebar badge, the install buttons, and the popover —
  * they all read the same cache entry via the shared key.
  */
 export function useInstalledSkills() {

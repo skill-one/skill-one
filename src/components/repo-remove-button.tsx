@@ -63,7 +63,7 @@ export function RepoRemoveButton({
     setRemoving(true);
     try {
       await removeInstalledSkills(names);
-      // Same broadcast the single removal makes: the my-skills list, the
+      // Same broadcast the single removal makes: the installed list, the
       // sidebar count and the menu bar popover all read this one signal.
       await markSkillsChanged(queryClient);
       toast.add({

@@ -12,7 +12,7 @@ import { useAppLocale } from "../i18n/use-language";
 import { errorMessage } from "../lib/utils";
 import { isTauri } from "../lib/tauri";
 import {
-  MY_SKILLS_PATH,
+  INSTALLED_PATH,
   POPOVER_NAVIGATE_EVENT,
   skillPath,
 } from "./popover-events";
@@ -24,7 +24,7 @@ import { useSkillsLiveSync } from "./use-skills-live-sync";
  *
  * Disabled skills belong to the main window's management page, not a
  * glanceable list, so they are filtered out here. Clicking an entry deep
- * links into the my-skills page with that skill pre-filtered; the footer
+ * links into the installed page with that skill pre-filtered; the footer
  * button opens the same page unfiltered. The window size is fixed (see
  * `tauri.conf.json`); the panel backdrop is the native glass/vibrancy
  * material applied by Rust (`tray.rs`), so nothing is drawn behind the
@@ -109,7 +109,7 @@ export function PopoverPage() {
           className="w-full"
           onClick={() => {
             if (isTauri())
-              void emit(POPOVER_NAVIGATE_EVENT, { path: MY_SKILLS_PATH });
+              void emit(POPOVER_NAVIGATE_EVENT, { path: INSTALLED_PATH });
           }}
         >
           {t("popover.open")}

@@ -15,7 +15,7 @@ import { createQueryClient } from "./lib/query-client";
 import { checkForUpdate } from "./lib/update-store";
 import { isTauri } from "./lib/tauri";
 import { storage } from "./lib/storage";
-import { MySkillsPage } from "./pages/my-skills/my-skills-page";
+import { InstalledPage } from "./pages/installed/installed-page";
 import { POPOVER_NAVIGATE_EVENT } from "./popover/popover-events";
 
 /**
@@ -91,7 +91,7 @@ export default function App() {
                       the header leads. */}
                   <Route path="/" element={<AgentsPage />} />
                   <Route path="/explore" element={<ExplorePage />} />
-                  <Route path="/my-skills" element={<MySkillsPage />} />
+                  <Route path="/installed" element={<InstalledPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>

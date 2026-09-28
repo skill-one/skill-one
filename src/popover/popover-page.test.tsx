@@ -137,7 +137,7 @@ describe("PopoverPage", () => {
     });
   });
 
-  it("emits the my-skills path from the footer button", async () => {
+  it("emits the installed path from the footer button", async () => {
     const user = userEvent.setup();
     renderWithRouter(<PopoverPage />);
 
@@ -146,7 +146,7 @@ describe("PopoverPage", () => {
     );
 
     expect(emitMock).toHaveBeenCalledWith(POPOVER_NAVIGATE_EVENT, {
-      path: "/my-skills",
+      path: "/installed",
     });
   });
 

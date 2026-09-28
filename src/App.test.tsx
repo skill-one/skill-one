@@ -108,8 +108,8 @@ describe("App routing", () => {
     expect(await screen.findByText("外观")).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
-    // Navigate back to the installed list, the header's 我的 segment.
-    await user.click(screen.getByRole("link", { name: /^我的$/ }));
+    // Navigate back to the installed list, the header's 已安装 segment.
+    await user.click(screen.getByRole("link", { name: /^已安装$/ }));
 
     expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
@@ -138,13 +138,13 @@ describe("App routing", () => {
     // The home's field is the store's, and the store's index is not ready in
     // this test, so open the installed list — whose field is always open —
     // and type there: the question follows the reader between the lists.
-    await user.click(screen.getByRole("link", { name: /^我的$/ }));
+    await user.click(screen.getByRole("link", { name: /^已安装$/ }));
     await user.type(await screen.findByLabelText("搜索 Skill"), "pdf");
 
     await user.click(screen.getByRole("link", { name: /商店/ }));
     expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
 
-    await user.click(screen.getByRole("link", { name: /^我的$/ }));
+    await user.click(screen.getByRole("link", { name: /^已安装$/ }));
 
     // Still the reader's question, and live on the list it was typed on: the
     // installed list answers it. The page debounces the field it reads, so the

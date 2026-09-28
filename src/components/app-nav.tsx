@@ -33,7 +33,7 @@ const navItems: NavItem[] = [
     icon: House,
     // The home owns only itself: `belongsTo` matches an exact root or a
     // `${root}/` prefix, and no real path begins `//`, so this never claims
-    // `/explore` or `/my-skills`.
+    // `/explore` or `/installed`.
     owns: ["/"],
   },
   {
@@ -42,9 +42,9 @@ const navItems: NavItem[] = [
     owns: ["/explore", "/repo"],
   },
   {
-    path: "/my-skills",
-    labelKey: "nav.my",
-    owns: ["/my-skills"],
+    path: "/installed",
+    labelKey: "nav.installed",
+    owns: ["/installed"],
   },
 ];
 
@@ -67,7 +67,7 @@ function belongsTo(roots: readonly string[], pathname: string): boolean {
  *
  * Every top-level place is here, the home included: a reader must be able to
  * see which one is on screen and reach any other, so the home cannot be left to
- * the brand alone. Two entries are named by their word (商店 · 我的); the home
+ * the brand alone. Two entries are named by their word (商店 · 已安装); the home
  * is a mark, because its word would name a role rather than a place and a
  * compact mark keeps the row short — the word rides its accessible name and
  * hover tip instead, the arrangement `DrillDownHead` uses for the same reason.

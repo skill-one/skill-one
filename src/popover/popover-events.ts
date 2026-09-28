@@ -22,14 +22,14 @@ export const POPOVER_NAVIGATE_EVENT = "popover-navigate";
  */
 export const SKILLS_CHANGED_EVENT = "skills-changed";
 
-/** The my-skills page the popover's footer button opens. */
-export const MY_SKILLS_PATH = "/my-skills";
+/** The installed page the popover's footer button opens. */
+export const INSTALLED_PATH = "/installed";
 
 /**
- * Deep link into the my-skills page with the search box pre-filled with
+ * Deep link into the installed page with the search box pre-filled with
  * `name`, so the clicked skill ranks near the top of the filtered list (its
  * name is the whole query) and the box stays editable.
  */
 export function skillPath(name: string): string {
-  return `${MY_SKILLS_PATH}?skill=${encodeURIComponent(name)}`;
+  return `${INSTALLED_PATH}?skill=${encodeURIComponent(name)}`;
 }

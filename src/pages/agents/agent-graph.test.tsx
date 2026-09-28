@@ -298,7 +298,7 @@ describe("AgentGraph", () => {
     );
     expect(screen.getByRole("link", { name: "管理" })).toHaveAttribute(
       "href",
-      "/my-skills",
+      "/installed",
     );
   });
 });

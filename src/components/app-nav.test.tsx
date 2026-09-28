@@ -25,7 +25,7 @@ describe("AppNav", () => {
 
     expect(screen.getByRole("link", { name: "首页" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "商店" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "我的" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "已安装" })).toBeInTheDocument();
   });
 
   it("is the app's whole navigation: every place and nothing else", () => {
@@ -53,20 +53,20 @@ describe("AppNav", () => {
   });
 
   it("marks the active destination", () => {
-    renderNav("/my-skills");
+    renderNav("/installed");
 
-    expect(screen.getByRole("link", { name: "我的" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "已安装" })).toHaveAttribute(
       "aria-current",
       "page",
     );
   });
 
   it("keeps a destination marked on its own sub-pages", () => {
-    renderNav("/my-skills/agents");
+    renderNav("/installed/agents");
 
     // The agents graph is a sub-page of the installed list, so the destination
     // it opened from stays lit.
-    expect(screen.getByRole("link", { name: "我的" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "已安装" })).toHaveAttribute(
       "aria-current",
       "page",
     );

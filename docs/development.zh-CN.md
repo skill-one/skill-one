@@ -70,7 +70,7 @@ skill-one/
 │   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
 │   │   ├── explore/        # 商店探索相关页面（skill-row + skill-run / repo-card / live-groups / search-results）
-│   │   └── my-skills/      # 我的 Skills 页（agent 头像菜单 / agent-link-settings-dialog 等）
+│   │   └── installed/      # 已安装页（agent 头像菜单 / agent-link-settings-dialog 等）
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层
 │   ├── types/              # 类型定义

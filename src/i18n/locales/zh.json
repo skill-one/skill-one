@@ -31,7 +31,7 @@
     "mainAria": "主导航",
     "home": "首页",
     "store": "商店",
-    "my": "我的"
+    "installed": "已安装"
   },
   "unit": {
     "byRepo": "按仓库",

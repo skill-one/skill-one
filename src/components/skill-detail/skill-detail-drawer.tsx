@@ -4,7 +4,7 @@ import { SkillDetailPanel, type SkillDetailSurface } from "./skill-detail-panel"
 
 /**
  * The skill detail sheet shared by the store's explore page and the
- * my-skills page: a modal right-side Sheet
+ * installed page: a modal right-side Sheet
  * (dimmed overlay; opening or closing never reflows the grid) with prev/next
  * walking the caller's list.
  *

@@ -4,7 +4,7 @@ import type { AgentStatus } from "./skills-manager";
 
 /**
  * The three link states an agent can present, derived once wherever state is
- * shown — the agents graph's ribbons and node cards, the my-skills entry
+ * shown — the agents graph's ribbons and node cards, the installed entry
  * card, and the link settings dialog.
  */
 export type AgentLinkState = "linked" | "warning" | "unlinked";

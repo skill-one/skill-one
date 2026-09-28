@@ -11,7 +11,7 @@ export const AVATAR_GROUP_MAX = 2;
  * than fit inline. Link state is not encoded here — the surface that embeds
  * the strip carries each agent's state elsewhere.
  *
- * Purely presentational. `max` lets a roomier surface (the my-skills entry
+ * Purely presentational. `max` lets a roomier surface (the installed entry
  * card) show more faces than the old header strip could.
  */
 export function AgentAvatarGroup({

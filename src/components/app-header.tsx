@@ -30,7 +30,7 @@ export interface HeaderRoute {
  * Pure, so the mapping can be read off directly in a test.
  */
 export function headerRoute(pathname: string): HeaderRoute {
-  if (pathname === "/my-skills") return { destination: "installed" };
+  if (pathname === "/installed") return { destination: "installed" };
   return { destination: "store" };
 }
 

@@ -124,7 +124,7 @@ function starsOf(group: RepoGroup): number | undefined {
  * ordered.
  */
 
-export function MySkillsPage() {
+export function InstalledPage() {
   const { t } = useTranslation();
   const { data: skills, isLoading, isError, error } = useInstalledSkills();
 
@@ -179,7 +179,7 @@ export function MySkillsPage() {
     setSelectedKey(null);
   }, [query, unit, domain]);
 
-  // Deep link from the menu bar popover: `/my-skills?skill=<name>` pre-fills
+  // Deep link from the menu bar popover: `/installed?skill=<name>` pre-fills
   // the search box, which ranks the targeted skill near the top (its name is
   // the whole query, and the name field is boosted) along with any sibling
   // whose terms it shares. The param is consumed (removed) once applied so a

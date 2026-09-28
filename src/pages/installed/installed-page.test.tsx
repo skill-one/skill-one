@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { MySkillsPage } from "./my-skills-page";
+import { InstalledPage } from "./installed-page";
 import { AppHeader } from "../../components/app-header";
 import { renderWithRouter } from "../../test/test-utils";
 import {
@@ -72,17 +72,17 @@ function ledgerRecord(name: string): { name: string; repo?: string } | undefined
  * arrives on. The header carries the two controls both lists share, so a page
  * mounted alone could be typed into but not searched.
  */
-function renderPage(route = "/my-skills") {
+function renderPage(route = "/installed") {
   return renderWithRouter(
     <>
       <AppHeader />
-      <MySkillsPage />
+      <InstalledPage />
     </>,
     { route },
   );
 }
 
-describe("MySkillsPage", () => {
+describe("InstalledPage", () => {
   afterEach(() => {
     resetMockInstalledSkills();
     resetMockAgentStatus();
@@ -847,9 +847,9 @@ describe("MySkillsPage", () => {
   });
 
   it("pre-fills the search box from the ?skill= deep link", async () => {
-    // The menu bar popover deep links to /my-skills?skill=<name>; the page
+    // The menu bar popover deep links to /installed?skill=<name>; the page
     // must land with that skill pre-filtered and consume the param.
-    renderPage("/my-skills?skill=pdf");
+    renderPage("/installed?skill=pdf");
 
     expect(await screen.findByLabelText("搜索 Skill")).toHaveValue("pdf");
     expect(await screen.findByText("pdf")).toBeInTheDocument();
