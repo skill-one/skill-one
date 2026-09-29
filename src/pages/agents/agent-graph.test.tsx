@@ -175,27 +175,26 @@ describe("AgentGraph", () => {
     expect(gemini.getAttribute("data-lifted")).toBe("false");
   });
 
-  it("renders every agent as a bare icon — hover names it, and nothing more", async () => {
+  it("renders every agent as a named pill — face, name, and nothing more", async () => {
     const user = userEvent.setup();
     renderWithRouter(<AgentGraph agents={agents} />);
 
-    // No name text on the graph itself; every icon is reachable by name.
-    expect(screen.queryByText("Claude Code")).toBeNull();
+    // The name sits beside its face in the pill; every pill is reachable by
+    // name, and no state words or actions appear on the graph itself.
     for (const name of ["Claude Code", "Cursor", "Gemini CLI", "Windsurf"]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
+      expect(screen.getByText(name)).toBeInTheDocument();
     }
-
-    // The tooltip carries the name alone — no state words, no actions; the
-    // icon's edge and face already say the state, and the icon is the switch.
-    await hoverAgent(user, "Cursor");
-    const tip = await screen.findByRole("tooltip");
-    expect(tip).toHaveTextContent("Cursor");
     for (const label of ["已链接", "未链接", "原生目录", "链接", "取消链接"]) {
       expect(screen.queryByText(label)).toBeNull();
     }
+
+    // Hovering wakes the ribbon pulse, never a tooltip.
+    await hoverAgent(user, "Cursor");
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
-  it("echoes the link state on the icon's edge, not in words", () => {
+  it("echoes the link state on the pill's edge, not in words", () => {
     renderWithRouter(<AgentGraph agents={agents} />);
     const icon = (label: string) => screen.getByRole("button", { name: label });
 
@@ -271,20 +270,23 @@ describe("AgentGraph", () => {
     expect(status.find((a) => a.name === "claude-code")?.linked).toBe(false);
   });
 
-  it("leaves the canonical agent's icon inert, but still names it on hover", async () => {
+  it("leaves the canonical agent's pill inert, its name always visible", async () => {
     const user = userEvent.setup();
-    renderWithRouter(<AgentGraph agents={agents} />);
+    const { container } = renderWithRouter(<AgentGraph agents={agents} />);
 
-    // A canonical agent uses its native skills directory, so its icon cannot
-    // be switched off: disabled and reading as pressed.
+    // A canonical agent uses its native skills directory, so its pill cannot
+    // be switched off: disabled and reading as pressed, name on its face.
     const card = screen.getByRole("button", { name: "Windsurf" });
     expect(card).toBeDisabled();
     expect(card).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Windsurf")).toBeInTheDocument();
 
-    // Even though the button is disabled, its wrapper still opens the name
-    // tooltip (the disabled element itself swallows pointer events).
+    // Hovering the inert pill still lifts its ribbon (the wrapper owns the
+    // pointer events the disabled button swallows).
     await user.hover(card);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Windsurf");
+    expect(
+      container.querySelector('g[data-agent="windsurf"]'),
+    ).toHaveAttribute("data-lifted", "true");
 
     const status = await fetchAgentStatus();
     expect(status.find((a) => a.name === "windsurf")?.linked).toBe(false);

@@ -2,10 +2,10 @@ import type { AgentStatus } from "../../lib/skills-manager";
 
 /**
  * The geometry of the agents page's constellation — a pure mapping from the
- * agent list and the canvas size to icon nodes, the SkillOne hub and the
- * ribbon paths that join them. One set of coordinates drives both the
- * absolutely-positioned HTML nodes and the SVG ribbons behind them, so the
- * two can never disagree, and the layout stays deterministic and unit
+ * agent list and the canvas size to icon-plus-name pills, the SkillOne hub
+ * and the ribbon paths that join them. One set of coordinates drives both
+ * the absolutely-positioned HTML nodes and the SVG ribbons behind them, so
+ * the two can never disagree, and the layout stays deterministic and unit
  * testable without a DOM.
  *
  * Nodes are placed by Vogel's phyllotaxis — the sunflower formula: each
@@ -13,16 +13,15 @@ import type { AgentStatus } from "../../lib/skills-manager";
  * with √index. The result looks casually scattered to every side of the hub
  * while staying evenly spaced and never overlapping; the same agent always
  * lands in the same place. A long roster shrinks the tile size before it
- * grows the canvas, so the constellation keeps fitting one screen.
+ * grows the canvas, so the constellation keeps fitting one screen. The label
+ * slot has a fixed width (longer names truncate), so the layout never needs
+ * to measure the DOM.
  */
 
 export interface Point {
   x: number;
   y: number;
 }
-
-/** Where the node's name tooltip opens, in screen-side terms. */
-export type NodeTipSide = "left" | "right" | "top" | "bottom";
 
 /** Which hub side a column-mode tile stands on. */
 export type GraphSide = "left" | "right";
@@ -36,15 +35,13 @@ export type AgentsLayoutMode = "constellation" | "columns";
 export interface NodeLayout {
   /** Agent id (`AgentStatus.name`). */
   name: string;
-  /** Square tile box, in canvas coordinates. */
+  /** Pill box (icon plus name label), in canvas coordinates. */
   x: number;
   y: number;
   width: number;
   height: number;
-  /** Point on the tile edge the ribbon leaves from, facing the hub. */
+  /** Point where the ribbon leaves the pill, on the edge facing the hub. */
   anchor: Point;
-  /** The side its name tooltip opens toward — always away from the hub. */
-  tipSide: NodeTipSide;
   /** Constellation mode: this node's polar angle around the hub (0 = east). */
   angle?: number;
   /** Columns mode: which side of the hub the tile stands on. */
@@ -76,6 +73,14 @@ export const NODE_GAP_MIN = 4;
 export const HUB_RADIUS = 48;
 export const HUB_TIP_GAP = 10;
 /**
+ * The fixed label slot inside every node pill; longer names truncate with an
+ * ellipsis. Fixed so the pure layout can reserve the width without measuring
+ * the DOM.
+ */
+export const NODE_LABEL_WIDTH = 88;
+/** Gap between the icon box and the label inside a pill. */
+export const NODE_LABEL_GAP = 8;
+/**
  * The shortest ribbon, between the hub rim and the innermost tile. Kept long
  * enough to read as a spoke, not a stub — the first node sits a full tile's
  * breath away from the disk.
@@ -95,15 +100,13 @@ export const DEFAULT_GRAPH_HEIGHT = 520;
  */
 export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 /**
- * Phyllotaxis density: with `r = r0 + k·spacing·√index` a square tile needs
- * k ≈ 0.62 for axis-aligned neighbours never to overlap (verified across up
- * to 35 nodes).
+ * Phyllotaxis density: with `r = r0 + k·spacing·√index` the spacing unit is
+ * the pill width, so neighbours along one ray still clear each other
+ * (verified across up to 35 nodes).
  */
 const DENSITY_K = 0.62;
 /** Where the spiral starts — one tile above the hub (angle 0 points east). */
 const ANGLE_OFFSET = -Math.PI / 2;
-/** Canvas room an outward name tooltip needs before it is diverted up/down. */
-const TIP_SIDE_REQUIRE = 96;
 
 /**
  * The five ribbon hues of the Skill One mark, in its top-to-bottom order.
@@ -180,10 +183,15 @@ function gapFor(size: number): number {
   return NODE_GAP_MIN + t * (NODE_GAP_MAX - NODE_GAP_MIN);
 }
 
+/** Full pill width for an icon box of `size`: icon plus fixed label slot. */
+export function pillWidth(size: number): number {
+  return size + NODE_LABEL_GAP + NODE_LABEL_WIDTH;
+}
+
 /** Radius of the outermost tile's centre for a given roster and tile size. */
 function outerRadius(agentCount: number, size: number): number {
-  const spacing = size + gapFor(size);
-  const r0 = HUB_RADIUS + HUB_TIP_GAP + size / 2 + RIBBON_MIN;
+  const spacing = pillWidth(size) + gapFor(size);
+  const r0 = HUB_RADIUS + HUB_TIP_GAP + pillWidth(size) / 2 + RIBBON_MIN;
   const last = agentCount > 0 ? Math.sqrt(agentCount - 1) : 0;
   return r0 + DENSITY_K * spacing * last;
 }
@@ -194,7 +202,7 @@ function outerRadius(agentCount: number, size: number): number {
  */
 function resolveTileSize(agentCount: number, availableRadius: number): number {
   for (let size = NODE_SIZE_MAX; size >= NODE_SIZE_MIN; size -= 1) {
-    if (outerRadius(agentCount, size) + size / 2 <= availableRadius) {
+    if (outerRadius(agentCount, size) + pillWidth(size) / 2 <= availableRadius) {
       return size;
     }
   }
@@ -210,32 +218,17 @@ export function resolveGraphWidth(measuredWidth: number): number {
   return measuredWidth > 0 ? measuredWidth : DEFAULT_GRAPH_WIDTH;
 }
 
-/** Where one node's tooltip opens: outward while the canvas edge holds it. */
-function resolveTipSide(angle: number, cx: number, width: number): NodeTipSide {
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const outwardX = cos >= 0 ? width - cx : cx;
-  if (Math.abs(cos) >= Math.abs(sin)) {
-    // Facing horizontally: keep it outward when there is room, otherwise flip
-    // it vertically so it never folds back over the ribbon.
-    if (outwardX >= TIP_SIDE_REQUIRE) return cos >= 0 ? "right" : "left";
-  }
-  return sin >= 0 ? "bottom" : "top";
-}
-
-/** Column-mode geometry: one bare icon tile per row. */
+/** Column-mode geometry: one icon-plus-name pill per row. */
 const COL_TILE = NODE_SIZE_MAX;
+const COL_PILL = COL_TILE + NODE_LABEL_GAP + NODE_LABEL_WIDTH;
 const COL_GAP = 14;
 const COL_PITCH = COL_TILE + COL_GAP;
 /** Vertical pad and the clear central lane for the hub. */
 const COL_PAD_TOP = 28;
 const COL_PAD_BOTTOM = 28;
 const COL_HUB_LANE = HUB_RADIUS + HUB_TIP_GAP + 24;
-/** Gutter outside the outermost column, holding the outward name tooltip. */
-const COL_TIP_GUTTER = 104;
 /** The narrowest the columns canvas renders; below it the page scrolls. */
-const COL_MIN_WIDTH =
-  2 * (COL_HUB_LANE + COL_TILE) + 2 * COL_TIP_GUTTER;
+const COL_MIN_WIDTH = 2 * (COL_HUB_LANE + COL_PILL) + 2 * OUTER_PAD;
 
 /** The height of an icon column holding `count` tiles. */
 function columnHeight(count: number): number {
@@ -243,7 +236,7 @@ function columnHeight(count: number): number {
 }
 
 /**
- * The original presentation: balanced icon columns on the hub's left and
+ * The original presentation: balanced pill columns on the hub's left and
  * right, opening more columns outward as the roster grows or the canvas
  * shortens. Ribbons cross the clear central lane on horizontal S-curves.
  */
@@ -261,9 +254,8 @@ function layoutColumns(
     return Math.max(1, Math.floor((usable + COL_GAP) / COL_PITCH));
   };
   const columnsPerSide = () => {
-    const half =
-      measuredW / 2 - COL_TIP_GUTTER - COL_HUB_LANE + COL_GAP;
-    return Math.max(1, Math.floor(half / (COL_TILE + COL_GAP)));
+    const half = measuredW / 2 - OUTER_PAD - COL_HUB_LANE + COL_GAP;
+    return Math.max(1, Math.floor(half / (COL_PILL + COL_GAP)));
   };
 
   const maxColumns = 2 * columnsPerSide();
@@ -299,12 +291,12 @@ function layoutColumns(
   const byName = new Map<string, NodeLayout>();
   columns.forEach((column, c) => {
     const side: GraphSide = c % 2 === 0 ? "left" : "right";
-    // Rank counts columns inward from the gutter: 0 is the outermost pair.
+    // Rank counts columns inward from the edge: 0 is the outermost pair.
     const rank = Math.floor(c / 2);
     const x =
       side === "left"
-        ? COL_TIP_GUTTER + rank * (COL_TILE + COL_GAP)
-        : width - COL_TIP_GUTTER - COL_TILE - rank * (COL_TILE + COL_GAP);
+        ? OUTER_PAD + rank * (COL_PILL + COL_GAP)
+        : width - OUTER_PAD - COL_PILL - rank * (COL_PILL + COL_GAP);
     // The two sides sit half a pitch apart, so their rows interlock.
     const stagger = side === "left" ? -COL_PITCH / 4 : COL_PITCH / 4;
     const top = hub.y - columnHeight(column.length) / 2 + stagger;
@@ -315,13 +307,12 @@ function layoutColumns(
         side,
         x,
         y,
-        width: COL_TILE,
+        width: COL_PILL,
         height: COL_TILE,
         anchor: {
-          x: side === "left" ? x + COL_TILE : x,
+          x: side === "left" ? x + COL_PILL : x,
           y: y + COL_TILE / 2,
         },
-        tipSide: side === "left" ? "left" : "right",
       });
     });
   });
@@ -370,36 +361,40 @@ function layoutConstellation(
 
   const availableRadius = Math.min(measuredW, measuredH) / 2 - OUTER_PAD;
   const size = resolveTileSize(agents.length, availableRadius);
+  const pillW = pillWidth(size);
 
   // The constellation is circular: once the floor tile size still cannot fit
   // the measured box, grow a square canvas enough to hold it.
-  const needed = (outerRadius(agents.length, size) + size / 2 + OUTER_PAD) * 2;
+  const needed = (outerRadius(agents.length, size) + pillW / 2 + OUTER_PAD) * 2;
   const width = Math.max(measuredW, needed);
   const height = Math.max(measuredH, needed);
   const hub = { x: width / 2, y: height / 2, radius: HUB_RADIUS };
 
-  const spacing = size + gapFor(size);
-  const r0 = HUB_RADIUS + HUB_TIP_GAP + size / 2 + RIBBON_MIN;
+  const spacing = pillW + gapFor(size);
+  const r0 = HUB_RADIUS + HUB_TIP_GAP + pillW / 2 + RIBBON_MIN;
 
   const nodes: NodeLayout[] = agents.map((agent, i) => {
     const angle = ANGLE_OFFSET + i * GOLDEN_ANGLE;
     const radius = r0 + DENSITY_K * spacing * Math.sqrt(i);
     const cx = hub.x + radius * Math.cos(angle);
     const cy = hub.y + radius * Math.sin(angle);
-    // The ribbon leaves from the tile edge facing the hub and arrives at the
-    // hub rim on the same ray, so the spoke is one straight radial line the
-    // curve gently bows along.
+    // The ribbon leaves where the hub-facing ray pierces the pill rect and
+    // arrives at the hub rim on the same ray, so the spoke is one straight
+    // radial line the curve gently bows along.
     const ux = -Math.cos(angle);
     const uy = -Math.sin(angle);
-    const anchor = { x: cx + ux * (size / 2), y: cy + uy * (size / 2) };
+    const t = Math.min(
+      ux !== 0 ? pillW / 2 / Math.abs(ux) : Infinity,
+      uy !== 0 ? size / 2 / Math.abs(uy) : Infinity,
+    );
+    const anchor = { x: cx + ux * t, y: cy + uy * t };
     return {
       name: agent.name,
-      x: cx - size / 2,
+      x: cx - pillW / 2,
       y: cy - size / 2,
-      width: size,
+      width: pillW,
       height: size,
       anchor,
-      tipSide: resolveTipSide(angle, cx, width),
       angle,
     };
   });
