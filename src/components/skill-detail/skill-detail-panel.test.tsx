@@ -354,6 +354,8 @@ describe("SkillDetailPanel", () => {
     // No registry stats for a pure local skill: no install figure at all.
     expect(screen.queryByText("安装量")).not.toBeInTheDocument();
     expect(screen.queryByTitle(/次安装/)).not.toBeInTheDocument();
+    // No description → nothing to estimate, so no token figure either.
+    expect(document.querySelector('[data-slot="token-estimate"]')).toBeNull();
   });
 
   it("opens the source link through the system browser on click", async () => {
@@ -492,6 +494,15 @@ describe("SkillDetailPanel", () => {
     // A store row describes a skill the reader does not have on disk, so there
     // is no install to date.
     expect(document.querySelector('[data-slot="installed-at"]')).toBeNull();
+  });
+
+  it("estimates the English description's token cost in the meta line", async () => {
+    renderDrawer({});
+    await screen.findByText("Read and merge PDF documents.");
+
+    // Five words and a period: "≈ 6 tokens" — computed from the English
+    // frontmatter description, whatever language the drawer displays.
+    expect(screen.getByText(/6 tokens/)).toBeInTheDocument();
   });
 
   it("shows no store facts for an installed skill the registry does not know", async () => {

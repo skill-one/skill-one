@@ -24,6 +24,7 @@ import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
 import { skillKey, type SkillView } from "../../lib/skill-view";
+import { estimateTokens } from "../../lib/token-estimate";
 import {
   errorMessage,
   formatDate,
@@ -566,6 +567,28 @@ export function SkillDetailPanel({
     // leaves no separator behind.
     shown?.installedAt != null && formatRelativeTime(shown.installedAt, locale) ? (
       <InstalledAt key="installed-at" installedAt={shown.installedAt} />
+    ) : null,
+    // Token cost of the English frontmatter description — the text an agent
+    // actually loads, whatever language the drawer displays. Estimated (see
+    // `lib/token-estimate`), so the figure wears an approximation mark and
+    // the hover note names its basis; a description-less skill shows nothing.
+    originalDescription ? (
+      <Tooltip key="tokens">
+        <TooltipTrigger
+          render={
+            <span
+              data-slot="token-estimate"
+              className="whitespace-nowrap"
+              aria-label={t("detail.tokensHint")}
+            >
+              ≈ {t("detail.tokensLabel", { count: estimateTokens(originalDescription) })}
+            </span>
+          }
+        />
+        <TooltipContent className="max-w-[260px] text-left normal-case">
+          {t("detail.tokensHint")}
+        </TooltipContent>
+      </Tooltip>
     ) : null,
   ].filter((item) => item !== null);
 
