@@ -10,20 +10,28 @@ import { useAgentLinkToggle } from "../../hooks/use-agent-link-toggle";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { AgentIcon } from "../../components/agent-icon";
 import { buttonVariants } from "../../components/ui/button";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "../../components/ui/hover-card";
 import { cn } from "../../lib/utils";
 import { useAgentEdgeColor } from "../../hooks/use-agent-edge-color";
 import {
   layoutAgents,
   resolveGraphWidth,
+  HUB_CARD_HALF,
+  HUB_CARD_HALF_COLUMNS,
   type AgentsLayoutMode,
   type GraphLayout,
   type NodeLayout,
 } from "./agent-graph-layout";
+
+/**
+ * Entrance stagger for one node: in columns mode a whole column lands at
+ * once and columns cascade outer-to-inner (ending at the hub); the
+ * constellation keeps the per-agent ripple. Callers add their own base
+ * (nodes 0.15s, ribbons 0.1s) on top.
+ */
+function enterStagger(col: number | undefined, index: number): number {
+  if (col !== undefined) return col * 0.12;
+  return index * 0.05;
+}
 
 /**
  * The staged hover pulse. With no hover every ribbon is fully still. While
@@ -83,7 +91,7 @@ interface ShimmerFlow {
  */
 export function AgentGraph({
   agents,
-  mode = "constellation",
+  mode = "columns",
 }: {
   agents: AgentStatus[];
   mode?: AgentsLayoutMode;
@@ -116,10 +124,8 @@ export function AgentGraph({
     return () => window.clearTimeout(timer);
   }, [active]);
 
-  // The canvas never renders narrower than the icon-column/hub clearance;
-  // below the window width the outer scroller carries the overflow. Its height
-  // is measured too, so the columns can be sized to keep the whole roster on
-  // one screen instead of a single column scrolling off the bottom.
+  // The canvas is always exactly the measured box — it never grows, so there
+  // is no scroller. The window's minimum size keeps the roster on one screen.
   const graphWidth = resolveGraphWidth(size.width);
   const layout = useMemo(
     () => layoutAgents(agents, graphWidth, size.height, mode),
@@ -127,8 +133,11 @@ export function AgentGraph({
   );
 
   return (
-    <div ref={ref} className="h-full w-full overflow-auto" data-pulse={pulse}>
-      <div className="relative" style={{ width: layout.width }}>
+    <div ref={ref} className="h-full w-full overflow-hidden" data-pulse={pulse}>
+      {/* Keyed by presentation: flipping constellation/columns remounts the
+          whole picture so the entrance cascade replays instead of hard-cutting
+          every node to its new spot. */}
+      <div key={mode} className="relative" style={{ width: layout.width }}>
         <svg
           width={layout.width}
           height={layout.height}
@@ -143,6 +152,7 @@ export function AgentGraph({
               from={layout.nodes[i].anchor}
               hub={layout.hub}
               index={i}
+              col={layout.nodes[i].col}
               pulse={pulse}
               lifted={active === agent.name}
             />
@@ -165,8 +175,10 @@ export function AgentGraph({
           ))}
           <HubDisk
             hub={layout.hub}
+            agents={agents}
             skills={skills ?? []}
             loading={skillsLoading && !skills}
+            mode={mode}
           />
         </div>
       </div>
@@ -194,6 +206,7 @@ function Ribbon({
   from,
   hub,
   index,
+  col,
   pulse,
   lifted,
 }: {
@@ -202,6 +215,8 @@ function Ribbon({
   from: { x: number; y: number };
   hub: { x: number; y: number };
   index: number;
+  /** Columns-mode column index: the ribbon draws with its column's cascade. */
+  col?: number;
   pulse: Pulse;
   lifted: boolean;
 }) {
@@ -325,7 +340,7 @@ function Ribbon({
             ? { duration: 0.2 }
             : {
                 pathLength: {
-                  delay: 0.1 + index * 0.05,
+                  delay: 0.1 + enterStagger(col, index),
                   duration: 0.5,
                   ease: "easeOut",
                 },
@@ -371,19 +386,26 @@ function Ribbon({
 }
 
 /**
- * The hub: a quiet card-surface disk at the constellation's centre showing
- * just the installed-skill count. Its hover card lists the enabled skills
- * (scrollable, so a hundred-plus names stay usable) and carries the two
- * routes — store and management — in its footer.
+ * The hub: a compact dashboard card pinned at the constellation's centre. The
+ * geometry (hub.x/y) is unchanged so ribbons still converge underneath it —
+ * the card is opaque and covers their tips. It always shows the figures that
+ * matter (installed total, enabled share, attention only when something needs
+ * it) plus the two routes, so no hover is needed. The one-line value
+ * proposition lives in the page head above, not here. Per-skill names are
+ * deliberately not listed here; management lives on /installed.
  */
 function HubDisk({
   hub,
+  agents,
   skills,
   loading,
+  mode,
 }: {
   hub: GraphLayout["hub"];
+  agents: AgentStatus[];
   skills: InstalledSkill[];
   loading: boolean;
+  mode: AgentsLayoutMode;
 }) {
   const { t } = useTranslation();
   const total = skills.length;
@@ -391,100 +413,86 @@ function HubDisk({
     () => skills.filter((skill) => skill.enabled),
     [skills],
   );
+  const attentionCount = agents.filter(
+    (agent) => agentLinkState(agent) === "warning",
+  ).length;
+  // The columns presentation keeps a narrow central lane, so the card renders
+  // slimmer there; widths stay in sync with the layout clearance constants.
+  const width =
+    mode === "columns" ? HUB_CARD_HALF_COLUMNS * 2 : HUB_CARD_HALF * 2;
 
   return (
     <div
       className="pointer-events-auto absolute"
       style={{
-        left: hub.x - hub.radius,
-        top: hub.y - hub.radius,
-        width: hub.radius * 2,
-        height: hub.radius * 2,
+        left: hub.x,
+        top: hub.y,
+        width,
+        transform: "translate(-50%, -50%)",
       }}
     >
-      <HoverCard>
-        <HoverCardTrigger
-          delay={150}
-          closeDelay={150}
-          render={
-            <div
-              data-testid="agent-hub"
-              aria-label={t("agents.hub.diskAria", { total })}
-              className="flex size-24 cursor-default items-center justify-center rounded-full border border-border bg-card shadow-sm transition-colors hover:border-primary/40"
-            >
-              {loading ? (
-                <Loader2 className="size-5 animate-spin text-muted-foreground" />
-              ) : (
-                <span className="text-[30px] leading-none font-semibold text-foreground tabular-nums">
-                  {total}
-                </span>
+      <div
+        data-testid="agent-hub"
+        aria-label={t("agents.hub.diskAria", { total, enabled: enabled.length })}
+        className="rounded-2xl border border-border bg-card px-4 py-3 text-center shadow-sm"
+      >
+        <p className="text-[11px] font-medium text-muted-foreground">
+          {t("agents.hub.title")}
+        </p>
+        {loading ? (
+          <Loader2
+            className="mx-auto mt-2 size-5 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
+        ) : (
+          <>
+            <p className="mt-1 text-[30px] leading-none font-semibold text-foreground tabular-nums">
+              {total}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {t("agents.hub.installed", { total })}
+            </p>
+            <div className="mt-1.5 space-y-0.5 text-[12px] tabular-nums">
+              <p className="whitespace-nowrap text-muted-foreground">
+                {enabled.length === 0 ? (
+                  <span>{t("agents.hub.noneEnabled")}</span>
+                ) : (
+                  <span>{t("agents.hub.enabled", { enabled: enabled.length, total })}</span>
+                )}
+              </p>
+              {attentionCount > 0 && (
+                <p className="whitespace-nowrap text-amber-600 tabular-nums dark:text-amber-500">
+                  {t("agents.attention", { count: attentionCount })}
+                </p>
               )}
             </div>
-          }
-        />
-        <HoverCardContent
-          side="top"
-          sideOffset={8}
-          className="w-72 p-3"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="text-[12px] font-medium">
-              {t("agents.hub.previewTitle")}
-            </p>
-            <p className="text-[11px] text-muted-foreground tabular-nums">
-              {enabled.length}/{total}
-            </p>
-          </div>
-          {enabled.length > 0 ? (
-            // Two compact columns, capped in height and scrolled: the list can
-            // run past a hundred names without growing the card unbounded.
-            // Capped at 224px, and never taller than the viewport minus room
-            // for the card's own header/footer: a hundred-plus names scroll
-            // inside the list while the whole card stays on screen.
-            <ul className="mt-2 grid max-h-[min(14rem,calc(100dvh-13rem))] grid-cols-2 gap-x-3 gap-y-0.5 overflow-y-auto pr-1">
-              {enabled.map((skill) => (
-                <li
-                  key={skill.name}
-                  className="truncate text-[12px] text-muted-foreground"
-                  title={skill.name}
-                >
-                  {skill.name}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-[12px] text-muted-foreground">
-              {t("agents.hub.noneEnabled")}
-            </p>
-          )}
-          {/* The two routes live in the card's footer, below the list. */}
-          <div className="mt-3 flex gap-2 border-t pt-2.5">
-            <Link
-              to="/explore"
-              className={buttonVariants({
-                variant: "outline",
-                size: "sm",
-                className: "flex-1",
-              })}
-            >
-              <Store />
-              {t("agents.hub.browseStore")}
-            </Link>
-            <Link
-              to="/installed"
-              className={buttonVariants({
-                variant: "outline",
-                size: "sm",
-                className: "flex-1",
-              })}
-            >
-              <SlidersHorizontal />
-              {t("agents.hub.manage")}
-            </Link>
-          </div>
-        </HoverCardContent>
-      </HoverCard>
+          </>
+        )}
+        <div className="mt-2.5 flex gap-2">
+          <Link
+            to="/explore"
+            className={buttonVariants({
+              variant: "outline",
+              size: "sm",
+              className: "flex-1",
+            })}
+          >
+            <Store />
+            {t("agents.hub.browseStore")}
+          </Link>
+          <Link
+            to="/installed"
+            className={buttonVariants({
+              variant: "outline",
+              size: "sm",
+              className: "flex-1",
+            })}
+          >
+            <SlidersHorizontal />
+            {t("agents.hub.manage")}
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
@@ -528,6 +536,8 @@ function AgentNode({
       onMouseEnter={() => onHover(agent.name)}
       onMouseLeave={() => onHover(null)}
       // Entrance drift: outward along the spiral ray, or sideways in columns.
+      // Columns cascade a column at a time (see `enterStagger`); the
+      // constellation ripples agent by agent.
       initial={
         reduceMotion
           ? undefined
@@ -544,7 +554,7 @@ function AgentNode({
         reduceMotion
           ? { duration: 0.2 }
           : {
-              delay: 0.15 + index * 0.05,
+              delay: 0.15 + enterStagger(node.col, index),
               type: "spring",
               stiffness: 300,
               damping: 28,

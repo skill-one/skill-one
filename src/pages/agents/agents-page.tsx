@@ -1,15 +1,10 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Columns2, Loader2, Orbit, Users } from "lucide-react";
+import { Columns2, Loader2, Users, Waypoints } from "lucide-react";
 
 import { fetchAgentStatus } from "../../lib/local-skills";
-import { agentLinkState } from "../../lib/agent-link-state";
-import {
-  getAgentsLayout,
-  setAgentsLayout,
-  type AgentsLayoutMode,
-} from "../../lib/agents-layout-preference";
+import { setAgentsLayout } from "../../lib/agents-layout-preference";
+import { useAgentsLayout } from "../../hooks/use-agents-layout";
 import { errorMessage } from "../../lib/utils";
 import { Placeholder } from "../../components/placeholder";
 import {
@@ -18,16 +13,6 @@ import {
   TooltipTrigger,
 } from "../../components/ui/tooltip";
 import { AgentGraph } from "./agent-graph";
-
-/** The two graph presentations, with their icons and label keys. */
-const LAYOUT_OPTIONS: ReadonlyArray<{
-  mode: AgentsLayoutMode;
-  icon: typeof Orbit;
-  labelKey: "agents.layout.constellation" | "agents.layout.columns";
-}> = [
-  { mode: "constellation", icon: Orbit, labelKey: "agents.layout.constellation" },
-  { mode: "columns", icon: Columns2, labelKey: "agents.layout.columns" },
-];
 
 /**
  * The agents page — the app's home. Every agent this machine detects is drawn
@@ -39,15 +24,10 @@ const LAYOUT_OPTIONS: ReadonlyArray<{
  */
 export function AgentsPage() {
   const { t } = useTranslation();
-  // The presentation choice is the user's, persisted across launches.
-  const [layoutMode, setLayoutMode] = useState<AgentsLayoutMode>(() =>
-    getAgentsLayout(),
-  );
-
-  const chooseLayout = (mode: AgentsLayoutMode) => {
-    setLayoutMode(mode);
-    setAgentsLayout(mode);
-  };
+  // The presentation reads live so a change re-renders the graph without a
+  // remount. The toggle below flips it; the choice persists across launches.
+  const layoutMode = useAgentsLayout();
+  const toColumns = layoutMode === "constellation";
   const {
     data: agents,
     isLoading,
@@ -60,69 +40,55 @@ export function AgentsPage() {
   });
 
   const list = agents ?? [];
-  const linkedCount = list.filter(
-    (agent) => agent.linked || agent.canonical,
-  ).length;
-  const attentionCount = list.filter(
-    (agent) => agentLinkState(agent) === "warning",
-  ).length;
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The home's head: the page's name over the figures behind the picture.
-          No way back — this is where the window opens (see the app's routes),
-          so there is nowhere above it to go. */}
+      {/* The home's head is the idea itself: one line saying what the app
+          does — install once, every agent uses it. The figures live on the
+          hub card at the picture's centre, so nothing here competes with
+          them. No way back — this is where the window opens (see the app's
+          routes), so there is nowhere above it to go. The single toggle flips
+          the graph between the columns and the constellation; its face names
+          the way it goes, not where it is. */}
       <div className="mb-4 flex min-w-0 items-center gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-semibold tracking-tight">
-            {t("agents.title")}
+            {t("agents.hub.tagline")}
           </h1>
-          <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground tabular-nums">
-            <span>
-              {t("agents.connected", {
-                linked: linkedCount,
-                total: list.length,
-              })}
-            </span>
-            {attentionCount > 0 && (
-              <span className="text-amber-600 dark:text-amber-500">
-                · {t("agents.attention", { count: attentionCount })}
-              </span>
-            )}
-          </p>
         </div>
 
-        {/* Presentation switch: constellation scatter vs. balanced columns. */}
-        <div
-          role="group"
-          aria-label={t("agents.layout.groupAria")}
-          className="flex shrink-0 items-center gap-0.5 rounded-lg border border-border bg-card p-0.5"
-        >
-          {LAYOUT_OPTIONS.map(({ mode, icon: Icon, labelKey }) => {
-            const active = layoutMode === mode;
-            return (
-              <Tooltip key={mode}>
-                <TooltipTrigger
-                  render={
-                    <button
-                      type="button"
-                      aria-pressed={active}
-                      aria-label={t(labelKey)}
-                      onClick={() => chooseLayout(mode)}
-                      className={
-                        active
-                          ? "flex size-7 items-center justify-center rounded-md bg-muted text-foreground outline-none"
-                          : "flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                      }
-                    >
-                      <Icon className="size-4" />
-                    </button>
+        <div className="flex shrink-0 items-center rounded-lg border border-border bg-card p-0.5">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label={t(
+                    toColumns
+                      ? "agents.layout.switchToColumns"
+                      : "agents.layout.switchToConstellation",
+                  )}
+                  onClick={() =>
+                    setAgentsLayout(toColumns ? "columns" : "constellation")
                   }
-                />
-                <TooltipContent side="bottom">{t(labelKey)}</TooltipContent>
-              </Tooltip>
-            );
-          })}
+                  className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {toColumns ? (
+                    <Columns2 className="size-4" />
+                  ) : (
+                    <Waypoints className="size-4" />
+                  )}
+                </button>
+              }
+            />
+            <TooltipContent side="bottom">
+              {t(
+                toColumns
+                  ? "agents.layout.switchToColumns"
+                  : "agents.layout.switchToConstellation",
+              )}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

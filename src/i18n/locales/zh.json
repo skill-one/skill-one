@@ -70,8 +70,6 @@
   "settings": {
     "title": "设置",
     "appearance": "外观",
-    "repoPreviewCount": "仓库卡片预览数",
-    "repoPreviewAria": "仓库卡片预览数量",
     "softwareUpdate": "软件更新",
     "advanced": "高级设置"
   },
@@ -134,17 +132,17 @@
     "unlinked": "未链接"
   },
   "agents": {
-    "title": "Agents",
-    "connected": "已连接 {{linked}}/{{total}} 个 agent",
     "attention": "{{count}} 个待处理",
     "layout": {
-      "groupAria": "图谱布局",
-      "constellation": "星座",
-      "columns": "分列"
+      "switchToColumns": "切换到分列",
+      "switchToConstellation": "切换到星座"
     },
     "hub": {
-      "diskAria": "管理技能（已安装 {{total}} 个）",
-      "previewTitle": "已启用的技能",
+      "diskAria": "共享中心（已安装 {{total}} 个，{{enabled}} 个已启用）",
+      "title": "SkillOne 共享中心",
+      "installed": "{{total}} 个 skills",
+      "enabled": "{{enabled}}/{{total}} 已启用",
+      "tagline": "安装一次，全 agents 直接使用",
       "noneEnabled": "还没有启用的技能",
       "browseStore": "商店",
       "manage": "管理"
@@ -229,6 +227,9 @@
   "advanced": {
     "title": "高级设置",
     "description": "配置技能数据的下载源（索引、SKILL.md 详情、安装统一生效）。",
+    "display": "显示",
+    "repoPreviewCount": "仓库卡片预览数",
+    "repoPreviewAria": "仓库卡片预览数量",
     "cdnTitle": "CDN 基址",
     "cdnSaved": "已保存",
     "cdnHintBefore": "留空 = 优先直连 GitHub（",

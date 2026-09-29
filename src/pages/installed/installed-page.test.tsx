@@ -105,14 +105,14 @@ describe("InstalledPage", () => {
     expect(screen.getByRole("button", { name: /^未分类/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^其他/ })).toBeNull();
     // No install has a recorded source, so every skill lives in one pool card:
-    // it lists the preview size, and its bar offers the one past it.
+    // it lists the preview size, and its bar offers the three past it.
     expect(await screen.findByText("本地安装")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "展开 本地安装 的全部 6 个 skill" }),
-    ).toHaveTextContent("1");
+    ).toHaveTextContent("3");
     expect(
       screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-    ).toHaveLength(5);
+    ).toHaveLength(3);
     // The rest opens in place: one press on the bar, no navigation.
     await user.click(
       screen.getByRole("button", { name: "展开 本地安装 的全部 6 个 skill" }),
@@ -126,19 +126,19 @@ describe("InstalledPage", () => {
     expect(await screen.findByText("pdf")).toBeInTheDocument();
     expect(screen.getByText("docx")).toBeInTheDocument();
     expect(screen.getByText("pptx")).toBeInTheDocument();
-    expect(screen.getByText("mcp-builder")).toBeInTheDocument();
-    expect(screen.getByText("code-review")).toBeInTheDocument();
-    // The sixth is past the pool card's preview: the bar's own offer accounts
-    // for it — one press lists it with the rest.
+    // The rest are past the pool card's preview: the bar's own offer accounts
+    // for them — one press lists them with the rest.
+    expect(screen.queryByText("mcp-builder")).not.toBeInTheDocument();
+    expect(screen.queryByText("code-review")).not.toBeInTheDocument();
     expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "展开 本地安装 的全部 6 个 skill" }),
-    ).toHaveTextContent("1");
+    ).toHaveTextContent("3");
   });
 
   it("caps a repository's card at the preview size and offers the rest", async () => {
     const user = userEvent.setup();
-    // All six installs share one repository: the card lists the first five and
+    // All six installs share one repository: the card lists the first three and
     // its bar states the repository's own total, which is what lets a capped
     // list read as "these of them" — and the rest opens in place, with the
     // page one link behind the open card.
@@ -159,10 +159,10 @@ describe("InstalledPage", () => {
     const bar = await screen.findByRole("button", {
       name: "展开 acme/tools 的全部 6 个 skill",
     });
-    expect(bar).toHaveTextContent("1");
+    expect(bar).toHaveTextContent("3");
     expect(
       screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-    ).toHaveLength(5);
+    ).toHaveLength(3);
     expect(screen.queryByText("frontend-design")).not.toBeInTheDocument();
 
     await user.click(bar);
@@ -211,6 +211,8 @@ describe("InstalledPage", () => {
     for (let remaining = 6; remaining > 0; remaining--) {
       // The cards only answer to a role query once the panel has closed, so
       // each turn of the loop also proves the previous uninstall dismissed it.
+      // The pool card caps at three rows, so early removals keep three on
+      // screen and only the tail shrinks the list.
       const [first] = await screen.findAllByRole("button", {
         name: /查看 .+ 详情/,
       });
@@ -223,7 +225,7 @@ describe("InstalledPage", () => {
       await waitFor(() =>
         expect(
           screen.queryAllByRole("button", { name: /查看 .+ 详情/ }),
-        ).toHaveLength(remaining - 1),
+        ).toHaveLength(Math.min(remaining - 1, 3)),
       );
     }
 
@@ -234,13 +236,13 @@ describe("InstalledPage", () => {
     renderPage();
 
     // All six installs pool into one card: its bar carries the one switch that
-    // governs them all, checked because the pool is fully enabled. The five
+    // governs them all, checked because the pool is fully enabled. The three
     // previewed rows carry their own hover-revealed switches alongside it.
     const groupSwitch = await screen.findByRole("switch", {
       name: "全部关闭（本地安装）",
     });
     expect(groupSwitch).toHaveAttribute("aria-checked", "true");
-    expect(screen.getAllByRole("switch")).toHaveLength(6);
+    expect(screen.getAllByRole("switch")).toHaveLength(4);
   });
 
   it("disables every skill of a card with one press, and re-enables them", async () => {
@@ -252,7 +254,7 @@ describe("InstalledPage", () => {
     );
 
     // The whole pool is now off: the visible rows dim together and the bar's
-    // own switch flips, including for the two skills past the preview cap that
+    // own switch flips, including for the three skills past the preview cap that
     // the backend write still covers (the card re-reads the same records).
     const off = await screen.findByRole("switch", {
       name: "全部开启（本地安装）",
@@ -359,8 +361,8 @@ describe("InstalledPage", () => {
     const poolSwitch = screen.getByRole("switch", {
       name: "全部关闭（本地安装）",
     });
-    // Two bars, plus every previewed row's own switch (5 pool rows, 1 repo row).
-    expect(screen.getAllByRole("switch")).toHaveLength(8);
+    // Two bars, plus every previewed row's own switch (3 pool rows, 1 repo row).
+    expect(screen.getAllByRole("switch")).toHaveLength(6);
 
     await user.click(repoSwitch);
 
@@ -883,7 +885,7 @@ describe("InstalledPage", () => {
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-      ).toHaveLength(5),
+      ).toHaveLength(3),
     );
   });
 
@@ -994,7 +996,7 @@ describe("InstalledPage", () => {
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-      ).toHaveLength(6),
+      ).toHaveLength(4),
     );
   });
 

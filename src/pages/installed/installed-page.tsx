@@ -98,7 +98,7 @@ function starsOf(group: RepoGroup): number | undefined {
  * - **按仓库**: one card per source repository, ordered by its *newest*
  *   install (newest first, so a card near the top has something new in it),
  *   listing that repository's installed skills in the same newest-first order
- *   (up to the preview size set in Settings, 5 by default; that newest install
+  *   (up to the preview size set in Advanced Settings, 3 by default; that newest install
  *   is therefore always inside the preview). Installs no recorded source
  *   vouches for have no repository to belong to, so they pool into one card of
  *   their own rather than inventing one — the same shape, with its bar stating

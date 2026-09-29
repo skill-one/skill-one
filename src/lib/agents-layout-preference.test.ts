@@ -21,21 +21,35 @@ describe("agents-layout-preference", () => {
     vi.resetModules();
   });
 
-  it("defaults to the constellation", async () => {
+  it("defaults to the columns", async () => {
     const { getAgentsLayout } = await freshPreference();
-    expect(getAgentsLayout()).toBe("constellation");
+    expect(getAgentsLayout()).toBe("columns");
   });
 
   it("persists the chosen layout", async () => {
     const { getAgentsLayout, setAgentsLayout } = await freshPreference();
-    setAgentsLayout("columns");
-    expect(window.localStorage.getItem(KEY)).toBe("columns");
-    expect(getAgentsLayout()).toBe("columns");
+    setAgentsLayout("constellation");
+    expect(window.localStorage.getItem(KEY)).toBe("constellation");
+    expect(getAgentsLayout()).toBe("constellation");
   });
 
   it("ignores an unreadable value and keeps the default", async () => {
     window.localStorage.setItem(KEY, "mosaic");
     const { getAgentsLayout } = await freshPreference();
-    expect(getAgentsLayout()).toBe("constellation");
+    expect(getAgentsLayout()).toBe("columns");
+  });
+
+  it("notifies subscribers on a change, until they unsubscribe", async () => {
+    const { setAgentsLayout, subscribeAgentsLayout } =
+      await freshPreference();
+    const listener = vi.fn();
+    const unsubscribe = subscribeAgentsLayout(listener);
+
+    setAgentsLayout("constellation");
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+    setAgentsLayout("columns");
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 });

@@ -16,10 +16,10 @@ describe("repo-card preview size", () => {
     storage.removeItem(STORAGE_KEY);
   });
 
-  it("offers 3/5/7 and defaults to five", () => {
+  it("offers 3/5/7 and defaults to three", () => {
     expect(REPO_CARD_LIMITS).toEqual([3, 5, 7]);
-    expect(DEFAULT_REPO_CARD_LIMIT).toBe(5);
-    expect(getRepoCardLimit()).toBe(5);
+    expect(DEFAULT_REPO_CARD_LIMIT).toBe(3);
+    expect(getRepoCardLimit()).toBe(3);
   });
 
   it("round-trips a chosen size", () => {
@@ -28,12 +28,12 @@ describe("repo-card preview size", () => {
   });
 
   it("falls back to the default on an unoffered or unreadable value", () => {
-    // A value the settings page never offers, and a payload that is not a
+    // A value the advanced settings never offer, and a payload that is not a
     // number at all, both read back as the default.
     storage.setItem(STORAGE_KEY, "9");
-    expect(getRepoCardLimit()).toBe(5);
+    expect(getRepoCardLimit()).toBe(3);
     storage.setItem(STORAGE_KEY, "not-a-number");
-    expect(getRepoCardLimit()).toBe(5);
+    expect(getRepoCardLimit()).toBe(3);
   });
 
   it("notifies subscribers on a change, until they unsubscribe", () => {

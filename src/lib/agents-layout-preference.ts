@@ -3,8 +3,8 @@ import { storage } from "./storage";
 /**
  * The agents graph presentation the user chose.
  *
- * - `constellation` — Vogel golden-angle scatter around the hub (default).
- * - `columns` — the original balanced icon columns on the hub's two sides.
+ * - `constellation` — Vogel golden-angle scatter around the hub.
+ * - `columns` — balanced icon columns on the hub's two sides (default).
  *
  * Persisted in localStorage with a session fallback, the same guarded shape
  * as the agent-link preferences: a blocked write or an unreadable payload
@@ -13,7 +13,7 @@ import { storage } from "./storage";
 export type AgentsLayoutMode = "constellation" | "columns";
 
 const STORAGE_KEY = "skill-one.agentsLayout";
-const DEFAULT_MODE: AgentsLayoutMode = "constellation";
+const DEFAULT_MODE: AgentsLayoutMode = "columns";
 const MODES: readonly AgentsLayoutMode[] = ["constellation", "columns"];
 
 /** What the last successful write said, for as long as this session runs. */
@@ -39,7 +39,16 @@ export function getAgentsLayout(): AgentsLayoutMode {
   return readStored();
 }
 
-/** Persist the chosen graph layout. */
+/** Persist the chosen graph layout and notify any live readers. */
 export function setAgentsLayout(mode: AgentsLayoutMode): void {
   writeStored(mode);
+  for (const listener of listeners) listener();
+}
+
+const listeners = new Set<() => void>();
+
+/** Subscribe to changes; returns an unsubscribe function. */
+export function subscribeAgentsLayout(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }

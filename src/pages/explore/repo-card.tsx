@@ -348,8 +348,8 @@ export function RepoCard({
   );
   // The toggle's own figure — a chip: icon and number as one block, the one
   // thing that answers for the whole interaction. Folded, a plus over the
-  // *increment*: 「＋ 3」, the exact number of rows a press reveals, read
-  // straight off the card (five rows on screen, three more behind the cap).
+  // *increment*: 「＋ 5」, the exact number of rows a press reveals, read
+  // straight off the card (three rows on screen, five more behind the cap).
   // Open, a minus beside the count the card now holds — 「− 15 个 skill」 —
   // which is both the fact the open card exists to show (its full size, no
   // counting rows across two columns) and the way back: the minus is the

@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,11 +6,6 @@ import { ThemeProvider } from "./theme-provider";
 import { I18nProvider } from "../i18n/language-provider";
 import { SettingsMenu } from "./settings-popover";
 import { TooltipProvider } from "./ui/tooltip";
-import {
-  DEFAULT_REPO_CARD_LIMIT,
-  getRepoCardLimit,
-  setRepoCardLimit,
-} from "../lib/repo-card-preview";
 import { getUpdateStatus, resetUpdateState } from "../lib/update-store";
 import { resetUpdateChannel } from "../lib/update-channel";
 
@@ -87,9 +82,6 @@ describe("SettingsMenu", () => {
   afterEach(() => {
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
-    // The reset notifies subscribers, and this hook runs before React
-    // Testing Library's own cleanup — hence the act() wrapper.
-    act(() => setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT));
   });
 
   it("opens a popover with the quick settings from the header entry", async () => {
@@ -99,9 +91,9 @@ describe("SettingsMenu", () => {
     await openPopover(user);
 
     expect(screen.getByText("外观")).toBeInTheDocument();
-    // "Follow system" appears twice: the theme row and the language row.
-    expect(screen.getAllByText("跟随系统")).toHaveLength(2);
-    expect(screen.getByText("仓库卡片预览数")).toBeInTheDocument();
+    // Display choices (graph layout, card preview size) live in Advanced
+    // Settings now, not in this flyout.
+    expect(screen.queryByText("仓库卡片预览数")).toBeNull();
     expect(screen.getByText("软件更新")).toBeInTheDocument();
     expect(screen.getByText("高级设置")).toBeInTheDocument();
     expect(
@@ -118,17 +110,6 @@ describe("SettingsMenu", () => {
 
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(document.documentElement.style.colorScheme).toBe("dark");
-  });
-
-  it("lets the reader size the repository card preview", async () => {
-    const user = userEvent.setup();
-    setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT);
-    renderSettings();
-    await openPopover(user);
-
-    await user.click(screen.getByRole("button", { name: "7" }));
-
-    expect(getRepoCardLimit()).toBe(7);
   });
 
   it("reports browser mode when checking updates outside Tauri", async () => {

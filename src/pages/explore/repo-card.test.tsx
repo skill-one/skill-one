@@ -108,8 +108,8 @@ describe("RepoCard", () => {
     expect(within(bar).getByText(REPO)).toBeInTheDocument();
     expect(within(bar).getByText(formatCount(STARS))).toBeInTheDocument();
     // The toggle's figure is the *increment* — the exact number of rows a
-    // press reveals, read straight off the five on screen.
-    const offer = within(bar).getByText("3");
+    // press reveals, read straight off the three on screen.
+    const offer = within(bar).getByText("5");
     expect(offer.tagName).toBe("SPAN");
     // ...and the repository's own figure rides the repository's own name, at
     // the front of the bar, rather than out in the offer's cluster — where it
@@ -129,7 +129,7 @@ describe("RepoCard", () => {
   it("lists the repository's skills in order, under a glyph and a description", () => {
     renderCard();
 
-    expect(rowNames()).toEqual(["pdf", "docx", "pptx", "xlsx", "slides"]);
+    expect(rowNames()).toEqual(["pdf", "docx", "pptx"]);
     const pdf = screen.getByRole("button", { name: "查看 pdf 详情" });
     // The classification rides the row as its glyph, the name is the row's own
     // strong element, and the description follows it on the same line.
@@ -137,25 +137,25 @@ describe("RepoCard", () => {
     expect(pdf).toHaveTextContent("pdf does something useful.");
   });
 
-  it("caps the list at the default five rows and offers the rest on the bar", () => {
+  it("caps the list at the default three rows and offers the rest on the bar", () => {
     renderCard();
 
-    // The default preview holds five rows; past the cap a skill is not rendered.
-    expect(rowNames()).toEqual(["pdf", "docx", "pptx", "xlsx", "slides"]);
-    expect(screen.queryByText("canvas")).not.toBeInTheDocument();
-    // The bar's figure is the *increment*: three rows behind the cap, which is
+    // The default preview holds three rows; past the cap a skill is not rendered.
+    expect(rowNames()).toEqual(["pdf", "docx", "pptx"]);
+    expect(screen.queryByText("xlsx")).not.toBeInTheDocument();
+    // The bar's figure is the *increment*: five rows behind the cap, which is
     // exactly what a press on the toggle reveals.
     const bar = screen.getByRole("button", {
       name: `展开 ${REPO} 的全部 8 个 skill`,
     });
-    expect(within(bar).getByText("3")).toBeInTheDocument();
+    expect(within(bar).getByText("5")).toBeInTheDocument();
   });
 
   it("honours a smaller preview size", () => {
-    renderCard({ maxSkills: 3 });
+    renderCard({ maxSkills: 2 });
 
-    expect(rowNames()).toEqual(["pdf", "docx", "pptx"]);
-    expect(screen.queryByText("xlsx")).not.toBeInTheDocument();
+    expect(rowNames()).toEqual(["pdf", "docx"]);
+    expect(screen.queryByText("pptx")).not.toBeInTheDocument();
   });
 
   it("honours a larger preview size", () => {
@@ -395,7 +395,7 @@ describe("RepoCard", () => {
     });
     expect(bar).toHaveAttribute("aria-expanded", "true");
     expect(within(bar).getByText("8 个 skill")).toBeInTheDocument();
-    expect(within(bar).queryByText("3")).not.toBeInTheDocument();
+    expect(within(bar).queryByText("5")).not.toBeInTheDocument();
   });
 
   it("folds back to the capped preview on a second press", async () => {
@@ -411,7 +411,7 @@ describe("RepoCard", () => {
       screen.getByRole("button", { name: `收起 ${REPO} 的 skill 列表` }),
     );
 
-    expect(rowNames()).toEqual(["pdf", "docx", "pptx", "xlsx", "slides"]);
+    expect(rowNames()).toEqual(["pdf", "docx", "pptx"]);
     expect(screen.queryByText("notion")).not.toBeInTheDocument();
     expect(bar()).toHaveAttribute("aria-expanded", "false");
   });

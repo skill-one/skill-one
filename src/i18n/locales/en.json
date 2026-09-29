@@ -70,8 +70,6 @@
   "settings": {
     "title": "Settings",
     "appearance": "Appearance",
-    "repoPreviewCount": "Skills previewed on repository card",
-    "repoPreviewAria": "Number of skills previewed on repository card",
     "softwareUpdate": "Software update",
     "advanced": "Advanced settings"
   },
@@ -134,17 +132,17 @@
     "unlinked": "Unlinked"
   },
   "agents": {
-    "title": "Agents",
-    "connected": "{{linked}} of {{total}} agents connected",
     "attention": "{{count}} need attention",
     "layout": {
-      "groupAria": "Graph layout",
-      "constellation": "Constellation",
-      "columns": "Columns"
+      "switchToColumns": "Switch to columns",
+      "switchToConstellation": "Switch to constellation"
     },
     "hub": {
-      "diskAria": "Manage skills ({{total}} installed)",
-      "previewTitle": "Enabled skills",
+      "diskAria": "Shared hub ({{total}} installed, {{enabled}} enabled)",
+      "title": "SkillOne shared hub",
+      "installed": "{{total}} skills",
+      "enabled": "{{enabled}}/{{total}} enabled",
+      "tagline": "Install once, use in every agent",
       "noneEnabled": "No enabled skills yet",
       "browseStore": "Store",
       "manage": "Manage"
@@ -229,6 +227,9 @@
   "advanced": {
     "title": "Advanced settings",
     "description": "Configure the download source for skill data (index, SKILL.md details, and installs all follow this setting).",
+    "display": "Display",
+    "repoPreviewCount": "Skills previewed on repository card",
+    "repoPreviewAria": "Number of skills previewed on repository card",
     "cdnTitle": "CDN base",
     "cdnSaved": "Saved",
     "cdnHintBefore": "Empty = connect to GitHub directly first (",

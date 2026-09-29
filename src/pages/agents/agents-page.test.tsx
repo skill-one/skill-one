@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { toast } from "../../components/ui/toast";
 import { renderWithRouter } from "../../test/test-utils";
 import { getExcludedAgents } from "../../lib/agent-link-preferences";
+import { setAgentsLayout } from "../../lib/agents-layout-preference";
 import { resetMockAgentStatus } from "../../lib/mock-local";
 import { AgentsPage } from "./agents-page";
 
@@ -15,17 +16,19 @@ function renderPage() {
 afterEach(() => {
   resetMockAgentStatus();
   // Link exclusions and the layout choice live in localStorage; neither must
-  // leak across tests.
+  // leak across tests. The layout module also keeps a session fallback, so it
+  // is restored to the default alongside the storage clear.
   window.localStorage.clear();
+  setAgentsLayout("columns");
 });
 
 describe("AgentsPage", () => {
-  it("draws every detected agent in the graph and states the summary", async () => {
+  it("states the idea in the head and the figures on the hub", async () => {
     renderPage();
 
-    // Three of the five mock agents are effectively linked (two linked plus
-    // the canonical one); the summary in the head states it.
-    expect(await screen.findByText("已连接 3/5 个 agent")).toBeInTheDocument();
+    // The head is the value proposition, not a count; the hub card carries
+    // the skill figures.
+    expect(screen.getByText("安装一次，全 agents 直接使用")).toBeInTheDocument();
 
     // Every agent is one bare icon, reachable by its name.
     for (const name of [
@@ -35,28 +38,28 @@ describe("AgentsPage", () => {
       "Gemini CLI",
       "Windsurf",
     ]) {
-      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+      expect(
+        await screen.findByRole("button", { name }),
+      ).toBeInTheDocument();
     }
   });
 
-  it("flags, in the head, the agent whose own directory already holds content", async () => {
+  it("flags, on the hub, the agent whose own directory already holds content", async () => {
     renderPage();
-    expect(await screen.findByText("已连接 3/5 个 agent")).toBeInTheDocument();
-    // The head carries the attention count; the icon's edge and ribbon carry
+    // The hub carries the attention count; the icon's edge and ribbon carry
     // the warning itself.
-    expect(screen.getByText(/1 个待处理/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 个待处理/)).toBeInTheDocument();
   });
 
   it("links an agent by clicking its icon and re-renders the graph", async () => {
     const user = userEvent.setup();
     const { container } = renderPage();
-    expect(await screen.findByText("已连接 3/5 个 agent")).toBeInTheDocument();
+    await screen.findByRole("button", { name: "Gemini CLI" });
 
     // The icon is the toggle: one click links the agent.
     await user.click(screen.getByRole("button", { name: "Gemini CLI" }));
 
-    // The head summary flips to 4/5 and the ribbon joins the linked set.
-    expect(await screen.findByText("已连接 4/5 个 agent")).toBeInTheDocument();
+    // The ribbon joins the linked set.
     const group = container.querySelector('g[data-agent="gemini-cli"]')!;
     expect(group.getAttribute("data-state")).toBe("linked");
   });
@@ -101,26 +104,55 @@ describe("AgentsPage", () => {
     expect(card).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("defaults to the constellation and switches to the columns layout", async () => {
+  it("replays the entrance instead of hard-cutting on a layout switch", async () => {
     const user = userEvent.setup();
-    const { container } = renderPage();
-    await screen.findByText("已连接 3/5 个 agent");
+    renderPage();
+    await screen.findByRole("button", { name: "Claude Code" });
 
-    // Default presentation: the Vogel scatter (nodes carry an angle, no side).
-    const ribbonGroup = () =>
-      container.querySelector('svg g[data-agent="claude-code"]')!;
-    expect(ribbonGroup()).toBeInTheDocument();
+    // The toggle remounts the picture for the new presentation: the node
+    // element itself is replaced, so the entrance cascade replays.
+    const before = screen.getByRole("button", { name: "Claude Code" });
+    await user.click(screen.getByRole("button", { name: "切换到星座" }));
 
-    // Switching to columns re-lays the graph out (the mode persists, but this
-    // test only asserts the control swaps the pressed presentation).
-    const columnsButton = screen.getByRole("button", { name: "分列" });
-    expect(
-      screen.getByRole("button", { name: "星座" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await user.click(columnsButton);
-    expect(columnsButton).toHaveAttribute("aria-pressed", "true");
+    // The press persists…
     expect(window.localStorage.getItem("skill-one.agentsLayout")).toBe(
-      "columns",
+      "constellation",
     );
+    // …and the picture remounts for the new presentation: the node element
+    // itself is replaced, so the entrance cascade replays instead of jumping.
+    expect(screen.getByRole("button", { name: "Claude Code" })).not.toBe(
+      before,
+    );
+    expect(
+      screen.getByRole("button", { name: "切换到分列" }),
+    ).toBeInTheDocument();
+  });
+
+  it("re-renders when the layout preference changes elsewhere", async () => {
+    const { container } = renderPage();
+    await screen.findByRole("button", { name: "Claude Code" });
+
+    // Columns first: the ribbon runs a horizontal S-curve.
+    const d = () =>
+      container
+        .querySelector('svg g[data-agent="claude-code"] path')
+        ?.getAttribute("d") ?? "";
+    const before = d();
+    expect(before).toMatch(/^M .* C .*$/);
+
+    try {
+      await act(async () => {
+        setAgentsLayout("constellation");
+      });
+
+      // Constellation re-lays the same agent onto the Vogel spiral.
+      expect(d()).not.toBe(before);
+    } finally {
+      // The preference module keeps a session fallback: restore the default
+      // so later suites read a clean store.
+      await act(async () => {
+        setAgentsLayout("columns");
+      });
+    }
   });
 });

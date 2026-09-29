@@ -21,7 +21,7 @@ export const REPO_CARD_LIMITS = [3, 5, 7] as const;
 export type RepoCardLimit = (typeof REPO_CARD_LIMITS)[number];
 
 /** The size a reader who has not chosen one gets. */
-export const DEFAULT_REPO_CARD_LIMIT: RepoCardLimit = 5;
+export const DEFAULT_REPO_CARD_LIMIT: RepoCardLimit = 3;
 
 function isLimit(value: number): value is RepoCardLimit {
   return (REPO_CARD_LIMITS as readonly number[]).includes(value);

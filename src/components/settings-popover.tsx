@@ -10,13 +10,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 
-import {
-  REPO_CARD_LIMITS,
-  setRepoCardLimit,
-  type RepoCardLimit,
-} from "../lib/repo-card-preview";
 import { useAppUpdate } from "../hooks/use-app-update";
-import { useRepoCardLimit } from "../hooks/use-repo-card-limit";
 import { AdvancedSettingsDialog } from "./advanced-settings-dialog";
 import { ActivityDialog } from "./activity-dialog";
 import { LanguageToggle } from "./language-toggle";
@@ -25,7 +19,6 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Separator } from "./ui/separator";
-import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /** Shared chrome for the two menu rows at the bottom of the popover. */
@@ -113,11 +106,11 @@ function UpdateRowStatus({
 
 /**
  * Settings entry: the header's trailing edge opens a small anchored popover
- * with the at-a-glance settings (appearance, repo-card preview size, software
- * update). Heavier sections — CDN base and the registry data source — live one
- * click deeper in a dialog, per the common desktop pattern (Linear, VS Code,
- * GitHub): a lightweight flyout for the frequent toggles, a full surface only
- * when there is real content to manage.
+ * with the at-a-glance settings (appearance, language, software
+ * update). Heavier sections — display choices, CDN base and the registry data
+ * source — live one click deeper in a dialog, per the common desktop pattern
+ * (Linear, VS Code, GitHub): a lightweight flyout for the frequent toggles, a
+ * full surface only when there is real content to manage.
  *
  * The entry itself is the icon alone. It is a control, not a place, so it does
  * not wear the labelled segment the two destinations wear; the label it drops
@@ -131,9 +124,6 @@ export function SettingsMenu() {
   const update = useAppUpdate();
   const { phase, open: openUpdateDialog, check } = update;
   const hasUpdate = phase === "available" && update.version !== null;
-  // The repository-card preview size, read live so the control reflects it and
-  // a change notifies any list already on screen.
-  const repoCardLimit = useRepoCardLimit();
 
   const handleUpdateClick = () => {
     if (phase === "available") {
@@ -211,31 +201,6 @@ export function SettingsMenu() {
                 {t("language.label")}
               </p>
               <LanguageToggle />
-            </div>
-            <div>
-              <p className="mb-1.5 text-xs text-muted-foreground">
-                {t("settings.repoPreviewCount")}
-              </p>
-              <ToggleGroup
-                variant="outline"
-                spacing={0}
-                value={[String(repoCardLimit)]}
-                onValueChange={(values) => {
-                  const next = values[0];
-                  if (next) setRepoCardLimit(Number(next) as RepoCardLimit);
-                }}
-                aria-label={t("settings.repoPreviewAria")}
-              >
-                {REPO_CARD_LIMITS.map((limit) => (
-                  <ToggleGroupItem
-                    key={limit}
-                    value={String(limit)}
-                    className="px-3"
-                  >
-                    {limit}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
             </div>
           </div>
           <Separator />

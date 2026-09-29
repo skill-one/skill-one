@@ -1,10 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdvancedSettingsDialog } from "./advanced-settings-dialog";
 import type { IndexInfo } from "../lib/registry/protocol";
 import { DEFAULT_CDN_BASE, getCdnBase, setIndexTag } from "../lib/cdn-config";
+import {
+  DEFAULT_REPO_CARD_LIMIT,
+  getRepoCardLimit,
+  setRepoCardLimit,
+} from "../lib/repo-card-preview";
 
 /** Snapshot the mocked registry hook reports; per-test overrides apply next. */
 const stats = vi.hoisted(() => ({
@@ -63,6 +68,11 @@ describe("AdvancedSettingsDialog", () => {
 
   afterEach(() => {
     setIndexTag("");
+    // The preview choice persists across renders: restore the default. The
+    // reset notifies subscribers before Testing Library's own cleanup.
+    act(() => {
+      setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT);
+    });
   });
 
   it("hosts the CDN settings under a dialog header", () => {
@@ -121,6 +131,29 @@ describe("AdvancedSettingsDialog", () => {
     renderDialog();
 
     expect(screen.getByText("dist-2026-09-06-2")).toBeInTheDocument();
+  });
+
+  it("hosts the display choices under their own section", () => {
+    renderDialog();
+
+    expect(screen.getByText("显示")).toBeInTheDocument();
+    expect(screen.getByText("仓库卡片预览数")).toBeInTheDocument();
+    // The graph presentation flips from the home page's own toggle, not here.
+    expect(
+      screen.queryByRole("button", { name: "星座" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "分列" }),
+    ).toBeNull();
+  });
+
+  it("sizes the repository card preview from the display section", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByRole("button", { name: "7" }));
+
+    expect(getRepoCardLimit()).toBe(7);
   });
 
   it.each([

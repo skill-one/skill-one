@@ -295,8 +295,8 @@ describe("ExplorePage", () => {
 
   it("caps a repository's rows at the default preview and reveals the rest in place", async () => {
     const user = userEvent.setup();
-    // One repository with eight skills: five on the card (the default preview),
-    // three behind it.
+    // One repository with eight skills: three on the card (the default preview),
+    // five behind it.
     harness.init();
     harness.pushAll(makeSkills(8, 0));
     harness.complete();
@@ -305,11 +305,11 @@ describe("ExplorePage", () => {
     // The cap is what keeps one big repository from pushing every other card
     // off the screen; the bar carries the repository's *total*, so a capped list
     // reads as "these of them" — and the rest is one press away in place.
-    expect(await screen.findByText("skill-4")).toBeInTheDocument();
-    expect(screen.queryByText("skill-5")).not.toBeInTheDocument();
+    expect(await screen.findByText("skill-2")).toBeInTheDocument();
+    expect(screen.queryByText("skill-3")).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
-    ).toHaveLength(5);
+    ).toHaveLength(3);
     await user.click(
       screen.getByRole("button", {
         name: `展开 ${BATCH_REPO} 的全部 8 个 skill`,
@@ -1132,9 +1132,8 @@ describe("ExplorePage", () => {
 
   it("measures a search card's width by the reader's own preview cap", async () => {
     const user = userEvent.setup();
-    // Four skills in one repository: within the default cap of five, over the
-    // reader's own choice of three — the setting, not a fixed figure, is the
-    // threshold the wide footprint reads.
+    // Four skills in one repository: over the default cap of three — the
+    // setting, not a fixed figure, is the threshold the wide footprint reads.
     setRepoCardLimit(3);
     harness.init();
     harness.pushAll(makeSkills(4, 0));
@@ -1599,10 +1598,10 @@ describe("ExplorePage", () => {
 
     const list = container.querySelector("ul.grid")!;
     expect(list.className).toContain(REPO_LIST_CLASS);
-    // One repository card in the list, five rows in the card: the list run is
+    // One repository card in the list, three rows in the card: the list run is
     // the cap, not the full 50-skill repository.
     expect(list.children).toHaveLength(1);
-    expect(list.querySelectorAll("li li")).toHaveLength(5);
+    expect(list.querySelectorAll("li li")).toHaveLength(3);
 
     // Opening the drawer overlays the list: its classes — and with them its
     // layout and scroll position — stay exactly the same while the drawer is
@@ -1617,7 +1616,7 @@ describe("ExplorePage", () => {
     );
     expect(list.className).toContain(REPO_LIST_CLASS);
     expect(list.children).toHaveLength(1);
-    expect(list.querySelectorAll("li li")).toHaveLength(5);
+    expect(list.querySelectorAll("li li")).toHaveLength(3);
   });
 });
 
@@ -1651,7 +1650,8 @@ describe("ExplorePage streaming", () => {
     // grows in place as more of the stream lands, without disturbing the card
     // the reader already has open.
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
-    expect(screen.getByText("skill-3")).toBeInTheDocument();
+    expect(screen.getByText("skill-2")).toBeInTheDocument();
+    expect(screen.queryByText("skill-3")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", {
         name: `展开 ${BATCH_REPO} 的全部 ${STREAM_BATCH + 5} 个 skill`,

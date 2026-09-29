@@ -5,6 +5,7 @@ import {
   DEFAULT_GRAPH_HEIGHT,
   DEFAULT_GRAPH_WIDTH,
   GOLDEN_ANGLE,
+  HUB_CARD_HALF,
   HUB_RADIUS,
   HUB_TIP_GAP,
   NODE_LABEL_GAP,
@@ -104,7 +105,7 @@ describe("resolveGraphWidth", () => {
 
 describe("layoutAgents", () => {
   it("falls back to the default canvas without a measurement", () => {
-    const layout = layoutAgents([agent("a")], 0, 0);
+    const layout = layoutAgents([agent("a")], 0, 0, "constellation");
     expect(layout.width).toBe(DEFAULT_GRAPH_WIDTH);
     expect(layout.height).toBe(DEFAULT_GRAPH_HEIGHT);
     expect(layout.hub).toEqual({
@@ -115,22 +116,21 @@ describe("layoutAgents", () => {
   });
 
   it("centres the hub on the canvas", () => {
-    const layout = layoutAgents(roster(8), 900, 700);
-    // Name pills need more room than the measured box, so the canvas grows
-    // — the hub stays at its centre.
+    const layout = layoutAgents(roster(8), 900, 700, "constellation");
+    // The hub stays at the canvas centre.
     expect(layout.hub.x).toBe(layout.width / 2);
     expect(layout.hub.y).toBe(layout.height / 2);
   });
 
   it("is deterministic — the same roster lands in the same places", () => {
-    const a = layoutAgents(roster(12), 900, 700);
-    const b = layoutAgents(roster(12), 900, 700);
+    const a = layoutAgents(roster(12), 900, 700, "constellation");
+    const b = layoutAgents(roster(12), 900, 700, "constellation");
     expect(a.nodes).toEqual(b.nodes);
     expect(a.ribbons).toEqual(b.ribbons);
   });
 
   it("steps each node the golden angle around the hub, starting on top", () => {
-    const layout = layoutAgents(roster(6), 900, 700);
+    const layout = layoutAgents(roster(6), 900, 700, "constellation");
     // Node 0 starts one spoke above the hub.
     expect(layout.nodes[0].angle).toBeCloseTo(-Math.PI / 2, 10);
     for (let i = 1; i < layout.nodes.length; i += 1) {
@@ -140,7 +140,7 @@ describe("layoutAgents", () => {
   });
 
   it("scatters a roster to every side of the hub", () => {
-    const layout = layoutAgents(roster(12), 900, 700);
+    const layout = layoutAgents(roster(12), 900, 700, "constellation");
     const { hub } = layout;
     const quadrants = new Set(
       layout.nodes.map((n) => {
@@ -156,7 +156,7 @@ describe("layoutAgents", () => {
 
   it("keeps name pills from overlapping for a full roster", () => {
     const N = 35;
-    const layout = layoutAgents(roster(N), 1400, 1100);
+    const layout = layoutAgents(roster(N), 1400, 1100, "constellation");
     expect(layout.nodes).toHaveLength(N);
     // The ring squeezes into the box instead of shrinking: full-size pills,
     // no canvas growth, never overlapping.
@@ -180,7 +180,7 @@ describe("layoutAgents", () => {
 
   it("fits a 20-plus roster on a laptop window with no canvas growth", () => {
     const N = 23;
-    const layout = layoutAgents(roster(N), 1150, 620);
+    const layout = layoutAgents(roster(N), 1150, 620, "constellation");
     expect(layout.nodes).toHaveLength(N);
     // No scrolling on a default-size window: the canvas stays measured.
     expect(layout.width).toBe(1150);
@@ -211,7 +211,7 @@ describe("layoutAgents", () => {
   });
 
   it("keeps every pill inside the canvas and clear of the hub disk", () => {
-    const layout = layoutAgents(roster(20), 900, 700);
+    const layout = layoutAgents(roster(20), 900, 700, "constellation");
     for (const node of layout.nodes) {
       expect(node.x).toBeGreaterThanOrEqual(OUTER_PAD - 0.001);
       expect(node.y).toBeGreaterThanOrEqual(OUTER_PAD - 0.001);
@@ -238,7 +238,7 @@ describe("layoutAgents", () => {
   });
 
   it("runs each ribbon from the pill's hub-facing edge to the hub rim", () => {
-    const layout = layoutAgents(roster(6), 900, 700);
+    const layout = layoutAgents(roster(6), 900, 700, "constellation");
     for (const [i, ribbon] of layout.ribbons.entries()) {
       const node = layout.nodes[i];
       const nums = ribbon.d.match(/-?\d+(\.\d+)?/g)!.map(Number);
@@ -255,23 +255,24 @@ describe("layoutAgents", () => {
     }
   });
 
-  it("squeezes before shrinking, and shrinks before growing", () => {
+  it("squeezes before shrinking, and squeezes harder instead of growing", () => {
     // A huge canvas holds the whole roster unsqueezed at full size.
-    const huge = layoutAgents(roster(35), 2200, 2200);
+    const huge = layoutAgents(roster(35), 2200, 2200, "constellation");
     expect(huge.nodes[0].height).toBe(NODE_SIZE_MAX);
     expect(huge.width).toBe(2200);
     expect(huge.height).toBe(2200);
     // An ordinary screen keeps full-size pills with no canvas growth — the
     // ring flattens into an ellipse instead.
-    const roomy = layoutAgents(roster(35), 1400, 1100);
+    const roomy = layoutAgents(roster(35), 1400, 1100, "constellation");
     expect(roomy.nodes[0].height).toBe(NODE_SIZE_MAX);
     expect(roomy.width).toBe(1400);
     expect(roomy.height).toBe(1100);
-    // Only a tiny screen falls back to floor tiles on a grown canvas.
-    const tight = layoutAgents(roster(35), 700, 460);
+    // A tiny screen keeps floor tiles on the measured canvas: the ellipse
+    // squeezes flatter instead of growing a scrolled canvas.
+    const tight = layoutAgents(roster(35), 700, 460, "constellation");
     expect(tight.nodes[0].height).toBe(NODE_SIZE_MIN);
-    expect(tight.width).toBeGreaterThan(700);
-    expect(tight.height).toBeGreaterThan(460);
+    expect(tight.width).toBe(700);
+    expect(tight.height).toBe(460);
     // Even then, the constellation still fits the box it reports.
     for (const node of tight.nodes) {
       expect(node.x).toBeGreaterThanOrEqual(0);
@@ -281,11 +282,36 @@ describe("layoutAgents", () => {
     }
   });
 
-  it("grows the canvas (never below the floor tile) when it truly cannot fit", () => {
-    const layout = layoutAgents(roster(40), 300, 300);
+  it("never grows the canvas: floor tiles on the measured box, however tight", () => {
+    const layout = layoutAgents(roster(40), 300, 300, "constellation");
     expect(layout.nodes[0].height).toBe(NODE_SIZE_MIN);
-    expect(layout.width).toBeGreaterThan(300);
-    expect(layout.height).toBeGreaterThan(300);
+    expect(layout.width).toBe(300);
+    expect(layout.height).toBe(300);
+  });
+
+  it("fits a 25-agent roster in the minimum-window graph area", () => {
+    // The Tauri minimum window (1150x760) leaves roughly 1086x618 for the
+    // graph: 25 agents stay on one screen at floor tiles or better, clear of
+    // the hub card and inside the canvas.
+    const layout = layoutAgents(roster(25), 1086, 618, "constellation");
+    expect(layout.width).toBe(1086);
+    expect(layout.height).toBe(618);
+    for (const node of layout.nodes) {
+      expect(node.x).toBeGreaterThanOrEqual(OUTER_PAD - 0.001);
+      expect(node.y).toBeGreaterThanOrEqual(OUTER_PAD - 0.001);
+      expect(node.x + node.width).toBeLessThanOrEqual(
+        layout.width - OUTER_PAD + 0.001,
+      );
+      expect(node.y + node.height).toBeLessThanOrEqual(
+        layout.height - OUTER_PAD + 0.001,
+      );
+      const overlaps =
+        node.x < layout.hub.x + HUB_CARD_HALF &&
+        node.x + node.width > layout.hub.x - HUB_CARD_HALF &&
+        node.y < layout.hub.y + HUB_CARD_HALF &&
+        node.y + node.height > layout.hub.y - HUB_CARD_HALF;
+      expect(overlaps).toBe(false);
+    }
   });
 
   it("lays out an empty roster as a hub-only canvas", () => {
@@ -294,6 +320,20 @@ describe("layoutAgents", () => {
     expect(layout.height).toBe(600);
     expect(layout.nodes).toEqual([]);
     expect(layout.ribbons).toEqual([]);
+  });
+
+  it("keeps every pill clear of the hub dashboard card", () => {
+    // The regression from the dashboard card: the innermost spiral node used
+    // to slide underneath the opaque 240-wide card.
+    const layout = layoutAgents(roster(22), 1400, 1100, "constellation");
+    for (const node of layout.nodes) {
+      const overlaps =
+        node.x < layout.hub.x + HUB_CARD_HALF &&
+        node.x + node.width > layout.hub.x - HUB_CARD_HALF &&
+        node.y < layout.hub.y + HUB_CARD_HALF &&
+        node.y + node.height > layout.hub.y - HUB_CARD_HALF;
+      expect(overlaps).toBe(false);
+    }
   });
 });
 
@@ -346,6 +386,17 @@ describe("layoutAgents columns mode", () => {
       expect(nums[6]).toBeCloseTo(tipX(node.side!), 6);
       expect(nums[7]).toBe(layout.hub.y);
     }
+  });
+
+  it("numbers columns in fill order for the entrance cascade", () => {
+    const layout = layoutAgents(
+      [agent("a"), agent("b"), agent("c"), agent("d")],
+      1200,
+      600,
+      "columns",
+    );
+    // Fill order is left column first: a/b land together, then c/d.
+    expect(layout.nodes.map((n) => n.col)).toEqual([0, 0, 1, 1]);
   });
 
   it("keeps name pills aligned on a fixed pitch within a column", () => {

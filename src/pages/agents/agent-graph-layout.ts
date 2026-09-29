@@ -14,7 +14,8 @@ import type { AgentStatus } from "../../lib/skills-manager";
  * while staying evenly spaced and never overlapping; the same agent always
  * lands in the same place. Wide pills on a short box flatten the ring into
  * an ellipse instead of shrinking the tiles; a long roster shrinks the tile
- * size before it grows the canvas, so the picture keeps fitting one screen.
+ * size, and anything past that flattens the ellipse further — the canvas is
+ * always exactly the measured box, so the picture keeps fitting one screen.
  * The label slot has a fixed width (longer names truncate), so the layout
  * never needs to measure the DOM.
  */
@@ -47,6 +48,11 @@ export interface NodeLayout {
   angle?: number;
   /** Columns mode: which side of the hub the tile stands on. */
   side?: GraphSide;
+  /**
+   * Columns mode: zero-based column index (0 fills first). Drives the
+   * entrance cascade — one column lands at a time, centre pair first.
+   */
+  col?: number;
 }
 
 export interface RibbonLayout {
@@ -73,6 +79,30 @@ export const NODE_GAP_MIN = 4;
 /** Hub geometry: the disk every ribbon converges on. */
 export const HUB_RADIUS = 48;
 export const HUB_TIP_GAP = 10;
+/**
+ * Central clearance reserved for the hub dashboard card. Ribbons still
+ * converge on `HUB_RADIUS` underneath the opaque card, but node placement
+ * keeps pills outside the card's half-width plus a ribbon stub, so the
+ * innermost agents are never covered by it.
+ */
+export const HUB_CARD_HALF = 120;
+export const HUB_CARD_HALF_COLUMNS = 100;
+/** Approximate half-height of the hub dashboard card plus a safety margin. */
+const HUB_CARD_HALF_H = 110;
+const HUB_CARD_MARGIN = 12;
+
+/** Whether a constellation pill would slide under the opaque hub card. */
+function pillHitsCard(
+  node: { x: number; y: number; width: number; height: number },
+  hub: { x: number; y: number },
+): boolean {
+  return (
+    node.x < hub.x + HUB_CARD_HALF + HUB_CARD_MARGIN &&
+    node.x + node.width > hub.x - HUB_CARD_HALF - HUB_CARD_MARGIN &&
+    node.y < hub.y + HUB_CARD_HALF_H + HUB_CARD_MARGIN &&
+    node.y + node.height > hub.y - HUB_CARD_HALF_H - HUB_CARD_MARGIN
+  );
+}
 /**
  * The fixed label slot inside every node pill; longer names truncate with an
  * ellipsis. Fixed so the pure layout can reserve the width without measuring
@@ -208,14 +238,17 @@ function outerRadius(agentCount: number, size: number): number {
  * whose ring squeezes (down to `SQUEEZE_MIN` per axis) inside the available
  * half-extents. Wide pills on a short box flatten the ring into an ellipse
  * at full tile size instead of shrinking; only when even the floor tiles
- * cannot squeeze in does the caller fall back to a circular ring on a grown
- * canvas.
+ * cannot squeeze in does the caller fall back to floor tiles squeezed harder
+ * without a lower bound (clamped to just above zero so the ring never flips).
+ * The canvas itself never grows — the app window carries a minimum size that
+ * keeps a 25-agent roster inside this well-squeezed region, and anything past
+ * that degrades into a flatter ellipse rather than a scrolled canvas.
  */
 function fitConstellation(
   agentCount: number,
   availRX: number,
   availRY: number,
-): { size: number; ex: number; ey: number } | null {
+): { size: number; ex: number; ey: number } {
   for (let s = NODE_SIZE_MAX; s >= NODE_SIZE_MIN; s -= 1) {
     const ring = outerRadius(agentCount, s);
     const sx = ring > 0 ? Math.min(1, (availRX - pillWidth(s) / 2) / ring) : 1;
@@ -224,7 +257,21 @@ function fitConstellation(
       return { size: s, ex: sx, ey: sy };
     }
   }
-  return null;
+  // Past the design envelope (a roster far beyond 25, or a browser squeezed
+  // below the app's minimum window): floor tiles, squeezed however far it
+  // takes to stay on one screen.
+  const ring = outerRadius(agentCount, NODE_SIZE_MIN);
+  return {
+    size: NODE_SIZE_MIN,
+    ex:
+      ring > 0
+        ? Math.min(1, Math.max(0.25, (availRX - pillWidth(NODE_SIZE_MIN) / 2) / ring))
+        : 1,
+    ey:
+      ring > 0
+        ? Math.min(1, Math.max(0.25, (availRY - NODE_SIZE_MIN / 2) / ring))
+        : 1,
+  };
 }
 
 /**
@@ -241,12 +288,10 @@ const COL_TILE = NODE_SIZE_MAX;
 const COL_PILL = COL_TILE + NODE_LABEL_GAP + NODE_LABEL_WIDTH;
 const COL_GAP = 14;
 const COL_PITCH = COL_TILE + COL_GAP;
-/** Vertical pad and the clear central lane for the hub. */
+/** Vertical pad and the clear central lane for the hub card. */
 const COL_PAD_TOP = 28;
 const COL_PAD_BOTTOM = 28;
-const COL_HUB_LANE = HUB_RADIUS + HUB_TIP_GAP + 24;
-/** The narrowest the columns canvas renders; below it the page scrolls. */
-const COL_MIN_WIDTH = 2 * (COL_HUB_LANE + COL_PILL) + 2 * OUTER_PAD;
+const COL_HUB_LANE = HUB_CARD_HALF_COLUMNS + HUB_TIP_GAP + 24;
 
 /** The height of an icon column holding `count` tiles. */
 function columnHeight(count: number): number {
@@ -296,12 +341,10 @@ function layoutColumns(
     cursor += size;
   }
 
-  const tallest = columns.reduce((max, col) => Math.max(max, col.length), 0);
-  const height = Math.max(
-    measuredH,
-    columnHeight(tallest) + COL_PITCH / 2 + COL_PAD_TOP + COL_PAD_BOTTOM,
-  );
-  const width = Math.max(measuredW, COL_MIN_WIDTH);
+  // The canvas never grows: it is always exactly the measured box, so the
+  // page never scrolls. Column counts already adapt to the measured height.
+  const height = measuredH;
+  const width = measuredW;
   const hub = { x: width / 2, y: height / 2, radius: HUB_RADIUS };
   const tipLeft: Point = { x: hub.x - HUB_RADIUS - HUB_TIP_GAP, y: hub.y };
   const tipRight: Point = { x: hub.x + HUB_RADIUS + HUB_TIP_GAP, y: hub.y };
@@ -323,6 +366,7 @@ function layoutColumns(
       byName.set(agent.name, {
         name: agent.name,
         side,
+        col: c,
         x,
         y,
         width: COL_PILL,
@@ -346,14 +390,13 @@ function layoutColumns(
 
 /**
  * Lay every agent out around the SkillOne hub. `mode` picks the
- * presentation: the Vogel constellation (default) or the original balanced
- * columns.
+ * presentation: the balanced columns (default) or the Vogel constellation.
  */
 export function layoutAgents(
   agents: readonly AgentStatus[],
   measuredWidth: number,
   measuredHeight: number,
-  mode: AgentsLayoutMode = "constellation",
+  mode: AgentsLayoutMode = "columns",
 ): GraphLayout {
   if (mode === "columns") {
     return layoutColumns(agents, measuredWidth, measuredHeight);
@@ -366,8 +409,9 @@ export function layoutAgents(
  * sits at the canvas centre, node 0 rests one spoke above it, and every
  * further node steps the golden angle and drifts outward with √index. Wide
  * pills on a short box squeeze the ring into an ellipse at full tile size;
- * a long roster then shrinks the tiles, and only tiny screens grow the
- * canvas and scroll.
+ * a long roster then shrinks the tiles, and anything past that squeezes the
+ * ellipse flatter — the canvas stays exactly the measured box, never
+ * scrolling.
  */
 function layoutConstellation(
   agents: readonly AgentStatus[],
@@ -380,25 +424,28 @@ function layoutConstellation(
   const availRX = measuredW / 2 - OUTER_PAD;
   const availRY = measuredH / 2 - OUTER_PAD;
   const fit = fitConstellation(agents.length, availRX, availRY);
-  // Tiny screens that fit nothing squeezed fall back to floor tiles on a
-  // circular ring; the canvas below grows to hold it.
-  const size = fit?.size ?? NODE_SIZE_MIN;
-  const ex = fit?.ex ?? 1;
-  const ey = fit?.ey ?? 1;
+  // The canvas is always exactly the measured box: it never grows and the
+  // page never scrolls. Squeezing (see `fitConstellation`) absorbs anything
+  // past the design envelope instead.
+  const size = fit.size;
+  const ex = fit.ex;
+  const ey = fit.ey;
   const pillW = pillWidth(size);
 
-  const neededW = (outerRadius(agents.length, size) + pillW / 2 + OUTER_PAD) * 2;
-  const neededH = (outerRadius(agents.length, size) + size / 2 + OUTER_PAD) * 2;
-  const width = fit ? measuredW : Math.max(measuredW, neededW);
-  const height = fit ? measuredH : Math.max(measuredH, neededH);
+  const width = measuredW;
+  const height = measuredH;
   const hub = { x: width / 2, y: height / 2, radius: HUB_RADIUS };
 
   const spacing = pillW + gapFor(size);
   const r0 = HUB_RADIUS + HUB_TIP_GAP + pillW / 2 + RIBBON_MIN;
 
-  const nodes: NodeLayout[] = agents.map((agent, i) => {
+  const placeNode = (
+    agent: (typeof agents)[number],
+    i: number,
+    extraRadius: number,
+  ): NodeLayout => {
     const angle = ANGLE_OFFSET + i * GOLDEN_ANGLE;
-    const radius = r0 + DENSITY_K * spacing * Math.sqrt(i);
+    const radius = r0 + DENSITY_K * spacing * Math.sqrt(i) + extraRadius;
     const cx = hub.x + ex * radius * Math.cos(angle);
     const cy = hub.y + ey * radius * Math.sin(angle);
     // Unit ray from the pill centre back to the hub, on the squeezed ring.
@@ -424,6 +471,20 @@ function layoutConstellation(
       anchor,
       angle,
     };
+  };
+
+  // The dashboard card is opaque and wider than the old hub disk, so the
+  // innermost spiral nodes would slide underneath it. Nudge only those pills
+  // radially outward until clear — the outer ring and canvas size are
+  // untouched, so a 20-plus roster still fits one screen.
+  const nodes: NodeLayout[] = agents.map((agent, i) => {
+    let extra = 0;
+    let node = placeNode(agent, i, extra);
+    for (let step = 0; step < 40 && pillHitsCard(node, hub); step += 1) {
+      extra += 8;
+      node = placeNode(agent, i, extra);
+    }
+    return node;
   });
 
   const ribbons: RibbonLayout[] = nodes.map((node, i) => {

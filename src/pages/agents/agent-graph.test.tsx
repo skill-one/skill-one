@@ -292,37 +292,22 @@ describe("AgentGraph", () => {
     expect(status.find((a) => a.name === "windsurf")?.linked).toBe(false);
   });
 
-  it("shows only the installed count on the disk itself", async () => {
+  it("shows the hub dashboard with stats and routes, no hover needed", async () => {
     renderWithRouter(<AgentGraph agents={agents} />);
     const skills = await fetchInstalledSkills();
 
-    // The disk is the count alone — the routes live in its hover card.
+    // The dashboard card is always visible: title, total, enabled share. The
+    // value proposition lives in the page head, not here; agent counts are
+    // gone entirely — only attention still surfaces, when something needs it.
     const disk = await screen.findByTestId("agent-hub");
+    expect(disk).toHaveTextContent("SkillOne 共享中心");
     expect(disk).toHaveTextContent(String(skills.length));
-    expect(disk.querySelectorAll("a")).toHaveLength(0);
-    expect(screen.queryByRole("link", { name: "商店" })).toBeNull();
-    expect(screen.queryByRole("link", { name: "管理" })).toBeNull();
-  });
+    expect(disk).toHaveTextContent("6/6 已启用");
+    expect(disk).toHaveTextContent("1 个待处理");
+    expect(disk).not.toHaveTextContent("agents");
+    expect(disk).not.toHaveTextContent("安装一次");
 
-  it("lists the enabled skills in the disk's hover card with the two routes", async () => {
-    const user = userEvent.setup();
-    renderWithRouter(<AgentGraph agents={agents} />);
-
-    await user.hover(await screen.findByTestId("agent-hub"));
-    expect(await screen.findByText("已启用的技能")).toBeInTheDocument();
-    expect(screen.getByText("6/6")).toBeInTheDocument();
-    for (const name of [
-      "pdf",
-      "docx",
-      "pptx",
-      "mcp-builder",
-      "code-review",
-      "frontend-design",
-    ]) {
-      expect(screen.getByText(name)).toBeInTheDocument();
-    }
-
-    // The card's footer carries exactly one route to each destination.
+    // The two routes are always visible — no hover card involved.
     expect(screen.getByRole("link", { name: "商店" })).toHaveAttribute(
       "href",
       "/explore",
@@ -331,5 +316,22 @@ describe("AgentGraph", () => {
       "href",
       "/installed",
     );
+  });
+
+  it("does not enumerate skill names on the hub dashboard", async () => {
+    renderWithRouter(<AgentGraph agents={agents} />);
+    await screen.findByTestId("agent-hub");
+
+    // Stats only — individual skill names live on /installed.
+    for (const name of [
+      "pdf",
+      "docx",
+      "pptx",
+      "mcp-builder",
+      "code-review",
+      "frontend-design",
+    ]) {
+      expect(screen.queryByText(name)).toBeNull();
+    }
   });
 });
