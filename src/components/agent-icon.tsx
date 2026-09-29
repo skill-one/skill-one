@@ -19,12 +19,11 @@ interface AgentIconProps extends ComponentProps<typeof Avatar> {
 }
 
 /**
- * Renders the colored brand icon for the given agent, resolved at runtime
- * against the agents-info dataset (`lib/agent-icons`) and loaded through the
- * CDN fallback chain. Candidate URLs are walked in order, one step per failed
- * load. Falls back to a generic Bot glyph when no dedicated icon is
- * available, while the dataset loads, or while the image loads; the glyph is
- * decorative — the label around the avatar carries the agent's name.
+ * Renders the colored brand icon for the given agent, resolved against the
+ * vendored agents-info copy (`lib/agent-icons`) and served locally from
+ * `public/agents/`. Falls back to a generic Bot glyph when no dedicated icon
+ * is available; the glyph is decorative — the label around the avatar carries
+ * the agent's name.
  */
 export function AgentIcon({
   agentName,
