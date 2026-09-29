@@ -1,8 +1,14 @@
-import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
 
 import type { AgentStatus } from "../../lib/skills-manager";
+import { renderWithRouter } from "../../test/test-utils";
 import { AgentAvatarGroup, AVATAR_GROUP_MAX } from "./agent-avatar-group";
+
+// The icon dataset is a runtime fetch; these are layout tests, so every
+// avatar resolves to no candidates and draws its Bot fallback.
+vi.mock("../../hooks/use-agent-icons", () => ({
+  useAgentIcon: () => ({ candidates: [], mono: false, ground: undefined }),
+}));
 
 function agent(overrides: Partial<AgentStatus>): AgentStatus {
   return {
@@ -28,7 +34,7 @@ function slots(container: HTMLElement, slot: string): Element[] {
 describe("AgentAvatarGroup", () => {
   it("shows at most AVATAR_GROUP_MAX avatars plus a +N count", () => {
     const total = AVATAR_GROUP_MAX + 3;
-    const { container } = render(<AgentAvatarGroup agents={agents(total)} />);
+    const { container } = renderWithRouter(<AgentAvatarGroup agents={agents(total)} />);
 
     expect(slots(container, "avatar")).toHaveLength(AVATAR_GROUP_MAX);
     const count = slots(container, "avatar-group-count");
@@ -37,7 +43,7 @@ describe("AgentAvatarGroup", () => {
   });
 
   it("omits the count when every agent fits inline", () => {
-    const { container } = render(
+    const { container } = renderWithRouter(
       <AgentAvatarGroup agents={agents(AVATAR_GROUP_MAX)} />,
     );
 
@@ -46,14 +52,14 @@ describe("AgentAvatarGroup", () => {
   });
 
   it("renders no avatars without agents", () => {
-    const { container } = render(<AgentAvatarGroup agents={[]} />);
+    const { container } = renderWithRouter(<AgentAvatarGroup agents={[]} />);
 
     expect(slots(container, "avatar")).toHaveLength(0);
     expect(slots(container, "avatar-group-count")).toHaveLength(0);
   });
 
   it("keeps every avatar a direct child of the group so the overlap ring applies", () => {
-    const { container } = render(<AgentAvatarGroup agents={agents(2)} />);
+    const { container } = renderWithRouter(<AgentAvatarGroup agents={agents(2)} />);
 
     const group = container.querySelector('[data-slot="avatar-group"]');
     expect(group).not.toBeNull();
@@ -65,7 +71,7 @@ describe("AgentAvatarGroup", () => {
   });
 
   it("lets a roomier surface show more faces inline through max", () => {
-    const { container } = render(
+    const { container } = renderWithRouter(
       <AgentAvatarGroup agents={agents(7)} max={5} />,
     );
     expect(slots(container, "avatar")).toHaveLength(5);
@@ -73,7 +79,7 @@ describe("AgentAvatarGroup", () => {
   });
 
   it("keeps the avatars plain — link state is never encoded on the faces", () => {
-    const { container } = render(
+    const { container } = renderWithRouter(
       <AgentAvatarGroup
         agents={[
           agent({ name: "codex", display: "Codex", linked: true }),

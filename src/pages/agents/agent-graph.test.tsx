@@ -8,6 +8,22 @@ import { resetMockAgentStatus } from "../../lib/mock-local";
 import { fetchAgentStatus, fetchInstalledSkills } from "../../lib/local-skills";
 import { AgentGraph, HOVER_MS } from "./agent-graph";
 
+// The icon dataset is a runtime fetch; these are graph-behavior tests, so
+// every node resolves to no candidates and draws its Bot fallback — except
+// where a test overrides the mock to exercise a resolved icon.
+const useAgentIconMock = vi.hoisted(() =>
+  vi.fn(
+    (): {
+      candidates: string[];
+      mono: boolean;
+      ground?: "dark" | "light";
+    } => ({ candidates: [], mono: false, ground: undefined }),
+  ),
+);
+vi.mock("../../hooks/use-agent-icons", () => ({
+  useAgentIcon: useAgentIconMock,
+}));
+
 function agent(overrides: Partial<AgentStatus>): AgentStatus {
   return {
     name: "cursor",
@@ -195,6 +211,13 @@ describe("AgentGraph", () => {
   });
 
   it("renders each agent as a macOS-style squircle tile", () => {
+    // A resolved candidate, so the tile shows the brand glyph (not the Bot
+    // fallback) — the shape asserts below are about the tile, not the glyph.
+    useAgentIconMock.mockReturnValue({
+      candidates: ["https://example.test/icons/cursor-color.svg"],
+      mono: false,
+      ground: undefined,
+    });
     renderWithRouter(<AgentGraph agents={agents} />);
     const tile = screen
       .getByRole("button", { name: "Cursor" })
@@ -206,6 +229,12 @@ describe("AgentGraph", () => {
     expect(tile.className).toContain("rounded-[22.5%]");
     expect(tile.className).not.toContain("rounded-full");
     expect(tile.querySelector("img")).toBeInTheDocument();
+    useAgentIconMock.mockClear();
+    useAgentIconMock.mockImplementation(() => ({
+      candidates: [],
+      mono: false,
+      ground: undefined,
+    }));
   });
 
   it("dims an unlinked agent's face so it reads as switched off", () => {

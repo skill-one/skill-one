@@ -1,7 +1,8 @@
+import { useEffect, useState } from "react";
 import type { ComponentProps } from "react";
 import { Bot } from "lucide-react";
 
-import { agentIconGround, getAgentIconUrl, isMonochromeAgentIcon } from "../lib/agent-icons";
+import { useAgentIcon } from "../hooks/use-agent-icons";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "../lib/utils";
 
@@ -18,9 +19,11 @@ interface AgentIconProps extends ComponentProps<typeof Avatar> {
 }
 
 /**
- * Renders a colored brand icon for the given agent (from LobeHub's
- * static-svg `-color` assets). Falls back to a generic Bot glyph when no
- * dedicated icon is available (or while the image loads); the glyph is
+ * Renders the colored brand icon for the given agent, resolved at runtime
+ * against the agents-info dataset (`lib/agent-icons`) and loaded through the
+ * CDN fallback chain. Candidate URLs are walked in order, one step per failed
+ * load. Falls back to a generic Bot glyph when no dedicated icon is
+ * available, while the dataset loads, or while the image loads; the glyph is
  * decorative — the label around the avatar carries the agent's name.
  */
 export function AgentIcon({
@@ -30,18 +33,24 @@ export function AgentIcon({
   shape = "circle",
   ...props
 }: AgentIconProps) {
-  const iconUrl = getAgentIconUrl(agentName);
+  const { candidates, mono, ground } = useAgentIcon(agentName);
+  // Walk the candidate chain one step per failed load; past the last
+  // candidate there is no src and the Bot fallback takes over.
+  const [step, setStep] = useState(0);
+  // A reused instance switching agents — or a freshly resolved map —
+  // restarts the candidate chain.
+  useEffect(() => setStep(0), [agentName, candidates.length]);
+  const src = step < candidates.length ? candidates[step] : undefined;
+
   // Monochrome `currentColor` SVGs render black as <img>; flip them to white
   // so they stay legible on the dark surface. Colored icons keep their hues.
-  const darkFixClass = isMonochromeAgentIcon(agentName)
-    ? "dark:invert"
-    : undefined;
+  const darkFixClass = mono ? "dark:invert" : undefined;
   // Surface-bound artwork (white glyph / black-dominant art on a transparent
   // background) is painted on a fixed contrasting ground in both modes.
   const groundClass =
-    agentIconGround(agentName) === "dark"
+    ground === "dark"
       ? "bg-neutral-900"
-      : agentIconGround(agentName) === "light"
+      : ground === "light"
         ? "bg-white"
         : undefined;
 
@@ -60,10 +69,13 @@ export function AgentIcon({
           className,
         )}
       >
-        {iconUrl ? (
+        {src ? (
           <img
-            src={iconUrl}
+            key={src}
+            src={src}
             alt=""
+            referrerPolicy="no-referrer"
+            onError={() => setStep((s) => s + 1)}
             className={cn("h-full w-full object-contain", darkFixClass, groundClass)}
           />
         ) : (
@@ -75,10 +87,16 @@ export function AgentIcon({
 
   return (
     <Avatar size={size} className={className} {...props}>
-      {iconUrl && (
+      {src && (
         <AvatarImage
-          src={iconUrl}
+          key={src}
+          src={src}
           alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onLoadingStatusChange={(status) => {
+            if (status === "error") setStep((s) => s + 1);
+          }}
           className={cn(darkFixClass, groundClass)}
         />
       )}
