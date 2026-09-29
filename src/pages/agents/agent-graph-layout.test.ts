@@ -158,10 +158,12 @@ describe("layoutAgents", () => {
     const N = 35;
     const layout = layoutAgents(roster(N), 1400, 1100);
     expect(layout.nodes).toHaveLength(N);
-    // Pills are wide: an ordinary screen shrinks them toward the floor and
-    // grows the canvas — never below the floor, never overlapping.
-    expect(layout.nodes[0].height).toBeGreaterThanOrEqual(NODE_SIZE_MIN);
-    expect(layout.nodes[0].width).toBe(pillWidth(layout.nodes[0].height));
+    // The ring squeezes into the box instead of shrinking: full-size pills,
+    // no canvas growth, never overlapping.
+    expect(layout.nodes[0].height).toBe(NODE_SIZE_MAX);
+    expect(layout.nodes[0].width).toBe(pillWidth(NODE_SIZE_MAX));
+    expect(layout.width).toBe(1400);
+    expect(layout.height).toBe(1100);
     for (let i = 0; i < N; i += 1) {
       for (let j = i + 1; j < N; j += 1) {
         const a = layout.nodes[i];
@@ -176,7 +178,7 @@ describe("layoutAgents", () => {
     }
   });
 
-  it("keeps every pill inside the canvas and clear of the hub rim", () => {
+  it("keeps every pill inside the canvas and clear of the hub disk", () => {
     const layout = layoutAgents(roster(20), 900, 700);
     for (const node of layout.nodes) {
       expect(node.x).toBeGreaterThanOrEqual(OUTER_PAD - 0.001);
@@ -187,11 +189,19 @@ describe("layoutAgents", () => {
       expect(node.y + node.height).toBeLessThanOrEqual(
         layout.height - OUTER_PAD + 0.001,
       );
+      // Exact rect-circle clearance: the hub disk must not reach the pill,
+      // measured along the hub-facing ray (pills are wide, so the centre
+      // distance alone would over-constrain the squeezed ring).
       const cx = node.x + node.width / 2;
       const cy = node.y + node.height / 2;
-      expect(Math.hypot(cx - layout.hub.x, cy - layout.hub.y)).toBeGreaterThan(
-        HUB_RADIUS + HUB_TIP_GAP + node.width / 2,
-      );
+      const dx = cx - layout.hub.x;
+      const dy = cy - layout.hub.y;
+      const dist = Math.hypot(dx, dy);
+      const ux = dx / dist;
+      const uy = dy / dist;
+      const support =
+        (node.width / 2) * Math.abs(ux) + (node.height / 2) * Math.abs(uy);
+      expect(dist - support).toBeGreaterThan(HUB_RADIUS + HUB_TIP_GAP);
     }
   });
 
@@ -213,22 +223,24 @@ describe("layoutAgents", () => {
     }
   });
 
-  it("shrinks the pills before growing the canvas when the roster is long", () => {
-    // A huge canvas holds the whole roster at full size without growing.
+  it("squeezes before shrinking, and shrinks before growing", () => {
+    // A huge canvas holds the whole roster unsqueezed at full size.
     const huge = layoutAgents(roster(35), 2200, 2200);
     expect(huge.nodes[0].height).toBe(NODE_SIZE_MAX);
     expect(huge.width).toBe(2200);
     expect(huge.height).toBe(2200);
-    // An ordinary screen shrinks the pills first...
+    // An ordinary screen keeps full-size pills with no canvas growth — the
+    // ring flattens into an ellipse instead.
     const roomy = layoutAgents(roster(35), 1400, 1100);
-    expect(roomy.nodes[0].height).toBeLessThan(NODE_SIZE_MAX);
-    // ...and only a tiny screen also grows the canvas past its measure.
+    expect(roomy.nodes[0].height).toBe(NODE_SIZE_MAX);
+    expect(roomy.width).toBe(1400);
+    expect(roomy.height).toBe(1100);
+    // Only a tiny screen falls back to floor tiles on a grown canvas.
     const tight = layoutAgents(roster(35), 700, 460);
-    expect(tight.nodes[0].height).toBeLessThanOrEqual(
-      roomy.nodes[0].height,
-    );
-    expect(tight.width).toBeGreaterThanOrEqual(roomy.width);
-    // Even shrunk, the constellation still fits the box it reports.
+    expect(tight.nodes[0].height).toBe(NODE_SIZE_MIN);
+    expect(tight.width).toBeGreaterThan(700);
+    expect(tight.height).toBeGreaterThan(460);
+    // Even then, the constellation still fits the box it reports.
     for (const node of tight.nodes) {
       expect(node.x).toBeGreaterThanOrEqual(0);
       expect(node.y).toBeGreaterThanOrEqual(0);

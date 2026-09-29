@@ -12,10 +12,11 @@ import type { AgentStatus } from "../../lib/skills-manager";
  * agent steps the golden angle (~137.5°) around the hub while drifting out
  * with √index. The result looks casually scattered to every side of the hub
  * while staying evenly spaced and never overlapping; the same agent always
- * lands in the same place. A long roster shrinks the tile size before it
- * grows the canvas, so the constellation keeps fitting one screen. The label
- * slot has a fixed width (longer names truncate), so the layout never needs
- * to measure the DOM.
+ * lands in the same place. Wide pills on a short box flatten the ring into
+ * an ellipse instead of shrinking the tiles; a long roster shrinks the tile
+ * size before it grows the canvas, so the picture keeps fitting one screen.
+ * The label slot has a fixed width (longer names truncate), so the layout
+ * never needs to measure the DOM.
  */
 
 export interface Point {
@@ -107,6 +108,12 @@ export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const DENSITY_K = 0.62;
 /** Where the spiral starts — one tile above the hub (angle 0 points east). */
 const ANGLE_OFFSET = -Math.PI / 2;
+/**
+ * How far the ring may squeeze into an ellipse to fit the measured box
+ * before the layout shrinks the tiles instead. 0.6 keeps the swirl readable
+ * while fitting ordinary rosters at full size with no canvas growth.
+ */
+const SQUEEZE_MIN = 0.6;
 
 /**
  * The five ribbon hues of the Skill One mark, in its top-to-bottom order.
@@ -197,16 +204,27 @@ function outerRadius(agentCount: number, size: number): number {
 }
 
 /**
- * The largest tile size that keeps the whole constellation inside
- * `availableRadius`; the floor, when even it cannot fit, lets the canvas grow.
+ * Fit the constellation ring into the measured box: the largest tile size
+ * whose ring squeezes (down to `SQUEEZE_MIN` per axis) inside the available
+ * half-extents. Wide pills on a short box flatten the ring into an ellipse
+ * at full tile size instead of shrinking; only when even the floor tiles
+ * cannot squeeze in does the caller fall back to a circular ring on a grown
+ * canvas.
  */
-function resolveTileSize(agentCount: number, availableRadius: number): number {
-  for (let size = NODE_SIZE_MAX; size >= NODE_SIZE_MIN; size -= 1) {
-    if (outerRadius(agentCount, size) + pillWidth(size) / 2 <= availableRadius) {
-      return size;
+function fitConstellation(
+  agentCount: number,
+  availRX: number,
+  availRY: number,
+): { size: number; ex: number; ey: number } | null {
+  for (let s = NODE_SIZE_MAX; s >= NODE_SIZE_MIN; s -= 1) {
+    const ring = outerRadius(agentCount, s);
+    const sx = ring > 0 ? Math.min(1, (availRX - pillWidth(s) / 2) / ring) : 1;
+    const sy = ring > 0 ? Math.min(1, (availRY - s / 2) / ring) : 1;
+    if (sx >= SQUEEZE_MIN && sy >= SQUEEZE_MIN) {
+      return { size: s, ex: sx, ey: sy };
     }
   }
-  return NODE_SIZE_MIN;
+  return null;
 }
 
 /**
@@ -346,10 +364,10 @@ export function layoutAgents(
 /**
  * Lay every agent out around the SkillOne hub on a Vogel spiral: the hub
  * sits at the canvas centre, node 0 rests one spoke above it, and every
- * further node steps the golden angle and drifts outward with √index. The
- * tile size shrinks (down to a floor) to keep a long roster inside the
- * measured canvas; only when the floor cannot fit does the canvas grow and
- * the page scroll.
+ * further node steps the golden angle and drifts outward with √index. Wide
+ * pills on a short box squeeze the ring into an ellipse at full tile size;
+ * a long roster then shrinks the tiles, and only tiny screens grow the
+ * canvas and scroll.
  */
 function layoutConstellation(
   agents: readonly AgentStatus[],
@@ -359,15 +377,20 @@ function layoutConstellation(
   const measuredW = measuredWidth > 0 ? measuredWidth : DEFAULT_GRAPH_WIDTH;
   const measuredH = measuredHeight > 0 ? measuredHeight : DEFAULT_GRAPH_HEIGHT;
 
-  const availableRadius = Math.min(measuredW, measuredH) / 2 - OUTER_PAD;
-  const size = resolveTileSize(agents.length, availableRadius);
+  const availRX = measuredW / 2 - OUTER_PAD;
+  const availRY = measuredH / 2 - OUTER_PAD;
+  const fit = fitConstellation(agents.length, availRX, availRY);
+  // Tiny screens that fit nothing squeezed fall back to floor tiles on a
+  // circular ring; the canvas below grows to hold it.
+  const size = fit?.size ?? NODE_SIZE_MIN;
+  const ex = fit?.ex ?? 1;
+  const ey = fit?.ey ?? 1;
   const pillW = pillWidth(size);
 
-  // The constellation is circular: once the floor tile size still cannot fit
-  // the measured box, grow a square canvas enough to hold it.
-  const needed = (outerRadius(agents.length, size) + pillW / 2 + OUTER_PAD) * 2;
-  const width = Math.max(measuredW, needed);
-  const height = Math.max(measuredH, needed);
+  const neededW = (outerRadius(agents.length, size) + pillW / 2 + OUTER_PAD) * 2;
+  const neededH = (outerRadius(agents.length, size) + size / 2 + OUTER_PAD) * 2;
+  const width = fit ? measuredW : Math.max(measuredW, neededW);
+  const height = fit ? measuredH : Math.max(measuredH, neededH);
   const hub = { x: width / 2, y: height / 2, radius: HUB_RADIUS };
 
   const spacing = pillW + gapFor(size);
@@ -376,13 +399,17 @@ function layoutConstellation(
   const nodes: NodeLayout[] = agents.map((agent, i) => {
     const angle = ANGLE_OFFSET + i * GOLDEN_ANGLE;
     const radius = r0 + DENSITY_K * spacing * Math.sqrt(i);
-    const cx = hub.x + radius * Math.cos(angle);
-    const cy = hub.y + radius * Math.sin(angle);
+    const cx = hub.x + ex * radius * Math.cos(angle);
+    const cy = hub.y + ey * radius * Math.sin(angle);
+    // Unit ray from the pill centre back to the hub, on the squeezed ring.
+    const dx = ex * Math.cos(angle);
+    const dy = ey * Math.sin(angle);
+    const dl = Math.hypot(dx, dy) || 1;
     // The ribbon leaves where the hub-facing ray pierces the pill rect and
     // arrives at the hub rim on the same ray, so the spoke is one straight
-    // radial line the curve gently bows along.
-    const ux = -Math.cos(angle);
-    const uy = -Math.sin(angle);
+    // line the curve gently bows along.
+    const ux = -dx / dl;
+    const uy = -dy / dl;
     const t = Math.min(
       ux !== 0 ? pillW / 2 / Math.abs(ux) : Infinity,
       uy !== 0 ? size / 2 / Math.abs(uy) : Infinity,
@@ -401,9 +428,12 @@ function layoutConstellation(
 
   const ribbons: RibbonLayout[] = nodes.map((node, i) => {
     const angle = ANGLE_OFFSET + i * GOLDEN_ANGLE;
+    const dx = ex * Math.cos(angle);
+    const dy = ey * Math.sin(angle);
+    const dl = Math.hypot(dx, dy) || 1;
     const tip = {
-      x: hub.x + (HUB_RADIUS + HUB_TIP_GAP) * Math.cos(angle),
-      y: hub.y + (HUB_RADIUS + HUB_TIP_GAP) * Math.sin(angle),
+      x: hub.x + (dx / dl) * (HUB_RADIUS + HUB_TIP_GAP),
+      y: hub.y + (dy / dl) * (HUB_RADIUS + HUB_TIP_GAP),
     };
     return { name: node.name, d: swirlPath(node.anchor, tip) };
   });
