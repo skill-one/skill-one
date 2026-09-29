@@ -1,120 +1,36 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
+  AGENT_EDGE_COLORS,
+  AGENT_ICON_MAP,
+} from "../data/agent-icons.generated";
+import {
+  agentEdgeColor,
   agentIconCandidates,
-  agentIconSourceCandidates,
+  agentIconMap,
   agentIconTraits,
-  loadAgentIcons,
-  readStoredAgentIcons,
 } from "./agent-icons";
 
-// A manifest shaped like the real `agents.jsonl`: one JSON record per line,
-// including a null-icon record (the catch-all agent) and lines a torn
-// download could produce.
-const MANIFEST = [
-  JSON.stringify({ name: "codex", icon: "icons/codex-color.svg" }),
-  JSON.stringify({ name: "trae-cn", icon: "icons/trae-color.svg" }),
-  JSON.stringify({ name: "universal", icon: null }),
-  JSON.stringify({ name: "eve", icon: "https://vercel.com/eve.png" }),
-  "not json",
-  "",
-].join("\n");
-
-function serveManifest(text: string) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => ({ ok: true, status: 200, text: async () => text })),
-  );
-}
-
-function serveNetworkFailure() {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => {
-      throw new TypeError("network down");
-    }),
-  );
-}
-
-const CACHE_KEY = "skill-one.agentIcons";
-
 describe("agent-icons", () => {
-  beforeEach(() => {
-    window.localStorage.clear();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("loads the dataset manifest and persists the parsed copy", async () => {
-    serveManifest(MANIFEST);
-
-    const icons = await loadAgentIcons();
-
-    expect(icons).toEqual({
-      codex: "icons/codex-color.svg",
-      "trae-cn": "icons/trae-color.svg",
-      eve: "https://vercel.com/eve.png",
-    });
-    // The copy in localStorage is what offline launches fall back to.
-    expect(readStoredAgentIcons()).toEqual(icons);
-  });
-
-  it("skips records without a usable name and icon pair", async () => {
-    serveManifest(MANIFEST);
-
-    const icons = await loadAgentIcons();
-
-    // The null-icon catch-all and the malformed line never make the map.
-    expect(icons.universal).toBeUndefined();
-    expect(Object.keys(icons)).toHaveLength(3);
-  });
-
-  it("falls back to the last stored copy when the dataset is unreachable", async () => {
-    serveManifest(MANIFEST);
-    await loadAgentIcons();
-
-    serveNetworkFailure();
-    const icons = await loadAgentIcons();
-
+  it("vendors a non-empty agent map with the known brands", () => {
+    const icons = agentIconMap();
+    expect(Object.keys(icons).length).toBeGreaterThan(0);
     expect(icons.codex).toBe("icons/codex-color.svg");
+    expect(icons["trae-cn"]).toBe("icons/trae-color.svg");
+    // The null-icon catch-all has no artwork: the UI draws its Bot fallback.
+    expect(icons.universal).toBeUndefined();
+    expect(icons).toEqual(AGENT_ICON_MAP);
   });
 
-  it("rejects when there is no network and nothing stored", async () => {
-    serveNetworkFailure();
-
-    await expect(loadAgentIcons()).rejects.toThrow(/no cached copy/);
-  });
-
-  it("ignores a stored copy whose version no longer matches", async () => {
-    window.localStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify({ v: 0, icons: { codex: "icons/stale.svg" } }),
-    );
-
-    serveNetworkFailure();
-
-    await expect(loadAgentIcons()).rejects.toThrow(/no cached copy/);
-  });
-
-  it("resolves repo-relative icons through the CDN fallback chain", () => {
-    expect(agentIconCandidates("icons/codex-color.svg")).toEqual([
-      "https://raw.githubusercontent.com/skill-one/agents-info/HEAD/icons/codex-color.svg",
-      "https://cdn.jsdmirror.com/gh/skill-one/agents-info/icons/codex-color.svg",
-    ]);
+  it("serves vendored icons from the local public copy", () => {
+    const candidates = agentIconCandidates("icons/codex-color.svg");
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].endsWith("/agents/icons/codex-color.svg")).toBe(true);
   });
 
   it("uses an off-repo https icon as its own single candidate", () => {
     expect(agentIconCandidates("https://vercel.com/eve.png")).toEqual([
       "https://vercel.com/eve.png",
-    ]);
-  });
-
-  it("reads the manifest itself from the same chain", () => {
-    expect(agentIconSourceCandidates()).toEqual([
-      "https://raw.githubusercontent.com/skill-one/agents-info/HEAD/agents.jsonl",
-      "https://cdn.jsdmirror.com/gh/skill-one/agents-info/agents.jsonl",
     ]);
   });
 
@@ -141,5 +57,27 @@ describe("agent-icons", () => {
     const traits = agentIconTraits("icons/never-seen.svg");
     expect(traits.mono).toBe(false);
     expect(traits.ground).toBeUndefined();
+  });
+
+  it("precomputes an edge color for every vendored artwork file", () => {
+    const files = new Set(
+      Object.values(AGENT_ICON_MAP).filter(
+        (icon): icon is string => typeof icon === "string",
+      ),
+    );
+    for (const file of files) {
+      expect(AGENT_EDGE_COLORS[file]).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+
+  it("resolves the edge color of a colored icon", () => {
+    expect(agentEdgeColor("icons/codex-color.svg")).toBe(
+      AGENT_EDGE_COLORS["icons/codex-color.svg"],
+    );
+  });
+
+  it("stays neutral for monochrome glyphs and unknown files", () => {
+    expect(agentEdgeColor("icons/cline.svg")).toBeUndefined();
+    expect(agentEdgeColor("icons/never-seen.svg")).toBeUndefined();
   });
 });
