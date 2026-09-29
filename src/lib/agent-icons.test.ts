@@ -1,104 +1,145 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  AGENT_ICON_BY_NAME,
-  agentIconGround,
-  getAgentIconUrl,
-  isMonochromeAgentIcon,
+  agentIconCandidates,
+  agentIconSourceCandidates,
+  agentIconTraits,
+  loadAgentIcons,
+  readStoredAgentIcons,
 } from "./agent-icons";
 
-// A trait key that no agent maps to would silently do nothing, so every
-// traits entry must reference an icon some agent actually uses. The traits
-// table itself is private; this guards its keys through the public surface.
-const EXPECTED_TRAITED_FILES = [
-  "/agent-icons/cline.svg",
-  "/agent-icons/commandcode.svg",
-  "/agent-icons/cursor.svg",
-  "/agent-icons/githubcopilot.svg",
-  "/agent-icons/goose.svg",
-  "/agent-icons/grok.svg",
-  "/agent-icons/hermesagent.svg",
-  "/agent-icons/inference.svg",
-  "/agent-icons/kimi-color.svg",
-  "/agent-icons/kilocode.svg",
-  "/agent-icons/lmstudio.svg",
-  "/agent-icons/opencode.svg",
-  "/agent-icons/pi.svg",
-  "/agent-icons/roocode.svg",
-  "/agent-icons/windsurf.svg",
-];
+// A manifest shaped like the real `agents.jsonl`: one JSON record per line,
+// including a null-icon record (the catch-all agent) and lines a torn
+// download could produce.
+const MANIFEST = [
+  JSON.stringify({ name: "codex", icon: "icons/codex-color.svg" }),
+  JSON.stringify({ name: "trae-cn", icon: "icons/trae-color.svg" }),
+  JSON.stringify({ name: "universal", icon: null }),
+  JSON.stringify({ name: "eve", icon: "https://vercel.com/eve.png" }),
+  "not json",
+  "",
+].join("\n");
+
+function serveManifest(text: string) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({ ok: true, status: 200, text: async () => text })),
+  );
+}
+
+function serveNetworkFailure() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      throw new TypeError("network down");
+    }),
+  );
+}
+
+const CACHE_KEY = "skill-one.agentIcons";
 
 describe("agent-icons", () => {
-  it("maps known agents to their icon assets", () => {
-    expect(getAgentIconUrl("claude-code")).toBe("/agent-icons/claudecode-color.svg");
-    expect(getAgentIconUrl("cursor")).toBe("/agent-icons/cursor.svg");
+  beforeEach(() => {
+    window.localStorage.clear();
   });
 
-  it("returns undefined for unknown agents", () => {
-    expect(getAgentIconUrl("not-an-agent")).toBeUndefined();
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it("resolves variant agents to their parent brand's icon", () => {
-    expect(getAgentIconUrl("trae-cn")).toBe(getAgentIconUrl("trae"));
-    expect(getAgentIconUrl("workbuddy-ai")).toBe(getAgentIconUrl("workbuddy"));
-    expect(getAgentIconUrl("lingma")).toBe(getAgentIconUrl("qwen-code"));
+  it("loads the dataset manifest and persists the parsed copy", async () => {
+    serveManifest(MANIFEST);
+
+    const icons = await loadAgentIcons();
+
+    expect(icons).toEqual({
+      codex: "icons/codex-color.svg",
+      "trae-cn": "icons/trae-color.svg",
+      eve: "https://vercel.com/eve.png",
+    });
+    // The copy in localStorage is what offline launches fall back to.
+    expect(readStoredAgentIcons()).toEqual(icons);
+  });
+
+  it("skips records without a usable name and icon pair", async () => {
+    serveManifest(MANIFEST);
+
+    const icons = await loadAgentIcons();
+
+    // The null-icon catch-all and the malformed line never make the map.
+    expect(icons.universal).toBeUndefined();
+    expect(Object.keys(icons)).toHaveLength(3);
+  });
+
+  it("falls back to the last stored copy when the dataset is unreachable", async () => {
+    serveManifest(MANIFEST);
+    await loadAgentIcons();
+
+    serveNetworkFailure();
+    const icons = await loadAgentIcons();
+
+    expect(icons.codex).toBe("icons/codex-color.svg");
+  });
+
+  it("rejects when there is no network and nothing stored", async () => {
+    serveNetworkFailure();
+
+    await expect(loadAgentIcons()).rejects.toThrow(/no cached copy/);
+  });
+
+  it("ignores a stored copy whose version no longer matches", async () => {
+    window.localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ v: 0, icons: { codex: "icons/stale.svg" } }),
+    );
+
+    serveNetworkFailure();
+
+    await expect(loadAgentIcons()).rejects.toThrow(/no cached copy/);
+  });
+
+  it("resolves repo-relative icons through the CDN fallback chain", () => {
+    expect(agentIconCandidates("icons/codex-color.svg")).toEqual([
+      "https://raw.githubusercontent.com/skill-one/agents-info/HEAD/icons/codex-color.svg",
+      "https://cdn.jsdmirror.com/gh/skill-one/agents-info/icons/codex-color.svg",
+    ]);
+  });
+
+  it("uses an off-repo https icon as its own single candidate", () => {
+    expect(agentIconCandidates("https://vercel.com/eve.png")).toEqual([
+      "https://vercel.com/eve.png",
+    ]);
+  });
+
+  it("reads the manifest itself from the same chain", () => {
+    expect(agentIconSourceCandidates()).toEqual([
+      "https://raw.githubusercontent.com/skill-one/agents-info/HEAD/agents.jsonl",
+      "https://cdn.jsdmirror.com/gh/skill-one/agents-info/agents.jsonl",
+    ]);
   });
 
   it("flags monochrome `currentColor` icons as needing dark-mode inversion", () => {
-    expect(isMonochromeAgentIcon("cursor")).toBe(true);
-    expect(isMonochromeAgentIcon("cline")).toBe(true);
-    expect(isMonochromeAgentIcon("github-copilot")).toBe(true);
-    expect(isMonochromeAgentIcon("windsurf")).toBe(true);
+    expect(agentIconTraits("icons/cline.svg").mono).toBe(true);
+    expect(agentIconTraits("icons/githubcopilot.svg").mono).toBe(true);
+    expect(agentIconTraits("icons/windsurf.svg").mono).toBe(true);
   });
 
   it("keeps colored brand icons un-inverted", () => {
-    expect(isMonochromeAgentIcon("claude-code")).toBe(false);
-    expect(isMonochromeAgentIcon("codex")).toBe(false);
-    expect(isMonochromeAgentIcon("qwen-code")).toBe(false);
-  });
-
-  it("never treats unknown agents as monochrome", () => {
-    expect(isMonochromeAgentIcon("not-an-agent")).toBe(false);
-  });
-
-  it("classifies every registered agent's traits through the public surface", () => {
-    for (const [name, url] of Object.entries(AGENT_ICON_BY_NAME)) {
-      const mono = isMonochromeAgentIcon(name);
-      const ground = agentIconGround(name);
-      // A file is either a monochrome glyph, a grounded artwork, or plain —
-      // never both, and every trait flag must trace back to the agent's file.
-      if (mono) expect(EXPECTED_TRAITED_FILES).toContain(url);
-      if (ground) {
-        expect(EXPECTED_TRAITED_FILES).toContain(url);
-        expect(mono).toBe(false);
-      }
-    }
-    // Every traited file is reachable from at least one agent (no dead keys).
-    const mapped = new Set(Object.values(AGENT_ICON_BY_NAME));
-    for (const url of EXPECTED_TRAITED_FILES) {
-      expect(mapped.has(url), `traited file no agent maps to: ${url}`).toBe(true);
-    }
-  });
-
-  it("points every registered agent at an icon file that exists on disk", () => {
-    for (const url of new Set(Object.values(AGENT_ICON_BY_NAME))) {
-      const file = resolve(process.cwd(), "public", url.replace(/^\//, ""));
-      expect(existsSync(file), `missing icon asset: ${url}`).toBe(true);
-    }
+    // Colored, including the dataset's colored redraw of the once-mono Cursor.
+    expect(agentIconTraits("icons/codex-color.svg").mono).toBe(false);
+    expect(agentIconTraits("icons/cursor-color.svg").mono).toBe(false);
   });
 
   it("grounds only the surface-bound artwork, verified on both backgrounds", () => {
-    // Surface-bound artwork must always get a ground; self-grounded or
-    // avatar-based icons must never get one.
-    expect(agentIconGround("kimi-code-cli")).toBe("dark"); // white K on transparent
-    expect(agentIconGround("codex")).toBeUndefined(); // covered layer, reads fine
-    expect(agentIconGround("openhands")).toBeUndefined(); // yellow hands read fine
-    expect(agentIconGround("kiro-cli")).toBeUndefined(); // full-bleed purple tile
-    expect(agentIconGround("claude-code")).toBeUndefined();
-    expect(agentIconGround("warp")).toBeUndefined(); // raster avatar
-    expect(agentIconGround("not-an-agent")).toBeUndefined();
+    expect(agentIconTraits("icons/kimi-color.svg").ground).toBe("dark"); // white K on transparent
+    expect(agentIconTraits("icons/codex-color.svg").ground).toBeUndefined(); // covered layer, reads fine
+    expect(agentIconTraits("icons/kiro-color.svg").ground).toBeUndefined(); // full-bleed purple tile
+    expect(agentIconTraits("icons/warp.png").ground).toBeUndefined(); // raster avatar
+  });
+
+  it("answers plain traits for files outside the table", () => {
+    const traits = agentIconTraits("icons/never-seen.svg");
+    expect(traits.mono).toBe(false);
+    expect(traits.ground).toBeUndefined();
   });
 });

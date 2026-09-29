@@ -1,108 +1,141 @@
-// Maps every agent (identified by the `name` field from agents-skills) to its
-// brand icon, served from /agent-icons/<file>. Two sources only:
-//
-// 1. LobeHub's static-svg assets (`.svg`, copied into this directory) —
-//    preferred: colored (`-color`) icons with monochrome (`.svg`) fallbacks.
-// 2. GitHub organization avatars (`.png`, vendored from
-//    `avatars.githubusercontent.com/<org>`) — for the long tail of coding
-//    agents that no icon set covers. Accounts whose avatar is a generic
-//    identicon or a personal picture were rejected: a wrong-looking icon is
-//    worse than the Bot fallback.
-//
-// Agents with neither source fall back to a generic Bot glyph in the
-// AgentIcon component.
+import { fileCandidates, fetchFirstText } from "./cdn-config";
+import { storage } from "./storage";
 
-// Icon file per brand — one entry per distinct piece of artwork. Variant
-// agents (region-locked or CLI editions of the same product) are not repeated
-// here; they alias to their parent brand in BRAND_BY_AGENT below.
-const ICON_BY_BRAND = {
-  "aider-desk": "/agent-icons/aider-desk.png", // github.com/Aider-AI
-  amp: "/agent-icons/amp-color.svg",
-  antigravity: "/agent-icons/antigravity-color.svg",
-  astrbot: "/agent-icons/astrbot.png", // github.com/AstrBotDevs
-  augment: "/agent-icons/augment.png", // github.com/AugmentCode
-  "claude-code": "/agent-icons/claudecode-color.svg",
-  cline: "/agent-icons/cline.svg",
-  "codearts-agent": "/agent-icons/huawei-color.svg", // vendor logo (Huawei)
-  codebuddy: "/agent-icons/codebuddy-color.svg",
-  codex: "/agent-icons/codex-color.svg",
-  "command-code": "/agent-icons/commandcode.svg",
-  comate: "/agent-icons/comate.png", // vendor logo (github.com/baidu)
-  continue: "/agent-icons/continue.png", // github.com/continuedev
-  cortex: "/agent-icons/cortex.png", // github.com/cortexapps
-  crush: "/agent-icons/crush.png", // github.com/charmbracelet (mascot)
-  cursor: "/agent-icons/cursor.svg",
-  deepagents: "/agent-icons/deepagents.png", // vendor logo (github.com/langchain-ai)
-  devin: "/agent-icons/devin-color.svg",
-  dexto: "/agent-icons/dexto.png", // github.com/traceloop
-  droid: "/agent-icons/droid.png", // github.com/Factory-AI
-  eve: "/agent-icons/eve.png", // vendor logo (github.com/vercel)
-  firebender: "/agent-icons/firebender.png", // github.com/firebender
-  forgecode: "/agent-icons/forgecode.png", // github.com/antinomyhq
-  "gemini-cli": "/agent-icons/geminicli-color.svg",
-  "github-copilot": "/agent-icons/githubcopilot.svg",
-  goose: "/agent-icons/goose.svg",
-  grok: "/agent-icons/grok.svg",
-  "hermes-agent": "/agent-icons/hermesagent.svg",
-  "inference-sh": "/agent-icons/inference.svg",
-  "iflow-cli": "/agent-icons/iflow-cli.png", // github.com/iflow-ai
-  junie: "/agent-icons/junie-color.svg",
-  kilo: "/agent-icons/kilocode.svg",
-  "kimi-code-cli": "/agent-icons/kimi-color.svg",
-  "kiro-cli": "/agent-icons/kiro-color.svg",
-  kode: "/agent-icons/kode.png", // github.com/kode-ai
-  "qwen-code": "/agent-icons/qwen-color.svg", // vendor logo (Alibaba)
-  lmstudio: "/agent-icons/lmstudio.svg",
-  "minimax-code": "/agent-icons/minimax-color.svg",
-  "mistral-vibe": "/agent-icons/mistral-color.svg",
-  mcpjam: "/agent-icons/mcpjam.png", // github.com/MCPJam
-  opencode: "/agent-icons/opencode.svg",
-  openclaw: "/agent-icons/openclaw-color.svg",
-  openhands: "/agent-icons/openhands-color.svg",
-  pi: "/agent-icons/pi.svg",
-  "posit-assistant": "/agent-icons/posit-assistant.png", // vendor logo (github.com/posit-dev)
-  qoder: "/agent-icons/qoder-color.svg",
-  replit: "/agent-icons/replit-color.svg",
-  roo: "/agent-icons/roocode.svg",
-  "tabnine-cli": "/agent-icons/tabnine-cli.png", // github.com/tabnine
-  trae: "/agent-icons/trae-color.svg",
-  warp: "/agent-icons/warp.png", // github.com/warpdotdev
-  windsurf: "/agent-icons/windsurf.svg",
-  workbuddy: "/agent-icons/workbuddy-color.svg",
-  zed: "/agent-icons/zed.png", // github.com/zed-industries
-  zencoder: "/agent-icons/zencoder-color.svg",
-};
+/**
+ * Where agent brand icons come from: the `agents-info` dataset repo, fetched
+ * at runtime instead of vendored into `public/`. The dataset keeps the whole
+ * picture — every agent's `name → icon` mapping in `agents.jsonl`, and the
+ * icon files themselves under `icons/` — so the app never repeats it, and a
+ * new agent (or a redrawn logo) shows up without an app update.
+ *
+ * The manifest rides the same download source and CDN fallback chain as the
+ * registry index (see `lib/cdn-config`): direct GitHub first, the default
+ * jsDelivr mirror as fallback, and a user-configured CDN ahead of both when
+ * one is set. Each icon file resolves through the same chain, so the images
+ * load even where `raw.githubusercontent.com` does not.
+ */
 
-// Variant agents inherit their parent brand's icon. Values are typed against
-// ICON_BY_BRAND's keys, so an alias to a removed brand fails to compile.
-const BRAND_BY_AGENT: Readonly<Record<string, keyof typeof ICON_BY_BRAND>> = {
-  "antigravity-cli": "antigravity",
-  lingma: "qwen-code",
-  "qoder-cn": "qoder",
-  qwenwork: "qwen-code",
-  qwenworkcn: "qwen-code",
-  "trae-cn": "trae",
-  "workbuddy-ai": "workbuddy",
-};
+const DATASET_REPO = "skill-one/agents-info";
+const DATASET_PATH = "agents.jsonl";
 
-export const AGENT_ICON_BY_NAME: Record<string, string> = {
-  ...ICON_BY_BRAND,
-  ...Object.fromEntries(
-    Object.entries(BRAND_BY_AGENT).map(([agent, brand]) => [
-      agent,
-      ICON_BY_BRAND[brand],
-    ]),
-  ),
-};
+/** localStorage key for the parsed manifest copy (offline fallback). */
+const CACHE_KEY = "skill-one.agentIcons";
+/** Bump when the stored shape changes in a way old copies can't serve. */
+const CACHE_VERSION = 1;
 
-export function getAgentIconUrl(name: string): string | undefined {
-  return AGENT_ICON_BY_NAME[name];
+/** Agent name → icon spec: a repo-relative dataset path or an https URL. */
+export type AgentIconMap = Record<string, string>;
+
+interface StoredCache {
+  v: number;
+  icons: AgentIconMap;
 }
 
-// How AgentIcon must treat a given icon file's artwork. Files without an
-// entry render as-is. Two traits, each verified by actually rendering the
-// asset on both backgrounds (fill heuristics lie — white/black paths may be
-// covered layers or mere outlines):
+/**
+ * Parse the JSONL manifest. One record per line; a torn or foreign line is
+ * skipped rather than failing the whole load. Records with a null icon (the
+ * built-in catch-all agent) simply don't map — the UI shows its Bot fallback.
+ */
+function parseAgentJsonl(text: string): AgentIconMap {
+  const icons: AgentIconMap = {};
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const record = JSON.parse(trimmed) as { name?: unknown; icon?: unknown };
+      if (
+        typeof record.name === "string" &&
+        record.name.length > 0 &&
+        typeof record.icon === "string" &&
+        record.icon.length > 0
+      ) {
+        icons[record.name] = record.icon;
+      }
+    } catch {
+      // Not a JSON object: skip the line, keep the rest.
+    }
+  }
+  return icons;
+}
+
+function readStoredIcons(): AgentIconMap | null {
+  try {
+    const raw = storage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredCache;
+    if (
+      parsed?.v !== CACHE_VERSION ||
+      typeof parsed.icons !== "object" ||
+      parsed.icons === null
+    ) {
+      return null;
+    }
+    return parsed.icons;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredIcons(icons: AgentIconMap): void {
+  const cache: StoredCache = { v: CACHE_VERSION, icons };
+  storage.setItem(CACHE_KEY, JSON.stringify(cache));
+}
+
+/** Every URL the manifest itself may be read from, most authoritative first. */
+export function agentIconSourceCandidates(): string[] {
+  return fileCandidates({ repo: DATASET_REPO, path: DATASET_PATH });
+}
+
+/**
+ * Load the agent→icon map. Fetches the dataset manifest through the CDN
+ * fallback chain, persists the parsed copy to localStorage, and — when every
+ * source is unreachable — falls back to the last stored copy so offline
+ * launches still get icons. Rejects only when there is nothing to draw from
+ * at all (no network on first ever run); react-query then surfaces the Bot
+ * fallback everywhere.
+ */
+export async function loadAgentIcons(): Promise<AgentIconMap> {
+  try {
+    const { text } = await fetchFirstText(agentIconSourceCandidates());
+    const icons = parseAgentJsonl(text);
+    if (Object.keys(icons).length > 0) {
+      writeStoredIcons(icons);
+      return icons;
+    }
+  } catch {
+    // Unreachable or unusable body: the stored copy below gets its turn.
+  }
+  const stored = readStoredIcons();
+  if (stored) return stored;
+  throw new Error(
+    "No agent icon map available: dataset unreachable and no cached copy",
+  );
+}
+
+/**
+ * The last persisted map, read synchronously — handed to the hook as
+ * `initialData`, so cached icons render on first paint while the manifest
+ * refreshes in the background.
+ */
+export function readStoredAgentIcons(): AgentIconMap | null {
+  return readStoredIcons();
+}
+
+/** Every URL an icon file may be read from, most authoritative first. */
+export function agentIconCandidates(icon: string): string[] {
+  // Off-repo artwork (a product's own hosted logo) has no mirror to fall
+  // back to — its one URL is the whole chain.
+  if (/^https:\/\//i.test(icon)) return [icon];
+  return fileCandidates({ repo: DATASET_REPO, path: icon });
+}
+
+// How AgentIcon must treat a given icon file's artwork. Keyed by the icon
+// path as recorded in the dataset (`icons/...`), not by agent name, so the
+// traits survive the dataset re-pointing a variant at another brand's file —
+// they describe the artwork, and travel with it. Files without an entry
+// render as-is. Two traits, each verified by actually rendering the asset on
+// both backgrounds (fill heuristics lie — white/black paths may be covered
+// layers or mere outlines):
 //
 // - `mono`: drawn as a monochrome `currentColor` glyph. As an `<img>` source
 //   it loses the page's CSS context and resolves to black — invisible on the
@@ -111,30 +144,37 @@ export function getAgentIconUrl(name: string): string | undefined {
 //   contrasting ground in both modes. Currently only Kimi: a white "K" on a
 //   transparent background that vanishes on light backgrounds, leaving just
 //   its blue accent.
-const FILE_TRAITS: Readonly<Record<string, { mono?: true; ground?: "dark" | "light" }>> = {
-  "/agent-icons/cline.svg": { mono: true },
-  "/agent-icons/commandcode.svg": { mono: true },
-  "/agent-icons/cursor.svg": { mono: true },
-  "/agent-icons/githubcopilot.svg": { mono: true },
-  "/agent-icons/goose.svg": { mono: true },
-  "/agent-icons/grok.svg": { mono: true },
-  "/agent-icons/hermesagent.svg": { mono: true },
-  "/agent-icons/inference.svg": { mono: true },
-  "/agent-icons/kimi-color.svg": { ground: "dark" },
-  "/agent-icons/kilocode.svg": { mono: true },
-  "/agent-icons/lmstudio.svg": { mono: true },
-  "/agent-icons/opencode.svg": { mono: true },
-  "/agent-icons/pi.svg": { mono: true },
-  "/agent-icons/roocode.svg": { mono: true },
-  "/agent-icons/windsurf.svg": { mono: true },
+//
+// Cursor is deliberately absent: the dataset ships `cursor-color.svg`, a
+// colored redraw of the once-monochrome glyph.
+const FILE_TRAITS: Readonly<
+  Record<string, { mono?: true; ground?: "dark" | "light" }>
+> = {
+  "icons/cline.svg": { mono: true },
+  "icons/commandcode.svg": { mono: true },
+  "icons/githubcopilot.svg": { mono: true },
+  "icons/goose.svg": { mono: true },
+  "icons/grok.svg": { mono: true },
+  "icons/hermesagent.svg": { mono: true },
+  "icons/inference.svg": { mono: true },
+  "icons/kimi-color.svg": { ground: "dark" },
+  "icons/kilocode.svg": { mono: true },
+  "icons/lmstudio.svg": { mono: true },
+  "icons/opencode.svg": { mono: true },
+  "icons/pi.svg": { mono: true },
+  "icons/roocode.svg": { mono: true },
+  "icons/windsurf.svg": { mono: true },
 };
 
-/** Whether the agent's brand icon is a monochrome glyph that needs a dark-mode inversion. */
-export function isMonochromeAgentIcon(name: string): boolean {
-  return FILE_TRAITS[AGENT_ICON_BY_NAME[name] ?? ""]?.mono === true;
+export interface AgentIconTraits {
+  /** Monochrome glyph that needs a dark-mode inversion. */
+  mono: boolean;
+  /** The contrasting ground the artwork must be painted on, if any. */
+  ground?: "dark" | "light";
 }
 
-/** The contrasting ground the agent's icon must be painted on, if any. */
-export function agentIconGround(name: string): "dark" | "light" | undefined {
-  return FILE_TRAITS[AGENT_ICON_BY_NAME[name] ?? ""]?.ground;
+/** The rendering traits of one icon file, as recorded by artwork inspection. */
+export function agentIconTraits(icon: string): AgentIconTraits {
+  const traits = FILE_TRAITS[icon];
+  return { mono: traits?.mono === true, ground: traits?.ground };
 }
