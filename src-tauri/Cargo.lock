@@ -10,9 +10,9 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "agents-skills"
-version = "0.24.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89a3958ae1634994e53d6d674b4610d58b3514d93f49cf0a44b2254d87c3faa1"
+checksum = "a66bcdaa820a9af2f3bd9703c3d948ea34e3d33ab00b480876803fdde8c7de12"
 dependencies = [
  "clap",
  "dirs 7.0.0",

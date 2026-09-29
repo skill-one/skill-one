@@ -2,7 +2,7 @@
 
 [English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
-本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.24 的
+本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.25 的
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
 门面，将技能安装与 agent 链接能力暴露给前端。前端经 `src/lib/skills-manager.ts`
 的 `invoke` 封装访问这些 Tauri 命令。
@@ -13,12 +13,12 @@
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.24"
+agents-skills = "0.25"
 ```
 
-## 0.15–0.24 的主要变化
+## 0.15–0.25 的主要变化
 
-本项目最初基于 0.14 编写，之后跨越了九个 breaking 版本。下表的变化均已在
+本项目最初基于 0.14 编写，之后跨越了十个 breaking 版本。下表的变化均已在
 `skills.rs` 中体现：
 
 | 版本 | 变化 | 对本项目的影响 |
@@ -33,6 +33,7 @@ agents-skills = "0.24"
 | 0.22 | 技能的身份永远是目录 basename——`SKILL.md` frontmatter 的 `name` 不再被读取或参与匹配；`owner/repo@<skill>` 在仓库树中按 basename（不区分大小写）匹配最浅的目录，只下载该目录；缺失或无法解析的 `SKILL.md` 不再致命 | 商店的 skill slug 原样放进 source；其余无需改动 |
 | 0.23 | 远程安装改为向 `codeload.github.com` 发起一次 tarball 请求（下载到本地后解包匹配）：不再走 GitHub REST API，也就没有匿名限流；同时移除 `GITHUB_TOKEN`、Git LFS 解析与缩写 SHA ref | 无需改代码——本项目使用的公开类型（`AddRequest`、`Manager`）未变，仅更新了描述下载机制的注释与文档 |
 | 0.24 | `owner/repo@<技能>` 未匹配到任何技能目录时，若仓库根目录存在 `SKILL.md`，会以仓库名静默安装整个仓库，而不再要求请求名等于仓库名；目录匹配仍然优先 | 无需改代码——公开类型未变；仅补充了描述该回退行为的注释与文档 |
+| 0.25 | agent 表的 `global` 字段重命名为 `skills_dir`，且该表改为取自上游 [`skill-one/agents-info`](https://github.com/skill-one/agents-info)；移除三个已消失的 agent（`jazz`、`loaf`、`promptscript`） | 无需改代码——应用从不读取 agent 表的字段，`AgentRequest` / `AgentStatus` 不受影响 |
 
 ### 更早的变化
 
