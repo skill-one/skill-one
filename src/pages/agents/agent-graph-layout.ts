@@ -83,10 +83,10 @@ export const NODE_LABEL_WIDTH = 88;
 export const NODE_LABEL_GAP = 8;
 /**
  * The shortest ribbon, between the hub rim and the innermost tile. Kept long
- * enough to read as a spoke, not a stub — the first node sits a full tile's
- * breath away from the disk.
+ * enough to read as a spoke, not a stub — the first node sits clear of the
+ * disk while a dense 20-plus roster still fits one screen.
  */
-export const RIBBON_MIN = 34;
+export const RIBBON_MIN = 28;
 /** Clearance kept between the outermost tile and the canvas edge. */
 export const OUTER_PAD = 14;
 
@@ -103,17 +103,17 @@ export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 /**
  * Phyllotaxis density: with `r = r0 + k·spacing·√index` the spacing unit is
  * the pill width, so neighbours along one ray still clear each other
- * (verified across up to 35 nodes).
+ * (verified across up to 40 nodes, including the squeezed ring).
  */
-const DENSITY_K = 0.62;
+const DENSITY_K = 0.55;
 /** Where the spiral starts — one tile above the hub (angle 0 points east). */
 const ANGLE_OFFSET = -Math.PI / 2;
 /**
  * How far the ring may squeeze into an ellipse to fit the measured box
- * before the layout shrinks the tiles instead. 0.6 keeps the swirl readable
- * while fitting ordinary rosters at full size with no canvas growth.
+ * before the layout shrinks the tiles instead. 0.55 keeps the swirl readable
+ * while fitting a 20-plus roster on a laptop window with no canvas growth.
  */
-const SQUEEZE_MIN = 0.6;
+const SQUEEZE_MIN = 0.55;
 
 /**
  * The five ribbon hues of the Skill One mark, in its top-to-bottom order.

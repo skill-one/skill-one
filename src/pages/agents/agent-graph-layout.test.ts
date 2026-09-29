@@ -178,6 +178,38 @@ describe("layoutAgents", () => {
     }
   });
 
+  it("fits a 20-plus roster on a laptop window with no canvas growth", () => {
+    const N = 23;
+    const layout = layoutAgents(roster(N), 1150, 620);
+    expect(layout.nodes).toHaveLength(N);
+    // No scrolling on a default-size window: the canvas stays measured.
+    expect(layout.width).toBe(1150);
+    expect(layout.height).toBe(620);
+    for (let i = 0; i < N; i += 1) {
+      for (let j = i + 1; j < N; j += 1) {
+        const a = layout.nodes[i];
+        const b = layout.nodes[j];
+        const overlapX =
+          Math.abs(a.x - b.x) < (a.width + b.width) / 2;
+        const overlapY =
+          Math.abs(a.y - b.y) < (a.height + b.height) / 2;
+        expect(overlapX && overlapY).toBe(false);
+      }
+    }
+    for (const node of layout.nodes) {
+      const cx = node.x + node.width / 2;
+      const cy = node.y + node.height / 2;
+      const dx = cx - layout.hub.x;
+      const dy = cy - layout.hub.y;
+      const dist = Math.hypot(dx, dy);
+      const ux = dx / dist;
+      const uy = dy / dist;
+      const support =
+        (node.width / 2) * Math.abs(ux) + (node.height / 2) * Math.abs(uy);
+      expect(dist - support).toBeGreaterThan(HUB_RADIUS + HUB_TIP_GAP);
+    }
+  });
+
   it("keeps every pill inside the canvas and clear of the hub disk", () => {
     const layout = layoutAgents(roster(20), 900, 700);
     for (const node of layout.nodes) {
