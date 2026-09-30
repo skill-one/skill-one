@@ -1,10 +1,10 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { renderWithRouter } from "../../test/test-utils";
 import type { AgentStatus } from "../../lib/skills-manager";
-import { resetMockAgentStatus } from "../../lib/mock-local";
+import { resetMockAgentStatus, setMockSkillEnabled } from "../../lib/mock-local";
 import { fetchAgentStatus, fetchInstalledSkills } from "../../lib/local-skills";
 import { AgentGraph, HOVER_MS } from "./agent-graph";
 
@@ -292,46 +292,77 @@ describe("AgentGraph", () => {
     expect(status.find((a) => a.name === "windsurf")?.linked).toBe(false);
   });
 
-  it("shows the hub dashboard with stats and routes, no hover needed", async () => {
+  it("shows the hub container with its jar of skills", async () => {
     renderWithRouter(<AgentGraph agents={agents} />);
     const skills = await fetchInstalledSkills();
 
-    // The dashboard card is always visible: title, total, enabled share. The
-    // value proposition lives in the page head, not here; agent counts are
-    // gone entirely — only attention still surfaces, when something needs it.
+    // The jar states its one figure in its own border line — the legend —
+    // and nothing else; the attention count rides the corner only when
+    // something needs it. The browse/manage routes are deliberately absent.
     const disk = await screen.findByTestId("agent-hub");
-    expect(disk).toHaveTextContent("SkillOne 共享中心");
-    expect(disk).toHaveTextContent(String(skills.length));
-    expect(disk).toHaveTextContent("6/6 已启用");
+    expect(disk).toHaveTextContent("6 个 skills");
     expect(disk).toHaveTextContent("1 个待处理");
-    expect(disk).not.toHaveTextContent("agents");
-    expect(disk).not.toHaveTextContent("安装一次");
+    expect(screen.queryByRole("link", { name: "商店" })).toBeNull();
 
-    // The two routes are always visible — no hover card involved.
-    expect(screen.getByRole("link", { name: "商店" })).toHaveAttribute(
-      "href",
-      "/explore",
-    );
-    expect(screen.getByRole("link", { name: "管理" })).toHaveAttribute(
-      "href",
-      "/installed",
-    );
+    // The jar holds every enabled skill as a mini card. Physics runs on
+    // transforms, so each card carries its own inline transform rather than
+    // a static pose class.
+    for (const { name } of skills) {
+      const card = disk.querySelector<HTMLElement>(`[data-skill="${name}"]`);
+      expect(card).not.toBeNull();
+      expect(card?.style.transform).toContain("translate(");
+    }
   });
 
-  it("does not enumerate skill names on the hub dashboard", async () => {
-    renderWithRouter(<AgentGraph agents={agents} />);
-    await screen.findByTestId("agent-hub");
-
-    // Stats only — individual skill names live on /installed.
+  it("jars only the enabled skills, and says when none are", async () => {
+    // One skill left enabled: it alone fills the jar, the parked ones stay
+    // out. The enabled-share badge keeps stating the facts.
     for (const name of [
-      "pdf",
       "docx",
       "pptx",
       "mcp-builder",
       "code-review",
       "frontend-design",
     ]) {
-      expect(screen.queryByText(name)).toBeNull();
+      setMockSkillEnabled(name, false);
     }
+    const first = renderWithRouter(<AgentGraph agents={agents} />);
+
+    // The persisted query cache may answer the first paint with the previous
+    // state; wait for the refetch to land — only pdf stays in the jar —
+    // before reading it.
+    const disk = await waitFor(() => {
+      // Both conditions together: a jar holding exactly pdf.
+      const el = screen.getByTestId("agent-hub");
+      expect(el.querySelector('[data-skill="pdf"]')).not.toBeNull();
+      expect(el.querySelector('[data-skill="docx"]')).toBeNull();
+      return el;
+    });
+    expect(disk.querySelector('[data-skill="pdf"]')).not.toBeNull();
+    for (const name of [
+      "docx",
+      "pptx",
+      "mcp-builder",
+      "code-review",
+      "frontend-design",
+    ]) {
+      expect(disk.querySelector(`[data-skill="${name}"]`)).toBeNull();
+    }
+
+    // Nothing enabled at all: the jar holds every installed skill rather
+    // than reading as broken — a fresh install is a full jar too. (The store
+    // mutation lands between mounts; the hub reads it on the next one.)
+    first.unmount();
+    setMockSkillEnabled("pdf", false);
+    renderWithRouter(<AgentGraph agents={agents} />);
+
+    await waitFor(() => {
+      expect(
+        document.querySelector('[data-testid="agent-hub"] [data-skill="docx"]'),
+      ).not.toBeNull();
+    });
+    expect(
+      document.querySelector('[data-testid="agent-hub"] [data-skill="pdf"]'),
+    ).not.toBeNull();
   });
 });

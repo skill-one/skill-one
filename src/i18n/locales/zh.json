@@ -144,6 +144,7 @@
       "enabled": "{{enabled}}/{{total}} 已启用",
       "tagline": "安装一次，全 agents 直接使用",
       "noneEnabled": "还没有启用的技能",
+      "overflowAria": "还有 {{count}} 个技能未在瓶中展示",
       "browseStore": "商店",
       "manage": "管理"
     }
