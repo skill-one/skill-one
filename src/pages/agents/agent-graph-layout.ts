@@ -80,15 +80,19 @@ export const NODE_GAP_MIN = 4;
 export const HUB_RADIUS = 48;
 export const HUB_TIP_GAP = 10;
 /**
- * Central clearance reserved for the hub dashboard card. Ribbons still
- * converge on `HUB_RADIUS` underneath the opaque card, but node placement
- * keeps pills outside the card's half-width plus a ribbon stub, so the
- * innermost agents are never covered by it.
+ * Central clearance reserved for the hub jar card. Node placement keeps pills
+ * outside the card's half-extents plus a ribbon stub, so the innermost agents
+ * are never covered by it — and the spokes' own tips land on the card's
+ * outline (see `layoutConstellation` and `layoutColumns`): the jar is
+ * translucent, so nothing is ever drawn inside it. The jar holds up to 50
+ * poured cards: it earns its room by being *wide* rather than tall — a wide,
+ * low jar packs the same cards while disturbing the ring's vertical clearance
+ * far less.
  */
-export const HUB_CARD_HALF = 120;
-export const HUB_CARD_HALF_COLUMNS = 100;
-/** Approximate half-height of the hub dashboard card plus a safety margin. */
-const HUB_CARD_HALF_H = 110;
+export const HUB_CARD_HALF = 200;
+export const HUB_CARD_HALF_COLUMNS = 190;
+/** Approximate half-height of the hub jar card plus a safety margin. */
+export const HUB_CARD_HALF_H = 105;
 const HUB_CARD_MARGIN = 12;
 
 /** Whether a constellation pill would slide under the opaque hub card. */
@@ -225,10 +229,26 @@ export function pillWidth(size: number): number {
   return size + NODE_LABEL_GAP + NODE_LABEL_WIDTH;
 }
 
+/**
+ * The ring's inner radius for a given pill width — the hole the hub sits in.
+ * Two floors, whichever is larger: the old hub disk (its rim, a tip gap, the
+ * pill's own half-width and the shortest readable spoke) and the jar's box
+ * (its half-diagonal plus that same pill allowance). The vessel is wider than
+ * the disk it replaced, so a ring sized for the disk alone would tuck its
+ * innermost pills under the glass — where the spokes, which stop at the jar's
+ * outline, would be left as stubs pressed against it.
+ */
+function innerRadius(pillW: number): number {
+  return Math.max(
+    HUB_RADIUS + HUB_TIP_GAP + pillW / 2 + RIBBON_MIN,
+    Math.hypot(HUB_CARD_HALF, HUB_CARD_HALF_H) + pillW / 2 + RIBBON_MIN,
+  );
+}
+
 /** Radius of the outermost tile's centre for a given roster and tile size. */
 function outerRadius(agentCount: number, size: number): number {
   const spacing = pillWidth(size) + gapFor(size);
-  const r0 = HUB_RADIUS + HUB_TIP_GAP + pillWidth(size) / 2 + RIBBON_MIN;
+  const r0 = innerRadius(pillWidth(size));
   const last = agentCount > 0 ? Math.sqrt(agentCount - 1) : 0;
   return r0 + DENSITY_K * spacing * last;
 }
@@ -346,8 +366,11 @@ function layoutColumns(
   const height = measuredH;
   const width = measuredW;
   const hub = { x: width / 2, y: height / 2, radius: HUB_RADIUS };
-  const tipLeft: Point = { x: hub.x - HUB_RADIUS - HUB_TIP_GAP, y: hub.y };
-  const tipRight: Point = { x: hub.x + HUB_RADIUS + HUB_TIP_GAP, y: hub.y };
+  // The S-curves stop at the jar's side walls, never at the hub disk under
+  // it: the vessel is translucent, so a tip inside it would show through the
+  // glass and read as a line crossing the jar rather than flowing into it.
+  const tipLeft: Point = { x: hub.x - HUB_CARD_HALF_COLUMNS, y: hub.y };
+  const tipRight: Point = { x: hub.x + HUB_CARD_HALF_COLUMNS, y: hub.y };
 
   const byName = new Map<string, NodeLayout>();
   columns.forEach((column, c) => {
@@ -437,7 +460,7 @@ function layoutConstellation(
   const hub = { x: width / 2, y: height / 2, radius: HUB_RADIUS };
 
   const spacing = pillW + gapFor(size);
-  const r0 = HUB_RADIUS + HUB_TIP_GAP + pillW / 2 + RIBBON_MIN;
+  const r0 = innerRadius(pillW);
 
   const placeNode = (
     agent: (typeof agents)[number],
@@ -474,17 +497,42 @@ function layoutConstellation(
   };
 
   // The dashboard card is opaque and wider than the old hub disk, so the
-  // innermost spiral nodes would slide underneath it. Nudge only those pills
-  // radially outward until clear — the outer ring and canvas size are
-  // untouched, so a 20-plus roster still fits one screen.
-  const nodes: NodeLayout[] = agents.map((agent, i) => {
-    let extra = 0;
-    let node = placeNode(agent, i, extra);
-    for (let step = 0; step < 40 && pillHitsCard(node, hub); step += 1) {
-      extra += 8;
-      node = placeNode(agent, i, extra);
+  // innermost spiral nodes would slide underneath it. Nudge those pills
+  // radially outward until clear — and, because a shove can land a pill on
+  // its neighbours, keep nudging until it clears the placed pills too. Each
+  // pill answers only to its own ray (earlier pills never move again), so
+  // the pass is deterministic; the outer ring and canvas size are untouched,
+  // so a 20-plus roster still fits one screen.
+  const pillsOverlap = (a: NodeLayout, b: NodeLayout): boolean =>
+    Math.abs(a.x - b.x) < (a.width + b.width) / 2 &&
+    Math.abs(a.y - b.y) < (a.height + b.height) / 2;
+  const inCanvas = (n: NodeLayout): boolean =>
+    n.x >= OUTER_PAD - 0.001 &&
+    n.y >= OUTER_PAD - 0.001 &&
+    n.x + n.width <= width - OUTER_PAD + 0.001 &&
+    n.y + n.height <= height - OUTER_PAD + 0.001;
+  const nodes: NodeLayout[] = [];
+  agents.forEach((agent, i) => {
+    // One walk outward along the pill's own ray, keeping the best candidate:
+    // fully clear (card, placed pills, canvas) wins; on a squeezed canvas
+    // where no such slot exists, the first spot that stays inside the canvas
+    // and off the card does — a pill grazing the opaque card's edge reads
+    // better than one outside the picture.
+    let ideal: NodeLayout | null = null;
+    let fallback: NodeLayout | null = null;
+    let last = placeNode(agent, i, 0);
+    for (let step = 0; step < 80; step += 1) {
+      const node = placeNode(agent, i, step * 8);
+      last = node;
+      if (!inCanvas(node)) break;
+      if (pillHitsCard(node, hub)) continue;
+      if (!nodes.some((other) => pillsOverlap(node, other))) {
+        ideal = node;
+        break;
+      }
+      fallback ??= node;
     }
-    return node;
+    nodes.push(ideal ?? fallback ?? last);
   });
 
   const ribbons: RibbonLayout[] = nodes.map((node, i) => {
@@ -492,10 +540,19 @@ function layoutConstellation(
     const dx = ex * Math.cos(angle);
     const dy = ey * Math.sin(angle);
     const dl = Math.hypot(dx, dy) || 1;
-    const tip = {
-      x: hub.x + (dx / dl) * (HUB_RADIUS + HUB_TIP_GAP),
-      y: hub.y + (dy / dl) * (HUB_RADIUS + HUB_TIP_GAP),
-    };
+    const ux = dx / dl;
+    const uy = dy / dl;
+    // The spoke stops where it meets the jar's outline — the point at which
+    // its own ray leaves the card's rect — never at the hub disk underneath.
+    // The vessel is translucent, so a tip under it would show through its
+    // glass and read as a line crossing the jar rather than flowing into it
+    // (and the placed pills are never nearer than the rect plus the layout's
+    // margin, so the spoke always has length to draw).
+    const reach = Math.min(
+      ux !== 0 ? HUB_CARD_HALF / Math.abs(ux) : Infinity,
+      uy !== 0 ? HUB_CARD_HALF_H / Math.abs(uy) : Infinity,
+    );
+    const tip = { x: hub.x + ux * reach, y: hub.y + uy * reach };
     return { name: node.name, d: swirlPath(node.anchor, tip) };
   });
 

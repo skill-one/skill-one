@@ -144,6 +144,7 @@
       "enabled": "{{enabled}}/{{total}} enabled",
       "tagline": "Install once, use in every agent",
       "noneEnabled": "No enabled skills yet",
+      "overflowAria": "{{count}} more skills not shown in the jar",
       "browseStore": "Store",
       "manage": "Manage"
     }

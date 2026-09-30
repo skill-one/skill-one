@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
 import { motion, useReducedMotion } from "motion/react";
-import { Loader2, SlidersHorizontal, Store } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { AgentStatus, InstalledSkill } from "../../lib/skills-manager";
@@ -9,9 +8,9 @@ import { agentLinkState } from "../../lib/agent-link-state";
 import { useAgentLinkToggle } from "../../hooks/use-agent-link-toggle";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { AgentIcon } from "../../components/agent-icon";
-import { buttonVariants } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { useAgentEdgeColor } from "../../hooks/use-agent-edge-color";
+import { JAR_CAPACITY, HubJar } from "./hub-jar";
 import {
   layoutAgents,
   resolveGraphWidth,
@@ -386,13 +385,22 @@ function Ribbon({
 }
 
 /**
- * The hub: a compact dashboard card pinned at the constellation's centre. The
+ * The hub: the container card pinned at the constellation's centre. The
  * geometry (hub.x/y) is unchanged so ribbons still converge underneath it —
- * the card is opaque and covers their tips. It always shows the figures that
- * matter (installed total, enabled share, attention only when something needs
- * it) plus the two routes, so no hover is needed. The one-line value
- * proposition lives in the page head above, not here. Per-skill names are
- * deliberately not listed here; management lives on /installed.
+ * the card is opaque and covers their tips.
+ *
+ * The hub is one abstract **jar** holding the enabled skills as tiny title
+ * cards, poured in by real physics (see `HubJar` — a matter-js run with
+ * seeded spawns, settling against the jar's floor and walls, then holding
+ * still). It is sized to hold fifty cards — a full roster, not a preview.
+ * With nothing enabled the jar holds every installed skill instead, so it
+ * never reads as broken on a fresh install; with nothing installed it says
+ * so. There is no card chrome around it and no prose on it: the one figure
+ * it states — how many skills it holds — sits **in the border line itself**,
+ * the way a fieldset's legend interrupts its own frame, and a roster past
+ * the jar's capacity states the remainder as a quiet `+n` chip riding the
+ * rim. The attention count rides the opposite corner when something needs
+ * it.
  */
 function HubDisk({
   hub,
@@ -416,8 +424,17 @@ function HubDisk({
   const attentionCount = agents.filter(
     (agent) => agentLinkState(agent) === "warning",
   ).length;
-  // The columns presentation keeps a narrow central lane, so the card renders
-  // slimmer there; widths stay in sync with the layout clearance constants.
+  // The jar's contents: the enabled skills, falling back to every installed
+  // one when nothing is enabled (a fresh install is an empty report, not an
+  // empty jar), up to the jar's own capacity — the physics jar is sized to
+  // hold exactly this many. Past the capacity the jar stays whole and the
+  // remainder is stated, never silently dropped.
+  const poured = enabled.length > 0 ? enabled : skills;
+  const jarred = poured.slice(0, JAR_CAPACITY);
+  const overflow = poured.length - jarred.length;
+  // The columns presentation keeps a narrower central lane, so the card
+  // renders slimmer there; widths stay in sync with the layout clearance
+  // constants.
   const width =
     mode === "columns" ? HUB_CARD_HALF_COLUMNS * 2 : HUB_CARD_HALF * 2;
 
@@ -434,64 +451,50 @@ function HubDisk({
       <div
         data-testid="agent-hub"
         aria-label={t("agents.hub.diskAria", { total, enabled: enabled.length })}
-        className="rounded-2xl border border-border bg-card px-4 py-3 text-center shadow-sm"
+        className="relative"
       >
-        <p className="text-[11px] font-medium text-muted-foreground">
-          {t("agents.hub.title")}
-        </p>
+        {/* The legend sits in the jar's own border line — a fieldset's
+            legend, not a caption above it: the one figure the jar states,
+            read as part of the frame rather than as prose on the page. */}
+        <span className="absolute left-3 top-0 z-10 -translate-y-1/2 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+          {t("agents.hub.installed", { total })}
+        </span>
+
+        {/* The jar: a field the cards rain into and settle at the bottom of.
+            It clips at the rim, so an over-capacity roster reads as a jar
+            filled to the neck, with the remainder stated by the `+n` chip on
+            the opposite corner from the attention chip. */}
         {loading ? (
-          <Loader2
-            className="mx-auto mt-2 size-5 animate-spin text-muted-foreground"
-            aria-hidden="true"
-          />
+          <div className="flex h-[190px] items-center justify-center rounded-xl border border-border/60 bg-muted/50">
+            <Loader2
+              className="size-5 animate-spin text-muted-foreground"
+              aria-hidden="true"
+            />
+          </div>
         ) : (
-          <>
-            <p className="mt-1 text-[30px] leading-none font-semibold text-foreground tabular-nums">
-              {total}
-            </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {t("agents.hub.installed", { total })}
-            </p>
-            <div className="mt-1.5 space-y-0.5 text-[12px] tabular-nums">
-              <p className="whitespace-nowrap text-muted-foreground">
-                {enabled.length === 0 ? (
-                  <span>{t("agents.hub.noneEnabled")}</span>
-                ) : (
-                  <span>{t("agents.hub.enabled", { enabled: enabled.length, total })}</span>
-                )}
+          <div className="relative h-[190px] overflow-hidden rounded-xl border border-border/60 bg-muted/50">
+            {jarred.length === 0 ? (
+              <p className="flex h-full items-center justify-center px-2 text-[11px] text-muted-foreground">
+                {t("agents.hub.noneEnabled")}
               </p>
-              {attentionCount > 0 && (
-                <p className="whitespace-nowrap text-amber-600 tabular-nums dark:text-amber-500">
-                  {t("agents.attention", { count: attentionCount })}
-                </p>
-              )}
-            </div>
-          </>
+            ) : (
+              <HubJar skills={jarred} className="h-full w-full" />
+            )}
+            {overflow > 0 && (
+              <p
+                title={t("agents.hub.overflowAria", { count: overflow })}
+                className="absolute left-2 top-2 rounded-full bg-background/80 px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground"
+              >
+                +{overflow}
+              </p>
+            )}
+            {attentionCount > 0 && (
+              <p className="absolute right-2 top-2 rounded-full bg-background/80 px-1.5 text-[10px] font-medium text-amber-600 tabular-nums dark:text-amber-500">
+                {t("agents.attention", { count: attentionCount })}
+              </p>
+            )}
+          </div>
         )}
-        <div className="mt-2.5 flex gap-2">
-          <Link
-            to="/explore"
-            className={buttonVariants({
-              variant: "outline",
-              size: "sm",
-              className: "flex-1",
-            })}
-          >
-            <Store />
-            {t("agents.hub.browseStore")}
-          </Link>
-          <Link
-            to="/installed"
-            className={buttonVariants({
-              variant: "outline",
-              size: "sm",
-              className: "flex-1",
-            })}
-          >
-            <SlidersHorizontal />
-            {t("agents.hub.manage")}
-          </Link>
-        </div>
       </div>
     </div>
   );

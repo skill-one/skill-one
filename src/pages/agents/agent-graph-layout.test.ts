@@ -6,6 +6,8 @@ import {
   DEFAULT_GRAPH_WIDTH,
   GOLDEN_ANGLE,
   HUB_CARD_HALF,
+  HUB_CARD_HALF_COLUMNS,
+  HUB_CARD_HALF_H,
   HUB_RADIUS,
   HUB_TIP_GAP,
   NODE_LABEL_GAP,
@@ -237,21 +239,31 @@ describe("layoutAgents", () => {
     }
   });
 
-  it("runs each ribbon from the pill's hub-facing edge to the hub rim", () => {
+  it("runs each ribbon from the pill's hub-facing edge to the jar's outline", () => {
     const layout = layoutAgents(roster(6), 900, 700, "constellation");
+    const { hub } = layout;
     for (const [i, ribbon] of layout.ribbons.entries()) {
       const node = layout.nodes[i];
       const nums = ribbon.d.match(/-?\d+(\.\d+)?/g)!.map(Number);
       // Starts exactly at the node anchor.
       expect(nums[0]).toBeCloseTo(node.anchor.x, 6);
       expect(nums[1]).toBeCloseTo(node.anchor.y, 6);
-      // Ends on the hub rim circle, on the node's own ray.
+      // Ends on the jar's outline — never inside it, where the translucent
+      // vessel would show the spoke through its glass: the tip's own ray
+      // leaves the card's rect exactly there.
       const tipX = nums[6];
       const tipY = nums[7];
-      expect(Math.hypot(tipX - layout.hub.x, tipY - layout.hub.y)).toBeCloseTo(
-        HUB_RADIUS + HUB_TIP_GAP,
-        6,
+      const dx = tipX - hub.x;
+      const dy = tipY - hub.y;
+      const onOutline = Math.max(
+        Math.abs(dx) / HUB_CARD_HALF,
+        Math.abs(dy) / HUB_CARD_HALF_H,
       );
+      expect(onOutline).toBeCloseTo(1, 6);
+      // On the node's own ray.
+      const rayX = node.x + node.width / 2 - hub.x;
+      const rayY = node.y + node.height / 2 - hub.y;
+      expect(dx * rayY - dy * rayX).toBeCloseTo(0, 3);
     }
   });
 
@@ -308,8 +320,8 @@ describe("layoutAgents", () => {
       const overlaps =
         node.x < layout.hub.x + HUB_CARD_HALF &&
         node.x + node.width > layout.hub.x - HUB_CARD_HALF &&
-        node.y < layout.hub.y + HUB_CARD_HALF &&
-        node.y + node.height > layout.hub.y - HUB_CARD_HALF;
+        node.y < layout.hub.y + HUB_CARD_HALF_H &&
+        node.y + node.height > layout.hub.y - HUB_CARD_HALF_H;
       expect(overlaps).toBe(false);
     }
   });
@@ -324,14 +336,15 @@ describe("layoutAgents", () => {
 
   it("keeps every pill clear of the hub dashboard card", () => {
     // The regression from the dashboard card: the innermost spiral node used
-    // to slide underneath the opaque 240-wide card.
+    // to slide underneath the opaque card. The clearance is the card's real
+    // rectangle, not a square blown up to its width.
     const layout = layoutAgents(roster(22), 1400, 1100, "constellation");
     for (const node of layout.nodes) {
       const overlaps =
         node.x < layout.hub.x + HUB_CARD_HALF &&
         node.x + node.width > layout.hub.x - HUB_CARD_HALF &&
-        node.y < layout.hub.y + HUB_CARD_HALF &&
-        node.y + node.height > layout.hub.y - HUB_CARD_HALF;
+        node.y < layout.hub.y + HUB_CARD_HALF_H &&
+        node.y + node.height > layout.hub.y - HUB_CARD_HALF_H;
       expect(overlaps).toBe(false);
     }
   });
@@ -368,17 +381,18 @@ describe("layoutAgents columns mode", () => {
     }
   });
 
-  it("ends every ribbon at the horizontal hub tip on its own side", () => {
+  it("ends every ribbon at the jar's side wall on its own side", () => {
     const layout = layoutAgents(
       [agent("a"), agent("b"), agent("c"), agent("d")],
       1200,
       600,
       "columns",
     );
+    // The walls of the translucent jar, not the hub disk hidden under it.
     const tipX = (side: string) =>
       side === "left"
-        ? layout.hub.x - HUB_RADIUS - HUB_TIP_GAP
-        : layout.hub.x + HUB_RADIUS + HUB_TIP_GAP;
+        ? layout.hub.x - HUB_CARD_HALF_COLUMNS
+        : layout.hub.x + HUB_CARD_HALF_COLUMNS;
     for (const [i, node] of layout.nodes.entries()) {
       const nums = layout.ribbons[i].d
         .match(/-?\d+(\.\d+)?/g)!
