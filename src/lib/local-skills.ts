@@ -167,19 +167,13 @@ export class SkillAlreadyInstalledError extends Error {
  * `SkillAlreadyInstalledError` — the existing skill is never re-labelled. In
  * the browser this records the install in the mock store instead.
  *
- * `options.rev` is the store entry's content hash at install time (from the
- * registry index). It is recorded in the provenance ledger as the version
- * marker a future update check compares against the latest rev — rev changed
- * means the store published a new version. The hash is deliberately NOT
- * computed from the freshly installed directory: the clone tracks repo HEAD,
- * which can be ahead of the indexed snapshot, so a computed value would
- * permanently disagree with the rev and poison the update signal. Computing
- * is reserved for the hash auto-link tier, where there is no rev to read.
+ * `recordSkillProvenance` writes the install into the provenance ledger
+ * after the copy lands — the only store↔install association that survives
+ * (agents-skills keeps no install metadata).
  */
 export async function installSkillFromSource(
   repo: string,
   name: string,
-  options: { rev?: string } = {},
 ): Promise<void> {
   if (isTauri()) {
     // The source is the id `owner/repo/slug` (the store's skill name is the
@@ -195,9 +189,6 @@ export async function installSkillFromSource(
     await new Promise((resolve) => setTimeout(resolve, MOCK_INSTALL_DELAY_MS));
     if (installMockSkill(name)) throw new SkillAlreadyInstalledError(name);
   }
-  // Record the install source in the app's provenance ledger — the only
-  // store↔install association that survives (agents-skills keeps no install
-  // metadata). Best-effort: it never fails the install itself.
   await logActivity({
     event: "skill.install",
     actor: "user",
@@ -205,7 +196,7 @@ export async function installSkillFromSource(
     names: [name],
     detail: { repo, skipped: false },
   });
-  await recordSkillProvenance(repo, name, options.rev, "install");
+  await recordSkillProvenance(repo, name);
 }
 
 /** Remove an installed skill from the global skills directory. */

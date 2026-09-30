@@ -47,7 +47,7 @@ vi.mock("./provenance", () => ({
   saveResolutionRecords,
 }));
 
-/** A namesake entry; `rev` doubles as the hash-matching handle. */
+/** A namesake entry, as the registry serves it (no per-skill hash anymore). */
 function namesake(repo: string, overrides: Partial<Skill> = {}): Skill {
   const name = overrides.name ?? "pdf";
   return {
@@ -142,7 +142,7 @@ describe("resolveAssociations", () => {
   it("auto-links a near-identical description at/above the threshold", async () => {
     // Hash tier misses, but the wording matches the namesake 100% — close
     // enough to be the same skill, so it links without a prompt.
-    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+    mockReady([namesake("anthropics/skills")]);
     analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
 
     const { linked, suggestions } = await resolveAssociations([
@@ -159,7 +159,7 @@ describe("resolveAssociations", () => {
 
   it("auto-links by similarity even outside Tauri (no real files needed)", async () => {
     isTauri.mockReturnValue(false);
-    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+    mockReady([namesake("anthropics/skills")]);
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and manipulate PDF files." },
@@ -177,7 +177,7 @@ describe("resolveAssociations", () => {
       descriptionSimilarity("Read and convert PDF files.", namesake("a").description),
     ).toBeLessThan(SIMILARITY_AUTO_LINK_THRESHOLD);
 
-    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+    mockReady([namesake("anthropics/skills")]);
     analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
 
     const { linked, suggestions } = await resolveAssociations([
@@ -188,10 +188,12 @@ describe("resolveAssociations", () => {
     expect(suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
   });
 
-  it("auto-links a hash-identical namesake via one batched ledger write", async () => {
+  it("links a matching description regardless of the local hash (the registry publishes none)", async () => {
+    // The registry no longer carries per-skill hashes, so the local hash
+    // matches nothing — the description tier is the only auto-link.
     mockReady([
-      namesake("anthropics/skills", { rev: "hash-a" }),
-      namesake("fork/skills", { rev: "hash-fork" }),
+      namesake("anthropics/skills"),
+      namesake("fork/skills"),
     ]);
     analyzeSkill.mockResolvedValue({ hash: "hash-fork", fingerprint: null });
 
@@ -201,14 +203,13 @@ describe("resolveAssociations", () => {
 
     expect(linked).toEqual(["pdf"]);
     expect(suggestions).toEqual({});
-    // The matched hash is stored as the installed version marker.
     expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
-      { repo: "fork/skills", name: "pdf", hash: "hash-fork", reason: "hash" },
+      { repo: "anthropics/skills", name: "pdf", reason: "description" },
     ]);
   });
 
-  it("offers ranked suggestions when the hash tier misses", async () => {
-    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+  it("offers ranked suggestions when the description misses", async () => {
+    mockReady([namesake("anthropics/skills")]);
     analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
 
     const { linked, suggestions } = await resolveAssociations([
@@ -225,8 +226,8 @@ describe("resolveAssociations", () => {
     );
   });
 
-  it("memoizes hash misses for the session but keeps suggesting", async () => {
-    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+  it("memoizes description misses for the session but keeps suggesting", async () => {
+    mockReady([namesake("anthropics/skills")]);
     analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
 
     const first = await resolveAssociations([
@@ -243,7 +244,7 @@ describe("resolveAssociations", () => {
   });
 
   it("reuses the stored outcome across a restart while snapshot and content are unchanged", async () => {
-    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+    mockReady([namesake("anthropics/skills")]);
     const fingerprint = { mtimeMs: 1000, size: 200 };
     const stored: ResolutionRecord = {
       name: "pdf",
@@ -262,7 +263,6 @@ describe("resolveAssociations", () => {
         stars: 10,
         downloads: 10,
         description: "Read and manipulate PDF files.",
-        rev: "hash-a",
       },
     ];
     loadResolutionRecords.mockResolvedValue({ pdf: stored });
@@ -282,7 +282,7 @@ describe("resolveAssociations", () => {
   });
 
   it("re-hashes when the stored fingerprint no longer matches the disk", async () => {
-    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+    mockReady([namesake("anthropics/skills")]);
     loadResolutionRecords.mockResolvedValue({
       pdf: {
         name: "pdf",
@@ -308,12 +308,12 @@ describe("resolveAssociations", () => {
     const { linked } = await resolveAssociations([{ name: "pdf" }]);
 
     expect(analyzeSkill).toHaveBeenCalledTimes(1);
-    expect(linked).toEqual(["pdf"]);
+    expect(linked).toEqual([]);
   });
 
   it("reuses the stored hash against a new snapshot without re-hashing", async () => {
     // First session: the hash missed.
-    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+    mockReady([namesake("anthropics/skills")]);
     analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: { mtimeMs: 1, size: 2 } });
     await resolveAssociations([{ name: "pdf", description: "Read and convert PDF files." }]);
     expect(analyzeSkill).toHaveBeenCalledTimes(1);
@@ -363,7 +363,7 @@ describe("resolveAssociations", () => {
   });
 
   it("treats an unavailable analysis as a miss, not an error", async () => {
-    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+    mockReady([namesake("anthropics/skills")]);
     // `analyzeSkill` reports failure as null (it owns the catch).
     analyzeSkill.mockResolvedValue(null);
 
@@ -378,7 +378,7 @@ describe("resolveAssociations", () => {
   });
 
   it("re-checks missed names once the registry epoch moves", async () => {
-    mockReady([namesake("a/skills", { rev: "hash-a" })]);
+    mockReady([namesake("a/skills")]);
     // The local copy hashes to something the current snapshot does not carry.
     analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
     await resolveAssociations([{ name: "pdf" }]);
@@ -390,13 +390,13 @@ describe("resolveAssociations", () => {
     noteRegistryEpoch(2);
     analyzeSkill.mockResolvedValue({ hash: "hash-a", fingerprint: null });
     const { linked } = await resolveAssociations([{ name: "pdf" }]);
-    expect(linked).toEqual(["pdf"]);
+    expect(linked).toEqual([]);
     expect(analyzeSkill).toHaveBeenCalledTimes(2);
   });
 
   it("runs no hash tier outside Tauri (the mock has no real files)", async () => {
     isTauri.mockReturnValue(false);
-    mockReady([namesake("anthropics/skills", { rev: "hash-a" })]);
+    mockReady([namesake("anthropics/skills")]);
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and convert PDF files." },

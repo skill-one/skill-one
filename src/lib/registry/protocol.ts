@@ -90,13 +90,14 @@ export type IndexOrigin =
 /** Published metadata describing the dataset currently served by the worker. */
 export interface IndexInfo {
   /**
-   * The `dist-<date>[-N]` tag the served snapshot was fetched at; absent when
-   * the probe could not derive one and the mutable branch was used.
+   * The `dist` branch head's commit SHA the served snapshot was fetched at;
+   * absent when the probe could not resolve one and the mutable branch was
+   * used.
    */
-  tag?: string;
-  /** The producing run's `finishedAt` (UTC). */
+  ref?: string;
+  /** The head commit's date (UTC) — the snapshot's publication time. */
   generatedAt?: string;
-  /** Published row count (`indexedRows`), before any consumer-side filtering. */
+  /** Row count served, before any consumer-side filtering. */
   total?: number;
   /** Origin of the served dataset for this run. */
   origin: IndexOrigin;
@@ -111,7 +112,7 @@ export interface IndexInfo {
 
 /** How a cheap freshness check ended. */
 export type RevalidateStatus =
-  /** A newer index and/or profiles snapshot landed; the store serves it now. */
+  /** A newer snapshot landed; the store serves it now. */
   | "updated"
   /** The served snapshot is still the published one — nothing changed. */
   | "current"

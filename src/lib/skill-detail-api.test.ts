@@ -6,7 +6,7 @@ import {
   parseFrontmatter,
   zhSkillPath,
 } from "./skill-detail-api";
-import { setIndexTag } from "./cdn-config";
+import { setIndexRef } from "./cdn-config";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -23,7 +23,7 @@ function notFound() {
 
 afterEach(() => {
   fetchMock.mockReset();
-  setIndexTag("");
+  setIndexRef("");
 });
 
 describe("parseFrontmatter", () => {
@@ -159,7 +159,7 @@ describe("fetchSkillDetail", () => {
   });
 
   it("pins the fetch to the recorded snapshot tag instead of the dist branch", async () => {
-    setIndexTag("dist-2026-09-06");
+    setIndexRef("a1b2c3d4e5f6a7b8c9d0");
     fetchMock.mockImplementation(async (url: string) =>
       String(url).endsWith("skills/pdf/SKILL.md")
         ? ok("---\nname: pdf\n---\n\nBody")
@@ -171,7 +171,7 @@ describe("fetchSkillDetail", () => {
     // The recorded tag is the snapshot the served index was built from, so
     // the SKILL.md body must come from exactly that snapshot.
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/skill-one/skills-profiles/dist-2026-09-06/skills/pdf/SKILL.md",
+      "https://raw.githubusercontent.com/skill-one/skills-profiles/a1b2c3d4e5f6a7b8c9d0/skills/pdf/SKILL.md",
       { signal: expect.anything() },
     );
   });
@@ -219,13 +219,13 @@ describe("fetchSkillDetail", () => {
 describe("zhSkillPath", () => {
   it("maps the index directory to the snapshot's Chinese page path", () => {
     expect(zhSkillPath("skills/vercel-labs/skills/find-skills")).toBe(
-      "profiles/vercel-labs/skills/find-skills/skill_zh.md",
+      "skills/vercel-labs/skills/find-skills/SKILL.zh.md",
     );
   });
 
   it("tolerates a trailing slash on the index directory", () => {
     expect(zhSkillPath("skills/vercel-labs/skills/find-skills/")).toBe(
-      "profiles/vercel-labs/skills/find-skills/skill_zh.md",
+      "skills/vercel-labs/skills/find-skills/SKILL.zh.md",
     );
   });
 
@@ -236,9 +236,9 @@ describe("zhSkillPath", () => {
 });
 
 describe("fetchSkillZhDetail", () => {
-  it("fetches the Chinese page from the profiles directory of the snapshot", async () => {
+  it("fetches the Chinese page from the skill directory of the snapshot", async () => {
     fetchMock.mockImplementation(async (url: string) =>
-      String(url).endsWith("profiles/vercel-labs/skills/find-skills/skill_zh.md")
+      String(url).endsWith("skills/vercel-labs/skills/find-skills/SKILL.zh.md")
         ? ok("# 查找技能\n\n中文正文。")
         : notFound(),
     );
@@ -256,24 +256,24 @@ describe("fetchSkillZhDetail", () => {
       license: undefined,
       author: undefined,
       instructions: "# 查找技能\n\n中文正文。",
-      path: "profiles/vercel-labs/skills/find-skills/skill_zh.md",
+      path: "skills/vercel-labs/skills/find-skills/SKILL.zh.md",
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/profiles/vercel-labs/skills/find-skills/skill_zh.md",
+      "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills/vercel-labs/skills/find-skills/SKILL.zh.md",
       { signal: expect.anything() },
     );
   });
 
   it("pins the fetch to the recorded snapshot tag", async () => {
-    setIndexTag("dist-2026-09-25-9");
+    setIndexRef("b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0a1");
     fetchMock.mockImplementation(async (url: string) =>
-      String(url).endsWith("profiles/a/b/c/skill_zh.md") ? ok("正文") : notFound(),
+      String(url).endsWith("skills/a/b/c/SKILL.zh.md") ? ok("正文") : notFound(),
     );
 
     await fetchSkillZhDetail("a/b", "c", "skills/a/b/c");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/skill-one/skills-profiles/dist-2026-09-25-9/profiles/a/b/c/skill_zh.md",
+      "https://raw.githubusercontent.com/skill-one/skills-profiles/b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0a1/skills/a/b/c/SKILL.zh.md",
       { signal: expect.anything() },
     );
   });

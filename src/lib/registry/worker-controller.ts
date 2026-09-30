@@ -14,7 +14,7 @@ import type {
   SearchHit,
 } from "./protocol";
 import type { RegistryCache } from "./cache";
-import type { PublishedIndex } from "./index-stream";
+import type { SnapshotHead } from "./snapshot";
 import { byRepoRank } from "./repo-rank";
 
 /**
@@ -59,12 +59,12 @@ const taxonomyIndex = (key: string): number =>
 
 export interface ControllerDeps {
   /**
-   * Read the published snapshot stats: the freshness oracle that decides
+   * Read the published snapshot identity: the freshness oracle that decides
    * whether the body needs downloading at all. Null when no source answered.
    */
-  probeMeta(cdnBase: string): Promise<PublishedIndex | null>;
+  probeMeta(cdnBase: string): Promise<SnapshotHead | null>;
   /**
-   * Stream the JSONL index, handing every parsed skill to `onLine`. `tag`
+   * Stream the JSONL catalog, handing every parsed skill to `onLine`. `ref`
    * pins the download to an immutable snapshot; undefined falls back to the
    * mutable branch ref. `onRestart` is called at the start of each candidate
    * attempt so the controller can drop its partial buffer (a failed mid-stream
@@ -72,7 +72,7 @@ export interface ControllerDeps {
    */
   readIndex(
     cdnBase: string,
-    tag: string | undefined,
+    ref: string | undefined,
     stars: Promise<Map<string, number> | null>,
     onLine: (skill: Skill) => void,
     onRestart: () => void,
@@ -80,13 +80,13 @@ export interface ControllerDeps {
   /**
    * Fetch the repos.jsonl sidecar (GitHub stars, keyed by `{owner}/{repo}`)
    * whose rows join into the parsed skill rows. Called with the resolved
-   * snapshot tag so the join table comes from the same snapshot as the
-   * index. Null when unavailable — a garnish, never a download failure
+   * snapshot ref so the join table comes from the same snapshot as the
+   * catalog. Null when unavailable — a garnish, never a download failure
    * (unjoined skills simply carry 0 stars).
    */
   readRepos(
     cdnBase: string,
-    tag?: string,
+    ref?: string,
   ): Promise<Map<string, number> | null>;
   /** Cold-start cache; every method may silently no-op. */
   cache: RegistryCache;
@@ -112,11 +112,11 @@ export function createRegistryController(
   // Bumped on every init/reload; responses from a superseded download are
   // dropped instead of clobbering newer data.
   let generation = 0;
-  // The producing run (`finishedAt`) the served `store` was built from. A
-  // probed run equal to this one means equal bytes, so the download is
-  // skipped; undefined until a download records one (a cold-start cache
-  // written before run addressing counts as unknown, so it always
-  // re-downloads once).
+  // The published snapshot (`generatedAt` — the head commit's date) the
+  // served `store` was built from. A probed head equal to this one means
+  // equal bytes, so the download is skipped; undefined until a download
+  // records one (a cold-start cache written before run addressing counts as
+  // unknown, so it always re-downloads once).
   let servedGeneratedAt: string | undefined;
   // Last announced snapshot identity, kept for `stats()` and for tests.
   let indexInfo: IndexInfo | null = null;
@@ -193,42 +193,41 @@ export function createRegistryController(
 
   /**
    * Bring the served dataset up to date. The published snapshot is probed
-   * first (its tag listed, then the ~300 B stats read pinned to that tag);
-   * only a differing run downloads the body, which is then streamed into a
-   * fresh buffer while any data already being served (cold-start cache,
-   * previous source) stays visible and queryable — a revalidation never
-   * blanks the UI.
+   * first (the `dist` branch head's SHA and commit date); only a differing
+   * snapshot downloads the body, which is then streamed into a fresh buffer
+   * while any data already being served (cold-start cache, previous source)
+   * stays visible and queryable — a revalidation never blanks the UI.
    *
    * `force` skips the "unchanged" short-circuit: a source switch or a user
-   * retry must re-download even when the published run has not moved.
+   * retry must re-download even when the published snapshot has not moved.
    *
-   * `probed` lets a caller that already read the published stats hand the
+   * `probed` lets a caller that already read the published head hand the
    * answer in, so the freshness probe is never paid for twice (the check
    * behind `revalidate`). Omit it to probe here, as boot and reload do.
    */
   const download = async (
     gen: number,
     force = false,
-    probed?: PublishedIndex | null,
+    probed?: SnapshotHead | null,
   ) => {
     // Null means no source answered: nothing to pin, nothing to compare.
     const published =
       probed !== undefined ? probed : await deps.probeMeta(cdnBase);
     if (gen !== generation) return;
-    const tag = published?.tag;
-    const identity = { tag, generatedAt: published?.generatedAt };
-    const total = published?.total;
+    const ref = published?.ref;
+    const identity = { ref, generatedAt: published?.generatedAt };
 
     if (
       !force &&
       published?.generatedAt !== undefined &&
       published.generatedAt === servedGeneratedAt
     ) {
-      // The published run is the one already served, so the body is byte
-      // -identical: keep serving the cache and skip the download entirely.
+      // The published snapshot is the one already served, so the body is
+      // byte-identical: keep serving the cache and skip the download
+      // entirely.
       emitIndex({
         ...identity,
-        total,
+        total: store.length,
         origin: "unchanged",
         checkedAt: deps.now(),
       });
@@ -244,7 +243,7 @@ export function createRegistryController(
     // A failed join is also never persisted (see the landing point below) —
     // an unchanged snapshot never re-runs the join, so stars-less skills
     // would otherwise be cached for a full day.
-    const stars = deps.readRepos(cdnBase, tag).catch(() => null);
+    const stars = deps.readRepos(cdnBase, ref).catch(() => null);
     if (!revalidating) {
       // Queries read the buffer as it fills (progressive page one); the
       // count-0 reset itself needs no event — the main-thread client boots
@@ -257,7 +256,7 @@ export function createRegistryController(
     try {
       await deps.readIndex(
         cdnBase,
-        tag,
+        ref,
         stars,
         (skill) => {
           buffer.push(skill);
@@ -314,7 +313,7 @@ export function createRegistryController(
     if (starsJoined) void deps.cache.save(store, identity);
     emitIndex({
       ...identity,
-      total,
+      total: buffer.length,
       origin: "updated",
       checkedAt: deps.now(),
     });
@@ -405,11 +404,11 @@ export function createRegistryController(
 
   /**
    * The one domain a repository is filed under by the domain filter: the
-   * domain its skills *lead* with most often (their `domain[0]`, the dataset's
-   * best fit), ties broken by the installs those leading skills carry and then
-   * by the taxonomy's own order. A repository with no classified skill at all
-   * is filed as unclassified rather than as 其他: the two are different claims,
-   * and the chip bar states them apart (see `data/domains`).
+   * domain its skills carry most often (each row's `domain[0]`), ties broken
+   * by the installs those skills carry and then by the taxonomy's own order.
+   * A repository with no classified skill at all is filed as unclassified
+   * rather than as 其他: the two are different claims, and the chip bar
+   * states them apart (see `data/domains`).
    */
   const primaryDomain = (skills: SearchHit[]): string => {
     const votes = new Map<string, { count: number; downloads: number }>();
@@ -530,7 +529,7 @@ export function createRegistryController(
           buildIndex();
           // What is on screen until the probe below answers.
           emitIndex({
-            tag: cached.tag,
+            ref: cached.ref,
             generatedAt: cached.generatedAt,
             total: cached.skills.length,
             origin: "cache",
@@ -565,34 +564,29 @@ export function createRegistryController(
     async revalidate({ id }: { id: number }) {
       const gen = generation;
       const published = await deps.probeMeta(cdnBase).catch(() => null);
-      // The stamp is the snapshot's freshness identity. A superseded run, an
-      // unreachable probe, and a partial probe (tag resolved but stats
-      // unreadable) all leave it unknown: nothing can be compared, so nothing
-      // is downloaded and the check stays undated — the caller retries on its
-      // next tick.
-      if (
-        gen !== generation ||
-        published === null ||
-        published.generatedAt === undefined
-      ) {
+      // The head commit's date is the snapshot's freshness identity. A
+      // superseded run and an unreachable probe both leave it unknown:
+      // nothing can be compared, so nothing is downloaded and the check
+      // stays undated — the caller retries on its next tick.
+      if (gen !== generation || published === null) {
         post({ type: "result", id, ok: true, data: { status: "unknown" } });
         return;
       }
       let status: RevalidateStatus;
       if (published.generatedAt === servedGeneratedAt) {
-        // The published run is the one already being served. The identity is
-        // re-announced, which is what dates the check.
+        // The published snapshot is the one already being served. The
+        // identity is re-announced, which is what dates the check.
         emitIndex({
-          tag: published.tag,
+          ref: published.ref,
           generatedAt: published.generatedAt,
-          total: published.total,
+          total: store.length,
           origin: "unchanged",
           checkedAt: deps.now(),
         });
         status = "current";
       } else {
-        // A newer run is published: the ordinary non-blanking download path,
-        // pinned to the tag the probe just resolved.
+        // A newer snapshot is published: the ordinary non-blanking download
+        // path, pinned to the SHA the probe just resolved.
         await download(gen, false, published);
         // A failed body download keeps the previous snapshot, so the check
         // learned something it could not act on.

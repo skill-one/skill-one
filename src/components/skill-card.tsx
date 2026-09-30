@@ -115,8 +115,8 @@ export function SkillCard({
   // a bare-host source is its own owner.
   const [owner] = skill.repo.split("/");
   // Classification and figure are both registry facts; the dataset simply has
-  // not classified every skill, so the classification is optional. A skill may
-  // belong to several domains — the badge leads with the best-fitting one.
+  // not classified every skill, so the classification is optional (the model
+  // keeps the upstream key as a one-element list).
   const domain = skill.profile?.domain;
   const locale = useAppLocale();
   const { t } = useTranslation();

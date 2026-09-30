@@ -8,7 +8,6 @@ import {
   fetchSkillDetail,
   fetchSkillZhDetail,
 } from "../../lib/skill-detail-api";
-import { formatDate } from "../../lib/utils";
 import {
   fetchInstalledSkills,
   fetchLocalSkillDetail,
@@ -110,23 +109,6 @@ const localSkill: SkillView = {
   storeBacked: false,
 };
 
-/** A registry entry that carries its version identity (the indexed majority). */
-const versionedSkill: SkillView = {
-  ...skill,
-  rev: "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
-  firstSeenAt: "2026-08-12T04:34:54Z",
-};
-
-/**
- * How the panel renders `versionedSkill.firstSeenAt`: through the same
- * `formatDate` call the panel makes, in the locale the suite pins the UI to
- * (zh — see `src/test/setup.ts`). Deriving the expectation from the host's
- * default locale instead (a bare `toLocaleDateString`) breaks wherever the
- * host does not run in Chinese, which is exactly the mismatch the suite's
- * language pin exists to remove; sharing the pipeline also keeps both sides
- * on the same time zone, so the assertion cannot flip on one alone.
- */
-const SEEN_AT_LOCALE = formatDate("2026-08-12T04:34:54Z", "zh") ?? "";
 
 const detail = {
   description: "Read and merge PDF documents.",
@@ -280,20 +262,17 @@ describe("SkillDetailPanel", () => {
     );
   });
 
-  it("shows the registry version fingerprint and when that version was recorded", async () => {
+  it("shows the mirror path in the 源 tip", async () => {
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderDrawer({ skill: versionedSkill });
+    renderDrawer({ skill });
 
     await screen.findByText("Use this skill for PDFs.");
-    // All provenance is collapsed into the 源 tip: hover reveals the full
-    // hash, the first-seen date and the exact SKILL.md path.
+    // All provenance is collapsed into the 源 tip: hover reveals the exact
+    // SKILL.md path.
     // Focus path, as above: hover-open inside the modal drawer is flaky
     // under jsdom.
     screen.getByRole("link", { name: "源" }).focus();
     const tip = await screen.findByRole("tooltip");
-    expect(within(tip).getByText(versionedSkill.rev!)).toBeInTheDocument();
-    tip.blur();
-    expect(tip).toHaveTextContent(SEEN_AT_LOCALE);
     expect(within(tip).getByText(detail.path)).toBeInTheDocument();
   });
 
@@ -854,65 +833,18 @@ describe("SkillDetailPanel installed translation", () => {
     expect(screen.getByText("SKILL.md")).toBeInTheDocument();
   });
 
-  it("warns that a stale translation does not follow the original's updates", async () => {
+  it("opens no caveat tooltip on the 原文 toggle", async () => {
+    // The registry no longer publishes per-skill versions, so there is no
+    // freshness to warn about — the toggle carries its plain label only.
     mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
     renderDrawer({
-      skill: { ...installedBacked, translationFreshness: "stale" },
+      skill: installedBacked,
       surface: "installed",
     });
 
     const toggle = await screen.findByRole("button", { name: "原文" });
-    expect(
-      toggle.querySelector('[data-slot="translation-warning"]'),
-    ).toBeInTheDocument();
-    // Focus (the a11y path) instead of hover: hover-open inside the modal
-    // drawer is unreliable under jsdom.
     toggle.focus();
-    const tip = await screen.findByRole("tooltip");
-    expect(tip).toHaveTextContent("原文此后已有更新");
-  });
-
-  it("falls back to the reference-only caveat when freshness is unverifiable", async () => {
-    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
-    renderDrawer({
-      skill: { ...installedBacked, translationFreshness: "unknown" },
-      surface: "installed",
-    });
-
-    const toggle = await screen.findByRole("button", { name: "原文" });
-    expect(
-      toggle.querySelector('[data-slot="translation-warning"]'),
-    ).toBeInTheDocument();
-    toggle.focus();
-    const tip = await screen.findByRole("tooltip");
-    expect(tip).toHaveTextContent("译文仅供参考");
-  });
-
-  it("shows no warning when the translation matches the installed version", async () => {
-    mockFetchSkillZhDetail.mockResolvedValue(zhDetail);
-    renderDrawer({
-      skill: { ...installedBacked, translationFreshness: "fresh" },
-      surface: "installed",
-    });
-
-    const toggle = await screen.findByRole("button", { name: "原文" });
-    expect(
-      toggle.querySelector('[data-slot="translation-warning"]'),
-    ).not.toBeInTheDocument();
-    toggle.focus();
-    // A fresh match needs no caveat, so no tooltip opens on the toggle.
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-  });
-
-  it("never warns on the store surface, whose translation is the indexed content", async () => {
-    renderDrawer({
-      skill: { ...skill, descriptionZh: "读取并合并 PDF 文档。", translationFreshness: "stale" },
-    });
-
-    const toggle = await screen.findByRole("button", { name: "原文" });
-    expect(
-      toggle.querySelector('[data-slot="translation-warning"]'),
-    ).not.toBeInTheDocument();
   });
 });
 

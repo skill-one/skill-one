@@ -248,11 +248,12 @@ export function domainIcon(domain?: readonly string[]): LucideIcon {
 
 /**
  * The hover text for a skill's classification: the leading domain's scope
- * description — or its label, for a key outside the taxonomy — plus the other
- * domains the skill belongs to. The glyph the tip hangs off already names the
- * domain, so the text carries no duplicated mark. `domain` is best fit first;
- * empty (a skill nothing classified) reads as Unclassified, and so does an
- * unknown key, which is the same state one upstream rename later.
+ * description — or its label, for a key outside the taxonomy. Upstream
+ * answers one domain per skill, so the list holds a single key in practice;
+ * the glyph the tip hangs off already names the domain, so the text carries
+ * no duplicated mark. Empty (a skill nothing classified) reads as
+ * Unclassified, and so does an unknown key, which is the same state one
+ * upstream rename later.
  */
 export function domainTooltip(
   domain: readonly string[],

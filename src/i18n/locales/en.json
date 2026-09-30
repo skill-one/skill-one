@@ -200,8 +200,6 @@
     "localFile": "Local file",
     "provenanceTitle": "View version and source info",
     "provenanceTitleLocal": "View source info",
-    "versionLabel": "Version ",
-    "seenAtLabel": "Indexed ",
     "installedAtLabel": "Installed ",
     "installedAtHint": "Creation time of the skill directory; skills adopted from an agent directory keep their original timestamp.",
     "tokensLabel": "{{count}} tokens",
@@ -221,8 +219,6 @@
     "viewOriginal": "View original",
     "viewTranslation": "View translation",
     "originalToggle": "Original",
-    "translationStaleNotice": "The translation matches the version recorded at install time, but the original has been updated since. It is for reference only and does not follow the original's updates.",
-    "translationReferenceNotice": "The translation is for reference only; it does not update when the original changes.",
     "loadFailed": "Failed to load: {{message}}",
     "loadFailedHint": "The skill directory may not contain an accessible SKILL.md."
   },

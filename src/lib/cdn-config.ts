@@ -9,8 +9,9 @@
  * Settings, which is then tried first (with the direct origin and the default
  * CDN as fallbacks). A configured CDN base is persisted to localStorage.
  *
- * Besides the CDN base, this module also records the snapshot tag of the
- * registry index currently in use (`getIndexTag` / `setIndexTag`). The tag is
+/**
+ * Besides the CDN base, this module also records the snapshot ref of the
+ * registry index currently in use (`getIndexRef` / `setIndexRef`). The ref is
  * written by the registry client whenever the worker announces the snapshot it
  * serves, and is read back to pin SKILL.md detail fetches — and displayed in
  * Settings — to the same snapshot the index was built from.
@@ -23,13 +24,18 @@ export const DEFAULT_CDN_BASE = "https://cdn.jsdmirror.com";
 
 const SETTINGS_KEY = "skill-one.cdn";
 
-/** localStorage key for the served snapshot tag (`dist-<date>[-N]`). */
-const INDEX_TAG_KEY = "skill-one.indexTag";
+/**
+ * localStorage key for the served snapshot ref (the `dist` branch head's
+ * commit SHA). Named afresh when the ref stopped being a `dist-<date>` tag:
+ * an old build's stored tag must never pin a fetch — its layout predates the
+ * current snapshot format.
+ */
+const INDEX_REF_KEY = "skill-one.indexRef";
 
 /**
  * Both keys are read through the shared storage guard (see `lib/storage`),
  * where an unset, unreadable or blocked key answers "" — the value that means
- * "direct GitHub first" and "no snapshot tag yet", so no caller has to
+ * "direct GitHub first" and "no snapshot ref yet", so no caller has to
  * distinguish the two.
  */
 function readStored(key: string): string {
@@ -59,17 +65,18 @@ export function setCdnBase(value: string): void {
 }
 
 /**
- * The registry snapshot tag (`dist-<date>`) currently recorded, or "" before
- * any snapshot has been served. Used to pin SKILL.md detail fetches to the
- * same snapshot the index was built from, and shown in Settings.
+ * The registry snapshot ref (the `dist` branch head's commit SHA) currently
+ * recorded, or "" before any snapshot has been served. Used to pin SKILL.md
+ * detail fetches to the same snapshot the index was built from, and shown in
+ * Settings.
  */
-export function getIndexTag(): string {
-  return readStored(INDEX_TAG_KEY);
+export function getIndexRef(): string {
+  return readStored(INDEX_REF_KEY);
 }
 
-/** Record the served registry snapshot tag (empty = clear). */
-export function setIndexTag(value: string): void {
-  writeStored(INDEX_TAG_KEY, value.trim());
+/** Record the served registry snapshot ref (empty = clear). */
+export function setIndexRef(value: string): void {
+  writeStored(INDEX_REF_KEY, value.trim());
 }
 
 /** Direct GitHub raw URL. No ref → default branch (`HEAD`). */

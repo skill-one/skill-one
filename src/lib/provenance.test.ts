@@ -180,7 +180,6 @@ describe("resolution records", () => {
           downloads: 340,
           description: "Read PDF files.",
           descriptionZh: "读取 PDF 文件。",
-          rev: "rev-1",
         },
       ],
     };

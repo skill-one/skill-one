@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { InstalledSkill } from "./skills-manager";
 import type { Skill } from "../types/skill";
-import { installedSkillView, translationFreshness } from "./skill-view";
+import { installedSkillView } from "./skill-view";
 
 /** One entry of the installed list, as the backend reports it. */
 const installedPdf: InstalledSkill = {
@@ -20,26 +20,7 @@ const entry: Skill = {
   downloads: 2991984,
   path: "skills/anthropics/skills/pdf",
   url: "https://www.skills.sh/anthropics/skills/pdf",
-  rev: "rev-current",
 };
-
-const REV_INSTALL = "rev-at-install";
-
-describe("translationFreshness", () => {
-  it("reports fresh when the installed rev matches the registry's", () => {
-    expect(translationFreshness(REV_INSTALL, REV_INSTALL)).toBe("fresh");
-  });
-
-  it("reports stale when the registry has moved past the installed rev", () => {
-    expect(translationFreshness(REV_INSTALL, "rev-current")).toBe("stale");
-  });
-
-  it("reports unknown when either side of the comparison is missing", () => {
-    expect(translationFreshness(undefined, "rev-current")).toBe("unknown");
-    expect(translationFreshness(REV_INSTALL, undefined)).toBe("unknown");
-    expect(translationFreshness(undefined, undefined)).toBe("unknown");
-  });
-});
 
 describe("installedSkillView", () => {
   it("keeps path undefined and carries the snapshot directory separately", () => {
@@ -50,31 +31,16 @@ describe("installedSkillView", () => {
     expect(view.snapshotPath).toBe("skills/anthropics/skills/pdf");
   });
 
-  it("derives the translation's freshness from the ledger hash and the entry rev", () => {
-    const ledger = (hash?: string) => ({
-      repo: entry.repo,
-      installedAt: "2026-08-12T04:34:54Z",
-      ...(hash ? { hash } : {}),
-    });
-    expect(
-      installedSkillView(installedPdf, { pdf: ledger("rev-current") }, entry)
-        .translationFreshness,
-    ).toBe("fresh");
-    expect(
-      installedSkillView(installedPdf, { pdf: ledger("rev-old") }, entry)
-        .translationFreshness,
-    ).toBe("stale");
-    // An association recorded before hashes existed cannot be checked.
-    expect(
-      installedSkillView(installedPdf, { pdf: ledger() }, entry)
-        .translationFreshness,
-    ).toBe("unknown");
+  it("carries the registry entry's facts an on-disk record never has", () => {
+    const view = installedSkillView(installedPdf, {}, entry);
+    expect(view.storeBacked).toBe(true);
+    expect(view.stars).toBe(169600);
+    expect(view.downloads).toBe(2991984);
   });
 
-  it("carries no freshness when no store entry backs the skill", () => {
+  it("carries no store backing without a resolved entry", () => {
     const view = installedSkillView(installedPdf);
     expect(view.storeBacked).toBe(false);
-    expect(view.translationFreshness).toBeUndefined();
     expect(view.snapshotPath).toBeUndefined();
   });
 });

@@ -21,9 +21,11 @@ describe("parseSkillLine", () => {
     expect(
       parseSkillLine(
         line({
-          url: "https://www.skills.sh/anthropics/skills/pdf",
-          hash: "b146008599c31057",
-          fetchedAt: "2026-09-06T07:57:37.803Z",
+          name: "pdf",
+          dir: "anthropics/skills/pdf",
+          description_zh: "处理 PDF。",
+          domain: "development",
+          confidence: 0.9,
         }),
         starsFor,
       ),
@@ -31,12 +33,12 @@ describe("parseSkillLine", () => {
       name: "pdf",
       repo: "anthropics/skills",
       description: "Work with PDFs.",
+      descriptionZh: "处理 PDF。",
       stars: 4200,
       downloads: 100,
       path: "skills/anthropics/skills/pdf",
-      rev: "b146008599c31057",
-      firstSeenAt: "2026-09-06T07:57:37.803Z",
       url: "https://www.skills.sh/anthropics/skills/pdf",
+      profile: { domain: ["development"], confidence: 0.9 },
     });
   });
 
@@ -91,34 +93,53 @@ describe("parseSkillLine", () => {
     expect(parseSkillLine(line({ description: null }))).toMatchObject({
       description: "",
       stars: 0,
-      rev: undefined,
-      firstSeenAt: undefined,
-      url: undefined,
     });
     expect(
       parseSkillLine(JSON.stringify({ id: "a/b/c" }))?.downloads,
     ).toBe(0);
   });
 
-  it("derives the mirror path from the id and keeps the slug as the name", () => {
-    const skill = parseSkillLine(line({ id: "vercel-labs/skills/find-skills" }));
-    expect(skill?.name).toBe("find-skills");
+  it("prefers the row's dir for the mirror path and its name for the name", () => {
+    // `dir` is the row's own spelling of where its files live and can differ
+    // from the id; `name` is the frontmatter name the mirror spells.
+    const skill = parseSkillLine(
+      line({
+        id: "vercel-labs/skills/find-skills",
+        name: "Find Skills",
+        dir: "vercel-labs/skills/find-skills",
+      }),
+    );
+    expect(skill?.name).toBe("Find Skills");
     expect(skill?.repo).toBe("vercel-labs/skills");
-    // The basename equals the skill name, so a locally installed copy still
-    // matches its registry entry.
-    expect(skill?.path?.split("/").pop()).toBe(skill?.name);
+    expect(skill?.path).toBe("skills/vercel-labs/skills/find-skills");
   });
 
-  it("reads the classification whichever shape the snapshot publishes it in", () => {
-    // The live `dist` rows carry one bare key; the model is a list because the
-    // dataset has carried 1–3 best-fit-first keys and can again. Reading only
-    // the list shape silently drops every classification.
+  it("falls back to the id for path and slug for name when the row omits them", () => {
+    const skill = parseSkillLine(JSON.stringify({ id: "a/b/c", installs: 1 }));
+    expect(skill?.name).toBe("c");
+    expect(skill?.path).toBe("skills/a/b/c");
+  });
+
+  it("derives the skills.sh page url from the id", () => {
+    expect(parseSkillLine(line({}))?.url).toBe(
+      "https://www.skills.sh/anthropics/skills/pdf",
+    );
+  });
+
+  it("wraps the single upstream key as the model's one-element list", () => {
+    // Upstream answers one closed category per skill; the model keeps a list
+    // so grouping and filtering can match by membership.
     expect(parseSkillLine(line({ domain: "development" }))?.profile).toEqual({
       domain: ["development"],
     });
-    expect(
-      parseSkillLine(line({ domain: ["development", "testing"] }))?.profile,
-    ).toEqual({ domain: ["development", "testing"] });
+  });
+
+  it("carries the classifier's confidence when the row states one", () => {
+    expect(parseSkillLine(line({ domain: "development", confidence: 0.8 }))?.profile)
+      .toEqual({ domain: ["development"], confidence: 0.8 });
+    // Null (the classifier did not say) is simply omitted.
+    expect(parseSkillLine(line({ domain: "development", confidence: null }))?.profile)
+      .toEqual({ domain: ["development"] });
   });
 
   it("carries no profile for a skill the generator has not classified", () => {

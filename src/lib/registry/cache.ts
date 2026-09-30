@@ -15,6 +15,11 @@ const KEY = "skills";
 /**
  * Bump when the stored Skill shape changes so stale records are dropped.
  *
+ * Version 6 flushes records parsed from the old upstream catalog layout:
+ * those rows have no `dir`/`confidence`, may classify `profile.domain` as a
+ * multi-key list, and carry `rev`/`firstSeenAt` stamps the dataset no longer
+ * publishes — the "unchanged" short-circuit would otherwise keep serving
+ * them for up to a day.
  * Version 5 flushes records written before the index carried Chinese
  * descriptions: those rows have no `descriptionZh`, and the "unchanged"
  * short-circuit would keep serving them for up to a day with no translation.
@@ -26,7 +31,7 @@ const KEY = "skills";
  * could fail silently: those hold 0 stars yet carry a current run stamp, so
  * the "unchanged" short-circuit would keep serving them for up to a day.
  */
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 /**
  * The same database and object store this module used before it delegated to
@@ -37,9 +42,12 @@ const store = createStore("skill-one-registry", "index");
 
 /** Identity of the published snapshot a record was built from. */
 export interface CacheIdentity {
-  /** `dist-<date>[-N]` tag the index was fetched at; absent when unpinned. */
-  tag?: string;
-  /** The producing run's `finishedAt`, the snapshot's freshness identity. */
+  /**
+   * The `dist` branch head's commit SHA the index was fetched at; absent
+   * when unpinned.
+   */
+  ref?: string;
+  /** The head commit's date, the snapshot's freshness identity. */
   generatedAt?: string;
 }
 
@@ -87,8 +95,8 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
         return null;
       }
       if (!record || record.schemaVersion !== SCHEMA_VERSION) return null;
-      const { skills, tag, generatedAt, fetchedAt } = record;
-      return { skills, tag, generatedAt, fetchedAt };
+      const { skills, ref, generatedAt, fetchedAt } = record;
+      return { skills, ref, generatedAt, fetchedAt };
     },
 
     /** Persist the parsed registry with its snapshot identity (overwrites). */
@@ -96,7 +104,7 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
       const record: CacheRecord = {
         schemaVersion: SCHEMA_VERSION,
         fetchedAt: Date.now(),
-        tag: identity.tag,
+        ref: identity.ref,
         generatedAt: identity.generatedAt,
         skills,
       };
