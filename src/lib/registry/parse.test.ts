@@ -99,9 +99,11 @@ describe("parseSkillLine", () => {
     ).toBe(0);
   });
 
-  it("prefers the row's dir for the mirror path and its name for the name", () => {
+  it("prefers the row's dir for the mirror path and the id's slug for the name", () => {
     // `dir` is the row's own spelling of where its files live and can differ
-    // from the id; `name` is the frontmatter name the mirror spells.
+    // from the id. The name is the id's slug — the skills.sh identity — even
+    // when the mirror spells the frontmatter `name` with casing the slug
+    // folds away, so it always matches what a local install is called.
     const skill = parseSkillLine(
       line({
         id: "vercel-labs/skills/find-skills",
@@ -109,7 +111,7 @@ describe("parseSkillLine", () => {
         dir: "vercel-labs/skills/find-skills",
       }),
     );
-    expect(skill?.name).toBe("Find Skills");
+    expect(skill?.name).toBe("find-skills");
     expect(skill?.repo).toBe("vercel-labs/skills");
     expect(skill?.path).toBe("skills/vercel-labs/skills/find-skills");
   });

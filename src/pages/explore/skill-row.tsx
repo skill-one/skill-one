@@ -5,6 +5,7 @@ import { useAppLocale } from "../../i18n/use-language";
 import { skillDescription } from "../../lib/i18n-content";
 import { ordinalClass } from "../../lib/ordinal";
 import {
+  isInstallableSkill,
   isLiveSkill,
   type SkillView,
 } from "../../lib/skill-view";
@@ -225,9 +226,12 @@ export function SkillRow({
 
         {/* The corner action. Clicks on the slot stop here: the row body opens
             the detail panel, the action must not. The installed list hands over
-            the enable switch; the store's rows keep the install button. */}
+            the enable switch; the store's rows keep the install button — a
+            live hit whose source no install id can be rebuilt from (a
+            discovery domain) gets neither, since its install could only fail. */}
         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-          {action ?? <SkillInstallButton skill={skill} />}
+          {action ??
+            (isInstallableSkill(skill) ? <SkillInstallButton skill={skill} /> : null)}
         </div>
       </Card>
     </li>

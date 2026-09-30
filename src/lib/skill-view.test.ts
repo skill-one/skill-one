@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { InstalledSkill } from "./skills-manager";
 import type { Skill } from "../types/skill";
-import { installedSkillView } from "./skill-view";
+import { installedSkillView, isInstallableSkill } from "./skill-view";
 
 /** One entry of the installed list, as the backend reports it. */
 const installedPdf: InstalledSkill = {
@@ -42,5 +42,46 @@ describe("installedSkillView", () => {
     const view = installedSkillView(installedPdf);
     expect(view.storeBacked).toBe(false);
     expect(view.snapshotPath).toBeUndefined();
+  });
+});
+
+describe("isInstallableSkill", () => {
+  /** A live skills.sh hit sourced from a GitHub repository. */
+  const repoLive: Skill = {
+    name: "find-skills",
+    repo: "vercel-labs/skills",
+    description: "",
+    stars: 0,
+    downloads: 100,
+  };
+
+  it("offers the install action on a store row", () => {
+    expect(isInstallableSkill({ ...entry, storeBacked: true })).toBe(true);
+  });
+
+  it("keeps the action on an installed row the store cannot resolve", () => {
+    // The button is the 已安装 fact about this machine there, not an
+    // invitation — it must survive whatever the ledger can vouch for.
+    const unbacked = installedSkillView(installedPdf);
+    expect(isInstallableSkill(unbacked)).toBe(true);
+  });
+
+  it("offers the action on a live hit a GitHub id can be rebuilt for", () => {
+    expect(isInstallableSkill({ ...repoLive, storeBacked: false })).toBe(true);
+  });
+
+  it("withholds the action from a live hit sourced from a discovery domain", () => {
+    // `open.feishu.cn/lark-skill-maker` is not an `owner/repo/slug` id —
+    // agents-skills can only refuse it.
+    const domainLive: Skill = { ...repoLive, repo: "open.feishu.cn" };
+    expect(isInstallableSkill({ ...domainLive, storeBacked: false })).toBe(
+      false,
+    );
+  });
+
+  it("withholds the action from a live hit with a dotted owner", () => {
+    // A dotted first segment is a domain, not a GitHub user.
+    const dotted: Skill = { ...repoLive, repo: "a.b/repo" };
+    expect(isInstallableSkill({ ...dotted, storeBacked: false })).toBe(false);
   });
 });

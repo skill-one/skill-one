@@ -1,5 +1,6 @@
 import type { SkillProvenance } from "./provenance";
 import type { InstalledSkill } from "./skills-manager";
+import { isCanonicalId } from "./registry/parse";
 import type { Skill } from "../types/skill";
 
 /**
@@ -49,7 +50,8 @@ export function skillKey(skill: { repo: string; name: string }): string {
  * a real "has none", and nothing classifying it is a real 未分类), while a
  * live hit is upstream data the endpoint simply does not carry — no
  * description, no classification, nothing the card could claim. The cards
- * use this to draw a live row as what it is: a name, a source and an install
+ * use this to draw a live row as what it is: a name, a source and — when the
+ * source is installable at all (see `isInstallableSkill`) — an install
  * button, with no placeholder standing in for facts nobody established.
  *
  * The test is structural: the installed adapter always sets `installedAt`
@@ -59,6 +61,24 @@ export function skillKey(skill: { repo: string; name: string }): string {
  */
 export function isLiveSkill(skill: SkillView): boolean {
   return skill.storeBacked === false && skill.installedAt === undefined;
+}
+
+/**
+ * Whether the shared surfaces may offer the install action for a skill view.
+ *
+ * Installing rebuilds the id `owner/repo/slug` from the row and hands it to
+ * agents-skills, which rejects anything but exactly that shape. Every row an
+ * install backs qualifies — the registry filtered its index lines through
+ * `isCanonicalId` at parse time, and an unbacked installed row keeps its
+ * button as the 已安装 fact about this machine regardless of what its ledger
+ * can vouch for. Only a live skills.sh hit can fall short: its `source` can
+ * be a discovery domain rather than a GitHub repo (e.g. `open.feishu.cn`),
+ * leaving an id the backend can only refuse — so that row is offered the way
+ * out it actually has (its skills.sh page) instead of a button that can only
+ * fail.
+ */
+export function isInstallableSkill(skill: SkillView): boolean {
+  return !isLiveSkill(skill) || isCanonicalId(`${skill.repo}/${skill.name}`);
 }
 
 export interface SkillView extends Skill {
