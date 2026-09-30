@@ -50,8 +50,11 @@ tauri-plugin-process = "2"
 # SKILL.md is the fallback when no skill directory matches, installing the
 # whole repository under the repository name; since 0.25 the agent table is
 # regenerated from the upstream skill-one/agents-info and its `global` field
-# is renamed `skills_dir` (fields this app never reads).
-agents-skills = "0.25"
+# is renamed `skills_dir` (fields this app never reads); since 0.26 the skill
+# identity is the skills.sh-style slug — the install id is `owner/repo/slug`,
+# remove/disable/enable share one `SelectionRequest`/`SelectionOutcome` pair,
+# and `Manager::new` resolves home fallibly.
+agents-skills = "0.26"
 serde = { version = "1", features = ["derive"] }
 # Required directly by the `tauri::generate_context!` macro (updater config).
 serde_json = "1"

@@ -2,7 +2,7 @@
 
 [English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
-本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.25 的
+本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.26 的
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
 门面，将技能安装与 agent 链接能力暴露给前端。前端经 `src/lib/skills-manager.ts`
 的 `invoke` 封装访问这些 Tauri 命令。
@@ -13,12 +13,12 @@
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.25"
+agents-skills = "0.26"
 ```
 
-## 0.15–0.25 的主要变化
+## 0.15–0.26 的主要变化
 
-本项目最初基于 0.14 编写，之后跨越了十个 breaking 版本。下表的变化均已在
+本项目最初基于 0.14 编写，之后跨越了十一个 breaking 版本。下表的变化均已在
 `skills.rs` 中体现：
 
 | 版本 | 变化 | 对本项目的影响 |
@@ -34,6 +34,7 @@ agents-skills = "0.25"
 | 0.23 | 远程安装改为向 `codeload.github.com` 发起一次 tarball 请求（下载到本地后解包匹配）：不再走 GitHub REST API，也就没有匿名限流；同时移除 `GITHUB_TOKEN`、Git LFS 解析与缩写 SHA ref | 无需改代码——本项目使用的公开类型（`AddRequest`、`Manager`）未变，仅更新了描述下载机制的注释与文档 |
 | 0.24 | `owner/repo@<技能>` 未匹配到任何技能目录时，若仓库根目录存在 `SKILL.md`，会以仓库名静默安装整个仓库，而不再要求请求名等于仓库名；目录匹配仍然优先 | 无需改代码——公开类型未变；仅补充了描述该回退行为的注释与文档 |
 | 0.25 | agent 表的 `global` 字段重命名为 `skills_dir`，且该表改为取自上游 [`skill-one/agents-info`](https://github.com/skill-one/agents-info)；移除三个已消失的 agent（`jazz`、`loaf`、`promptscript`） | 无需改代码——应用从不读取 agent 表的字段，`AgentRequest` / `AgentStatus` 不受影响 |
+| 0.26 | 技能身份改为 skills.sh 风格的 slug：安装 id 为 `owner/repo/slug`（旧 `owner/repo@<skill>` 形式被拒绝），`add` / `remove` / `disable` / `enable` 全部按 frontmatter `name` slug 化后的结果匹配，安装目录则保留源仓库的原始目录名。`remove` / `disable` / `enable` 统一为一对 `SelectionRequest` / `SelectionOutcome`（各动词专属的 request/outcome 类型删除；`removed` / `enabled` / `disabled` → `applied`）。`ListedSkill` 重新获得 `display_name` 与 `path`；`Manager::skill_dir` 返回扫描到的路径。`Manager::new` / `ManagerBuilder::build` 返回 `Result`（home 解析不再静默回退） | 安装 source 改为 id `owner/repo/slug`（商店的 slug 即 id 末段）；`remove_skills` / `set_skills_enabled` 构造 `SelectionRequest` 并返回 `outcome.applied`；`manager()` 透传构造错误 |
 
 ### 更早的变化
 
@@ -58,8 +59,8 @@ agents-skills = "0.25"
 因此代码始终构造 `Manager::new()`：
 
 ```rust
-let manager = Manager::new();   // 解析真实的 home / config / cwd
-let manager = Manager::builder().home(p).config(c).cwd(w).build(); // 沙盒
+let manager = Manager::new();   // 解析真实的 home / config / cwd；0.26 起返回 Result
+let manager = Manager::builder().home(p).config(c).cwd(w).build(); // 沙盒；返回 Result
 ```
 
 ## 使用到的 API
@@ -68,9 +69,9 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // 沙盒
 | --- | --- | --- | --- |
 | 安装 / 预览技能 | `add` | `AddRequest` | `AddOutcome` |
 | 列出已安装技能 | `list` | —（无参数） | `Vec<ListedSkill>` |
-| 卸载技能 | `remove` | `RemoveRequest` | `RemoveOutcome` |
-| 停用技能 | `disable` | `DisableRequest` | `DisableOutcome` |
-| 启用技能 | `enable` | `EnableRequest` | `EnableOutcome` |
+| 卸载技能 | `remove` | `SelectionRequest` | `SelectionOutcome` |
+| 停用技能 | `disable` | `SelectionRequest` | `SelectionOutcome` |
+| 启用技能 | `enable` | `SelectionRequest` | `SelectionOutcome` |
 | 链接 / 取消链接 agent | `agent` | `AgentRequest` | `AgentOutcome` |
 | 查询 agent 链接状态 | `agent_status` | —（无参数） | `Vec<AgentStatus>` |
 
@@ -78,34 +79,36 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // 沙盒
 
 | Tauri 命令 | 请求构造（`skills.rs`） |
 | --- | --- |
-| `install_skill` | `AddRequest::new(source)`——`source` 即 `owner/repo@<skill>` |
+| `install_skill` | `AddRequest::new(source)`——`source` 即 id `owner/repo/slug` |
 | `list_installed_skills` | `manager.list()` |
-| `remove_skills` | `RemoveRequest { skills, all: false }` |
-| `set_skills_enabled` | `DisableRequest` / `EnableRequest { skills, all }` |
+| `remove_skills` | `SelectionRequest { skills, all: false }` |
+| `set_skills_enabled` | 以 `SelectionRequest { skills, all: false }` 调用 `enable` / `disable` |
 | `link_agents` | `AgentRequest { agents, unlink }` |
 | `link_status` | `manager.agent_status()` |
 
 ## 消费到的返回字段
 
-- **`AddOutcome`**：应用只读取 `skill.name`（安装后技能的磁盘目录名——即
-  `remove` / `disable` / `enable` 使用的身份）与 `skipped`（同名技能已存在——无论
-  启用还是停用——因此未复制任何内容）。安装失败不会以 DTO 形式出现：`add` 返回
-  `Err`，它成为命令的 `Err`、也就是前端的 rejection，库给出的错误信息就是读者看到的
-  失败原因。
-- **`ListedSkill`**：`name`、`description`（单行，库自身已折叠块标量）、`enabled`、
-  `installed_at`（`Option<u64>`，Unix 秒；不记录创建时间的文件系统为 `None`）。
-  应用把这四个字段原样透传为 `ListedSkillDto`——本地不再提取任何内容。
-  （`path` 在 0.19 及之前存在，0.20 起改用 `Manager::skill_dir` 解析目录；
-  `estimated_tokens` 仅在 0.18 到 0.19 之间短暂存在。）
+- **`AddOutcome`**：应用只读取 `source.slug`（id 末段——即 slug，
+  `remove` / `disable` / `enable` 共同匹配的唯一身份；`skill.name` 是 frontmatter
+  中原样的 `name`，slug 化后可能与其不同）与 `skipped`（同 slug 技能已
+  存在——无论启用还是停用——因此未复制任何内容）。安装失败不会以 DTO 形式出现：
+  `add` 返回 `Err`，它成为命令的 `Err`、也就是前端的 rejection，库给出的错误信息
+  就是读者看到的失败原因。
+- **`ListedSkill`**：`name`（slug）、`description`（单行，库自身已折叠块标量）、
+  `enabled`、`installed_at`（`Option<u64>`，Unix 秒；不记录创建时间的文件系统为
+  `None`）。应用把这四个字段原样透传为 `ListedSkillDto`——本地不再提取任何内容。
+  （`path` 在 0.19 及之前存在，0.26 起与 `display_name` 一同回归，目录解析则自
+  0.20 起改用 `Manager::skill_dir`；`estimated_tokens` 仅在 0.18 到 0.19 之间
+  短暂存在。）
 - **`AgentOutcome`**：`results: Vec<AgentLinkResult>`；每条 `AgentLinkResult` 含
   `agent`、`display`、`outcome: LinkOutcome`。
 - **`AgentStatus`**：`name`、`display`、`linked`、`canonical`、`internal_skills`、
   `internal_others`。对未链接的非原生 agent，库会对 agent 目录内的私有内容分类：
   链接时会收编的 skills（`internal_skills`）与会被隔离的杂项
   （`internal_others`）。应用不再自扫 agent 目录。
-- **`DisableOutcome` / `EnableOutcome`**：应用返回发生移动的名字（`disabled` /
-  `enabled`），其余丢弃——`requested`、`already`、`missing` 与 `installed` 清单
-  描述的是一次前端从不发起的无参调用。
+- **`SelectionOutcome`**（`remove` / `disable` / `enable` 共用）：应用返回命令实际
+  作用于的名字（`applied`），其余丢弃——`available`、`requested`、`already`、
+  `missing` 描述的是一次前端从不发起的无参 / 幂等调用。
 
 ## 0.15 起的链接语义
 
