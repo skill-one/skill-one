@@ -69,14 +69,15 @@
   },
   "settings": {
     "title": "Settings",
-    "appearance": "Appearance",
+    "interfaceLanguage": "Language",
+    "interfaceTheme": "Theme",
     "softwareUpdate": "Software update",
     "advanced": "Advanced settings"
   },
   "language": {
     "label": "Language",
     "en": "English",
-    "zh": "中文",
+    "zh": "中文简体",
     "system": "System"
   },
   "theme": {

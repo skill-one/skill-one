@@ -107,10 +107,10 @@ describe("App routing", () => {
       </I18nProvider>,
     );
 
-    // 设置 is a popover trigger, not a route: it opens the quick-settings
-    // flyout in place.
+    // 设置 is a menu trigger, not a route: it opens the settings menu
+    // in place.
     await user.click(screen.getByRole("button", { name: /设置/ }));
-    expect(await screen.findByText("外观")).toBeInTheDocument();
+    expect(await screen.findByText("主题")).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
     // Navigate back to the installed list, the header's 已安装 segment.

@@ -4,8 +4,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "./index";
 import { I18nProvider } from "./language-provider";
-import { LanguageToggle } from "../components/language-toggle";
+import { useLanguagePreference } from "./use-language";
 import { LANGUAGE_STORAGE_KEY } from "../lib/i18n-content";
+
+/** A one-button consumer standing in for the settings menu's language
+ *  submenu: cycles en → zh, the two explicit choices. */
+function LanguageButton() {
+  const { preference, setPreference } = useLanguagePreference();
+  return (
+    <button
+      type="button"
+      onClick={() => setPreference(preference === "zh" ? "en" : "zh")}
+    >
+      language: {preference}
+    </button>
+  );
+}
 
 /** The global setup pins the preference to zh; the provider tests start from
  *  the real default (no stored choice). */
@@ -13,12 +27,12 @@ beforeEach(() => {
   localStorage.removeItem(LANGUAGE_STORAGE_KEY);
 });
 
-/** Render the three-way toggle inside its own provider (test-utils' wrapper
+/** Render the toggle button inside its own provider (test-utils' wrapper
  *  would mount a second provider around it). */
 function renderToggle() {
   return render(
     <I18nProvider>
-      <LanguageToggle />
+      <LanguageButton />
     </I18nProvider>,
   );
 }
@@ -30,12 +44,12 @@ function mockPlatformLanguage(tag: string) {
     .mockReturnValue(tag);
 }
 
-describe("I18nProvider + LanguageToggle", () => {
+describe("I18nProvider + language preference", () => {
   it("defaults to following the system language", () => {
     // jsdom's navigator.language is en-US.
     renderToggle();
 
-    expect(screen.getByRole("group", { name: "Language" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "language: system" })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("en");
     expect(i18n.language).toBe("en");
   });
@@ -44,9 +58,9 @@ describe("I18nProvider + LanguageToggle", () => {
     const user = userEvent.setup();
     renderToggle();
 
-    await user.click(screen.getByRole("button", { name: "中文" }));
+    await user.click(screen.getByRole("button"));
 
-    expect(screen.getByRole("group", { name: "语言" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "language: zh" })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("zh-CN");
     expect(i18n.language).toBe("zh");
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("zh");
@@ -57,7 +71,7 @@ describe("I18nProvider + LanguageToggle", () => {
 
     renderToggle();
 
-    expect(screen.getByRole("group", { name: "语言" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "language: zh" })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("zh-CN");
   });
 
@@ -81,7 +95,7 @@ describe("I18nProvider + LanguageToggle", () => {
     const user = userEvent.setup();
     renderToggle();
 
-    await user.click(screen.getByRole("button", { name: "中文" }));
+    await user.click(screen.getByRole("button"));
     const language = mockPlatformLanguage("en-US");
     fireEvent(window, new Event("languagechange"));
 

@@ -69,15 +69,16 @@
   },
   "settings": {
     "title": "设置",
-    "appearance": "外观",
+    "interfaceLanguage": "语言",
+    "interfaceTheme": "主题",
     "softwareUpdate": "软件更新",
     "advanced": "高级设置"
   },
   "language": {
     "label": "语言",
     "en": "English",
-    "zh": "中文",
-    "system": "跟随系统"
+    "zh": "中文简体",
+    "system": "系统默认"
   },
   "theme": {
     "light": "浅色",

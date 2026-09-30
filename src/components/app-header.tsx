@@ -5,7 +5,7 @@ import { cn } from "../lib/utils";
 import { isTauri } from "../lib/tauri";
 import { AppNav } from "./app-nav";
 import { SearchInput } from "./search-input";
-import { SettingsMenu } from "./settings-popover";
+import { SettingsMenu } from "./settings-menu";
 import { useListQuery } from "../hooks/use-list-view";
 import { useRegistrySnapshot } from "../hooks/use-registry-snapshot";
 import { setQuery, type Destination } from "../lib/list-view";
