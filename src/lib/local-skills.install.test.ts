@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 describe("installSkillFromSource", () => {
-  it("hands the owner/repo@<skill> source to the backend's install (Tauri)", async () => {
+  it("hands the owner/repo/slug source to the backend's install (Tauri)", async () => {
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({ skill: "pdf", skipped: false });
 
@@ -38,10 +38,10 @@ describe("installSkillFromSource", () => {
       rev: "rev-at-install",
     });
 
-    // Since agents-skills 0.21 the source carries the skill: one source is one
-    // skill, matched on the directory basename — which is what the store's
-    // slug already is.
-    expect(installSkill).toHaveBeenCalledWith("anthropics/skills@pdf");
+    // Since agents-skills 0.26 the install source is the id `owner/repo/slug`:
+    // one source is one skill, matched on the slugified SKILL.md name — which
+    // is what the store's slug already is.
+    expect(installSkill).toHaveBeenCalledWith("anthropics/skills/pdf");
     // The install source lands in the provenance ledger (Tauri path) with
     // the store-side content hash as the installed version marker.
     expect(recordSkillProvenance).toHaveBeenCalledWith(

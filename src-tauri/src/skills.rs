@@ -7,17 +7,16 @@
 use serde::Serialize;
 
 use crate::skill_hash;
-use agents_skills::{
-    AddRequest, AgentRequest, DisableRequest, EnableRequest, LinkOutcome, Manager, RemoveRequest,
-};
+use agents_skills::{AddRequest, AgentRequest, LinkOutcome, Manager, SelectionRequest};
 
 /// The skills directory is the user-level **global** one (`~/.agents/skills`).
 ///
 /// Since agents-skills 0.17 project-level scope is gone entirely: the library
 /// no longer takes a `global` flag (every operation targets the canonical dir),
-/// so neither does this app.
-fn manager() -> Manager {
-    Manager::new()
+/// so neither does this app. Since 0.26 home resolution can fail, so
+/// construction is fallible — surfaced as the command error string.
+fn manager() -> Result<Manager, String> {
+    Manager::new().map_err(|e| e.to_string())
 }
 
 /// Run a blocking manager operation off the async runtime (install, link,
@@ -29,9 +28,12 @@ where
     F: FnOnce(&Manager) -> Result<T, String> + Send + 'static,
     T: Send + 'static,
 {
-    tauri::async_runtime::spawn_blocking(move || f(&manager()))
-        .await
-        .map_err(|e| format!("{task} task failed: {e}"))?
+    tauri::async_runtime::spawn_blocking(move || {
+        let manager = manager()?;
+        f(&manager)
+    })
+    .await
+    .map_err(|e| format!("{task} task failed: {e}"))?
 }
 
 // ============================ DTOs (serialized to the frontend) ============================
@@ -39,14 +41,14 @@ where
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallResult {
-    /// The installed skill's on-disk directory name — the identity
-    /// `remove`/`disable`/`enable` use. Since 0.22 the `SKILL.md` frontmatter
-    /// `name` is never read, so this is always the directory basename.
+    /// The installed skill's slug (the SKILL.md frontmatter `name` slugified) —
+    /// the identity `remove`/`disable`/`enable` select by. Since 0.26 the
+    /// slug is the single identity; the on-disk directory name keeps the
+    /// source repository's original directory name.
     pub skill: String,
-    /// `true` when nothing was copied because a skill of the same name is
-    /// already installed (enabled or disabled): since 0.17 `add` never
-    /// overwrites, so a repeat install is a no-op reported here, never a
-    /// failure.
+    /// `true` when nothing was copied because a skill of the same slug is
+    /// already installed (enabled or disabled): `add` never overwrites, so a
+    /// repeat install is a no-op reported here, never a failure.
     pub skipped: bool,
 }
 
@@ -96,9 +98,11 @@ pub struct AgentStatusDto {
 ///
 /// `description` (single-line) and `installed_at` come straight from
 /// `Manager::list` — the app no longer parses SKILL.md itself. Since 0.20 the
-/// library's `ListedSkill` carries no `path` either (the name *is* the on-disk
-/// directory name; resolve a directory with `Manager::skill_dir` when one is
-/// needed), and neither does this DTO.
+/// app's DTO carries no `path`; since 0.26 the library's `ListedSkill` gained
+/// `display_name` and `path` (the slug is the identity and
+/// `Manager::skill_dir` returns the scanned directory), but this DTO keeps
+/// passing only the facts the UI reads — `name` is the slug every selection
+/// command matches on.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListedSkillDto {
@@ -229,7 +233,9 @@ mod tests {
     fn listed_skill_dto_passes_the_library_facts_through() {
         let dto = listed_skill_dto(agents_skills::ListedSkill {
             name: "pdf".into(),
+            display_name: "pdf".into(),
             description: "读取 PDF 文件。".into(),
+            path: "/home/user/.agents/skills/pdf".into(),
             enabled: true,
             installed_at: Some(1_760_000_000),
         });
@@ -244,7 +250,9 @@ mod tests {
         // Some Linux filesystems record no directory creation time.
         let dto = listed_skill_dto(agents_skills::ListedSkill {
             name: "pdf".into(),
+            display_name: "pdf".into(),
             description: "d".into(),
+            path: "/home/user/.agents/skills/pdf".into(),
             enabled: false,
             installed_at: None,
         });
@@ -366,20 +374,20 @@ mod tests {
 
 /// Install one skill into the global skills directory.
 ///
-/// `source` is one of the two forms agents-skills 0.21 accepts: a local skill
-/// directory (it must directly contain a `SKILL.md`), or `owner/repo@<skill>`
-/// for one skill on GitHub. Since 0.23 the whole repository tarball is
-/// downloaded from codeload.github.com, unpacked into a temp dir, and the
-/// named skill is matched locally — the GitHub REST API is never called, so
-/// its anonymous 60-requests-per-hour rate limit no longer applies (the git
-/// clone / per-file paths are gone). Since 0.24, when no directory matches
-/// and the repository root has a `SKILL.md`, the whole repository is
-/// installed under the repository name. The app always sends the GitHub form;
-/// the store's skill name is the directory name the source matches on.
+/// `source` is one of the two forms agents-skills 0.26 accepts: a local skill
+/// directory (it must directly contain a `SKILL.md` declaring a non-empty
+/// `name`), or the GitHub id `owner/repo/slug` — the slug is the SKILL.md
+/// frontmatter `name` slugified. The whole repository tarball is downloaded
+/// from codeload.github.com and the skill is matched locally by slugified
+/// name — the GitHub REST API is never called, so its anonymous
+/// 60-requests-per-hour rate limit no longer applies. When no skill directory
+/// matches and the repository root has a `SKILL.md`, the whole repository is
+/// installed under the repository name. The app always sends the GitHub id
+/// form; the store's skill slug is the id's last segment.
 ///
 /// One source resolves to exactly one skill, so there is no per-skill outcome
-/// list: a failure is this command's `Err`, and `skipped` reports the 0.17
-/// no-overwrite rule (a skill of the same name already installed, enabled or
+/// list: a failure is this command's `Err`, and `skipped` reports the
+/// no-overwrite rule (a skill of the same slug already installed, enabled or
 /// parked, is left untouched).
 #[tauri::command]
 pub async fn install_skill(source: String) -> Result<InstallResult, String> {
@@ -387,8 +395,11 @@ pub async fn install_skill(source: String) -> Result<InstallResult, String> {
         let outcome = manager
             .add(&AddRequest::new(source))
             .map_err(|e| e.to_string())?;
+        // `source.slug` is the id's last segment — the slug the identity
+        // commands select by. (`outcome.skill.name` is the frontmatter `name`
+        // as declared, which the slug may fold differently.)
         Ok(InstallResult {
-            skill: outcome.skill.name,
+            skill: outcome.source.slug,
             skipped: outcome.skipped,
         })
     })
@@ -411,11 +422,11 @@ pub async fn list_installed_skills() -> Result<Vec<ListedSkillDto>, String> {
 #[tauri::command]
 pub async fn remove_skills(skills: Option<Vec<String>>) -> Result<Vec<String>, String> {
     run_blocking("remove", move |manager| {
-        let req = RemoveRequest {
+        let req = SelectionRequest {
             skills: skills.unwrap_or_default(),
             all: false,
         };
-        Ok(manager.remove(&req).map_err(|e| e.to_string())?.removed)
+        Ok(manager.remove(&req).map_err(|e| e.to_string())?.applied)
     })
     .await
 }
@@ -429,25 +440,16 @@ pub async fn set_skills_enabled(
     enabled: bool,
 ) -> Result<Vec<String>, String> {
     run_blocking(if enabled { "enable" } else { "disable" }, move |manager| {
-        let names = skills.unwrap_or_default();
-        let outcome = if enabled {
-            manager
-                .enable(&EnableRequest {
-                    skills: names,
-                    all: false,
-                })
-                .map_err(|e| e.to_string())?
-                .enabled
-        } else {
-            manager
-                .disable(&DisableRequest {
-                    skills: names,
-                    all: false,
-                })
-                .map_err(|e| e.to_string())?
-                .disabled
+        let req = SelectionRequest {
+            skills: skills.unwrap_or_default(),
+            all: false,
         };
-        Ok(outcome)
+        let outcome = if enabled {
+            manager.enable(&req).map_err(|e| e.to_string())?
+        } else {
+            manager.disable(&req).map_err(|e| e.to_string())?
+        };
+        Ok(outcome.applied)
     })
     .await
 }

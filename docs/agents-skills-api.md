@@ -4,7 +4,7 @@
 
 Through the Tauri backend (`src-tauri/src/skills.rs`), this project calls the
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
-facade of `agents-skills` v0.25 to expose skill installation and agent-linking
+facade of `agents-skills` v0.26 to expose skill installation and agent-linking
 capabilities to the frontend. The frontend reaches these Tauri commands via the
 `invoke` wrapper in `src/lib/skills-manager.ts`.
 
@@ -14,12 +14,12 @@ capabilities to the frontend. The frontend reaches these Tauri commands via the
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.25"
+agents-skills = "0.26"
 ```
 
-## What 0.15–0.25 changed
+## What 0.15–0.26 changed
 
-Ten breaking releases separate the API this app was written against (0.14)
+Eleven breaking releases separate the API this app was written against (0.14)
 from the current one. Everything below is reflected in `skills.rs`:
 
 | Version | Change | Effect here |
@@ -35,6 +35,7 @@ from the current one. Everything below is reflected in `skills.rs`:
 | 0.23 | Remote installs are one tarball request to `codeload.github.com` (unpacked, matched locally): the GitHub REST API and its anonymous rate limit are gone, as are `GITHUB_TOKEN`, Git LFS resolution, and abbreviated-SHA refs | No code change — the public types used here (`AddRequest`, `Manager`) are unchanged; only comments/docs describing the fetch mechanism were updated |
 | 0.24 | When `owner/repo@<skill>` matches no skill directory, a `SKILL.md` at the repository root now silently installs the whole repository under the repository name, instead of failing unless the requested name equaled the repository name; a directory match still wins | No code change — the public types are unchanged; only comments/docs describing the fallback were updated |
 | 0.25 | The agent table's `global` field is renamed to `skills_dir`, and the table is now sourced from the upstream [`skill-one/agents-info`](https://github.com/skill-one/agents-info); three stale agents (`jazz`, `loaf`, `promptscript`) are removed | No code change — the app never reads the agent table's fields, and `AgentRequest` / `AgentStatus` are unaffected |
+| 0.26 | The skill identity is the skills.sh-style slug: the install id is `owner/repo/slug` (the legacy `owner/repo@<skill>` form is rejected), `add`/`remove`/`disable`/`enable` all match on the slugified frontmatter `name`, and the on-disk directory keeps the source repository's original directory name. `remove` / `disable` / `enable` share one `SelectionRequest` / `SelectionOutcome` pair (per-verb request/outcome types gone; `removed` / `enabled` / `disabled` → `applied`). `ListedSkill` regained `display_name` and `path`; `Manager::skill_dir` returns the scanned path. `Manager::new` / `ManagerBuilder::build` return `Result` (home resolution no longer silently falls back) | The install source becomes the id `owner/repo/slug` (the store's slug rides as the last segment); `remove_skills` / `set_skills_enabled` build `SelectionRequest` and return `outcome.applied`; `manager()` propagates construction errors |
 
 ### Earlier changes
 
@@ -65,8 +66,8 @@ The app only uses the user-level skills directory (`~/.agents/skills`); since
 `Manager::new()`:
 
 ```rust
-let manager = Manager::new();   // resolves the real home / config / cwd
-let manager = Manager::builder().home(p).config(c).cwd(w).build(); // sandboxed
+let manager = Manager::new();   // resolves the real home / config / cwd; Result since 0.26
+let manager = Manager::builder().home(p).config(c).cwd(w).build(); // sandboxed; Result
 ```
 
 ## API surface in use
@@ -75,9 +76,9 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // sandboxed
 | --- | --- | --- | --- |
 | Install / preview skills | `add` | `AddRequest` | `AddOutcome` |
 | List installed skills | `list` | — (no arguments) | `Vec<ListedSkill>` |
-| Uninstall skills | `remove` | `RemoveRequest` | `RemoveOutcome` |
-| Disable skills | `disable` | `DisableRequest` | `DisableOutcome` |
-| Enable skills | `enable` | `EnableRequest` | `EnableOutcome` |
+| Uninstall skills | `remove` | `SelectionRequest` | `SelectionOutcome` |
+| Disable skills | `disable` | `SelectionRequest` | `SelectionOutcome` |
+| Enable skills | `enable` | `SelectionRequest` | `SelectionOutcome` |
 | Link / unlink agents | `agent` | `AgentRequest` | `AgentOutcome` |
 | Query agent link status | `agent_status` | — (no arguments) | `Vec<AgentStatus>` |
 
@@ -85,26 +86,29 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // sandboxed
 
 | Tauri command | Request construction (`skills.rs`) |
 | --- | --- |
-| `install_skill` | `AddRequest::new(source)` — `source` is `owner/repo@<skill>` |
+| `install_skill` | `AddRequest::new(source)` — `source` is the id `owner/repo/slug` |
 | `list_installed_skills` | `manager.list()` |
-| `remove_skills` | `RemoveRequest { skills, all: false }` |
-| `set_skills_enabled` | `DisableRequest` / `EnableRequest { skills, all: false }` |
+| `remove_skills` | `SelectionRequest { skills, all: false }` |
+| `set_skills_enabled` | `SelectionRequest { skills, all: false }` to `enable` / `disable` |
 | `link_agents` | `AgentRequest { agents, unlink }` |
 | `link_status` | `manager.agent_status()` |
 
 ## Consumed return fields
 
-- **`AddOutcome`**: the app reads `skill.name` (the installed skill's on-disk
-  directory name — the identity `remove` / `disable` / `enable` use) and
-  `skipped` (nothing was copied because the same name is already installed,
+- **`AddOutcome`**: the app reads `source.slug` (the id's last segment — the
+  slug, the single identity `remove` / `disable` / `enable` select by;
+  `skill.name` is the frontmatter `name` as declared, which the slug may fold
+  differently) and
+  `skipped` (nothing was copied because the same slug is already installed,
   enabled or parked). A failed install never reaches a DTO: `add` returns
   `Err`, which becomes the command's `Err` and the frontend's rejection, the
   library's message riding along as the reason the reader sees.
-- **`ListedSkill`**: `name`, `description` (single line — the library folds
-  block scalars itself), `enabled`, `installed_at` (`Option<u64>`, Unix
-  seconds; `None` on filesystems that record no creation time). The app passes
-  all four straight through as its `ListedSkillDto` — nothing is extracted
-  locally any more. (`path` existed until 0.19; since 0.20 a directory is
+- **`ListedSkill`**: `name` (the slug), `description` (single line — the
+  library folds block scalars itself), `enabled`, `installed_at`
+  (`Option<u64>`, Unix seconds; `None` on filesystems that record no creation
+  time). The app passes all four straight through as its `ListedSkillDto` —
+  nothing is extracted locally any more. (`path` existed until 0.19 and
+  returned in 0.26 together with `display_name`; since 0.20 a directory is
   resolved with `Manager::skill_dir`. `estimated_tokens` existed between 0.18
   and 0.19 only.)
 - **`AgentOutcome`**: `results: Vec<AgentLinkResult>`; each `AgentLinkResult`
@@ -114,10 +118,10 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // sandboxed
   library classifies the agent dir's private content — skills that a link
   would adopt (`internal_skills`) and non-skill entries that would be
   quarantined (`internal_others`). The app does not scan agent dirs itself.
-- **`DisableOutcome` / `EnableOutcome`**: the app returns the names that moved
-  (`disabled` / `enabled`) and discards the rest — `requested`, `already`,
-  `missing` and the `installed` inventory describe a no-argument call the
-  frontend never makes.
+- **`SelectionOutcome`** (from `remove` / `disable` / `enable`): the app
+  returns the names the command actually applied to (`applied`) and discards
+  the rest — `available`, `requested`, `already`, `missing` describe
+  no-argument / idempotent calls the frontend never makes.
 
 ## Link semantics since 0.15
 
