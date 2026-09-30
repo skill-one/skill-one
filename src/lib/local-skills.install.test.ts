@@ -34,35 +34,18 @@ describe("installSkillFromSource", () => {
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({ skill: "pdf", skipped: false });
 
-    await installSkillFromSource("anthropics/skills", "pdf", {
-      rev: "rev-at-install",
-    });
+    await installSkillFromSource("anthropics/skills", "pdf");
 
     // Since agents-skills 0.21 the source carries the skill: one source is one
     // skill, matched on the directory basename — which is what the store's
     // slug already is.
     expect(installSkill).toHaveBeenCalledWith("anthropics/skills@pdf");
-    // The install source lands in the provenance ledger (Tauri path) with
-    // the store-side content hash as the installed version marker.
+    // The install source lands in the provenance ledger (Tauri path). The
+    // registry no longer publishes per-skill hashes, so no version marker
+    // rides along.
     expect(recordSkillProvenance).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
-      "rev-at-install",
-      "install",
-    );
-  });
-
-  it("records the install without a hash when the entry carries no rev", async () => {
-    isTauri.mockReturnValue(true);
-    installSkill.mockResolvedValue({ skill: "pdf", skipped: false });
-
-    await installSkillFromSource("anthropics/skills", "pdf");
-
-    expect(recordSkillProvenance).toHaveBeenCalledWith(
-      "anthropics/skills",
-      "pdf",
-      undefined,
-      "install",
     );
   });
 
@@ -99,7 +82,7 @@ describe("installSkillFromSource", () => {
     installSkill.mockResolvedValue({ skill: "pdf", skipped: true });
 
     await expect(
-      installSkillFromSource("anthropics/skills", "pdf", { rev: "rev-1" }),
+      installSkillFromSource("anthropics/skills", "pdf"),
     ).rejects.toBeInstanceOf(SkillAlreadyInstalledError);
 
     expect(recordSkillProvenance).not.toHaveBeenCalled();
@@ -120,8 +103,6 @@ describe("installSkillFromSource", () => {
     expect(recordSkillProvenance).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
-      undefined,
-      "install",
     );
   });
 

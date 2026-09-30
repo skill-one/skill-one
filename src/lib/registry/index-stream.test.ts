@@ -7,7 +7,7 @@ import {
   readLines,
   readRepos,
 } from "./index-stream";
-import { readLatestTag } from "./snapshot";
+import { readSnapshotHead } from "./snapshot";
 
 /** Chunk a string into UTF-8 byte segments of the given size. */
 function chunksOf(text: string, size: number): Uint8Array[] {
@@ -59,29 +59,34 @@ describe("readLines", () => {
   });
 });
 
-/** The dataset's `latest` pointer, as `fileCandidates` builds it. */
-const POINTER_ORIGIN =
-  "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/latest";
-const POINTER_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@dist/latest`;
+/** The GitHub API endpoint the branch-head probe calls, cache-busted. */
+const API_URL =
+  "https://api.github.com/repos/skill-one/skills-profiles/commits/dist";
 
-/** A 200 response serving a plain-text body (the pointer file). */
-function textResponse(body: string): Response {
+/** A branch-head commit as the API reports it. */
+const HEAD_COMMIT = {
+  sha: "a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0",
+  commit: { committer: { date: "2026-09-30T12:21:45Z" } },
+};
+
+/** A 200 response serving a JSON body (the API answer). */
+function jsonResponse(body: unknown): Response {
   return {
     ok: true,
     status: 200,
-    text: async () => body,
+    json: async () => body,
   } as unknown as Response;
 }
 
-describe("readLatestTag", () => {
-  const fetchMock = vi.fn();
+/** The branch index URL, as `fileCandidates` builds it (before busting). */
+const BRANCH_INDEX =
+  "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills.jsonl";
 
-  /** The dataset's pointer contract, as `index-stream.ts` declares it. */
-  const SOURCE = {
-    repo: "skill-one/skills-profiles",
-    branch: "dist",
-    tag: /^dist-\d{4}-\d{2}-\d{2}(?:-\d+)?$/,
-  };
+/** The dataset's pointer contract, as `index-stream.ts` declares it. */
+const SOURCE = { repo: "skill-one/skills-profiles", branch: "dist" };
+
+describe("readSnapshotHead", () => {
+  const fetchMock = vi.fn();
 
   beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock);
@@ -92,82 +97,52 @@ describe("readLatestTag", () => {
     vi.unstubAllGlobals();
   });
 
-  it("reads the pointer's one-line body as the tag, cache-busted", async () => {
-    fetchMock.mockImplementation(async () => textResponse("dist-2026-09-12\n"));
+  it("answers with the branch head's SHA and commit date, cache-busted", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse(HEAD_COMMIT));
 
-    await expect(readLatestTag("", SOURCE)).resolves.toBe("dist-2026-09-12");
-    // The pointer is a mutable freshness address: an edge copy answering with
-    // yesterday's tag would pin the whole download to yesterday's snapshot.
-    expect(fetchMock.mock.calls[0][0]).toMatch(`${POINTER_ORIGIN}?t=`);
-  });
-
-  it("trims surrounding whitespace off the body", async () => {
-    fetchMock.mockImplementation(async () => textResponse("  dist-2026-09-12  "));
-
-    await expect(readLatestTag("", SOURCE)).resolves.toBe("dist-2026-09-12");
-  });
-
-  it("refuses a body that is not a tag this repo publishes", async () => {
-    // The value is interpolated into download URLs, so anything that is not a
-    // snapshot tag must not become a ref.
-    fetchMock.mockImplementation(async (url: string) =>
-      url.startsWith(POINTER_ORIGIN)
-        ? textResponse("main")
-        : textResponse("<html>404</html>"),
-    );
-
-    await expect(readLatestTag("", SOURCE)).resolves.toBeNull();
-  });
-
-  it("walks to the next source when one is unreachable", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(POINTER_ORIGIN)) throw new TypeError("network down");
-      return textResponse("dist-2026-09-11");
+    await expect(readSnapshotHead(SOURCE)).resolves.toEqual({
+      ref: HEAD_COMMIT.sha,
+      generatedAt: "2026-09-30T12:21:45Z",
     });
-
-    await expect(readLatestTag("", SOURCE)).resolves.toBe("dist-2026-09-11");
-    expect(fetchMock.mock.calls.map(([url]) => url.split("?")[0])).toEqual([
-      POINTER_ORIGIN,
-      POINTER_CDN,
-    ]);
+    // The head is a mutable freshness address: an edge copy answering with
+    // yesterday's commit would pin the whole download to yesterday's snapshot.
+    expect(fetchMock.mock.calls[0][0]).toMatch(`${API_URL}?t=`);
   });
 
-  it("returns null when no source answers", async () => {
+  it("refuses a payload whose sha is not a commit SHA", async () => {
+    // The value is interpolated into download URLs, so anything that is not a
+    // commit SHA must not become a ref.
+    fetchMock.mockImplementation(async () =>
+      jsonResponse({ ...HEAD_COMMIT, sha: "main" }),
+    );
+    await expect(readSnapshotHead(SOURCE)).resolves.toBeNull();
+  });
+
+  it("refuses a payload without a commit date", async () => {
+    // The date is the freshness stamp the "unchanged" short-circuit compares;
+    // without it the caller cannot skip a download.
+    fetchMock.mockImplementation(async () =>
+      jsonResponse({
+        ...HEAD_COMMIT,
+        commit: { committer: { date: undefined } },
+      }),
+    );
+    await expect(readSnapshotHead(SOURCE)).resolves.toBeNull();
+  });
+
+  it("returns null on a body that is not a JSON object", async () => {
+    fetchMock.mockImplementation(async () => jsonResponse("<html>"));
+    await expect(readSnapshotHead(SOURCE)).resolves.toBeNull();
+  });
+
+  it("returns null when the API does not answer", async () => {
     fetchMock.mockRejectedValue(new TypeError("network down"));
-    await expect(readLatestTag("", SOURCE)).resolves.toBeNull();
+    await expect(readSnapshotHead(SOURCE)).resolves.toBeNull();
   });
 });
 
 describe("probeIndexMeta", () => {
-  // Candidate URLs as produced by `fileCandidates(META_SPEC, "")`: the direct
-  // GitHub origin first, the default CDN mirror second.
-  const ORIGIN_STATS =
-    "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/upstream/stats.json";
-  const CDN_STATS = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@dist/upstream/stats.json`;
-
-  const TAG = "dist-2026-09-06";
-  // Tag-pinned stats candidates: immutable, so no busting is needed.
-  const PINNED_STATS_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-profiles/${TAG}/upstream/stats.json`;
-  const PINNED_STATS_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@${TAG}/upstream/stats.json`;
-
   const fetchMock = vi.fn();
-
-  /** A 200 stats response carrying the given body. */
-  function statsResponse(body: unknown): Response {
-    return {
-      ok: true,
-      status: 200,
-      json: async () => body,
-    } as unknown as Response;
-  }
-
-  /** The published run as upstream CI writes it. */
-  const PUBLISHED = {
-    startedAt: "2026-09-06T15:02:30.557Z",
-    finishedAt: "2026-09-06T15:32:29.423Z",
-    indexedRows: 8945,
-    changed: 15,
-  };
 
   /** URLs actually fetched, with any cache-busting stamp stripped off. */
   let requested: string[];
@@ -182,152 +157,66 @@ describe("probeIndexMeta", () => {
     vi.unstubAllGlobals();
   });
 
-  /** Make the `latest` pointer unreachable (the degraded branch path). */
-  function withoutPointer() {
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(POINTER_ORIGIN) || url.startsWith(POINTER_CDN)) {
-        throw new TypeError("network down");
-      }
-      requested.push(url.split("?")[0]);
-      return statsResponse(PUBLISHED);
-    });
-  }
-
-  it("resolves the tag from the latest pointer, then reads the stats pinned to it", async () => {
+  it("resolves the snapshot identity from the branch head, cache-busted", async () => {
     fetchMock.mockImplementation(async (url: string) => {
       requested.push(url.split("?")[0]);
-      if (url.startsWith(POINTER_ORIGIN)) return textResponse(TAG);
-      return statsResponse(PUBLISHED);
+      return jsonResponse(HEAD_COMMIT);
     });
 
     expect(await probeIndexMeta("")).toEqual({
-      tag: TAG,
-      generatedAt: "2026-09-06T15:32:29.423Z",
-      total: 8945,
+      ref: HEAD_COMMIT.sha,
+      generatedAt: "2026-09-30T12:21:45Z",
     });
-    // The pointer is busted; the pinned stats are not — the tag makes the URL
-    // immutable, so the origin answering means the CDN is never asked.
-    expect(requested).toEqual([POINTER_ORIGIN, PINNED_STATS_ORIGIN]);
+    expect(requested).toEqual([API_URL]);
   });
 
-  it("pins the tag even when the stats cannot be read", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
+  it("falls back to a branch etag identity when the API does not answer", async () => {
+    // Rate-limited or blocked egress IPs make the API unreliable, so the
+    // branch itself is consulted: a cache-busted HEAD answers with the
+    // index body's etag — a content hash, so equal etag still means equal
+    // index bytes. No SHA answers, so the body stays unpinned.
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       requested.push(url.split("?")[0]);
-      if (url.startsWith(POINTER_ORIGIN)) return textResponse(TAG);
-      return { ok: false, status: 404 } as unknown as Response;
+      if (url.startsWith(API_URL)) throw new TypeError("rate limited");
+      if (init?.method === "HEAD") {
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers({ etag: 'W/"6fbdf1-E7rN6kKBORnBBnTXbDWPNXYOrHU"' }),
+        } as unknown as Response;
+      }
+      throw new TypeError("unexpected GET");
     });
 
-    // The tag alone still pins the body download; only the stamp/count are
-    // unknown, which costs the caller its "unchanged" short-circuit.
-    expect(await probeIndexMeta("")).toEqual({ tag: TAG });
-    expect(requested).toEqual([
-      POINTER_ORIGIN,
-      PINNED_STATS_ORIGIN,
-      PINNED_STATS_CDN,
-    ]);
-  });
-
-  it("falls back to the branch probe, unpinned, when the pointer is unreadable", async () => {
-    withoutPointer();
-
-    // Nothing is derived from the stats stamp any more: the pointer is
-    // upstream's own statement of the tag, so a missing pointer leaves the
-    // version unpinned rather than guessing at its naming convention.
     expect(await probeIndexMeta("")).toEqual({
-      generatedAt: "2026-09-06T15:32:29.423Z",
-      total: 8945,
+      generatedAt: 'W/"6fbdf1-E7rN6kKBORnBBnTXbDWPNXYOrHU"',
     });
-    // The origin answers, so no further source is consulted.
-    expect(requested).toEqual([ORIGIN_STATS]);
+    // The branch index is probed through the candidate chain, cache-busted.
+    expect(requested).toEqual([API_URL, BRANCH_INDEX]);
   });
 
-  it("refuses a pointer body that is not a snapshot tag", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      requested.push(url.split("?")[0]);
-      if (url.startsWith(POINTER_ORIGIN) || url.startsWith(POINTER_CDN)) {
-        return textResponse("main");
-      }
-      return statsResponse(PUBLISHED);
-    });
-
-    const published = await probeIndexMeta("");
-    expect(published?.tag).toBeUndefined();
-    expect(published?.generatedAt).toBe("2026-09-06T15:32:29.423Z");
-    expect(requested).toEqual([POINTER_ORIGIN, ORIGIN_STATS]);
-  });
-
-  it("busts the CDN cache on every branch request", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      if (
-        url.startsWith(POINTER_ORIGIN) ||
-        url.startsWith(POINTER_CDN) ||
-        url.startsWith(ORIGIN_STATS)
-      ) {
-        throw new TypeError("network down");
-      }
-      requested.push(url);
-      return statsResponse(PUBLISHED);
-    });
-
-    await probeIndexMeta("");
-    // Without the pointer the branch is the freshness oracle: an edge copy as
-    // much as the WebView's own cache would make yesterday's snapshot look
-    // current.
-    expect(requested).toHaveLength(1);
-    expect(requested[0].startsWith(`${CDN_STATS}?t=`)).toBe(true);
-  });
-
-  it("accepts a stamp-less stats file from a source lagging behind the format", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(POINTER_ORIGIN) || url.startsWith(POINTER_CDN)) {
-        throw new TypeError("network down");
-      }
-      return statsResponse({ startedAt: "2026-08-31T04:34:54Z" });
-    });
-    expect(await probeIndexMeta("")).toEqual({
-      generatedAt: undefined,
-      total: undefined,
-    });
-  });
-
-  it("walks to the next source when one is unreachable", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(POINTER_ORIGIN) || url.startsWith(POINTER_CDN)) {
-        throw new TypeError("network down");
-      }
-      requested.push(url.split("?")[0]);
-      if (url.startsWith(ORIGIN_STATS)) return { ok: false, status: 503 };
-      return statsResponse(PUBLISHED);
-    });
-
-    expect(await probeIndexMeta("")).not.toBeNull();
-    expect(requested).toEqual([ORIGIN_STATS, CDN_STATS]);
-  });
-
-  it("returns null when no source answers", async () => {
+  it("returns null when neither the API nor any etag source answers", async () => {
     fetchMock.mockImplementation(async () => {
       throw new TypeError("network down");
     });
     await expect(probeIndexMeta("")).resolves.toBeNull();
   });
 
-  it("returns null on a body that is not a JSON object", async () => {
+  it("returns null on a body that is not a usable branch head and no etag", async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(POINTER_ORIGIN) || url.startsWith(POINTER_CDN)) {
-        throw new TypeError("network down");
-      }
-      return statsResponse("<html>");
+      if (url.startsWith(API_URL)) return jsonResponse("<html>");
+      return { ok: false, status: 404 } as unknown as Response;
     });
     await expect(probeIndexMeta("")).resolves.toBeNull();
   });
 });
 
 describe("readIndex", () => {
-  const TAG = "dist-2026-09-06";
-  // Tag-addressed candidates: immutable, so no busting is needed.
-  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-profiles/${TAG}/skills.jsonl`;
-  const PINNED_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@${TAG}/skills.jsonl`;
-  // Branch candidates, used only when no tag is known.
+  const SHA = HEAD_COMMIT.sha;
+  // SHA-addressed candidates: immutable, so no busting is needed.
+  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-profiles/${SHA}/skills.jsonl`;
+  const PINNED_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@${SHA}/skills.jsonl`;
+  // Branch candidates, used only when no SHA is known.
   const BRANCH_ORIGIN =
     "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills.jsonl";
 
@@ -383,11 +272,13 @@ describe("readIndex", () => {
     const body = [
       JSON.stringify({
         id: "acme/tools/hammer",
+        name: "hammer",
         installs: 10,
-        url: "https://www.skills.sh/acme/tools/hammer",
+        dir: "acme/tools/hammer",
         description: "Hammers.",
-        hash: "b146008599c31057",
-        fetchedAt: "2026-09-06T07:57:37.803Z",
+        description_zh: "锤子。",
+        domain: "development",
+        confidence: 0.8,
       }),
       "not json", // malformed → skipped
       JSON.stringify({ id: "open.feishu.cn/tools/x", installs: 1 }), // non-GitHub → skipped
@@ -402,7 +293,7 @@ describe("readIndex", () => {
     let restarts = 0;
     await readIndex(
       "",
-      TAG,
+      SHA,
       Promise.resolve(new Map([["acme/tools", 3]])),
       (skill) => skills.push(skill),
       () => restarts++,
@@ -414,12 +305,12 @@ describe("readIndex", () => {
         name: "hammer",
         repo: "acme/tools",
         description: "Hammers.",
+        descriptionZh: "锤子。",
         stars: 3,
         downloads: 10,
         path: "skills/acme/tools/hammer",
-        rev: "b146008599c31057",
-        firstSeenAt: "2026-09-06T07:57:37.803Z",
         url: "https://www.skills.sh/acme/tools/hammer",
+        profile: { domain: ["development"], confidence: 0.8 },
       },
     ]);
   });
@@ -428,7 +319,7 @@ describe("readIndex", () => {
     const skills: unknown[] = [];
     await readIndex(
       "",
-      TAG,
+      SHA,
       // null = the repos.jsonl sidecar was unreachable; never rejects.
       Promise.resolve(null),
       (skill) => skills.push(skill),
@@ -442,26 +333,27 @@ describe("readIndex", () => {
         stars: 0,
         downloads: 0,
         path: "skills/acme/tools/x",
+        url: "https://www.skills.sh/acme/tools/x",
       },
     ]);
   });
 
-  it("downloads the tag-addressed URL untouched by a busting stamp", async () => {
+  it("downloads the SHA-addressed URL untouched by a busting stamp", async () => {
     await readIndex(
       "",
-      TAG,
+      SHA,
       Promise.resolve(null),
       () => {},
       () => {},
     );
 
-    // The tag makes the URL content-addressed: a cached copy is by
+    // The SHA makes the URL content-addressed: a cached copy is by
     // definition the right copy, so busting it would only cost a full
     // origin download.
     expect(requested).toEqual([PINNED_ORIGIN]);
   });
 
-  it("busts the mutable branch URL when no tag is known", async () => {
+  it("busts the mutable branch URL when no SHA is known", async () => {
     await readIndex(
       "",
       undefined,
@@ -471,7 +363,7 @@ describe("readIndex", () => {
     );
 
     // Without a pin, an edge copy could be a day old and indistinguishable
-    // from the current index — the failure tag addressing exists to kill.
+    // from the current index — the failure SHA addressing exists to kill.
     expect(requested).toHaveLength(1);
     expect(requested[0].startsWith(`${BRANCH_ORIGIN}?t=`)).toBe(true);
   });
@@ -490,7 +382,7 @@ describe("readIndex", () => {
     // map is reused, not re-fetched.
     await readIndex(
       DEFAULT_CDN_BASE,
-      TAG,
+      SHA,
       Promise.resolve(new Map([["acme/tools", 7]])),
       (skill) => skills.push(skill),
       () => restarts++,
@@ -506,6 +398,7 @@ describe("readIndex", () => {
         stars: 7,
         downloads: 0,
         path: "skills/acme/tools/x",
+        url: "https://www.skills.sh/acme/tools/x",
       },
     ]);
   });
@@ -518,7 +411,7 @@ describe("readIndex", () => {
 
     const err = await readIndex(
       "",
-      TAG,
+      SHA,
       Promise.resolve(null),
       () => {},
       () => {},
@@ -531,10 +424,10 @@ describe("readIndex", () => {
 });
 
 describe("readRepos", () => {
-  const TAG = "dist-2026-09-06";
-  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-profiles/${TAG}/upstream/repos.jsonl`;
+  const SHA = HEAD_COMMIT.sha;
+  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-profiles/${SHA}/repos.jsonl`;
   const BRANCH_ORIGIN =
-    "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/upstream/repos.jsonl";
+    "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/repos.jsonl";
 
   const fetchMock = vi.fn();
 
@@ -561,34 +454,37 @@ describe("readRepos", () => {
       bodyResponse(
         [
           JSON.stringify({
-            repo: "vercel-labs/skills",
-            stars: 1523,
-            description: "Agents, skills, and plugins for Vercel",
-            pushedAt: "2026-09-11T14:02:11.000Z",
+            id: "vercel-labs/skills",
+            owner: "vercel-labs",
+            repo: "skills",
+            stars: 32793,
+            description: "The open agent skills tool - npx skills",
+            pushed_at: "2026-09-28T20:20:57Z",
+            gone: false,
           }),
-          JSON.stringify({ repo: "anthropics/skills", stars: 30501 }),
+          JSON.stringify({ id: "anthropics/skills", stars: 30501 }),
           "", // blank → skipped
           "not json", // malformed → skipped
-          JSON.stringify({ stars: 5 }), // missing repo → skipped
-          JSON.stringify({ repo: "gone/repo", stars: null }), // deleted repo → dropped
-          JSON.stringify({ repo: "bad/types", stars: "many" }), // non-number → skipped
+          JSON.stringify({ stars: 5 }), // missing id → skipped
+          JSON.stringify({ id: "gone/repo", stars: null }), // deleted repo → dropped
+          JSON.stringify({ id: "bad/types", stars: "many" }), // non-number → skipped
         ].join("\n"),
       ),
     );
 
-    await expect(readRepos("", TAG)).resolves.toEqual(
+    await expect(readRepos("", SHA)).resolves.toEqual(
       new Map([
-        ["vercel-labs/skills", 1523],
+        ["vercel-labs/skills", 32793],
         ["anthropics/skills", 30501],
       ]),
     );
-    // Tag-addressed: immutable, fetched untouched.
+    // SHA-addressed: immutable, fetched untouched.
     expect(fetchMock.mock.calls[0][0]).toBe(PINNED_ORIGIN);
   });
 
-  it("busts the mutable branch URL when no tag is known", async () => {
+  it("busts the mutable branch URL when no SHA is known", async () => {
     fetchMock.mockImplementation(async () =>
-      bodyResponse(JSON.stringify({ repo: "a/b", stars: 1 })),
+      bodyResponse(JSON.stringify({ id: "a/b", stars: 1 })),
     );
 
     await expect(readRepos("", undefined)).resolves.toEqual(
@@ -604,7 +500,7 @@ describe("readRepos", () => {
       return { ok: false, status: 404 } as unknown as Response;
     });
 
-    const err = await readRepos("", TAG).catch((e) => e);
+    const err = await readRepos("", SHA).catch((e) => e);
     expect(err).toBeInstanceOf(SourceFetchError);
     expect(err.kind).toBe("http");
   });

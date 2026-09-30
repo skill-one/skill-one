@@ -7,7 +7,7 @@ import type {
   SearchData,
 } from "../lib/registry/protocol";
 import type { RegistrySnapshot } from "../lib/registry/client";
-import type { PublishedIndex } from "../lib/registry/index-stream";
+import type { SnapshotHead } from "../lib/registry/snapshot";
 import type { Skill, SkillRef } from "../types/skill";
 
 /**
@@ -37,7 +37,7 @@ export interface RegistryHarness {
    * what the controller compares against its cache to decide whether the body
    * needs downloading, and its tag is what downloads get pinned to.
    */
-  publishMeta(meta: PublishedIndex | null): void;
+  publishMeta(meta: SnapshotHead | null): void;
   /** Tag the most recent download was pinned to (undefined = branch). */
   readonly pinnedTag: string | undefined;
   /** Make every RPC reject (worker crash stand-in) until cleared. */
@@ -90,7 +90,7 @@ export function createRegistryHarness(): RegistryHarness {
   // The published snapshot the fake sources advertise. Null (the default) means
   // "no stats reachable": no tag to pin or run to compare, so every boot
   // downloads — exactly the behavior from before run addressing existed.
-  let published: PublishedIndex | null = null;
+  let published: SnapshotHead | null = null;
   /** Tag the newest download was pinned to (undefined = branch fallback). */
   let pinnedTag: string | undefined;
 

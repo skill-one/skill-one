@@ -2,16 +2,12 @@
  * Registry-side association for skills the provenance ledger does not know:
  * skills installed by other tools (the `npx skills` CLI, manual copies).
  *
- * Three steps per unlinked skill, ordered cheap-first:
+ * Two steps per unlinked skill, ordered cheap-first:
  *
  * 1. **Namesake lookup** — registry entries whose exact slug equals the
  *    skill's name. None? The skill is a plain local skill, nothing more to
  *    do (and, importantly, no disk walk either).
- * 2. **Hash auto-link** — compute the skills.sh upstream content hash of the
- *    local directory and compare it against the namesakes' `rev`s. Equality
- *    is content-level identity, so the association is written into the
- *    ledger exactly like a native install.
- * 3. **Description auto-link or candidate suggestions** — the namesakes are
+ * 2. **Description auto-link or candidate suggestions** — the namesakes are
  *    ranked by description similarity. At/above `SIMILARITY_AUTO_LINK_THRESHOLD`
  *    the wording is close enough to call it the same skill, so the association
  *    is written automatically (no prompt). Below the threshold the decision is
@@ -53,8 +49,7 @@ import type {
 import type { SourceLinkReason } from "./activity";
 
 /**
- * Candidates offered for a skill, ranked: any hash-identical entry first
- * (returned by the auto-link tier, not here), then by similarity.
+ * Candidates offered for a skill, ranked by description similarity.
  */
 export interface LinkCandidate {
   skill: Skill;
@@ -126,12 +121,12 @@ export function rankNamesakes(
 
 /**
  * Equality key of a ranking input: the full namesake list's identity fields
- * (`rev` covers content, the descriptions the wording the similarity reads).
- * A fresh lookup with the same key ranks identically over unchanged content.
+ * (the repo and the descriptions the similarity reads). A fresh lookup with
+ * the same key ranks identically over unchanged content.
  */
 function namesakesKey(namesakes: Skill[]): string {
   return namesakes
-    .map((s) => [s.repo, s.rev ?? "", s.description, s.descriptionZh ?? ""].join("\u0000"))
+    .map((s) => [s.repo, s.description, s.descriptionZh ?? ""].join("\u0000"))
     .toSorted()
     .join("\u0001");
 }
@@ -145,7 +140,6 @@ function toPersisted(candidate: LinkCandidate): PersistedCandidate {
     downloads: skill.downloads,
     description: skill.description,
     ...(skill.descriptionZh !== undefined ? { descriptionZh: skill.descriptionZh } : {}),
-    ...(skill.rev !== undefined ? { rev: skill.rev } : {}),
   };
 }
 
@@ -159,7 +153,6 @@ function reviveCandidates(name: string, candidates: PersistedCandidate[]): LinkC
       stars: candidate.stars,
       downloads: candidate.downloads,
       ...(candidate.descriptionZh !== undefined ? { descriptionZh: candidate.descriptionZh } : {}),
-      ...(candidate.rev !== undefined ? { rev: candidate.rev } : {}),
     },
   }));
 }
@@ -187,7 +180,6 @@ export async function resolveAssociations(
   const matched: Array<{
     repo: string;
     name: string;
-    hash?: string;
     reason: SourceLinkReason;
   }> = [];
   const upserts = new Map<string, ResolutionRecord>();
@@ -230,13 +222,14 @@ export async function resolveAssociations(
         return;
       }
 
-      // Step 2 — content identity. The computed hash is only meaningful for
-      // the match itself; a matched hash equals the matched rev by
-      // definition. A stored hash is reused while the stat-only fingerprint
-      // says the directory is unchanged; otherwise the directory is analyzed
-      // (hash + fingerprint in one walk). Hashing needs the native shell (the
-      // browser mock has no real files), so outside Tauri the tier degrades
-      // to suggestions only.
+      // Step 2 — content check. The directory is analyzed (hash +
+      // fingerprint in one walk) so the ledger can guard the ranking by the
+      // stat-only fingerprint: a stored hash reused while the fingerprint
+      // says the directory is unchanged lets a restart skip re-ranking. The
+      // registry no longer publishes per-skill hashes, so the hash itself
+      // matches nothing — it is bookkeeping, not an identity. Hashing needs
+      // the native shell (the browser mock has no real files), so outside
+      // Tauri this step degrades to suggestions only.
       let hash: string | null = null;
       let fingerprint: SkillFingerprint | null = null;
       let contentVerified = false;
@@ -254,18 +247,6 @@ export async function resolveAssociations(
           hash = analyzed?.hash ?? null;
           fingerprint = analyzed?.fingerprint ?? null;
         }
-      }
-      const match =
-        hash != null
-          ? namesakes.find((s) => s.rev != null && s.rev === hash)
-          : undefined;
-      if (hash != null && match) {
-        matched.push({ repo: match.repo, name: skill.name, hash, reason: "hash" });
-        linked.push(skill.name);
-        // Linked — the entry leaves the candidate pool for good.
-        resolved.set(skill.name, []);
-        drops.add(skill.name);
-        return;
       }
 
       // Step 3 — ranked candidates. A near-identical description (≥ threshold)
@@ -319,9 +300,8 @@ export async function resolveAssociations(
  * Per-skill resolution memoization for the current snapshot: `[]` marks a
  * dead end (no namesakes, hashing unavailable) or a linked skill; a
  * non-empty array holds the cached candidates. Cleared when the served
- * snapshot changes — a fresh snapshot can carry the rev a local hash was
- * waiting for, or new namesakes. Across restarts the persisted ledger takes
- * over this role.
+ * snapshot changes — a fresh snapshot can carry new namesakes. Across
+ * restarts the persisted ledger takes over this role.
  */
 const resolved = new Map<string, LinkCandidate[]>();
 

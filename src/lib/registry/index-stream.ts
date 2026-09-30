@@ -1,46 +1,45 @@
 import {
   cacheBusted,
-  fetchFirstJson,
   fetchFirstStreamInOrder,
+  fetchSignal,
   fileCandidates,
   type FileSpec,
 } from "../cdn-config";
 import { MIRROR } from "../mirror";
-import { count, record, text } from "../value";
+import {
+  readSnapshotHead,
+  type SnapshotSource,
+  type SnapshotHead,
+} from "./snapshot";
 import type { Skill } from "../../types/skill";
 import { jsonLine, parseSkillLine, type StarsFor } from "./parse";
-import { readLatestTag } from "./snapshot";
-import type { SnapshotSource } from "./snapshot";
 
 /**
  * Streaming reader for the registry snapshot: resolves which published
  * version to use, then splits the response body into JSONL lines and hands
  * every parsed skill to the caller. Runs inside the registry worker.
  *
- * Version resolution is pointer-first (see `snapshot.ts`): upstream publishes
- * every daily snapshot to the `dist` branch and writes a `latest` file beside
- * it holding the tag that branch points at, so a single small read names the
- * version everything else is addressed through. Two cache policies follow:
+ * Version resolution is branch-head-first (see `snapshot.ts`): upstream
+ * publishes every snapshot to the `dist` branch and states nothing else about
+ * currency — no pointer file, no per-run stats — so the branch head's commit
+ * SHA is what names the version everything else is addressed through. Two
+ * cache policies follow:
  *
- * - The `latest` pointer and the `dist` branch are mutable pointers, so their
- *   requests are always cache-busted — a stale answer defeats their purpose.
- *   `stats.json` read pinned to the resolved tag is immutable, so it is not
- *   busted; its `finishedAt` identifies the snapshot (equal stamps mean equal
- *   bytes: a run publishes once) and dates it.
- * - `skills.jsonl` is fetched through the `dist-<date>` tag, so its URL is
- *   content-addressed and immutable: a cached copy is by definition the right
- *   bytes, and a CDN that lags behind can only serve the *same* version
- *   (same-day re-runs force-move the tag to the newest snapshot, which the
- *   changed `finishedAt` detects and re-downloads). Callers compare the stamp
- *   against their own cache to decide whether the multi-megabyte body needs
- *   downloading at all.
+ * - The branch head is a mutable pointer, so its one small API request is
+ *   always cache-busted — a stale answer defeats its purpose. The commit date
+ *   it reports is the snapshot's freshness identity (equal dates mean equal
+ *   bytes: a run publishes once), which drives the "unchanged" short-circuit.
+ * - `skills.jsonl` and `repos.jsonl` are fetched pinned to the commit SHA, so
+ *   their URLs are content-addressed and immutable: a cached copy is by
+ *   definition the right bytes, and a CDN that lags behind can only serve the
+ *   *same* version. Callers compare the stamp against their own cache to
+ *   decide whether the multi-megabyte body needs downloading at all.
  */
 
 /**
- * The dataset repo publishes the whole dataset (JSONL) to its `dist` branch as
- * a snapshot. Each row already carries the profile classification (`domain`),
- * so this single file *is* the dataset — there is no second source decoration
- * step.
+ * The dataset repo publishes the whole dataset to its `dist` branch as a
+ * snapshot. Each row already carries the profile classification (`domain`),
+ * so the catalog *is* the dataset — there is no second source decoration step.
  */
 const INDEX_SPEC = {
   repo: MIRROR.repo,
@@ -48,41 +47,36 @@ const INDEX_SPEC = {
   ref: MIRROR.ref,
 } as const;
 
-/** Sidecar run stats published beside the index (under `upstream/`). */
-const META_SPEC = { ...INDEX_SPEC, path: "upstream/stats.json" } as const;
-
 /**
  * Per-repo metadata sidecar (GitHub stars; one row per repo). Star counts
  * left the skill rows themselves — this file is their join table, keyed by
- * `{owner}/{repo}`, the first two segments of every index id.
+ * the `id` field (`{owner}/{repo}`), the first two segments of every index id.
  */
-const REPOS_SPEC = { ...INDEX_SPEC, path: "upstream/repos.jsonl" } as const;
+const REPOS_SPEC = { ...INDEX_SPEC, path: "repos.jsonl" } as const;
 
 /**
- * The dataset repo's pointer contract: the `latest` file at the `dist` root
- * names a `dist-` tag — a day's baseline (`dist-<date>`) or one of the
- * batches generated on top of it (`dist-<date>-N`).
+ * The dataset repo's snapshot source: the rolling `dist` branch, whose head
+ * commit names the snapshot.
  */
 const INDEX_SOURCE: SnapshotSource = {
   repo: INDEX_SPEC.repo,
   branch: INDEX_SPEC.ref,
-  tag: /^dist-\d{4}-\d{2}-\d{2}(?:-\d+)?$/,
 };
 
 /**
  * Candidate URLs for one snapshot file, addressed by the file's own policy:
- * pinned to the immutable `dist-` tag when one is resolved — cache-safe, so a
- * lagging CDN can only serve the same snapshot — and read off the mutable
- * branch cache-busted when none is, since a stale copy there would pass for
- * the current publish.
+ * pinned to the snapshot's commit SHA when one is resolved — immutable, so
+ * cache-safe, and a lagging CDN can only serve the same snapshot — and read
+ * off the mutable branch cache-busted when none is, since a stale copy there
+ * would pass for the current publish.
  */
 function snapshotUrls(
   spec: FileSpec,
   cdnBase: string,
-  tag?: string,
+  ref?: string,
 ): string[] {
-  const urls = fileCandidates({ ...spec, ref: tag ?? spec.ref }, cdnBase);
-  return tag ? urls : urls.map(cacheBusted);
+  const urls = fileCandidates({ ...spec, ref: ref ?? spec.ref }, cdnBase);
+  return ref ? urls : urls.map(cacheBusted);
 }
 
 /**
@@ -91,31 +85,6 @@ function snapshotUrls(
  * keeps a dead connection from hanging the load forever.
  */
 const CHUNK_TIMEOUT_MS = 15_000;
-
-/**
- * Freshness and shape of the currently published snapshot, as reported by
- * the run's stats.
- */
-interface RawRunStats {
-  startedAt?: unknown;
-  finishedAt?: unknown;
-  indexedRows?: unknown;
-}
-
-/**
- * Normalized facts about the currently published snapshot. Fields are
- * optional because a partial or future-shaped stats file simply omits them;
- * the caller treats a missing `tag` as "cannot pin", and a missing
- * `generatedAt` as "cannot skip".
- */
-export interface PublishedIndex {
-  /** Immutable `dist-<date>` tag the index body can be fetched at. */
-  tag?: string;
-  /** UTC stamp of the run that produced the snapshot (second precision). */
-  generatedAt?: string;
-  /** Published row count, before any consumer-side filtering. */
-  total?: number;
-}
 
 /**
  * Read a response body as decoded text lines, delivering each complete line
@@ -170,99 +139,76 @@ export async function readLines(
 }
 
 /**
- * Probe the currently published snapshot, resolving its identity from the
- * repo's `latest` pointer: that single line names the tag, and `stats.json` is
- * then read **pinned to that tag** — an immutable address, so no busting is
- * needed and a lagging CDN can only serve the same snapshot's stats. The stats
- * supply the publication stamp and row count; if they cannot be read the tag
- * alone still pins the download.
+ * Probe the currently published snapshot, resolving its identity in two
+ * stages. Primary: the repo's `dist` branch head via one small GitHub API
+ * request, which answers with the commit SHA (the immutable ref the body is
+ * fetched at) and the commit date (the publication stamp). Degraded: when
+ * the API does not answer — rate-limited or blocked egress IPs are common —
+ * a cache-busted `HEAD` on the branch's `skills.jsonl` answers with its
+ * etag, a content hash that makes an equally valid freshness identity (equal
+ * etag, equal index bytes). The body is then not pinned, but the "unchanged"
+ * short-circuit still works.
  *
- * When the pointer cannot be read at all, the branch's own `stats.json` is
- * probed cache-busted for the stamp — busted because a source that answers
- * must answer for the current publish, or a stale mirror would pass
- * yesterday's snapshot off as current. No tag is derived on that path: the
- * version simply stays unpinned, costing the body its immutable address while
- * still letting the caller skip one it already has.
- *
- * Returns null when neither path could reach a source, which leaves the
- * caller to fall back to the mutable branch ref.
+ * Returns null when neither stage answered, which leaves the caller to fall
+ * back to the mutable branch ref: the version stays unpinned and undatable,
+ * so the next boot re-downloads once.
  */
 export async function probeIndexMeta(
   cdnBase: string,
-): Promise<PublishedIndex | null> {
-  const tag = await readLatestTag(cdnBase, INDEX_SOURCE);
-  if (!tag) return probeBranchStats(cdnBase);
-  const stats = await readStatsAt(cdnBase, tag);
-  return stats ? { ...normalizeStats(stats), tag } : { tag };
-}
-
-/** Fetch `stats.json` pinned to an immutable snapshot tag (no cache-busting). */
-function readStatsAt(
-  cdnBase: string,
-  tag: string,
-): Promise<RawRunStats | null> {
-  return fetchFirstJson(snapshotUrls(META_SPEC, cdnBase, tag), (raw) =>
-    record<RawRunStats>(raw),
-  );
+): Promise<SnapshotHead | null> {
+  const head = await readSnapshotHead(INDEX_SOURCE).catch(() => null);
+  if (head) return head;
+  return probeBranchEtag(cdnBase);
 }
 
 /**
- * Degraded probe, used when the `latest` pointer is unreadable: read
- * `stats.json` off the mutable branch, cache-busted. The stamp and count still
- * drive the caller's "unchanged" short-circuit; only the tag is unknown, which
- * costs the download its immutable address.
+ * Degraded identity probe: `HEAD` the branch body (cache-busted) through the
+ * candidate chain and read its etag. `HEAD` transfers no body, so probing
+ * the multi-megabyte file costs only headers.
  */
-async function probeBranchStats(
-  cdnBase: string,
-): Promise<PublishedIndex | null> {
-  return fetchFirstJson(snapshotUrls(META_SPEC, cdnBase), (raw) => {
-      const stats = record<RawRunStats>(raw);
-      return stats ? normalizeStats(stats) : null;
-    },
-  );
-}
-
-/**
- * Keep only the fields we can actually use; junk becomes `undefined`. The tag
- * is deliberately not derived here — it comes from the `latest` pointer, which
- * is upstream's own statement of it rather than our guess at its naming
- * convention.
- */
-function normalizeStats(raw: RawRunStats): PublishedIndex {
-  return {
-    generatedAt: text(raw.finishedAt),
-    total: count(raw.indexedRows),
-  };
+async function probeBranchEtag(cdnBase: string): Promise<SnapshotHead | null> {
+  for (const url of snapshotUrls(INDEX_SPEC, cdnBase)) {
+    try {
+      const resp = await fetch(url, { method: "HEAD", signal: fetchSignal() });
+      if (!resp.ok) continue;
+      const etag = resp.headers.get("etag");
+      if (etag) return { generatedAt: etag };
+    } catch {
+      // Unreachable or timed out: give the next source a turn.
+    }
+  }
+  return null;
 }
 
 /**
  * Repo → GitHub-star lookup over the snapshot's `repos.jsonl` sidecar, keyed
- * by `{owner}/{repo}`. Follows the same addressing rules as the index body:
- * pinned to the snapshot tag when one is known (immutable, cache-safe),
- * fetched off the mutable `dist` branch cache-busted otherwise. Rows whose
- * `stars` is null (a deleted repo) are dropped, so lookups normalize to 0.
+ * by the row's `id` (`{owner}/{repo}`). Follows the same addressing rules as
+ * the index body: pinned to the snapshot SHA when one is known (immutable,
+ * cache-safe), fetched off the mutable `dist` branch cache-busted otherwise.
+ * Rows whose `stars` is null (a repo gone from GitHub) are dropped, so
+ * lookups normalize to 0.
  *
- * Like the run stats, this is garnish, not the dataset: the caller turns a
- * fetch failure into "no join", which leaves every skill with 0 stars rather
- * than failing the download.
+ * Like the old run stats, this is garnish, not the dataset: the caller turns
+ * a fetch failure into "no join", which leaves every skill with 0 stars
+ * rather than failing the download.
  */
 export async function readRepos(
   cdnBase: string,
-  tag?: string,
+  ref?: string,
 ): Promise<Map<string, number>> {
   const stars = new Map<string, number>();
   await fetchFirstStreamInOrder(
-    snapshotUrls(REPOS_SPEC, cdnBase, tag),
+    snapshotUrls(REPOS_SPEC, cdnBase, ref),
     async (body) => {
       stars.clear();
       await readLines(body, (line) => {
-        const row = jsonLine<{ repo?: unknown; stars?: unknown }>(line);
+        const row = jsonLine<{ id?: unknown; stars?: unknown }>(line);
         if (
           row &&
-          typeof row.repo === "string" &&
+          typeof row.id === "string" &&
           typeof row.stars === "number"
         ) {
-          stars.set(row.repo, row.stars);
+          stars.set(row.id, row.stars);
         }
       });
     },
@@ -272,10 +218,10 @@ export async function readRepos(
 
 /**
  * Stream the index from the freshest source, handing every parsed skill to
- * `onLine`. `tag` pins the download to an immutable snapshot (see
+ * `onLine`. `ref` pins the download to an immutable snapshot (see
  * `probeIndexMeta`); without one the mutable `dist` branch is used, and only
  * that fallback path is cache-busted — otherwise a stale edge copy could be
- * mistaken for the current index, which is exactly the failure the tag pin
+ * mistaken for the current index, which is exactly the failure the SHA pin
  * exists to remove.
  *
  * `stars` is the in-flight `repos.jsonl` fetch started by the caller so its
@@ -289,13 +235,13 @@ export async function readRepos(
  */
 export async function readIndex(
   cdnBase: string,
-  tag: string | undefined,
+  ref: string | undefined,
   stars: Promise<Map<string, number> | null>,
   onLine: (skill: Skill) => void,
   onRestart: () => void,
 ): Promise<void> {
   await fetchFirstStreamInOrder(
-    snapshotUrls(INDEX_SPEC, cdnBase, tag),
+    snapshotUrls(INDEX_SPEC, cdnBase, ref),
     async (body) => {
       onRestart();
       // The sidecar fetch runs concurrently with the body; by the time a

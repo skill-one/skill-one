@@ -1,48 +1,54 @@
 import type { Skill } from "../../types/skill";
-import { record, text, textList } from "../value";
+import { count, record, text } from "../value";
 
 /**
- * Pure parsing of the skills-profiles index's JSONL lines into the app's
+ * Pure parsing of the skills-profiles catalog's JSONL lines into the app's
  * Skill model. Runs inside the registry worker, one line at a time while the
  * download streams in.
  *
- * The upstream index is self-contained: a row carries the skill's own fields
+ * The upstream catalog is self-contained: a row carries the skill's own fields
  * plus the profile classification (`domain`) the dataset generated for it, so
  * one parsed line yields the fully decorated skill — nothing is merged in
  * afterwards.
  *
- * Star counts are the one exception: they are not carried by the index rows
- * themselves but kept in a separate `upstream/repos.jsonl` (one row per
- * GitHub repo), which is joined in at parse time through the `starsFor`
- * callback — see `readRepos` in `index-stream.ts`.
+ * Star counts are the one exception: they are not carried by the catalog rows
+ * themselves but kept in a separate `repos.jsonl` (one row per GitHub repo),
+ * which is joined in at parse time through the `starsFor` callback — see
+ * `readRepos` in `index-stream.ts`.
  */
 
-/** Raw skill shape as stored in one JSONL index line. */
+/** Raw skill shape as stored in one JSONL catalog line. */
 interface RawSkill {
   /**
-   * Canonical skills.sh id encoding source and slug: `{owner}/{repo}/{slug}`.
-   * The slug is slash-free — multi-segment slugs upstream are keyed with the
-   * slashes stripped.
+   * Canonical skills.sh id encoding source and slug: `{owner}/{repo}/{slug}`,
+   * spelled the way the mirror lists it. The slug is slash-free —
+   * multi-segment slugs upstream are keyed with the slashes stripped.
    */
   id: string;
+  /** The skill's frontmatter `name`, as the mirror spells it. */
+  name?: string | null;
   installs: number;
-  /** The skill's page on skills.sh. */
-  url?: string | null;
+  /**
+   * Directory the skill's files live at, relative to `skills/` — the row's
+   * own `owner/repo` leading a path that can differ from the id's spelling.
+   * Null while the repository has not been fetched.
+   */
+  dir?: string | null;
   /** From the SKILL.md frontmatter; null when it has none. */
   description?: string | null;
   /** Chinese translation of `description`; null when untranslated. */
   description_zh?: string | null;
-  /** SHA-256 of the skill's files; null when unknown. */
-  hash?: string | null;
-  /** When the current content version was first fetched (ISO, UTC). */
-  fetchedAt?: string | null;
   /**
-   * The dataset's classification. The snapshot publishes one key per skill as a
-   * bare string (`"domain": "development"`); the model is a list because it has
-   * carried 1–3 keys, best fit first, and can again. Absent for skills the
-   * generator has not reached.
+   * The dataset's classification: one closed English category
+   * (`development`, `data-analysis`, …). Null for skills the generator has
+   * not reached.
    */
   domain?: unknown;
+  /**
+   * The classifier's own reading of how close the call was (0–1); null when
+   * it does not say. Published to be sorted on, not trusted as a probability.
+   */
+  confidence?: unknown;
 }
 
 /**
@@ -74,15 +80,14 @@ function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
   const repoId = `${owner}/${repo}`;
   // Classification is optional garnish: a skill the generator has not reached
   // simply carries no profile, and every consumer already treats it that way.
-  // The snapshot's own shape has moved between a bare key and a list of them,
-  // so both are read — a row whose `domain` is missing, empty or of some other
-  // type lands on the same "no profile" shape rather than a half-filled one.
-  const one = text(raw.domain);
-  const domains = textList(raw.domain) ?? (one ? [one] : []);
+  // Upstream answers one closed category per skill; the model keeps a list so
+  // grouping and filtering can match by membership.
+  const domain = text(raw.domain);
+  const confidence = count(raw.confidence);
   return {
-    // The slug is the skill's name: the directory the skill ships in, and
-    // what a locally installed copy of it is called.
-    name: slug,
+    // The frontmatter name is the skill's name; the id's slug is the
+    // fallback, and what a locally installed copy of it is called.
+    name: text(raw.name) || slug,
     repo: repoId,
     // Upstream exposes descriptions; fall back to an empty placeholder
     // when an entry lacks one so the row layout stays stable.
@@ -96,22 +101,24 @@ function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
     // Install counts are separate metrics; an entry missing one normalizes
     // to 0.
     downloads: raw.installs ?? 0,
-    // The skill's files live in the snapshot at this directory; the basename
-    // equals the skill name, so a locally installed copy still matches its
-    // registry entry.
-    path: `skills/${raw.id}`,
-    rev: raw.hash ?? undefined,
-    firstSeenAt: raw.fetchedAt ?? undefined,
-    url: raw.url ?? undefined,
-    ...(domains.length > 0 ? { profile: { domain: domains } } : {}),
+    // The skill's files live in the snapshot at `skills/<dir>`; `dir` is the
+    // row's own spelling of where they are and wins over the id. The
+    // basename equals the skill name, so a locally installed copy still
+    // matches its registry entry.
+    path: `skills/${text(raw.dir) || raw.id}`,
+    // The skill's page on skills.sh is derivable from the id.
+    url: `https://www.skills.sh/${raw.id}`,
+    ...(domain ? { profile: { domain: [domain], ...(
+      confidence !== undefined ? { confidence } : {}
+    ) } } : {}),
   };
 }
 
 /**
  * One streamed JSONL line as a raw record: null for a blank line, malformed
  * JSON, or a value that is not an object. The single definition of what a
- * snapshot line is, shared by the index rows (`parseSkillLine`) and the repos
- * sidecar (see `readRepos` in `index-stream.ts`).
+ * snapshot line is, shared by the catalog rows (`parseSkillLine`) and the
+ * repos sidecar (see `readRepos` in `index-stream.ts`).
  */
 export function jsonLine<T extends object>(line: string): T | null {
   const trimmed = line.trim();
@@ -126,9 +133,9 @@ export function jsonLine<T extends object>(line: string): T | null {
 }
 
 /**
- * Parse one JSONL index line into a GitHub skill. Returns null for a line that
- * is not a usable record (see `jsonLine`), and for ids that are not canonical
- * GitHub ids.
+ * Parse one JSONL catalog line into a GitHub skill. Returns null for a line
+ * that is not a usable record (see `jsonLine`), and for ids that are not
+ * canonical GitHub ids.
  *
  * `starsFor` supplies the source repo's GitHub star count (see `StarsFor`);
  * omitting it leaves every skill with 0 stars — the graceful shape when the

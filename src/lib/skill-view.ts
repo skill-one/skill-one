@@ -61,32 +61,6 @@ export function isLiveSkill(skill: SkillView): boolean {
   return skill.storeBacked === false && skill.installedAt === undefined;
 }
 
-/**
- * How the snapshot's translation relates to the copy the user actually has
- * installed, derived by comparing the version the ledger recorded at install
- * time against the registry's current rev.
- *
- * - `fresh`: both sides are known and equal — the translation the snapshot
- *   serves is the translation of the installed version, no caveat needed.
- * - `stale`: both sides are known and differ — the store published a newer
- *   version than the one installed, so the translation reads an original the
- *   user no longer has.
- * - `unknown`: one side is missing (an association made before the ledger
- *   recorded hashes, or a registry entry that ships no rev) — the match
- *   cannot be established either way.
- */
-export type TranslationFreshness = "fresh" | "stale" | "unknown";
-
-export function translationFreshness(
-  installedRev: string | undefined,
-  currentRev: string | undefined,
-): TranslationFreshness {
-  if (installedRev && currentRev) {
-    return installedRev === currentRev ? "fresh" : "stale";
-  }
-  return "unknown";
-}
-
 export interface SkillView extends Skill {
   /**
    * False for a skill no store entry backs: an installed record the registry
@@ -103,17 +77,10 @@ export interface SkillView extends Skill {
    * Installed skills only: the registry entry's snapshot directory, kept
    * apart from `path` on purpose. `path` stays undefined so the detail panel
    * reads the English SKILL.md the user actually has on disk, while the
-   * snapshot's Chinese page (`skill_zh.md`) is still reachable through this
+   * snapshot's Chinese page (`SKILL.zh.md`) is still reachable through this
    * — the one file a disk install has no local counterpart for.
    */
   snapshotPath?: string;
-  /**
-   * Installed skills backed by a registry entry: how the snapshot's
-   * translation relates to the installed copy (see `TranslationFreshness`).
-   * Absent for store rows — their translation *is* the indexed content —
-   * and for skills no entry backs, which have no translation at all.
-   */
-  translationFreshness?: TranslationFreshness;
 }
 
 /**
@@ -157,12 +124,6 @@ export function installedSkillView(
     // The snapshot directory rides the entry alone, for the Chinese-page
     // fetch; `path` stays undefined so the English body still reads from disk.
     ...(entry?.path ? { snapshotPath: entry.path } : {}),
-    // The translation's version caveat: the ledger's install-time rev against
-    // the entry's current one. Only meaningful when an entry backs the skill —
-    // without one there is no translation to vouch for.
-    ...(entry != null
-      ? { translationFreshness: translationFreshness(ledger?.hash, entry.rev) }
-      : {}),
     storeBacked: entry != null,
   };
 }

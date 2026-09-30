@@ -7,9 +7,9 @@ import {
   fetchFirstStreamInOrder,
   fetchFirstText,
   getCdnBase,
-  getIndexTag,
+  getIndexRef,
   setCdnBase,
-  setIndexTag,
+  setIndexRef,
 } from "./cdn-config";
 
 const ORIGIN =
@@ -29,7 +29,7 @@ function bad() {
 afterEach(() => {
   fetchMock.mockReset();
   setCdnBase("");
-  setIndexTag("");
+  setIndexRef("");
 });
 
 const spec = { repo: "anthropics/skills", path: "skills/pdf/SKILL.md" };
@@ -70,13 +70,13 @@ describe("getCdnBase / setCdnBase", () => {
   });
 });
 
-describe("getIndexTag / setIndexTag", () => {
-  it("records the served snapshot tag and clears it with an empty value", () => {
-    expect(getIndexTag()).toBe("");
-    setIndexTag("  dist-2026-09-06  ");
-    expect(getIndexTag()).toBe("dist-2026-09-06");
-    setIndexTag("");
-    expect(getIndexTag()).toBe("");
+describe("getIndexRef / setIndexRef", () => {
+  it("records the served snapshot ref and clears it with an empty value", () => {
+    expect(getIndexRef()).toBe("");
+    setIndexRef("  dist-2026-09-06  ");
+    expect(getIndexRef()).toBe("dist-2026-09-06");
+    setIndexRef("");
+    expect(getIndexRef()).toBe("");
   });
 });
 

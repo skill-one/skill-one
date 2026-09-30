@@ -27,7 +27,6 @@ import { skillKey, type SkillView } from "../../lib/skill-view";
 import { estimateTokens } from "../../lib/token-estimate";
 import {
   errorMessage,
-  formatDate,
   formatRelativeTime,
   formatUnixDate,
 } from "../../lib/utils";
@@ -89,22 +88,15 @@ function MarkdownSkeleton() {
 /**
  * The header's single provenance affordance: a quiet "源" link for registry
  * skills (opens the mirror SKILL.md) or a "本地文件" label for local ones.
- * The version hash, first-seen date and exact file path are provenance
- * detail, so one hover reveals them in the tooltip instead of taking three
- * permanent header rows.
+ * The exact file path is provenance detail, so one hover reveals it in the
+ * tooltip instead of taking a permanent header row.
  */
 function ProvenanceTip({
   href,
-  rev,
-  seenAt,
   path,
 }: {
   /** When present the trigger is a link that opens the mirror SKILL.md. */
   href?: string;
-  /** Full content hash, as the scraper indexed it. */
-  rev?: string;
-  /** Formatted date the mirror first fetched this version. */
-  seenAt?: string;
   path?: string;
 }) {
   const { t } = useTranslation();
@@ -113,18 +105,6 @@ function ProvenanceTip({
   const body = (
     <TooltipContent className="max-w-[260px] text-left normal-case">
       <div className="flex flex-col gap-1">
-        {rev && (
-          <p>
-            <span className="text-background/55">{t("detail.versionLabel")}</span>
-            <span className="font-mono break-all">{rev}</span>
-          </p>
-        )}
-        {seenAt && (
-          <p>
-            <span className="text-background/55">{t("detail.seenAtLabel")}</span>
-            {seenAt}
-          </p>
-        )}
         {path && <p className="font-mono break-all">{path}</p>}
       </div>
     </TooltipContent>
@@ -301,7 +281,7 @@ export function SkillDetailPanel({
   // the same repo/name never share a cache entry.
   const fromDisk = shown != null && shown.path == null;
 
-  // The snapshot's Chinese page (skill_zh.md), fetched only in zh mode. For a
+  // The snapshot's Chinese page (SKILL.zh.md), fetched only in zh mode. For a
   // mirror read the path rides the row itself; an installed skill carries the
   // entry's snapshot directory as `snapshotPath` — the Chinese page is the one
   // file a disk install has no local counterpart for, so it still reads from
@@ -492,20 +472,6 @@ export function SkillDetailPanel({
   // on disk.
   const translateToggleVisible =
     locale === "zh" && !editing && (translated !== "" || zhBodyAvailable);
-  // The translation's freshness, meaningful on the installed surface only: a
-  // store row's translation *is* the indexed content, so it never needs the
-  // caveat. When the installed copy's version cannot be matched against the
-  // snapshot's current one (stale or unverifiable), the toggle wears a
-  // warning dot and the hover notice says what the translation can and
-  // cannot be trusted for; a fresh match needs no warning at all.
-  const freshness =
-    surface === "installed" ? shown?.translationFreshness : undefined;
-  const freshnessNotice =
-    freshness === "stale"
-      ? t("detail.translationStaleNotice")
-      : freshness === "unknown"
-        ? t("detail.translationReferenceNotice")
-        : null;
   // The detail the body renders from: the Chinese page when it leads, the
   // English SKILL.md otherwise (including disk reads, which never have a
   // translation on disk).
@@ -526,29 +492,22 @@ export function SkillDetailPanel({
   const [owner] = (shown?.repo ?? "").split("/");
   // The link's href and its open-externally handler point at the same place.
   const skillBlobUrl = githubBlobUrl(MIRROR.repo, filePath, MIRROR.ref);
-  // Version identity as the scraper sees it: the full content hash, and the
-  // date the mirror first fetched that exact content. Provenance detail —
-  // surfaced on hover via the header's 源 tip, not as permanent header rows.
-  const rev = shown?.rev ?? null;
-  const seenAt = shown?.firstSeenAt ? formatDate(shown.firstSeenAt, locale) : null;
 
   // The meta line's facts in reading order. Nulls drop out and the renderer
   // interleaves the interpunct separators, so any combination of present
   // facts — a registry-backed store row, an unindexed local install, a disk
-  // read with no rev — leaves no dangling separator.
+  // read — leaves no dangling separator.
   const metaItems = [
     // The same install figure the list rows show. Shown for exactly the
     // skills whose card shows it — the registry-backed ones.
     showStats && shown ? <SkillInstalls key="installs" skill={shown} /> : null,
     // Provenance reads the index row, not the fetched file, so the 源 tip
     // renders before — and without — the English SKILL.md's fetch.
-    shown && !fromDisk && (rev || seenAt || filePath) ? (
+    shown && !fromDisk && filePath ? (
       <ProvenanceTip
         key="provenance"
-        href={filePath ? skillBlobUrl : undefined}
-        rev={rev ?? undefined}
-        seenAt={seenAt ?? undefined}
-        path={filePath || undefined}
+        href={skillBlobUrl}
+        path={filePath}
       />
     ) : null,
     fromDisk && detail ? <ProvenanceTip key="local-provenance" path={detail.path} /> : null,
@@ -683,10 +642,7 @@ export function SkillDetailPanel({
               default aria-pressed wash) while the original leads and rests
               flat on the translation. The name stays fixed the way a toggle
               button's must — the state rides aria-pressed, not the label —
-              while the tooltip keeps naming the action. On the installed
-              surface a translation whose version does not match the copy on
-              disk (or cannot be checked) adds an amber dot and swaps the
-              tooltip's payload to the freshness caveat. */}
+              while the tooltip keeps naming the action. */}
           {translateToggleVisible && (
             <Tooltip>
               <TooltipTrigger
@@ -704,21 +660,9 @@ export function SkillDetailPanel({
                     }
                   >
                     <Languages />
-                    {freshnessNotice && (
-                      <span
-                        aria-hidden
-                        data-slot="translation-warning"
-                        className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-amber-500"
-                      />
-                    )}
                   </Toggle>
                 }
               />
-              {freshnessNotice && (
-                <TooltipContent className="max-w-[260px] text-left normal-case">
-                  {freshnessNotice}
-                </TooltipContent>
-              )}
             </Tooltip>
           )}
           {isStore && (

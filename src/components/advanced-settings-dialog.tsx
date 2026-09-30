@@ -6,7 +6,7 @@ import { Check } from "lucide-react";
 import {
   DEFAULT_CDN_BASE,
   getCdnBase,
-  getIndexTag,
+  getIndexRef,
   setCdnBase,
 } from "../lib/cdn-config";
 import {
@@ -102,15 +102,15 @@ export function AdvancedSettingsDialog({
     setCheck(result?.status ?? "unknown");
   };
 
-  // Facts about the snapshot the store is actually serving. The
-  // `dist-<date>[-N]` tag is short enough to display whole and to diff
-  // against a release. A recorded tag (persisted by the registry client)
-  // stands in until the live snapshot identity arrives, so a fresh session
-  // still names its snapshot.
+  // Facts about the snapshot the store is actually serving. The branch
+  // head's commit SHA is short enough to display whole and to diff against a
+  // release. A recorded ref (persisted by the registry client) stands in
+  // until the live snapshot identity arrives, so a fresh session still names
+  // its snapshot.
   const indexRows: { termKey: ParseKeys; value: string }[] = [
     {
       termKey: "advanced.snapshot",
-      value: index?.tag ?? (getIndexTag() || t("common.unknown")),
+      value: index?.ref ?? (getIndexRef() || t("common.unknown")),
     },
     {
       termKey: "advanced.publishedAt",

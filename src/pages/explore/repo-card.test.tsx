@@ -223,9 +223,7 @@ describe("RepoCard", () => {
 
     await user.click(screen.getAllByRole("button", { name: "安装" })[0]);
 
-    expect(installSkillFromSource).toHaveBeenCalledWith(REPO, "pdf", {
-      rev: undefined,
-    });
+    expect(installSkillFromSource).toHaveBeenCalledWith(REPO, "pdf");
     expect(onOpenSkill).not.toHaveBeenCalled();
   });
 

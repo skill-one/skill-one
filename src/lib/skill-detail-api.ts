@@ -11,7 +11,7 @@ import { MIRROR, mirrorRef } from "./mirror";
  * skill directories are guaranteed to match (a row exists if and only if its
  * directory exists), so a registry-known path resolves in one request.
  *
- * Detail fetches are pinned to the snapshot tag recorded by the registry
+ * Detail fetches are pinned to the snapshot ref recorded by the registry
  * client, so the SKILL.md body is read from exactly the snapshot the served
  * index describes.
  */
@@ -33,9 +33,9 @@ type Frontmatter = Partial<Record<FrontmatterField, string>>;
  * to TanStack Query.
  *
  * `knownPath` is the skill's directory inside the mirror snapshot
- * ("skills/{owner}/{repo}/{slug}", as recorded in the registry index) and
- * always present for registry skills, so the SKILL.md resolves in a single
- * request. A missing or stale path throws.
+ * ("skills/<dir>", as recorded in the registry catalog) and always present
+ * for registry skills, so the SKILL.md resolves in a single request. A
+ * missing or stale path throws.
  */
 export async function fetchSkillDetail(
   repo: string,
@@ -73,10 +73,9 @@ export async function fetchSkillDetail(
 
 /**
  * Derive the mirror path of the snapshot's Chinese skill page from the
- * skill's index directory ("skills/{owner}/{repo}/{slug}"). The snapshot
- * writes the Chinese translation beside the index metadata under `profiles/`
- * as `skill_zh.md` (lowercase), and ships it for a subset of skills — about
- * 87% at the time of writing; the index row carries no marker for it, so the
+ * skill's index directory ("skills/<dir>"). The snapshot writes the Chinese
+ * translation as `SKILL.zh.md` inside the skill's own directory, and ships it
+ * for a subset of skills — the catalog row carries no marker for it, so the
  * file's presence is the only signal. Returns null for a path the snapshot
  * cannot have a translation for.
  */
@@ -84,11 +83,11 @@ export function zhSkillPath(knownPath?: string): string | null {
   if (!knownPath) return null;
   const dir = knownPath.replace(/\/+$/, "");
   if (!dir.startsWith("skills/")) return null;
-  return `${dir.replace(/^skills\//, "profiles/")}/skill_zh.md`;
+  return `${dir}/SKILL.zh.md`;
 }
 
 /**
- * Fetch a skill's Chinese page (skill_zh.md) from the skills-profiles
+ * Fetch a skill's Chinese page (SKILL.zh.md) from the skills-profiles
  * snapshot, or null when this snapshot does not ship one.
  *
  * Unlike `fetchSkillDetail`, absence is not an error — the translation is

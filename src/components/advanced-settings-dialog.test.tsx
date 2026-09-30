@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdvancedSettingsDialog } from "./advanced-settings-dialog";
 import type { IndexInfo } from "../lib/registry/protocol";
-import { DEFAULT_CDN_BASE, getCdnBase, setIndexTag } from "../lib/cdn-config";
+import { DEFAULT_CDN_BASE, getCdnBase, setIndexRef } from "../lib/cdn-config";
 import {
   DEFAULT_REPO_CARD_LIMIT,
   getRepoCardLimit,
@@ -43,7 +43,7 @@ vi.mock("../lib/registry/client", () => ({
 const CHECKED_AT_ISO = "2026-09-11T08:00:00Z";
 
 const SERVED: IndexInfo = {
-  tag: "dist-2026-09-06-2",
+  ref: "a1b2c3d4e5f6a7b8c9d0",
   generatedAt: "2026-01-01T00:00:00Z",
   total: 23734,
   origin: "unchanged",
@@ -67,7 +67,7 @@ describe("AdvancedSettingsDialog", () => {
   });
 
   afterEach(() => {
-    setIndexTag("");
+    setIndexRef("");
     // The preview choice persists across renders: restore the default. The
     // reset notifies subscribers before Testing Library's own cleanup.
     act(() => {
@@ -103,7 +103,7 @@ describe("AdvancedSettingsDialog", () => {
 
     expect(screen.getByText("数据源")).toBeInTheDocument();
     // The tag names the snapshot batch; displayed whole.
-    expect(screen.getByText("dist-2026-09-06-2")).toBeInTheDocument();
+    expect(screen.getByText("a1b2c3d4e5f6a7b8c9d0")).toBeInTheDocument();
     expect(screen.getByText("23,734")).toBeInTheDocument();
     expect(screen.getByText(GENERATED_AT_LOCALE)).toBeInTheDocument();
     // The last completed check is dated too.
@@ -119,18 +119,18 @@ describe("AdvancedSettingsDialog", () => {
   it("holds placeholders until a snapshot is being served", () => {
     renderDialog();
 
-    // The snapshot tag, its stamp, the row count, and the last check.
+    // The snapshot ref, its stamp, the row count, and the last check.
     expect(screen.getAllByText("未知")).toHaveLength(4);
     expect(screen.getByText("数据尚未就绪")).toBeInTheDocument();
   });
 
-  it("shows the recorded snapshot tag when the live identity has not arrived", () => {
+  it("shows the recorded snapshot ref when the live identity has not arrived", () => {
     // The registry client persists the served tag; a fresh session reads it
     // back before the first index event lands.
-    setIndexTag("dist-2026-09-06-2");
+    setIndexRef("a1b2c3d4e5f6a7b8c9d0");
     renderDialog();
 
-    expect(screen.getByText("dist-2026-09-06-2")).toBeInTheDocument();
+    expect(screen.getByText("a1b2c3d4e5f6a7b8c9d0")).toBeInTheDocument();
   });
 
   it("hosts the display choices under their own section", () => {

@@ -40,12 +40,10 @@ export interface ProvenanceRecord {
   /** When the skill was installed (ISO 8601). Rewritten on reinstalls. */
   installedAt?: string;
   /**
-   * The store-side content hash recorded when the association was made —
-   * the registry entry's rev at install time or the matched rev (hash
-   * auto-link). A future update check compares it against the index's latest
-   * rev: differ means the store published a new version. This is a version
-   * marker, NOT a description of the local files — local edits are invisible
-   * to it, by design.
+   * The local content hash recorded when the association was made (the hash
+   * the reconcile pass computed for the installed directory). A version
+   * marker for ledger bookkeeping, NOT a description of the local files —
+   * local edits are invisible to it, by design.
    */
   hash?: string;
 }
@@ -71,7 +69,6 @@ export interface PersistedCandidate {
   downloads: number;
   description: string;
   descriptionZh?: string;
-  rev?: string;
 }
 
 /**
@@ -171,7 +168,6 @@ function parseCandidate(value: unknown): PersistedCandidate | null {
     description: c.description,
   };
   if (typeof c.descriptionZh === "string") candidate.descriptionZh = c.descriptionZh;
-  if (typeof c.rev === "string") candidate.rev = c.rev;
   return candidate;
 }
 

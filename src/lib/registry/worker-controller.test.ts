@@ -2,9 +2,14 @@ import { describe, it, expect } from "vitest";
 
 import { createRegistryController } from "./worker-controller";
 import type { CachedIndex, RegistryCache } from "./cache";
-import type { PublishedIndex } from "./index-stream";
+import type { SnapshotHead } from "./snapshot";
 import type { RegistryWorkerMessage, RevalidateResult } from "./protocol";
 import type { Skill } from "../../types/skill";
+
+/** Readable stand-ins for the `dist` branch head SHAs the probe answers with. */
+const SHA_0901 = "s0901";
+const SHA_0902 = "s0902";
+const SHA_0906 = "s0906";
 
 /** Deterministic skill factory; `i` varies name, repo and metrics. */
 function skill(i: number, over: Partial<Skill> = {}): Skill {
@@ -46,7 +51,7 @@ function setup(options?: {
   cache?: RegistryCache;
   now?: () => number;
   /** What the sources advertise as published; null = probe found nothing. */
-  published?: PublishedIndex | null;
+  published?: SnapshotHead | null;
   /**
    * What the repos.jsonl source serves (the stars join); null (default) =
    * sidecar unavailable.
@@ -220,11 +225,7 @@ describe("createRegistryController — boot", () => {
         },
         clear: async () => {},
       },
-      published: {
-        tag: "dist-2026-09-01",
-        generatedAt,
-        total: 2,
-      },
+      published: { ref: SHA_0901, generatedAt },
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
@@ -236,7 +237,7 @@ describe("createRegistryController — boot", () => {
     // The read-out still carries what the probe learned (fresh tag, count),
     // and dates the check so the next one is only due once the window passes.
     expect(t.recorded.indexes.at(-1)?.info).toEqual({
-      tag: "dist-2026-09-01",
+      ref: SHA_0901,
       generatedAt,
       total: 2,
       origin: "unchanged",
@@ -255,26 +256,27 @@ describe("createRegistryController — boot", () => {
         clear: async () => {},
       },
       published: {
-        tag: "dist-2026-09-06",
+        ref: SHA_0906,
         generatedAt: "2026-09-06T15:32:29.423Z",
-        total: 8945,
       },
       skills: [skill(0), skill(1)],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    // The download is addressed at the published tag, not the branch.
-    expect(t.pins).toEqual(["dist-2026-09-06"]);
+    // The download is addressed at the published snapshot, not the branch.
+    expect(t.pins).toEqual([SHA_0906]);
     expect(saved).toEqual([
       [
         [skill(0), skill(1)],
-        { tag: "dist-2026-09-06", generatedAt: "2026-09-06T15:32:29.423Z" },
+        { ref: SHA_0906, generatedAt: "2026-09-06T15:32:29.423Z" },
       ],
     ]);
+    // The served count is the parsed row count — the dataset no longer
+    // publishes one for the read-out to compare against.
     expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
-      tag: "dist-2026-09-06",
-      total: 8945,
+      ref: SHA_0906,
+      total: 2,
       origin: "updated",
       checkedAt: 0,
     });
@@ -332,18 +334,18 @@ describe("createRegistryController — boot", () => {
   it("re-downloads an unchanged run when the user forces a reload", async () => {
     const generatedAt = "2026-09-01T14:25:32Z";
     const t = setup({
-      published: { tag: "dist-2026-09-01", generatedAt },
+      published: { ref: SHA_0901, generatedAt },
       skills: [skill(0)],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
-    expect(t.pins).toEqual(["dist-2026-09-01"]);
+    expect(t.pins).toEqual([SHA_0901]);
 
     // Second boot-equivalent: the run never moved, but a manual retry (or a
     // source switch) must still fetch rather than report "nothing to do".
     t.controller.reload({ cdnBase: "other" });
     await t.flush();
-    expect(t.pins).toEqual(["dist-2026-09-01", "dist-2026-09-01"]);
+    expect(t.pins).toEqual([SHA_0901, SHA_0901]);
   });
 
   it("falls back to the branch ref when no meta can be reached", async () => {
@@ -401,7 +403,7 @@ describe("createRegistryController — revalidate", () => {
         save: async () => {},
         clear: async () => {},
       },
-      published: { tag: "dist-2026-09-01", generatedAt, total: 1 },
+      published: { ref: SHA_0901, generatedAt },
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
@@ -426,26 +428,24 @@ describe("createRegistryController — revalidate", () => {
     const options: SourceOptions = {
       skills: [skill(0)],
       published: {
-        tag: "dist-2026-09-01",
+        ref: SHA_0901,
         generatedAt: "2026-09-01T00:00:00Z",
-        total: 1,
       },
     };
     const t = setup(options);
     t.controller.init({ cdnBase: "test" });
     await t.flush();
-    expect(t.pins).toEqual(["dist-2026-09-01"]);
+    expect(t.pins).toEqual([SHA_0901]);
 
     // A new day publishes while the app stays open.
     options.published = {
-      tag: "dist-2026-09-02",
+      ref: SHA_0902,
       generatedAt: "2026-09-02T00:00:00Z",
-      total: 1,
     };
     void t.controller.revalidate({ id: 1 });
     await t.flush();
 
-    expect(t.pins).toEqual(["dist-2026-09-01", "dist-2026-09-02"]);
+    expect(t.pins).toEqual([SHA_0901, SHA_0902]);
     expect(resultData<RevalidateResult>(t.recorded.results.at(-1)!)).toEqual({
       status: "updated",
     });
@@ -454,7 +454,7 @@ describe("createRegistryController — revalidate", () => {
   it("downloads nothing when the probe cannot answer", async () => {
     const generatedAt = "2026-09-01T14:25:32Z";
     const options: SourceOptions = {
-      published: { tag: "dist-2026-09-01", generatedAt, total: 1 },
+      published: { ref: SHA_0901, generatedAt },
       cache: {
         load: async () => record([skill(0)], generatedAt),
         save: async () => {},

@@ -7,13 +7,18 @@
  */
 export interface SkillProfile {
   /**
-   * The dataset's classification: 1–3 domain keys, best fit first. The keys
-   * are the generator's English enum (`development`, `data-analysis`, …);
-   * `data/domains.ts` maps a key to its display label and icon. A skill may
-   * legitimately belong to several, so grouping and filtering match by
-   * membership.
+   * The dataset's classification. The keys are the generator's English enum
+   * (`development`, `data-analysis`, …); `data/domains.ts` maps a key to its
+   * display label and icon. Upstream answers one closed category per skill;
+   * the model keeps a list so grouping and filtering match by membership.
    */
   domain: string[];
+  /**
+   * The classifier's own reading of how close the call was (0–1), when it
+   * stated one — published to be sorted on, not to be trusted as the
+   * probability of the label being right.
+   */
+  confidence?: number;
 }
 
 /**
@@ -50,25 +55,12 @@ export interface Skill {
   downloads: number;
   /**
    * Directory the skill's files live in, relative to the skills-profiles
-   * snapshot ("skills/{owner}/{repo}/{slug}"). Used to fetch the SKILL.md
-   * directly from the snapshot without path probing; absent for installed
-   * skills that the dataset does not list.
+   * snapshot ("skills/<dir>", the row's own spelling of where its files are).
+   * Used to fetch the SKILL.md directly from the snapshot without path
+   * probing; absent for installed skills that the dataset does not list.
    */
   path?: string;
-  /**
-   * SHA-256 content hash the scraper computed for the skill directory. The
-   * authoritative identity of *which version of the skill* the snapshot
-   * describes: it changes when any upstream file changes. Absent when the
-   * scraper could not compute it.
-   */
-  rev?: string;
-  /**
-   * When the scraper first fetched this content version (ISO, UTC) — i.e. how
-   * long the skill has been published in its current version, not when the
-   * skill first appeared. Absent together with `rev`.
-   */
-  firstSeenAt?: string;
-  /** The skill's page on skills.sh, when the index carries one. */
+  /** The skill's page on skills.sh, derived from its id. */
   url?: string;
   /**
    * Classification metadata, carried by the index row. Absent for skills the

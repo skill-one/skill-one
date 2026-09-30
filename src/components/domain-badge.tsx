@@ -16,10 +16,6 @@ import {
  * description (falling back to the raw label for a key the taxonomy no
  * longer knows).
  *
- * A skill may be classified under several domains, best fit first: the chip
- * shows the leading one and the tooltip names the rest, so the rail stays one
- * compact fact while nothing is hidden.
- *
  * `variant` is the one thing the two surfaces disagree about: a list card's
  * rail is a line of facts, so it wears the chip flattened to plain text
  * (`ghost` plus a caller-supplied `px-0 py-0`), while the detail panel states
@@ -32,7 +28,7 @@ export function DomainBadge({
   className,
   variant = "outline",
 }: {
-  /** The classification, best fit first. Empty renders nothing. */
+  /** The classification keys; empty renders nothing. */
   domain: string[];
   className?: string;
   /** Badge chrome; `outline` by default, `ghost` for a flattened rail. */

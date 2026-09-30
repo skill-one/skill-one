@@ -132,10 +132,7 @@ export function SkillInstallButton({
     if (installState === "installing" || installState === "installed") return;
     setInstallState("installing");
     try {
-      // The store entry's rev travels along as the installed version marker
-      // (see installSkillFromSource): the future update check compares it
-      // against the latest index rev.
-      await installSkillFromSource(skill.repo, skill.name, { rev: skill.rev });
+      await installSkillFromSource(skill.repo, skill.name);
       // The "my skills" list is cached for 10 minutes (staleTime) and never
       // GCs, so refresh this window and broadcast the change: invalidate here
       // makes the new skill show up on the next visit, and the broadcast lets

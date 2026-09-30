@@ -1,4 +1,4 @@
-import { getCdnBase, setIndexTag } from "../cdn-config";
+import { getCdnBase, setIndexRef } from "../cdn-config";
 import type {
   GroupsData,
   GroupsRequest,
@@ -85,11 +85,11 @@ function onMessage(message: RegistryWorkerMessage) {
     };
     emit();
   } else if (message.type === "index") {
-    // Record the served snapshot tag: it pins SKILL.md detail fetches — and
+    // Record the served snapshot ref: it pins SKILL.md detail fetches — and
     // the Settings read-out — to the same snapshot the served data was built
     // from. A null info (a failed download with nothing served) keeps the
-    // last good tag rather than un-pinning known-good data.
-    if (message.info?.tag) setIndexTag(message.info.tag);
+    // last good ref rather than un-pinning known-good data.
+    if (message.info?.ref) setIndexRef(message.info.ref);
     snapshot = { ...snapshot, index: message.info };
     emit();
   } else if (message.type === "error") {

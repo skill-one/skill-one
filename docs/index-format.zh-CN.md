@@ -2,7 +2,7 @@
 
 [English](index-format.md) | [简体中文](index-format.zh-CN.md)
 
-商店内容来自 [skill-one/skills-profiles](https://github.com/skill-one/skills-profiles)——它覆盖 [skills.sh](https://www.skills.sh) 上全部 GitHub 来源技能，并为每个技能生成分类。快照发布在 `dist` 分支：`skills.jsonl` 每行一个技能，`skills/` 目录存放每个技能的完整文件，`profiles/` 目录是该数据集自带的分类可浏览副本，`upstream/` 目录则存放镜像侧的附属文件（`stats.json`、`repos.jsonl`、`avatars/`）。
+商店内容来自 [skill-one/skills-profiles](https://github.com/skill-one/skills-profiles)——它覆盖 [skills.sh](https://www.skills.sh) 上全部 GitHub 来源技能，并为每个技能生成分类。快照以一整个目录的形式发布在 `dist` 分支：`skills.jsonl` 目录（每行一个技能），`skills/` 目录存放每个技能自己的 `SKILL.md` 和为它撰写的中文页，`repos.jsonl` 侧表（每个 GitHub 仓库一行），以及 `owners/` 目录存放各所有者的头像。
 
 ## 格式
 
@@ -11,98 +11,91 @@
 ```json
 {
   "id": "vercel-labs/skills/find-skills",
-  "installs": 3474068,
-  "url": "https://www.skills.sh/vercel-labs/skills/find-skills",
+  "name": "find-skills",
+  "installs": 3630988,
+  "dir": "vercel-labs/skills/find-skills",
   "description": "Helps users discover and install agent skills …",
   "description_zh": "帮助用户发现和安装 agent skills …",
-  "hash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf",
-  "fetchedAt": "2026-09-06T07:57:37.803Z",
-  "domain": "development"
+  "domain": "development",
+  "confidence": 0.8
 }
 ```
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | `string` | skills.sh 规范 id：`{owner}/{repo}/{slug}`。含 `/` 的多段 slug 会去掉斜杠后作为键，因此 id 恒为三段。 |
+| `id` | `string` | 规范的 skills.sh id：`{owner}/{repo}/{slug}`，按镜像的拼写方式。多段 slug 以去除斜杠的方式键入，因此 id 恒为三段。 |
+| `name` | `string \| null` | 该技能 frontmatter 的 `name`，按镜像的拼写方式。 |
 | `installs` | `number` | skills.sh 记录的总安装量 |
-| `url` | `string` | 技能在 skills.sh 的页面 |
+| `dir` | `string \| null` | 技能文件所在的目录，相对 `skills/`——以该行自己的 `owner/repo` 开头，拼写可能与 id 不同。仓库尚未被抓取时为 null。 |
 | `description` | `string \| null` | 来自 SKILL.md frontmatter（缺失时为空） |
-| `description_zh` | `string \| null` | `description` 的中文翻译。中文模式下优先使用，缺失或为空白时回退到 `description`。 |
-| `hash` | `string \| null` | 技能文件的 SHA-256。上游任何文件变化都会使其改变，即**快照所描述的那个版本**。 |
-| `fetchedAt` | `string` | 抓取器首次取到当前内容版本的时间（ISO，UTC）：说的是*当前内容*发布了多久，不是技能最早何时出现 |
-| `domain` | `string \| string[]` | 分类，取自固定的英文枚举（`development`、`data-analysis`、…、`other`）。`dist` 快照当前把最贴合的那一个键作为裸字符串下发；该字段也曾承载 1–3 个键、最贴合的在前，因此应用两种形状都读、并统一存成列表。[data/domains.ts](../src/data/domains.ts) 负责把键映射为展示名与单色 lucide 图标。生成器尚未处理到的技能不含该字段。 |
+| `description_zh` | `string \| null` | `description` 的中文翻译。中文模式下应用优先使用它，缺失或空白时回落到 `description`。 |
+| `domain` | `string \| null` | 分类：13 个封闭英文类别之一（`development`、`data-analysis`、……、`other`）。生成器尚未处理的技能为 null。[data/domains.ts](../src/data/domains.ts) 将键映射为展示标签与单色 lucide 图标。 |
+| `confidence` | `number \| null` | 分类器自己对这次判断把握的读数（0–1）；它没有说时为 null——发布出来用于排序，而非当作标签正确的概率。 |
 
-分类随索引行一起下发，因此一行解析完就是一个装饰完整的技能——不存在需要事后合并的第二数据源。一个技能可以合法地属于多个分类，这也是分组与筛选按「包含」匹配、而不是按精确值匹配的原因。
+分类随目录行一起发布，因此解析一行即得到完整装饰的技能——不存在第二步合并来源。应用在模型中把上游键保存为单元素列表，分组与筛选即可按成员关系匹配。
 
-分类**缺失**是第三种状态，不等于 其他：枚举里的 `other` 是数据集给出的回答（以上都不贴合），而生成器尚未处理到的技能根本没有回答。应用把两者区分开——其他 用混合图形图标，没有回答的用帮助图标（未分类）——筛选栏也为两者各留一个 chip，因此标着 其他 的筛选不会悄悄把「没人看过」的技能也算进去。
+*缺失*的分类是第三种状态，不是其他：枚举中的 `other` 是数据集"以上都不贴合"的回答，而生成器从未触及的技能根本没有回答。应用将两者区分开——其他佩戴混合形状的图标，未回答者佩戴问号图标（未分类）——筛选栏也为两者各保留一枚 chip，让承诺"其他"的范围永远不会悄悄混入没人看过的技能。
 
-GitHub star 数**不在**技能行里：它存放在下文的 `upstream/repos.jsonl` 附属文件中，解析时 join 进来。
+GitHub 星数**不**随技能行发布：它们存放在下文的 `repos.jsonl` 侧表中，在解析时联接进来。
 
-## 仓库元数据（upstream/repos.jsonl）
+## 仓库元数据（repos.jsonl）
 
-每行一个 JSON 对象，一个 GitHub 仓库一行，按 repo 排序：
+每行一个 JSON 对象，每个 GitHub 仓库一行：
 
 ```json
-{"repo": "vercel-labs/skills", "stars": 1523, "description": "Agents, skills, and plugins for Vercel", "pushedAt": "2026-09-11T14:02:11.000Z"}
+{"id": "vercel-labs/skills", "owner": "vercel-labs", "repo": "skills", "description": "The open agent skills tool - npx skills", "stars": 32793, "updated_at": "2026-09-30T01:48:12Z", "pushed_at": "2026-09-28T20:20:57Z", "html_url": "https://github.com/vercel-labs/skills", "gone": false, "fetched_at": "2026-09-30T01:50:01Z"}
 ```
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `repo` | `string` | `{owner}/{repo}`——即索引 id 的前两段，join 的连接键 |
-| `stars` | `number \| null` | 仓库的 GitHub star 数；仓库已删除时为 `null`（应用内归一为 0） |
+| `id` | `string` | `{owner}/{repo}`——每个索引 id 的前两段，即联接键 |
+| `owner` / `repo` | `string` | 联接键的拆分形式。 |
+| `stars` | `number \| null` | 该仓库的 GitHub star 数；仓库消失时为 `null`（应用归一化为 0） |
 | `description` | `string \| null` | 仓库的 GitHub About 文本。应用未使用：技能描述来自 SKILL.md frontmatter。 |
-| `pushedAt` | `string \| null` | 仓库最后一次 push。它跟踪的是**仓库**而非技能——技能级的变化由 `hash` / `fetchedAt` 描述。应用未使用。 |
+| `updated_at` / `pushed_at` / `fetched_at` | `string \| null` | 仓库时间戳。追踪的是**仓库**，不是技能。应用未使用。 |
+| `html_url` | `string \| null` | 仓库的 GitHub 页面。应用未使用。 |
+| `gone` | `boolean` | GitHub 对该仓库没有答案（已改名或删除）。应用把其 null 星数归一化为 0。 |
 
-## Owner 头像（upstream/avatars/）
+## 所有者头像（owners/）
 
-数据集会把每个 owner 的 GitHub 头像复制进快照，路径固定为 `upstream/avatars/{owner}.png`（无论实际编码如何，扩展名一律为 `.png`——图片解码器会嗅探字节内容）。因此 owner 头像与 SKILL.md 走同一条下载源与 CDN 回退链，存在已记录标签时定址到该快照。GitHub 自身的头像服务（`github.com/{owner}.png`）保留在回退链末尾，兜底数据集缺失的 owner（某次运行失败会留洞，直到下次运行补上）；最后的最后是 owner 首字母占位。
+数据集把每个所有者的 GitHub 头像作为普通文件复制进快照，固定路径 `owners/{owner}.png`（无论实际编码如何一律 `.png` 扩展名——图像解码器自行嗅探字节）。因此头像与 SKILL.md、索引走同一下载源与 CDN 回退链，在已记录快照 ref 时钉定到它。GitHub 自身的头像端点（`github.com/{owner}.png`）留在链尾，作为数据集漏拷的所有者的回退（一次失败的运行会留下空洞直到下一次）；所有者首字母是最后兜底。
 
-## 分类文件（profiles/）
+## 技能目录（skills/）
 
-每个已分类的技能还会发布 `profiles/{id}/domain.json`——载荷与索引行里的分类完全一致——以及供人阅读的 `md/domain.md`。应用只读索引行、从不拉取这两个文件，它们作为数据集自己的可浏览副本存在。快照不再发布逐技能封面插图：详情抽屉的图片位显示作者首字母（见 [../src/components/skill-cover.tsx](../src/components/skill-cover.tsx)）。列表卡片则完全不放图片位——每张卡都重复一个首字母方块，只是 48px 不承载技能任何事实的装饰——因此每张卡由名称打头，来源则写在卡片的信息行上。
+索引行与 `skills/` 目录按该行的 `dir` 联接：`skills/<dir>/` 存放该技能自己的 `SKILL.md`、数据集的类型化答案（`domain.json`）以及中文页 `SKILL.zh.md`。应用只读索引行，从不抓取 `domain.json`。技能没有封面插图：详情抽屉的图片位置显示作者首字母（见 [src/components/skill-cover.tsx](../src/components/skill-cover.tsx)）。卡片列表则完全不显示图片——每行重复一个字母方块只是 48px 承载不了任何事实的装饰——所以每张卡以技能名领头，来源以文字写在卡片栏上。
 
-索引行与 `skills/` 目录按 id 一一对应：`skills/{owner}/{repo}/{slug}/` 内正是上游技能自带的全部文件。应用把每行映射为 `Skill` 模型：`name = slug`、`repo = {owner}/{repo}`、`path = skills/{id}`（快照内目录，用于详情拉取与按目录名匹配）、`rev = hash`、`firstSeenAt = fetchedAt`、`descriptionZh = description_zh`、`profile = { domain }`——`stars` 则来自 join 到的 `repos.jsonl` 行（未 join 到时为 0）。
+应用把每行映射到 `Skill` 模型：`name = 该行的 name（回落到 id 的 slug）`、`repo = {owner}/{repo}`、`path = skills/<dir>`（快照内目录，用于详情抓取与 basename 匹配）、`url = https://www.skills.sh/{id}`（推导得出）、`descriptionZh = description_zh`、`profile = { domain: [domain], confidence }`——`stars` 由联接的 `repos.jsonl` 行提供（未联接时为 0）。快照不再发布每技能的内容哈希或首次抓取时间，模型因此不再携带 `rev`/`firstSeenAt`。
 
-技能详情抽屉将 `hash` 以「版本」呈现（`#b1460085`，完整值放 tooltip），`fetchedAt` 以「收录时间」呈现，分类则以分类标签呈现。作者自己在 frontmatter 写的 `version` 刻意不再并列展示：它是对另一件事的声明。
+详情抽屉把分类显示为领域 chip，并在"源"提示中给出 SKILL.md 的确切路径。
 
-## 消费方式
+## 消费快照
 
-实现位于 [../src/lib/registry/](../src/lib/registry/)（worker + 主线程代理），由商店各页面消费。
+实现在 [src/lib/registry/](../src/lib/registry/)（worker + 主线程代理），由商店各页面消费。
 
-### `latest` 指针
+### 分支头探测
 
-版本解析是**指针优先**的：上游在 `dist` 分支根目录发布一个 `latest` 文件，里面一行文本就是该分支当前指向的标签——当天的基线（`dist-<date>`）或在其之上生成的某一批次（`dist-<date>-N`）。读这一个小文件就确定了版本——其它所有地址都由该标签拼出，因此不涉及列举标签、排序或解析标签名；而且它走用户配置的下载源，不需要一个 CDN 无法提供的 API。该请求**带打散缓存的时间戳**：一个以报告新鲜度为职责的可变指针绝不能从缓存里拿，否则旧快照会被当成当前版本。
+上游不发布指针文件，也没有每次运行的统计侧表：关于"当前是什么"的唯一陈述就是 `dist` 分支本身。因此版本解析是**分支头优先**：向 GitHub commits API（`/repos/{repo}/commits/{branch}`——支持 CORS，公开仓库无需鉴权）发起一次小请求，应答给出头提交的 SHA 与日期。SHA 是所有快照文件寻址所用的不可变 ref；日期是快照的发布时间——即"未变化"短路所比较的新鲜度身份。该请求携带**缓存击穿戳**：以报告新鲜度为职责的可变指针绝不能由缓存应答，否则旧快照会冒充当前快照。
 
-### `upstream/stats.json` 附属文件
+### 抓取策略
 
-快照的缓存能力全靠随行的运行统计承载：
+- SHA 来自分支头探测（上文），下载即钉定在它上面，也就是恰好钉在上游发布的那个快照上。
+- 正文以提交 SHA 抓取（`…/skills-profiles@<sha>/skills.jsonl`），它是内容寻址且不可变的：不做缓存击穿，CDN 边缘副本必然是正确的字节。
+- 若 API 探测无法应答，下载回落到可变的 `dist` ref——并做击穿，因为没有钉定时一天前的边缘副本与当前索引无从区分。该路径上快照身份未知，"未变化"短路在下一次探测成功前失效。
+- 解析结果连同其身份（`ref` + 头提交日期）持久化到 IndexedDB，ref 记录到 localStorage（`skill-one.indexRef`），用于钉定 SKILL.md 详情抓取并显示在设置里。下次启动先立即提供缓存，再将探测到的日期与存储的比较：相等则多兆字节的正文完全不必下载。
+- 应用保持打开期间会重复探测：每小时 tick 会在上次完成的检查超过 12 小时后重跑一次（数据集每日发布），休眠恢复可见时也会重新询问窗口。什么都不问用户——刷新原位换入新快照而不清空 UI，失败或无事的检查绝不打扰——但真正落地新快照的检查会顺带告知一声，让脚下变化的列表不至于像故障。服务身份上的 `checkedAt` 戳记录检查日期，也就是窗口的起算点，且只有真正应答的探测才会写入，于是够不着的源就在下个 tick 重试。注意：解析不出 SHA 的周期性检查**绝不**回落到未钉定的正文抓取——与启动和强制重载不同——探测够不着时被服务的数据原样保留，而不是凭猜测拉取整个索引。
+- [index-stream.ts](../src/lib/registry/index-stream.ts) 的 `INDEX_SPEC` 钉定 `repo` / `path: "skills.jsonl"` / `ref: "dist"`（上文 ref 随每次下载提供），侧表相对其寻址：`repos.jsonl`。
+- 解析后，非规范 GitHub id（三段、所有者不含点）的行被过滤掉，其余每行映射到 `Skill` 模型。
+- 下载是流式的：响应体逐行解码，每行到齐即解析，UI 无需等待整个 ~8MB 文件。进度至多每 400ms 推送一次，某来源中途失败时活动缓冲会回卷、下一候选从头重启该文件——因此播报的计数是单调的。
+- `repos.jsonl`（GitHub 星数联接表，上文）钉定到同一快照 SHA，与正文并行发起，让它的延迟藏进多兆字节的下载里；解析出的行在解析时联接进每条技能行。它是装饰品：够不着或缺失的侧表只会让技能 0 星，而不是让下载失败。"未变化"短路会整个跳过它——缓存的技能已带着星数。失败的联接也绝不持久化：冷启动缓存只在侧表应答后写入（空 map 算应答，null 不算），星数缺失的会话不会带进下一次；下次启动重新下载并重试联接。
 
-| 字段 | 作用 |
-| --- | --- |
-| `finishedAt` | 标识快照：一次运行只发布一次，因此相同的值意味着相同的字节——「索引变了吗」由此变成一次字符串比较。它同时作为发布时间展示在「设置」页。 |
-| `indexedRows` | 发布的行数；「设置」页中与本地实际加载数并列展示（后者可能更少：解析时有防御性过滤）。 |
+### UI
 
-### 拉取策略
+- 探索页在流式下载进行中渐进渲染：下载完成前计数显示"N · 加载中"。
+- 需要完整注册表的页面（已安装页的元数据联接）以完成为门槛，流结束前保持骨架——部分数据会解析出错误的技能。
+- 设置报告正在服务的快照（分支头 SHA、发布时间、行数）以及本次启动是下载还是复用了本地副本；实时身份到达前回落到已记录的 ref。它还记录最近一次完成检查的时间（`checkedAt`），即自动窗口的起算点。检测更新按需运行同一廉价检查（无视新鲜度窗口），报告是否有新内容落地；立即重新下载在快照未动时也强制重下。
 
-- 标签来自上面的 `latest` 指针，下载定址到它，即恰好就是上游发布的那个快照。
-- `upstream/stats.json` 随后**定址到该标签读取**——地址不可变，因此不打散缓存——从中取得发布时间戳与行数。若读不到，仅凭标签仍可锚定正文下载（只是失去「未变化则跳过」的短路优化）。若指针本身就读不到，则走降级路径：打散缓存地探测可变 `dist` 分支上的 `stats.json` 取得时间戳，版本保持未定址。不再有任何地方从时间戳反推标签：指针就是上游对标签的正式声明，从 `finishedAt` 猜只会更差。
-- 正文随后按 `dist-<date>[-N]` 标签拉取（`…/skills-profiles@dist-2026-09-20-12/skills.jsonl`）。标签对单个快照不可变，因此不打散缓存，且边缘副本必然就是正确的字节。（重跑会强制把标签移到最新快照；变化了的 `finishedAt` 会察觉这一点并触发重下。）
-- 若指针与分支统计均无法解析，则退回可变的 `dist` ref——此时必须打散缓存，因为没有定址锚点时，一份一天前的边缘副本与当前索引无从分辨。
-- 解析结果连同其身份（`tag` + `finishedAt`）一起持久化到 IndexedDB，同时把标签记录到 localStorage（`skill-one.indexTag`），用于锚定 SKILL.md 详情拉取并在「设置」页展示。下次启动立即用该缓存渲染，再把探测到的时间戳与存储的比较：相同则**完全跳过多 MB 的正文下载**。
-- 应用只是开着不动时，该探测也会被重复：每小时检查一次是否距上次完成的校验超过 12 小时（数据集每日发布一次），窗口重新可见时（例如系统休眠吞掉了若干次 tick）也会再查一次。整个过程不向用户索要任何操作——刷新是原地替换当前快照、不闪白屏，失败或没有变化的校验也完全不提——但**确实拉到了新快照时会顺带提示一句**，免得列表在眼皮底下变化被当成故障。当前快照身份上的 `checkedAt` 就是校验时间的来源（窗口即以此为基准），且**只有真正得到应答的探测才会写入它**，因此数据源不可达时下一次 tick 会自行重试。注意：周期性校验在解析不出标签时**绝不**回退到未锚定的正文下载（启动与强制重下才会）——探测没有应答就什么都不下载，原有数据原样保留，而不是凭猜测拉取整份索引。
-- [index-stream.ts](../src/lib/registry/index-stream.ts) 中的 `INDEX_SPEC` 固定 `repo` / `path: "skills.jsonl"` / `ref: "dist"`（上面的标签由每次下载注入），两个附属文件都相对它定址：`upstream/stats.json`、`upstream/repos.jsonl`。
-- 解析后过滤掉非规范 GitHub id（非三段、owner 含 `.`）的行，其余映射为 `Skill` 模型。
-- 下载是流式的：响应体逐行解码，每凑齐一行就立即解析，界面不必等待整份约 6.9MB 的文件。进度最多每 400ms 推送一次；某个下载源中途失败、切换到下一个候选重新解析时活动缓冲区会被清空重头解析，因此推送出的计数是单调的，永远只增不减。
-- `upstream/repos.jsonl`（GitHub star 数的 join 表，见上文）同样定址到同一快照标签拉取，与正文同时启动，因此其延迟隐藏在多 MB 的索引下载之内；解析出的行在解析阶段 join 进每一行技能数据。它只是点缀：附属文件缺失或不可达时技能以 0 star 呈现，而不是让下载失败。「未变化」短路会完全跳过它——缓存里的技能早已带着各自的 star 数。join 失败的结果也绝不落缓存：只有 sidecar 真正应答过（空 map 算应答，null 不算）才写入冷启动缓存，因此本轮的 0 star 不会被带进下一轮；下次启动会重新下载并重试 join。
+技能的 `SKILL.md` 从快照的 `skills/<dir>/SKILL.md` 抓取，已记录快照 ref 时钉定到它（否则走可变的 `dist` 分支）；见 [src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。
 
-### 界面
+快照还为一部分技能发布中文页 `skills/<dir>/SKILL.zh.md`（索引行没有任何标记；文件存在与否是唯一信号）。中文模式下详情抽屉以该页领起正文，只有当读者通过头部的查看原文开关把抽屉翻回原文时才抓取英文 `SKILL.md`（描述与正文共用一个开关）——对未翻译的技能则直接以英文正文呈现（磁盘读取只读英文文件）。中文页的抓取与 repos 侧表一样是装饰品：缺页、网络失败或服务器错误都把正文交回英文原版。
 
-- 探索页在流式下载期间渐进渲染：计数显示为「N · 加载中」，直到下载结束。
-- 依赖全量数据的页面——「我的技能」的元数据 join——以「下载完成」为门控，在此之前保持骨架屏，因为部分数据会解析出错误的技能。
-- 「设置」页报告当前服务的快照（`dist-<date>[-N]` 标签、发布时间、发布行数），以及本次启动是重新下载还是复用了本地缓存；在线身份到来之前会回退显示已记录的标签。它还会给出上次完成的校验时间（`checkedAt`），自动刷新的窗口正是以此为基准。「检测更新」按需执行同一套廉价校验（不受新鲜度窗口限制）并报告是否拉到了新快照；「立即重新下载」则即使快照没有变化也强制重下。
-
-技能详情 `SKILL.md` 从快照按 `skills/{id}/SKILL.md` 拉取，存在已记录标签时定址到该快照（否则用可变的 `dist` 分支），见 [../src/lib/skill-detail-api.ts](../src/lib/skill-detail-api.ts)。
-
-快照还为部分 skill 附带中文页面，路径为 `profiles/{id}/skill_zh.md`（索引行没有对应标记，文件是否存在是唯一信号）。中文模式下详情抽屉的正文以该页面为主，英文 `SKILL.md` 只在读者通过头部的「查看原文」开关把整个抽屉切回原文（描述与正文由同一个开关一起切换）时才拉取；未翻译的 skill 则立即拉取英文正文（磁盘读取始终只读英文文件）。这次中文页拉取与 repos 旁车一样是装饰性的：页面缺失、网络故障或服务端错误都会把正文交还给英文原文。
-
-Owner 头像（skill 卡片元信息行上的作者头像，以及详情抽屉仓库行上的仓库所有者头像）从快照按 `upstream/avatars/{owner}.png` 拉取，走同一条下载源回退链，存在已记录标签时定址到该快照，见 [../src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx)。头像本身只是装饰：详情抽屉的仓库行与卡片的信息行都会把仓库名以文本形式紧邻显示，头像自带的浮窗（见 [../src/components/repo-hover-card.tsx](../src/components/repo-hover-card.tsx)）则额外给出其 Star 数，因此头像对辅助技术隐藏。
+所有者头像（技能卡元数据栏上的作者 chip，以及详情抽屉仓库行上的所有者头像）从快照的 `owners/{owner}.png` 经同一下载源链抓取，钉定到已记录的快照 ref；见 [src/components/owner-avatar.tsx](../src/components/owner-avatar.tsx)。头像仅是装饰：抽屉仓库行与卡片栏都在旁边以文字印出仓库名，chip 的悬停卡（见 [src/components/repo-hover-card.tsx](../src/components/repo-hover-card.tsx)）在其后补充星数——因此头像对辅助技术隐藏。
