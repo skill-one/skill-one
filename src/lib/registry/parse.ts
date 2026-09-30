@@ -25,7 +25,13 @@ interface RawSkill {
    * multi-segment slugs upstream are keyed with the slashes stripped.
    */
   id: string;
-  /** The skill's frontmatter `name`, as the mirror spells it. */
+  /**
+   * The skill's frontmatter `name`, as the mirror spells it. Deliberately not
+   * carried into the model: the slug — the id's last segment, the skills.sh
+   * fold of that same frontmatter `name` — is the one identity every consumer
+   * shares (see `toSkill`), so a raw spelling that folded differently would
+   * only open a second naming currency.
+   */
   name?: string | null;
   installs: number;
   /**
@@ -85,9 +91,14 @@ function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
   const domain = text(raw.domain);
   const confidence = count(raw.confidence);
   return {
-    // The frontmatter name is the skill's name; the id's slug is the
-    // fallback, and what a locally installed copy of it is called.
-    name: text(raw.name) || slug,
+    // The name is the id's slug — the skills.sh identity, not the frontmatter
+    // `name` verbatim. The slug is what a locally installed copy is called
+    // (agents-skills matches installs by the slugified frontmatter `name`),
+    // what the live skills.sh search reports (`skillId`), and the id's own
+    // last segment installs rebuild from — holding the raw spelling instead
+    // would split the name into two currencies that only agree while upstream
+    // declares no casing or spaces the fold removes.
+    name: slug,
     repo: repoId,
     // Upstream exposes descriptions; fall back to an empty placeholder
     // when an entry lacks one so the row layout stays stable.

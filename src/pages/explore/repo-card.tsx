@@ -8,7 +8,12 @@ import { skillDescription } from "../../lib/i18n-content";
 import { domainIcon } from "../../data/domains";
 import { DomainGlyph } from "../../components/domain-glyph";
 import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
-import { isLiveSkill, skillKey, type SkillView } from "../../lib/skill-view";
+import {
+  isInstallableSkill,
+  isLiveSkill,
+  skillKey,
+  type SkillView,
+} from "../../lib/skill-view";
 import type { Skill } from "../../types/skill";
 import { cn, formatCount } from "../../lib/utils";
 
@@ -505,13 +510,16 @@ export function RepoCard({
               // local fact, and keeps both.
               const live = isLiveSkill(skill);
               const isSelected = selected != null && selected === key;
-              // The caller's own row control, else the store's install button.
-              // Either one only renders when this card carries row actions at
-              // all (`rowActions={false}` leaves the bar's group switch the
-              // one control).
-              const control = action ?? (
-                <SkillInstallButton skill={skill} className="h-7 w-7" />
-              );
+              // The caller's own row control, else the store's install button —
+              // withheld from a live hit whose source no install id can be
+              // rebuilt from (a discovery domain), whose install could only
+              // fail. Either one only renders when this card carries row
+              // actions at all (`rowActions={false}` leaves the bar's group
+              // switch the one control).
+              const control = action ??
+                (isInstallableSkill(skill) ? (
+                  <SkillInstallButton skill={skill} className="h-7 w-7" />
+                ) : null);
               return (
                 <motion.li
                   key={key}
