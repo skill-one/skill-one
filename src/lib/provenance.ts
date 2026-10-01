@@ -28,7 +28,11 @@
 
 import { isTauri } from "./tauri";
 import { storage } from "./storage";
-import { readProvenanceRaw, writeProvenanceRaw } from "./skills-manager";
+import {
+  openProvenanceDirRaw,
+  readProvenanceRaw,
+  writeProvenanceRaw,
+} from "./skills-manager";
 import { logActivity, type SourceLinkReason } from "./activity";
 
 /** A stored source record: one installed skill's store identity. */
@@ -482,8 +486,86 @@ export async function saveResolutionRecords(
   await saveLedger(ledger);
 }
 
-// ------------------------------------------------- browser mock hooks (tests)
+// ------------------------------------------------------- developer inspector
 
+/**
+ * The raw ledger content, whichever store backs it: the `.skill-one.jsonl`
+ * file inside Tauri, the browser stand-in otherwise. Unlike `loadLedger` (the
+ * write paths' internal helper) it does not parse or normalize — the
+ * developer viewer renders the file as it is on disk.
+ */
+export async function readLedgerRaw(): Promise<string | null> {
+  if (isTauri()) return readProvenanceRaw();
+  return storage.getItem(BROWSER_STORAGE_KEY);
+}
+
+/**
+ * One rendered line of the ledger: the parsed JSON value when the line is
+ * well-formed JSON, the raw text when it is not (a broken line stays visible
+ * in the developer viewer, flagged — the inspector shows the file as it is,
+ * it does not silently skip what `parseLedger` tolerates).
+ */
+export interface LedgerLine {
+  /** 1-based position in the raw content. */
+  line: number;
+  /** The parsed value (any JSON — field validity is the viewer's call). */
+  record?: unknown;
+  /** The verbatim text of a line that did not parse. */
+  text?: string;
+}
+
+/**
+ * Split raw ledger content into per-line entries for the developer viewer,
+ * keeping the file's own order and duplicates (no last-wins merging — the
+ * viewer shows what was written, `parseLedger` decides what the UI acts on).
+ *
+ * The legacy v1 JSON document (one object, not one record per line) is
+ * converted to its per-skill records so both formats render the same way.
+ */
+export function ledgerLines(raw: string | null | undefined): LedgerLine[] {
+  if (!raw) return [];
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+  // A whole-content JSON parse first: the legacy document, or a single
+  // JSONL record stored without a trailing newline.
+  if (trimmed.startsWith("{")) {
+    try {
+      const doc = JSON.parse(trimmed) as { skills?: unknown };
+      if (doc && typeof doc === "object" && doc.skills && typeof doc.skills === "object") {
+        return Object.entries(doc.skills as Record<string, unknown>).map(
+          ([name, entry], index) => ({
+            line: index + 1,
+            record: { ...(entry as object), name },
+          }),
+        );
+      }
+      return [{ line: 1, record: doc }];
+    } catch {
+      // Multi-line JSONL falls through to the line parser.
+    }
+  }
+  // Split the raw text, not the trimmed one: the line number is the line's
+  // real position in the file, blank lines included.
+  return raw.split("\n").flatMap((line, index): LedgerLine[] => {
+    const trimmed = line.trim();
+    if (!trimmed) return [];
+    try {
+      return [{ line: index + 1, record: JSON.parse(trimmed) }];
+    } catch {
+      return [{ line: index + 1, text: trimmed }];
+    }
+  });
+}
+
+/**
+ * Reveal the ledger's directory (the global skills directory) in the system
+ * file manager. A no-op in the browser, where there is no file to reveal.
+ */
+export async function revealProvenanceDir(): Promise<void> {
+  if (isTauri()) await openProvenanceDirRaw();
+}
+
+// ------------------------------------------------- browser mock hooks (tests)
 /**
  * Seed the browser ledger directly (dev server demos, tests). No-op inside
  * Tauri, where the real file is the only source of truth.
@@ -503,4 +585,14 @@ export function seedMockProvenance(
 export function resetMockProvenance(): void {
   if (isTauri()) return;
   storage.removeItem(BROWSER_STORAGE_KEY);
+}
+
+/**
+ * Seed the browser ledger with verbatim raw content (developer-viewer demos
+ * and tests: broken lines, duplicates and resolution records that the
+ * structured seed above cannot express). No-op inside Tauri.
+ */
+export function seedMockLedgerRaw(raw: string): void {
+  if (isTauri()) return;
+  storage.setItem(BROWSER_STORAGE_KEY, raw);
 }

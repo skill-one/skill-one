@@ -92,6 +92,24 @@ pub async fn write_provenance(content: String) -> Result<(), String> {
     .map_err(|e| format!("write provenance task failed: {e}"))?
 }
 
+/// Reveal the ledger's directory (the global skills directory) in the system
+/// file manager, creating it first so the action never fails on a fresh
+/// install. The developer viewer's escape hatch to the raw file.
+#[tauri::command]
+pub async fn open_provenance_dir() -> Result<(), String> {
+    let dir = ledger_path()?
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| "no skills directory".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        std::fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+        tauri_plugin_opener::open_path(&dir, None::<&str>)
+            .map_err(|e| format!("open {}: {e}", dir.display()))
+    })
+    .await
+    .map_err(|e| format!("open provenance dir task failed: {e}"))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

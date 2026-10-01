@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
 import {
+  Braces,
   CircleCheck,
   Globe,
   History,
@@ -19,6 +20,7 @@ import { useLanguagePreference } from "../i18n/use-language";
 import { useAppUpdate } from "../hooks/use-app-update";
 import { AdvancedSettingsDialog } from "./advanced-settings-dialog";
 import { ActivityDialog } from "./activity-dialog";
+import { DeveloperDialog } from "./developer-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -134,6 +136,7 @@ export function SettingsMenu() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [developerOpen, setDeveloperOpen] = useState(false);
   const update = useAppUpdate();
   const { phase, open: openUpdateDialog, check } = update;
   const hasUpdate = phase === "available" && update.version !== null;
@@ -161,6 +164,11 @@ export function SettingsMenu() {
   const openActivity = () => {
     setMenuOpen(false);
     setActivityOpen(true);
+  };
+
+  const openDeveloper = () => {
+    setMenuOpen(false);
+    setDeveloperOpen(true);
   };
 
   return (
@@ -302,6 +310,10 @@ export function SettingsMenu() {
             <History />
             {t("activity.title")}
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={openDeveloper}>
+            <Braces />
+            {t("developer.title")}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       {/* Mounted outside the menu: its content unmounts on close and would
@@ -311,6 +323,7 @@ export function SettingsMenu() {
         onOpenChange={setAdvancedOpen}
       />
       <ActivityDialog open={activityOpen} onOpenChange={setActivityOpen} />
+      <DeveloperDialog open={developerOpen} onOpenChange={setDeveloperOpen} />
     </>
   );
 }

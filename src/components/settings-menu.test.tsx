@@ -125,6 +125,7 @@ describe("SettingsMenu", () => {
       "软件更新",
       "高级设置",
       "活动日志",
+      "开发者",
     ]) {
       expect(screen.getByText(row)).toBeInTheDocument();
     }
@@ -255,6 +256,21 @@ describe("SettingsMenu", () => {
     await user.click(screen.getByRole("menuitem", { name: /活动日志/ }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    // One overlay at a time here too.
+    expect(screen.queryByText("软件更新")).not.toBeInTheDocument();
+  });
+
+  it("opens the developer dialog from the 开发者 row", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    await openMenu(user);
+
+    await user.click(screen.getByRole("menuitem", { name: /开发者/ }));
+
+    // The dialog reads the (empty, browser-mode) ledger and says so.
+    expect(
+      await screen.findByText("账本为空——安装技能后，其来源将记录在这里"),
+    ).toBeInTheDocument();
     // One overlay at a time here too.
     expect(screen.queryByText("软件更新")).not.toBeInTheDocument();
   });

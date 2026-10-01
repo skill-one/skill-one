@@ -10,7 +10,10 @@ import {
   dismissSkillSource,
   loadResolutionRecords,
   saveResolutionRecords,
+  ledgerLines,
+  readLedgerRaw,
   resetMockProvenance,
+  seedMockLedgerRaw,
   seedMockProvenance,
 } from "./provenance";
 import type { LedgerRecord, ProvenanceRecord, ResolutionRecord } from "./provenance";
@@ -125,6 +128,77 @@ describe("serializeLedger", () => {
       pdf: SOURCE,
       "my-tool": RESOLUTION,
     })));
+  });
+});
+
+// The developer viewer's per-line split: unlike parseLedger it keeps the
+// file's own order, duplicates and broken lines — the file as it is.
+
+describe("ledgerLines", () => {
+  it("splits JSONL into numbered lines, keeping order and duplicates", () => {
+    const lines = ledgerLines(
+      [JSON.stringify(SOURCE), JSON.stringify(RESOLUTION), JSON.stringify(SOURCE)].join("\n"),
+    );
+    expect(lines.map((l) => l.line)).toEqual([1, 2, 3]);
+    expect(lines[0]?.record).toEqual(SOURCE);
+    expect(lines[1]?.record).toEqual(RESOLUTION);
+    expect(lines[2]?.record).toEqual(SOURCE);
+  });
+
+  it("flags broken lines with their raw text instead of skipping them", () => {
+    const lines = ledgerLines([JSON.stringify(SOURCE), "{broken"].join("\n"));
+    expect(lines[0]?.record).toEqual(SOURCE);
+    expect(lines[1]?.text).toBe("{broken");
+    expect(lines[1]?.record).toBeUndefined();
+  });
+
+  it("skips blank lines but keeps later line numbers intact", () => {
+    const lines = ledgerLines(["", JSON.stringify(SOURCE), "", JSON.stringify(RESOLUTION)].join("\n"));
+    expect(lines.map((l) => l.line)).toEqual([2, 4]);
+  });
+
+  it("converts the legacy v1 document to per-skill records", () => {
+    const lines = ledgerLines(
+      JSON.stringify({
+        version: 1,
+        skills: {
+          pdf: { repo: "anthropics/skills", installedAt: SOURCE.installedAt },
+          noRepo: { slug: "noRepo" },
+        },
+      }),
+    );
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toEqual({
+      line: 1,
+      record: { repo: "anthropics/skills", installedAt: SOURCE.installedAt, name: "pdf" },
+    });
+    expect(lines[1]).toEqual({ line: 2, record: { slug: "noRepo", name: "noRepo" } });
+  });
+
+  it("renders a single record without a trailing newline as one line", () => {
+    expect(ledgerLines(JSON.stringify(SOURCE))).toEqual([{ line: 1, record: SOURCE }]);
+  });
+
+  it("returns no lines for null, blank and whitespace input", () => {
+    expect(ledgerLines(null)).toEqual([]);
+    expect(ledgerLines("")).toEqual([]);
+    expect(ledgerLines("  \n  ")).toEqual([]);
+  });
+});
+
+// Raw read path backing the developer viewer (browser stand-in here).
+
+describe("readLedgerRaw", () => {
+  beforeEach(() => resetMockProvenance());
+  afterEach(() => resetMockProvenance());
+
+  it("returns the stored ledger verbatim", async () => {
+    seedMockLedgerRaw(JSON.stringify(SOURCE));
+    expect(await readLedgerRaw()).toBe(JSON.stringify(SOURCE));
+  });
+
+  it("returns null when nothing is stored yet", async () => {
+    expect(await readLedgerRaw()).toBeNull();
   });
 });
 

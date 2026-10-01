@@ -268,6 +268,45 @@
       "unknown": "Check failed, please try again later"
     }
   },
+  "developer": {
+    "title": "Developer",
+    "description": "Internal data for debugging: the provenance ledger (.skill-one.jsonl) recording where each installed skill came from.",
+    "recordCount_one": "{{count}} record",
+    "recordCount_other": "{{count}} records",
+    "viewAria": "Choose the ledger view",
+    "view": {
+      "structured": "Structured",
+      "raw": "Raw JSONL"
+    },
+    "kind": {
+      "source": "source",
+      "resolution": "resolution",
+      "unknown": "unrecognized"
+    },
+    "field": {
+      "name": "name",
+      "repo": "repo",
+      "installedAt": "installedAt",
+      "hash": "hash",
+      "epoch": "epoch",
+      "fingerprint": "fingerprint",
+      "namesakesKey": "namesakesKey",
+      "candidates": "candidates",
+      "similarity": "similarity",
+      "stars": "stars",
+      "downloads": "downloads",
+      "description": "description",
+      "descriptionZh": "descriptionZh",
+      "mtimeMs": "mtimeMs",
+      "size": "size"
+    },
+    "unparsableLine": "Unparsable line",
+    "empty": "The ledger is empty — install a skill and its source will be recorded here",
+    "reveal": "Show in folder",
+    "refresh": "Refresh",
+    "copy": "Copy",
+    "copied": "Copied"
+  },
   "activity": {
     "title": "Activity log",
     "description": "Every change Skill One has made to your skills and agents.",
