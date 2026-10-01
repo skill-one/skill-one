@@ -14,7 +14,7 @@
     "installs": "安装量",
     "searchSkills": "搜索 Skill",
     "indexBuilding": "索引构建中…",
-    "listUnit": "列表单位",
+    "listUnit": "视图",
     "back": "返回",
     "viewDetailAria": "查看 {{name}} 详情",
     "expand": "展开",
@@ -34,8 +34,8 @@
     "installed": "已安装"
   },
   "unit": {
-    "byRepo": "按仓库",
-    "bySkill": "按技能"
+    "byRepo": "网格",
+    "bySkill": "列表"
   },
   "action": {
     "install": "安装",

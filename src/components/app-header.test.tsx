@@ -97,7 +97,7 @@ describe("AppHeader", () => {
     // so both open that list's content; the header holds the window's chrome.
     expect(screen.queryByRole("button", { name: /更多分类/ })).toBeNull();
     expect(header().querySelector("button[aria-label*='全部']")).toBeNull();
-    expect(screen.queryByRole("button", { name: "按技能" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "列表" })).toBeNull();
   });
 
   it("keeps the navigation, search and settings on a page inside a list", async () => {

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ParseKeys } from "i18next";
-import { Boxes, Rows3, type LucideIcon } from "lucide-react";
+import { LayoutGrid, Rows3, type LucideIcon } from "lucide-react";
 
 import { cn } from "../lib/utils";
 import type { ListUnit } from "../lib/list-view";
@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /** The two readings: a mark each, and the i18n key a hover says for it. */
 const UNITS: { unit: ListUnit; labelKey: ParseKeys; icon: LucideIcon }[] = [
-  { unit: "repo", labelKey: "unit.byRepo", icon: Boxes },
+  { unit: "repo", labelKey: "unit.byRepo", icon: LayoutGrid },
   { unit: "skill", labelKey: "unit.bySkill", icon: Rows3 },
 ];
 
@@ -19,8 +19,16 @@ const UNITS: { unit: ListUnit; labelKey: ParseKeys; icon: LucideIcon }[] = [
  * exactly two units and both are marked on it, so the current one stays legible
  * at a glance instead of hiding behind a trigger.
  *
- * The marks do the talking: one crate per repository, one row per skill — the
- * same subject in two shapes, so what changes on screen is what changes on the
+ * The control wears the app's one segmented-control look — the muted bed with
+ * the active segment raised off it — that `AppNav` wears in the header: two
+ * two-way switches in the same window should answer with the same selected
+ * language, or each press reads differently depending on where it lands. The
+ * shadcn `ToggleGroup` still carries the semantics (an `aria-pressed` pair, not
+ * links); only its stock outline dress is set aside for the shared one.
+ *
+ * The marks do the talking, and they name the shape the screen takes, not the
+ * data behind it: rows stacked in one column are the list, repo cards laid out
+ * across columns are the grid — what changes on screen is what changes on the
  * control, and the pair reads in the same visual weight at 16px or 20px. The
  * words are a hover away rather than on the row, because the row is a list's and
  * the pair is legible without them; each half keeps an accessible name, though,
@@ -40,9 +48,7 @@ export function ListUnitToggle({
   const { t } = useTranslation();
   return (
     <ToggleGroup
-      className={cn("shrink-0", className)}
-      variant="outline"
-      spacing={0}
+      className={cn("shrink-0 bg-muted p-0.5", className)}
       value={[unit]}
       onValueChange={(value) => {
         const next = value[0];
@@ -57,7 +63,7 @@ export function ListUnitToggle({
               <ToggleGroupItem
                 value={value}
                 aria-label={t(labelKey)}
-                className="px-2.5"
+                className="rounded-md px-2.5 text-muted-foreground hover:bg-transparent aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
               />
             }
           >

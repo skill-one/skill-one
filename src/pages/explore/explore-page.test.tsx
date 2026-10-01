@@ -494,7 +494,7 @@ describe("ExplorePage", () => {
     ).toBeInTheDocument();
 
     // … and so do the skill unit's rows, which share the resolver.
-    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await user.click(screen.getByRole("button", { name: "列表" }));
     const strayRow = await screen.findByRole("button", {
       name: "查看 stray 详情",
     });
@@ -579,7 +579,7 @@ describe("ExplorePage", () => {
 
     // The repository unit leads with one card per repository...
     await screen.findByText("o/one");
-    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await user.click(screen.getByRole("button", { name: "列表" }));
 
     // ...and the skill unit with one row per skill, most installed first. o/one's
     // three skills are a run, but below the fold threshold it is listed whole —
@@ -642,7 +642,7 @@ describe("ExplorePage", () => {
     harness.complete();
     renderExplorePage();
 
-    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await user.click(screen.getByRole("button", { name: "列表" }));
     await waitFor(() => expect(cardOrder()).toEqual(["r1", "z1"]));
 
     // o/one's four-skill run folds its three hidden rows into one line whose
@@ -708,7 +708,7 @@ describe("ExplorePage", () => {
     harness.complete();
     renderExplorePage();
 
-    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await user.click(screen.getByRole("button", { name: "列表" }));
     await waitFor(() =>
       expect(cardOrder()).toEqual(["alpha", "beta", "gamma", "delta"]),
     );
@@ -729,7 +729,7 @@ describe("ExplorePage", () => {
     bootGadgetRegistry();
     renderExplorePage();
 
-    await user.click(await screen.findByRole("button", { name: "按技能" }));
+    await user.click(await screen.findByRole("button", { name: "列表" }));
     await user.type(await searchField(), "gadget");
 
     // The match comes back as a skill row rather than a repository card.
@@ -1198,7 +1198,7 @@ describe("ExplorePage", () => {
     // The skill unit's live row is the same full-width row the local list
     // uses (the repository unit renders live hits as repository-card rows,
     // which never draw a per-skill figure).
-    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await user.click(screen.getByRole("button", { name: "列表" }));
     await user.type(await searchField(), "gadget");
     await screen.findByText("sprocket");
 
@@ -1233,7 +1233,7 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("gadget-master");
 
-    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await user.click(screen.getByRole("button", { name: "列表" }));
     await user.type(await searchField(), "gadget");
 
     const section = await screen.findByRole("region", {

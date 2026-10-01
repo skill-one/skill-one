@@ -1130,7 +1130,7 @@ describe("InstalledPage", () => {
     renderPage();
     await screen.findByText("pdf");
 
-    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await user.click(screen.getByRole("button", { name: "列表" }));
 
     // One row per install, uncapped: this is the whole list, so the unit that
     // reads it one skill at a time reads all of it.
@@ -1152,7 +1152,7 @@ describe("InstalledPage", () => {
     renderPage();
     await screen.findByText("pdf");
 
-    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await user.click(screen.getByRole("button", { name: "列表" }));
     await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
 
     // One flat list, newest first: pdf landed today, docx three days ago,
@@ -1186,7 +1186,7 @@ describe("InstalledPage", () => {
     seedStoreEntries({ pdf: 30, docx: 20, pptx: 10, "mcp-builder": 5 });
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "按技能" }));
+    await user.click(await screen.findByRole("button", { name: "列表" }));
 
     // Every install keeps its own row, across the day groups...
     expect(
@@ -1215,7 +1215,7 @@ describe("InstalledPage", () => {
       "2",
     );
 
-    await user.click(screen.getByRole("button", { name: "按技能" }));
+    await user.click(screen.getByRole("button", { name: "列表" }));
 
     // The same chip now weighs skills, and 全部 every install.
     await waitFor(() =>
@@ -1238,7 +1238,7 @@ describe("InstalledPage", () => {
 
     // Switching units clears the scope with it: the two units weigh a domain
     // differently, so a scope set in one need not mean anything in the other.
-    await user.click(screen.getByRole("button", { name: "按仓库" }));
+    await user.click(screen.getByRole("button", { name: "网格" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
         "2",
@@ -1249,7 +1249,7 @@ describe("InstalledPage", () => {
   it("answers a search with rows in the skill unit", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "按技能" }));
+    await user.click(await screen.findByRole("button", { name: "列表" }));
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
@@ -1268,7 +1268,7 @@ describe("InstalledPage", () => {
   it("walks the skill unit's newest-first time order in the detail drawer", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "按技能" }));
+    await user.click(await screen.findByRole("button", { name: "列表" }));
 
     // The walk follows the newest-first time order: after code-review (200
     // days) the next install is frontend-design (400) — one press lands there,
