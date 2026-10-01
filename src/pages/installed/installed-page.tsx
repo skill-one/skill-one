@@ -98,7 +98,7 @@ function starsOf(group: RepoGroup): number | undefined {
  * - **按仓库**: one card per source repository, ordered by its *newest*
  *   install (newest first, so a card near the top has something new in it),
  *   listing that repository's installed skills in the same newest-first order
-  *   (up to the preview size set in Advanced Settings, 3 by default; that newest install
+ *   (up to the preview size set in Advanced Settings, 3 by default; that newest install
  *   is therefore always inside the preview). Installs no recorded source
  *   vouches for have no repository to belong to, so they pool into one card of
  *   their own rather than inventing one — the same shape, with its bar stating
@@ -116,9 +116,9 @@ function starsOf(group: RepoGroup): number | undefined {
  * same floating slot the store's install buttons live in — the dimming of a
  * disabled row, and the migration badge beside an install whose source the
  * ledger cannot vouch for. A card also names what its repository still has
- * that this machine does not: one folded row beneath the installed group
- * states the count of uninstalled siblings, and a press unfolds them (each
- * with the store's install button) as their own group under the divider.
+ * that this machine does not: a badge on the card's bar states the count of
+ * uninstalled siblings, and a press on the bar unfolds them (each with the
+ * store's install button) as their own group under the divider.
  * The skill unit carries its per-row switch, and both units feed the same
  * detail drawer, so what a skill looks like never depends on how the list is
  * ordered.
@@ -251,20 +251,17 @@ export function InstalledPage() {
   // search is left exactly as the index answered it: relevance is a ranking
   // too, and the better one while a query is live — the same order the store
   // keeps there.
-  const activeRows = useMemo(
-    () => {
-      if (unit !== "skill") return [];
-      if (isSearching) return rows;
-      const scoped =
-        domain === null
-          ? rows
-          : rows.filter((row) => domainsOf(row.skill).includes(domain));
-      return scoped.toSorted(
-        compareByInstalledTime((row) => row.skill.installedAt),
-      );
-    },
-    [unit, rows, isSearching, domain],
-  );
+  const activeRows = useMemo(() => {
+    if (unit !== "skill") return [];
+    if (isSearching) return rows;
+    const scoped =
+      domain === null
+        ? rows
+        : rows.filter((row) => domainsOf(row.skill).includes(domain));
+    return scoped.toSorted(
+      compareByInstalledTime((row) => row.skill.installedAt),
+    );
+  }, [unit, rows, isSearching, domain]);
 
   // Each row's ordinal in the flat order, so numbering runs continuously
   // across the groups rather than restarting per bucket.
@@ -375,9 +372,7 @@ export function InstalledPage() {
     () =>
       unit === "skill"
         ? activeRows.map((row) => row.skill)
-        : activeCards.flatMap((card) =>
-            card.items.map((row) => row.skill),
-          ),
+        : activeCards.flatMap((card) => card.items.map((row) => row.skill)),
     [unit, activeRows, activeCards],
   );
 
