@@ -55,7 +55,9 @@ beforeEach(() => {
 });
 
 /** The persisted ledger's record for `name` (the store is JSONL). */
-function ledgerRecord(name: string): { name: string; repo?: string } | undefined {
+function ledgerRecord(
+  name: string,
+): { name: string; repo?: string } | undefined {
   return (localStorage.getItem("skill-one.provenance") ?? "")
     .split("\n")
     .filter((line) => line.trim())
@@ -382,7 +384,7 @@ describe("InstalledPage", () => {
     );
   });
 
-  it("offers the repository's uninstalled skills behind one folded row", async () => {
+  it("offers the repository's uninstalled skills as a badge on the bar", async () => {
     const user = userEvent.setup();
     // pdf carries a recorded source and moves into its own repository card;
     // the registry's grouping answers the same repository with one skill the
@@ -421,27 +423,39 @@ describe("InstalledPage", () => {
     });
     renderPage();
 
-    // The repository card states how many of its skills are missing, folded
-    // under the installed group; the uninstalled skill itself stays hidden.
-    // Folded, the offer is held off the installed rows by spacing alone —
-    // no hairline, since there is no second list yet to tell apart.
-    const offer = await screen.findByRole("button", {
-      name: "展开或收起 anthropics/skills 的 1 个未安装 skill",
+    // The card's bar states how many of its repository's skills are missing:
+    // one badge on the bar itself — no row of its own — while the uninstalled
+    // skill stays hidden. The bar is the toggle, and its aria counts the
+    // card's whole offer (one installed, one uninstalled).
+    const bar = await screen.findByRole("button", {
+      name: "展开 anthropics/skills 的全部 2 个 skill",
     });
-    expect(offer).toHaveTextContent("1 个未安装");
-    expect(offer.parentElement).not.toHaveClass("border-t");
+    expect(screen.getByText("1 个未安装")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("list", {
+        name: "anthropics/skills 的未安装 skill",
+      }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("pdf-annotate")).not.toBeInTheDocument();
 
-    // One press unfolds the uninstalled group in place, and the hairline
-    // arrives with it — now there are two lists to keep apart — with the
-    // store's install CTA on the row: no switch, and no drawer: an
+    // One press on the bar unfolds the uninstalled group in place, and the
+    // hairline arrives with it — now there are two lists to keep apart —
+    // with the store's install CTA on the row: no switch, and no drawer: an
     // uninstalled row's destination is the install itself. The installed
     // group is untouched: pdf keeps its own row and its switch.
-    await user.click(offer);
-    expect(offer.parentElement).toHaveClass("border-t");
+    await user.click(bar);
     const section = screen.getByRole("list", {
       name: "anthropics/skills 的未安装 skill",
     });
+    // The group opens with its own marker row under the divider — a minus
+    // over the count — so the second list never reads as one with the
+    // installed rows.
+    expect(
+      screen.getByRole("button", {
+        name: "展开或收起 anthropics/skills 的 1 个未安装 skill",
+      }),
+    ).toHaveTextContent("1 个未安装");
+    expect(section.parentElement).toHaveClass("border-t");
     expect(within(section).getByText("pdf-annotate")).toBeInTheDocument();
     expect(
       within(section).getByRole("button", { name: "安装" }),
@@ -449,8 +463,12 @@ describe("InstalledPage", () => {
     expect(within(section).queryByRole("switch")).toBeNull();
 
     // A second press folds it back, hairline and all.
-    await user.click(offer);
-    expect(offer.parentElement).not.toHaveClass("border-t");
+    await user.click(bar);
+    expect(
+      screen.queryByRole("list", {
+        name: "anthropics/skills 的未安装 skill",
+      }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("pdf-annotate")).not.toBeInTheDocument();
   });
 
@@ -513,15 +531,15 @@ describe("InstalledPage", () => {
     const { container } = renderPage();
 
     const card = () =>
-      container.querySelector('[data-repo="anthropics/skills"]')?.closest(
-        "li",
-      ) ?? null;
+      container
+        .querySelector('[data-repo="anthropics/skills"]')
+        ?.closest("li") ?? null;
     const offer = () =>
       screen.getByRole("button", {
-        name: "展开或收起 anthropics/skills 的 2 个未安装 skill",
+        name: "展开 anthropics/skills 的全部 3 个 skill",
       });
     await screen.findByRole("button", {
-      name: "展开或收起 anthropics/skills 的 2 个未安装 skill",
+      name: "展开 anthropics/skills 的全部 3 个 skill",
     });
 
     // Folded, the card sits in its grid lane like every other card.
@@ -537,8 +555,13 @@ describe("InstalledPage", () => {
     });
     expect(section).toHaveClass("grid-flow-col");
 
-    // Folding the group hands the lane back.
-    await user.click(offer());
+    // Folding the group hands the lane back. (Open, the bar's aria speaks of
+    // collapsing, so the fold presses the button by its other name.)
+    await user.click(
+      screen.getByRole("button", {
+        name: "收起 anthropics/skills 的 skill 列表",
+      }),
+    );
     expect(card()).not.toHaveClass("col-span-full");
   });
 
@@ -849,7 +872,9 @@ describe("InstalledPage", () => {
       ).not.toBeInTheDocument(),
     );
     // The persisted ledger already carries the source the auto-link wrote.
-    await waitFor(() => expect(ledgerRecord("pdf")?.repo).toBe("anthropics/skills"));
+    await waitFor(() =>
+      expect(ledgerRecord("pdf")?.repo).toBe("anthropics/skills"),
+    );
     // And pdf's card now names the source it was linked to on its own.
     await screen.findByText("anthropics/skills");
   });
@@ -1095,9 +1120,7 @@ describe("InstalledPage", () => {
   /** Records one source for every name of the set. */
   function seedRunSource(repo = "acme/tools") {
     seedMockProvenance(
-      Object.fromEntries(
-        RUN_SOURCE.map((name) => [name, { repo }]),
-      ),
+      Object.fromEntries(RUN_SOURCE.map((name) => [name, { repo }])),
     );
   }
 

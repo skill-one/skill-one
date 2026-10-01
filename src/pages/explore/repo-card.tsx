@@ -141,18 +141,21 @@ export interface RepoCardRow {
  * switch (`footerAction`) remains the control that answers "all of them".
  *
  * **Uninstalled siblings** — the optional `uninstalled` prop — give an
- * installed card its repository's missing skills: a hairline closes the
- * installed rows off, and one quiet row states how many skills of the same
- * repository are *not* installed yet. A press unfolds them in place as rows
- * of their own group (each with the store's hover-revealed install button),
- * the same offer the store's repository view makes, so "what else is in
- * here?" reads without leaving the list. The two groups never mix: the
- * installed rows keep their order and the fold, the uninstalled ones live
- * below the divider and stay folded until asked for. An open group widens the
- * card — the same full-row, two-column footprint the bar's expansion takes,
- * with the uninstalled rows splitting into balanced columns like the
- * installed ones — so the reveal reads at the width of the list, and the two
- * offers (more of the card's rows, more of the repository) land identically.
+ * installed card its repository's missing skills. Folded, the offer is one
+ * badge on the bar — 「1 个未安装」 — a status mark rather than a second row:
+ * the card stays one line tall, and the count reads in the same scan that
+ * reads the name and the stars. The bar itself is the toggle: a press unfolds
+ * the uninstalled group in place — the same reveal the bar's 「＋ N」 makes
+ * for the rows behind the cap — and on a card holding both, one press
+ * reveals both, so the bar never means two different folds. Open, the group
+ * reads as its own: a hairline, then the group's marker row (a minus over
+ * the count, the fold's way back) before the rows begin, so the two lists
+ * never read as one. An open group widens the card — the same full-row,
+ * two-column footprint the bar's expansion takes, with the uninstalled rows
+ * splitting into balanced columns like the installed ones — so the reveal
+ * reads at the width of the list. The installed rows keep their order, the
+ * uninstalled ones live below the divider, and a second press folds them all
+ * back.
  *
  * Because the button is only ever *shown* on intent, it does not take part in
  * the row's layout: it floats over the row's right edge, so a name and a
@@ -258,11 +261,12 @@ export function RepoCard({
   // know which of its cards is open, and the grid reflows around it on its own
   // (the open card spans the full row; see the note on the list item below).
   const [expanded, setExpanded] = useState(false);
-  // The uninstalled section's own fold, independent of the card's: it starts
-  // closed (the count row is the offer) and only the section's own press
-  // moves it, so revealing the card's rows never drags the uninstalled ones
-  // along.
-  const [uninstalledOpen, setUninstalledOpen] = useState(false);
+  // The repository's registry skills that are not installed — the badge's
+  // fact, and the second thing a bar press reveals. Their fold is the card's
+  // own `expanded` rather than a state of their own: one bar, one fold, so a
+  // card holding both cap-hidden rows and uninstalled ones never needs two
+  // presses to show everything it has.
+  const hasUninstalled = uninstalled != null && uninstalled.length > 0;
   // The owner segment is what the dataset hosts an avatar for; a repository
   // group always has one (a bare-host source is its own owner).
   const [owner] = repo.split("/");
@@ -270,8 +274,8 @@ export function RepoCard({
   // A card can only expand past its cap when the cap is actually holding
   // something back: a search already lists everything (the cap stands down,
   // see the note on `hasQuery`), and a card within its cap has no rest to
-  // reveal — both keep the bar as the plain door it was. Expanding is worth a
-  // press only when the alternative was walking through the door.
+  // reveal — both keep the bar's 「＋ N」 figure off unless uninstalled
+  // siblings stand behind the badge.
   const canExpand = !hasQuery && skills.length > maxSkills;
   // The wide footprint, from any of the three sources: the reader's own
   // toggle in browse, a search answer that outruns the cap, or an open
@@ -281,7 +285,7 @@ export function RepoCard({
   const wide =
     (canExpand && expanded) ||
     (hasQuery && skills.length > maxSkills) ||
-    uninstalledOpen;
+    (hasUninstalled && expanded);
   // The toggle is also a transition. Opening a right-lane card re-plumbs the
   // whole grid — the card jumps to a full row start, every card after it
   // shifts, the open card's box doubles in width — and a hard cut between the
@@ -306,7 +310,8 @@ export function RepoCard({
   // only thing that changes is what is on top — nothing can pop in a single
   // frame when the card folds.
   const [collapsing, setCollapsing] = useState(false);
-  const lifted = canExpand && !reducedMotion && (expanded || collapsing);
+  const lifted =
+    (canExpand || hasUninstalled) && !reducedMotion && (expanded || collapsing);
   const toggleExpanded = () => {
     if (expanded && !reducedMotion) setCollapsing(true);
     setExpanded((value) => !value);
@@ -352,6 +357,29 @@ export function RepoCard({
       )}
     </>
   );
+  // The badge: the repository's uninstalled count, riding the bar's right end
+  // as a status mark rather than a second row — the card stays one line tall
+  // folded, and the fact reads in the same scan as the name and the stars. It
+  // is quieter than the toggle chip (muted fill, pill shape) because it is
+  // not the control: the whole bar is, and the badge answers "what is
+  // missing here" while the chip answers "what a press adds". The hover
+  // surface still fills — the badge sits inside the toggle's press area, and
+  // a control the pointer is on owes it the same answer. Hovering also earns
+  // one quiet sentence of explanation — the badge's figure 「2 个未安装」 is
+  // compact enough to want a gloss — but the plainest the platform gives: a
+  // native `title`, naming the repository and the fact, not the interaction
+  // (the bar already answers for that).
+  const uninstalledBadge = hasUninstalled ? (
+    <span
+      className="flex shrink-0 items-center rounded-full bg-muted px-1.5 py-0.5 font-medium text-muted-foreground tabular-nums transition-colors group-hover/head:bg-accent group-hover/head:text-foreground"
+      title={t("state.uninstalledBadgeTip", {
+        name,
+        count: uninstalled.length,
+      })}
+    >
+      {t("state.uninstalledCount", { count: uninstalled.length })}
+    </span>
+  ) : null;
   // The toggle's own figure — a chip: icon and number as one block, the one
   // thing that answers for the whole interaction. Folded, a plus over the
   // *increment*: 「＋ 5」, the exact number of rows a press reveals, read
@@ -362,19 +390,29 @@ export function RepoCard({
   // fold. The chip is what carries the hover feedback — a quiet surface that
   // fills on point-over, the way every control in the app answers the
   // pointer — because the press acts on this mark, never on the repository's
-  // name. A card that cannot expand shows no chip at all — and no hover of
-  // any kind; its bar is a label, not a control.
-  const toggleCount = expanded ? (
-    <span className="ml-auto flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-foreground transition-colors group-hover/head:bg-accent">
+  // name. A card that cannot expand shows no chip at all.
+  const toggleChip = expanded ? (
+    <span className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-foreground transition-colors group-hover/head:bg-accent">
       <Minus className="size-3" aria-hidden />
       {t("state.skillCount", { count: skills.length })}
     </span>
   ) : (
-    <span className="ml-auto flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium text-foreground tabular-nums transition-colors group-hover/head:bg-accent">
+    <span className="flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium text-foreground tabular-nums transition-colors group-hover/head:bg-accent">
       <Plus className="size-3" aria-hidden />
       {skills.length - maxSkills}
     </span>
   );
+  // The bar's right cluster — badge, then chip — as one group pushed to the
+  // far end. The chip leads a press only when the cap is holding rows back;
+  // the badge is the card's missing-skills fact either way. When neither is
+  // drawn the cluster is nothing, and the bar reads as the plain label it is.
+  const barActions =
+    canExpand || hasUninstalled ? (
+      <span className="ml-auto flex shrink-0 items-center gap-1">
+        {uninstalledBadge}
+        {canExpand && toggleChip}
+      </span>
+    ) : null;
 
   return (
     <li
@@ -413,16 +451,21 @@ export function RepoCard({
           transition={reducedMotion ? undefined : EXPAND_TRANSITION}
           className="min-w-0 flex items-center gap-2 border-b border-border/60 text-[11px] text-muted-foreground"
         >
-          {canExpand ? (
+          {canExpand || hasUninstalled ? (
             /* The expandable card's bar is a toggle: pressing it reveals (or
-               folds away) the rows the cap was holding, right here — the
-               shortest path from "this card" to "all of it". The button is
-               stretched over the header's whole height, its padding bleeding
-               into the card's own, so every pixel a reader aims at the bar
-               presses the toggle — a hit area the size of the text alone
-               would make the bar's edges dead. `layout="position"` keeps the
-               bar's text at its own size while the card surface scales
-               around it — only the bar's spot in the card animates. */
+               folds away) everything the folded card holds back — the rows
+               the cap was holding, and the repository's uninstalled skills
+               behind their badge — right here, the shortest path from "this
+               card" to "all of it". One bar, one fold: a card holding both
+               never asks for two presses. The button is stretched over the
+               header's whole height, its padding bleeding into the card's
+               own, so every pixel a reader aims at the bar presses the
+               toggle — a hit area the size of the text alone would make the
+               bar's edges dead. `layout="position"` keeps the bar's text at
+               its own size while the card surface scales around it — only
+               the bar's spot in the card animates. The aria count is the
+               card's whole offer: installed rows plus the uninstalled ones
+               the badge stands for. */
             <motion.button
               type="button"
               onClick={toggleExpanded}
@@ -430,14 +473,19 @@ export function RepoCard({
               aria-label={
                 expanded
                   ? t("state.collapseRepoAria", { name })
-                  : t("state.expandRepoAria", { name, count: skills.length })
+                  : t("state.expandRepoAria", {
+                      name,
+                      count:
+                        skills.length +
+                        (hasUninstalled ? uninstalled.length : 0),
+                    })
               }
               layout={!reducedMotion && "position"}
               transition={reducedMotion ? undefined : EXPAND_TRANSITION}
               className="group/head -my-(--card-spacing) flex min-w-0 flex-1 cursor-pointer items-center gap-2 self-stretch rounded-md py-(--card-spacing) text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               {barIdentity}
-              {toggleCount}
+              {barActions}
             </motion.button>
           ) : (
             /* A bar with nothing to reveal is pure identity — the face, the
@@ -517,7 +565,8 @@ export function RepoCard({
               // fail. Either one only renders when this card carries row
               // actions at all (`rowActions={false}` leaves the bar's group
               // switch the one control).
-              const control = action ??
+              const control =
+                action ??
                 (isInstallableSkill(skill) ? (
                   <SkillInstallButton skill={skill} className="h-7 w-7" />
                 ) : null);
@@ -631,104 +680,97 @@ export function RepoCard({
           </ul>
 
           {/* The uninstalled group: the repository's registry skills the
-              reader does not have. Folded, it is one quiet row — a plus over
-              the exact count, the same offer the bar's 「＋ N」 makes for the
-              rows behind the cap — held off the installed rows by spacing
-              alone, since there is no second list yet to tell apart. The
-              hairline arrives with the group itself: while the rows are open
-              it keeps the two lists from reading as one. A press unfolds the
-              rows in place; each carries the store's hover-revealed install
+              reader does not have. Its folded offer is the badge on the bar —
+              the count rides the card's one line rather than a row of its
+              own. Open, it reads as its own group, the way it always has: the
+              hairline arrives with it, and under the line sits the group's
+              marker row (a minus over the count) naming the second list
+              before its rows begin — without it the rows would butt against
+              the divider and read as one list with the installed ones. The
+              marker is a fold control like the bar is: one fold, either press
+              moves it. Each row carries the store's hover-revealed install
               button, and none opens the detail panel (this surface's drawer
               walks the *installed* list — an uninstalled row's destination is
-              the install itself). */}
-          {uninstalled && uninstalled.length > 0 && (
-            <div
-              className={cn(
-                "mt-1",
-                uninstalledOpen && "border-t border-border/60 pt-1",
-              )}
-            >
+              the install itself). The fold is the card's own `expanded`, so a
+              card holding cap-hidden rows and uninstalled ones reveals both
+              with the one press. */}
+          {uninstalled && uninstalled.length > 0 && expanded && (
+            <div className="mt-1 border-t border-border/60 pt-1">
               <button
                 type="button"
-                onClick={() => setUninstalledOpen((value) => !value)}
-                aria-expanded={uninstalledOpen}
+                onClick={toggleExpanded}
+                aria-expanded={expanded}
                 aria-label={t("state.uninstalledToggleAria", {
                   name,
                   count: uninstalled.length,
                 })}
-                className="group/uninstalled -mx-1.5 flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="-mx-1.5 flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <span
                   aria-hidden="true"
                   className="flex w-4 shrink-0 items-center justify-center"
                 >
-                  {uninstalledOpen ? (
-                    <Minus className="size-3" />
-                  ) : (
-                    <Plus className="size-3" />
-                  )}
+                  <Minus className="size-3" />
                 </span>
                 <span className="truncate font-medium">
                   {t("state.uninstalledCount", { count: uninstalled.length })}
                 </span>
               </button>
-              {uninstalledOpen && (
-                <ul
-                  aria-label={t("state.uninstalledListAria", { name })}
-                  className={cn(
-                    "-mx-1.5",
-                    // The same body the installed rows use on a wide card:
-                    // column-major fill over a balanced row count, so a
-                    // full-width card never turns every row into a
-                    // full-width sweep — whichever press widened the card.
-                    wide
-                      ? "grid grid-flow-col auto-cols-fr gap-x-8"
-                      : "flex flex-col",
-                  )}
-                  style={
-                    wide
-                      ? {
-                          gridTemplateRows: `repeat(${Math.ceil(uninstalled.length / 2)}, auto)`,
-                        }
-                      : undefined
-                  }
-                >
-                  {uninstalled.map((skill) => (
-                    <li
-                      key={skill.name}
-                      data-skill={skill.name}
-                      className="group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent"
-                    >
-                      <span className="flex min-w-0 flex-1 items-center gap-2 py-1">
-                        <span
-                          aria-hidden="true"
-                          className="flex w-4 shrink-0 items-center justify-center text-muted-foreground"
-                        >
-                          <DomainGlyph
-                            icon={domainIcon(skill.profile?.domain)}
-                            className="size-3.5"
-                          />
-                        </span>
+              <ul
+                aria-label={t("state.uninstalledListAria", { name })}
+                className={cn(
+                  "-mx-1.5",
+                  // The same body the installed rows use on a wide card:
+                  // column-major fill over a balanced row count, so a
+                  // full-width card never turns every row into a
+                  // full-width sweep — whichever press widened the card.
+                  wide
+                    ? "grid grid-flow-col auto-cols-fr gap-x-8"
+                    : "flex flex-col",
+                )}
+                style={
+                  wide
+                    ? {
+                        gridTemplateRows: `repeat(${Math.ceil(uninstalled.length / 2)}, auto)`,
+                      }
+                    : undefined
+                }
+              >
+                {uninstalled.map((skill) => (
+                  <li
+                    key={skill.name}
+                    data-skill={skill.name}
+                    className="group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent"
+                  >
+                    <span className="flex min-w-0 flex-1 items-center gap-2 py-1">
+                      <span
+                        aria-hidden="true"
+                        className="flex w-4 shrink-0 items-center justify-center text-muted-foreground"
+                      >
+                        <DomainGlyph
+                          icon={domainIcon(skill.profile?.domain)}
+                          className="size-3.5"
+                        />
+                      </span>
                         <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
                           {skillDisplayName(skill)}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                          {skillDescription(skill, locale) ||
-                            t("common.noDescription")}
-                        </span>
+                      <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                        {skillDescription(skill, locale) ||
+                          t("common.noDescription")}
                       </span>
-                      {/* The same floating slot the installed rows' controls
+                    </span>
+                    {/* The same floating slot the installed rows' controls
                           live in: revealed on hover or focus, floating over a
                           gradient of the row's own hover surface. After an
                           install the button settles into its 已安装 badge and
                           the wrapper keeps it on screen. */}
-                      <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100 has-data-unchecked:opacity-100">
-                        <SkillInstallButton skill={skill} className="h-7 w-7" />
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                    <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100 has-data-unchecked:opacity-100">
+                      <SkillInstallButton skill={skill} className="h-7 w-7" />
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </CardContent>

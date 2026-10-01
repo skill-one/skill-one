@@ -177,6 +177,7 @@
     "expandRepoAria": "展开 {{name}} 的全部 {{count}} 个 skill",
     "collapseRepoAria": "收起 {{name}} 的 skill 列表",
     "uninstalledCount": "{{count}} 个未安装",
+    "uninstalledBadgeTip": "{{name}} 还有 {{count}} 个 skill 未安装",
     "uninstalledToggleAria": "展开或收起 {{name}} 的 {{count}} 个未安装 skill",
     "uninstalledListAria": "{{name}} 的未安装 skill",
     "noInstalled": "还没有安装任何技能",
