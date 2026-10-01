@@ -29,12 +29,12 @@ One JSON object per line, sorted by installs descending:
 | `dir` | `string \| null` | Directory the skill's files live at, relative to `skills/` — the row's own `owner/repo` leading a path that can differ from the id's spelling. Null while the repository has not been fetched. |
 | `description` | `string \| null` | From the SKILL.md frontmatter (empty when missing) |
 | `description_zh` | `string \| null` | Chinese translation of `description`. The app prefers it in Chinese mode and falls back to `description` when it is missing or blank. |
-| `domain` | `string \| null` | The classification: one of 13 closed English categories (`development`, `data-analysis`, …, `other`). Null for skills the generator has not reached. [data/domains.ts](../src/data/domains.ts) maps a key to its display label and monochrome lucide icon. |
+| `domain` | `string \| null` | The classification: one of 13 closed English categories (`development`, `data-analysis`, …, `other`). Null for skills the generator has not reached. [data/domains.ts](../src/data/domains.ts) maps a key to its display label and colored emoji. |
 | `confidence` | `number \| null` | The classifier's own reading of how close the call was (0–1); null when it does not say — published to be sorted on, not trusted as a probability. |
 
 The classification rides the index row, so one parsed line yields a fully decorated skill — there is no second source to merge in afterwards. The app keeps the upstream key as a one-element list in its model, so grouping and filtering can match by membership.
 
-A *missing* classification is a third state, not 其他: the enum's `other` is the dataset's answer that no domain fits, while a skill the generator never reached has no answer at all. The app marks the two apart — 其他 wears a mixed-shapes icon, the unanswered one a help icon (未分类) — and the filter bar keeps a chip for each, so a scope that promises 其他 never silently includes the skills nobody looked at.
+A *missing* classification is a third state, not 其他: the enum's `other` is the dataset's answer that no domain fits, while a skill the generator never reached has no answer at all. The app marks the two apart — 其他 wears a leftovers box, the unanswered one a question mark (未分类) — and the filter bar keeps a chip for each, so a scope that promises 其他 never silently includes the skills nobody looked at.
 
 GitHub star counts are **not** carried by the skill rows: they live in the `repos.jsonl` sidecar below and are joined in at parse time.
 

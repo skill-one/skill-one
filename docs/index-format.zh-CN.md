@@ -29,12 +29,12 @@
 | `dir` | `string \| null` | 技能文件所在的目录，相对 `skills/`——以该行自己的 `owner/repo` 开头，拼写可能与 id 不同。仓库尚未被抓取时为 null。 |
 | `description` | `string \| null` | 来自 SKILL.md frontmatter（缺失时为空） |
 | `description_zh` | `string \| null` | `description` 的中文翻译。中文模式下应用优先使用它，缺失或空白时回落到 `description`。 |
-| `domain` | `string \| null` | 分类：13 个封闭英文类别之一（`development`、`data-analysis`、……、`other`）。生成器尚未处理的技能为 null。[data/domains.ts](../src/data/domains.ts) 将键映射为展示标签与单色 lucide 图标。 |
+| `domain` | `string \| null` | 分类：13 个封闭英文类别之一（`development`、`data-analysis`、……、`other`）。生成器尚未处理的技能为 null。[data/domains.ts](../src/data/domains.ts) 将键映射为展示标签与彩色 emoji。 |
 | `confidence` | `number \| null` | 分类器自己对这次判断把握的读数（0–1）；它没有说时为 null——发布出来用于排序，而非当作标签正确的概率。 |
 
 分类随目录行一起发布，因此解析一行即得到完整装饰的技能——不存在第二步合并来源。应用在模型中把上游键保存为单元素列表，分组与筛选即可按成员关系匹配。
 
-*缺失*的分类是第三种状态，不是其他：枚举中的 `other` 是数据集"以上都不贴合"的回答，而生成器从未触及的技能根本没有回答。应用将两者区分开——其他佩戴混合形状的图标，未回答者佩戴问号图标（未分类）——筛选栏也为两者各保留一枚 chip，让承诺"其他"的范围永远不会悄悄混入没人看过的技能。
+*缺失*的分类是第三种状态，不是其他：枚举中的 `other` 是数据集"以上都不贴合"的回答，而生成器从未触及的技能根本没有回答。应用将两者区分开——其他佩戴杂物箱 📦，未回答者佩戴问号 ❓（未分类）——筛选栏也为两者各保留一枚 chip，让承诺"其他"的范围永远不会悄悄混入没人看过的技能。
 
 GitHub 星数**不**随技能行发布：它们存放在下文的 `repos.jsonl` 侧表中，在解析时联接进来。
 

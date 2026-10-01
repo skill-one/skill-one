@@ -5,8 +5,7 @@ import { Minus, Plus, Star } from "lucide-react";
 
 import { useAppLocale } from "../../i18n/use-language";
 import { skillDescription } from "../../lib/i18n-content";
-import { domainIcon } from "../../data/domains";
-import { DomainGlyph } from "../../components/domain-glyph";
+import { domainEmoji } from "../../data/domains";
 import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
 import {
   isInstallableSkill,
@@ -597,21 +596,16 @@ export function RepoCard({
                     )}
                   >
                     {/* The classification's glyph, in a fixed slot so the names
-                        line up whether the skill is classified or not: mixed
-                        shapes for the dataset's own 其他, the help icon for a
-                        skill nothing classified — the same mark the list rows
-                        wear (see `domainIcon`). A live row draws nothing in the
+                        line up whether the skill is classified or not: a box for
+                        the dataset's own 其他, the question mark for a skill
+                        nothing classified — the same mark the list rows wear
+                        (see `domainEmoji`). A live row draws nothing in the
                         slot, which stays fixed so the names still line up. */}
                     <span
                       aria-hidden="true"
-                      className="flex w-4 shrink-0 items-center justify-center text-muted-foreground"
+                      className="w-4 shrink-0 text-center text-[13px]"
                     >
-                      {!live && (
-                        <DomainGlyph
-                          icon={domainIcon(skill.profile?.domain)}
-                          className="size-3.5"
-                        />
-                      )}
+                      {!live && domainEmoji(skill.profile?.domain)}
                     </span>
                     {/* The name is the identifier and the row's one strong
                         element — semibold where the description is plain — and
@@ -745,12 +739,9 @@ export function RepoCard({
                     <span className="flex min-w-0 flex-1 items-center gap-2 py-1">
                       <span
                         aria-hidden="true"
-                        className="flex w-4 shrink-0 items-center justify-center text-muted-foreground"
+                        className="w-4 shrink-0 text-center text-[13px]"
                       >
-                        <DomainGlyph
-                          icon={domainIcon(skill.profile?.domain)}
-                          className="size-3.5"
-                        />
+                        {domainEmoji(skill.profile?.domain)}
                       </span>
                         <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
                           {skillDisplayName(skill)}
