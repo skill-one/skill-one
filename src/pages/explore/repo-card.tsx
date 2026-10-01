@@ -11,6 +11,7 @@ import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
 import {
   isInstallableSkill,
   isLiveSkill,
+  skillDisplayName,
   skillKey,
   type SkillView,
 } from "../../lib/skill-view";
@@ -569,7 +570,7 @@ export function RepoCard({
                         description can never truncate it away. */}
                     <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
                       <HighlightedText
-                        text={skill.name}
+                        text={skillDisplayName(skill)}
                         terms={matched?.name}
                       />
                     </span>
@@ -709,7 +710,7 @@ export function RepoCard({
                           />
                         </span>
                         <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
-                          {skill.name}
+                          {skillDisplayName(skill)}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
                           {skillDescription(skill, locale) ||

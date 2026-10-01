@@ -42,6 +42,18 @@ export function skillKey(skill: { repo: string; name: string }): string {
 }
 
 /**
+ * The name a skill surface shows. The slug is the identity, but the row may
+ * carry the upstream frontmatter spelling alongside it (`displayName`) — shown
+ * when present, since that is the name the skill was published under.
+ */
+export function skillDisplayName(skill: {
+  name: string;
+  displayName?: string;
+}): string {
+  return skill.displayName ?? skill.name;
+}
+
+/**
  * Whether a skill view is a live skills.sh hit — the one unbacked shape that
  * is not an install.
  *
@@ -66,13 +78,11 @@ export function isLiveSkill(skill: SkillView): boolean {
 /**
  * Whether the shared surfaces may offer the install action for a skill view.
  *
- * Installing rebuilds the id `owner/repo/slug` from the row and hands it to
- * agents-skills, which rejects anything but exactly that shape. Every row an
- * install backs qualifies — the registry filtered its index lines through
- * `isCanonicalId` at parse time, and an unbacked installed row keeps its
- * button as the 已安装 fact about this machine regardless of what its ledger
- * can vouch for. Only a live skills.sh hit can fall short: its `source` can
- * be a discovery domain rather than a GitHub repo (e.g. `open.feishu.cn`),
+ * Installing hands the row's upstream id to agents-skills, which accepts
+ * nothing but exactly the `owner/repo/slug` shape. Every row an install backs
+ * qualifies — the registry carries the id on its index lines and the live
+ * search on its hits. Only a live skills.sh hit can fall short: its `source`
+ * can be a discovery domain rather than a GitHub repo (e.g. `open.feishu.cn`),
  * leaving an id the backend can only refuse — so that row is offered the way
  * out it actually has (its skills.sh page) instead of a button that can only
  * fail.
@@ -129,6 +139,12 @@ export function installedSkillView(
   const ledger = provenance?.[skill.name];
   return {
     name: skill.name,
+    // The display spelling is what agents-skills reports for this on-disk copy
+    // (`display_name` since 0.26 — the frontmatter `name` as declared), shown
+    // as returned rather than second-guessed against the slug or the store
+    // entry. The id, by contrast, is a registry fact the entry alone carries.
+    ...(skill.displayName ? { displayName: skill.displayName } : {}),
+    ...(entry?.id ? { id: entry.id } : {}),
     repo: ledger?.repo ?? "",
     description: skill.description,
     // The translated description comes from the registry entry; the on-disk

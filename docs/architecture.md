@@ -81,7 +81,7 @@ When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest te
 **Installing a skill**:
 
 1. The user clicks "Install" on the explore page.
-2. `local-skills.installSkillFromSource(repo, name)` checks the environment and composes the source id `owner/repo/slug`.
+2. `local-skills.installSkillFromSource(skill)` checks the environment and hands the row's upstream id `owner/repo/slug` to the backend verbatim.
 3. Tauri environment → `skills-manager.installSkill` → `invoke("install_skill", ...)` → Rust `install_skill` command → `agents-skills::Manager.add` (it downloads the repository tarball from codeload.github.com and matches the skill by slug locally).
 4. When finished, the frontend refreshes the `installed-skills` query cache.
 5. Browser environment → writes via `mock-local.installMockSkill`.

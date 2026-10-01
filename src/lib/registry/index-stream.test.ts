@@ -303,6 +303,7 @@ describe("readIndex", () => {
     expect(skills).toEqual([
       {
         name: "hammer",
+        id: "acme/tools/hammer",
         repo: "acme/tools",
         description: "Hammers.",
         descriptionZh: "锤子。",
@@ -328,6 +329,7 @@ describe("readIndex", () => {
     expect(skills).toEqual([
       {
         name: "x",
+        id: "acme/tools/x",
         repo: "acme/tools",
         description: "",
         stars: 0,
@@ -393,6 +395,7 @@ describe("readIndex", () => {
     expect(skills).toEqual([
       {
         name: "x",
+        id: "acme/tools/x",
         repo: "acme/tools",
         description: "",
         stars: 7,

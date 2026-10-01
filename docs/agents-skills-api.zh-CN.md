@@ -94,9 +94,10 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // 沙盒；�
   存在——无论启用还是停用——因此未复制任何内容）。安装失败不会以 DTO 形式出现：
   `add` 返回 `Err`，它成为命令的 `Err`、也就是前端的 rejection，库给出的错误信息
   就是读者看到的失败原因。
-- **`ListedSkill`**：`name`（slug）、`description`（单行，库自身已折叠块标量）、
+- **`ListedSkill`**：`name`（slug）、`display_name`（frontmatter `name` 的原样
+  拼写——与 slug 折叠结果不同时，界面显示它）、`description`（单行，库自身已折叠块标量）、
   `enabled`、`installed_at`（`Option<u64>`，Unix 秒；不记录创建时间的文件系统为
-  `None`）。应用把这四个字段原样透传为 `ListedSkillDto`——本地不再提取任何内容。
+  `None`）。应用把这五个字段原样透传为 `ListedSkillDto`——本地不再提取任何内容。
   （`path` 在 0.19 及之前存在，0.26 起与 `display_name` 一同回归，目录解析则自
   0.20 起改用 `Manager::skill_dir`；`estimated_tokens` 仅在 0.18 到 0.19 之间
   短暂存在。）

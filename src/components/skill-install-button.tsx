@@ -14,6 +14,7 @@ import {
 } from "../hooks/use-installed-skills";
 import { useSkillProvenance } from "../hooks/use-skill-provenance";
 import { cn, errorMessage } from "../lib/utils";
+import { skillKey } from "../lib/skill-view";
 import { toast } from "./ui/toast";
 import type { Skill } from "../types/skill";
 import { Button } from "./ui/button";
@@ -132,7 +133,14 @@ export function SkillInstallButton({
     if (installState === "installing" || installState === "installed") return;
     setInstallState("installing");
     try {
-      await installSkillFromSource(skill.repo, skill.name);
+      await installSkillFromSource({
+        // The row's upstream id, verbatim. The key fallback covers the
+        // installed-skill views that synthesize without an id — their button
+        // renders disabled, so the fallback never actually installs.
+        id: skill.id ?? skillKey(skill),
+        repo: skill.repo,
+        name: skill.name,
+      });
       // The "my skills" list is cached for 10 minutes (staleTime) and never
       // GCs, so refresh this window and broadcast the change: invalidate here
       // makes the new skill show up on the next visit, and the broadcast lets

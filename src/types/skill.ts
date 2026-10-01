@@ -36,6 +36,21 @@ export interface SkillRef {
 export interface Skill {
   /** Skill name, e.g. "algorithmic-art" */
   name: string;
+  /**
+   * Canonical skills.sh id, `{owner}/{repo}/{slug}` — what install sends to
+   * the backend verbatim. Carried by every row the registry (or the live
+   * skills.sh search) produces; absent for installed-skill views synthesized
+   * from an on-disk record with no store entry behind it.
+   */
+  id?: string;
+  /**
+   * The skill's display name, e.g. "Algorithmic Art" — the upstream frontmatter
+   * `name` as spelled before the slug fold. Absent when it folds to the same
+   * string as `name` (the common case), so the UI renders
+   * `displayName ?? name` and the raw spelling rides along only when it
+   * actually differs.
+   */
+  displayName?: string;
   /** Source repository in "owner/repo" form, e.g. "vercel-labs/skills" */
   repo: string;
   /**

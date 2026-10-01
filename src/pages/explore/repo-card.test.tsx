@@ -223,7 +223,13 @@ describe("RepoCard", () => {
 
     await user.click(screen.getAllByRole("button", { name: "安装" })[0]);
 
-    expect(installSkillFromSource).toHaveBeenCalledWith(REPO, "pdf");
+    // The row's upstream id goes through verbatim — no rebuild from the
+    // identity pair at the call site.
+    expect(installSkillFromSource).toHaveBeenCalledWith({
+      id: "anthropics/skills/pdf",
+      repo: REPO,
+      name: "pdf",
+    });
     expect(onOpenSkill).not.toHaveBeenCalled();
   });
 

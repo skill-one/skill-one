@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { skillDescription } from "../lib/i18n-content";
-import { isLiveSkill, type SkillView } from "../lib/skill-view";
+import { isLiveSkill, skillDisplayName, type SkillView } from "../lib/skill-view";
 import { cn } from "../lib/utils";
 import { useAppLocale } from "../i18n/use-language";
 import { DomainBadge } from "./domain-badge";
@@ -130,7 +130,7 @@ export function SkillCard({
         data-skill={dataSkill}
         role={onSelect ? "button" : undefined}
         tabIndex={onSelect ? 0 : undefined}
-        aria-label={onSelect ? t("common.viewDetailAria", { name: skill.name }) : undefined}
+        aria-label={onSelect ? t("common.viewDetailAria", { name: skillDisplayName(skill) }) : undefined}
         onClick={onSelect}
         onKeyDown={(e) => {
           if (onSelect && (e.key === "Enter" || e.key === " ")) {
@@ -161,7 +161,7 @@ export function SkillCard({
                 muted && "text-muted-foreground",
               )}
             >
-              <HighlightedText text={skill.name} terms={matched?.name} />
+              <HighlightedText text={skillDisplayName(skill)} terms={matched?.name} />
             </h3>
           </CardTitle>
           {/* The corner control. Clicks on the slot stop here: the card body

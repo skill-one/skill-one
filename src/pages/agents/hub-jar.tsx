@@ -5,6 +5,7 @@ import { useReducedMotion } from "motion/react";
 import type { InstalledSkill } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
 import { scatterOf, scatterStyle, unitOf } from "../../lib/scatter";
+import { skillDisplayName } from "../../lib/skill-view";
 import { RIBBON_COLORS, ribbonColorIndex } from "./agent-graph-layout";
 import {
   Tooltip,
@@ -464,7 +465,7 @@ const JarCard = forwardRef<
           <span
             ref={ref}
             data-skill={skill.name}
-            aria-label={skill.name}
+            aria-label={skillDisplayName(skill)}
             style={{ width: scale.size, height: scale.size, ...style }}
             className={cn("flex items-center justify-center", className)}
           />
@@ -472,7 +473,9 @@ const JarCard = forwardRef<
       >
         {/* The macOS-app-style squircle: a soft hue wash with the initial
             in the hue itself, edged by a hairline so the tint reads on the
-            jar's own ground. */}
+            jar's own ground. The initial comes from the display spelling —
+            what the skill is published as — while the hue and scatter stay
+            seeded by the slug, so renames upstream cannot reshuffle the jar. */}
         <span
           aria-hidden="true"
           data-slot="jar-face"
@@ -485,10 +488,10 @@ const JarCard = forwardRef<
           }}
           className="flex items-center justify-center rounded-[22.5%] font-semibold uppercase ring-black/10 ring-1 ring-inset dark:ring-white/10"
         >
-          {skill.name.charAt(0)}
+          {skillDisplayName(skill).charAt(0)}
         </span>
       </TooltipTrigger>
-      <TooltipContent>{skill.name}</TooltipContent>
+      <TooltipContent>{skillDisplayName(skill)}</TooltipContent>
     </Tooltip>
   );
 });
