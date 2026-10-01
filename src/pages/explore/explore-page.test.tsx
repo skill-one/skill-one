@@ -23,6 +23,7 @@ import {
   DEFAULT_REPO_CARD_LIMIT,
   setRepoCardLimit,
 } from "../../lib/repo-card-preview";
+import { setUnit } from "../../lib/list-view";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
@@ -251,6 +252,10 @@ beforeEach(() => {
   // it back, so no other test inherits the change (act() because the reset
   // notifies live readers — see the settings-popover suite's note).
   act(() => setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT));
+  // The app's default unit is the skill rows, but most tests here read the
+  // store list as repository cards — the reading they were written against;
+  // the ones that want the other unit click the switch themselves.
+  setUnit("store", "repo");
   mockFetchSkillDetail.mockImplementation(
     async (_repo: string, id: string) => ({
       description: `Description of ${id}.`,

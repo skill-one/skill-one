@@ -15,15 +15,21 @@
  * What is *not* here is everything that is one page's own business: the
  * revealed depth, the scroll position, which folds are open. Those belong to
  * the page that renders the list, and stay there.
+ *
+ * Each list's unit persists across sessions in `localStorage` (via the guarded
+ * `storage` wrapper — a blocked write costs persistence and nothing else); the
+ * query and the scopes stay session-only, because a question asked and a
+ * taxonomy slice chosen are this visit's business.
  */
+
+import { storage } from "./storage";
 
 /** The two lists the app shows. */
 export type Destination = "store" | "installed";
 
 /**
  * What a skill list is made of: one repository card each, or one skill row
- * each. Absent in a view written before the switch existed, and read as `repo`
- * — the shape both lists had first.
+ * each — the rows stacked in one column the switch calls the list.
  */
 export type ListUnit = "repo" | "skill";
 
@@ -51,11 +57,28 @@ export interface ListViewState {
   views: Readonly<Record<Destination, DestinationView>>;
 }
 
-/** Both units read as repositories until the reader says otherwise. */
-const INITIAL: ListViewState = {
-  query: "",
-  views: { store: { unit: "repo" }, installed: { unit: "repo" } },
-};
+/** Both lists read as skill rows — the list — until the reader says otherwise. */
+const DEFAULT_UNIT: ListUnit = "skill";
+const UNITS: readonly ListUnit[] = ["repo", "skill"];
+
+/** One key per list, so each keeps its own answer under its own name. */
+const UNIT_KEY_PREFIX = "skill-one.listUnit.";
+
+function readStoredUnit(destination: Destination): ListUnit {
+  const raw = storage.getItem(UNIT_KEY_PREFIX + destination);
+  return raw !== null && UNITS.includes(raw as ListUnit)
+    ? (raw as ListUnit)
+    : DEFAULT_UNIT;
+}
+
+function initialViews(): Record<Destination, DestinationView> {
+  return {
+    store: { unit: readStoredUnit("store") },
+    installed: { unit: readStoredUnit("installed") },
+  };
+}
+
+const INITIAL: ListViewState = { query: "", views: initialViews() };
 
 let state = INITIAL;
 const subscribers = new Set<() => void>();
@@ -92,6 +115,7 @@ export function setQuery(query: string): void {
  */
 export function setUnit(destination: Destination, unit: ListUnit): void {
   if (unit === state.views[destination].unit) return;
+  storage.setItem(UNIT_KEY_PREFIX + destination, unit);
   publish({
     ...state,
     views: { ...state.views, [destination]: { unit } },
@@ -108,5 +132,8 @@ export function setScope(destination: Destination, scope: string | null): void {
 
 /** Test hook: forget both lists, so one case cannot inherit another's. */
 export function resetListView(): void {
-  publish(INITIAL);
+  for (const destination of ["store", "installed"] as const) {
+    storage.removeItem(UNIT_KEY_PREFIX + destination);
+  }
+  publish({ query: "", views: initialViews() });
 }
