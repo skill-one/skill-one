@@ -41,6 +41,7 @@ pub fn run() {
             skills::skill_fingerprint,
             provenance::read_provenance,
             provenance::write_provenance,
+            provenance::open_provenance_dir,
             activity::append_activity,
             activity::read_activity,
             activity::clear_activity,

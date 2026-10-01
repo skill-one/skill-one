@@ -81,11 +81,23 @@ analysis, no ledger schema knowledge (parsing, merging and pruning live in
 | --- | --- |
 | `read_provenance` | Raw ledger content; `null` when neither the JSONL file nor the legacy document exists |
 | `write_provenance` | Full-document replace, atomic (temp file + rename); removes a leftover legacy document |
+| `open_provenance_dir` | Reveal the ledger's directory (the global skills directory) in the system file manager |
 | `analyze_skill` | The skill's content identity in one walk: upstream hash + fingerprint |
 | `skill_fingerprint` | Stat-only fingerprint (no file bytes read), the cheap validity check for a stored hash |
 
 All resolve paths internally (`<home>/.agents/skills/…`); no caller-controlled
 paths are accepted.
+
+### Developer viewer
+
+Settings → 开发者 opens `developer-dialog.tsx`, a read-only debugging surface
+over the ledger: it renders the file as it actually is — one card per line, in
+file order, duplicates included, every field shown (unknown fields included,
+under their raw key), broken lines flagged with their verbatim text rather
+than skipped — plus a raw JSONL view and a reveal-in-folder action. It
+deliberately does **not** reuse `parseLedger`'s tolerant merging: the app must
+decide what to act on, but a developer asking "why does this skill think it
+came from X" needs to see the record the app is not acting on too.
 
 ## Consumers
 

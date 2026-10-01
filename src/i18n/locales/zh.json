@@ -259,6 +259,45 @@
       "unknown": "检测失败，请稍后重试"
     }
   },
+  "developer": {
+    "title": "开发者",
+    "description": "用于排查问题的内部数据：provenance 账本（.skill-one.jsonl），记录每个已安装技能的来源。",
+    "recordCount_one": "{{count}} 条记录",
+    "recordCount_other": "{{count}} 条记录",
+    "viewAria": "选择账本视图",
+    "view": {
+      "structured": "结构化",
+      "raw": "原始 JSONL"
+    },
+    "kind": {
+      "source": "来源",
+      "resolution": "解析缓存",
+      "unknown": "未识别"
+    },
+    "field": {
+      "name": "name",
+      "repo": "repo",
+      "installedAt": "installedAt",
+      "hash": "hash",
+      "epoch": "epoch",
+      "fingerprint": "fingerprint",
+      "namesakesKey": "namesakesKey",
+      "candidates": "candidates",
+      "similarity": "similarity",
+      "stars": "stars",
+      "downloads": "downloads",
+      "description": "description",
+      "descriptionZh": "descriptionZh",
+      "mtimeMs": "mtimeMs",
+      "size": "size"
+    },
+    "unparsableLine": "无法解析的行",
+    "empty": "账本为空——安装技能后，其来源将记录在这里",
+    "reveal": "在文件夹中显示",
+    "refresh": "刷新",
+    "copy": "复制",
+    "copied": "已复制"
+  },
   "activity": {
     "title": "活动日志",
     "description": "Skill One 对技能与 Agent 做过的每一次改动。",

@@ -276,6 +276,12 @@ export async function openActivityDirRaw(): Promise<void> {
   await invoke("open_activity_dir");
 }
 
+/** Reveal the provenance ledger's directory (the global skills directory). */
+export async function openProvenanceDirRaw(): Promise<void> {
+  requireTauri();
+  await invoke("open_provenance_dir");
+}
+
 /** Stat-only change-detection identity of an installed skill's directory. */
 export interface SkillFingerprint {
   /** Latest file mtime in the directory, as Unix milliseconds. */
