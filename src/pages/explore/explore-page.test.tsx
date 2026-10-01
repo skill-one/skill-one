@@ -414,9 +414,7 @@ describe("ExplorePage", () => {
       screen.getByRole("button", { name: /测试与质量/ }),
     ).toBeInTheDocument();
     const unclassified = screen.getByRole("button", { name: /^未分类/ });
-    expect(
-      unclassified.querySelector("svg.lucide-circle-help"),
-    ).toBeInTheDocument();
+    expect(unclassified).toHaveTextContent("❓");
     expect(screen.queryByRole("button", { name: /^其他/ })).toBeNull();
 
     // Pressing a domain scopes the list to its repositories alone.
@@ -470,14 +468,12 @@ describe("ExplorePage", () => {
     harness.complete();
     renderExplorePage();
 
-    // An answer and a blank, told apart in the chip bar: the mixed shapes for
-    // 其他, the help icon for 未分类, each counting its own.
+    // An answer and a blank, told apart in the chip bar: the leftovers box for
+    // 其他, the question mark for 未分类, each counting its own.
     const other = await screen.findByRole("button", { name: /^其他/ });
     const unclassified = screen.getByRole("button", { name: /^未分类/ });
-    expect(other.querySelector("svg.lucide-shapes")).toBeInTheDocument();
-    expect(
-      unclassified.querySelector("svg.lucide-circle-help"),
-    ).toBeInTheDocument();
+    expect(other).toHaveTextContent("📦");
+    expect(unclassified).toHaveTextContent("❓");
     expect(other).toHaveTextContent("1");
     expect(unclassified).toHaveTextContent("1");
 
@@ -485,25 +481,21 @@ describe("ExplorePage", () => {
     const strayCardRow = screen.getByRole("button", {
       name: "查看 stray 详情",
     });
-    expect(strayCardRow.querySelector("svg.lucide-shapes")).toBeInTheDocument();
+    expect(strayCardRow).toHaveTextContent("📦");
     const orphanCardRow = screen.getByRole("button", {
       name: "查看 orphan 详情",
     });
-    expect(
-      orphanCardRow.querySelector("svg.lucide-circle-help"),
-    ).toBeInTheDocument();
+    expect(orphanCardRow).toHaveTextContent("❓");
 
     // … and so do the skill unit's rows, which share the resolver.
     await user.click(screen.getByRole("button", { name: "列表" }));
     const strayRow = await screen.findByRole("button", {
       name: "查看 stray 详情",
     });
-    expect(strayRow.querySelector("svg.lucide-shapes")).toBeInTheDocument();
+    expect(strayRow).toHaveTextContent("📦");
     expect(
-      screen
-        .getByRole("button", { name: "查看 orphan 详情" })
-        .querySelector("svg.lucide-circle-help"),
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "查看 orphan 详情" }),
+    ).toHaveTextContent("❓");
   });
 
   it("keeps a domain chip's label collapsed until the chip is chosen", async () => {
@@ -1073,9 +1065,9 @@ describe("ExplorePage", () => {
     ).toEqual(["查看 cog 详情", "查看 sprocket 详情"]);
     // A live row claims nothing its source does not carry: no 暂无描述
     // placeholder standing in for a description nobody published, and no
-    // help mark — nothing ever classified it, but nothing looked either.
+    // ❓ mark — nothing ever classified it, but nothing looked either.
     expect(within(fresh as HTMLElement).queryByText("暂无描述")).toBeNull();
-    expect(fresh.querySelector("svg.lucide-circle-help")).toBeNull();
+    expect(fresh).not.toHaveTextContent("❓");
     // The bar still knows its owner: the face rides the label, resolving
     // through the mirror and then GitHub's own endpoint.
     expect(
@@ -1213,7 +1205,7 @@ describe("ExplorePage", () => {
     // so it claims none rather than a placeholder — and no classification
     // mark, which stays an empty slot.
     expect(live).not.toHaveTextContent("暂无描述");
-    expect(live.querySelector("svg.lucide-circle-help")).toBeNull();
+    expect(live).not.toHaveTextContent("❓");
     // The indexed skill is on the page beside it, as a repository card's row:
     // that surface prints no per-skill figure either (the figure belongs to
     // the standalone skill card — see skill-card.test.tsx), so what this test

@@ -133,7 +133,7 @@ describe("RepoCard", () => {
     const pdf = screen.getByRole("button", { name: "查看 pdf 详情" });
     // The classification rides the row as its glyph, the name is the row's own
     // strong element, and the description follows it on the same line.
-    expect(pdf.querySelector("svg.lucide-file-text")).toBeInTheDocument();
+    expect(pdf).toHaveTextContent("🗂️");
     expect(pdf).toHaveTextContent("pdf does something useful.");
   });
 
