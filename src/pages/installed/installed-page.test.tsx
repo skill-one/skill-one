@@ -20,6 +20,7 @@ import {
 } from "../../lib/mock-local";
 import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
 import { resetLinkSuggestions } from "../../lib/link-suggestions";
+import { setUnit } from "../../lib/list-view";
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -52,6 +53,10 @@ beforeEach(() => {
   lookupSkills.mockResolvedValue({ entries: [] });
   getGroups.mockResolvedValue({ groups: [], total: 0 });
   resetLinkSuggestions();
+  // The app's default unit is the skill rows, but these tests read the
+  // installed list as repository cards — the reading they were written
+  // against; the ones that want the other unit click the switch themselves.
+  setUnit("installed", "repo");
 });
 
 /** The persisted ledger's record for `name` (the store is JSONL). */
