@@ -51,6 +51,8 @@ describe("searchSkillsSh", () => {
         // The pair the registry keys a skill by, so a live row dedupes
         // against an indexed one by identity alone.
         name: "pdf",
+        // The hit's own id, what install sends verbatim.
+        id: "anthropics/skills/pdf",
         repo: "anthropics/skills",
         description: "",
         // The live answer carries no stars — see the module's note.
@@ -86,6 +88,7 @@ describe("searchSkillsSh", () => {
     await expect(searchSkillsSh("hammer")).resolves.toEqual([
       {
         name: "hammer",
+        id: "acme/tools/hammer",
         repo: "acme/tools",
         description: "",
         stars: 0,

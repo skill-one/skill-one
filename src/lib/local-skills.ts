@@ -149,38 +149,37 @@ export class SkillAlreadyInstalledError extends Error {
 }
 
 /**
- * Install a single skill from its source GitHub repo (`owner/repo`) into the
+ * Install a single skill from its skills.sh id (`owner/repo/slug`) into the
  * global skills directory. Normally only the named skill is installed; when
  * no skill directory matches and the repository root has a `SKILL.md`, the
  * entire repo is installed under the repository name.
  *
- * In Tauri the source handed to the backend is the id `owner/repo/slug`:
- * since agents-skills 0.26 the slug is the single skill identity (the id's
- * last segment — the SKILL.md frontmatter `name` slugified, which is exactly
- * the store's `skill.name`). The backend downloads the whole repository
- * tarball from codeload.github.com and matches the skill locally by
- * slugified name — the GitHub REST API is never called, so its anonymous
- * rate limit does not apply. One source resolves to exactly one skill, so a
- * failure is this call's rejection and there is no outcome list to inspect.
- * A same-slug skill already on disk comes back as `skipped` (the
- * no-overwrite rule), which this call surfaces as
- * `SkillAlreadyInstalledError` — the existing skill is never re-labelled. In
- * the browser this records the install in the mock store instead.
+ * In Tauri the id is handed to the backend verbatim — the row carries the
+ * upstream `id` (the registry index and the live skills.sh search both spell
+ * it `{owner}/{repo}/{slug}`), so nothing is rebuilt from repo plus slug at
+ * the call site. The backend downloads the whole repository tarball from
+ * codeload.github.com and matches the skill locally by slugified name — the
+ * GitHub REST API is never called, so its anonymous rate limit does not apply.
+ * One source resolves to exactly one skill, so a failure is this call's
+ * rejection and there is no outcome list to inspect. A same-slug skill
+ * already on disk comes back as `skipped` (the no-overwrite rule), which this
+ * call surfaces as `SkillAlreadyInstalledError` — the existing skill is never
+ * re-labelled. In the browser this records the install in the mock store
+ * instead (keyed by the slug, the mock's own identity).
  *
  * `recordSkillProvenance` writes the install into the provenance ledger
  * after the copy lands — the only store↔install association that survives
  * (agents-skills keeps no install metadata).
  */
 export async function installSkillFromSource(
-  repo: string,
-  name: string,
+  skill: { id: string; repo: string; name: string },
 ): Promise<void> {
+  const { id, repo, name } = skill;
   if (isTauri()) {
-    // The source is the id `owner/repo/slug` (the store's skill name is the
-    // slug), and a failure is this call's rejection — the backend has no
-    // outcome list to inspect. The no-overwrite outcome is an explicit error
-    // so no provenance is written.
-    const result = await installSkill(`${repo}/${name}`);
+    // The id goes to the backend as-is, and a failure is this call's
+    // rejection — the backend has no outcome list to inspect. The
+    // no-overwrite outcome is an explicit error so no provenance is written.
+    const result = await installSkill(id);
     if (result.skipped) throw new SkillAlreadyInstalledError(name);
   } else {
     // Simulate a realistic download duration so the installing state is

@@ -103,10 +103,12 @@ let manager = Manager::builder().home(p).config(c).cwd(w).build(); // sandboxed;
   enabled or parked). A failed install never reaches a DTO: `add` returns
   `Err`, which becomes the command's `Err` and the frontend's rejection, the
   library's message riding along as the reason the reader sees.
-- **`ListedSkill`**: `name` (the slug), `description` (single line — the
-  library folds block scalars itself), `enabled`, `installed_at`
+- **`ListedSkill`**: `name` (the slug), `display_name` (the frontmatter
+  `name` as declared — the display-only rendition the UI shows when it folds
+  differently than the slug), `description` (single line — the library folds
+  block scalars itself), `enabled`, `installed_at`
   (`Option<u64>`, Unix seconds; `None` on filesystems that record no creation
-  time). The app passes all four straight through as its `ListedSkillDto` —
+  time). The app passes all five straight through as its `ListedSkillDto` —
   nothing is extracted locally any more. (`path` existed until 0.19 and
   returned in 0.26 together with `display_name`; since 0.20 a directory is
   resolved with `Manager::skill_dir`. `estimated_tokens` existed between 0.18

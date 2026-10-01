@@ -81,7 +81,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 **安装一个 skill**：
 
 1. 用户在探索页点击「安装」。
-2. `local-skills.installSkillFromSource(repo, name)` 判断环境，并拼出 source id `owner/repo/slug`。
+2. `local-skills.installSkillFromSource(skill)` 判断环境，并把该行自带的上游 id `owner/repo/slug` 原样交给后端。
 3. Tauri 环境 → `skills-manager.installSkill` → `invoke("install_skill", ...)` → Rust `install_skill` 命令 → `agents-skills::Manager.add`（从 codeload.github.com 下载整个仓库 tarball，在本地按 slug 匹配技能）。
 4. 完成后前端刷新 `installed-skills` 查询缓存。
 5. 浏览器环境 → 写入 `mock-local.installMockSkill`。

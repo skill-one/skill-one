@@ -26,11 +26,10 @@ interface RawSkill {
    */
   id: string;
   /**
-   * The skill's frontmatter `name`, as the mirror spells it. Deliberately not
-   * carried into the model: the slug — the id's last segment, the skills.sh
-   * fold of that same frontmatter `name` — is the one identity every consumer
-   * shares (see `toSkill`), so a raw spelling that folded differently would
-   * only open a second naming currency.
+   * The skill's frontmatter `name`, as the mirror spells it. Carried as
+   * `displayName` when it folds to a different string than the slug — the
+   * human-readable rendition the UI shows — while the slug stays the one
+   * identity every consumer shares (see `toSkill`).
    */
   name?: string | null;
   installs: number;
@@ -97,9 +96,14 @@ function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
     // what the live skills.sh search reports (`skillId`), and the id's own
     // last segment installs rebuild from — holding the raw spelling instead
     // would split the name into two currencies that only agree while upstream
-    // declares no casing or spaces the fold removes.
+    // declares no casing or spaces the fold removes. The raw spelling rides
+    // along as `displayName` when it differs, which is what the UI shows.
     name: slug,
+    // The id is what install hands to the backend, verbatim — no rebuild
+    // from repo plus slug at the call site.
+    id: raw.id,
     repo: repoId,
+    ...(raw.name && raw.name !== slug ? { displayName: raw.name } : {}),
     // Upstream exposes descriptions; fall back to an empty placeholder
     // when an entry lacks one so the row layout stays stable.
     description: raw.description ?? "",

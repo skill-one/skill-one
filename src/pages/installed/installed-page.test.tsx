@@ -1166,7 +1166,9 @@ describe("InstalledPage", () => {
       "查看 docx 详情",
       "查看 pptx 详情",
       "查看 mcp-builder 详情",
-      "查看 code-review 详情",
+      // The one mock row whose frontmatter name folds differently than its
+      // slug: the aria label names the display spelling.
+      "查看 Code Review 详情",
       "查看 frontend-design 详情",
     ]);
 
@@ -1272,12 +1274,12 @@ describe("InstalledPage", () => {
 
     // The walk follows the newest-first time order: after code-review (200
     // days) the next install is frontend-design (400) — one press lands there,
-    // never back on a newer install.
+    // never back on a newer install. The row answers by its display name.
     await user.click(
-      await screen.findByRole("button", { name: "查看 code-review 详情" }),
+      await screen.findByRole("button", { name: "查看 Code Review 详情" }),
     );
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("code-review")).toBeInTheDocument();
+    expect(within(dialog).getByText("Code Review")).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     expect(

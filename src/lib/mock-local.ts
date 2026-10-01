@@ -49,6 +49,9 @@ const mockGlobalRows = [
   },
   {
     name: "code-review",
+    // The one row whose frontmatter `name` folds differently than its slug,
+    // so the browser demo exercises the display-spelling fallback too.
+    displayName: "Code Review",
     description: "运行结构化代码审查，包含严重级别和建议。",
     installedDaysAgo: 200,
   },
@@ -64,14 +67,18 @@ function mockInstalledAt(days: number): number {
   return Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
 }
 
-/** One mock skill record with the derived facts `list` reports since 0.16. */
+/** One mock skill record with the derived facts `list` reports since 0.26. */
 function mockSkill(
   name: string,
   description: string,
   installedAt: number | null,
+  displayName?: string,
 ): InstalledSkill {
   return {
     name,
+    // The backend's list always reports the frontmatter spelling; a row with
+    // no distinct one folds to the slug.
+    displayName: displayName ?? name,
     description,
     enabled: true,
     installedAt,
@@ -80,7 +87,12 @@ function mockSkill(
 
 function buildMockSkills(): InstalledSkill[] {
   return mockGlobalRows.map((row) =>
-    mockSkill(row.name, row.description, mockInstalledAt(row.installedDaysAgo)),
+    mockSkill(
+      row.name,
+      row.description,
+      mockInstalledAt(row.installedDaysAgo),
+      "displayName" in row ? row.displayName : undefined,
+    ),
   );
 }
 

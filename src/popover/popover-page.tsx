@@ -9,6 +9,7 @@ import { Separator } from "../components/ui/separator";
 import { useInstalledSkills } from "../hooks/use-installed-skills";
 import { skillDescription } from "../lib/i18n-content";
 import { useAppLocale } from "../i18n/use-language";
+import { skillDisplayName } from "../lib/skill-view";
 import { errorMessage } from "../lib/utils";
 import { isTauri } from "../lib/tauri";
 import {
@@ -92,7 +93,7 @@ export function PopoverPage() {
                   }}
                   className="w-full rounded-md px-2 py-1.5 text-left hover:bg-accent"
                 >
-                  <p className="truncate text-sm font-medium">{skill.name}</p>
+                  <p className="truncate text-sm font-medium">{skillDisplayName(skill)}</p>
                   {skillDescription(skill, locale) && (
                     <p className="truncate text-xs text-muted-foreground">
                       {skillDescription(skill, locale)}

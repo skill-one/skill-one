@@ -23,7 +23,7 @@ import {
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
-import { skillKey, type SkillView } from "../../lib/skill-view";
+import { skillDisplayName, skillKey, type SkillView } from "../../lib/skill-view";
 import { estimateTokens } from "../../lib/token-estimate";
 import {
   errorMessage,
@@ -605,7 +605,7 @@ export function SkillDetailPanel({
           )}
           <div className="min-w-0 flex-1">
             <SheetTitle className="truncate text-lg font-bold tracking-tight">
-              {shown?.name}
+              {shown ? skillDisplayName(shown) : null}
             </SheetTitle>
             {hasSource ? (
               <SheetDescription

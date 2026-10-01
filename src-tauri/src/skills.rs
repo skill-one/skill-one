@@ -100,13 +100,17 @@ pub struct AgentStatusDto {
 /// `Manager::list` — the app no longer parses SKILL.md itself. Since 0.20 the
 /// app's DTO carries no `path`; since 0.26 the library's `ListedSkill` gained
 /// `display_name` and `path` (the slug is the identity and
-/// `Manager::skill_dir` returns the scanned directory), but this DTO keeps
-/// passing only the facts the UI reads — `name` is the slug every selection
+/// `Manager::skill_dir` returns the scanned directory); this DTO passes the
+/// display spelling through (the UI shows it when it differs from the slug)
+/// while still omitting `path` — `name` remains the slug every selection
 /// command matches on.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListedSkillDto {
     pub name: String,
+    /// The frontmatter `name` as declared — the display-only rendition of the
+    /// same skill (casing and spaces the slug folds away).
+    pub display_name: String,
     /// Single-line description from the on-disk SKILL.md frontmatter.
     pub description: String,
     pub enabled: bool,
@@ -132,6 +136,7 @@ pub struct SkillMdDto {
 fn listed_skill_dto(skill: agents_skills::ListedSkill) -> ListedSkillDto {
     ListedSkillDto {
         name: skill.name,
+        display_name: skill.display_name,
         description: skill.description,
         enabled: skill.enabled,
         installed_at: skill.installed_at,
@@ -240,6 +245,7 @@ mod tests {
             installed_at: Some(1_760_000_000),
         });
         assert_eq!(dto.name, "pdf");
+        assert_eq!(dto.display_name, "pdf");
         assert_eq!(dto.description, "读取 PDF 文件。");
         assert!(dto.enabled);
         assert_eq!(dto.installed_at, Some(1_760_000_000));

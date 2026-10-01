@@ -29,16 +29,20 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// The row the install button passes on: the upstream id plus the identity
+// pair the ledger and activity log are keyed by.
+const PDF = { id: "anthropics/skills/pdf", repo: "anthropics/skills", name: "pdf" };
+
 describe("installSkillFromSource", () => {
-  it("hands the owner/repo/slug source to the backend's install (Tauri)", async () => {
+  it("hands the row's upstream id to the backend's install verbatim (Tauri)", async () => {
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({ skill: "pdf", skipped: false });
 
-    await installSkillFromSource("anthropics/skills", "pdf");
+    await installSkillFromSource(PDF);
 
-    // Since agents-skills 0.26 the install source is the id `owner/repo/slug`:
-    // one source is one skill, matched on the slugified SKILL.md name — which
-    // is what the store's slug already is.
+    // The id goes through untouched — no rebuild from repo plus slug at the
+    // call site; one source is one skill, matched on the slugified SKILL.md
+    // name, which is what the id's last segment already is.
     expect(installSkill).toHaveBeenCalledWith("anthropics/skills/pdf");
     // The install source lands in the provenance ledger (Tauri path). The
     // registry no longer publishes per-skill hashes, so no version marker
@@ -58,9 +62,9 @@ describe("installSkillFromSource", () => {
       new Error("download failed: network unreachable"),
     );
 
-    await expect(
-      installSkillFromSource("anthropics/skills", "pdf"),
-    ).rejects.toThrow("download failed: network unreachable");
+    await expect(installSkillFromSource(PDF)).rejects.toThrow(
+      "download failed: network unreachable",
+    );
   });
 
   it("propagates the backend's refusal of an unresolvable source", async () => {
@@ -70,7 +74,11 @@ describe("installSkillFromSource", () => {
     );
 
     await expect(
-      installSkillFromSource("anthropics/skills", "missing"),
+      installSkillFromSource({
+        ...PDF,
+        id: "anthropics/skills/missing",
+        name: "missing",
+      }),
     ).rejects.toThrow("no directory named missing");
   });
 
@@ -81,9 +89,9 @@ describe("installSkillFromSource", () => {
     isTauri.mockReturnValue(true);
     installSkill.mockResolvedValue({ skill: "pdf", skipped: true });
 
-    await expect(
-      installSkillFromSource("anthropics/skills", "pdf"),
-    ).rejects.toBeInstanceOf(SkillAlreadyInstalledError);
+    await expect(installSkillFromSource(PDF)).rejects.toBeInstanceOf(
+      SkillAlreadyInstalledError,
+    );
 
     expect(recordSkillProvenance).not.toHaveBeenCalled();
   });
@@ -92,10 +100,11 @@ describe("installSkillFromSource", () => {
     vi.useFakeTimers();
     isTauri.mockReturnValue(false);
 
-    const pending = installSkillFromSource("anthropics/skills", "pdf");
+    const pending = installSkillFromSource(PDF);
     await vi.advanceTimersByTimeAsync(MOCK_INSTALL_DELAY_MS);
     await pending;
 
+    // The mock store is keyed by the slug — the mock's own identity.
     expect(installMockSkill).toHaveBeenCalledWith("pdf");
     expect(installSkill).not.toHaveBeenCalled();
     // The browser mock records the source in the ledger too, mirroring the
@@ -111,7 +120,7 @@ describe("installSkillFromSource", () => {
     isTauri.mockReturnValue(false);
     installMockSkill.mockReturnValue(true);
 
-    const pending = installSkillFromSource("anthropics/skills", "pdf");
+    const pending = installSkillFromSource(PDF);
     // Attach the rejection handler before advancing timers, so the rejection
     // is not momentarily unhandled.
     const expectation = expect(pending).rejects.toBeInstanceOf(
@@ -129,9 +138,9 @@ describe("installSkillFromSource", () => {
       new Error("download failed: network unreachable"),
     );
 
-    await expect(
-      installSkillFromSource("anthropics/skills", "pdf"),
-    ).rejects.toThrow("download failed: network unreachable");
+    await expect(installSkillFromSource(PDF)).rejects.toThrow(
+      "download failed: network unreachable",
+    );
 
     expect(recordSkillProvenance).not.toHaveBeenCalled();
   });
@@ -140,7 +149,7 @@ describe("installSkillFromSource", () => {
     vi.useFakeTimers();
     isTauri.mockReturnValue(false);
 
-    const pending = installSkillFromSource("anthropics/skills", "pdf");
+    const pending = installSkillFromSource(PDF);
     await vi.advanceTimersByTimeAsync(MOCK_INSTALL_DELAY_MS - 1);
     expect(installMockSkill).not.toHaveBeenCalled();
 

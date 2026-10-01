@@ -43,6 +43,23 @@ describe("installedSkillView", () => {
     expect(view.storeBacked).toBe(false);
     expect(view.snapshotPath).toBeUndefined();
   });
+
+  it("shows the display spelling agents-skills reports, as returned", () => {
+    // `display_name` (since 0.26) is what this on-disk copy declares; the
+    // view passes it through — even when it folds to the same string as the
+    // slug — rather than second-guessing it against the store entry.
+    const view = installedSkillView(
+      { ...installedPdf, displayName: "pdf" },
+      {},
+      { ...entry, displayName: "PDF" },
+    );
+    expect(view.displayName).toBe("pdf");
+
+    const distinct = installedSkillView(
+      { ...installedPdf, displayName: "Code Review" },
+    );
+    expect(distinct.displayName).toBe("Code Review");
+  });
 });
 
 describe("isInstallableSkill", () => {

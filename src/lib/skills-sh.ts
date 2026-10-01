@@ -81,7 +81,15 @@ function isHit(value: unknown): value is SkillsShHit {
 function toSkill(hit: SkillsShHit): SkillView {
   return {
     name: hit.skillId,
+    // The hit's own id, sent to install verbatim — the same canonical form the
+    // registry rows carry.
+    id: hit.id,
     repo: hit.source,
+    // Upstream currently repeats the slug in `name`; carry it only when it
+    // ever differs, so the UI's `displayName ?? name` has one spelling.
+    ...(hit.name && hit.name !== hit.skillId
+      ? { displayName: hit.name }
+      : {}),
     description: "",
     stars: 0,
     downloads: typeof hit.installs === "number" ? hit.installs : 0,

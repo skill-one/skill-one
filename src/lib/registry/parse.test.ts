@@ -31,6 +31,7 @@ describe("parseSkillLine", () => {
       ),
     ).toEqual({
       name: "pdf",
+      id: "anthropics/skills/pdf",
       repo: "anthropics/skills",
       description: "Work with PDFs.",
       descriptionZh: "处理 PDF。",
@@ -112,8 +113,16 @@ describe("parseSkillLine", () => {
       }),
     );
     expect(skill?.name).toBe("find-skills");
+    // The raw frontmatter spelling rides along as the display name, since it
+    // folds to a different string than the slug.
+    expect(skill?.displayName).toBe("Find Skills");
     expect(skill?.repo).toBe("vercel-labs/skills");
     expect(skill?.path).toBe("skills/vercel-labs/skills/find-skills");
+  });
+
+  it("carries no display name when the frontmatter name folds to the slug", () => {
+    expect(parseSkillLine(line({ name: "pdf" }))?.displayName).toBeUndefined();
+    expect(parseSkillLine(line({}))?.displayName).toBeUndefined();
   });
 
   it("falls back to the id for path and slug for name when the row omits them", () => {

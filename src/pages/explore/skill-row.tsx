@@ -7,6 +7,7 @@ import { ordinalClass } from "../../lib/ordinal";
 import {
   isInstallableSkill,
   isLiveSkill,
+  skillDisplayName,
   type SkillView,
 } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
@@ -126,7 +127,7 @@ export function SkillRow({
         size="sm"
         role={onSelect ? "button" : undefined}
         tabIndex={onSelect ? 0 : undefined}
-        aria-label={onSelect ? t("common.viewDetailAria", { name: skill.name }) : undefined}
+        aria-label={onSelect ? t("common.viewDetailAria", { name: skillDisplayName(skill) }) : undefined}
         onClick={onSelect}
         onKeyDown={(e) => {
           if (onSelect && (e.key === "Enter" || e.key === " ")) {
@@ -186,7 +187,7 @@ export function SkillRow({
             nothing rather than a placeholder. */}
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-[14px] font-medium leading-tight">
-            <HighlightedText text={skill.name} terms={matched?.name} />
+            <HighlightedText text={skillDisplayName(skill)} terms={matched?.name} />
           </h3>
           {!live && (
             <p className="truncate text-[12px] leading-snug text-muted-foreground">

@@ -18,12 +18,20 @@ import { isTauri } from "./tauri";
  *
  * Since agents-skills 0.26 the name is the skill's slug — the SKILL.md
  * frontmatter `name` slugified, the identity `add`/`remove`/`disable`/
- * `enable` all select by. (The library's `ListedSkill` also carries
- * `displayName` and `path` since 0.26; the backend DTO passes only the facts
- * the UI reads.)
+ * `enable` all select by — and the record also carries `displayName`, the
+ * frontmatter spelling the UI shows. (`path` is the other 0.26 addition the
+ * DTO leaves out.)
  */
 export interface InstalledSkill {
   name: string;
+  /**
+   * The frontmatter `name` as declared — the display-only rendition of the
+   * same skill (it may hold casing and spaces the slug folds away). The
+   * backend DTO has passed it through since agents-skills 0.26, and the UI
+   * shows it as returned; a skill whose declared name folds to the slug
+   * simply carries the slug here.
+   */
+  displayName?: string;
   /**
    * Whether the skill is enabled (`true`) or parked in the disabled dir
    * (`false`). Set by the backend from the on-disk state, not a UI preference.
