@@ -7,6 +7,7 @@ import {
   recordSkillProvenanceBatch,
   reconcileProvenance,
   removeSkillProvenance,
+  dismissSkillSource,
   loadResolutionRecords,
   saveResolutionRecords,
   resetMockProvenance,
@@ -87,6 +88,34 @@ describe("parseLedger", () => {
     const ledger = parseLedger(JSON.stringify(SOURCE));
     expect(ledger.get("pdf")).toEqual(SOURCE);
   });
+
+  it("parses `via` on source records and rejects unknown values", () => {
+    const ledger = parseLedger(
+      [
+        JSON.stringify({ name: "a", repo: "o/r", via: "install" }),
+        JSON.stringify({ name: "b", repo: "o/r", via: "confirm" }),
+        JSON.stringify({ name: "c", repo: "o/r", via: "bogus" }),
+        JSON.stringify({ name: "d", repo: "o/r" }),
+      ].join("\n"),
+    );
+    expect(ledger.get("a")).toMatchObject({ via: "install" });
+    expect(ledger.get("b")).toMatchObject({ via: "confirm" });
+    expect(ledger.get("c")).not.toHaveProperty("via");
+    expect(ledger.get("d")).not.toHaveProperty("via");
+  });
+
+  it("parses `dismissed` on resolution records, dropping unusable entries", () => {
+    const ledger = parseLedger(
+      [
+        JSON.stringify({ name: "a", epoch: 1, dismissed: ["x/y", "", 3] }),
+        JSON.stringify({ name: "b", epoch: 1, dismissed: [] }),
+        JSON.stringify({ name: "c", epoch: 1 }),
+      ].join("\n"),
+    );
+    expect(ledger.get("a")).toMatchObject({ dismissed: ["x/y"] });
+    expect(ledger.get("b")).not.toHaveProperty("dismissed");
+    expect(ledger.get("c")).not.toHaveProperty("dismissed");
+  });
 });
 
 describe("serializeLedger", () => {
@@ -159,6 +188,17 @@ describe("provenance browser store", () => {
     const map = await reconcileProvenance(["pdf"]);
     expect(map.pdf).toMatchObject({ repo: "fork/skills", hash: "hash-1" });
   });
+
+  it("records how the source was established via `via`", async () => {
+    await recordSkillProvenance("anthropics/skills", "pdf");
+    expect((await reconcileProvenance(["pdf"])).pdf?.via).toBe("install");
+
+    await recordSkillProvenance("fork/skills", "pdf", undefined, "confirm");
+    expect((await reconcileProvenance(["pdf"])).pdf?.via).toBe("confirm");
+
+    await recordSkillProvenanceBatch([{ repo: "o/r", name: "pdf", reason: "description" }]);
+    expect((await reconcileProvenance(["pdf"])).pdf?.via).toBe("description");
+  });
 });
 
 describe("resolution records", () => {
@@ -206,5 +246,29 @@ describe("resolution records", () => {
     await reconcileProvenance(["other"]);
 
     expect(await loadResolutionRecords()).toEqual({});
+  });
+
+  it("dismissSkillSource replaces the source record with a dismissal", async () => {
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
+    await dismissSkillSource("pdf", "anthropics/skills", 7);
+
+    // The source is gone from the reconcile answer…
+    expect(await reconcileProvenance(["pdf"])).toEqual({});
+    // …and the dismissal is persisted on the resolution record.
+    expect(await loadResolutionRecords()).toEqual({
+      pdf: { name: "pdf", epoch: 7, dismissed: ["anthropics/skills"] },
+    });
+  });
+
+  it("dismissSkillSource accumulates repos and runs before any source record", async () => {
+    await dismissSkillSource("pdf", "a/skills", 7);
+    await recordSkillProvenance("b/skills", "pdf", undefined, "confirm");
+    await dismissSkillSource("pdf", "b/skills", 8);
+    await dismissSkillSource("pdf", "a/skills", 8);
+
+    expect(await loadResolutionRecords()).toEqual({
+      pdf: { name: "pdf", epoch: 8, dismissed: ["b/skills", "a/skills"] },
+    });
+    expect(await reconcileProvenance(["pdf"])).toEqual({});
   });
 });

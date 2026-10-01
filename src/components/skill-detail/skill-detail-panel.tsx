@@ -51,6 +51,9 @@ import { OwnerAvatar } from "../owner-avatar";
 import { SkillEnableSwitch } from "../skill-enable-switch";
 import { SkillInstallButton } from "../skill-install-button";
 import { SkillRemoveButton } from "../skill-remove-button";
+import { LinkSuggestionBadge } from "../../pages/installed/link-suggestion-badge";
+import { useSkillProvenance } from "../../hooks/use-skill-provenance";
+import { SourceLinkMenu } from "./source-link-menu";
 import { ExpandableDescription } from "./expandable-description";
 
 /**
@@ -264,6 +267,14 @@ export function SkillDetailPanel({
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const locale = useAppLocale();
+
+  // The provenance state the installed surface's source line reads from: the
+  // candidates an unlinked skill can link to (the same namesake suggestions
+  // its list row shows) and — through the view's `via` — how a linked
+  // skill's source was established. A shared cache entry; the store surface
+  // already pays for it through the install button.
+  const { data: provenanceState } = useSkillProvenance();
+  const suggestion = shown ? provenanceState?.suggestions?.[shown.name] : undefined;
 
   // Leaving the current skill (or closing the drawer) drops any edit session, so
   // the next skill never opens on a stale draft. The drawer language resets with
@@ -493,6 +504,25 @@ export function SkillDetailPanel({
   // The link's href and its open-externally handler point at the same place.
   const skillBlobUrl = githubBlobUrl(MIRROR.repo, filePath, MIRROR.ref);
 
+  // The repo line under the title. On the installed surface it carries the
+  // provenance tooltip — store install vs linked third-party copy, read off
+  // the ledger's `via` — and the change-source menu; the store's own rows
+  // keep the bare external link.
+  const repoLink = (
+    <a
+      href={sourceHref}
+      onClick={(e) => {
+        e.preventDefault();
+        void openExternal(sourceHref);
+      }}
+      title={t("detail.openSourceRepo")}
+      className="inline-flex min-w-0 items-center gap-1"
+    >
+      <span className="truncate">{shown?.repo}</span>
+      <ExternalLink className="h-3 w-3 shrink-0" />
+    </a>
+  );
+
   // The meta line's facts in reading order. Nulls drop out and the renderer
   // interleaves the interpunct separators, so any combination of present
   // facts — a registry-backed store row, an unindexed local install, a disk
@@ -607,23 +637,39 @@ export function SkillDetailPanel({
             <SheetTitle className="truncate text-lg font-bold tracking-tight">
               {shown ? skillDisplayName(shown) : null}
             </SheetTitle>
-            {hasSource ? (
-              <SheetDescription
-                render={
-                  <a
-                    href={sourceHref}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      void openExternal(sourceHref);
-                    }}
-                    title={t("detail.openSourceRepo")}
-                    className="inline-flex min-w-0 items-center gap-1"
-                  >
-                    <span className="truncate">{shown?.repo}</span>
-                    <ExternalLink className="h-3 w-3 shrink-0" />
-                  </a>
-                }
-              />
+            {hasSource && !isStore && shown ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <SheetDescription
+                      render={
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          {repoLink}
+                          <SourceLinkMenu skill={shown} />
+                        </span>
+                      }
+                    />
+                  }
+                />
+                <TooltipContent className="max-w-[260px] text-left normal-case">
+                  {shown.via === "install"
+                    ? t("detail.sourceViaInstall")
+                    : t("detail.sourceViaLink")}
+                </TooltipContent>
+              </Tooltip>
+            ) : hasSource ? (
+              <SheetDescription render={repoLink} />
+            ) : !isStore && shown ? (
+              // An unlinked install: the same suggestion badge its list row
+              // shows — the link affordance when namesake candidates exist,
+              // the plain local-install label when they do not.
+              <SheetDescription render={<div className="min-w-0" />}>
+                <LinkSuggestionBadge
+                  name={shown.name}
+                  localDescription={shown.description}
+                  candidates={suggestion ?? []}
+                />
+              </SheetDescription>
             ) : (
               <SheetDescription>{t("common.localInstall")}</SheetDescription>
             )}

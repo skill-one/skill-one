@@ -220,6 +220,26 @@ export function InstalledPage() {
     }));
   }, [hits, list, linked, storeEntries, suggestions]);
 
+  // Linking or unlinking a source inside the detail drawer changes the
+  // skill's identity (the unlinked `/name` key becomes `repo/name` and
+  // back). The drawer must never render the closed state in between, so the
+  // stale key is remapped during render: the name is the key's last segment
+  // (the repo half of a linked key contains slashes; the name never does),
+  // and the row carrying that name supplies the key's new shape. The state
+  // is synced right after.
+  const selectedName =
+    selectedKey == null ? null : selectedKey.slice(selectedKey.lastIndexOf("/") + 1);
+  const selectedRow = selectedName
+    ? rows.find((r) => r.skill.name === selectedName)
+    : undefined;
+  const selected =
+    selectedRow && skillKey(selectedRow.skill) !== selectedKey
+      ? skillKey(selectedRow.skill)
+      : selectedKey;
+  useEffect(() => {
+    if (selected !== selectedKey) setSelectedKey(selected);
+  }, [selected, selectedKey]);
+
   // One card per source repository: the skills no recorded source vouches for
   // pool into the one card that stands for them, so every installed skill still
   // lives somewhere. Inside each card the installs read newest-first (the same
@@ -492,7 +512,7 @@ export function InstalledPage() {
                     // it cannot place at all would leave the podium on
                     // alphabetical order. The numbers merely count.
                     ranked={false}
-                    selected={key === selectedKey}
+                    selected={key === selected}
                     muted={!row.enabled}
                     extra={rowExtra(row, "label")}
                     action={<SkillEnableSwitch skill={row.skill} />}
@@ -523,7 +543,7 @@ export function InstalledPage() {
                   }))}
                   maxSkills={maxSkills}
                   hasQuery={isSearching}
-                  selected={selectedKey}
+                  selected={selected}
                   onOpenSkill={setSelectedKey}
                   uninstalled={
                     card.repo ? uninstalledByRepo.get(card.repo) : undefined
@@ -553,7 +573,7 @@ export function InstalledPage() {
           in the first place — see `SkillDetailDrawer`.) */}
       <SkillDetailDrawer
         skills={detailSkills}
-        selected={selectedKey}
+        selected={selected}
         onSelect={setSelectedKey}
         onRemoved={() => setSelectedKey(null)}
         surface="installed"

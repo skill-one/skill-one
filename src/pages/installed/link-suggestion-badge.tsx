@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Loader2, Star, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 
-import { useAppLocale } from "../../i18n/use-language";
-import { skillDescription } from "../../lib/i18n-content";
 import {
   Popover,
   PopoverContent,
@@ -16,12 +14,12 @@ import {
   TooltipTrigger,
 } from "../../components/ui/tooltip";
 import { toast } from "../../components/ui/toast";
+import { LinkCandidateList } from "../../components/link-candidate-list";
 
 import { recordSkillProvenance } from "../../lib/provenance";
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
-import { cn, errorMessage, formatCount } from "../../lib/utils";
+import { cn, errorMessage } from "../../lib/utils";
 import type { LinkCandidate } from "../../lib/link-suggestions";
-import { OwnerAvatar } from "../../components/owner-avatar";
 
 /**
  * How the entry point presents:
@@ -55,7 +53,6 @@ export function LinkSuggestionBadge({
   const [pendingRepo, setPendingRepo] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const locale = useAppLocale();
 
   const pick = async (candidate: LinkCandidate) => {
     setPendingRepo(candidate.skill.repo);
@@ -156,58 +153,11 @@ export function LinkSuggestionBadge({
             </div>
           ) : null}
 
-          <ul className="max-h-72 overflow-y-auto">
-            {candidates.map(({ skill, similarity }) => {
-              const pending = pendingRepo === skill.repo;
-              return (
-                <li key={skill.repo}>
-                  <button
-                    type="button"
-                    disabled={pendingRepo != null}
-                    onClick={() => void pick({ skill, similarity })}
-                    className={cn(
-                      "flex w-full flex-col gap-1 rounded-md px-2 py-1.5 text-left",
-                      "transition-colors hover:bg-accent/50",
-                      "focus-visible:bg-accent/50 focus-visible:outline-none",
-                      "disabled:cursor-wait disabled:opacity-60",
-                    )}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <OwnerAvatar
-                        owner={skill.repo.split("/")[0]}
-                        className="size-4 text-[9px]"
-                      />
-                      <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
-                        {skill.repo}
-                      </span>
-                      {pending ? (
-                        <Loader2
-                          className="size-3 shrink-0 animate-spin text-muted-foreground"
-                          aria-hidden
-                        />
-                      ) : skill.stars > 0 ? (
-                        <span
-                          className="inline-flex shrink-0 items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground"
-                          title={t("migration.starsTitle")}
-                        >
-                          <Star className="size-2.5" aria-hidden />
-                          {formatCount(skill.stars)}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-                      {skillDescription(skill, locale)}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground/70">
-                      {t("migration.similarity", {
-                        percent: Math.round(similarity * 100),
-                      })}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <LinkCandidateList
+            candidates={candidates}
+            pendingRepo={pendingRepo}
+            onPick={(candidate) => void pick(candidate)}
+          />
 
           <p className="text-[10px] text-muted-foreground">
             {t("migration.footnote")}

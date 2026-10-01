@@ -26,11 +26,16 @@ one line per skill, last line wins:
 
 ```jsonc
 // A source record (`repo` present): the skill is linked to its store entry.
-{"name":"pdf","repo":"anthropics/skills","installedAt":"2026-09-13T08:00:00.000Z","hash":"9a1f…"}
+{"name":"pdf","repo":"anthropics/skills","installedAt":"2026-09-13T08:00:00.000Z","hash":"9a1f…","via":"install"}
 
 // A resolution record (`repo` absent): the cached outcome of failed source
 // matching — see "Associating skills installed by other tools" below.
 {"name":"my-tool","epoch":42,"hash":"b2e0…","fingerprint":{"mtimeMs":1738022.4,"size":48213},"namesakesKey":"…","candidates":[…]}
+
+// A dismissal (`repo` absent, `dismissed` present): the user cut a skill's
+// source association in the detail drawer. The auto-link tiers never link a
+// dismissed repo back; the user can still pick it from candidates.
+{"name":"my-tool","epoch":42,"dismissed":["someone/skills"]}
 ```
 
 There is no kind tag and no version field: `repo` discriminates the two
@@ -44,7 +49,12 @@ installed clone tracks repo HEAD, which can be ahead of the indexed snapshot,
 so a computed directory hash would permanently disagree with the rev and
 poison the update signal. A future update check simply compares the recorded
 hash against the latest index rev: differ means the store published a new
-version since install. Local edits are invisible to it, by design.
+version since install. Local edits are invisible to it, by design. The
+optional `via` states how the association was established — `install` (the
+app installed the skill itself), `confirm` (the user picked the source from
+candidates) or `description`/`hash` (auto-linked) — which is how the detail
+drawer tells a store install from a linked third-party copy. Absent in
+pre-v3 records, treated as unknown.
 
 Key properties:
 
@@ -199,3 +209,27 @@ deliberately trades the rare silent mislink (wrong source link, wrong update
 stream) for far fewer prompts on genuinely identical skills — the one case
 where the user would confirm the obvious anyway — while still leaving anything
 below 90% to the user's judgement.
+
+## Re-selecting and cutting a source in the detail drawer
+
+The detail drawer's source line is the provenance surface: its hover tooltip
+states how the recorded source was established (store install via this app, a
+linked third-party copy, or an unlinked local install), and the line carries
+the re-selection affordances:
+
+- **Unlinked, candidates exist** — the local-install label becomes the same
+  确认关联 trigger the list rows show, opening the ranked namesake candidates.
+- **Linked** — a quiet chevron beside the repo opens a change-source popover:
+  the source currently on record (pinned and marked), the other same-name
+  store entries (`findLinkCandidates`, ranked like the suggestions but
+  excluding the current repo, fetched when the popover opens), and the way
+  out. A confirmed pick is written like a native install (`via: "confirm"`);
+  nothing is written until the user picks or unlinks.
+
+**Unlinking dismisses the repo.** Cutting the association replaces the source
+record with a resolution record carrying `dismissed`, so the auto-link tiers
+never chain the same repo back on their own — the user's cut is a decision.
+The dismissed repo still surfaces among the manual candidates, since picking
+it again is the user's own act of re-identification. Inside a running session
+the suggestion memo is cleared, so the next reconcile pass immediately
+re-runs the lookup and offers what remains.

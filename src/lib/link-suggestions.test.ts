@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import {
   MAX_CANDIDATES,
+  findLinkCandidates,
   noteRegistryEpoch,
   rankNamesakes,
   resetLinkSuggestions,
   resolveAssociations,
   SIMILARITY_AUTO_LINK_THRESHOLD,
+  unlinkSkillSource,
 } from "./link-suggestions";
 import { descriptionSimilarity } from "./description-similarity";
 import type { Skill } from "../types/skill";
@@ -20,6 +22,7 @@ const {
   recordSkillProvenanceBatch,
   loadResolutionRecords,
   saveResolutionRecords,
+  dismissSkillSource,
   isTauri,
 } = vi.hoisted(() => ({
   searchSkills: vi.fn(),
@@ -29,6 +32,7 @@ const {
   recordSkillProvenanceBatch: vi.fn(),
   loadResolutionRecords: vi.fn(),
   saveResolutionRecords: vi.fn(),
+  dismissSkillSource: vi.fn(),
   isTauri: vi.fn(),
 }));
 
@@ -45,6 +49,7 @@ vi.mock("./provenance", () => ({
   recordSkillProvenanceBatch,
   loadResolutionRecords,
   saveResolutionRecords,
+  dismissSkillSource,
 }));
 
 /** A namesake entry, as the registry serves it (no per-skill hash anymore). */
@@ -417,5 +422,113 @@ describe("resolveAssociations", () => {
     expect(suggestions).toEqual({});
     expect(analyzeSkill).not.toHaveBeenCalled();
     expect(searchSkills).not.toHaveBeenCalled();
+  });
+
+  it("never auto-links a repo the user dismissed, but keeps it as a candidate", async () => {
+    mockReady([namesake("anthropics/skills")]);
+    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
+    loadResolutionRecords.mockResolvedValue({
+      pdf: { name: "pdf", epoch: 1, dismissed: ["anthropics/skills"] },
+    });
+
+    const { linked, suggestions } = await resolveAssociations([
+      { name: "pdf", description: "Read and manipulate PDF files." },
+    ]);
+
+    // The perfect description match is dismissed — no auto-link; the choice
+    // stays with the user, and the dismissed repo remains among the
+    // candidates it can still be picked from manually.
+    expect(linked).toEqual([]);
+    expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
+    expect(suggestions.pdf.map((c) => c.skill.repo)).toEqual(["anthropics/skills"]);
+    // The dismissal is carried into the persisted outcome.
+    expect(saveResolutionRecords).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: "pdf", dismissed: ["anthropics/skills"] })],
+      [],
+    );
+  });
+
+  it("auto-links the best non-dismissed namesake", async () => {
+    mockReady([
+      namesake("anthropics/skills"),
+      namesake("fork/skills"),
+    ]);
+    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
+    loadResolutionRecords.mockResolvedValue({
+      pdf: { name: "pdf", epoch: 1, dismissed: ["anthropics/skills"] },
+    });
+
+    const { linked } = await resolveAssociations([
+      { name: "pdf", description: "Read and manipulate PDF files." },
+    ]);
+
+    expect(linked).toEqual(["pdf"]);
+    expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
+      { repo: "fork/skills", name: "pdf", reason: "description" },
+    ]);
+  });
+
+  it("keeps the dismissal when the skill has no namesakes", async () => {
+    mockReady([]);
+    loadResolutionRecords.mockResolvedValue({
+      pdf: { name: "pdf", epoch: 1, dismissed: ["a/skills"] },
+    });
+
+    await resolveAssociations([{ name: "pdf" }]);
+
+    expect(saveResolutionRecords).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: "pdf", epoch: 1, dismissed: ["a/skills"] })],
+      [],
+    );
+  });
+});
+
+describe("findLinkCandidates", () => {
+  it("ranks the skill's namesakes without writing anything", async () => {
+    mockReady([namesake("a/skills"), namesake("b/skills", { description: "unrelated" })]);
+
+    const candidates = await findLinkCandidates("pdf", "Read and manipulate PDF files.");
+
+    expect(candidates.map((c) => c.skill.repo)).toEqual(["a/skills", "b/skills"]);
+    expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
+    expect(saveResolutionRecords).not.toHaveBeenCalled();
+  });
+
+  it("excludes the currently linked repo", async () => {
+    mockReady([namesake("a/skills"), namesake("b/skills")]);
+
+    const candidates = await findLinkCandidates("pdf", "whatever", {
+      excludeRepo: "a/skills",
+    });
+
+    expect(candidates.map((c) => c.skill.repo)).toEqual(["b/skills"]);
+  });
+
+  it("returns nothing when the registry is not ready", async () => {
+    getRegistrySnapshot.mockReturnValue({ ready: false, epoch: 0 });
+    expect(await findLinkCandidates("pdf")).toEqual([]);
+  });
+});
+
+describe("unlinkSkillSource", () => {
+  it("dismisses the repo against the served snapshot epoch", async () => {
+    mockReady([namesake("anthropics/skills")]);
+
+    await unlinkSkillSource("pdf", "anthropics/skills");
+
+    expect(dismissSkillSource).toHaveBeenCalledWith("pdf", "anthropics/skills", 1);
+  });
+
+  it("clears the session memo, so the next pass re-runs the lookup", async () => {
+    mockReady([namesake("anthropics/skills")]);
+    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
+    // Warm the memo with a dead end.
+    await resolveAssociations([{ name: "totally-custom" }]);
+    expect(searchSkills).toHaveBeenCalledTimes(1);
+
+    await unlinkSkillSource("totally-custom", "a/skills");
+    await resolveAssociations([{ name: "totally-custom" }]);
+
+    expect(searchSkills).toHaveBeenCalledTimes(2);
   });
 });

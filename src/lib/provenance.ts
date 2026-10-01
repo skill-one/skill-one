@@ -46,6 +46,14 @@ export interface ProvenanceRecord {
    * local edits are invisible to it, by design.
    */
   hash?: string;
+  /**
+   * How the association was established: `install` (the app installed the
+   * skill itself), `confirm` (the user picked the source from candidates),
+   * or `description`/`hash` (auto-linked). Lets the UI tell a store install
+   * from a third-party copy whose source was matched later. Absent in
+   * pre-v3 records — treated as unknown, not as `install`.
+   */
+  via?: SourceLinkReason;
 }
 
 /** Stat-only change-detection identity of a skill directory. */
@@ -91,6 +99,12 @@ export interface ResolutionRecord {
    * fields): a matching fresh lookup skips the similarity math.
    */
   namesakesKey?: string;
+  /**
+   * Repos the user explicitly cut or rejected for this skill. The auto-link
+   * tier never links them again; they still surface as manual candidates,
+   * since picking one is the user's own act of re-identification.
+   */
+  dismissed?: string[];
 }
 
 /** One ledger line: a skill is either linked (source) or unresolved. */
@@ -104,9 +118,18 @@ export interface SkillProvenance {
   repo: string;
   installedAt: string;
   hash?: string;
+  via?: SourceLinkReason;
 }
 
 // ------------------------------------------------------------------- parsing
+
+/** The reasons a source association can carry (mirrors `SourceLinkReason`). */
+const SOURCE_LINK_REASONS: ReadonlySet<string> = new Set([
+  "install",
+  "hash",
+  "description",
+  "confirm",
+]);
 
 /** Parse one ledger line (or legacy entry) into a record; null when invalid. */
 function parseRecord(value: unknown): LedgerRecord | null {
@@ -117,6 +140,9 @@ function parseRecord(value: unknown): LedgerRecord | null {
     const record: ProvenanceRecord = { name: entry.name, repo: entry.repo };
     if (typeof entry.installedAt === "string") record.installedAt = entry.installedAt;
     if (typeof entry.hash === "string") record.hash = entry.hash;
+    if (typeof entry.via === "string" && SOURCE_LINK_REASONS.has(entry.via)) {
+      record.via = entry.via as SourceLinkReason;
+    }
     return record;
   }
   return parseResolutionRecord(entry.name, entry);
@@ -131,6 +157,12 @@ function parseResolutionRecord(
   if (typeof entry.hash === "string") record.hash = entry.hash;
   if (isFingerprint(entry.fingerprint)) record.fingerprint = entry.fingerprint;
   if (typeof entry.namesakesKey === "string") record.namesakesKey = entry.namesakesKey;
+  if (Array.isArray(entry.dismissed)) {
+    const dismissed = entry.dismissed.filter(
+      (repo): repo is string => typeof repo === "string" && repo.length > 0,
+    );
+    if (dismissed.length > 0) record.dismissed = dismissed;
+  }
   if (Array.isArray(entry.candidates)) {
     const candidates = entry.candidates
       .map(parseCandidate)
@@ -277,6 +309,7 @@ export async function recordSkillProvenance(
       name,
       repo,
       installedAt: new Date().toISOString(),
+      via: reason,
       ...(hash ? { hash } : {}),
     });
     await saveLedger(ledger);
@@ -307,6 +340,7 @@ export async function recordSkillProvenanceBatch(
         name: entry.name,
         repo: entry.repo,
         installedAt: new Date().toISOString(),
+        via: entry.reason ?? "hash",
         ...(entry.hash ? { hash: entry.hash } : {}),
       });
     }
@@ -350,6 +384,32 @@ export async function removeSkillProvenanceBatch(names: readonly string[]): Prom
 }
 
 /**
+ * Record that the user cut a skill's source association: the source record is
+ * replaced by a resolution record carrying `dismissed`, so the auto-link
+ * tiers never link that repo back on their own. The user can still pick the
+ * repo again from candidates — a manual pick overwrites this record, which is
+ * exactly the act of re-identification. Best-effort like every ledger write.
+ */
+export async function dismissSkillSource(
+  name: string,
+  repo: string,
+  epoch: number,
+): Promise<void> {
+  try {
+    const ledger = await loadLedger();
+    const existing = ledger.get(name);
+    const dismissed = new Set(
+      existing !== undefined && "epoch" in existing ? (existing.dismissed ?? []) : [],
+    );
+    dismissed.add(repo);
+    ledger.set(name, { name, epoch, dismissed: [...dismissed] });
+    await saveLedger(ledger);
+  } catch (e) {
+    console.warn("provenance: failed to dismiss install source", e);
+  }
+}
+
+/**
  * Reconcile the ledger with the on-disk truth and return the current
  * name→source map. Called whenever the installed list is (re)loaded: skills
  * removed outside the app stop claiming a source, and stale resolution
@@ -376,6 +436,7 @@ export async function reconcileProvenance(
         repo: record.repo,
         installedAt: record.installedAt ?? "",
         ...(record.hash !== undefined ? { hash: record.hash } : {}),
+        ...(record.via !== undefined ? { via: record.via } : {}),
       };
     }
   }

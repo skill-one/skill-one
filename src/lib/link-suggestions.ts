@@ -37,6 +37,7 @@ import { analyzeSkill, skillFingerprint } from "./skills-manager";
 import { isTauri } from "./tauri";
 import { descriptionSimilarity } from "./description-similarity";
 import {
+  dismissSkillSource,
   loadResolutionRecords,
   recordSkillProvenanceBatch,
   saveResolutionRecords,
@@ -120,6 +121,38 @@ export function rankNamesakes(
 }
 
 /**
+ * The user cut a skill's source association (detail drawer): the source
+ * record is replaced by a resolution record dismissing `repo` — the auto-link
+ * tier never links it back on its own — and the session memo is cleared so
+ * the next reconcile pass re-runs the lookup and surfaces the remaining
+ * candidates.
+ */
+export async function unlinkSkillSource(
+  name: string,
+  repo: string,
+): Promise<void> {
+  await dismissSkillSource(name, repo, getRegistrySnapshot().epoch);
+  resolved.delete(name);
+}
+
+/**
+ * On-demand candidates for the detail drawer's change-source popover: the
+ * namesakes of `name` ranked by description similarity, minus the currently
+ * linked repo. A pure lookup — nothing is written; the caller records the
+ * user's pick (or dismissal) itself.
+ */
+export async function findLinkCandidates(
+  name: string,
+  description?: string,
+  opts?: { excludeRepo?: string },
+): Promise<LinkCandidate[]> {
+  const namesakes = await findNamesakes(name);
+  return rankNamesakes(namesakes, description ?? "").filter(
+    (c) => !opts?.excludeRepo || c.skill.repo !== opts.excludeRepo,
+  );
+}
+
+/**
  * Equality key of a ranking input: the full namesake list's identity fields
  * (the repo and the descriptions the similarity reads). A fresh lookup with
  * the same key ranks identically over unchanged content.
@@ -190,7 +223,11 @@ export async function resolveAssociations(
       if (resolved.has(skill.name)) return; // dead end or cached candidates
 
       const cached = stored[skill.name];
-      if (cached && cached.epoch === epoch) {
+      // A user-dismissed repo (cut via the detail drawer) must never ride the
+      // cache: the lookup re-runs so the suppression applies to the fresh
+      // ranking, and the dismissal is carried into whatever outcome is stored.
+      const dismissed = new Set(cached?.dismissed ?? []);
+      if (cached && cached.epoch === epoch && dismissed.size === 0) {
         // Already verified against this snapshot. A dead end is
         // content-independent — "no namesakes" cannot change until the
         // snapshot does. Candidates are content-dependent (the ranking reads
@@ -218,7 +255,15 @@ export async function resolveAssociations(
       const namesakes = await findNamesakes(skill.name);
       if (namesakes.length === 0) {
         resolved.set(skill.name, []);
-        upserts.set(skill.name, { name: skill.name, epoch, candidates: [] });
+        upserts.set(skill.name, {
+          name: skill.name,
+          epoch,
+          candidates: [],
+          // A dead end still remembers the dismissal, so a future snapshot
+          // that re-introduces the repo cannot auto-link it behind the
+          // user's back.
+          ...(dismissed.size > 0 ? { dismissed: [...dismissed] } : {}),
+        });
         return;
       }
 
@@ -259,7 +304,9 @@ export async function resolveAssociations(
         contentVerified && cached?.namesakesKey === key && cached.candidates?.length
           ? reviveCandidates(skill.name, cached.candidates)
           : rankNamesakes(namesakes, skill.description ?? "");
-      const top = ranked[0];
+      // The auto-link candidate is the best-ranked namesake the user has not
+      // dismissed; a dismissed top stays in `ranked` as a manual candidate.
+      const top = ranked.find((c) => !dismissed.has(c.skill.repo));
       if (top && top.similarity >= SIMILARITY_AUTO_LINK_THRESHOLD) {
         // No content hash is verified by a description match, so the version
         // marker stays unset — same as a user-confirmed link.
@@ -277,6 +324,7 @@ export async function resolveAssociations(
         ...(fingerprint ? { fingerprint } : {}),
         namesakesKey: key,
         candidates: ranked.map(toPersisted),
+        ...(dismissed.size > 0 ? { dismissed: [...dismissed] } : {}),
       });
     }),
   );

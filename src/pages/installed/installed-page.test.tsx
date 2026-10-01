@@ -632,6 +632,70 @@ describe("InstalledPage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("keeps the drawer open on the same skill through a link and an unlink", async () => {
+    const user = userEvent.setup();
+    // One same-slug store entry with a dissimilar description: offered as a
+    // candidate, never auto-linked.
+    searchSkills.mockResolvedValue({
+      hits: [
+        {
+          skill: {
+            name: "pdf",
+            repo: "anthropics/skills",
+            description: "Spreadsheet editing and cell formulas.",
+            stars: 1,
+            downloads: 2,
+          },
+          matched: {},
+        },
+      ],
+    });
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: "查看 pdf 详情" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+
+    // Link from inside the drawer: the unlinked skill offers the suggestion
+    // badge, and picking a candidate writes the confirmation to the ledger.
+    // The popover teleports outside the sheet element, so its contents are
+    // queried at the screen level.
+    await user.click(
+      within(dialog).getByRole("button", { name: "关联 pdf 的商店来源" }),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: /anthropics\/skills/ }),
+    );
+    await waitFor(() =>
+      expect(ledgerRecord("pdf")).toMatchObject({
+        repo: "anthropics/skills",
+        via: "confirm",
+      }),
+    );
+
+    // The skill's identity changed (`/pdf` → `anthropics/skills/pdf`), but
+    // the drawer follows the row's new key instead of closing — and now
+    // presents the linked source.
+    expect(
+      await within(dialog).findByText("anthropics/skills"),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByText("本地安装")).not.toBeInTheDocument();
+
+    // Unlinking from the change-source menu flips the identity back and
+    // still keeps the drawer on the skill.
+    await user.click(
+      within(dialog).getByRole("button", { name: "更改 pdf 关联的来源" }),
+    );
+    await user.click(screen.getByRole("button", { name: "解除关联" }));
+    await waitFor(() =>
+      expect(ledgerRecord("pdf")).toMatchObject({
+        dismissed: ["anthropics/skills"],
+      }),
+    );
+    expect(await within(dialog).findByText("本地安装")).toBeInTheDocument();
+  }, 20_000);
+
   it("does not open the drawer or the door from the bar's switch", async () => {
     const user = userEvent.setup();
     renderPage();

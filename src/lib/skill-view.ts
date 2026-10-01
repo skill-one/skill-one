@@ -2,6 +2,7 @@ import type { SkillProvenance } from "./provenance";
 import type { InstalledSkill } from "./skills-manager";
 import { isCanonicalId } from "./registry/parse";
 import type { Skill } from "../types/skill";
+import type { SourceLinkReason } from "./activity";
 
 /**
  * The one adapter between the installed record and the shared skill surfaces.
@@ -98,6 +99,13 @@ export interface SkillView extends Skill {
    */
   storeBacked?: boolean;
   /**
+   * Installed skills only: how the recorded source was established —
+   * `install` (this app installed the skill), `confirm` (the user picked the
+   * source from candidates), or `description`/`hash` (auto-linked). Absent
+   * for store rows (which need no provenance) and pre-v3 ledger records.
+   */
+  via?: SourceLinkReason;
+  /**
    * Installed skills only: when the skill's directory landed on disk, as Unix
    * seconds (UTC) — absent for registry-only rows and for filesystems that
    * record no creation time (agents-skills 0.16).
@@ -146,6 +154,10 @@ export function installedSkillView(
     ...(skill.displayName ? { displayName: skill.displayName } : {}),
     ...(entry?.id ? { id: entry.id } : {}),
     repo: ledger?.repo ?? "",
+    // How that source was established (`install` vs a confirmed or auto
+    // link) — the fact that tells a store install from a linked third-party
+    // copy on the shared surfaces.
+    ...(ledger?.via ? { via: ledger.via } : {}),
     description: skill.description,
     // The translated description comes from the registry entry; the on-disk
     // record carries no translation.

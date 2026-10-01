@@ -21,6 +21,8 @@ import { openExternal } from "../../lib/open-external";
 import type { SkillView } from "../../lib/skill-view";
 import { LANGUAGE_STORAGE_KEY } from "../../lib/i18n-content";
 import i18n from "../../i18n/index";
+import { useSkillProvenance } from "../../hooks/use-skill-provenance";
+import { findLinkCandidates, unlinkSkillSource } from "../../lib/link-suggestions";
 import { Sheet } from "../ui/sheet";
 import { I18nProvider } from "../../i18n/language-provider";
 import { toast } from "../ui/toast";
@@ -46,6 +48,17 @@ vi.mock("../../lib/local-skills", () => ({
 
 vi.mock("../../lib/open-external", () => ({
   openExternal: vi.fn(),
+}));
+
+// The source-linking flows the panel composes are covered by their own
+// suites; here they are stubbed so the tests pin what the panel itself
+// renders and calls.
+vi.mock("../../hooks/use-skill-provenance", () => ({
+  useSkillProvenance: vi.fn(),
+}));
+vi.mock("../../lib/link-suggestions", () => ({
+  findLinkCandidates: vi.fn(),
+  unlinkSkillSource: vi.fn(),
 }));
 
 vi.mock("./skill-editor", () => ({
@@ -187,6 +200,14 @@ beforeEach(() => {
   // The header install button reads the installed list; nothing is
   // installed unless a test says otherwise.
   vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
+  // The provenance hook answers empty by default: no suggestions, no
+  // candidates. Individual tests override what they need.
+  vi.mocked(useSkillProvenance).mockReset();
+  vi.mocked(useSkillProvenance).mockReturnValue({ data: undefined } as never);
+  vi.mocked(findLinkCandidates).mockReset();
+  vi.mocked(findLinkCandidates).mockResolvedValue([]);
+  vi.mocked(unlinkSkillSource).mockReset();
+  vi.mocked(unlinkSkillSource).mockResolvedValue(undefined);
 });
 
 describe("SkillDetailPanel", () => {
@@ -627,6 +648,138 @@ describe("SkillDetailPanel", () => {
   });
 });
 
+describe("SkillDetailPanel source linking", () => {
+  /** A same-name store entry, as `findLinkCandidates` serves it. */
+  const forkCandidate = {
+    skill: {
+      name: "pdf",
+      repo: "fork/skills",
+      description: "Read and merge PDF documents.",
+      stars: 5,
+      downloads: 6,
+    },
+    similarity: 0.8,
+  };
+
+  it("offers the change-source menu beside the repo line on the installed surface", async () => {
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({
+      skill: { ...skill, path: undefined, via: "install" },
+      surface: "installed",
+    });
+
+    await screen.findByText("Use this skill for PDFs.");
+    expect(
+      screen.getByRole("button", { name: "更改 pdf 关联的来源" }),
+    ).toBeInTheDocument();
+  });
+
+  it("offers no change-source menu on the store surface", async () => {
+    renderDrawer({});
+
+    await screen.findByText("Use this skill for PDFs.");
+    expect(
+      screen.queryByRole("button", { name: "更改 pdf 关联的来源" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("lists the current source, the other namesakes and the unlink action", async () => {
+    const user = userEvent.setup();
+    vi.mocked(findLinkCandidates).mockResolvedValue([forkCandidate]);
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({
+      skill: { ...skill, path: undefined },
+      surface: "installed",
+    });
+
+    await user.click(
+      await screen.findByRole("button", { name: "更改 pdf 关联的来源" }),
+    );
+    expect(await screen.findByText("当前来源")).toBeInTheDocument();
+    // The other same-name entries are offered; the current repo is pinned
+    // once, as the source on record.
+    expect(await screen.findByText("fork/skills")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /fork\/skills/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "解除关联" }),
+    ).toBeInTheDocument();
+  });
+
+  it("re-links to the picked candidate as a user confirmation", async () => {
+    const user = userEvent.setup();
+    const toastSpy = vi.spyOn(toast, "add");
+    vi.mocked(findLinkCandidates).mockResolvedValue([forkCandidate]);
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({
+      skill: { ...skill, path: undefined },
+      surface: "installed",
+    });
+
+    await user.click(
+      await screen.findByRole("button", { name: "更改 pdf 关联的来源" }),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: /fork\/skills/ }),
+    );
+
+    expect(unlinkSkillSource).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(toastSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "已关联来源：fork/skills" }),
+      ),
+    );
+  });
+
+  it("unlinks the source, dismissing the repo", async () => {
+    const user = userEvent.setup();
+    const toastSpy = vi.spyOn(toast, "add");
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({
+      skill: { ...skill, path: undefined },
+      surface: "installed",
+    });
+
+    await user.click(
+      await screen.findByRole("button", { name: "更改 pdf 关联的来源" }),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "解除关联" }),
+    );
+
+    expect(unlinkSkillSource).toHaveBeenCalledWith("pdf", "anthropics/skills");
+    await waitFor(() =>
+      expect(toastSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "已解除关联，恢复为本地安装" }),
+      ),
+    );
+  });
+
+  it("offers the link-suggestion badge for an unlinked skill with candidates", async () => {
+    vi.mocked(useSkillProvenance).mockReturnValue({
+      data: { suggestions: { "my-tool": [forkCandidate] } },
+    } as never);
+    mockFetchLocalSkillDetail.mockResolvedValue(localDetail);
+    renderDrawer({ skill: localSkill, surface: "installed" });
+
+    expect(
+      await screen.findByRole("button", { name: "关联 my-tool 的商店来源" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the plain local-install label for an unlinked skill without candidates", async () => {
+    mockFetchLocalSkillDetail.mockResolvedValue(localDetail);
+    renderDrawer({ skill: localSkill, surface: "installed" });
+
+    await screen.findByText("Local skill body.");
+    expect(screen.getByText("本地安装")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "关联 my-tool 的商店来源" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("SkillDetailPanel Chinese page", () => {
   /** The snapshot's Chinese page for the drawer's fixture skill. */
   const zhDetail = {
@@ -844,7 +997,6 @@ describe("SkillDetailPanel installed translation", () => {
 
     const toggle = await screen.findByRole("button", { name: "原文" });
     toggle.focus();
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 });
 

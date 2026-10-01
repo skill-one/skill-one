@@ -19,7 +19,7 @@ export const INSTALLED_SKILLS_QUERY_KEY = ["installed-skills"] as const;
  * is invalidated alongside — so the provenance hook can read the installed
  * list without a circular import.
  */
-export const PROVENANCE_QUERY_KEY = ["skill-provenance", "v2"] as const;
+export const PROVENANCE_QUERY_KEY = ["skill-provenance", "v3"] as const;
 
 /**
  * The installed-skills list for the global skills directory. Shared by the
