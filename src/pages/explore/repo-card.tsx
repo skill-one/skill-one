@@ -107,7 +107,8 @@ export interface RepoCardRow {
  * **Expansion** answers the commonest question the card leaves open ("what
  * else is in here?") without leaving the list: a card whose cap is hiding rows
  * turns its bar into a toggle, and a press reveals every row in place — the
- * body already runs in two balanced columns, so the reveal reads at the width
+ * body already runs in two columns filled across then down, so the reveal
+ * reads at the width
  * of the list rather than of one lane. A second press folds the card back to
  * its five-row preview. A card with nothing behind its cap — or one under a
  * live search, whose every row is already on screen — keeps the bar as a plain
@@ -153,7 +154,8 @@ export interface RepoCardRow {
  * reveals both, so the bar never means two different folds. Open, the group
  * reads as its own: a hairline, then the group's marker row (a minus over
  * the count, the fold's way back) before the rows begin, so the two lists
- * never read as one. The group's rows run in the same balanced columns the
+ * never read as one. The group's rows run in the same two across-then-down
+ * columns the
  * installed rows do, the installed ones keep their order, the uninstalled
  * ones live below the divider, and a second press folds them all back.
  *
@@ -495,21 +497,16 @@ export function RepoCard({
               the repository is the card, and a skill inside it is one line of
               its content. The horizontal bleed lets the hover highlight read as
               a row band rather than as a box inside the card's padding. The
-              rows always run in two balanced columns — the upper half of the
-              list down the left, the rest down the right — so a full-width
-              card never turns every row into a full-width sweep.
-              `grid-flow-col` over `ceil(n/2)` rows is what balances them: the
-              items fill column-major, so the split is by count and stays put
-              no matter how tall the individual rows run. Each row carries
+              rows always run in two columns, filled across then down — the
+              first row holds the list's first two skills, the next row the
+              next two — so the reading order *is* the list order, and it is
+              the same folded as expanded (a column-major fill would re-pair
+              the rows whenever the row count changes).
+              Each row carries
               `layout="position"`: while rows appear or leave around it, the
               rows themselves never stretch — they keep their size and glide
               into place (the card's own overflow clipping is the mask). */}
-          <ul
-            className="grid grid-flow-col auto-cols-fr gap-x-8 -mx-1.5"
-            style={{
-              gridTemplateRows: `repeat(${Math.ceil(shown.length / 2)}, auto)`,
-            }}
-          >
+          <ul className="grid grid-cols-2 gap-x-8 -mx-1.5">
             {shown.map(({ skill, matched, muted, extra, action }) => {
               const key = skillKey(skill);
               // A live skills.sh row claims only what its source carries —
@@ -673,10 +670,7 @@ export function RepoCard({
               </button>
               <ul
                 aria-label={t("state.uninstalledListAria", { name })}
-                className="grid grid-flow-col auto-cols-fr gap-x-8 -mx-1.5"
-                style={{
-                  gridTemplateRows: `repeat(${Math.ceil(uninstalled.length / 2)}, auto)`,
-                }}
+                className="grid grid-cols-2 gap-x-8 -mx-1.5"
               >
                 {uninstalled.map((skill) => (
                   <li

@@ -61,7 +61,6 @@ const skills: SearchHit[] = NAMES.map((name, index) =>
     ...(name === "pdf" ? { profile: { domain: ["office-productivity"] } } : {}),
   }),
 );
-const FOLDED_ROWS_COUNT = Math.ceil(FOLDED_LIMIT / 2);
 const foldedNames = NAMES.slice(0, FOLDED_LIMIT);
 const hiddenNames = NAMES.slice(FOLDED_LIMIT);
 
@@ -157,16 +156,12 @@ describe("RepoCard", () => {
     for (const name of hiddenNames) {
       expect(screen.queryByText(name)).not.toBeInTheDocument();
     }
-    // The body is one list laid out column-major over ceil(10/2) rows, so the
-    // rows split evenly — five down the left, five down the right — and DOM
-    // order (the reading order) stays most-installed first.
+    // The body is one list laid out across then down over two columns: the
+    // first row holds the list's first two skills, and DOM order (the reading
+    // order) stays most-installed first — the same order folded or expanded.
     const body = container.querySelector('[data-slot="card-content"] ul')!;
     expect(body).toHaveClass("grid");
-    expect(body).toHaveClass("grid-flow-col");
-    expect(body).toHaveClass("auto-cols-fr");
-    expect(body).toHaveStyle({
-      gridTemplateRows: `repeat(${FOLDED_ROWS_COUNT}, auto)`,
-    });
+    expect(body).toHaveClass("grid-cols-2");
     // The bar's figure is the *increment*: the rows behind the cap, which is
     // exactly what a press on the toggle reveals.
     const bar = screen.getByRole("button", {
@@ -368,17 +363,12 @@ describe("RepoCard", () => {
     // The reveal: every skill the cap was holding, right here — no navigation.
     expect(rowNames()).toEqual(NAMES);
 
-    // The body is one list laid out column-major over ceil(12/2) rows, so the
-    // rows split evenly — six down the left, six down the right — and DOM
-    // order (the reading order) stays most-installed first. The count puts two
-    // columns on the grid; `auto-cols-fr` makes each half the card's width.
+    // The body is one list laid out across then down over two columns, so the
+    // expanded rows keep the same reading order the folded preview had — the
+    // first row holds the list's first two skills, the next row the next two.
     const body = container.querySelector('[data-slot="card-content"] ul')!;
     expect(body).toHaveClass("grid");
-    expect(body).toHaveClass("grid-flow-col");
-    expect(body).toHaveClass("auto-cols-fr");
-    expect(body).toHaveStyle({
-      gridTemplateRows: `repeat(${Math.ceil(NAMES.length / 2)}, auto)`,
-    });
+    expect(body).toHaveClass("grid-cols-2");
 
     // The toggle reads its own state: the figure becomes the card's total —
     // the fact the open card exists to show, beside the minus that folds it.
@@ -425,13 +415,9 @@ describe("RepoCard", () => {
     expect(screen.queryByText(/个 skill/)).toBeNull();
 
     // Uncapped is not unshaped: the search card's rows run in the same
-    // balanced columns the folded preview and the expansion use.
+    // across-then-down two columns the folded preview and the expansion use.
     const body = container.querySelector('[data-slot="card-content"] ul')!;
     expect(body).toHaveClass("grid");
-    expect(body).toHaveClass("grid-flow-col");
-    expect(body).toHaveClass("auto-cols-fr");
-    expect(body).toHaveStyle({
-      gridTemplateRows: `repeat(${Math.ceil(NAMES.length / 2)}, auto)`,
-    });
+    expect(body).toHaveClass("grid-cols-2");
   });
 });
