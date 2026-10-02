@@ -32,15 +32,17 @@ const SORT_LABELS: { sort: ListSort; labelKey: ParseKeys }[] = [
  *
  * The trigger states the order on screen — the one thing the reader must
  * always be able to see — and the menu marks the current pick, the same
- * radio semantics the settings menu's own pickers use. A search stands the
- * ordering down (relevance is the better ranking while a query is live), so
- * the page hides the control along with the chips rather than offering a
- * choice that does nothing.
+ * radio semantics the settings menu's own pickers use. A live search stands the
+ * ordering down (relevance is the better ranking while a query is live), so the
+ * switch locks where it stands rather than offering a choice that does nothing
+ * — and rather than leaving the row, which would move the field beside it on
+ * every keystroke.
  */
 export function ListSortSelect({
   sort,
   onChange,
   sorts,
+  disabled = false,
   className,
 }: {
   /** The order on screen. */
@@ -53,6 +55,12 @@ export function ListSortSelect({
    * can state (see `LIST_SORTS` in `lib/list-view`).
    */
   sorts?: readonly ListSort[];
+  /**
+   * Locks the switch while the list is answering something else — a live search
+   * re-ranks its hits, so an order picked now would not be honoured (see
+   * `ListToolbar`). Locked, not unmounted, so the row holds still.
+   */
+  disabled?: boolean;
   className?: string;
 }) {
   const { t } = useTranslation();
@@ -63,12 +71,17 @@ export function ListSortSelect({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        // The lock reaches the button, so the control reads as locked and takes
+        // no press; Base UI's own `disabled` is set with it so the menu cannot
+        // be opened by a key the trigger would otherwise answer.
+        disabled={disabled}
         render={
           <Button
             type="button"
             variant="outline"
             size="sm"
             aria-label={t("common.listSort")}
+            disabled={disabled}
             className={cn("shrink-0", className)}
           />
         }

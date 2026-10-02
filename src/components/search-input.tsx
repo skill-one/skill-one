@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 
+import { cn } from "../lib/utils";
 import { Input } from "./ui/input";
 
 /**
@@ -7,11 +8,14 @@ import { Input } from "./ui/input";
  * names what is being searched and doubles as the accessible label, so the
  * visible hint and the announced one can never drift apart.
  *
- * It closes the header's row, just before the window's settings entry, and it
- * is open all the time: a field that has to be asked for first is a field the
- * reader has to look for first, and searching is the first thing a reader does
- * to a list of eight thousand. The magnifier is decorative and never the click
- * target — the field under it is.
+ * It opens its list's own row, the one the scope and the order stand on (see
+ * `ListToolbar`), and is open all the time: a field that has to be asked for
+ * first is a field the reader has to look for first, and searching is the first
+ * thing a reader does to a list of eight thousand. The magnifier is decorative
+ * and never the click target — the field under it is.
+ *
+ * The caller sizes the field (`className`): how wide the search sits in its row
+ * is that row's decision, not this field's.
  */
 export function SearchInput({
   value,
@@ -19,6 +23,7 @@ export function SearchInput({
   label,
   disabled = false,
   placeholder,
+  className,
 }: {
   value: string;
   /** Receives the raw field value; debouncing is the caller's. */
@@ -29,9 +34,10 @@ export function SearchInput({
   disabled?: boolean;
   /** Overrides the `${label}...` hint, e.g. to say why the field is locked. */
   placeholder?: string;
+  className?: string;
 }) {
   return (
-    <div className="relative w-56 shrink-0">
+    <div className={cn("relative", className)}>
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         value={value}

@@ -40,6 +40,7 @@ export function ListFacets({
   total,
   selected,
   onSelect,
+  disabled = false,
 }: {
   facets: readonly Facet[];
   /** What 全部 counts, in the unit on screen. */
@@ -47,6 +48,13 @@ export function ListFacets({
   /** The scope on screen, by key; null is 全部. */
   selected: string | null;
   onSelect: (key: string | null) => void;
+  /**
+   * Locks the picker while the list is answering something else — a live search
+   * re-ranks the whole registry by relevance and ignores the scope, so a scope
+   * picked now would not narrow anything (see `ListToolbar`). Locked, not
+   * unmounted, so the row holds still under the reader's cursor.
+   */
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const locale = useAppLocale();
@@ -59,12 +67,17 @@ export function ListFacets({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        // The lock reaches the button, so the control reads as locked and takes
+        // no press; Base UI's own `disabled` is set with it so the menu cannot
+        // be opened by a key the trigger would otherwise answer.
+        disabled={disabled}
         render={
           <Button
             type="button"
             variant={selected === null ? "outline" : "default"}
             size="sm"
             aria-label={t("facet.categories")}
+            disabled={disabled}
             className="shrink-0"
           />
         }

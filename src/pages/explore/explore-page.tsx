@@ -9,7 +9,7 @@ import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useInstalledSearchRows } from "../../hooks/use-installed-search";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
-import { setScope, setSort, LIST_SORTS } from "../../lib/list-view";
+import { LIST_SORTS } from "../../lib/list-view";
 import type { ListUnit } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
 import {
@@ -20,8 +20,7 @@ import {
 } from "../../lib/skill-list-layout";
 
 import { Button } from "../../components/ui/button";
-import { ListFacets } from "../../components/list-facets";
-import { ListSortSelect } from "../../components/list-sort-select";
+import { ListToolbar } from "../../components/list-toolbar";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
@@ -76,9 +75,9 @@ interface ExploreView {
  *   (`byRepoRank`, the most-starred repository first), each card's preview
  *   listing its skills most-installed first.
  *
- * The reader scopes either reading to a single domain with the picker beside
- * the control; a search re-answers either in relevance order across the whole
- * registry, and the picker and the sort stand down while it is live.
+ * The reader searches and scopes either reading from the list's own first row
+ * (`ListToolbar`); a search re-answers in relevance order across the whole
+ * registry, and the picker and the sort lock while it is live.
  */
 export function ExplorePage() {
   const { t } = useTranslation();
@@ -99,7 +98,7 @@ export function ExplorePage() {
   const { scope, sort = "popularity" } = useDestinationView("store");
   const unit: ListUnit = sort === "repo" ? "repo" : "skill";
   // The filter is a browse control: a search re-orders the whole registry by
-  // relevance, so it ignores the filter (and the filter bar stands down).
+  // relevance, so it ignores the filter (and the filter bar locks).
   const selectedDomain = scope ?? null;
 
   const query = useDebouncedValue(search).trim();
@@ -294,36 +293,21 @@ export function ExplorePage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The list's own first row: the domain picker, one press to scope the
-          list (全部 clears it), and the sort switch closing it. The picker is
-          a browse control — a search re-orders the whole registry by relevance
-          and ignores the scope — so it stands down while a search is live; the
-          sort stands down with it, as on the installed list: a search
-          re-orders the list by relevance, and its answer reads in the shape
-          the sort already chose. Its counts follow the unit the sort implies:
-          the repository unit weighs a domain by repositories, the skill unit
-          by skills. */}
-      <div className="mb-3 flex min-w-0 items-center gap-3">
-        {!isSearching && (
-          <ListFacets
-            facets={facets}
-            total={totalCount}
-            selected={selectedDomain}
-            onSelect={(key) => setScope("store", key)}
-          />
-        )}
-        {/* The one control for both what the screen is made of and what order
-            it reads in — the old unit switch's repository shape is the sort
-            menu's second answer, exactly the merge the installed list made. */}
-        {!isSearching && (
-          <ListSortSelect
-            className="ml-auto"
-            sort={sort}
-            sorts={LIST_SORTS.store}
-            onChange={(next) => setSort("store", next)}
-          />
-        )}
-      </div>
+      {/* The list's own first row, and the only row above the answer: the
+          search field, the domain picker that scopes the list (全部 clears it),
+          and the sort switch that says what order — and which shape — it reads
+          in. All three read and write the shared view, so what they leave behind
+          is still here on the way back. The page hands the row its counts and
+          whether a query is live; the row's own arrangement is `ListToolbar`'s
+          to answer. The counts follow the unit the sort implies: the repository
+          unit weighs a domain by repositories, the skill unit by skills. */}
+      <ListToolbar
+        destination="store"
+        facets={facets}
+        total={totalCount}
+        sorts={LIST_SORTS.store}
+        searching={isSearching}
+      />
 
       {/* The list; the modal detail drawer overlays it without reflowing it or
           moving its scroll position. */}

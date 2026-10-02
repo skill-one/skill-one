@@ -1,12 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SearchInput } from "./search-input";
 import { renderWithRouter } from "../test/test-utils";
 
-function renderSearchField(props: Partial<Parameters<typeof SearchInput>[0]> = {}) {
+function renderSearchField(
+  props: Partial<Parameters<typeof SearchInput>[0]> = {},
+) {
   return renderWithRouter(
     <SearchInput value="" onChange={() => {}} label="搜索 Skill" {...props} />,
   );
@@ -17,7 +19,7 @@ describe("SearchInput", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     // The field is controlled by its caller, so the honest test drives it the
-    // way the header does: the query it keeps is the query the field shows.
+    // way the row does: the query it keeps is the query the field shows.
     function Controlled() {
       const [value, setValue] = useState("");
       return (
@@ -70,5 +72,17 @@ describe("SearchInput", () => {
 
     expect(field).not.toHaveFocus();
     expect(document.querySelector("kbd")).toBeNull();
+  });
+
+  it("takes the size the row gives it", () => {
+    renderSearchField({ className: "w-full max-w-sm" });
+
+    // Where the field sits in its row is the row's decision (see
+    // `ListToolbar`), so the field takes the size it is handed rather than
+    // holding a width of its own.
+    expect(screen.getByLabelText("搜索 Skill").parentElement).toHaveClass(
+      "w-full",
+      "max-w-sm",
+    );
   });
 });
