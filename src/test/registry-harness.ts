@@ -7,7 +7,7 @@ import type {
   SearchData,
 } from "../lib/registry/protocol";
 import type { RegistrySnapshot } from "../lib/registry/client";
-import type { SnapshotHead } from "../lib/registry/snapshot";
+import type { SnapshotHead } from "../lib/registry/index-stream";
 import type { Skill, SkillRef } from "../types/skill";
 
 /**
@@ -33,13 +33,11 @@ export interface RegistryHarness {
   /** How many downloads (init + reloads) have started. */
   readonly downloads: number;
   /**
-   * Advertise the published snapshot the fake sources serve: its run stamp is
-   * what the controller compares against its cache to decide whether the body
-   * needs downloading, and its tag is what downloads get pinned to.
+   * Advertise the published snapshot the fake sources serve: its etag is
+   * what the controller compares against its cache to decide whether the
+   * body needs downloading.
    */
   publishMeta(meta: SnapshotHead | null): void;
-  /** Tag the most recent download was pinned to (undefined = branch). */
-  readonly pinnedTag: string | undefined;
   /** Make every RPC reject (worker crash stand-in) until cleared. */
   setRpcError(err: Error | null): void;
   searchSkills(query: string): Promise<SearchData>;
@@ -88,11 +86,9 @@ export function createRegistryHarness(): RegistryHarness {
   let earlyOutcome: "none" | "complete" | "fail" = "none";
   let earlyError: unknown;
   // The published snapshot the fake sources advertise. Null (the default) means
-  // "no stats reachable": no tag to pin or run to compare, so every boot
-  // downloads — exactly the behavior from before run addressing existed.
+  // "no stats reachable": no etag to compare, so every boot downloads — exactly
+  // the behavior when the probe answers nothing.
   let published: SnapshotHead | null = null;
-  /** Tag the newest download was pinned to (undefined = branch fallback). */
-  let pinnedTag: string | undefined;
 
   const replies = new Map<
     number,
@@ -105,9 +101,8 @@ export function createRegistryHarness(): RegistryHarness {
   function spawnController() {
     return createRegistryController(
       {
-        readIndex: async (_cdnBase, tag, _stars, line) => {
+        readIndex: async (_cdnBase, _stars, line) => {
           downloads++;
-          pinnedTag = tag;
           onLine = line;
           for (const skill of earlyBuffer) line(skill);
           earlyBuffer = [];
@@ -222,9 +217,6 @@ export function createRegistryHarness(): RegistryHarness {
     publishMeta(meta) {
       published = meta;
     },
-    get pinnedTag() {
-      return pinnedTag;
-    },
     setRpcError(err) {
       rpcError = err;
     },
@@ -259,7 +251,6 @@ export function createRegistryHarness(): RegistryHarness {
       earlyOutcome = "none";
       earlyError = undefined;
       published = null;
-      pinnedTag = undefined;
       controller = spawnController();
     },
   };

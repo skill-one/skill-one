@@ -2,14 +2,14 @@ import { describe, it, expect } from "vitest";
 
 import { createRegistryController } from "./worker-controller";
 import type { CachedIndex, RegistryCache } from "./cache";
-import type { SnapshotHead } from "./snapshot";
+import type { SnapshotHead } from "./index-stream";
 import type { RegistryWorkerMessage, RevalidateResult } from "./protocol";
 import type { Skill } from "../../types/skill";
 
-/** Readable stand-ins for the `dist` branch head SHAs the probe answers with. */
-const SHA_0901 = "s0901";
-const SHA_0902 = "s0902";
-const SHA_0906 = "s0906";
+/** Readable stand-ins for the body etags the probe answers with. */
+const ETAG_0901 = "etag-0901";
+const ETAG_0902 = "etag-0902";
+const ETAG_0906 = "etag-0906";
 
 /** Deterministic skill factory; `i` varies name, repo and metrics. */
 function skill(i: number, over: Partial<Skill> = {}): Skill {
@@ -26,8 +26,8 @@ function skill(i: number, over: Partial<Skill> = {}): Skill {
 type ResultMessage = Extract<RegistryWorkerMessage, { type: "result" }>;
 
 /** A stored record as the cache hands it back: skills plus their identity. */
-function record(skills: Skill[], generatedAt?: string): CachedIndex {
-  return { skills, generatedAt, fetchedAt: 1 };
+function record(skills: Skill[], etag?: string): CachedIndex {
+  return { skills, etag, fetchedAt: 1 };
 }
 
 /** Unwrap a posted result, asserting it succeeded. */
@@ -81,16 +81,12 @@ function setup(options?: {
     resolve(): void;
     reject(err: unknown): void;
   }> = [];
-  /** Tag each started download was pinned to (undefined = branch ref). */
-  const pins: Array<string | undefined> = [];
   const readIndex = async (
     _cdnBase: string,
-    tag: string | undefined,
     _stars: Promise<Map<string, number> | null>,
     line: (skill: Skill) => void,
   ): Promise<void> => {
     onLine = line;
-    pins.push(tag);
     if (options?.skills) {
       for (const s of options.skills) line(s);
       return;
@@ -124,7 +120,6 @@ function setup(options?: {
   return {
     controller,
     recorded,
-    pins,
     /** Deliver one skill on the newest open stream. */
     push(s: Skill) {
       onLine?.(s);
@@ -174,7 +169,7 @@ describe("createRegistryController — boot", () => {
   });
 
   it("serves instantly from the cold-start cache, then revalidates", async () => {
-    const cached = record([skill(0), skill(1)], "2026-09-01T14:25:32Z");
+    const cached = record([skill(0), skill(1)], ETAG_0901);
     const saved: Skill[][] = [];
     const t = setup({
       cache: {
@@ -198,7 +193,7 @@ describe("createRegistryController — boot", () => {
 
     // What is on screen is announced as such, including the run it came from.
     expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
-      generatedAt: "2026-09-01T14:25:32Z",
+      etag: ETAG_0901,
       origin: "cache",
     });
 
@@ -215,67 +210,66 @@ describe("createRegistryController — boot", () => {
   });
 
   it("skips the body download when the published run is unchanged", async () => {
-    const generatedAt = "2026-09-01T14:25:32Z";
     const saved: Array<[Skill[], unknown]> = [];
     const t = setup({
       cache: {
-        load: async () => record([skill(0), skill(1)], generatedAt),
+        load: async () => record([skill(0), skill(1)], ETAG_0901),
         save: async (skills, identity) => {
           saved.push([skills, identity]);
         },
         clear: async () => {},
       },
-      published: { ref: SHA_0901, generatedAt },
+      published: { etag: ETAG_0901 },
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    // No stream was ever opened: the cached bytes belong to this run.
-    expect(t.pins).toEqual([]);
+    // The cached bytes belong to this run: nothing was re-downloaded or
+    // re-saved, and the read-out still carries what the probe learned (etag,
+    // count) and dates the check so the next one is only due once the window
+    // passes.
     expect(saved).toEqual([]);
     expect(t.controller.stats()).toMatchObject({ count: 2, ready: true });
-    // The read-out still carries what the probe learned (fresh tag, count),
-    // and dates the check so the next one is only due once the window passes.
     expect(t.recorded.indexes.at(-1)?.info).toEqual({
-      ref: SHA_0901,
-      generatedAt,
+      etag: ETAG_0901,
       total: 2,
       origin: "unchanged",
       checkedAt: 0,
     });
   });
 
-  it("downloads a newer run pinned to its tag and records it", async () => {
+  it("downloads a newer run and records its identity", async () => {
     const saved: Array<[Skill[], unknown]> = [];
     const t = setup({
       cache: {
-        load: async () => record([skill(0)], "2026-09-01T14:25:32Z"),
+        load: async () => record([skill(0)], ETAG_0901),
         save: async (skills, identity) => {
           saved.push([skills, identity]);
         },
         clear: async () => {},
       },
       published: {
-        ref: SHA_0906,
-        generatedAt: "2026-09-06T15:32:29.423Z",
+        etag: ETAG_0906,
+        publishedAt: "Sun, 06 Sep 2026 15:32:29 GMT",
       },
       skills: [skill(0), skill(1)],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    // The download is addressed at the published snapshot, not the branch.
-    expect(t.pins).toEqual([SHA_0906]);
     expect(saved).toEqual([
       [
         [skill(0), skill(1)],
-        { ref: SHA_0906, generatedAt: "2026-09-06T15:32:29.423Z" },
+        {
+          etag: ETAG_0906,
+          publishedAt: "Sun, 06 Sep 2026 15:32:29 GMT",
+        },
       ],
     ]);
     // The served count is the parsed row count — the dataset no longer
     // publishes one for the read-out to compare against.
     expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
-      ref: SHA_0906,
+      etag: ETAG_0906,
       total: 2,
       origin: "updated",
       checkedAt: 0,
@@ -332,26 +326,31 @@ describe("createRegistryController — boot", () => {
   });
 
   it("re-downloads an unchanged run when the user forces a reload", async () => {
-    const generatedAt = "2026-09-01T14:25:32Z";
     const t = setup({
-      published: { ref: SHA_0901, generatedAt },
+      published: { etag: ETAG_0901 },
       skills: [skill(0)],
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
-    expect(t.pins).toEqual([SHA_0901]);
+    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
+      etag: ETAG_0901,
+      origin: "updated",
+    });
 
     // Second boot-equivalent: the run never moved, but a manual retry (or a
     // source switch) must still fetch rather than report "nothing to do".
     t.controller.reload({ cdnBase: "other" });
     await t.flush();
-    expect(t.pins).toEqual([SHA_0901, SHA_0901]);
+    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
+      etag: ETAG_0901,
+      origin: "updated",
+    });
   });
 
-  it("falls back to the branch ref when no meta can be reached", async () => {
+  it("downloads even when no meta can be reached", async () => {
     const t = setup({
       cache: {
-        load: async () => record([skill(0)], "2026-09-01T14:25:32Z"),
+        load: async () => record([skill(0)], ETAG_0901),
         save: async () => {},
         clear: async () => {},
       },
@@ -360,9 +359,15 @@ describe("createRegistryController — boot", () => {
     t.controller.init({ cdnBase: "test" });
     await t.flush();
 
-    // Nothing to compare against: download unpinned instead of trusting a
-    // tag that may no longer be current.
-    expect(t.pins).toEqual([undefined]);
+    // Nothing to compare against: the body is downloaded rather than
+    // trusting a cache whose currency cannot be confirmed.
+    t.push(skill(1));
+    t.complete();
+    await t.flush();
+    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
+      origin: "updated",
+    });
+    expect(t.controller.stats()).toMatchObject({ count: 1, ready: true });
   });
 
   it("throttles progress notifications by wall clock", async () => {
@@ -395,25 +400,22 @@ describe("createRegistryController — revalidate", () => {
 
   it("downloads nothing and dates the check when the run is unchanged", async () => {
     let clock = 0;
-    const generatedAt = "2026-09-01T14:25:32Z";
     const t = setup({
       now: () => clock,
       cache: {
-        load: async () => record([skill(0)], generatedAt),
+        load: async () => record([skill(0)], ETAG_0901),
         save: async () => {},
         clear: async () => {},
       },
-      published: { ref: SHA_0901, generatedAt },
+      published: { etag: ETAG_0901 },
     });
     t.controller.init({ cdnBase: "test" });
     await t.flush();
-    expect(t.pins).toEqual([]);
 
     clock = 5_000;
     void t.controller.revalidate({ id: 1 });
     await t.flush();
 
-    expect(t.pins).toEqual([]);
     expect(resultData<RevalidateResult>(t.recorded.results.at(-1)!)).toEqual({
       status: "current",
     });
@@ -427,36 +429,32 @@ describe("createRegistryController — revalidate", () => {
   it("pulls in the newer run when the published stamp moved", async () => {
     const options: SourceOptions = {
       skills: [skill(0)],
-      published: {
-        ref: SHA_0901,
-        generatedAt: "2026-09-01T00:00:00Z",
-      },
+      published: { etag: ETAG_0901 },
     };
     const t = setup(options);
     t.controller.init({ cdnBase: "test" });
     await t.flush();
-    expect(t.pins).toEqual([SHA_0901]);
+    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({ origin: "updated" });
 
     // A new day publishes while the app stays open.
-    options.published = {
-      ref: SHA_0902,
-      generatedAt: "2026-09-02T00:00:00Z",
-    };
+    options.published = { etag: ETAG_0902 };
     void t.controller.revalidate({ id: 1 });
     await t.flush();
 
-    expect(t.pins).toEqual([SHA_0901, SHA_0902]);
+    expect(t.recorded.indexes.at(-1)?.info).toMatchObject({
+      etag: ETAG_0902,
+      origin: "updated",
+    });
     expect(resultData<RevalidateResult>(t.recorded.results.at(-1)!)).toEqual({
       status: "updated",
     });
   });
 
   it("downloads nothing when the probe cannot answer", async () => {
-    const generatedAt = "2026-09-01T14:25:32Z";
     const options: SourceOptions = {
-      published: { ref: SHA_0901, generatedAt },
+      published: { etag: ETAG_0901 },
       cache: {
-        load: async () => record([skill(0)], generatedAt),
+        load: async () => record([skill(0)], ETAG_0901),
         save: async () => {},
         clear: async () => {},
       },
@@ -464,16 +462,14 @@ describe("createRegistryController — revalidate", () => {
     const t = setup(options);
     t.controller.init({ cdnBase: "test" });
     await t.flush();
-    expect(t.pins).toEqual([]);
 
-    // The tag listing is unreachable now. Boot and a forced reload fall back
-    // to the mutable branch here; a periodic check must not — that would pull
-    // the whole multi-megabyte index on a probe that answered nothing.
+    // The body is unreachable now. Boot and a forced reload download here;
+    // a periodic check must not — that would pull the whole multi-megabyte
+    // index on a probe that answered nothing.
     options.published = null;
     void t.controller.revalidate({ id: 1 });
     await t.flush();
 
-    expect(t.pins).toEqual([]);
     expect(resultData<RevalidateResult>(t.recorded.results.at(-1)!)).toEqual({
       status: "unknown",
     });

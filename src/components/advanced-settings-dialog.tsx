@@ -6,7 +6,6 @@ import { Check } from "lucide-react";
 import {
   DEFAULT_CDN_BASE,
   getCdnBase,
-  getIndexRef,
   setCdnBase,
 } from "../lib/cdn-config";
 import { reloadRegistry } from "../lib/registry/client";
@@ -92,19 +91,17 @@ export function AdvancedSettingsDialog({
     setCheck(result?.status ?? "unknown");
   };
 
-  // Facts about the snapshot the store is actually serving. The branch
-  // head's commit SHA is short enough to display whole and to diff against a
-  // release. A recorded ref (persisted by the registry client) stands in
-  // until the live snapshot identity arrives, so a fresh session still names
-  // its snapshot.
+  // Facts about the snapshot the store is actually serving. The etag names
+  // the served snapshot — the freshness identity the probe compared against —
+  // and the body's Last-Modified stamp says when it was published.
   const indexRows: { termKey: ParseKeys; value: string }[] = [
     {
       termKey: "advanced.snapshot",
-      value: index?.ref ?? (getIndexRef() || t("common.unknown")),
+      value: index?.etag ?? t("common.unknown"),
     },
     {
       termKey: "advanced.publishedAt",
-      value: formatIndexTime(index?.generatedAt, t("common.unknown")),
+      value: formatIndexTime(index?.publishedAt, t("common.unknown")),
     },
     {
       termKey: "advanced.entryCount",

@@ -90,13 +90,17 @@ export type IndexOrigin =
 /** Published metadata describing the dataset currently served by the worker. */
 export interface IndexInfo {
   /**
-   * The `dist` branch head's commit SHA the served snapshot was fetched at;
-   * absent when the probe could not resolve one and the mutable branch was
-   * used.
+   * The `dist` branch body's etag — the snapshot's freshness identity
+   * (equal etag, equal index bytes). Absent while nothing has been probed
+   * yet.
    */
-  ref?: string;
-  /** The head commit's date (UTC) — the snapshot's publication time. */
-  generatedAt?: string;
+  etag?: string;
+  /**
+   * The body's `Last-Modified` stamp as the serving source reported it —
+   * display garnish for the Settings read-out, absent when the source gave
+   * none.
+   */
+  publishedAt?: string;
   /** Row count served, before any consumer-side filtering. */
   total?: number;
   /** Origin of the served dataset for this run. */
