@@ -3,7 +3,7 @@ import { parse as parseYaml } from "yaml";
 import type { SkillDetail } from "../types/skill";
 import { errorMessage } from "./utils";
 import { SourceFetchError, fetchFirstText, fileCandidates } from "./cdn-config";
-import { MIRROR, mirrorRef } from "./mirror";
+import { MIRROR } from "./mirror";
 
 /**
  * The skills-profiles snapshot ships every indexed skill's full files — the
@@ -11,9 +11,9 @@ import { MIRROR, mirrorRef } from "./mirror";
  * skill directories are guaranteed to match (a row exists if and only if its
  * directory exists), so a registry-known path resolves in one request.
  *
- * Detail fetches are pinned to the snapshot ref recorded by the registry
- * client, so the SKILL.md body is read from exactly the snapshot the served
- * index describes.
+ * Detail fetches ride the snapshot's `dist` branch like everything else (see
+ * `lib/mirror`): a CDN edge copy may briefly trail the freshest publish, which
+ * for a SKILL.md body is a lag of at most one daily run.
  */
 
 /** Frontmatter fields surfaced in the detail view. */
@@ -48,7 +48,7 @@ export async function fetchSkillDetail(
   const path = `${knownPath.replace(/\/+$/, "")}/SKILL.md`;
   try {
     const { text } = await fetchFirstText(
-      fileCandidates({ repo: MIRROR.repo, ref: mirrorRef(), path }),
+      fileCandidates({ repo: MIRROR.repo, ref: MIRROR.ref, path }),
     );
     return toDetail(text, path);
   } catch (err) {
@@ -108,7 +108,7 @@ export async function fetchSkillZhDetail(
   if (!path) return null;
   try {
     const { text } = await fetchFirstText(
-      fileCandidates({ repo: MIRROR.repo, ref: mirrorRef(), path }),
+      fileCandidates({ repo: MIRROR.repo, ref: MIRROR.ref, path }),
     );
     return toDetail(text, path);
   } catch {

@@ -1,10 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdvancedSettingsDialog } from "./advanced-settings-dialog";
 import type { IndexInfo } from "../lib/registry/protocol";
-import { DEFAULT_CDN_BASE, getCdnBase, setIndexRef } from "../lib/cdn-config";
+import { DEFAULT_CDN_BASE, getCdnBase } from "../lib/cdn-config";
 
 /** Snapshot the mocked registry hook reports; per-test overrides apply next. */
 const stats = vi.hoisted(() => ({
@@ -38,16 +38,16 @@ vi.mock("../lib/registry/client", () => ({
 const CHECKED_AT_ISO = "2026-09-11T08:00:00Z";
 
 const SERVED: IndexInfo = {
-  ref: "a1b2c3d4e5f6a7b8c9d0",
-  generatedAt: "2026-01-01T00:00:00Z",
+  etag: 'W/"6fbdf1-E7rN6kKBORnBBnTXbDWPNXYOrHU"',
+  publishedAt: "Thu, 01 Jan 2026 00:00:00 GMT",
   total: 23734,
   origin: "unchanged",
   checkedAt: Date.parse(CHECKED_AT_ISO),
 };
 
 /** How the card renders a snapshot stamp in the host's local time zone. */
-const localeStamp = (iso: string) => new Date(iso).toLocaleString();
-const GENERATED_AT_LOCALE = localeStamp("2026-01-01T00:00:00Z");
+const localeStamp = (httpDate: string) => new Date(httpDate).toLocaleString();
+const PUBLISHED_AT_LOCALE = localeStamp("Thu, 01 Jan 2026 00:00:00 GMT");
 const CHECKED_AT_LOCALE = localeStamp(CHECKED_AT_ISO);
 
 function renderDialog() {
@@ -59,10 +59,6 @@ describe("AdvancedSettingsDialog", () => {
     stats.current = null;
     refresh.check.mockReset();
     registry.reload.mockReset();
-  });
-
-  afterEach(() => {
-    setIndexRef("");
   });
 
   it("hosts the CDN settings under a dialog header", () => {
@@ -92,10 +88,12 @@ describe("AdvancedSettingsDialog", () => {
     renderDialog();
 
     expect(screen.getByText("数据源")).toBeInTheDocument();
-    // The tag names the snapshot batch; displayed whole.
-    expect(screen.getByText("a1b2c3d4e5f6a7b8c9d0")).toBeInTheDocument();
+    // The etag names the snapshot; displayed whole.
+    expect(
+      screen.getByText('W/"6fbdf1-E7rN6kKBORnBBnTXbDWPNXYOrHU"'),
+    ).toBeInTheDocument();
     expect(screen.getByText("23,734")).toBeInTheDocument();
-    expect(screen.getByText(GENERATED_AT_LOCALE)).toBeInTheDocument();
+    expect(screen.getByText(PUBLISHED_AT_LOCALE)).toBeInTheDocument();
     // The last completed check is dated too.
     expect(screen.getByText(CHECKED_AT_LOCALE)).toBeInTheDocument();
     expect(
@@ -109,18 +107,9 @@ describe("AdvancedSettingsDialog", () => {
   it("holds placeholders until a snapshot is being served", () => {
     renderDialog();
 
-    // The snapshot ref, its stamp, the row count, and the last check.
+    // The snapshot etag, its stamp, the row count, and the last check.
     expect(screen.getAllByText("未知")).toHaveLength(4);
     expect(screen.getByText("数据尚未就绪")).toBeInTheDocument();
-  });
-
-  it("shows the recorded snapshot ref when the live identity has not arrived", () => {
-    // The registry client persists the served tag; a fresh session reads it
-    // back before the first index event lands.
-    setIndexRef("a1b2c3d4e5f6a7b8c9d0");
-    renderDialog();
-
-    expect(screen.getByText("a1b2c3d4e5f6a7b8c9d0")).toBeInTheDocument();
   });
 
   it.each([

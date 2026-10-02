@@ -6,7 +6,6 @@ import {
   parseFrontmatter,
   zhSkillPath,
 } from "./skill-detail-api";
-import { setIndexRef } from "./cdn-config";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -23,7 +22,6 @@ function notFound() {
 
 afterEach(() => {
   fetchMock.mockReset();
-  setIndexRef("");
 });
 
 describe("parseFrontmatter", () => {
@@ -158,24 +156,6 @@ describe("fetchSkillDetail", () => {
     );
   });
 
-  it("pins the fetch to the recorded snapshot tag instead of the dist branch", async () => {
-    setIndexRef("a1b2c3d4e5f6a7b8c9d0");
-    fetchMock.mockImplementation(async (url: string) =>
-      String(url).endsWith("skills/pdf/SKILL.md")
-        ? ok("---\nname: pdf\n---\n\nBody")
-        : notFound(),
-    );
-
-    await fetchSkillDetail("anthropics/skills", "pdf", "skills/pdf");
-
-    // The recorded tag is the snapshot the served index was built from, so
-    // the SKILL.md body must come from exactly that snapshot.
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/skill-one/skills-profiles/a1b2c3d4e5f6a7b8c9d0/skills/pdf/SKILL.md",
-      { signal: expect.anything() },
-    );
-  });
-
   it("rejects when the index path is missing", async () => {
     await expect(fetchSkillDetail("anthropics/skills", "pdf")).rejects.toThrow(
       "SKILL.md for pdf not found in anthropics/skills",
@@ -260,20 +240,6 @@ describe("fetchSkillZhDetail", () => {
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills/vercel-labs/skills/find-skills/SKILL.zh.md",
-      { signal: expect.anything() },
-    );
-  });
-
-  it("pins the fetch to the recorded snapshot tag", async () => {
-    setIndexRef("b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0a1");
-    fetchMock.mockImplementation(async (url: string) =>
-      String(url).endsWith("skills/a/b/c/SKILL.zh.md") ? ok("正文") : notFound(),
-    );
-
-    await fetchSkillZhDetail("a/b", "c", "skills/a/b/c");
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://raw.githubusercontent.com/skill-one/skills-profiles/b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0a1/skills/a/b/c/SKILL.zh.md",
       { signal: expect.anything() },
     );
   });

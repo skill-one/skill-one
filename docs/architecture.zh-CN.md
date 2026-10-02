@@ -33,7 +33,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 - **`src/lib/skill-detail-api.ts`**：按需拉取单个 skill 的 `SKILL.md`，解析 frontmatter 与正文；同时拉取快照可选的中文页面（`skills/<dir>/SKILL.zh.md`），中文模式下详情正文以它为主——此时英文 `SKILL.md` 只在读者通过头部的「查看原文」开关把整个抽屉切回原文（或该 skill 没有翻译）时才拉取。
 - **`src/lib/cdn-config.ts`**：管理下载源。默认直连 `raw.githubusercontent.com`，失败后回退到 CDN 镜像（`cdn.jsdmirror.com`），并支持用户在「设置」中配置自定义 CDN。候选地址按优先级依次尝试——包括响应体中途失败时——配置持久化到 localStorage。
 
-读取数据通过 TanStack Query 缓存（`staleTime` 10 分钟、`gcTime` 无限），重启后可先从缓存渲染再后台刷新。每个候选请求带 10 秒超时，仅守护响应头；流式响应体另有分块间的停滞超时（数 MB 的下载本就可能超过任何固定上限）。注册表索引还有两层专属持久化，都在 worker 内部：IndexedDB 里的解析结果，以及它所定址的快照 ref（见「浏览 skill 列表」）；两者合起来让一次启动在「上游没有新发布」时完全跳过下载。已安装列表、agent 状态等小体量查询由 TanStack Query 落盘；解析后的索引体积远超 WebView localStorage 配额，刻意排除在外。
+读取数据通过 TanStack Query 缓存（`staleTime` 10 分钟、`gcTime` 无限），重启后可先从缓存渲染再后台刷新。每个候选请求带 10 秒超时，仅守护响应头；流式响应体另有分块间的停滞超时（数 MB 的下载本就可能超过任何固定上限）。注册表索引还有两层专属持久化，都在 worker 内部：IndexedDB 里的解析结果，以及服务它的快照 etag（见「浏览 skill 列表」）；两者合起来让一次启动在「上游没有新发布」时完全跳过下载。已安装列表、agent 状态等小体量查询由 TanStack Query 落盘；解析后的索引体积远超 WebView localStorage 配额，刻意排除在外。
 
 ### 后端（写入）
 
@@ -69,7 +69,7 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 | `src/hooks/use-installed-search.ts` | 已安装列表对共享搜索查询的回答：磁盘记录过共享名称索引，再按行联入来源账本与商店条目——与已安装列表浏览时同一条管道 |
 | `src/pages/explore/live-groups.ts` | skills.sh 实时搜索结果按仓库重新归组，供搜索视图的仓库视图使用：把去重后的命中按 `owner/repo` 分桶——桶保持端点自己的相关度顺序，桶内 skill 按安装量降序。列表的排序决定 live 段由什么构成：这里是仓库卡片（与所有搜索卡片一样不截断——卡片就是完整的 live 答案），技能视图则是一行一个 skill 的扁平列表。live 卡片的底栏只是标签——行（点击打开 skills.sh）是唯一的出路 |
 | `src/lib/view-memory.ts` / `src/hooks/use-view-memory.ts` / `use-return.ts` | 列表页自己的视图——它上面的控件、已展开的深度、滚动位置——按历史记录逐条记住：页面自带滚动容器，浏览器对它什么都不会恢复。`use-return.ts` 是应用统一的返回控件：它弹回那条记录，而不是往栈里再压一份列表——这正是上面那份记忆有意义的前提 |
-| `src/lib/avatar-source.ts` | 「owner 头像在哪里」的唯一答案：数据集镜像（定址到已记录的快照 ref）、它的可变分支、最后是 GitHub 自己的端点——所有界面都从这一条链取图 |
+| `src/lib/avatar-source.ts` | 「owner 头像在哪里」的唯一答案：数据集镜像的 `dist` 分支（经下载源链）、最后是 GitHub 自己的端点——所有界面都从这一条链取图 |
 | `src/lib/tauri.ts` | 判断是否运行在 Tauri WebView 中 |
 | `src/lib/open-external.ts` | 在系统浏览器中打开外链（Tauri 需 opener 插件） |
 | `src/lib/activity.ts` / `src/components/activity-dialog.tsx` | append-only 活动日志——应用对用户技能与 Agent 做过什么——及其查看器，从设置 popover 进入（见 `docs/activity-log.md`） |
@@ -90,10 +90,10 @@ Skill One 是一个 Tauri v2 桌面应用，前端（React）负责渲染与数�
 
 1. 注册表跑在按需创建的 worker 里（`lib/registry/client.ts` 是 `lib/registry/worker.ts` 的主线程代理）：主线程只接收分组结果、有上限的搜索回复与进度事件，从不持有那几 MB 的索引。
 2. 启动时 worker 先从 IndexedDB 读取解析结果（`lib/registry/cache.ts`）并立即用于渲染——冷启动不等网络。
-3. 随后通过 GitHub commits API 探测 `dist` 分支头（一次带缓存击穿的小请求），取得快照的 SHA 与发布日期，避免任何缓存副本把旧快照冒充成当前版本。日期与缓存一致时：**完全跳过多 MB 的正文下载**。
-4. 否则 `registry/index-stream.ts` 拉取**定址到该 SHA** 的 `skills.jsonl`（不可变，镜像里的副本必然是正确字节），每收到一行就解析一行；页面直接用部分数据渲染。按注册表顺序时部分列表始终是完整列表的前缀，因此翻页稳定、仅总数不断上涨；但列表按热度（`src/lib/popularity.ts` 里安装量与 star 的合成指标）排序，首页是「当前最好的一批」，随着数据继续到达，早先的行的会往下移。
+3. 随后以带缓存击穿的 `HEAD` 探测 `dist` 分支索引正文（只花头部代价——从不调用 GitHub 的 API），读出正文 etag 作为新鲜度身份，避免任何缓存副本把旧快照冒充成当前版本。etag 与缓存一致时：**完全跳过多 MB 的正文下载**。
+4. 否则 `registry/index-stream.ts` 拉取可变 `dist` 分支上的 `skills.jsonl`（带击穿戳，边缘的滞后副本不会冒充当前索引），每收到一行就解析一行；页面直接用部分数据渲染。按注册表顺序时部分列表始终是完整列表的前缀，因此翻页稳定、仅总数不断上涨；但列表按热度（`src/lib/popularity.ts` 里安装量与 star 的合成指标）排序，首页是「当前最好的一批」，随着数据继续到达，早先的行的会往下移。
 5. 搜索要等整个数据集就绪：MiniSearch 索引（由 `lib/search-index.ts` 构建，见第 9 条）在流结束后一次性构建（每个快照都重建的代价高于下载本身），在 worker 报告 `ready` 之前搜索框保持禁用。因此任何查询都不会基于不完整的注册表作答——索引存在之前 worker 一律返回空，作为禁用态字段的兜底。
-6. 落地后的数据连同其身份（快照 SHA、头提交日期）一起覆盖 IndexedDB 记录。
+6. 落地后的数据连同其身份（快照 etag、`Last-Modified` 时间）一起覆盖 IndexedDB 记录。
 7. `cdn-config.ts` 按优先级尝试自定义 CDN、直连 GitHub 与默认 CDN；某个源中途失败即交给下一个并重头解析。
 8. 广播出的身份信息经 client 快照到达主线程，「设置」页据此显示当前使用哪个快照、本次启动是复用本地缓存还是重新下载。TanStack Query 只缓存页面问出来的那些结果（分组答案、搜索回复），注册表本身不在那里重复存一份。
 9. 排序有一条规则和一处例外：浏览列表只有一种形态——一个仓库一张卡、按 star 数降序排列，卡内 skill 按浏览顺序排列；而只要 query 非空，worker 一律按相关度返回。一次搜索重新作答的是列表的顺序、而不是它的布局，页面上也没有任何控件会声称相反的顺序。下面这套排序是注册表特有的。这个顺序是：查询的每个词都必须命中，不再退化为「命中任意一个词」；名称精确命中或前缀命中排在最前，它们之间按热度排——名称命中已经确定了「这是什么」，同名之间安装量与 star 的合成热度才是真正有意义的差别；其余是「含有查询词但不以它开头」的名称命中，先按热度、再以 BM25 分数作为最后的平手判定。

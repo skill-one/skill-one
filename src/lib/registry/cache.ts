@@ -43,12 +43,16 @@ const store = createStore("skill-one-registry", "index");
 /** Identity of the published snapshot a record was built from. */
 export interface CacheIdentity {
   /**
-   * The `dist` branch head's commit SHA the index was fetched at; absent
-   * when unpinned.
+   * The `dist` branch body's etag — the snapshot's freshness identity (equal
+   * etag, equal index bytes). Absent when no probe had answered by the time
+   * the record was written; the next boot then re-downloads once.
    */
-  ref?: string;
-  /** The head commit's date, the snapshot's freshness identity. */
-  generatedAt?: string;
+  etag?: string;
+  /**
+   * The body's `Last-Modified` stamp, kept only so the Settings read-out can
+   * name the snapshot's publication time after a restart.
+   */
+  publishedAt?: string;
 }
 
 /** A single cached record. */
@@ -95,8 +99,8 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
         return null;
       }
       if (!record || record.schemaVersion !== SCHEMA_VERSION) return null;
-      const { skills, ref, generatedAt, fetchedAt } = record;
-      return { skills, ref, generatedAt, fetchedAt };
+      const { skills, etag, publishedAt, fetchedAt } = record;
+      return { skills, etag, publishedAt, fetchedAt };
     },
 
     /** Persist the parsed registry with its snapshot identity (overwrites). */
@@ -104,8 +108,8 @@ export function createRegistryCache(kv: KeyValueStore = keyVal) {
       const record: CacheRecord = {
         schemaVersion: SCHEMA_VERSION,
         fetchedAt: Date.now(),
-        ref: identity.ref,
-        generatedAt: identity.generatedAt,
+        etag: identity.etag,
+        publishedAt: identity.publishedAt,
         skills,
       };
       try {

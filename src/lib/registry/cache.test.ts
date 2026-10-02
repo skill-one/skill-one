@@ -35,28 +35,28 @@ describe("createRegistryCache", () => {
     const cache = createRegistryCache(fakeStore());
 
     await cache.save(skills, {
-      ref: "a1b2c3d4",
-      generatedAt: "2026-09-01T14:25:32Z",
+      etag: '"etag-0901"',
+      publishedAt: "Mon, 01 Sep 2026 14:25:32 GMT",
     });
     const loaded = await cache.load();
     expect(loaded?.skills).toEqual(skills);
     expect(loaded).toMatchObject({
-      ref: "a1b2c3d4",
-      generatedAt: "2026-09-01T14:25:32Z",
+      etag: '"etag-0901"',
+      publishedAt: "Mon, 01 Sep 2026 14:25:32 GMT",
     });
     // When the record was written is kept for display, never for comparison.
     expect(loaded?.fetchedAt).toBeGreaterThan(0);
   });
 
-  it("loads a record saved without an identity as an unknown tag", async () => {
+  it("loads a record saved without an identity as an unknown run", async () => {
     const cache = createRegistryCache(fakeStore());
 
     await cache.save(skills);
-    // A record from before run addressing (or from a run that could not
+    // A record from before the etag identity (or from a run that could not
     // reach any meta): usable data, but nothing to compare a probe against.
     await expect(cache.load()).resolves.toMatchObject({
       skills,
-      ref: undefined,
+      etag: undefined,
     });
   });
 
@@ -76,7 +76,7 @@ describe("createRegistryCache", () => {
   it("drops records written by an older schema version", async () => {
     const store = fakeStore();
     const cache = createRegistryCache(store);
-    await cache.save(skills, { ref: "a1b2c3d4" });
+    await cache.save(skills, { etag: '"etag-0901"' });
 
     // Age the stored record into a previous schema version.
     const record = [...store.data.values()][0] as { schemaVersion: number };
@@ -86,7 +86,7 @@ describe("createRegistryCache", () => {
 
   it("clear() removes the stored record", async () => {
     const cache = createRegistryCache(fakeStore());
-    await cache.save(skills, { ref: "a1b2c3d4" });
+    await cache.save(skills, { etag: '"etag-0901"' });
     await cache.clear();
     await expect(cache.load()).resolves.toBeNull();
   });
@@ -95,7 +95,7 @@ describe("createRegistryCache", () => {
     const cache = createRegistryCache(fakeStore("all"));
     await expect(cache.load()).resolves.toBeNull();
     await expect(
-      cache.save(skills, { ref: "a1b2c3d4" }),
+      cache.save(skills, { etag: '"etag-0901"' }),
     ).resolves.toBeUndefined();
     await expect(cache.clear()).resolves.toBeUndefined();
   });

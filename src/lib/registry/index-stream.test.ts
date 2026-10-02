@@ -7,7 +7,6 @@ import {
   readLines,
   readRepos,
 } from "./index-stream";
-import { readSnapshotHead } from "./snapshot";
 
 /** Chunk a string into UTF-8 byte segments of the given size. */
 function chunksOf(text: string, size: number): Uint8Array[] {
@@ -59,87 +58,9 @@ describe("readLines", () => {
   });
 });
 
-/** The GitHub API endpoint the branch-head probe calls, cache-busted. */
-const API_URL =
-  "https://api.github.com/repos/skill-one/skills-profiles/commits/dist";
-
-/** A branch-head commit as the API reports it. */
-const HEAD_COMMIT = {
-  sha: "a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0",
-  commit: { committer: { date: "2026-09-30T12:21:45Z" } },
-};
-
-/** A 200 response serving a JSON body (the API answer). */
-function jsonResponse(body: unknown): Response {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => body,
-  } as unknown as Response;
-}
-
 /** The branch index URL, as `fileCandidates` builds it (before busting). */
 const BRANCH_INDEX =
   "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills.jsonl";
-
-/** The dataset's pointer contract, as `index-stream.ts` declares it. */
-const SOURCE = { repo: "skill-one/skills-profiles", branch: "dist" };
-
-describe("readSnapshotHead", () => {
-  const fetchMock = vi.fn();
-
-  beforeEach(() => {
-    vi.stubGlobal("fetch", fetchMock);
-    fetchMock.mockReset();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("answers with the branch head's SHA and commit date, cache-busted", async () => {
-    fetchMock.mockImplementation(async () => jsonResponse(HEAD_COMMIT));
-
-    await expect(readSnapshotHead(SOURCE)).resolves.toEqual({
-      ref: HEAD_COMMIT.sha,
-      generatedAt: "2026-09-30T12:21:45Z",
-    });
-    // The head is a mutable freshness address: an edge copy answering with
-    // yesterday's commit would pin the whole download to yesterday's snapshot.
-    expect(fetchMock.mock.calls[0][0]).toMatch(`${API_URL}?t=`);
-  });
-
-  it("refuses a payload whose sha is not a commit SHA", async () => {
-    // The value is interpolated into download URLs, so anything that is not a
-    // commit SHA must not become a ref.
-    fetchMock.mockImplementation(async () =>
-      jsonResponse({ ...HEAD_COMMIT, sha: "main" }),
-    );
-    await expect(readSnapshotHead(SOURCE)).resolves.toBeNull();
-  });
-
-  it("refuses a payload without a commit date", async () => {
-    // The date is the freshness stamp the "unchanged" short-circuit compares;
-    // without it the caller cannot skip a download.
-    fetchMock.mockImplementation(async () =>
-      jsonResponse({
-        ...HEAD_COMMIT,
-        commit: { committer: { date: undefined } },
-      }),
-    );
-    await expect(readSnapshotHead(SOURCE)).resolves.toBeNull();
-  });
-
-  it("returns null on a body that is not a JSON object", async () => {
-    fetchMock.mockImplementation(async () => jsonResponse("<html>"));
-    await expect(readSnapshotHead(SOURCE)).resolves.toBeNull();
-  });
-
-  it("returns null when the API does not answer", async () => {
-    fetchMock.mockRejectedValue(new TypeError("network down"));
-    await expect(readSnapshotHead(SOURCE)).resolves.toBeNull();
-  });
-});
 
 describe("probeIndexMeta", () => {
   const fetchMock = vi.fn();
@@ -157,54 +78,72 @@ describe("probeIndexMeta", () => {
     vi.unstubAllGlobals();
   });
 
-  it("resolves the snapshot identity from the branch head, cache-busted", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      requested.push(url.split("?")[0]);
-      return jsonResponse(HEAD_COMMIT);
-    });
-
-    expect(await probeIndexMeta("")).toEqual({
-      ref: HEAD_COMMIT.sha,
-      generatedAt: "2026-09-30T12:21:45Z",
-    });
-    expect(requested).toEqual([API_URL]);
-  });
-
-  it("falls back to a branch etag identity when the API does not answer", async () => {
-    // Rate-limited or blocked egress IPs make the API unreliable, so the
-    // branch itself is consulted: a cache-busted HEAD answers with the
-    // index body's etag — a content hash, so equal etag still means equal
-    // index bytes. No SHA answers, so the body stays unpinned.
+  it("reads the etag and Last-Modified off a cache-busted HEAD", async () => {
+    // The etag is the freshness identity (equal etag, equal index bytes); the
+    // Last-Modified stamp is display garnish for the Settings read-out. The
+    // branch is a mutable address, so the probe must be busted.
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       requested.push(url.split("?")[0]);
-      if (url.startsWith(API_URL)) throw new TypeError("rate limited");
-      if (init?.method === "HEAD") {
-        return {
-          ok: true,
-          status: 200,
-          headers: new Headers({ etag: 'W/"6fbdf1-E7rN6kKBORnBBnTXbDWPNXYOrHU"' }),
-        } as unknown as Response;
-      }
-      throw new TypeError("unexpected GET");
+      if (init?.method !== "HEAD") throw new TypeError("unexpected GET");
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          etag: 'W/"6fbdf1-E7rN6kKBORnBBnTXbDWPNXYOrHU"',
+          "last-modified": "Tue, 30 Sep 2026 12:21:45 GMT",
+        }),
+      } as unknown as Response;
     });
 
     expect(await probeIndexMeta("")).toEqual({
-      generatedAt: 'W/"6fbdf1-E7rN6kKBORnBBnTXbDWPNXYOrHU"',
+      etag: 'W/"6fbdf1-E7rN6kKBORnBBnTXbDWPNXYOrHU"',
+      publishedAt: "Tue, 30 Sep 2026 12:21:45 GMT",
     });
-    // The branch index is probed through the candidate chain, cache-busted.
-    expect(requested).toEqual([API_URL, BRANCH_INDEX]);
+    expect(requested).toEqual([BRANCH_INDEX]);
   });
 
-  it("returns null when neither the API nor any etag source answers", async () => {
+  it("omits publishedAt when the source serves no Last-Modified", async () => {
+    fetchMock.mockImplementation(async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({
+        etag: '"abc"',
+      }),
+    }) as unknown as Response);
+
+    expect(await probeIndexMeta("")).toEqual({ etag: '"abc"' });
+  });
+
+  it("moves to the next candidate when one answers without an etag", async () => {
+    const cdnUrl = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@dist/skills.jsonl`;
+    fetchMock.mockImplementation(async (url: string) => {
+      requested.push(url.split("?")[0]);
+      if (url.startsWith(DEFAULT_CDN_BASE)) {
+        // A configured CDN answers, but with nothing usable as an identity.
+        return { ok: true, status: 200, headers: new Headers() } as unknown as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ etag: '"origin-etag"' }),
+      } as unknown as Response;
+    });
+
+    expect(await probeIndexMeta(DEFAULT_CDN_BASE)).toEqual({
+      etag: '"origin-etag"',
+    });
+    expect(requested).toEqual([cdnUrl, BRANCH_INDEX]);
+  });
+
+  it("returns null when no source answers", async () => {
     fetchMock.mockImplementation(async () => {
       throw new TypeError("network down");
     });
     await expect(probeIndexMeta("")).resolves.toBeNull();
   });
 
-  it("returns null on a body that is not a usable branch head and no etag", async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      if (url.startsWith(API_URL)) return jsonResponse("<html>");
+  it("returns null when every source answers without an etag", async () => {
+    fetchMock.mockImplementation(async () => {
       return { ok: false, status: 404 } as unknown as Response;
     });
     await expect(probeIndexMeta("")).resolves.toBeNull();
@@ -212,13 +151,10 @@ describe("probeIndexMeta", () => {
 });
 
 describe("readIndex", () => {
-  const SHA = HEAD_COMMIT.sha;
-  // SHA-addressed candidates: immutable, so no busting is needed.
-  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-profiles/${SHA}/skills.jsonl`;
-  const PINNED_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@${SHA}/skills.jsonl`;
-  // Branch candidates, used only when no SHA is known.
+  // Branch candidates: the only address the dataset publishes, always busted.
   const BRANCH_ORIGIN =
     "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/skills.jsonl";
+  const BRANCH_CDN = `${DEFAULT_CDN_BASE}/gh/skill-one/skills-profiles@dist/skills.jsonl`;
 
   const fetchMock = vi.fn();
 
@@ -293,7 +229,6 @@ describe("readIndex", () => {
     let restarts = 0;
     await readIndex(
       "",
-      SHA,
       Promise.resolve(new Map([["acme/tools", 3]])),
       (skill) => skills.push(skill),
       () => restarts++,
@@ -320,7 +255,6 @@ describe("readIndex", () => {
     const skills: unknown[] = [];
     await readIndex(
       "",
-      SHA,
       // null = the repos.jsonl sidecar was unreachable; never rejects.
       Promise.resolve(null),
       (skill) => skills.push(skill),
@@ -340,32 +274,11 @@ describe("readIndex", () => {
     ]);
   });
 
-  it("downloads the SHA-addressed URL untouched by a busting stamp", async () => {
-    await readIndex(
-      "",
-      SHA,
-      Promise.resolve(null),
-      () => {},
-      () => {},
-    );
+  it("busts the mutable branch URL: a stale edge copy must not pass for current", async () => {
+    await readIndex("", Promise.resolve(null), () => {}, () => {});
 
-    // The SHA makes the URL content-addressed: a cached copy is by
-    // definition the right copy, so busting it would only cost a full
-    // origin download.
-    expect(requested).toEqual([PINNED_ORIGIN]);
-  });
-
-  it("busts the mutable branch URL when no SHA is known", async () => {
-    await readIndex(
-      "",
-      undefined,
-      Promise.resolve(null),
-      () => {},
-      () => {},
-    );
-
-    // Without a pin, an edge copy could be a day old and indistinguishable
-    // from the current index — the failure SHA addressing exists to kill.
+    // Without a commit SHA to pin to, an edge copy could be a day old and
+    // indistinguishable from the current index — the bust is the only guard.
     expect(requested).toHaveLength(1);
     expect(requested[0].startsWith(`${BRANCH_ORIGIN}?t=`)).toBe(true);
   });
@@ -373,7 +286,7 @@ describe("readIndex", () => {
   it("falls back to the next source when the chosen body fails mid-download", async () => {
     fetchMock.mockImplementation(async (url: string) => {
       requested.push(url);
-      if (url === PINNED_CDN) return bodyResponse("partial", 1);
+      if (url.startsWith(DEFAULT_CDN_BASE)) return bodyResponse("partial", 1);
       return bodyResponse(MINIMAL_LINE);
     });
 
@@ -384,13 +297,14 @@ describe("readIndex", () => {
     // map is reused, not re-fetched.
     await readIndex(
       DEFAULT_CDN_BASE,
-      SHA,
       Promise.resolve(new Map([["acme/tools", 7]])),
       (skill) => skills.push(skill),
       () => restarts++,
     );
 
-    expect(requested).toEqual([PINNED_CDN, PINNED_ORIGIN]);
+    expect(requested).toHaveLength(2);
+    expect(requested[0].startsWith(`${BRANCH_CDN}?t=`)).toBe(true);
+    expect(requested[1].startsWith(`${BRANCH_ORIGIN}?t=`)).toBe(true);
     expect(restarts).toBe(2);
     expect(skills).toEqual([
       {
@@ -414,7 +328,6 @@ describe("readIndex", () => {
 
     const err = await readIndex(
       "",
-      SHA,
       Promise.resolve(null),
       () => {},
       () => {},
@@ -422,13 +335,13 @@ describe("readIndex", () => {
     expect(err).toBeInstanceOf(SourceFetchError);
     expect(err.kind).toBe("http");
     expect(err.status).toBe(404);
-    expect(requested).toEqual([PINNED_ORIGIN, PINNED_CDN]);
+    expect(requested).toHaveLength(2);
+    expect(requested[0].startsWith(BRANCH_ORIGIN)).toBe(true);
+    expect(requested[1].startsWith(BRANCH_CDN)).toBe(true);
   });
 });
 
 describe("readRepos", () => {
-  const SHA = HEAD_COMMIT.sha;
-  const PINNED_ORIGIN = `https://raw.githubusercontent.com/skill-one/skills-profiles/${SHA}/repos.jsonl`;
   const BRANCH_ORIGIN =
     "https://raw.githubusercontent.com/skill-one/skills-profiles/dist/repos.jsonl";
 
@@ -475,24 +388,13 @@ describe("readRepos", () => {
       ),
     );
 
-    await expect(readRepos("", SHA)).resolves.toEqual(
+    await expect(readRepos("")).resolves.toEqual(
       new Map([
         ["vercel-labs/skills", 32793],
         ["anthropics/skills", 30501],
       ]),
     );
-    // SHA-addressed: immutable, fetched untouched.
-    expect(fetchMock.mock.calls[0][0]).toBe(PINNED_ORIGIN);
-  });
-
-  it("busts the mutable branch URL when no SHA is known", async () => {
-    fetchMock.mockImplementation(async () =>
-      bodyResponse(JSON.stringify({ id: "a/b", stars: 1 })),
-    );
-
-    await expect(readRepos("", undefined)).resolves.toEqual(
-      new Map([["a/b", 1]]),
-    );
+    // Branch-addressed and busted, like the index body itself.
     expect(fetchMock.mock.calls[0][0].startsWith(`${BRANCH_ORIGIN}?t=`)).toBe(
       true,
     );
@@ -503,7 +405,7 @@ describe("readRepos", () => {
       return { ok: false, status: 404 } as unknown as Response;
     });
 
-    const err = await readRepos("", SHA).catch((e) => e);
+    const err = await readRepos("").catch((e) => e);
     expect(err).toBeInstanceOf(SourceFetchError);
     expect(err.kind).toBe("http");
   });

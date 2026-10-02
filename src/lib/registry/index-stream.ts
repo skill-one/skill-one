@@ -6,35 +6,40 @@ import {
   type FileSpec,
 } from "../cdn-config";
 import { MIRROR } from "../mirror";
-import {
-  readSnapshotHead,
-  type SnapshotSource,
-  type SnapshotHead,
-} from "./snapshot";
 import type { Skill } from "../../types/skill";
 import { jsonLine, parseSkillLine, type StarsFor } from "./parse";
 
 /**
- * Streaming reader for the registry snapshot: resolves which published
- * version to use, then splits the response body into JSONL lines and hands
- * every parsed skill to the caller. Runs inside the registry worker.
+ * Streaming reader for the registry snapshot: establishes which published
+ * version is current, then splits the response body into JSONL lines and
+ * hands every parsed skill to the caller. Runs inside the registry worker.
  *
- * Version resolution is branch-head-first (see `snapshot.ts`): upstream
- * publishes every snapshot to the `dist` branch and states nothing else about
- * currency — no pointer file, no per-run stats — so the branch head's commit
- * SHA is what names the version everything else is addressed through. Two
- * cache policies follow:
+ * Version resolution is etag-only: upstream publishes every snapshot to the
+ * `dist` branch and states nothing else about currency — no pointer file, no
+ * per-run stats — so the branch body's etag is the version identity. GitHub's
+ * API is deliberately never called: an anonymous API probe is rate-limited
+ * per IP and is the one request in the data layer that can be refused for
+ * reasons the app cannot control. The etag makes an equally valid freshness
+ * identity (equal etag, equal index bytes), and the `HEAD` that reads it
+ * costs only headers. Two cache policies follow:
  *
- * - The branch head is a mutable pointer, so its one small API request is
- *   always cache-busted — a stale answer defeats its purpose. The commit date
- *   it reports is the snapshot's freshness identity (equal dates mean equal
- *   bytes: a run publishes once), which drives the "unchanged" short-circuit.
- * - `skills.jsonl` and `repos.jsonl` are fetched pinned to the commit SHA, so
- *   their URLs are content-addressed and immutable: a cached copy is by
- *   definition the right bytes, and a CDN that lags behind can only serve the
- *   *same* version. Callers compare the stamp against their own cache to
- *   decide whether the multi-megabyte body needs downloading at all.
+ * - The `HEAD` probe is always cache-busted: a stale answer would pin the
+ *   whole download to yesterday's snapshot.
+ * - `skills.jsonl` and `repos.jsonl` are read off the mutable `dist` branch,
+ *   also cache-busted: without a commit SHA to pin to, a stale edge copy
+ *   could otherwise pass for the current publish.
  */
+
+/**
+ * The snapshot's freshness identity as the current source reports it: the
+ * branch body's etag (a content hash — equal etag, equal index bytes) plus
+ * the body's `Last-Modified` stamp when the source gives one (display
+ * garnish; the etag alone drives the "unchanged" short-circuit).
+ */
+export interface SnapshotHead {
+  etag: string;
+  publishedAt?: string;
+}
 
 /**
  * The dataset repo publishes the whole dataset to its `dist` branch as a
@@ -55,28 +60,13 @@ const INDEX_SPEC = {
 const REPOS_SPEC = { ...INDEX_SPEC, path: "repos.jsonl" } as const;
 
 /**
- * The dataset repo's snapshot source: the rolling `dist` branch, whose head
- * commit names the snapshot.
+ * Candidate URLs for one snapshot file: the mutable `dist` branch through the
+ * configured download source, cache-busted — with no commit SHA to pin to,
+ * only the bust keeps a lagging edge copy from passing for the current
+ * snapshot.
  */
-const INDEX_SOURCE: SnapshotSource = {
-  repo: INDEX_SPEC.repo,
-  branch: INDEX_SPEC.ref,
-};
-
-/**
- * Candidate URLs for one snapshot file, addressed by the file's own policy:
- * pinned to the snapshot's commit SHA when one is resolved — immutable, so
- * cache-safe, and a lagging CDN can only serve the same snapshot — and read
- * off the mutable branch cache-busted when none is, since a stale copy there
- * would pass for the current publish.
- */
-function snapshotUrls(
-  spec: FileSpec,
-  cdnBase: string,
-  ref?: string,
-): string[] {
-  const urls = fileCandidates({ ...spec, ref: ref ?? spec.ref }, cdnBase);
-  return ref ? urls : urls.map(cacheBusted);
+function snapshotUrls(spec: FileSpec, cdnBase: string): string[] {
+  return fileCandidates(spec, cdnBase).map(cacheBusted);
 }
 
 /**
@@ -139,40 +129,30 @@ export async function readLines(
 }
 
 /**
- * Probe the currently published snapshot, resolving its identity in two
- * stages. Primary: the repo's `dist` branch head via one small GitHub API
- * request, which answers with the commit SHA (the immutable ref the body is
- * fetched at) and the commit date (the publication stamp). Degraded: when
- * the API does not answer — rate-limited or blocked egress IPs are common —
- * a cache-busted `HEAD` on the branch's `skills.jsonl` answers with its
- * etag, a content hash that makes an equally valid freshness identity (equal
- * etag, equal index bytes). The body is then not pinned, but the "unchanged"
- * short-circuit still works.
+ * Probe the currently published snapshot: `HEAD` the branch's index body
+ * (cache-busted) through the candidate chain and read its etag — a content
+ * hash that makes a valid freshness identity (equal etag, equal index bytes).
+ * The body's `Last-Modified` stamp rides along when the source gives one, so
+ * Settings can still say when the snapshot was published.
  *
- * Returns null when neither stage answered, which leaves the caller to fall
- * back to the mutable branch ref: the version stays unpinned and undatable,
- * so the next boot re-downloads once.
+ * `HEAD` transfers no body, so probing the multi-megabyte file costs only
+ * headers. Returns null when no source answers, which leaves the version
+ * undatable — the next boot re-downloads once.
  */
 export async function probeIndexMeta(
   cdnBase: string,
 ): Promise<SnapshotHead | null> {
-  const head = await readSnapshotHead(INDEX_SOURCE).catch(() => null);
-  if (head) return head;
-  return probeBranchEtag(cdnBase);
-}
-
-/**
- * Degraded identity probe: `HEAD` the branch body (cache-busted) through the
- * candidate chain and read its etag. `HEAD` transfers no body, so probing
- * the multi-megabyte file costs only headers.
- */
-async function probeBranchEtag(cdnBase: string): Promise<SnapshotHead | null> {
   for (const url of snapshotUrls(INDEX_SPEC, cdnBase)) {
     try {
       const resp = await fetch(url, { method: "HEAD", signal: fetchSignal() });
       if (!resp.ok) continue;
       const etag = resp.headers.get("etag");
-      if (etag) return { generatedAt: etag };
+      if (etag) {
+        return {
+          etag,
+          publishedAt: resp.headers.get("last-modified") ?? undefined,
+        };
+      }
     } catch {
       // Unreachable or timed out: give the next source a turn.
     }
@@ -182,23 +162,18 @@ async function probeBranchEtag(cdnBase: string): Promise<SnapshotHead | null> {
 
 /**
  * Repo → GitHub-star lookup over the snapshot's `repos.jsonl` sidecar, keyed
- * by the row's `id` (`{owner}/{repo}`). Follows the same addressing rules as
- * the index body: pinned to the snapshot SHA when one is known (immutable,
- * cache-safe), fetched off the mutable `dist` branch cache-busted otherwise.
- * Rows whose `stars` is null (a repo gone from GitHub) are dropped, so
- * lookups normalize to 0.
+ * by the row's `id` (`{owner}/{repo}`). Read off the mutable `dist` branch,
+ * cache-busted like the index body. Rows whose `stars` is null (a repo gone
+ * from GitHub) are dropped, so lookups normalize to 0.
  *
  * Like the old run stats, this is garnish, not the dataset: the caller turns
  * a fetch failure into "no join", which leaves every skill with 0 stars
  * rather than failing the download.
  */
-export async function readRepos(
-  cdnBase: string,
-  ref?: string,
-): Promise<Map<string, number>> {
+export async function readRepos(cdnBase: string): Promise<Map<string, number>> {
   const stars = new Map<string, number>();
   await fetchFirstStreamInOrder(
-    snapshotUrls(REPOS_SPEC, cdnBase, ref),
+    snapshotUrls(REPOS_SPEC, cdnBase),
     async (body) => {
       stars.clear();
       await readLines(body, (line) => {
@@ -218,11 +193,8 @@ export async function readRepos(
 
 /**
  * Stream the index from the freshest source, handing every parsed skill to
- * `onLine`. `ref` pins the download to an immutable snapshot (see
- * `probeIndexMeta`); without one the mutable `dist` branch is used, and only
- * that fallback path is cache-busted — otherwise a stale edge copy could be
- * mistaken for the current index, which is exactly the failure the SHA pin
- * exists to remove.
+ * `onLine`. The mutable `dist` branch is the only address — cache-busted, so
+ * a stale edge copy can never be mistaken for the current index.
  *
  * `stars` is the in-flight `repos.jsonl` fetch started by the caller so its
  * latency hides inside the multi-megabyte body download; it is awaited once
@@ -235,13 +207,12 @@ export async function readRepos(
  */
 export async function readIndex(
   cdnBase: string,
-  ref: string | undefined,
   stars: Promise<Map<string, number> | null>,
   onLine: (skill: Skill) => void,
   onRestart: () => void,
 ): Promise<void> {
   await fetchFirstStreamInOrder(
-    snapshotUrls(INDEX_SPEC, cdnBase, ref),
+    snapshotUrls(INDEX_SPEC, cdnBase),
     async (body) => {
       onRestart();
       // The sidecar fetch runs concurrently with the body; by the time a
