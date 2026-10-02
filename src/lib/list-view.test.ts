@@ -6,6 +6,7 @@ import {
   setQuery,
   setScope,
   setSort,
+  setUnit,
   subscribeListView,
 } from "./list-view";
 
@@ -73,11 +74,29 @@ describe("list view", () => {
     ).toBeNull();
   });
 
-  it("keeps each list's sort to itself", () => {
-    setSort("store", "repo");
+  it("keeps each list's shape to itself", () => {
+    setUnit("store", "repo");
 
-    expect(getListView().views.store.sort).toBe("repo");
-    expect(getListView().views.installed).not.toHaveProperty("sort");
+    expect(getListView().views.store.unit).toBe("repo");
+    expect(getListView().views.installed).not.toHaveProperty("unit");
+  });
+
+  it("reads the shape as its own answer, default excluded", () => {
+    expect(getListView().views.installed).not.toHaveProperty("unit");
+
+    setUnit("installed", "repo");
+    expect(getListView().views.installed.unit).toBe("repo");
+    expect(window.localStorage.getItem("skill-one.listUnit.installed")).toBe(
+      "repo",
+    );
+
+    // A card is a choice about the screen, not a ranking, so it is written
+    // under its own key and the default shape leaves none behind.
+    setUnit("installed", "skill");
+    expect(getListView().views.installed).not.toHaveProperty("unit");
+    expect(
+      window.localStorage.getItem("skill-one.listUnit.installed"),
+    ).toBeNull();
   });
 
   it("refuses a sort the list does not answer in", () => {
@@ -85,6 +104,14 @@ describe("list view", () => {
     // its own to read by — so only a hand-built call could ask for one.
     setSort("store", "installed");
     expect(getListView().views.store).toEqual({});
+  });
+
+  it("refuses the shape the sort used to carry", () => {
+    // "按仓库" was never an order: it said how many rows, not which came first.
+    // A caller reaching for it as a sort gets nothing rather than a silent
+    // change of shape.
+    setSort("installed", "repo" as never);
+    expect(getListView().views.installed).toEqual({});
   });
 
   it("starts from a stored sort, ignoring one the list cannot answer", async () => {
@@ -96,17 +123,21 @@ describe("list view", () => {
     expect(stored().views.store).not.toHaveProperty("sort");
   });
 
-  it("reads either list's old unit choice as its repository sort", async () => {
-    // A reader who had a list in repository cards keeps that reading under the
-    // merged control's repository sort — the installed list migrated when its
-    // sort arrived, the store when its own switch merged too.
+  it("reads a stored shape from either era of the control", async () => {
+    // The shape key is written again, so a reader who had a list in repository
+    // cards reads that back as the shape…
     window.localStorage.setItem("skill-one.listUnit.installed", "repo");
-    const { getListView: installedMigrated } = await freshListView();
-    expect(installedMigrated().views.installed.sort).toBe("repo");
+    const { getListView: fromUnitKey } = await freshListView();
+    expect(fromUnitKey().views.installed.unit).toBe("repo");
+    expect(fromUnitKey().views.installed).not.toHaveProperty("sort");
 
-    window.localStorage.setItem("skill-one.listUnit.store", "repo");
-    const { getListView: storeMigrated } = await freshListView();
-    expect(storeMigrated().views.store.sort).toBe("repo");
+    // …and so does one who read the shape as the merged control's repository
+    // sort, which is where that era of the key left it.
+    window.localStorage.removeItem("skill-one.listUnit.installed");
+    window.localStorage.setItem("skill-one.listSort.store", "repo");
+    const { getListView: fromMergedSort } = await freshListView();
+    expect(fromMergedSort().views.store.unit).toBe("repo");
+    expect(fromMergedSort().views.store).not.toHaveProperty("sort");
   });
 
   it("keeps the sort through a scope change, then forgets it on reset", () => {
@@ -130,7 +161,7 @@ describe("list view", () => {
     setQuery("pdf");
     expect(listener).toHaveBeenCalledTimes(1);
 
-    setSort("store", "repo");
+    setUnit("store", "repo");
     expect(listener).toHaveBeenCalledTimes(2);
 
     setScope("store", "development");
@@ -149,7 +180,7 @@ describe("list view", () => {
   it("leaves the list that did not change referentially stable", () => {
     const before = getListView().views.installed;
 
-    setSort("store", "repo");
+    setUnit("store", "repo");
     setScope("store", "development");
     setQuery("pdf");
 

@@ -10,7 +10,6 @@ import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useInstalledSearchRows } from "../../hooks/use-installed-search";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import { LIST_SORTS } from "../../lib/list-view";
-import type { ListUnit } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
 import {
   REPO_CARD_SKELETON_CLASS,
@@ -91,12 +90,15 @@ export function ExplorePage() {
 
   // What the reader is looking for, how the list reads, and which domain they
   // scoped the browse to: all three are shared with the installed list, so they
-  // are read from the shared view rather than held here. The sort *is* the
-  // reading here, as on the installed list: the repository shape is its second
-  // option, so the unit the rest of the page renders by is derived, not stored.
+  // are read from the shared view rather than held here. The shape and the order
+  // are two answers again — the store's list is one of skill rows or of
+  // repository cards, read in the one order a list of skills can be read in.
   const search = useListQuery();
-  const { scope, sort = "popularity" } = useDestinationView("store");
-  const unit: ListUnit = sort === "repo" ? "repo" : "skill";
+  const {
+    scope,
+    sort = "popularity",
+    unit = "skill",
+  } = useDestinationView("store");
   // The filter is a browse control: a search re-orders the whole registry by
   // relevance, so it ignores the filter (and the filter bar locks).
   const selectedDomain = scope ?? null;
@@ -108,7 +110,7 @@ export function ExplorePage() {
   // The depth below is remembered against it: the controls can re-answer the
   // list without the page ever being unmounted, and a depth revealed for one
   // answer is not a place the reader is at under another.
-  const signature = `${query}\u0000${sort}\u0000${selectedDomain ?? "all"}`;
+  const signature = `${query}\u0000${unit}\u0000${sort}\u0000${selectedDomain ?? "all"}`;
 
   // How deep the list had been revealed, remembered per history entry: a
   // drill-down — into a repository's page and back — unmounts this page, and

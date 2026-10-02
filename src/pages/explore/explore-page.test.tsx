@@ -19,7 +19,7 @@ import {
   fetchSkillZhDetail,
 } from "../../lib/skill-detail-api";
 import { searchSkillsSh } from "../../lib/skills-sh";
-import { setSort } from "../../lib/list-view";
+import { setUnit } from "../../lib/list-view";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
@@ -226,19 +226,15 @@ const repoCards = (scope: ParentNode = document.body) =>
   scope.querySelectorAll('[data-slot="card"][data-repo]');
 
 /**
- * Picks a sort from the merged control — the only way the store list now
- * changes shape or order. `label` names the menu item: 热度 (the default:
- * skill rows, most-installed first) or 按仓库 (repository cards, led by the
- * registry's own ranking).
+ * Picks the shape the store list is read in: 列表 (one row per skill) or 卡片
+ * (one card per repository). The pair stands on the row itself, so this is one
+ * press on a named toggle and no popup to open.
  */
-async function pickSort(
+async function pickUnit(
   user: ReturnType<typeof userEvent.setup>,
-  label: string,
+  shape: "列表" | "卡片",
 ) {
-  await user.click(
-    await screen.findByRole("button", { name: "排序方式" }),
-  );
-  await user.click(await screen.findByRole("menuitemradio", { name: label }));
+  await user.click(screen.getByRole("button", { name: shape }));
 }
 
 /**
@@ -286,10 +282,10 @@ beforeEach(() => {
   // null and the English body leads.
   vi.mocked(fetchSkillZhDetail).mockReset();
   vi.mocked(fetchSkillZhDetail).mockResolvedValue(null);
-  // The app's default sort is the popularity rows, but most tests here read
+  // The app's default reading is the popularity rows, but most tests here read
   // the store list as repository cards — the reading they were written
-  // against; the ones that want the other reading pick the sort themselves.
-  setSort("store", "repo");
+  // against; the ones that want the other reading pick the shape themselves.
+  setUnit("store", "repo");
   mockFetchSkillDetail.mockImplementation(
     async (_repo: string, id: string) => ({
       description: `Description of ${id}.`,
@@ -332,7 +328,7 @@ describe("ExplorePage", () => {
     expect(harness.downloads).toBe(1);
   });
 
-  it("answers the sort select with the two orders its rows can state", async () => {
+  it("answers the shape switch with the two arrangements, and orders only by popularity", async () => {
     const user = userEvent.setup();
     harness.reset();
     harness.init();
@@ -356,43 +352,31 @@ describe("ExplorePage", () => {
     ]);
     harness.complete();
     const { unmount } = renderExplorePage();
-    // The beforeEach pick has the list in repository cards; the select reads it
-    // back into rows. The store's own orders carry only the two its rows
-    // display — the install clock is the installed list's answer, not this
-    // list's.
-    await user.click(
-      await screen.findByRole("button", { name: "排序方式" }),
-    );
-    const items = await screen.findAllByRole("menuitemradio");
-    expect(items.map((item) => item.textContent)).toEqual([
-      "热度",
-      "按仓库",
-    ]);
-    await user.click(screen.getByRole("menuitemradio", { name: "热度" }));
+    // The store's only order is the figure its own rows display, so it has no
+    // order control to press — what it has instead is the shape, and both of its
+    // arrangements stand on the row.
+    expect(
+      screen.queryByRole("button", { name: "排序方式" }),
+    ).not.toBeInTheDocument();
+
+    await pickUnit(user, "列表");
     await screen.findByText("few");
-    // Picking 热度 shapes the list as skill rows and orders it — the one
-    // control answers both questions, exactly the merge the installed list
-    // made. It is the default pick, so the trigger states it.
-    expect(screen.getByRole("button", { name: "排序方式" })).toHaveTextContent(
-      "热度",
-    );
+    // 列表 is one row per skill, most installed first — the figure each row
+    // shows, so the order and the numbers beside it cannot disagree.
     await waitFor(() => expect(cardOrder()).toEqual(["few", "star"]));
-    // The popup's exit never settles under jsdom, so the second pick mounts
-    // the page again rather than reopening a closing popup — and the pick
-    // survives the remount, because the choice lives in the shared view.
+    // The choice lives in the shared view, so it survives the page going away.
     unmount();
     renderExplorePage();
-    await user.click(
-      await screen.findByRole("button", { name: "排序方式" }),
-    );
-    await user.click(
-      await screen.findByRole("menuitemradio", { name: "按仓库" }),
+    expect(screen.getByRole("button", { name: "列表" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
 
-    // 按仓库 is the repository reading: one card per repository, led by the
-    // most-starred one — however few installs its skills claim.
+    await pickUnit(user, "卡片");
+    // 卡片 is one card per repository, led by the most-starred one — however
+    // few installs its skills claim.
     await waitFor(() => expect(cardOrder()).toEqual(["star", "few"]));
-    expect(repoCards().length).toBe(2);
+    expect(repoCards()).toHaveLength(2);
   });
 
   it("caps a repository's rows at the folded limit and reveals the rest in place", async () => {
@@ -597,7 +581,7 @@ describe("ExplorePage", () => {
     expect(orphanCardRow).toHaveTextContent("❓");
 
     // … and so do the skill unit's rows, which share the resolver.
-    await pickSort(user, "热度");
+    await pickUnit(user, "列表");
     const strayRow = await screen.findByRole("button", {
       name: "查看 stray 详情",
     });
@@ -650,7 +634,7 @@ describe("ExplorePage", () => {
 
     // The repository unit leads with one card per repository...
     await screen.findByText("o/one");
-    await pickSort(user, "热度");
+    await pickUnit(user, "列表");
 
     // ...and the skill unit with one row per skill, most installed first.
     // A source's several skills each keep their own row.
@@ -709,7 +693,7 @@ describe("ExplorePage", () => {
     harness.complete();
     renderExplorePage();
 
-    await pickSort(user, "热度");
+    await pickUnit(user, "列表");
     await waitFor(() =>
       expect(cardOrder()).toEqual(["r1", "r2", "r3", "r4", "z1"]),
     );
@@ -764,7 +748,7 @@ describe("ExplorePage", () => {
     harness.complete();
     renderExplorePage();
 
-    await pickSort(user, "热度");
+    await pickUnit(user, "列表");
     await waitFor(() =>
       expect(cardOrder()).toEqual(["alpha", "beta", "gamma", "delta"]),
     );
@@ -788,7 +772,7 @@ describe("ExplorePage", () => {
     bootGadgetRegistry();
     renderExplorePage();
 
-    await pickSort(user, "热度");
+    await pickUnit(user, "列表");
     await user.type(await searchField(), "gadget");
 
     // The match comes back as a skill row rather than a repository card.
@@ -1220,7 +1204,7 @@ describe("ExplorePage", () => {
     // The skill unit's live row is the same full-width row the local list
     // uses (the repository unit renders live hits as repository-card rows,
     // which never draw a per-skill figure).
-    await pickSort(user, "热度");
+    await pickUnit(user, "列表");
     await user.type(await searchField(), "gadget");
     await screen.findByText("sprocket");
 
@@ -1255,7 +1239,7 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("gadget-master");
 
-    await pickSort(user, "热度");
+    await pickUnit(user, "列表");
     await user.type(await searchField(), "gadget");
 
     const section = await screen.findByRole("region", {

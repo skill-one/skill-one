@@ -28,7 +28,6 @@ import { Placeholder } from "../../components/placeholder";
 import { errorMessage } from "../../lib/utils";
 import { buildSearchIndex } from "../../lib/search-index";
 import { setQuery } from "../../lib/list-view";
-import type { ListUnit } from "../../lib/list-view";
 import { popularity } from "../../lib/popularity";
 import { estimateTokens } from "../../lib/token-estimate";
 import type { SkillMatched } from "../../components/skill-card";
@@ -205,14 +204,13 @@ export function InstalledPage() {
   // What the reader is looking for, how the list reads, and which
   // classification they scoped it to: all three are shared with the store's
   // list (see `lib/list-view`), so they are read from the shared view rather
-  // than held here. The full installed list is already in memory, so everything
-  // below filters on the main thread.
+  // than held here. The shape and the order are two answers again: the list is
+  // one of skill rows or of repository cards, and each reads in its own orders.
+  // The full installed list is already in memory, so everything below filters on
+  // the main thread.
   const search = useListQuery();
-  const { scope, sort = "popularity" } = useDestinationView("installed");
-  // The sort *is* the reading here: the repository shape is its third option,
-  // so the unit the rest of the page renders by is derived, not stored — the
-  // old unit switch's two answers now live inside the one control.
-  const unit: ListUnit = sort === "repo" ? "repo" : "skill";
+  const { scope, sort = "popularity", unit = "skill" } =
+    useDestinationView("installed");
   const domain = scope ?? null;
   // Open skill in the shared detail drawer, tracked by identity rather than by
   // index: the provenance and store-entry queries land asynchronously and
@@ -391,11 +389,8 @@ export function InstalledPage() {
   // The repository shape's flat order — the sort's own answer over cards:
   // by their repository's stars (the 按仓库 option; the figure-less pool and
   // unlisted sources sink, and cards the stars cannot separate keep the
-  // newest-install order), by the popularity blend of the installs and stars
-  // their skills add up to, or by their *newest* install — a card near the top
-  // has something new in it. Scoped to the chosen domain by membership, since
-  // a card rides every domain its rows belong to. Cards whose installs all
-  // lack a birth time settle last in the time order.
+  // newest-install order). Scoped to the chosen domain by membership, since a
+  // card rides every domain its rows belong to.
   const activeCards = useMemo<RepoGroup[]>(() => {
     if (unit !== "repo" || isSearching) return [];
     const scoped =
@@ -404,33 +399,20 @@ export function InstalledPage() {
         : cards.filter((card) =>
             card.items.some((row) => domainsOf(row.skill).includes(domain)),
           );
+    // Cards are led by the repository's own stars, and that is the whole of
+    // their order: a card is a repository, so the figure it answers in is the
+    // repository's. The three orders the row shape offers say nothing about it —
+    // which is why the order control is gone in this shape (see `ListToolbar`),
+    // and why an installed-clock or token pick could never have reordered these
+    // cards whatever the control said.
     const byNewestInstall = compareByInstalledTime<RepoGroup>(
       (card) => newestInstallTime(card.items, (row) => row.skill.installedAt),
       (a, b) => a.repo.localeCompare(b.repo),
     );
     return scoped.toSorted(
-      sort === "repo"
-        ? compareByStars((card) => starsOf(card), byNewestInstall)
-        : sort === "installed"
-          ? byNewestInstall
-          : compareByPopularity(
-              (card) =>
-                popularity({
-                  downloads: card.items.reduce(
-                    (sum, row) => sum + row.skill.downloads,
-                    0,
-                  ),
-                  stars: card.items.reduce(
-                    (sum, row) => sum + row.skill.stars,
-                    0,
-                  ),
-                }),
-              (card) =>
-                newestInstallTime(card.items, (row) => row.skill.installedAt),
-              (a, b) => a.repo.localeCompare(b.repo),
-            ),
+      compareByStars((card) => starsOf(card), byNewestInstall),
     );
-  }, [unit, isSearching, cards, domain, sort]);
+  }, [unit, isSearching, cards, domain]);
 
   // The registry's own grouping — every skill it lists, per repository — so
   // each card can also name the repository's skills this machine does not

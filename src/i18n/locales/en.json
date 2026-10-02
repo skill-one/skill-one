@@ -13,6 +13,7 @@
     "searchSkills": "Search skills",
     "indexBuilding": "Building index…",
     "listSort": "Sort by",
+    "listLayout": "List layout",
     "back": "Back",
     "viewDetailAria": "View {{name}} details",
     "expand": "Expand",
@@ -34,8 +35,11 @@
   "sort": {
     "byPopularity": "Popularity",
     "byInstalled": "Install time",
-    "byTokens": "Token usage",
-    "byRepo": "By repository"
+    "byTokens": "Token usage"
+  },
+  "unit": {
+    "list": "List",
+    "cards": "Cards"
   },
   "action": {
     "install": "Install",

@@ -18,17 +18,22 @@ const SORT_LABELS: { sort: ListSort; labelKey: ParseKeys }[] = [
   { sort: "popularity", labelKey: "sort.byPopularity" },
   { sort: "installed", labelKey: "sort.byInstalled" },
   { sort: "tokens", labelKey: "sort.byTokens" },
-  { sort: "repo", labelKey: "sort.byRepo" },
 ];
 
 /**
- * The sort switch of a list that answers in more than one order — both lists,
- * today. A labelled menu rather than a row of segmented controls: the orders
- * are *facts* the list is read through (whose figure, whose clock, whose
- * shape), not toggles, so they name themselves in words and stay out of the
- * row until opened. The repository option carries the shape the old unit
- * switch picked — repository cards — so one control now answers both "what
- * does the screen look like" and "what order does it read in".
+ * The sort switch of a list that answers in more than one order — the installed
+ * list today. A labelled menu rather than a row of segmented controls: the
+ * orders are *facts* the list is read through (whose figure, whose clock, whose
+ * cost), not toggles, so they name themselves in words and stay out of the row
+ * until opened.
+ *
+ * Only ever about the order. The shape the list is read in — repository cards
+ * or skill rows — used to ride along here as a "按仓库" option, which made this
+ * one value carry two answers: it persisted a shape as though it were a ranking,
+ * and a list whose only order is the figure its own rows display (the store)
+ * carried a menu of one for it. The shape is the reader's other decision and
+ * has its own switch (`ListUnitToggle`), which shows both answers side by side
+ * instead of hiding one behind a popup.
  *
  * The trigger states the order on screen — the one thing the reader must
  * always be able to see — and the menu marks the current pick, the same
@@ -50,9 +55,10 @@ export function ListSortSelect({
   /** Called with the order the reader picked; never with the current one. */
   onChange: (sort: ListSort) => void;
   /**
-   * The orders this list answers in, menu order included. Absent is every
-   * order — the installed list's menu; the store offers the subset its rows
-   * can state (see `LIST_SORTS` in `lib/list-view`).
+   * The orders this list answers in, list order included. Absent is every
+   * order — the installed list's menu; the store offers the subset its rows can
+   * state (see `LIST_SORTS` in `lib/list-view`), which is one order, and the row
+   * hosting it then shows no switch at all rather than a menu of one.
    */
   sorts?: readonly ListSort[];
   /**

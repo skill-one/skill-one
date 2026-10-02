@@ -129,7 +129,7 @@ describe("ListToolbar", () => {
     expect(screen.getByRole("button", { name: "排序方式" })).toBeEnabled();
   });
 
-  it("holds the scope and the order in the shared view, not in the row", async () => {
+  it("holds the scope, the shape and the order in the shared view, not in the row", async () => {
     const user = userEvent.setup();
     renderRow();
 
@@ -137,36 +137,107 @@ describe("ListToolbar", () => {
     await user.click(
       await screen.findByRole("menuitemradio", { name: /^开发编程/ }),
     );
-    await user.click(screen.getByRole("button", { name: "排序方式" }));
-    await user.click(
-      await screen.findByRole("menuitemradio", { name: "按仓库" }),
-    );
+    await user.click(screen.getByRole("button", { name: "卡片" }));
 
-    // A list the reader left and came back to is still scoped and sorted as they
+    // A list the reader left and came back to is still scoped and shaped as they
     // left it, because the state outlives the page that set it.
     expect(getListView().views.installed).toEqual({
-      sort: "repo",
       scope: "development",
+      unit: "repo",
     });
   });
 
-  it("keeps each list's own scope and order to itself", async () => {
+  it("shows both arrangements on the row, and never in a menu", () => {
+    renderRow();
+
+    // The shape is the one answer with two values and nothing to name, so both
+    // of them stand there: no press to discover which one is on, and no popup
+    // between the reader and the arrangement they want.
+    for (const name of ["列表", "卡片"]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("button", { name: "列表" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "卡片" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByRole("group", { name: "列表布局" })).toBeInTheDocument();
+  });
+
+  it("reads the shape as its own answer, and keeps the order beside it", async () => {
+    const user = userEvent.setup();
+    renderRow();
+
+    await user.click(screen.getByRole("button", { name: "列表" }));
+    await user.click(screen.getByRole("button", { name: "排序方式" }));
+    await user.click(
+      await screen.findByRole("menuitemradio", { name: "安装时间" }),
+    );
+    await user.click(screen.getByRole("button", { name: "卡片" }));
+    await user.click(screen.getByRole("button", { name: "列表" }));
+
+    // Two answers, two values: the shape is where the reader left it and so is
+    // the order, because neither one was standing in for the other.
+    expect(getListView().views.installed).toEqual({ sort: "installed" });
+  });
+
+  it("has no order control for a list that answers in one order", () => {
+    renderRow({ destination: "store", sorts: ["popularity"] });
+
+    // The store's rows display the figure they are ordered by, so a menu of one
+    // would be a control that costs a press to say what the rows already say.
+    expect(
+      screen.queryByRole("button", { name: "排序方式" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "卡片" })).toBeInTheDocument();
+  });
+
+  it("takes the order control away in the card shape, and gives it back", async () => {
+    const user = userEvent.setup();
+    renderRow();
+
+    await user.click(screen.getByRole("button", { name: "卡片" }));
+
+    // A card is a repository led by its own stars; an install clock and a token
+    // cost are figures the rows carry and the card does not, so the control
+    // leaves rather than promise a pick that changes nothing.
+    expect(
+      screen.queryByRole("button", { name: "排序方式" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "列表" }));
+
+    expect(screen.getByRole("button", { name: "排序方式" })).toBeInTheDocument();
+  });
+
+  it("keeps the shape live while a search is live, unlike the scope", () => {
+    renderRow({ searching: true });
+
+    // A search answers in sections and those sections are read in the shape the
+    // reader chose, so that choice is honoured while a query is live — and the
+    // switch that carries it stays open.
+    expect(screen.getByRole("button", { name: "分类" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "排序方式" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "卡片" })).toBeEnabled();
+  });
+
+  it("keeps each list's own scope, shape and order to itself", async () => {
     const user = userEvent.setup();
     const { unmount } = renderRow();
 
-    await user.click(screen.getByRole("button", { name: "排序方式" }));
-    await user.click(
-      await screen.findByRole("menuitemradio", { name: "按仓库" }),
-    );
+    await user.click(screen.getByRole("button", { name: "卡片" }));
     unmount();
-    renderRow({ destination: "store", sorts: ["popularity", "repo"] });
+    renderRow({ destination: "store", sorts: ["popularity"] });
 
-    // The store never took the installed list's pick, and its own menu offers
-    // only the orders its rows can state — the default, in the state the rows
-    // display.
+    // The store never took the installed list's shape, and it has no order
+    // control of its own to show.
     expect(getListView().views.store).toEqual({});
-    expect(screen.getByRole("button", { name: "排序方式" })).toHaveTextContent(
-      "热度",
+    expect(screen.getByRole("button", { name: "列表" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
   });
 
@@ -189,7 +260,7 @@ describe("ListToolbar", () => {
 
   it("locks the store's field until the index over the registry is ready", () => {
     registrySnapshot.ready = false;
-    renderRow({ destination: "store", sorts: ["popularity", "repo"] });
+    renderRow({ destination: "store", sorts: ["popularity"] });
 
     // A query must never be answered over a partially downloaded registry, and
     // the field says why it is closed instead of sitting there mute.

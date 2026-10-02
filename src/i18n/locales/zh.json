@@ -13,6 +13,7 @@
     "searchSkills": "搜索 Skill",
     "indexBuilding": "索引构建中…",
     "listSort": "排序方式",
+    "listLayout": "列表布局",
     "back": "返回",
     "viewDetailAria": "查看 {{name}} 详情",
     "expand": "展开",
@@ -34,8 +35,11 @@
   "sort": {
     "byPopularity": "热度",
     "byInstalled": "安装时间",
-    "byTokens": "Token 占用",
-    "byRepo": "按仓库"
+    "byTokens": "Token 占用"
+  },
+  "unit": {
+    "list": "列表",
+    "cards": "卡片"
   },
   "action": {
     "install": "安装",

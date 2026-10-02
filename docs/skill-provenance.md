@@ -117,8 +117,8 @@ came from X" needs to see the record the app is not acting on too.
   source falls back to name-only). A same-named skill from a different repo
   stays installable.
 - **Installed page** (`installed-page.tsx`): the page lists the same installs in
-  either sort — the repository cards (按仓库) and the skill rows (按热度 or
-  按安装时间) — and every shape presents a skill identically, so a skill reads
+  either shape — the repository cards (卡片) and the skill rows (列表, read by
+  热度 or 按安装时间) — and every shape presents a skill identically, so a skill reads
   the same wherever it is listed. A row
   with a ledger entry carries
   the owner's GitHub avatar (the author chip on the card's metadata rail, whose
