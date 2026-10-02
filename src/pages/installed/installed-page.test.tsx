@@ -1386,6 +1386,33 @@ describe("InstalledPage", () => {
     ).toBeNull();
   });
 
+  it("shows each row's install stamp under the time sort, the blend under popularity", { timeout: 15000 }, async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("pdf");
+
+    await pickSort(user, "安装时间");
+
+    // The figure a row states is the one the list is ordered by: every
+    // install carries its stamp (a local fact — no store entry needed), so
+    // the slots read as ages, newest first — pdf landed today ("刚刚").
+    await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
+    const stamps = screen.getAllByLabelText(/^安装于 /);
+    expect(stamps.length).toBeGreaterThanOrEqual(5);
+    expect(stamps[0]).toHaveTextContent("刚刚");
+    expect(stamps[1]).toHaveTextContent("3天前");
+
+    // Picking 热度 re-answers the list and its slots together: the stamps
+    // leave with the ordering they belonged to. (No store entry resolves
+    // here, so the rows state no blend either — an absent fact, not a zero.)
+    // The switch goes through the same `setSort` call the menu item's change
+    // makes — jsdom never runs the menu's closing animation, so its content
+    // stays mounted and a second open/close cycle cannot be clicked through.
+    setSort("installed", "popularity");
+    await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
+    expect(screen.queryByLabelText(/^安装于 /)).toBeNull();
+  });
+
   it("orders one source's several installs by time instead of folding them", async () => {
     const user = userEvent.setup();
     // Four installs share one source the registry still lists: where the old

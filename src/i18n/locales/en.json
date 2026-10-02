@@ -11,6 +11,7 @@
     "noDescription": "No description",
     "coverAria": "{{name}} cover",
     "popularityAria": "Popularity {{blended}}: {{installed}} installs · {{starred}} stars",
+    "installedTimeAria": "Installed {{relative}}, on {{exact}}",
     "searchSkills": "Search skills",
     "indexBuilding": "Building index…",
     "listSort": "Sort by",

@@ -155,7 +155,9 @@ function compareByStars<T>(
  *   with its bar stating 本地安装 in place of a repository it would have to
  *   make up, and opening the page that lists the pool whole.
  * - **按安装时间**: one row per install — the installs' own clock, newest
- *   first, so "what did I add lately" reads top to bottom. Nothing caps the
+ *   first, so "what did I add lately" reads top to bottom. Each row states
+ *   its own stamp where the default sort prints the blend, so the figure a
+ *   row shows is always the one the list is ordered by. Nothing caps the
  *   skill rows: that shape is the whole list.
  *
  * A search re-answers any of the three in relevance order. What the page adds
@@ -584,9 +586,11 @@ export function InstalledPage() {
               }
             />
           ) : unit === "skill" ? (
-            // The skill unit: one row per install, newest first. The same row
-            // a repository's own page lists, so a skill reads the same
-            // wherever it is found.
+            // The skill unit: one row per install, in the sort's own order.
+            // The same row a repository's own page lists, so a skill reads the
+            // same wherever it is found — and the figure each row states is
+            // the one this list answers in: the install's own clock under the
+            // 按安装时间 sort, the popularity blend otherwise.
             <ul className={SKILL_ROW_LIST_CLASS}>
               {shownRows.map((row) => {
                 const key = skillKey(row.skill);
@@ -601,6 +605,7 @@ export function InstalledPage() {
                     // it cannot place at all would leave the podium on
                     // alphabetical order. The numbers merely count.
                     ranked={false}
+                    fact={sort === "installed" ? "installedAt" : "popularity"}
                     selected={key === selected}
                     muted={!row.enabled}
                     extra={rowExtra(row, "label")}

@@ -11,6 +11,7 @@
     "noDescription": "暂无描述",
     "coverAria": "{{name}} 封面图",
     "popularityAria": "热度 {{blended}}：安装 {{installed}} · Star {{starred}}",
+    "installedTimeAria": "安装于 {{relative}}（{{exact}}）",
     "searchSkills": "搜索 Skill",
     "indexBuilding": "索引构建中…",
     "listSort": "排序方式",
