@@ -105,6 +105,30 @@ async function pickSort(
   await user.click(await screen.findByRole("menuitemradio", { name: label }));
 }
 
+/**
+ * Picks a domain scope from the 分类 picker. `label` names the menu item —
+ * 全部 or a domain's display label. The menu closes on the pick, so each
+ * scope change reopens it.
+ */
+async function pickDomain(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string | RegExp,
+) {
+  // The list renders its bar only once rows exist, so the trigger is waited
+  // for rather than read off the first render.
+  await user.click(await screen.findByRole("button", { name: "分类" }));
+  await user.click(await screen.findByRole("menuitemradio", { name: label }));
+}
+
+/**
+ * Opens the 分类 picker without picking, to read its menu of scopes; the
+ * menu mounts asynchronously, so the caller's queries can be synchronous.
+ */
+async function openDomainMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: "分类" }));
+  await screen.findByRole("menuitemradio", { name: /^全部/ });
+}
+
 describe("InstalledPage", () => {
   afterEach(() => {
     resetMockInstalledSkills();
@@ -116,16 +140,21 @@ describe("InstalledPage", () => {
   });
 
   it("gives every source-less install a home in one repository-style card", async () => {
+    const user = userEvent.setup();
     renderPage();
 
-    // The browse bar leads with 全部 and the 未分类 chip: an install no store
-    // entry covers has no classification either, and that is not the dataset's
-    // 其他 — nobody has looked at it at all.
+    // The browse bar leads with 全部: an install no store entry covers has no
+    // classification either, and that is not the dataset's 其他 — nobody has
+    // looked at it at all. The picker states the whole count, and its menu
+    // carries 未分类 and nothing for 其他.
     expect(
-      await screen.findByRole("button", { name: /^全部/ }),
+      await screen.findByRole("button", { name: "分类" }),
     ).toHaveTextContent("1");
-    expect(screen.getByRole("button", { name: /^未分类/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^其他/ })).toBeNull();
+    await openDomainMenu(user);
+    expect(
+      screen.getByRole("menuitemradio", { name: /^未分类/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("menuitemradio", { name: /^其他/ })).toBeNull();
     // No install has a recorded source, so every skill lives in one pool card:
     // six skills fit inside the folded cap, so the bar is a plain label and
     // every row is on screen.
@@ -862,12 +891,14 @@ describe("InstalledPage", () => {
     });
     renderPage();
 
-    // The resolved entry is what classifies the install, so a chip for its
-    // domain joins the filter bar — and the card's bar prints the repository's
-    // stars, the same figure the store's own repository cards carry.
+    // The resolved entry is what classifies the install, so an item for its
+    // domain joins the picker's menu — and the card's bar prints the
+    // repository's stars, the same figure the store's own cards carry.
+    await openDomainMenu(user);
     expect(
-      await screen.findByRole("button", { name: /^内容创作/ }),
+      screen.getByRole("menuitemradio", { name: /^内容创作/ }),
     ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
     expect(screen.getByTitle("169600 stars")).toBeInTheDocument();
 
     // The drawer states the classification and the store figure the compact
@@ -1080,7 +1111,7 @@ describe("InstalledPage", () => {
     );
   });
 
-  it("scopes the list to a classification from the chip row", async () => {
+  it("scopes the list to a classification from the picker", async () => {
     const user = userEvent.setup();
     seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
     // The registry still lists the source the ledger recorded, so pdf wears a
@@ -1100,7 +1131,7 @@ describe("InstalledPage", () => {
     });
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: /^内容创作/ }));
+    await pickDomain(user, /^内容创作/);
 
     // The scope leaves only the classified skill on screen...
     await waitFor(() =>
@@ -1113,7 +1144,7 @@ describe("InstalledPage", () => {
     ).toBeInTheDocument();
 
     // ...and 全部 clears the scope again.
-    await user.click(screen.getByRole("button", { name: /^全部/ }));
+    await pickDomain(user, /^全部/);
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
@@ -1498,40 +1529,47 @@ describe("InstalledPage", () => {
 
     // The repository unit weighs a domain by repositories: one source holds
     // both classified installs, so 内容创作 counts 1 beside 全部's 2 cards.
-    const chip = await screen.findByRole("button", { name: /^内容创作/ });
-    expect(chip).toHaveTextContent("1");
-    expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
-      "2",
+    // The figures arrive with the store's lookup, so the trigger is waited
+    // out before the menu is read.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "分类" })).toHaveTextContent(
+        "2",
+      ),
     );
+    await openDomainMenu(user);
+    expect(
+      screen.getByRole("menuitemradio", { name: /^内容创作/ }),
+    ).toHaveTextContent("1");
+    expect(
+      screen.getByRole("menuitemradio", { name: /^全部/ }),
+    ).toHaveTextContent("2");
+    await user.keyboard("{Escape}");
 
     await pickSort(user, "安装时间");
 
-    // The same chip now weighs skills, and 全部 every install.
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: /^内容创作/ }),
-      ).toHaveTextContent("2"),
-    );
-    expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
+    // The same domain now weighs skills, and 全部 every install.
+    await openDomainMenu(user);
+    expect(
+      screen.getByRole("menuitemradio", { name: /^内容创作/ }),
+    ).toHaveTextContent("2");
+    expect(screen.getByRole("menuitemradio", { name: /^全部/ })).toHaveTextContent(
       "6",
     );
 
     // Scoping keeps the skills that belong to the domain, whoever they share a
     // source with: each keeps its own row.
-    await user.click(screen.getByRole("button", { name: /^内容创作/ }));
+    await user.click(screen.getByRole("menuitemradio", { name: /^内容创作/ }));
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
       ).toHaveLength(2),
     );
 
-    // Switching units clears the scope with it: the two units weigh a domain
-    // differently, so a scope set in one need not mean anything in the other.
+    // Back in the repository unit, 全部 counts cards again.
     await pickSort(user, "按仓库");
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
-        "2",
-      ),
+    await openDomainMenu(user);
+    expect(screen.getByRole("menuitemradio", { name: /^全部/ })).toHaveTextContent(
+      "2",
     );
   });
 
@@ -1578,15 +1616,15 @@ describe("InstalledPage", () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("pdf");
-    expect(screen.getByRole("button", { name: /^全部/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "分类" })).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
     // A search re-orders the list by relevance and ignores the scope, so the
-    // bar goes away with it — exactly as it does in the store.
+    // picker goes away with it — exactly as it does in the store.
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: /^全部/ }),
+        screen.queryByRole("button", { name: "分类" }),
       ).not.toBeInTheDocument(),
     );
   });

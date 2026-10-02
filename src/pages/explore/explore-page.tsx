@@ -76,9 +76,9 @@ interface ExploreView {
  *   (`byRepoRank`, the most-starred repository first), each card's preview
  *   listing its skills most-installed first.
  *
- * The reader scopes either reading to a single domain with the chips beside
+ * The reader scopes either reading to a single domain with the picker beside
  * the control; a search re-answers either in relevance order across the whole
- * registry, and the chips and the sort stand down while it is live.
+ * registry, and the picker and the sort stand down while it is live.
  */
 export function ExplorePage() {
   const { t } = useTranslation();
@@ -128,7 +128,7 @@ export function ExplorePage() {
   const { visibleCount } = view;
 
   // The browse answer: every repository once, filed under its leading domain.
-  // It is both the filter's chip set (a domain, and how many repositories it
+  // It is both the filter's facet set (a domain, and how many repositories it
   // holds) and, when one is chosen, that domain's own list. A search's answer
   // is not fetched here — the unified search view fetches for itself (see
   // `SearchResults`), so browse and search never fetch together.
@@ -154,7 +154,7 @@ export function ExplorePage() {
   }, [sectionsData, selectedDomain]);
 
   // Every skill the browse answer holds, flattened once: the skill unit reads
-  // this list, and the filter's chip counts derive from it. A repository's
+  // this list, and the filter's facet counts derive from it. A repository's
   // leading domain is unique, so no skill is listed twice.
   const allSkills = useMemo(
     () =>
@@ -177,13 +177,13 @@ export function ExplorePage() {
 
   // Consecutive skills from one repository stay listed where the ranking puts
   // them: one row per skill, whatever its source.
-  // The filter's chips for the current unit — repositories per domain, or skills
-  // per domain: the two units file the same data differently. Both lead with the
-  // biggest domain, ties broken by the taxonomy's own order. A skill rides every
-  // domain it belongs to, and one nothing classified holds the 未分类 chip — as
-  // the repository unit files such a repository, and never under 其他, which is
-  // the dataset's own answer.
-  const chips = useMemo(() => {
+  // The filter's facets for the current unit — repositories per domain, or
+  // skills per domain: the two units file the same data differently. Both lead
+  // with the biggest domain, ties broken by the taxonomy's own order. A skill
+  // rides every domain it belongs to, and one nothing classified holds the
+  // 未分类 item — as the repository unit files such a repository, and never
+  // under 其他, which is the dataset's own answer.
+  const facets = useMemo(() => {
     if (unit === "skill") {
       return domainFacets(allSkills, (hit) => domainsOf(hit.skill));
     }
@@ -193,7 +193,7 @@ export function ExplorePage() {
     }));
   }, [unit, allSkills, sectionsData]);
 
-  // What the 全部 chip counts: every repository, or every skill.
+  // What the 全部 item counts: every repository, or every skill.
   const totalCount =
     unit === "skill" ? allSkills.length : (sectionsData?.total ?? 0);
 
@@ -294,19 +294,19 @@ export function ExplorePage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The list's own first row: the domains that hold rows, flat, one press
-          to scope the list (全部 clears it), and the sort switch closing it.
-          The chips are a browse control — a search re-orders the whole registry
-          by relevance and ignores the scope — so they stand down while a search
-          is live; the sort stands down with them, as on the installed list: a
-          search re-orders the list by relevance, and its answer reads in the
-          shape the sort already chose. Their counts follow the unit the sort
-          implies: the repository unit weighs a domain by repositories, the
-          skill unit by skills. */}
+      {/* The list's own first row: the domain picker, one press to scope the
+          list (全部 clears it), and the sort switch closing it. The picker is
+          a browse control — a search re-orders the whole registry by relevance
+          and ignores the scope — so it stands down while a search is live; the
+          sort stands down with it, as on the installed list: a search
+          re-orders the list by relevance, and its answer reads in the shape
+          the sort already chose. Its counts follow the unit the sort implies:
+          the repository unit weighs a domain by repositories, the skill unit
+          by skills. */}
       <div className="mb-3 flex min-w-0 items-center gap-3">
         {!isSearching && (
           <ListFacets
-            facets={chips}
+            facets={facets}
             total={totalCount}
             selected={selectedDomain}
             onSelect={(key) => setScope("store", key)}

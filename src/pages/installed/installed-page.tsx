@@ -318,8 +318,8 @@ export function InstalledPage() {
   // The skill unit's flat order: the installs in the chosen sort's order —
   // the registry's popularity blend (the default), or newest-first by the
   // recorded install time (see `lib/install-time`) — scoped to the chosen
-  // domain by membership, since a skill's own classification is what the chip
-  // row counts here. Installs the platform recorded no birth time for settle
+  // domain by membership, since a skill's own classification is what the
+  // picker counts here. Installs the platform recorded no birth time for settle
   // last in the time order. A search is left exactly as the index answered it:
   // relevance is a ranking too, and the better one while a query is live — the
   // same order the store keeps there.
@@ -351,14 +351,14 @@ export function InstalledPage() {
     return ordinals;
   }, [activeRows]);
 
-  // The category chips of the unit on screen: how many *repositories* a domain
+  // The category facets of the unit on screen: how many *repositories* a domain
   // holds, or how many *skills*. A repository rides every domain its rows belong
   // to and a skill every domain it belongs to; either way one nothing classified
-  // holds the 未分类 chip of its own, apart from the dataset's 其他. The two
+  // holds the 未分类 item of its own, apart from the dataset's 其他. The two
   // units file the same installs differently, which is exactly why the count
-  // follows the unit — a chip that promised six skills must not scope the list
+  // follows the unit — an item that promised six skills must not scope the list
   // to two cards.
-  const chips = useMemo(() => {
+  const facets = useMemo(() => {
     if (unit === "skill") {
       return domainFacets(rows, (row) => domainsOf(row.skill));
     }
@@ -445,7 +445,7 @@ export function InstalledPage() {
   // entry, not a bucket, is what the reveal counts, because an entry is what
   // both units list.
   const itemCount = unit === "skill" ? activeRows.length : activeCards.length;
-  // What the 全部 chip counts, in the unit on screen: every repository, or every
+  // What the 全部 item counts, in the unit on screen: every repository, or every
   // skill.
   const totalCount = unit === "skill" ? rows.length : cards.length;
 
@@ -496,15 +496,15 @@ export function InstalledPage() {
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
       {/* The list's own first row: the classifications that hold an install
           (one press to scope the list; 全部 clears it), and — closing the row —
-          the sort switch, this page's own status control. The chips are a
+          the sort switch, this page's own status control. The picker is a
           browse control — a search re-orders the list by relevance and ignores
-          them — so they stand down while a search is live. The chips count
-          what the shape on screen lists, so the figures and the list they
-          scope can never disagree. */}
+          it — so it stands down while a search is live. It counts what the
+          shape on screen lists, so the figures and the list they scope can
+          never disagree. */}
       <div className="mb-3 flex min-w-0 items-center gap-3">
         {!isSearching && rows.length > 0 && (
           <ListFacets
-            facets={chips}
+            facets={facets}
             total={totalCount}
             selected={domain}
             onSelect={(key) => setScope("installed", key)}
@@ -513,7 +513,7 @@ export function InstalledPage() {
         <div className="ml-auto flex shrink-0 items-center gap-2">
           {/* The one control for both what the screen is made of and what
               order it reads in — the old unit switch's repository shape is
-              the sort menu's third answer. It stands down with the chips
+              the sort menu's third answer. It stands down with the picker
               while a search is live: a search re-orders the list by
               relevance, and its answer reads in the shape the sort already
               chose. */}

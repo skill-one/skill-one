@@ -1,9 +1,7 @@
 {
   "facet": {
     "all": "全部",
-    "more": "更多",
-    "moreCategories": "更多分类",
-    "moreCategoriesSelected": "更多分类，已选 {{label}}"
+    "categories": "分类"
   },
   "common": {
     "unknown": "未知",

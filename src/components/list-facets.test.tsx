@@ -7,7 +7,7 @@ import { renderWithRouter } from "../test/test-utils";
 
 const FACETS = [
   { key: "development", count: 12 },
-  { key: "design", count: 7 },
+  { key: "testing", count: 7 },
 ];
 
 function renderFacets(
@@ -26,43 +26,71 @@ function renderFacets(
   return { onSelect };
 }
 
+const trigger = () => screen.getByRole("button", { name: "分类" });
+
 describe("ListFacets", () => {
-  it("leads with 全部, counting the whole list", () => {
+  it("states the current scope on the trigger", () => {
     renderFacets();
 
-    expect(screen.getByRole("button", { name: /全部/ })).toHaveTextContent(
-      "42",
-    );
+    // With nothing picked the trigger reads 全部 and counts the whole list;
+    // it is the one thing the reader must always be able to see.
+    expect(trigger()).toHaveTextContent("全部");
+    expect(trigger()).toHaveTextContent("42");
   });
 
-  it("shows every scope when the line cannot be measured", () => {
-    renderFacets();
+  it("states a picked scope on the trigger, count included", () => {
+    renderFacets({ selected: "development" });
 
-    // jsdom lays nothing out, so the row reports no width. Every chip is shown
-    // then: a filter hidden behind a control nobody can see is worse than a row
-    // that overflows.
-    expect(screen.getAllByRole("button")).toHaveLength(1 + FACETS.length);
-    expect(screen.queryByRole("button", { name: /更多/ })).toBeNull();
+    expect(trigger()).toHaveTextContent("开发编程");
+    expect(trigger()).toHaveTextContent("12");
   });
 
-  it("scopes the list from a chip, and clears it from 全部", async () => {
+  it("opens a menu of scopes, 全部 first, each with its count", async () => {
     const user = userEvent.setup();
-    const { onSelect } = renderFacets();
+    renderFacets();
+    await user.click(trigger());
 
-    await user.click(screen.getAllByRole("button")[1]);
-    expect(onSelect).toHaveBeenCalledWith("development");
-
-    await user.click(screen.getByRole("button", { name: /全部/ }));
-    expect(onSelect).toHaveBeenLastCalledWith(null);
+    // The menu mounts asynchronously, so the queries wait for it.
+    const items = await screen.findAllByRole("menuitemradio");
+    expect(items[0]).toHaveTextContent("全部");
+    expect(items[0]).toHaveTextContent("42");
+    expect(
+      screen.getByRole("menuitemradio", { name: /开发编程/ }),
+    ).toHaveTextContent("12");
+    expect(
+      screen.getByRole("menuitemradio", { name: /测试与质量/ }),
+    ).toHaveTextContent("7");
   });
 
-  it("keeps a second, hidden copy of the row for measuring", () => {
+  it("marks the scope on screen in the menu", async () => {
+    const user = userEvent.setup();
     renderFacets();
+    await user.click(trigger());
 
-    // The measurement is taken from chips that are laid out but never seen, so
-    // computing the fit cannot depend on a row that has already hidden some.
+    expect(await screen.findByRole("menuitemradio", { name: /全部/ }))
+      .toHaveAttribute("aria-checked", "true");
     expect(
-      document.querySelectorAll('[aria-hidden="true"] button'),
-    ).toHaveLength(FACETS.length);
+      screen.getByRole("menuitemradio", { name: /开发编程/ }),
+    ).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("scopes the list from the menu", async () => {
+    const { onSelect } = renderFacets();
+    const user = userEvent.setup();
+    await user.click(trigger());
+
+    await user.click(
+      await screen.findByRole("menuitemradio", { name: /开发编程/ }),
+    );
+    expect(onSelect).toHaveBeenCalledWith("development");
+  });
+
+  it("clears the scope from 全部", async () => {
+    const { onSelect } = renderFacets({ selected: "development" });
+    const user = userEvent.setup();
+    await user.click(trigger());
+
+    await user.click(await screen.findByRole("menuitemradio", { name: /全部/ }));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
   });
 });

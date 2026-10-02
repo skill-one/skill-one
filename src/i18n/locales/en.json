@@ -1,9 +1,7 @@
 {
   "facet": {
     "all": "All",
-    "more": "More",
-    "moreCategories": "More categories",
-    "moreCategoriesSelected": "More categories, selected {{label}}"
+    "categories": "Categories"
   },
   "common": {
     "unknown": "Unknown",

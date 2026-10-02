@@ -1,34 +1,39 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown } from "lucide-react";
 
 import { domainLabel, domainMeta } from "../data/domains";
 import { useAppLocale } from "../i18n/use-language";
-import { FACET_GAP, useFacetOverflow } from "../hooks/use-facet-overflow";
-import { DomainChip } from "./domain-chip";
 import { Button } from "./ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
-/** One scope of a list, as its chip shows it. */
+/** One scope of a list, as the filter counts it. */
 export interface Facet {
   key: string;
   count: number;
 }
 
 /**
- * The scope chips of the list on screen: 全部, then as many classifications as
- * the line holds, then 更多 for the rest.
+ * The radio value standing for 全部 — no domain key of the taxonomy reads
+ * "all", so the two can never collide.
+ */
+const ALL = "all";
+
+/**
+ * The scope picker of a list: one dropdown, not a row of chips.
  *
- * It opens that list's own content, above its first row. The categories are the
- * list's taxonomy and the counts are its own figures, so nothing here belongs to
- * the shell — and the row narrows the list it sits on, which is where the reader
- * looks for it.
- *
- * One line, fixed height, and the overflow does not scroll: a row of scopes that
- * has to be scrolled to be read hides things behind a gesture nobody performs
- * over a list. What does not fit is named in a flyout instead, one press away,
- * and the chosen scope stays on the line even when it is one of them — the
- * active filter is the one chip the reader must always be able to see.
+ * A menu rather than a line of toggles, the same call `ListSortSelect` makes
+ * for the sort: the scopes are *facts* the list is read through, so they stay
+ * out of the row until opened, and the trigger states the current scope — the
+ * one thing the reader must always be able to see. The menu marks the current
+ * pick with radio semantics, 全部 first, then every scope the list holds, each
+ * with its count, so the whole taxonomy is one press away and nothing depends
+ * on how wide the line is.
  */
 export function ListFacets({
   facets,
@@ -43,110 +48,81 @@ export function ListFacets({
   selected: string | null;
   onSelect: (key: string | null) => void;
 }) {
-  const { rowRef, measureRef, moreRef, visibleCount } = useFacetOverflow(
-    facets.length,
-  );
   const { t } = useTranslation();
   const locale = useAppLocale();
-  const [open, setOpen] = useState(false);
 
-  const shown = visibleCount === null ? facets : facets.slice(0, visibleCount);
-  const hidden = visibleCount === null ? [] : facets.slice(visibleCount);
-  const hiddenScope =
-    selected !== null && hidden.some((facet) => facet.key === selected);
-
-  const chip = (
-    facet: Facet,
-    { expanded = false, onPick }: { expanded?: boolean; onPick?: () => void } = {},
-  ) => (
-    <DomainChip
-      key={facet.key}
-      selected={selected === facet.key}
-      emoji={domainMeta(facet.key)?.emoji}
-      count={facet.count}
-      expanded={expanded}
-      onClick={onPick ?? (() => onSelect(facet.key))}
-    >
-      {domainLabel(facet.key, locale)}
-    </DomainChip>
-  );
+  const current = facets.find((facet) => facet.key === selected);
+  const currentEmoji = selected === null ? undefined : domainMeta(selected)?.emoji;
+  const currentLabel =
+    selected === null ? t("facet.all") : domainLabel(selected, locale);
 
   return (
-    <div className="relative flex min-w-0 flex-1 items-center" style={{ gap: FACET_GAP }}>
-      <DomainChip
-        selected={selected === null}
-        count={total}
-        expanded
-        onClick={() => onSelect(null)}
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            variant={selected === null ? "outline" : "default"}
+            size="sm"
+            aria-label={t("facet.categories")}
+            className="shrink-0"
+          />
+        }
       >
-        {t("facet.all")}
-      </DomainChip>
-
-      <div
-        ref={rowRef}
-        className="flex min-w-0 flex-1 items-center overflow-hidden"
-        style={{ gap: FACET_GAP }}
-      >
-        {shown.map((facet) => chip(facet))}
-        {hidden.length > 0 && (
-          <Popover open={open} onOpenChange={setOpen}>
-            {/* The trigger's own span: the line measures it to know what room
-                the control needs, and a trigger's element is the library's. */}
-            <span ref={moreRef} className="shrink-0">
-              <PopoverTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant={hiddenScope ? "default" : "outline"}
-                    size="sm"
-                    aria-label={
-                      hiddenScope
-                        ? t("facet.moreCategoriesSelected", {
-                            label: domainLabel(selected, locale),
-                          })
-                        : t("facet.moreCategories")
-                    }
-                  />
-                }
-              >
-                <span className="max-w-24 truncate whitespace-nowrap">
-                  {hiddenScope
-                    ? domainLabel(selected, locale)
-                    : t("facet.more")}
-                </span>
-                <ChevronDown />
-              </PopoverTrigger>
-            </span>
-            <PopoverContent align="start" className="w-auto max-w-md p-1.5">
-              <div className="flex flex-wrap items-center gap-1.5">
-                {hidden.map((facet) =>
-                  chip(facet, {
-                    // Named in full here: a flyout is not a row of glyphs to
-                    // scan, so nothing is hidden behind a hover.
-                    expanded: true,
-                    onPick: () => {
-                      onSelect(facet.key);
-                      setOpen(false);
-                    },
-                  }),
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
+        {currentEmoji && (
+          <span aria-hidden="true" className="text-[13px] leading-none">
+            {currentEmoji}
+          </span>
         )}
-      </div>
-
-      {/* The measuring line: every chip, laid out but invisible, so the count
-          above can be computed without the row first having to hide any of
-          them. Out of flow, so it costs the header nothing. */}
-      <div
-        ref={measureRef}
-        aria-hidden="true"
-        className="pointer-events-none invisible absolute flex items-center"
-        style={{ gap: FACET_GAP }}
-      >
-        {facets.map((facet) => chip(facet))}
-      </div>
-    </div>
+        <span className="max-w-40 truncate whitespace-nowrap">
+          {currentLabel}
+        </span>
+        <span className="text-[11px] tabular-nums opacity-70">
+          {current ? current.count : total}
+        </span>
+        <ChevronDown aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-44">
+        <DropdownMenuRadioGroup
+          value={selected ?? ALL}
+          onValueChange={(value) => {
+            // A stale key this build does not know, or one of this menu's own
+            // values, is no scope to file under; only real keys pass through.
+            if (value === ALL || typeof value === "string") {
+              onSelect(value === ALL ? null : value);
+            }
+          }}
+        >
+          {/* A scope is one pick and done: the menu closes on the press,
+              unlike the radio item's own default, which leaves it open. */}
+          <DropdownMenuRadioItem value={ALL} closeOnClick>
+            {t("facet.all")}
+            <span className="pl-1.5 text-xs tabular-nums text-muted-foreground">
+              {total}
+            </span>
+          </DropdownMenuRadioItem>
+          {facets.map((facet) => {
+            const emoji = domainMeta(facet.key)?.emoji;
+            return (
+              <DropdownMenuRadioItem
+                key={facet.key}
+                value={facet.key}
+                closeOnClick
+              >
+                {emoji && (
+                  <span aria-hidden="true" className="text-[13px] leading-none">
+                    {emoji}
+                  </span>
+                )}
+                {domainLabel(facet.key, locale)}
+                <span className="pl-1.5 text-xs tabular-nums text-muted-foreground">
+                  {facet.count}
+                </span>
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
