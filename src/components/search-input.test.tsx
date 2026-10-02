@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -12,56 +13,62 @@ function renderSearchField(props: Partial<Parameters<typeof SearchInput>[0]> = {
 }
 
 describe("SearchInput", () => {
-  it("calls the field up with Cmd+K: focus moves and the query is selected", () => {
-    renderSearchField({ value: "pdf" });
-    const field = screen.getByLabelText(
-      "搜索 Skill",
-    ) as HTMLInputElement;
-
-    fireEvent.keyDown(window, { key: "k", metaKey: true });
-
-    expect(field).toHaveFocus();
-    expect(field).toHaveDisplayValue("pdf");
-    // The selection, not the focus alone, is the point: the keystroke a reader
-    // types next replaces the question they were asking, with no backspacing.
-    expect(field.selectionStart).toBe(0);
-    expect(field.selectionEnd).toBe(3);
-  });
-
-  it("answers Ctrl+K too, where there is no command key", () => {
-    renderSearchField();
-
-    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-
-    expect(screen.getByLabelText("搜索 Skill")).toHaveFocus();
-  });
-
-  it("leaves plain K alone — only the shortcut's key opens the field", async () => {
+  it("hands every field value up as it stands — debouncing is the caller's", async () => {
     const user = userEvent.setup();
-    renderSearchField();
+    const onChange = vi.fn();
+    // The field is controlled by its caller, so the honest test drives it the
+    // way the header does: the query it keeps is the query the field shows.
+    function Controlled() {
+      const [value, setValue] = useState("");
+      return (
+        <SearchInput
+          value={value}
+          onChange={(next) => {
+            onChange(next);
+            setValue(next);
+          }}
+          label="搜索 Skill"
+        />
+      );
+    }
+    renderWithRouter(<Controlled />);
 
-    await user.keyboard("k");
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
-    expect(screen.getByLabelText("搜索 Skill")).not.toHaveFocus();
+    // One call per keystroke, each carrying the field as it stands — not the
+    // typed character, and not a debounced query the caller has to wait for.
+    expect(onChange).toHaveBeenCalledTimes(3);
+    expect(onChange).toHaveBeenLastCalledWith("pdf");
+    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
   });
 
-  it("keeps the shortcut from a locked field", () => {
-    renderSearchField({ disabled: true });
-
-    fireEvent.keyDown(window, { key: "k", metaKey: true });
-
-    expect(screen.getByLabelText("搜索 Skill")).not.toHaveFocus();
-  });
-
-  it("shows the shortcut where the hint sits, and only while the field is open", () => {
+  it("shows what it searches as the hint, and lets a caller override it", () => {
     const { unmount } = renderSearchField();
-
-    expect(screen.getByText("Ctrl")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("搜索 Skill...")).toBeInTheDocument();
 
     unmount();
+    renderSearchField({ placeholder: "索引构建中…" });
+    expect(screen.getByPlaceholderText("索引构建中…")).toBeInTheDocument();
+  });
+
+  it("locks the field while what it searches is unavailable", () => {
     renderSearchField({ disabled: true });
 
-    // A locked field has no shortcut to offer, so the hint goes with it.
-    expect(screen.queryByText("Ctrl")).not.toBeInTheDocument();
+    const field = screen.getByLabelText("搜索 Skill");
+    expect(field).toBeDisabled();
+    fireEvent.change(field, { target: { value: "pdf" } });
+    // A locked field says nothing, so the query never leaves it.
+    expect(field).toHaveValue("");
+  });
+
+  it("leaves the keyboard alone — there is no shortcut to the field", () => {
+    renderSearchField({ value: "pdf" });
+    const field = screen.getByLabelText("搜索 Skill");
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+
+    expect(field).not.toHaveFocus();
+    expect(document.querySelector("kbd")).toBeNull();
   });
 });
