@@ -13,7 +13,6 @@
     "popularityAria": "Popularity {{blended}}: {{installed}} installs · {{starred}} stars",
     "searchSkills": "Search skills",
     "indexBuilding": "Building index…",
-    "listUnit": "View",
     "listSort": "Sort by",
     "back": "Back",
     "viewDetailAria": "View {{name}} details",
@@ -32,10 +31,6 @@
     "home": "Home",
     "store": "Store",
     "installed": "Installed"
-  },
-  "unit": {
-    "byRepo": "Grid",
-    "bySkill": "List"
   },
   "sort": {
     "byPopularity": "Popularity",

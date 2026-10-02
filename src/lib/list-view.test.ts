@@ -6,7 +6,6 @@ import {
   setQuery,
   setScope,
   setSort,
-  setUnit,
   subscribeListView,
 } from "./list-view";
 
@@ -21,39 +20,13 @@ describe("list view", () => {
     return import("./list-view");
   };
 
-  it("starts with one empty query and both lists reading as skill rows", () => {
+  it("starts with one empty query and both lists answering by popularity", () => {
+    // The default stays absent from the view, so a fresh list reads exactly
+    // as it did before the sort control existed.
     expect(getListView()).toEqual({
       query: "",
-      views: { store: { unit: "skill" }, installed: { unit: "skill" } },
+      views: { store: {}, installed: {} },
     });
-  });
-
-  it("starts from each list's stored unit, ignoring an unreadable one", async () => {
-    window.localStorage.setItem("skill-one.listUnit.store", "repo");
-    window.localStorage.setItem("skill-one.listUnit.installed", "nonsense");
-
-    const { getListView } = await freshListView();
-    expect(getListView().views.store.unit).toBe("repo");
-    expect(getListView().views.installed.unit).toBe("skill");
-  });
-
-  it("persists a unit choice under the list's own key", () => {
-    setUnit("store", "repo");
-
-    expect(window.localStorage.getItem("skill-one.listUnit.store")).toBe("repo");
-    expect(window.localStorage.getItem("skill-one.listUnit.installed")).toBe(
-      null,
-    );
-  });
-
-  it("forgets both lists' units again, stored ones included", () => {
-    setUnit("installed", "repo");
-    resetListView();
-
-    expect(getListView().views.installed.unit).toBe("skill");
-    expect(window.localStorage.getItem("skill-one.listUnit.installed")).toBe(
-      null,
-    );
   });
 
   it("holds one query, not one per list", () => {
@@ -64,22 +37,6 @@ describe("list view", () => {
     expect(getListView().query).toBe("pdf");
     expect(getListView().views.store).not.toHaveProperty("query");
     expect(getListView().views.installed).not.toHaveProperty("query");
-  });
-
-  it("keeps each list's unit to itself", () => {
-    setUnit("store", "repo");
-
-    expect(getListView().views.store.unit).toBe("repo");
-    expect(getListView().views.installed.unit).toBe("skill");
-  });
-
-  it("drops a list's scope when its unit changes", () => {
-    // The two units file their taxonomies differently, so a scope read under
-    // one may mean nothing under the other.
-    setScope("store", "development");
-    setUnit("store", "repo");
-
-    expect(getListView().views.store).toEqual({ unit: "repo" });
   });
 
   it("keeps each list's scope to itself, and clears one with null", () => {
@@ -116,7 +73,21 @@ describe("list view", () => {
     ).toBeNull();
   });
 
-  it("starts from a stored sort, ignoring an unreadable one", async () => {
+  it("keeps each list's sort to itself", () => {
+    setSort("store", "repo");
+
+    expect(getListView().views.store.sort).toBe("repo");
+    expect(getListView().views.installed).not.toHaveProperty("sort");
+  });
+
+  it("refuses a sort the list does not answer in", () => {
+    // The store's menu never offers the install clock — it has no install of
+    // its own to read by — so only a hand-built call could ask for one.
+    setSort("store", "installed");
+    expect(getListView().views.store).toEqual({});
+  });
+
+  it("starts from a stored sort, ignoring one the list cannot answer", async () => {
     window.localStorage.setItem("skill-one.listSort.installed", "installed");
     window.localStorage.setItem("skill-one.listSort.store", "nonsense");
 
@@ -125,25 +96,21 @@ describe("list view", () => {
     expect(stored().views.store).not.toHaveProperty("sort");
   });
 
-  it("reads the installed list's old unit choice as its repository sort", async () => {
-    // A reader who had the installed list in repository cards keeps that
-    // reading under the merged control's third sort.
+  it("reads either list's old unit choice as its repository sort", async () => {
+    // A reader who had a list in repository cards keeps that reading under the
+    // merged control's repository sort — the installed list migrated when its
+    // sort arrived, the store when its own switch merged too.
     window.localStorage.setItem("skill-one.listUnit.installed", "repo");
-    const { getListView: migrated } = await freshListView();
-    expect(migrated().views.installed.sort).toBe("repo");
+    const { getListView: installedMigrated } = await freshListView();
+    expect(installedMigrated().views.installed.sort).toBe("repo");
 
-    // The store keeps its unit switch, so its stored unit is not a sort.
     window.localStorage.setItem("skill-one.listUnit.store", "repo");
-    const { getListView: untouched } = await freshListView();
-    expect(untouched().views.store).not.toHaveProperty("sort");
-    expect(untouched().views.store.unit).toBe("repo");
+    const { getListView: storeMigrated } = await freshListView();
+    expect(storeMigrated().views.store.sort).toBe("repo");
   });
 
-  it("keeps the sort through a unit switch and a scope change, then forgets it", () => {
+  it("keeps the sort through a scope change, then forgets it on reset", () => {
     setSort("installed", "installed");
-    setUnit("installed", "repo");
-    expect(getListView().views.installed.sort).toBe("installed");
-
     setScope("installed", "development");
     expect(getListView().views.installed.sort).toBe("installed");
 
@@ -163,7 +130,7 @@ describe("list view", () => {
     setQuery("pdf");
     expect(listener).toHaveBeenCalledTimes(1);
 
-    setUnit("store", "repo");
+    setSort("store", "repo");
     expect(listener).toHaveBeenCalledTimes(2);
 
     setScope("store", "development");
@@ -171,7 +138,7 @@ describe("list view", () => {
     setScope("store", "development");
     expect(listener).toHaveBeenCalledTimes(3);
 
-    setUnit("store", "skill");
+    setSort("store", "popularity");
     expect(listener).toHaveBeenCalledTimes(4);
 
     unsubscribe();
@@ -182,7 +149,7 @@ describe("list view", () => {
   it("leaves the list that did not change referentially stable", () => {
     const before = getListView().views.installed;
 
-    setUnit("store", "repo");
+    setSort("store", "repo");
     setScope("store", "development");
     setQuery("pdf");
 
