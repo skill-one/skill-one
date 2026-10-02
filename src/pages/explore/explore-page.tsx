@@ -10,7 +10,8 @@ import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useInstalledSearchRows } from "../../hooks/use-installed-search";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
-import { setScope, setUnit } from "../../lib/list-view";
+import { setScope, setSort, LIST_SORTS } from "../../lib/list-view";
+import type { ListUnit } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
 import {
   REPO_CARD_SKELETON_CLASS,
@@ -21,7 +22,7 @@ import {
 
 import { Button } from "../../components/ui/button";
 import { ListFacets } from "../../components/list-facets";
-import { ListUnitToggle } from "../../components/list-unit-toggle";
+import { ListSortSelect } from "../../components/list-sort-select";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
@@ -65,14 +66,20 @@ interface ExploreView {
 
 /**
  * The store's browse list, in either of two units: one card per repository (each
- * listing the skills it publishes), or one row per skill. The reader picks the
- * unit on the list's own first row and scopes either to a single domain with
- * the chips beside it, and both share the same selection. There is no sort
- * control: the repository unit leads with the highest-starred repositories
- * (their skills most-installed first) and the skill unit with the most
- * installed skills; a search re-answers
- * either in relevance order across the whole registry, and the filter stands
- * down while it is live.
+ * listing the skills it publishes), or one row per skill. As on the installed
+ * list, the sort *is* the whole reading — one control on the list's own first
+ * row answers both what the screen is made of and what order it reads in:
+ *
+ * - **按热度** (the default): one row per skill, most installed first — the
+ *   figure every row displays, so the order and the numbers beside it can
+ *   never disagree.
+ * - **按仓库**: one card per repository, led by the registry's own ranking
+ *   (`byRepoRank`, the most-starred repository first), each card's preview
+ *   listing its skills most-installed first.
+ *
+ * The reader scopes either reading to a single domain with the chips beside
+ * the control; a search re-answers either in relevance order across the whole
+ * registry, and the chips and the sort stand down while it is live.
  */
 export function ExplorePage() {
   const { t } = useTranslation();
@@ -90,9 +97,12 @@ export function ExplorePage() {
 
   // What the reader is looking for, how the list reads, and which domain they
   // scoped the browse to: all three are shared with the installed list, so they
-  // are read from the shared view rather than held here.
+  // are read from the shared view rather than held here. The sort *is* the
+  // reading here, as on the installed list: the repository shape is its second
+  // option, so the unit the rest of the page renders by is derived, not stored.
   const search = useListQuery();
-  const { unit, scope } = useDestinationView("store");
+  const { scope, sort = "popularity" } = useDestinationView("store");
+  const unit: ListUnit = sort === "repo" ? "repo" : "skill";
   // The filter is a browse control: a search re-orders the whole registry by
   // relevance, so it ignores the filter (and the filter bar stands down).
   const selectedDomain = scope ?? null;
@@ -104,7 +114,7 @@ export function ExplorePage() {
   // The depth below is remembered against it: the controls can re-answer the
   // list without the page ever being unmounted, and a depth revealed for one
   // answer is not a place the reader is at under another.
-  const signature = `${query}\u0000${unit}\u0000${selectedDomain ?? "all"}`;
+  const signature = `${query}\u0000${sort}\u0000${selectedDomain ?? "all"}`;
 
   // How deep the list had been revealed, remembered per history entry: a
   // drill-down — into a repository's page and back — unmounts this page, and
@@ -268,9 +278,9 @@ export function ExplorePage() {
   // the revealed depth (it belongs to the list it was revealed for) and the
   // detail panel (its skill may not be in the new answer at all).
   //
-  // The controls are shared with the other list now, so this watches the answer
-  // instead of each control. Switching the unit still lands here as one change,
-  // because the list view drops the scope with the unit (`lib/list-view`).
+  // The controls are shared with the other list now, so this watches the
+  // answer instead of each control; the sort is the unit, so one field covers
+  // both switches' old answers.
   //
   // Only a *change* resets: mounting with the answer already in hand is the
   // reader coming back to it, and the depth they left it at is the whole point
@@ -290,13 +300,14 @@ export function ExplorePage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
       {/* The list's own first row: the domains that hold rows, flat, one press
-          to scope the list (全部 clears it), and the unit switch closing it.
+          to scope the list (全部 clears it), and the sort switch closing it.
           The chips are a browse control — a search re-orders the whole registry
           by relevance and ignores the scope — so they stand down while a search
-          is live; the switch stays, because the search answer reads in either
-          unit too (see `SearchResults`). Their counts follow the unit: the
-          repository unit weighs a domain by repositories, the skill unit by
-          skills. */}
+          is live; the sort stands down with them, as on the installed list: a
+          search re-orders the list by relevance, and its answer reads in the
+          shape the sort already chose. Their counts follow the unit the sort
+          implies: the repository unit weighs a domain by repositories, the
+          skill unit by skills. */}
       <div className="mb-3 flex min-w-0 items-center gap-3">
         {!isSearching && (
           <ListFacets
@@ -306,11 +317,17 @@ export function ExplorePage() {
             onSelect={(key) => setScope("store", key)}
           />
         )}
-        <ListUnitToggle
-          className="ml-auto"
-          unit={unit}
-          onChange={(next) => setUnit("store", next)}
-        />
+        {/* The one control for both what the screen is made of and what order
+            it reads in — the old unit switch's repository shape is the sort
+            menu's second answer, exactly the merge the installed list made. */}
+        {!isSearching && (
+          <ListSortSelect
+            className="ml-auto"
+            sort={sort}
+            sorts={LIST_SORTS.store}
+            onChange={(next) => setSort("store", next)}
+          />
+        )}
       </div>
 
       {/* The list; the modal detail drawer overlays it without reflowing it or

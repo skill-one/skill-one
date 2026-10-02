@@ -13,21 +13,21 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-/** The orders a list answers in: a key each, and the i18n key that names it. */
-const SORTS: { sort: ListSort; labelKey: ParseKeys }[] = [
+/** The orders a list can answer in: a key each, and the i18n key that names it. */
+const SORT_LABELS: { sort: ListSort; labelKey: ParseKeys }[] = [
   { sort: "popularity", labelKey: "sort.byPopularity" },
   { sort: "installed", labelKey: "sort.byInstalled" },
   { sort: "repo", labelKey: "sort.byRepo" },
 ];
 
 /**
- * The sort switch of a list that answers in more than one order — the
- * installed list, today. A labelled menu rather than a row of segmented
- * controls: the orders are *facts* the list is read through (whose figure,
- * whose clock, whose shape), not toggles, so they name themselves in words
- * and stay out of the row until opened. The third option carries the shape
- * the old unit switch picked — repository cards — so one control now answers
- * both "what does the screen look like" and "what order does it read in".
+ * The sort switch of a list that answers in more than one order — both lists,
+ * today. A labelled menu rather than a row of segmented controls: the orders
+ * are *facts* the list is read through (whose figure, whose clock, whose
+ * shape), not toggles, so they name themselves in words and stay out of the
+ * row until opened. The repository option carries the shape the old unit
+ * switch picked — repository cards — so one control now answers both "what
+ * does the screen look like" and "what order does it read in".
  *
  * The trigger states the order on screen — the one thing the reader must
  * always be able to see — and the menu marks the current pick, the same
@@ -39,16 +39,26 @@ const SORTS: { sort: ListSort; labelKey: ParseKeys }[] = [
 export function ListSortSelect({
   sort,
   onChange,
+  sorts,
   className,
 }: {
   /** The order on screen. */
   sort: ListSort;
   /** Called with the order the reader picked; never with the current one. */
   onChange: (sort: ListSort) => void;
+  /**
+   * The orders this list answers in, menu order included. Absent is every
+   * order — the installed list's menu; the store offers the subset its rows
+   * can state (see `LIST_SORTS` in `lib/list-view`).
+   */
+  sorts?: readonly ListSort[];
   className?: string;
 }) {
   const { t } = useTranslation();
-  const current = SORTS.find((option) => option.sort === sort) ?? SORTS[0];
+  const options = SORT_LABELS.filter(
+    ({ sort: value }) => !sorts || sorts.includes(value),
+  );
+  const current = options.find((option) => option.sort === sort) ?? options[0];
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -69,12 +79,12 @@ export function ListSortSelect({
         <DropdownMenuRadioGroup
           value={sort}
           onValueChange={(value) => {
-            if (SORTS.some((option) => option.sort === value)) {
+            if (options.some((option) => option.sort === value)) {
               onChange(value as ListSort);
             }
           }}
         >
-          {SORTS.map(({ sort: value, labelKey }) => (
+          {options.map(({ sort: value, labelKey }) => (
             <DropdownMenuRadioItem key={value} value={value}>
               {t(labelKey)}
             </DropdownMenuRadioItem>

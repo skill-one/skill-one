@@ -13,7 +13,6 @@
     "popularityAria": "热度 {{blended}}：安装 {{installed}} · Star {{starred}}",
     "searchSkills": "搜索 Skill",
     "indexBuilding": "索引构建中…",
-    "listUnit": "视图",
     "listSort": "排序方式",
     "back": "返回",
     "viewDetailAria": "查看 {{name}} 详情",
@@ -32,10 +31,6 @@
     "home": "首页",
     "store": "商店",
     "installed": "已安装"
-  },
-  "unit": {
-    "byRepo": "网格",
-    "bySkill": "列表"
   },
   "sort": {
     "byPopularity": "热度",

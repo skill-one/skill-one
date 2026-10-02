@@ -27,7 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
  * can already see is noise. The
  * word moves to where a mark that cannot say it itself says it — the control's
  * accessible name and its hover tip — which is the arrangement the list's own
- * tools use for the same reason (see `ListUnitToggle`).
+ * tools use for the same reason (see `ListSortSelect`).
  *
  * The row reads left to right the way the list below it is read: the control
  * that goes back, then the entity's face, then what it is called over the

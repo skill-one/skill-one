@@ -1,6 +1,6 @@
 /**
  * The controls both lists show, held in one place because they mean one thing:
- * there is a single search field and a single unit switch, and the state behind
+ * there is a single search field and a single sort switch, and the state behind
  * them cannot belong to either page. A page reads the slice it needs out of
  * here and answers with it; the page showing the list writes.
  *
@@ -16,7 +16,7 @@
  * revealed depth, the scroll position, which folds are open. Those belong to
  * the page that renders the list, and stay there.
  *
- * Each list's unit persists across sessions in `localStorage` (via the guarded
+ * Each list's sort persists across sessions in `localStorage` (via the guarded
  * `storage` wrapper — a blocked write costs persistence and nothing else); the
  * query and the scopes stay session-only, because a question asked and a
  * taxonomy slice chosen are this visit's business.
@@ -28,26 +28,39 @@ import { storage } from "./storage";
 export type Destination = "store" | "installed";
 
 /**
- * What a skill list is made of: one repository card each, or one skill row
- * each — the rows stacked in one column the switch calls the list.
- */
-export type ListUnit = "repo" | "skill";
-
-/**
  * How a list orders itself while no search is live. `popularity` is the
  * registry's blended installs-and-stars figure (`lib/popularity.ts`), the
  * figure every row displays; `installed` is the install's own clock (newest
  * first); `repo` reads the list as repository cards at all, the cards led by
- * the most-starred repository. On the installed list the sort *is* the whole
- * reading — the third option is the shape the unit switch used to pick, merged
- * into this one control — while the store's browse list still reads through its
- * own unit switch and carries no sort of its own.
+ * the most-starred repository. On both lists the sort *is* the whole reading —
+ * the repository option is the shape the unit switch used to pick, merged into
+ * this one control — so a page renders by the unit its sort implies.
  */
 export type ListSort = "installed" | "popularity" | "repo";
 
-/** One list's own reading: how it is made up, and what it is narrowed to. */
+/**
+ * The orders each list answers in. The installed list carries the install's
+ * own clock as its middle option; the store has no install of its own to
+ * clock, so it answers in the two orders its rows can state. The repository
+ * option carries the shape the old unit switch picked on either list, so one
+ * control now answers both "what does the screen look like" and "what order
+ * does it read in".
+ */
+export const LIST_SORTS: Readonly<Record<Destination, readonly ListSort[]>> = {
+  store: ["popularity", "repo"],
+  installed: ["popularity", "installed", "repo"],
+};
+
+/**
+ * The two shapes a list reads as — one repository card each, or one skill row
+ * each. No longer a stored choice of its own: it is the unit the list's sort
+ * implies (`repo` sort, repository cards; otherwise skill rows), derived by
+ * the page that renders.
+ */
+export type ListUnit = "repo" | "skill";
+
+/** One list's own reading: what order it answers in, and what it is narrowed to. */
 export interface DestinationView {
-  unit: ListUnit;
   /**
    * The sort the list answers in while no search is live. Absent is
    * `popularity` — the default: the figure the rows display is the order the
@@ -75,49 +88,38 @@ export interface ListViewState {
   views: Readonly<Record<Destination, DestinationView>>;
 }
 
-/** Both lists read as skill rows — the list — until the reader says otherwise. */
-const DEFAULT_UNIT: ListUnit = "skill";
-const UNITS: readonly ListUnit[] = ["repo", "skill"];
-
 /** The default order is the figure the rows themselves display: popularity. */
 const DEFAULT_SORT: ListSort = "popularity";
-const SORTS: readonly ListSort[] = ["popularity", "installed", "repo"];
 
-/** One key per list, so each keeps its own answer under its own name. */
+/**
+ * One key per list, so each keeps its own answer under its own name. The unit
+ * key is read-only now: both lists have merged their unit switch into the sort
+ * menu, and a stored unit is honoured once — as the repository sort — then
+ * left behind.
+ */
 const UNIT_KEY_PREFIX = "skill-one.listUnit.";
 const SORT_KEY_PREFIX = "skill-one.listSort.";
 
-function readStoredUnit(destination: Destination): ListUnit {
-  const raw = storage.getItem(UNIT_KEY_PREFIX + destination);
-  return raw !== null && UNITS.includes(raw as ListUnit)
-    ? (raw as ListUnit)
-    : DEFAULT_UNIT;
-}
-
 function readStoredSort(destination: Destination): ListSort | undefined {
   const raw = storage.getItem(SORT_KEY_PREFIX + destination);
-  if (raw !== null && SORTS.includes(raw as ListSort)) {
+  if (raw !== null && LIST_SORTS[destination].includes(raw as ListSort)) {
     // The default stays absent from the view, so a fresh list reads exactly
     // as it did before the control existed.
     return raw === DEFAULT_SORT ? undefined : (raw as ListSort);
   }
   // One-time reading of the choice the unit switch used to hold: a reader who
-  // had the installed list in repository cards keeps that reading as the
-  // merged control's third sort. The store keeps its unit switch, so its
-  // stored unit means nothing here.
-  if (
-    destination === "installed" &&
-    storage.getItem(UNIT_KEY_PREFIX + destination) === "repo"
-  ) {
+  // had a list in repository cards keeps that reading as the merged control's
+  // repository sort. (The installed list migrated when its sort arrived; the
+  // store joins it now that its own switch has merged too.)
+  if (storage.getItem(UNIT_KEY_PREFIX + destination) === "repo") {
     return "repo";
   }
   return undefined;
 }
 
 function storedView(destination: Destination): DestinationView {
-  const unit = readStoredUnit(destination);
   const sort = readStoredSort(destination);
-  return sort === undefined ? { unit } : { unit, sort };
+  return sort === undefined ? {} : { sort };
 }
 
 function initialViews(): Record<Destination, DestinationView> {
@@ -161,46 +163,25 @@ export function setQuery(query: string): void {
  * a fresh list reads exactly as it did before `sort` (and any scope) existed.
  */
 function buildView(
-  unit: ListUnit,
   sort: ListSort | undefined,
   scope: string | undefined,
 ): DestinationView {
-  const view: DestinationView = { unit };
+  const view: DestinationView = {};
   if (sort !== undefined) view.sort = sort;
   if (scope !== undefined) view.scope = scope;
   return view;
 }
 
 /**
- * How one list reads. The scope goes with the unit: the two units file their
- * taxonomies differently (a repository's leading domain against a skill's own),
- * so a scope read under one may mean nothing under the other — and leaving it
- * standing would narrow the new unit for a reason the reader never asked for.
- * The sort rides along: how the list orders is not what the unit switch is
- * about, so the reader's choice survives the switch.
- */
-export function setUnit(destination: Destination, unit: ListUnit): void {
-  const { unit: current, sort } = state.views[destination];
-  if (unit === current) return;
-  storage.setItem(UNIT_KEY_PREFIX + destination, unit);
-  publish({
-    ...state,
-    views: {
-      ...state.views,
-      // The scope drops with the unit; only the sort rides along.
-      [destination]: buildView(unit, sort, undefined),
-    },
-  });
-}
-
-/**
- * How one list orders itself while no search is live. Like the unit, the
- * choice persists across sessions under the list's own key; unlike the scope,
- * it survives both the unit switch and the chips, because a popularity answer
- * means the same thing in every unit and every slice.
+ * How one list orders itself while no search is live. The choice persists
+ * across sessions under the list's own key; it survives a scope change,
+ * because a popularity answer means the same thing in every slice. A sort the
+ * list does not answer in is refused: the caller holds the list's own menu,
+ * so only a hand-built call can offer one.
  */
 export function setSort(destination: Destination, sort: ListSort): void {
-  const { unit, scope, sort: current } = state.views[destination];
+  if (!LIST_SORTS[destination].includes(sort)) return;
+  const { scope, sort: current } = state.views[destination];
   if (sort === current) return;
   if (sort === DEFAULT_SORT) storage.removeItem(SORT_KEY_PREFIX + destination);
   else storage.setItem(SORT_KEY_PREFIX + destination, sort);
@@ -210,7 +191,6 @@ export function setSort(destination: Destination, sort: ListSort): void {
       ...state.views,
       // The default stays absent, exactly as it is never stored.
       [destination]: buildView(
-        unit,
         sort === DEFAULT_SORT ? undefined : sort,
         scope,
       ),
@@ -220,13 +200,13 @@ export function setSort(destination: Destination, sort: ListSort): void {
 
 /** Narrow one list to a scope, or — with `null` — to every scope. */
 export function setScope(destination: Destination, scope: string | null): void {
-  const { unit, sort, scope: current } = state.views[destination];
+  const { sort, scope: current } = state.views[destination];
   if ((scope ?? undefined) === current) return;
   publish({
     ...state,
     views: {
       ...state.views,
-      [destination]: buildView(unit, sort, scope ?? undefined),
+      [destination]: buildView(sort, scope ?? undefined),
     },
   });
 }
