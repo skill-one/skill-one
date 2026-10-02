@@ -1264,8 +1264,7 @@ describe("InstalledPage", () => {
       "查看 frontend-design 详情",
     ]);
 
-    // The installed list carries no run fold of its own: no row hides behind
-    // one.
+    // The installed list folds nothing: no row hides behind one.
     expect(
       screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
     ).toBeNull();
@@ -1322,7 +1321,7 @@ describe("InstalledPage", () => {
     );
 
     // Scoping keeps the skills that belong to the domain, whoever they share a
-    // source with: two is below the fold threshold, so each keeps its own row.
+    // source with: each keeps its own row.
     await user.click(screen.getByRole("button", { name: /^内容创作/ }));
     await waitFor(() =>
       expect(

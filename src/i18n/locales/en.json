@@ -184,11 +184,6 @@
     "noMatchSkill": "No skills match the filters",
     "noMatchRepo": "No repositories match the filters"
   },
-  "run": {
-    "moreFrom": "{{count}} more from",
-    "moreFromAria": "{{count}} more from {{repo}}",
-    "total": "{{count}} total"
-  },
   "popover": {
     "skillCount": "{{count}} skills",
     "loadFailed": "Failed to load skill list",

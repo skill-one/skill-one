@@ -69,7 +69,7 @@ skill-one/
 │   │   ├── advanced-settings-dialog.tsx # 二级设置（CDN 基址 + 数据源）
 │   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
 │   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
-│   │   ├── explore/        # 商店探索相关页面（skill-row + skill-run / repo-card / live-groups / search-results）
+│   │   ├── explore/        # 商店探索相关页面（skill-row / repo-card / live-groups / search-results）
 │   │   └── installed/      # 已安装页（agent 头像菜单 / agent-link-settings-dialog 等）
 │   ├── hooks/              # 自定义 hooks
 │   ├── lib/                # API / 业务逻辑层
