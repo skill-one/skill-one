@@ -135,7 +135,7 @@ describe("LinkSuggestionBadge — label variant (default)", () => {
     expect(screen.queryByText("本地描述")).not.toBeInTheDocument();
   });
 
-  it("records the picked candidate without a hash and closes the popover", async () => {
+  it("records the picked candidate as a confirmed link and closes the popover", async () => {
     const user = userEvent.setup();
     renderBadge();
 
@@ -147,7 +147,6 @@ describe("LinkSuggestionBadge — label variant (default)", () => {
     expect(recordSkillProvenance).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
-      undefined,
       "confirm",
     );
     expect(markSkillsChanged).toHaveBeenCalledTimes(1);

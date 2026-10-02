@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { isTauri, searchSkills, getRegistrySnapshot, analyzeSkill } = vi.hoisted(
+const { isTauri, searchSkills, getRegistrySnapshot, skillFingerprint } = vi.hoisted(
   () => ({
     isTauri: vi.fn(),
     searchSkills: vi.fn(),
     getRegistrySnapshot: vi.fn(),
-    analyzeSkill: vi.fn(),
+    skillFingerprint: vi.fn(),
   }),
 );
 
@@ -28,10 +28,12 @@ const { readProvenanceRaw, writeProvenanceRaw, resetLedgerFile } = vi.hoisted(
   },
 );
 vi.mock("../lib/skills-manager", () => ({
-  analyzeSkill,
-  skillFingerprint: vi.fn(async () => null),
+  skillFingerprint,
   readProvenanceRaw,
   writeProvenanceRaw,
+  // The activity log's append path: linking a skill records an event, and the
+  // write itself is not what this suite is about.
+  appendActivityRaw: vi.fn(),
 }));
 
 import { resetMockProvenance } from "../lib/provenance";
@@ -57,13 +59,16 @@ const NAMESAKE = {
     stars: 1,
     downloads: 1,
     path: "skills/a/b/pdf",
-    rev: "hash-a",
   },
   matched: {},
 };
 
 function mockRegistry() {
-  getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 1 });
+  getRegistrySnapshot.mockReturnValue({
+    ready: true,
+    epoch: 1,
+    index: { etag: '"e1"' },
+  });
   searchSkills.mockResolvedValue({ hits: [NAMESAKE] });
 }
 
@@ -73,13 +78,17 @@ beforeEach(() => {
   resetMockProvenance();
   resetLinkSuggestions();
   isTauri.mockReturnValue(true);
-  getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 1 });
+  skillFingerprint.mockResolvedValue(null);
+  getRegistrySnapshot.mockReturnValue({
+    ready: true,
+    epoch: 1,
+    index: { etag: '"e1"' },
+  });
 });
 
 describe("fetchProvenanceState", () => {
-  it("auto-links a tool-installed skill whose hash matches a namesake", async () => {
+  it("auto-links a tool-installed skill whose description matches a namesake", async () => {
     mockRegistry();
-    analyzeSkill.mockResolvedValue({ hash: "hash-a", fingerprint: null });
 
     const state = await runQueryFn([installed("pdf", "Read PDF files.")]);
 
@@ -87,13 +96,12 @@ describe("fetchProvenanceState", () => {
     // Ledger entries written by the auto-link survive a reload.
     const rerun = await runQueryFn([installed("pdf", "Read PDF files.")]);
     expect(rerun.linked.pdf?.repo).toBe("anthropics/skills");
-    // The second run skips the hash work entirely (ledger has it now).
-    expect(analyzeSkill).toHaveBeenCalledTimes(1);
+    // The second run reads the ledger and does no association work at all.
+    expect(searchSkills).toHaveBeenCalledTimes(1);
   });
 
-  it("offers ranked suggestions when the hash tier misses", async () => {
+  it("offers ranked suggestions when the description does not match", async () => {
     mockRegistry();
-    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
 
     // A description below the 90% auto-link threshold keeps the skill in the
     // confirmable pool.
@@ -103,26 +111,26 @@ describe("fetchProvenanceState", () => {
     expect(state.suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
   });
 
-  it("runs no hash tier outside Tauri (the mock has no real files)", async () => {
+  it("stats no directory outside Tauri (the mock has no real files)", async () => {
     isTauri.mockReturnValue(false);
     mockRegistry();
 
-    // Below the 90% auto-link threshold, so it stays a suggestion even without
-    // the hash tier.
+    // Below the 90% auto-link threshold, so it stays a suggestion even with no
+    // fingerprint to store.
     const state = await runQueryFn([installed("pdf", "Convert PDF files.")]);
 
-    expect(analyzeSkill).not.toHaveBeenCalled();
+    expect(skillFingerprint).not.toHaveBeenCalled();
     // Suggestions still work — they are registry lookups only.
     expect(state.suggestions.pdf).toHaveLength(1);
   });
 
   it("returns empty state when the registry is not ready", async () => {
-    getRegistrySnapshot.mockReturnValue({ ready: false, epoch: 0 });
+    getRegistrySnapshot.mockReturnValue({ ready: false, epoch: 0, index: null });
 
     const state = await runQueryFn([installed("pdf", "Read PDF files.")]);
     expect(state.linked).toEqual({});
     expect(state.suggestions).toEqual({});
-    expect(analyzeSkill).not.toHaveBeenCalled();
+    expect(skillFingerprint).not.toHaveBeenCalled();
     expect(searchSkills).not.toHaveBeenCalled();
   });
 });

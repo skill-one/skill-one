@@ -48,7 +48,7 @@ export function SourceLinkMenu({ skill }: { skill: SkillView }) {
     try {
       // A confirmed pick is recorded into the ledger like a native install;
       // the user's choice is the act of identification.
-      await recordSkillProvenance(repo, skill.name, undefined, "confirm");
+      await recordSkillProvenance(repo, skill.name, "confirm");
       await markSkillsChanged(queryClient);
       toast.add({ title: t("migration.migrated", { repo }), type: "success" });
       setOpen(false);

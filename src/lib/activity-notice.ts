@@ -56,8 +56,6 @@ function originKey(value: unknown): ParseKeys {
 /** The i18n key naming why a skill was associated with its source. */
 function reasonKey(value: unknown): ParseKeys {
   switch (value) {
-    case "hash":
-      return "activity.reason.hash";
     case "description":
       return "activity.reason.description";
     case "confirm":

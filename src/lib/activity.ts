@@ -48,7 +48,7 @@ export type ActivityTargetKind = "skill" | "agent";
 export type ActivityResult = "ok" | "failed";
 
 /** Why a skill was associated with a store source. */
-export type SourceLinkReason = "install" | "hash" | "description" | "confirm";
+export type SourceLinkReason = "install" | "description" | "confirm";
 
 /** The event types the app records. */
 export type ActivityEventType =

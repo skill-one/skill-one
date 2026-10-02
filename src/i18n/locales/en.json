@@ -276,18 +276,20 @@
       "raw": "Raw JSONL"
     },
     "kind": {
+      "meta": "header",
       "source": "source",
-      "resolution": "resolution",
+      "pending": "pending",
       "unknown": "unrecognized"
     },
     "field": {
+      "kind": "kind",
+      "index": "index",
       "name": "name",
       "repo": "repo",
-      "installedAt": "installedAt",
-      "hash": "hash",
-      "epoch": "epoch",
+      "via": "via",
+      "key": "key",
+      "repos": "repos",
       "fingerprint": "fingerprint",
-      "namesakesKey": "namesakesKey",
       "candidates": "candidates",
       "similarity": "similarity",
       "stars": "stars",
@@ -345,7 +347,6 @@
     },
     "reason": {
       "install": "Recorded at install",
-      "hash": "Auto-linked by content match",
       "description": "Auto-linked by description",
       "confirm": "Confirmed by you"
     },

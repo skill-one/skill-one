@@ -101,8 +101,8 @@ export interface SkillView extends Skill {
   /**
    * Installed skills only: how the recorded source was established —
    * `install` (this app installed the skill), `confirm` (the user picked the
-   * source from candidates), or `description`/`hash` (auto-linked). Absent
-   * for store rows (which need no provenance) and pre-v3 ledger records.
+   * source from candidates), or `description` (auto-linked). Absent for store
+   * rows (which need no provenance) and for a ledger record written without it.
    */
   via?: SourceLinkReason;
   /**

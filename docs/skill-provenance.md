@@ -17,44 +17,68 @@ distinguished from the installed one.
 
 ## Design: an app-level ledger
 
-The app keeps its own record — the **provenance ledger** — as a JSONL file,
-one line per skill, last line wins:
+The app keeps its own record — the **provenance ledger** — as a JSONL file: a
+header line, then one line per skill, last line wins:
 
 ```
 ~/.agents/skills/.skill-one.jsonl
 ```
 
 ```jsonc
-// A source record (`repo` present): the skill is linked to its store entry.
-{"name":"pdf","repo":"anthropics/skills","installedAt":"2026-09-13T08:00:00.000Z","hash":"9a1f…","via":"install"}
+// The header, always first: the identity of the registry snapshot the pending
+// records below were computed against.
+{"kind":"meta","index":"\"a1b2c3\""}
 
-// A resolution record (`repo` absent): the cached outcome of failed source
-// matching — see "Associating skills installed by other tools" below.
-{"name":"my-tool","epoch":42,"hash":"b2e0…","fingerprint":{"mtimeMs":1738022.4,"size":48213},"namesakesKey":"…","candidates":[…]}
+// A source record: the skill is linked to its store entry. `via` states how —
+// `install` (this app installed it), `confirm` (the user picked the source
+// from candidates) or `description` (auto-linked) — which is how the detail
+// drawer tells a store install from a linked third-party copy.
+{"kind":"source","name":"pdf","repo":"anthropics/skills","via":"install"}
 
-// A dismissal (`repo` absent, `dismissed` present): the user cut a skill's
-// source association in the detail drawer. The auto-link tiers never link a
-// dismissed repo back; the user can still pick it from candidates.
-{"name":"my-tool","epoch":42,"dismissed":["someone/skills"]}
+// A pending record: a suggestion still waiting on the user. `candidates` are
+// the ranked namesakes, `key` a digest of the ranking input, `fingerprint`
+// the stat-only directory state they were computed against. `repos` are ones
+// the user cut: the auto-link never links those back on its own, while the
+// user can still pick one by hand.
+{"kind":"pending","name":"my-tool","key":"1a2b3c4d5e6f7081","fingerprint":{"mtimeMs":1738022.4,"size":48213},"candidates":[…],"repos":["someone/skills"]}
 ```
 
-There is no kind tag and no version field: `repo` discriminates the two
-record shapes, unknown or broken lines are skipped (per-line tolerance), and
-a format change ships as a one-time whole-file migration rather than a
-version number. The optional `hash` on a source record is the **store-side**
-content hash recorded when the association was made: the registry entry's
-`rev` at install time (native installs) or the matched rev (hash auto-link).
-It is a version marker, not a description of the local files — the freshly
-installed clone tracks repo HEAD, which can be ahead of the indexed snapshot,
-so a computed directory hash would permanently disagree with the rev and
-poison the update signal. A future update check simply compares the recorded
-hash against the latest index rev: differ means the store published a new
-version since install. Local edits are invisible to it, by design. The
-optional `via` states how the association was established — `install` (the
-app installed the skill itself), `confirm` (the user picked the source from
-candidates) or `description`/`hash` (auto-linked) — which is how the detail
-drawer tells a store install from a linked third-party copy. Absent in
-pre-v3 records, treated as unknown.
+Every line says what it is: `kind` discriminates the shapes, so a record is
+read as what it claims to be rather than as an inference from which fields
+happen to be present. The header's `index` is the served snapshot's `etag`
+(`IndexInfo.etag` — equal etag, equal index bytes), which makes "is this
+cached ranking still good?" one comparison against the snapshot being served
+now. It is deliberately not the client-side `epoch` counter, which restarts
+at zero with every process and would validate a month-old record against
+today's dataset. A header that names no snapshot vouches for nothing: its
+cached records are recomputed rather than trusted.
+
+Two things the format deliberately does not carry, and one it refuses to
+cache, each because nothing read them or nothing could:
+
+- **No timestamps.** The ledger never displayed an install time — the UI reads
+  the filesystem's own stamp off the installed record — and for a third-party
+  copy the only time the app knew was the moment it wrote the *association*,
+  which is not an install. When a link happened is the activity log's fact.
+- **No content hash.** The registry stopped publishing per-skill hashes, so a
+  stored hash had nothing to be compared against. The tier that computed one
+  (`analyze_skill` and `skill_hash.rs`) is gone with it: what guards a cached
+  ranking is the stat-only `fingerprint`, which answers the only question the
+  ledger asks of a directory — has it changed — without reading a file byte.
+  An association pass over a dozen unlinked skills now costs a dozen stat
+  walks, not a dozen full content reads.
+- **No dead ends.** A skill with no same-slug registry entry is worth no line
+  at all: re-deriving it is one in-memory query, and a stored one would be
+  re-written in bulk on every snapshot change. What is persisted is what was
+  expensive (a ranking) or was a decision (a cut), so a name disappearing from
+  the ledger is the format working, not data loss.
+
+Unknown or broken lines are skipped, and that per-line tolerance is the whole
+safety story: a line this build cannot read — malformed, hand-edited, or
+written by a format it does not know — is dropped while the rest of the file
+still answers. There is no format version and no older shape to read. A format
+change is a whole-file replacement, and whatever a build could parse it can
+also express.
 
 Key properties:
 
@@ -69,9 +93,6 @@ Key properties:
   (name-only matching, the pre-ledger behavior).
 - **Invisible to other tools.** The file is a hidden dotfile without a
   `SKILL.md`, so the `agents-skills` directory scan ignores it entirely.
-- **Migrated transparently.** The pre-JSONL format (`.skill-one.json`, a
-  single JSON document) is read while it exists; the first write of the new
-  format removes it.
 
 ### Storage choice
 
@@ -83,17 +104,16 @@ it and the ledger is rebuilt by future installs.
 
 ### Backend surface
 
-The Rust side stays thin — fixed-path file commands plus the content-identity
-analysis, no ledger schema knowledge (parsing, merging and pruning live in
+The Rust side stays thin — fixed-path file commands plus the directory
+identity, no ledger schema knowledge (parsing, merging and pruning live in
 `src/lib/provenance.ts`):
 
 | Command | Behavior |
 | --- | --- |
-| `read_provenance` | Raw ledger content; `null` when neither the JSONL file nor the legacy document exists |
-| `write_provenance` | Full-document replace, atomic (temp file + rename); removes a leftover legacy document |
+| `read_provenance` | Raw ledger content; `null` when it does not exist yet |
+| `write_provenance` | Full-document replace, atomic (temp file + rename) |
 | `open_provenance_dir` | Reveal the ledger's directory (the global skills directory) in the system file manager |
-| `analyze_skill` | The skill's content identity in one walk: upstream hash + fingerprint |
-| `skill_fingerprint` | Stat-only fingerprint (no file bytes read), the cheap validity check for a stored hash |
+| `skill_fingerprint` | Stat-only directory fingerprint (latest mtime + total size, no file bytes read) — what guards a stored ranking |
 
 All resolve paths internally (`<home>/.agents/skills/…`); no caller-controlled
 paths are accepted.
@@ -146,64 +166,32 @@ came from X" needs to see the record the app is not acting on too.
 ## Associating skills installed by other tools
 
 The ledger only covers installs made through this app. Skills installed by
-other tools (the `npx skills` CLI, manual copies) get associated through two
-further tiers, run by the same reconcile query (`use-skill-provenance.ts`,
-`lib/link-suggestions.ts`) and only when the registry snapshot is ready:
+other tools (the `npx skills` CLI, manual copies) are associated by the same
+reconcile query (`use-skill-provenance.ts`, `lib/link-suggestions.ts`), and
+only when the registry snapshot is ready. It runs cheap-first.
 
-### Tier 1 — hash auto-link (certain)
+### Step 1 — the namesake filter
 
-The store index carries the skills.sh upstream content hash per skill:
-SHA-256 over each file's `relative path + 0x00 + bytes + 0x00`, files in
-case-insensitive ICU collation order (`Intl.Collator("en", {sensitivity:
-"base"})` — *not* byte order, which reproduces only ~40% of hashes). The
-cheap filter runs first: a skill with no same-slug registry entries is
-skipped entirely — plain local skill, no disk walk. Otherwise the backend
-computes the same hash for the installed skill (`analyze_skill`,
-`skill_hash.rs`, which also yields the change-detection fingerprint in the
-same walk); equality with a namesake entry's `rev` is content-level
-identity, so the association is written into the ledger exactly like a
-native install — no user interaction, and the card immediately shows the
-source repo.
+A skill with no same-slug registry entry is a plain local skill: nothing to
+associate, and no reason to look at its directory at all. This is one in-memory
+query against the worker's search index, which is why its "no namesakes"
+verdict earns no line in the ledger — see the format section above.
 
-Verified against the published snapshot: 51/51 sampled skills re-hashed
-locally match the index. Misses are expected and handled: the mirror snapshot
-may omit files the local clone has (media/binaries), `safeSegment` rewrites
-exotic path characters, and the local copy may simply be a different version
-than the indexed one.
+### Step 2 — description auto-link, then ranked candidates
 
-**Misses are cached, not repeated.** Every outcome — dead end, hash, ranked
-candidates — is persisted as a resolution record (see the ledger format
-above), stamped with the registry snapshot's `epoch` and, where a hash was
-computed, guarded by a stat-only directory `fingerprint` (latest mtime +
-total size). Consequences:
-
-- **Same snapshot, unchanged content → no work at all.** An app restart
-  re-runs nothing: the ledger answers from disk, the session memo answers
-  within a run.
-- **New snapshot → cheap lookups only.** A fresh snapshot can carry the rev a
-  local hash was waiting for, or new namesakes, so the namesake lookup
-  re-runs — an in-memory index query, no disk. The stored hash is reused for
-  matching after the fingerprint revalidates the directory (stat-only);
-  re-ranking is skipped while the ranking input (namesake identity fields)
-  is unchanged.
-- **Edited content → one re-analysis.** A fingerprint mismatch re-runs the
-  single walk that recomputes hash and fingerprint together.
-
-### Tier 2 — description auto-link, then ranked candidates (heuristic)
-
-For whatever remains, same-slug registry entries are ranked by description
-similarity (token Jaccard; Han text is compared as character bigrams, the
-same trick the shared search index uses).
+The remaining namesakes are ranked by description similarity (token Jaccard;
+Han text is compared as character bigrams, the same trick the shared search
+index uses).
 
 **Auto-link at ≥ 90%.** When the best namesake's similarity reaches
 `SIMILARITY_AUTO_LINK_THRESHOLD` (0.9), the wording is close enough to call
 the two skills the same, so the association is written into the ledger
-automatically — no prompt. A description match verifies no content, so the
-version marker (`hash`) is left unset, exactly like a user-confirmed link; the
-card shows the source repo the same way a native install does.
+automatically — no prompt, and the card shows the source repo the same way a
+native install does.
 
-**Below 90% — surfaced for confirmation.** The remaining candidates are shown
-on the card as a 确认关联 affordance. The dialog lists the top 5 candidates by
+**Below 90% — surfaced for confirmation.** The ranking is stored as a pending
+record, so a restart revives it instead of redoing the similarity math, and the
+candidates are shown on the card as a 确认关联 affordance. The dialog lists the top 5 candidates by
 similarity with their percentage, explicitly labeled as a reference, not proof
 — forks share descriptions, so a high score still does not *identify* a skill.
 There is no lower floor: a low score only sinks a candidate to the bottom of
@@ -239,10 +227,12 @@ the re-selection affordances:
   out. A confirmed pick is written like a native install (`via: "confirm"`);
   nothing is written until the user picks or unlinks.
 
-**Unlinking dismisses the repo.** Cutting the association replaces the source
-record with a resolution record carrying `dismissed`, so the auto-link tiers
-never chain the same repo back on their own — the user's cut is a decision.
-The dismissed repo still surfaces among the manual candidates, since picking
-it again is the user's own act of re-identification. Inside a running session
-the suggestion memo is cleared, so the next reconcile pass immediately
-re-runs the lookup and offers what remains.
+**Unlinking cuts the repo.** Cutting the association replaces the source record
+with a pending record listing that repo in `repos`, so the auto-link tiers
+never chain it back on their own — the user's cut is a decision, not a cache.
+Everything else the record already knew stays: the candidates, the fingerprint
+and the ranking digest survive, so re-deciding later costs nothing. The cut
+repo still surfaces among the manual candidates, since picking it again is the
+user's own act of re-identification. Inside a running session the suggestion
+memo is cleared, so the next reconcile pass immediately re-runs the lookup and
+offers what remains.
