@@ -18,16 +18,13 @@ import {
  */
 
 const RAW = [
-  JSON.stringify({
-    name: "pdf",
-    repo: "anthropics/skills",
-    installedAt: "2026-09-13T00:00:00.000Z",
-    hash: "sha256:abc",
-  }),
+  JSON.stringify({ kind: "meta", v: 3, index: '"e1"' }),
+  JSON.stringify({ kind: "source", name: "pdf", repo: "anthropics/skills", via: "install" }),
   "{broken",
   JSON.stringify({
+    kind: "pending",
     name: "my-tool",
-    epoch: 7,
+    key: "1a2b3c4d5e6f7081",
     fingerprint: { mtimeMs: 1738022400000, size: 48213 },
     candidates: [
       {
@@ -69,31 +66,27 @@ describe("DeveloperDialog", () => {
     expect(
       screen.getByRole("heading", { name: "my-tool" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("3 条记录")).toBeInTheDocument();
+    expect(screen.getByText("4 条记录")).toBeInTheDocument();
     // The source record's fields, verbatim.
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
-    expect(screen.getByText("2026-09-13T00:00:00.000Z")).toBeInTheDocument();
-    expect(screen.getByText("sha256:abc")).toBeInTheDocument();
-    // The resolution record renders fully, nested objects included.
+    expect(screen.getByText("install")).toBeInTheDocument();
+    // The header line is a card of its own, showing the snapshot identity the
+    // cached records below belong to.
+    expect(screen.getByText('"e1"')).toBeInTheDocument();
+    // The pending record renders fully, nested objects included.
+    expect(screen.getByText("1a2b3c4d5e6f7081")).toBeInTheDocument();
     expect(screen.getByText("1738022400000")).toBeInTheDocument();
     expect(screen.getByText("48213")).toBeInTheDocument();
     expect(screen.getByText("0.93")).toBeInTheDocument();
     expect(screen.getByText("Read PDF files.")).toBeInTheDocument();
-    // Kind badges distinguish the two record kinds.
+    // Kind badges distinguish the three record kinds.
+    expect(screen.getByText("文件头")).toBeInTheDocument();
     expect(screen.getByText("来源")).toBeInTheDocument();
-    expect(screen.getByText("解析缓存")).toBeInTheDocument();
-  });
-
-  it("flags a broken line with its verbatim text instead of hiding it", async () => {
-    seedMockLedgerRaw(RAW);
-    renderDialog();
-
-    expect(await screen.findByText("无法解析的行")).toBeInTheDocument();
-    expect(screen.getByText("{broken")).toBeInTheDocument();
+    expect(screen.getByText("待确认")).toBeInTheDocument();
   });
 
   it("renders an unrecognized record anyway, flagged", async () => {
-    seedMockLedgerRaw(JSON.stringify({ name: "weird", size: 3 }));
+    seedMockLedgerRaw(JSON.stringify({ kind: "someday", name: "weird", size: 3 }));
     renderDialog();
 
     expect(

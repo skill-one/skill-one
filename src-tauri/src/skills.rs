@@ -6,7 +6,7 @@
 
 use serde::Serialize;
 
-use crate::skill_hash;
+use crate::dir_fingerprint;
 use agents_skills::{AddRequest, AgentRequest, LinkOutcome, Manager, SelectionRequest};
 
 /// The skills directory is the user-level **global** one (`~/.agents/skills`).
@@ -567,7 +567,9 @@ pub async fn open_skill_dir(name: String) -> Result<(), String> {
 
 /// The cheap change-detection fingerprint of a skill directory (stat only —
 /// no file bytes are read). Serialized with numeric fields the frontend stores
-/// in the ledger and compares after a restart.
+/// Stat-only change-detection identity of an installed skill's directory (see
+/// `dir_fingerprint.rs`): the guard the provenance ledger checks before reusing
+/// a cached ranking.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FingerprintDto {
@@ -575,46 +577,8 @@ pub struct FingerprintDto {
     pub size: u64,
 }
 
-/// The content identity of a locally installed skill: the upstream hash plus
-/// the fingerprint that tells when the hash can be reused without re-walking
-/// the directory (see `skill_hash.rs`).
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillContentDto {
-    pub hash: String,
-    pub fingerprint: FingerprintDto,
-}
-
-/// Compute the content identity of a locally installed skill: the skills.sh
-/// upstream hash plus its change-detection fingerprint (see `skill_hash.rs`).
-///
-/// `None` when the name is not installed; an analysis error (unreadable files)
-/// surfaces as the command error — the frontend treats both as "no match".
-/// The name resolves through `list`, so no path is ever interpolated.
-#[tauri::command]
-pub async fn analyze_skill(name: String) -> Result<Option<SkillContentDto>, String> {
-    run_blocking("analyze skill", move |manager| {
-        let listed = manager.list().map_err(|e| e.to_string())?;
-        match listed.into_iter().find(|s| s.name == name) {
-            None => Ok(None),
-            Some(skill) => {
-                let content = skill_hash::analyze_skill_dir(&manager.skill_dir(&skill))?;
-                Ok(Some(SkillContentDto {
-                    hash: content.hash,
-                    fingerprint: FingerprintDto {
-                        mtime_ms: content.fingerprint.mtime_ms,
-                        size: content.fingerprint.size,
-                    },
-                }))
-            }
-        }
-    })
-    .await
-}
-
-/// Stat-only fingerprint of an installed skill's directory — the cheap
-/// validity check that lets the ledger reuse a stored content hash across
-/// restarts without reading any file bytes.
+/// Stat-only fingerprint of an installed skill's directory — no file bytes are
+/// read, so the ledger can revalidate a cached candidate list cheaply.
 ///
 /// `None` when the name is not installed. The name resolves through `list`,
 /// so no path is ever interpolated.
@@ -625,7 +589,7 @@ pub async fn skill_fingerprint(name: String) -> Result<Option<FingerprintDto>, S
         match listed.into_iter().find(|s| s.name == name) {
             None => Ok(None),
             Some(skill) => {
-                let fp = skill_hash::fingerprint_skill_dir(&manager.skill_dir(&skill))?;
+                let fp = dir_fingerprint::fingerprint_skill_dir(&manager.skill_dir(&skill))?;
                 Ok(Some(FingerprintDto {
                     mtime_ms: fp.mtime_ms,
                     size: fp.size,

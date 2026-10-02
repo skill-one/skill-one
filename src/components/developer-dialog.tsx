@@ -24,38 +24,35 @@ import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 type LedgerView = "structured" | "raw";
 
 /**
- * What kind of knowledge a ledger line holds, judged by the same
- * discriminators `parseLedger` uses (`repo` present = source, `epoch`
- * present = resolution). Anything else is rendered anyway — the viewer shows
- * the file as it is — just flagged as unrecognized.
+ * What kind of knowledge a ledger line holds, read off the `kind` field every
+ * line carries. Anything else is rendered anyway — the viewer shows the file as
+ * it is — just flagged as unrecognized.
  */
-type LedgerKind = "source" | "resolution" | "unknown";
+type LedgerKind = "meta" | "source" | "pending" | "unknown";
 
 function ledgerKind(record: unknown): LedgerKind {
   if (typeof record !== "object" || record === null) return "unknown";
-  const entry = record as Record<string, unknown>;
-  if (typeof entry.repo === "string" && entry.repo.length > 0) return "source";
-  if (typeof entry.epoch === "number" && Number.isFinite(entry.epoch)) {
-    return "resolution";
-  }
-  return "unknown";
+  const { kind } = record as Record<string, unknown>;
+  return kind === "meta" || kind === "source" || kind === "pending" ? kind : "unknown";
 }
 
 const KIND_VARIANT: Record<LedgerKind, "default" | "secondary" | "outline"> = {
+  meta: "outline",
   source: "default",
-  resolution: "secondary",
+  pending: "secondary",
   unknown: "outline",
 };
 
 /** i18n keys for the known ledger fields; unknown fields show their raw key. */
 const FIELD_KEYS: Record<string, ParseKeys> = {
+  kind: "developer.field.kind",
+  index: "developer.field.index",
   name: "developer.field.name",
   repo: "developer.field.repo",
-  installedAt: "developer.field.installedAt",
-  hash: "developer.field.hash",
-  epoch: "developer.field.epoch",
+  via: "developer.field.via",
+  key: "developer.field.key",
+  repos: "developer.field.repos",
   fingerprint: "developer.field.fingerprint",
-  namesakesKey: "developer.field.namesakesKey",
   candidates: "developer.field.candidates",
   similarity: "developer.field.similarity",
   stars: "developer.field.stars",
@@ -238,8 +235,9 @@ function LedgerCard({ entry }: { entry: LedgerLine }) {
 
 /** i18n keys for the record kinds. */
 const KIND_KEY: Record<LedgerKind, ParseKeys> = {
+  meta: "developer.kind.meta",
   source: "developer.kind.source",
-  resolution: "developer.kind.resolution",
+  pending: "developer.kind.pending",
   unknown: "developer.kind.unknown",
 };
 

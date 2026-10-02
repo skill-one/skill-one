@@ -25,9 +25,8 @@ export { PROVENANCE_QUERY_KEY };
  */
 export interface ProvenanceState {
   /**
-   * Skills this app associated with a store entry: name → `{repo, slug,
-   * installedAt, hash?}`. Covers native installs (recorded at install
-   * time), hash-auto-linked tool installs and user confirmations.
+   * Skills this app associated with a store entry: name → `{repo, via?}`.
+   * Covers native installs, auto-linked tool installs and user confirmations.
    */
   linked: Record<string, SkillProvenance>;
   /**
@@ -40,11 +39,11 @@ export interface ProvenanceState {
 
 /**
  * The provenance state for the given installed list, reconciled against it.
- * The tiers run in order: the ledger prune, then (Tauri only — the browser
- * mock has no real files to hash) the content-hash auto-link for unknown
- * skills, then candidate suggestions for whatever remains. Every tier is
- * best-effort; a registry that is not ready yet simply yields fewer
- * suggestions, and the next run retries.
+ * The tiers run in order: the ledger prune, then the association pass over
+ * whatever the ledger does not know (auto-linking a near-identical namesake,
+ * offering the rest for confirmation). Every tier is best-effort; a registry
+ * that is not ready yet simply yields fewer suggestions, and the next run
+ * retries.
  */
 export async function fetchProvenanceState(
   installed: InstalledSkill[],
@@ -59,10 +58,10 @@ export async function fetchProvenanceState(
   // retries.
   if (unlinked.length > 0 && getRegistrySnapshot().ready) {
     noteRegistryEpoch(getRegistrySnapshot().epoch);
-    // Tier 1 — content identity: hash match auto-links (a batched ledger
-    // write), the returned names drop out of the candidate pool and the
-    // refreshed reconcile below picks the entries up.
-    // Tier 2 — ranked namesakes for the user to confirm.
+    // One pass over the unlinked names: a near-identical namesake is linked
+    // outright (a batched ledger write), the rest come back as ranked
+    // candidates for the user to confirm. The refreshed reconcile below picks
+    // the new entries up.
     const resolved = await resolveAssociations(unlinked);
     if (resolved.linked.length > 0) {
       linked = await reconcileProvenance(names);
@@ -84,9 +83,11 @@ export async function fetchProvenanceState(
  * - **The installed name set** (part of the query key): any change to the
  *   on-disk skills — from any code path, this app or not — lands here and
  *   supersedes the state without anyone remembering to invalidate.
- * - **The registry epoch** (also in the key): the tiers need a ready
-   * snapshot, and a new one can carry revs and namesakes the previous one
- *   lacked.
+ * - **The registry epoch** (also in the key): the association pass needs a
+ *   ready snapshot, and a new one can carry namesakes the previous one lacked.
+ *   The epoch is a per-process counter, so it only orders the passes within one
+ *   run; whether a *stored* ranking may be reused is decided by the snapshot
+ *   identity in the ledger header, not by this number.
  *
  * `markSkillsChanged` still invalidates the prefix, covering same-name
  * reinstalls where the set does not change but the ledger does.

@@ -12,26 +12,24 @@ import {
 } from "./link-suggestions";
 import { descriptionSimilarity } from "./description-similarity";
 import type { Skill } from "../types/skill";
-import type { ResolutionRecord } from "./provenance";
+import type { PendingRecord, StoredPending } from "./provenance";
 
 const {
   searchSkills,
   getRegistrySnapshot,
-  analyzeSkill,
   skillFingerprint,
   recordSkillProvenanceBatch,
-  loadResolutionRecords,
-  saveResolutionRecords,
+  loadPendingRecords,
+  savePendingRecords,
   dismissSkillSource,
   isTauri,
 } = vi.hoisted(() => ({
   searchSkills: vi.fn(),
   getRegistrySnapshot: vi.fn(),
-  analyzeSkill: vi.fn(),
   skillFingerprint: vi.fn(),
   recordSkillProvenanceBatch: vi.fn(),
-  loadResolutionRecords: vi.fn(),
-  saveResolutionRecords: vi.fn(),
+  loadPendingRecords: vi.fn(),
+  savePendingRecords: vi.fn(),
   dismissSkillSource: vi.fn(),
   isTauri: vi.fn(),
 }));
@@ -39,7 +37,6 @@ const {
 vi.mock("./registry/client", () => ({ searchSkills, getRegistrySnapshot }));
 vi.mock("./tauri", () => ({ isTauri }));
 vi.mock("./skills-manager", () => ({
-  analyzeSkill,
   skillFingerprint,
   // The activity log's append path: this module links skills, which records an
   // event; the write itself is not under test here.
@@ -47,10 +44,13 @@ vi.mock("./skills-manager", () => ({
 }));
 vi.mock("./provenance", () => ({
   recordSkillProvenanceBatch,
-  loadResolutionRecords,
-  saveResolutionRecords,
+  loadPendingRecords,
+  savePendingRecords,
   dismissSkillSource,
 }));
+
+/** The snapshot identity the mocked registry serves. */
+const ETAG = '"e1"';
 
 /** A namesake entry, as the registry serves it (no per-skill hash anymore). */
 function namesake(repo: string, overrides: Partial<Skill> = {}): Skill {
@@ -66,19 +66,46 @@ function namesake(repo: string, overrides: Partial<Skill> = {}): Skill {
   };
 }
 
-function mockReady(entries: Skill[]) {
-  getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 1 });
+/** A ready registry serving `entries` under the given snapshot identity. */
+function mockReady(entries: Skill[], etag: string = ETAG) {
+  getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 1, index: { etag } });
   searchSkills.mockResolvedValue({
     hits: entries.map((skill) => ({ skill, matched: {} })),
   });
+}
+
+/** Nothing stored yet: no header, no records. */
+function mockLedger(stored: Partial<StoredPending> = {}) {
+  loadPendingRecords.mockResolvedValue({ index: ETAG, records: {}, ...stored });
+}
+
+/** A pending record awaiting the user's confirmation. */
+function pending(overrides: Partial<PendingRecord> = {}): PendingRecord {
+  return {
+    kind: "pending",
+    name: "pdf",
+    key: "1a2b3c4d5e6f7081",
+    fingerprint: { mtimeMs: 1000, size: 200 },
+    candidates: [
+      {
+        repo: "anthropics/skills",
+        similarity: 0.4,
+        stars: 10,
+        downloads: 10,
+        description: "Read and manipulate PDF files.",
+      },
+    ],
+    ...overrides,
+  };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   resetLinkSuggestions();
   isTauri.mockReturnValue(true);
-  loadResolutionRecords.mockResolvedValue({});
+  mockLedger();
   mockReady([]);
+  skillFingerprint.mockResolvedValue(null);
 });
 
 describe("rankNamesakes", () => {
@@ -145,10 +172,9 @@ describe("rankNamesakes", () => {
 
 describe("resolveAssociations", () => {
   it("auto-links a near-identical description at/above the threshold", async () => {
-    // Hash tier misses, but the wording matches the namesake 100% — close
-    // enough to be the same skill, so it links without a prompt.
+    // The wording matches the namesake 100% — close enough to be the same
+    // skill, so it links without a prompt.
     mockReady([namesake("anthropics/skills")]);
-    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and manipulate PDF files." },
@@ -156,13 +182,12 @@ describe("resolveAssociations", () => {
 
     expect(linked).toEqual(["pdf"]);
     expect(suggestions).toEqual({});
-    // A description match does not verify content, so no version marker.
     expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
       { repo: "anthropics/skills", name: "pdf", reason: "description" },
     ]);
   });
 
-  it("auto-links by similarity even outside Tauri (no real files needed)", async () => {
+  it("auto-links by description outside Tauri too (no files to stat)", async () => {
     isTauri.mockReturnValue(false);
     mockReady([namesake("anthropics/skills")]);
 
@@ -170,7 +195,7 @@ describe("resolveAssociations", () => {
       { name: "pdf", description: "Read and manipulate PDF files." },
     ]);
 
-    expect(analyzeSkill).not.toHaveBeenCalled();
+    expect(skillFingerprint).not.toHaveBeenCalled();
     expect(linked).toEqual(["pdf"]);
     expect(suggestions).toEqual({});
   });
@@ -183,7 +208,6 @@ describe("resolveAssociations", () => {
     ).toBeLessThan(SIMILARITY_AUTO_LINK_THRESHOLD);
 
     mockReady([namesake("anthropics/skills")]);
-    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and convert PDF files." },
@@ -193,14 +217,10 @@ describe("resolveAssociations", () => {
     expect(suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
   });
 
-  it("links a matching description regardless of the local hash (the registry publishes none)", async () => {
-    // The registry no longer carries per-skill hashes, so the local hash
-    // matches nothing — the description tier is the only auto-link.
-    mockReady([
-      namesake("anthropics/skills"),
-      namesake("fork/skills"),
-    ]);
-    analyzeSkill.mockResolvedValue({ hash: "hash-fork", fingerprint: null });
+  it("links a matching description regardless of any content hash", async () => {
+    // The registry carries no per-skill hash, so a description match is the
+    // only auto-link there is.
+    mockReady([namesake("anthropics/skills"), namesake("fork/skills")]);
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and manipulate PDF files." },
@@ -215,7 +235,7 @@ describe("resolveAssociations", () => {
 
   it("offers ranked suggestions when the description misses", async () => {
     mockReady([namesake("anthropics/skills")]);
-    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
+    skillFingerprint.mockResolvedValue({ mtimeMs: 1, size: 2 });
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and convert PDF files." },
@@ -224,139 +244,93 @@ describe("resolveAssociations", () => {
     expect(linked).toEqual([]);
     expect(suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
     expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
-    // The outcome is persisted, so a restart starts from the ledger.
-    expect(saveResolutionRecords).toHaveBeenCalledWith(
-      [expect.objectContaining({ name: "pdf", epoch: 1, hash: "hash-other" })],
+    // The outcome is persisted against the snapshot it was computed from, so a
+    // restart starts from the ledger.
+    expect(savePendingRecords).toHaveBeenCalledWith(
+      [expect.objectContaining({ kind: "pending", name: "pdf", key: expect.any(String) })],
       [],
+      ETAG,
     );
   });
 
-  it("memoizes description misses for the session but keeps suggesting", async () => {
+  it("never re-stats a skill the session memo already settled", async () => {
     mockReady([namesake("anthropics/skills")]);
-    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
+    skillFingerprint.mockResolvedValue({ mtimeMs: 1, size: 2 });
 
     const first = await resolveAssociations([
       { name: "pdf", description: "Read and convert PDF files." },
     ]);
     expect(first.suggestions.pdf).toHaveLength(1);
 
-    // Second pass: no re-hash, but the candidates are still offered.
+    // Second pass: the memo answers, so not even a stat call happens.
     const second = await resolveAssociations([
       { name: "pdf", description: "Read and convert PDF files." },
     ]);
     expect(second.suggestions.pdf).toHaveLength(1);
-    expect(analyzeSkill).toHaveBeenCalledTimes(1);
+    expect(skillFingerprint).toHaveBeenCalledTimes(1);
   });
 
-  it("reuses the stored outcome across a restart while snapshot and content are unchanged", async () => {
+  it("reuses the stored ranking across a restart while snapshot and content hold", async () => {
     mockReady([namesake("anthropics/skills")]);
-    const fingerprint = { mtimeMs: 1000, size: 200 };
-    const stored: ResolutionRecord = {
-      name: "pdf",
-      epoch: 1,
-      hash: "hash-other",
-      fingerprint,
-      namesakesKey: "x",
-      candidates: [],
-    };
-    // The suggestion variant of the record: ranked candidates awaiting
-    // confirmation, their hash/fingerprint guarding any re-work.
-    stored.candidates = [
-      {
-        repo: "anthropics/skills",
-        similarity: 0.4,
-        stars: 10,
-        downloads: 10,
-        description: "Read and manipulate PDF files.",
-      },
-    ];
-    loadResolutionRecords.mockResolvedValue({ pdf: stored });
-    skillFingerprint.mockResolvedValue(fingerprint);
+    mockLedger({ records: { pdf: pending() } });
+    skillFingerprint.mockResolvedValue({ mtimeMs: 1000, size: 200 });
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and convert PDF files." },
     ]);
 
-    // No worker query, no disk walk — the ledger answers.
+    // No worker query, no re-ranking: the ledger answers.
     expect(searchSkills).not.toHaveBeenCalled();
-    expect(analyzeSkill).not.toHaveBeenCalled();
     expect(skillFingerprint).toHaveBeenCalledTimes(1);
     expect(linked).toEqual([]);
     expect(suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
     expect(suggestions.pdf[0].skill.name).toBe("pdf");
   });
 
-  it("re-hashes when the stored fingerprint no longer matches the disk", async () => {
+  it("re-ranks when the served snapshot is not the one on record", async () => {
+    mockReady([namesake("anthropics/skills")], '"e2"');
+    mockLedger({ records: { pdf: pending() } });
+    skillFingerprint.mockResolvedValue({ mtimeMs: 1000, size: 200 });
+
+    await resolveAssociations([{ name: "pdf", description: "Read and convert PDF files." }]);
+
+    // A new dataset can carry other namesakes, so the lookup re-runs…
+    expect(searchSkills).toHaveBeenCalledTimes(1);
+    // …and the record is re-stamped with the snapshot it now belongs to.
+    expect(savePendingRecords).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: "pdf" })],
+      [],
+      '"e2"',
+    );
+  });
+
+  it("trusts nothing when the file names no snapshot", async () => {
+    // The records are still there, but nothing may claim they are current.
     mockReady([namesake("anthropics/skills")]);
-    loadResolutionRecords.mockResolvedValue({
-      pdf: {
-        name: "pdf",
-        epoch: 1,
-        hash: "hash-other",
-        fingerprint: { mtimeMs: 1000, size: 200 },
-        namesakesKey: "x",
-        candidates: [
-          {
-            repo: "anthropics/skills",
-            similarity: 0.4,
-            stars: 10,
-            downloads: 10,
-            description: "Read and manipulate PDF files.",
-          },
-        ],
-      },
-    });
-    // The skill was edited on disk: fingerprint mismatch, fresh analysis.
+    mockLedger({ index: undefined, records: { pdf: pending() } });
+    skillFingerprint.mockResolvedValue({ mtimeMs: 1000, size: 200 });
+
+    await resolveAssociations([{ name: "pdf", description: "Read and convert PDF files." }]);
+
+    expect(searchSkills).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-ranks when the stored fingerprint no longer matches the disk", async () => {
+    mockReady([namesake("anthropics/skills")]);
+    mockLedger({ records: { pdf: pending() } });
+    // The skill was edited on disk: fingerprint mismatch, fresh ranking.
     skillFingerprint.mockResolvedValue({ mtimeMs: 2000, size: 300 });
-    analyzeSkill.mockResolvedValue({ hash: "hash-a", fingerprint: { mtimeMs: 2000, size: 300 } });
 
-    const { linked } = await resolveAssociations([{ name: "pdf" }]);
+    const { suggestions } = await resolveAssociations([
+      { name: "pdf", description: "Read and convert PDF files." },
+    ]);
 
-    expect(analyzeSkill).toHaveBeenCalledTimes(1);
-    expect(linked).toEqual([]);
+    expect(searchSkills).toHaveBeenCalledTimes(1);
+    expect(suggestions.pdf).toHaveLength(1);
   });
 
-  it("reuses the stored hash against a new snapshot without re-hashing", async () => {
-    // First session: the hash missed.
-    mockReady([namesake("anthropics/skills")]);
-    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: { mtimeMs: 1, size: 2 } });
-    await resolveAssociations([{ name: "pdf", description: "Read and convert PDF files." }]);
-    expect(analyzeSkill).toHaveBeenCalledTimes(1);
-
-    // Restart (fresh memo) with a new snapshot; the stale-epoch record falls
-    // through to the lookup, and the stored hash is reused after the
-    // fingerprint revalidation — no re-hash.
-    resetLinkSuggestions();
-    loadResolutionRecords.mockResolvedValue({
-      pdf: {
-        name: "pdf",
-        epoch: 1,
-        hash: "hash-other",
-        fingerprint: { mtimeMs: 1, size: 2 },
-        namesakesKey: "x",
-        candidates: [
-          {
-            repo: "anthropics/skills",
-            similarity: 0.4,
-            stars: 10,
-            downloads: 10,
-            description: "Read and manipulate PDF files.",
-          },
-        ],
-      },
-    });
-    getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 2 });
-    noteRegistryEpoch(2);
-    skillFingerprint.mockResolvedValue({ mtimeMs: 1, size: 2 });
-
-    await resolveAssociations([{ name: "pdf", description: "Read and convert PDF files." }]);
-    expect(analyzeSkill).toHaveBeenCalledTimes(1);
-    expect(skillFingerprint).toHaveBeenCalledTimes(1);
-  });
-
-  it("skips hashing for skills with no namesakes at all", async () => {
+  it("skips the directory entirely for skills with no namesakes at all", async () => {
     mockReady([]);
-    searchSkills.mockResolvedValue({ hits: [] });
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "totally-custom", description: "whatever" },
@@ -364,13 +338,34 @@ describe("resolveAssociations", () => {
 
     expect(linked).toEqual([]);
     expect(suggestions).toEqual({});
-    expect(analyzeSkill).not.toHaveBeenCalled();
+    expect(skillFingerprint).not.toHaveBeenCalled();
   });
 
-  it("treats an unavailable analysis as a miss, not an error", async () => {
+  it("caches no dead end: nothing is written for a skill with no namesake", async () => {
+    mockReady([]);
+
+    await resolveAssociations([{ name: "totally-custom" }]);
+
+    // A dead end is one in-memory query that cannot go stale between runs, so
+    // it is recomputed rather than stored: the pass produces no records at all,
+    // upserts or drops, which the write treats as nothing to do.
+    expect(savePendingRecords).toHaveBeenCalledWith([], [], ETAG);
+  });
+
+  it("drops a stored ranking the fresh run no longer reproduces", async () => {
+    // The namesake left the dataset, so the stored candidates are stale.
+    mockReady([]);
+    mockLedger({ records: { pdf: pending() } });
+
+    await resolveAssociations([{ name: "pdf" }]);
+
+    expect(savePendingRecords).toHaveBeenCalledWith([], ["pdf"], ETAG);
+  });
+
+  it("treats an unreadable directory as a miss, not an error", async () => {
     mockReady([namesake("anthropics/skills")]);
-    // `analyzeSkill` reports failure as null (it owns the catch).
-    analyzeSkill.mockResolvedValue(null);
+    // `skillFingerprint` reports failure as null (it owns the catch).
+    skillFingerprint.mockResolvedValue(null);
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and convert PDF files." },
@@ -378,28 +373,31 @@ describe("resolveAssociations", () => {
 
     expect(linked).toEqual([]);
     expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
-    // Still confirmable by the user through the suggestion list.
+    // Still confirmable by the user, and stored without a fingerprint — so the
+    // next run re-ranks it rather than trusting a guard it never got.
     expect(suggestions.pdf).toHaveLength(1);
+    expect(savePendingRecords).toHaveBeenCalledWith(
+      [expect.not.objectContaining({ fingerprint: expect.anything() })],
+      [],
+      ETAG,
+    );
   });
 
-  it("re-checks missed names once the registry epoch moves", async () => {
+  it("re-checks a settled skill once the served dataset changes", async () => {
     mockReady([namesake("a/skills")]);
-    // The local copy hashes to something the current snapshot does not carry.
-    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
     await resolveAssociations([{ name: "pdf" }]);
-    expect(analyzeSkill).toHaveBeenCalledTimes(1);
+    expect(searchSkills).toHaveBeenCalledTimes(1);
 
-    // A new snapshot publishes the rev the local hash was waiting for; the
-    // memoized miss must not survive the epoch change.
-    getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 2 });
+    // A new dataset can publish namesakes the previous one lacked, so the
+    // memoized dead end must not survive it.
+    mockReady([namesake("a/skills")], '"e2"');
+    getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 2, index: { etag: '"e2"' } });
     noteRegistryEpoch(2);
-    analyzeSkill.mockResolvedValue({ hash: "hash-a", fingerprint: null });
-    const { linked } = await resolveAssociations([{ name: "pdf" }]);
-    expect(linked).toEqual([]);
-    expect(analyzeSkill).toHaveBeenCalledTimes(2);
+    await resolveAssociations([{ name: "pdf" }]);
+    expect(searchSkills).toHaveBeenCalledTimes(2);
   });
 
-  it("runs no hash tier outside Tauri (the mock has no real files)", async () => {
+  it("stores no fingerprint outside Tauri (the mock has no real files)", async () => {
     isTauri.mockReturnValue(false);
     mockReady([namesake("anthropics/skills")]);
 
@@ -407,56 +405,54 @@ describe("resolveAssociations", () => {
       { name: "pdf", description: "Read and convert PDF files." },
     ]);
 
-    expect(analyzeSkill).not.toHaveBeenCalled();
+    expect(skillFingerprint).not.toHaveBeenCalled();
     expect(linked).toEqual([]);
     expect(suggestions.pdf).toHaveLength(1);
   });
 
   it("returns nothing when the registry is not ready", async () => {
-    getRegistrySnapshot.mockReturnValue({ ready: false, epoch: 0 });
+    getRegistrySnapshot.mockReturnValue({ ready: false, epoch: 0, index: null });
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "read pdf files" },
     ]);
     expect(linked).toEqual([]);
     expect(suggestions).toEqual({});
-    expect(analyzeSkill).not.toHaveBeenCalled();
+    expect(skillFingerprint).not.toHaveBeenCalled();
     expect(searchSkills).not.toHaveBeenCalled();
+    // A registry that is not ready has no snapshot to stamp and no verdict to
+    // record, so the pass produces nothing — the stored records stay exactly
+    // as they are until it answers, rather than being stamped with nothing.
+    expect(savePendingRecords).toHaveBeenCalledWith([], [], undefined);
   });
 
-  it("never auto-links a repo the user dismissed, but keeps it as a candidate", async () => {
+  it("never auto-links a repo the user cut, but keeps it as a candidate", async () => {
     mockReady([namesake("anthropics/skills")]);
-    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
-    loadResolutionRecords.mockResolvedValue({
-      pdf: { name: "pdf", epoch: 1, dismissed: ["anthropics/skills"] },
-    });
+    mockLedger({ records: { pdf: pending({ repos: ["anthropics/skills"] }) } });
+    skillFingerprint.mockResolvedValue({ mtimeMs: 1, size: 2 });
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and manipulate PDF files." },
     ]);
 
-    // The perfect description match is dismissed — no auto-link; the choice
-    // stays with the user, and the dismissed repo remains among the
-    // candidates it can still be picked from manually.
+    // The perfect description match is cut — no auto-link; the choice stays
+    // with the user, and the cut repo remains among the candidates it can still
+    // be picked from manually.
     expect(linked).toEqual([]);
     expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
     expect(suggestions.pdf.map((c) => c.skill.repo)).toEqual(["anthropics/skills"]);
-    // The dismissal is carried into the persisted outcome.
-    expect(saveResolutionRecords).toHaveBeenCalledWith(
-      [expect.objectContaining({ name: "pdf", dismissed: ["anthropics/skills"] })],
+    // The cut is carried into the persisted outcome.
+    expect(savePendingRecords).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: "pdf", repos: ["anthropics/skills"] })],
       [],
+      ETAG,
     );
   });
 
-  it("auto-links the best non-dismissed namesake", async () => {
-    mockReady([
-      namesake("anthropics/skills"),
-      namesake("fork/skills"),
-    ]);
-    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
-    loadResolutionRecords.mockResolvedValue({
-      pdf: { name: "pdf", epoch: 1, dismissed: ["anthropics/skills"] },
-    });
+  it("auto-links the best namesake that was not cut", async () => {
+    mockReady([namesake("anthropics/skills"), namesake("fork/skills")]);
+    mockLedger({ records: { pdf: pending({ repos: ["anthropics/skills"] }) } });
+    skillFingerprint.mockResolvedValue({ mtimeMs: 1, size: 2 });
 
     const { linked } = await resolveAssociations([
       { name: "pdf", description: "Read and manipulate PDF files." },
@@ -468,17 +464,17 @@ describe("resolveAssociations", () => {
     ]);
   });
 
-  it("keeps the dismissal when the skill has no namesakes", async () => {
+  it("keeps the cut when the skill has no namesakes", async () => {
     mockReady([]);
-    loadResolutionRecords.mockResolvedValue({
-      pdf: { name: "pdf", epoch: 1, dismissed: ["a/skills"] },
-    });
+    mockLedger({ records: { pdf: pending({ name: "pdf", candidates: undefined, repos: ["a/skills"] }) } });
 
     await resolveAssociations([{ name: "pdf" }]);
 
-    expect(saveResolutionRecords).toHaveBeenCalledWith(
-      [expect.objectContaining({ name: "pdf", epoch: 1, dismissed: ["a/skills"] })],
+    // A cut outlives any cache: the record stays, stripped to the decision.
+    expect(savePendingRecords).toHaveBeenCalledWith(
+      [{ kind: "pending", name: "pdf", repos: ["a/skills"] }],
       [],
+      ETAG,
     );
   });
 });
@@ -491,7 +487,7 @@ describe("findLinkCandidates", () => {
 
     expect(candidates.map((c) => c.skill.repo)).toEqual(["a/skills", "b/skills"]);
     expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
-    expect(saveResolutionRecords).not.toHaveBeenCalled();
+    expect(savePendingRecords).not.toHaveBeenCalled();
   });
 
   it("excludes the currently linked repo", async () => {
@@ -505,23 +501,22 @@ describe("findLinkCandidates", () => {
   });
 
   it("returns nothing when the registry is not ready", async () => {
-    getRegistrySnapshot.mockReturnValue({ ready: false, epoch: 0 });
+    getRegistrySnapshot.mockReturnValue({ ready: false, epoch: 0, index: null });
     expect(await findLinkCandidates("pdf")).toEqual([]);
   });
 });
 
 describe("unlinkSkillSource", () => {
-  it("dismisses the repo against the served snapshot epoch", async () => {
+  it("records the cut against the skill", async () => {
     mockReady([namesake("anthropics/skills")]);
 
     await unlinkSkillSource("pdf", "anthropics/skills");
 
-    expect(dismissSkillSource).toHaveBeenCalledWith("pdf", "anthropics/skills", 1);
+    expect(dismissSkillSource).toHaveBeenCalledWith("pdf", "anthropics/skills");
   });
 
   it("clears the session memo, so the next pass re-runs the lookup", async () => {
     mockReady([namesake("anthropics/skills")]);
-    analyzeSkill.mockResolvedValue({ hash: "hash-other", fingerprint: null });
     // Warm the memo with a dead end.
     await resolveAssociations([{ name: "totally-custom" }]);
     expect(searchSkills).toHaveBeenCalledTimes(1);

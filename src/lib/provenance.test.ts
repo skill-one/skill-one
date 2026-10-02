@@ -8,97 +8,124 @@ import {
   reconcileProvenance,
   removeSkillProvenance,
   dismissSkillSource,
-  loadResolutionRecords,
-  saveResolutionRecords,
+  loadPendingRecords,
+  savePendingRecords,
   ledgerLines,
   readLedgerRaw,
   resetMockProvenance,
   seedMockLedgerRaw,
   seedMockProvenance,
 } from "./provenance";
-import type { LedgerRecord, ProvenanceRecord, ResolutionRecord } from "./provenance";
+import type { LedgerRecord, PendingRecord, SourceRecord } from "./provenance";
 
 // The ledger degrades to fewer records on any malformed input; these tests
 // pin that contract — a broken file must never break the UI, only lose the
 // association (which falls back to name-only matching).
 
-const SOURCE: ProvenanceRecord = {
+const SOURCE: SourceRecord = {
+  kind: "source",
   name: "pdf",
   repo: "anthropics/skills",
-  installedAt: "2026-09-13T00:00:00.000Z",
+  via: "install",
 };
-const RESOLUTION: ResolutionRecord = {
+const PENDING: PendingRecord = {
+  kind: "pending",
   name: "my-tool",
-  epoch: 42,
-  hash: "sha256:abc",
+  key: "1a2b3c4d5e6f7081",
   fingerprint: { mtimeMs: 1738022.4, size: 48213 },
+  candidates: [
+    {
+      repo: "a/skills",
+      similarity: 0.4,
+      stars: 12,
+      downloads: 340,
+      description: "Read PDF files.",
+    },
+  ],
 };
+/** The header every file opens with. */
+const HEADER = { kind: "meta", index: '"e1"' };
+
+/** The records of a parsed file, keyed by name. */
+function records(raw: string | null): Map<string, LedgerRecord> {
+  return parseLedger(raw).records;
+}
 
 describe("parseLedger", () => {
   it("parses JSONL records, one per skill, last one winning", () => {
-    const ledger = parseLedger(
+    const ledger = records(
       [
+        JSON.stringify(HEADER),
         JSON.stringify(SOURCE),
-        JSON.stringify(RESOLUTION),
-        JSON.stringify({ name: "pdf", repo: "other/repo" }),
+        JSON.stringify(PENDING),
+        JSON.stringify({ kind: "source", name: "pdf", repo: "other/repo" }),
       ].join("\n"),
     );
     expect(ledger.size).toBe(2);
     expect(ledger.get("pdf")).toMatchObject({ repo: "other/repo" });
-    expect(ledger.get("my-tool")).toMatchObject({ epoch: 42 });
+    expect(ledger.get("my-tool")).toMatchObject({ key: "1a2b3c4d5e6f7081" });
+  });
+
+  it("reads the header, and keeps it out of the records", () => {
+    const parsed = parseLedger([JSON.stringify(HEADER), JSON.stringify(SOURCE)].join("\n"));
+    expect(parsed.index).toBe('"e1"');
+    expect([...parsed.records.keys()]).toEqual(["pdf"]);
   });
 
   it("skips broken lines and keeps the rest", () => {
-    const ledger = parseLedger(
-      [JSON.stringify(SOURCE), "{broken", "not json", JSON.stringify(RESOLUTION)].join("\n"),
+    const ledger = records(
+      [JSON.stringify(SOURCE), "{broken", "not json", JSON.stringify(PENDING)].join("\n"),
     );
     expect([...ledger.keys()]).toEqual(["pdf", "my-tool"]);
   });
 
   it("returns an empty ledger for null, blank and invalid JSON", () => {
-    expect(parseLedger(null).size).toBe(0);
-    expect(parseLedger("").size).toBe(0);
-    expect(parseLedger("not json {").size).toBe(0);
+    expect(parseLedger(null).records.size).toBe(0);
+    expect(parseLedger("").records.size).toBe(0);
+    expect(parseLedger("not json {").records.size).toBe(0);
   });
 
-  it("rejects records without a usable name or discriminator", () => {
-    const ledger = parseLedger(
+  it("rejects records without a usable name or of an unknown kind", () => {
+    const ledger = records(
       [
-        JSON.stringify({ repo: "a/b" }), // no name
-        JSON.stringify({ name: "x" }), // no repo, no epoch
-        JSON.stringify({ name: "y", repo: "" }), // empty repo
-        JSON.stringify({ name: "z", epoch: "42" }), // non-numeric epoch
-        JSON.stringify({ name: "good", repo: "a/b" }),
+        JSON.stringify({ kind: "source", repo: "a/b" }), // no name
+        JSON.stringify({ kind: "source", name: "x" }), // no repo
+        JSON.stringify({ kind: "source", name: "y", repo: "" }), // empty repo
+        JSON.stringify({ kind: "pending", name: "z" }), // nothing worth keeping
+        JSON.stringify({ kind: "someday", name: "w", repo: "a/b" }), // unknown kind
+        JSON.stringify({ kind: "source", name: "good", repo: "a/b" }),
       ].join("\n"),
     );
     expect([...ledger.keys()]).toEqual(["good"]);
   });
 
-  it("converts the legacy v1 JSON document", () => {
-    const legacy = JSON.stringify({
-      version: 1,
-      skills: {
-        pdf: { repo: "anthropics/skills", slug: "pdf", installedAt: SOURCE.installedAt },
-        noRepo: { slug: "noRepo" },
-      },
-    });
-    const ledger = parseLedger(legacy);
-    expect(ledger.size).toBe(1);
-    expect(ledger.get("pdf")).toEqual(SOURCE);
+  it("skips a line it cannot read, whatever the reason", () => {
+    // A `kind` this build does not know, a line from before the tag existed,
+    // and a whole-document JSON object all land in the same place: skipped.
+    // What is left is what answers.
+    const ledger = records(
+      [
+        JSON.stringify({ kind: "someday", name: "a", repo: "o/r" }),
+        JSON.stringify({ name: "b", repo: "o/r", installedAt: "2026-09-13T00:00:00.000Z" }),
+        JSON.stringify({ version: 1, skills: { c: { repo: "o/r" } } }),
+        JSON.stringify(SOURCE),
+      ].join("\n"),
+    );
+    expect([...ledger.keys()]).toEqual(["pdf"]);
   });
 
-  it("parses a single JSONL record stored without a trailing newline", () => {
-    const ledger = parseLedger(JSON.stringify(SOURCE));
-    expect(ledger.get("pdf")).toEqual(SOURCE);
+  it("parses a single JSONL line stored without a trailing newline", () => {
+    expect(records(JSON.stringify(SOURCE)).get("pdf")).toEqual(SOURCE);
+    expect(parseLedger(JSON.stringify(HEADER)).index).toBe('"e1"');
   });
 
   it("parses `via` on source records and rejects unknown values", () => {
-    const ledger = parseLedger(
+    const ledger = records(
       [
-        JSON.stringify({ name: "a", repo: "o/r", via: "install" }),
-        JSON.stringify({ name: "b", repo: "o/r", via: "confirm" }),
-        JSON.stringify({ name: "c", repo: "o/r", via: "bogus" }),
-        JSON.stringify({ name: "d", repo: "o/r" }),
+        JSON.stringify({ kind: "source", name: "a", repo: "o/r", via: "install" }),
+        JSON.stringify({ kind: "source", name: "b", repo: "o/r", via: "confirm" }),
+        JSON.stringify({ kind: "source", name: "c", repo: "o/r", via: "bogus" }),
+        JSON.stringify({ kind: "source", name: "d", repo: "o/r" }),
       ].join("\n"),
     );
     expect(ledger.get("a")).toMatchObject({ via: "install" });
@@ -107,27 +134,64 @@ describe("parseLedger", () => {
     expect(ledger.get("d")).not.toHaveProperty("via");
   });
 
-  it("parses `dismissed` on resolution records, dropping unusable entries", () => {
-    const ledger = parseLedger(
+  it("parses `repos` on pending records, dropping unusable entries", () => {
+    const ledger = records(
       [
-        JSON.stringify({ name: "a", epoch: 1, dismissed: ["x/y", "", 3] }),
-        JSON.stringify({ name: "b", epoch: 1, dismissed: [] }),
-        JSON.stringify({ name: "c", epoch: 1 }),
+        JSON.stringify({ kind: "pending", name: "a", repos: ["x/y", "", 3] }),
+        JSON.stringify({ kind: "pending", name: "b", repos: [] }),
+        JSON.stringify({
+          kind: "pending",
+          name: "c",
+          candidates: [{ repo: "a/b", similarity: 1, stars: 1, downloads: 1, description: "d" }],
+        }),
       ].join("\n"),
     );
-    expect(ledger.get("a")).toMatchObject({ dismissed: ["x/y"] });
-    expect(ledger.get("b")).not.toHaveProperty("dismissed");
-    expect(ledger.get("c")).not.toHaveProperty("dismissed");
+    expect(ledger.get("a")).toMatchObject({ repos: ["x/y"] });
+    // An empty list leaves nothing worth a line, exactly like no list at all.
+    expect(ledger.has("b")).toBe(false);
+    expect(ledger.get("c")).not.toHaveProperty("repos");
+  });
+
+  it("drops candidates that cannot be rendered", () => {
+    const ledger = records(
+      JSON.stringify({
+        kind: "pending",
+        name: "a",
+        candidates: [
+          { repo: "a/b", similarity: "high", stars: 1, downloads: 1, description: "d" },
+          { repo: "c/d", similarity: 0.5, stars: 1, downloads: 1, description: "d" },
+        ],
+      }),
+    );
+    expect(ledger.get("a")).toMatchObject({
+      candidates: [{ repo: "c/d", similarity: 0.5 }],
+    });
   });
 });
 
 describe("serializeLedger", () => {
+  it("opens with the header, then one line per record", () => {
+    const text = serializeLedger('"e1"', [SOURCE, PENDING]);
+    expect(text.split("\n").filter(Boolean)).toEqual([
+      JSON.stringify(HEADER),
+      JSON.stringify(SOURCE),
+      JSON.stringify(PENDING),
+    ]);
+  });
+
+  it("writes a bare header when no snapshot is known", () => {
+    expect(serializeLedger(undefined, [SOURCE]).split("\n")[0]).toBe('{"kind":"meta"}');
+  });
+
   it("round-trips records through one line per skill", () => {
-    const records: LedgerRecord[] = [SOURCE, RESOLUTION];
-    expect(parseLedger(serializeLedger(records))).toEqual(new Map(Object.entries({
-      pdf: SOURCE,
-      "my-tool": RESOLUTION,
-    })));
+    const parsed = parseLedger(serializeLedger('"e1"', [SOURCE, PENDING]));
+    expect(parsed.index).toBe('"e1"');
+    expect(parsed.records).toEqual(
+      new Map<string, LedgerRecord>([
+        ["pdf", SOURCE],
+        ["my-tool", PENDING],
+      ]),
+    );
   });
 });
 
@@ -137,11 +201,11 @@ describe("serializeLedger", () => {
 describe("ledgerLines", () => {
   it("splits JSONL into numbered lines, keeping order and duplicates", () => {
     const lines = ledgerLines(
-      [JSON.stringify(SOURCE), JSON.stringify(RESOLUTION), JSON.stringify(SOURCE)].join("\n"),
+      [JSON.stringify(SOURCE), JSON.stringify(PENDING), JSON.stringify(SOURCE)].join("\n"),
     );
     expect(lines.map((l) => l.line)).toEqual([1, 2, 3]);
     expect(lines[0]?.record).toEqual(SOURCE);
-    expect(lines[1]?.record).toEqual(RESOLUTION);
+    expect(lines[1]?.record).toEqual(PENDING);
     expect(lines[2]?.record).toEqual(SOURCE);
   });
 
@@ -153,29 +217,13 @@ describe("ledgerLines", () => {
   });
 
   it("skips blank lines but keeps later line numbers intact", () => {
-    const lines = ledgerLines(["", JSON.stringify(SOURCE), "", JSON.stringify(RESOLUTION)].join("\n"));
+    const lines = ledgerLines(
+      ["", JSON.stringify(SOURCE), "", JSON.stringify(PENDING)].join("\n"),
+    );
     expect(lines.map((l) => l.line)).toEqual([2, 4]);
   });
 
-  it("converts the legacy v1 document to per-skill records", () => {
-    const lines = ledgerLines(
-      JSON.stringify({
-        version: 1,
-        skills: {
-          pdf: { repo: "anthropics/skills", installedAt: SOURCE.installedAt },
-          noRepo: { slug: "noRepo" },
-        },
-      }),
-    );
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toEqual({
-      line: 1,
-      record: { repo: "anthropics/skills", installedAt: SOURCE.installedAt, name: "pdf" },
-    });
-    expect(lines[1]).toEqual({ line: 2, record: { slug: "noRepo", name: "noRepo" } });
-  });
-
-  it("renders a single record without a trailing newline as one line", () => {
+  it("renders a single line without a trailing newline as one line", () => {
     expect(ledgerLines(JSON.stringify(SOURCE))).toEqual([{ line: 1, record: SOURCE }]);
   });
 
@@ -212,7 +260,17 @@ describe("provenance browser store", () => {
     await recordSkillProvenance("anthropics/skills", "pdf");
 
     const map = await reconcileProvenance(["pdf"]);
-    expect(map.pdf).toMatchObject({ repo: "anthropics/skills" });
+    expect(map.pdf).toEqual({ repo: "anthropics/skills", via: "install" });
+  });
+
+  it("opens a fresh ledger with a header, snapshot unknown", async () => {
+    await recordSkillProvenance("anthropics/skills", "pdf");
+
+    // An install says nothing about the dataset, so the header names no
+    // snapshot — which is exactly what invalidates any stored ranking.
+    const parsed = parseLedger(await readLedgerRaw());
+    expect(parsed.index).toBeUndefined();
+    expect(await readLedgerRaw()).toContain('{"kind":"meta"}');
   });
 
   it("a recorded entry for a name that is not installed gets pruned", async () => {
@@ -239,14 +297,6 @@ describe("provenance browser store", () => {
     expect(map).toEqual({});
   });
 
-  it("preserves a recorded content hash through parse and prune", async () => {
-    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-    await recordSkillProvenance("anthropics/skills", "pdf", "hash-1");
-
-    const map = await reconcileProvenance(["pdf"]);
-    expect(map.pdf?.hash).toBe("hash-1");
-  });
-
   it("reinstalls overwrite the recorded source", async () => {
     seedMockProvenance({ pdf: { repo: "old/repo" } });
     await recordSkillProvenance("new/repo", "pdf");
@@ -255,94 +305,127 @@ describe("provenance browser store", () => {
     expect(map.pdf?.repo).toBe("new/repo");
   });
 
-  it("auto-links overwrite a resolution record with a source record", async () => {
-    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-    await recordSkillProvenanceBatch([{ repo: "fork/skills", name: "pdf", hash: "hash-1" }]);
+  it("auto-links overwrite a pending record with a source record", async () => {
+    await savePendingRecords([{ kind: "pending", name: "pdf", repos: ["fork/skills"] }], [], '"e1"');
+    await recordSkillProvenanceBatch([{ repo: "fork/skills", name: "pdf", reason: "description" }]);
 
     const map = await reconcileProvenance(["pdf"]);
-    expect(map.pdf).toMatchObject({ repo: "fork/skills", hash: "hash-1" });
+    expect(map.pdf).toEqual({ repo: "fork/skills", via: "description" });
+    expect((await loadPendingRecords()).records).toEqual({});
   });
 
   it("records how the source was established via `via`", async () => {
     await recordSkillProvenance("anthropics/skills", "pdf");
     expect((await reconcileProvenance(["pdf"])).pdf?.via).toBe("install");
 
-    await recordSkillProvenance("fork/skills", "pdf", undefined, "confirm");
+    await recordSkillProvenance("fork/skills", "pdf", "confirm");
     expect((await reconcileProvenance(["pdf"])).pdf?.via).toBe("confirm");
 
     await recordSkillProvenanceBatch([{ repo: "o/r", name: "pdf", reason: "description" }]);
     expect((await reconcileProvenance(["pdf"])).pdf?.via).toBe("description");
   });
+
+  it("keeps no timestamp: when a link happened is the activity log's fact", async () => {
+    await recordSkillProvenance("anthropics/skills", "pdf");
+
+    const line = (await readLedgerRaw())?.split("\n")[1] ?? "";
+    expect(JSON.parse(line)).not.toHaveProperty("installedAt");
+  });
 });
 
-describe("resolution records", () => {
+describe("pending records", () => {
   beforeEach(() => resetMockProvenance());
   afterEach(() => resetMockProvenance());
 
-  it("round-trips upserts through the persisted ledger", async () => {
-    const record: ResolutionRecord = {
-      name: "my-tool",
-      epoch: 7,
-      hash: "sha256:abc",
-      fingerprint: { mtimeMs: 1738022.4, size: 48213 },
-      namesakesKey: "a\u0000b",
-      candidates: [
-        {
-          repo: "a/skills",
-          similarity: 0.93,
-          stars: 12,
-          downloads: 340,
-          description: "Read PDF files.",
-          descriptionZh: "读取 PDF 文件。",
-        },
-      ],
-    };
-    await saveResolutionRecords([record], []);
+  it("round-trips upserts through the persisted ledger, stamped with the snapshot", async () => {
+    await savePendingRecords([PENDING], [], '"e1"');
 
-    expect(await loadResolutionRecords()).toEqual({ "my-tool": record });
+    expect(await loadPendingRecords()).toEqual({ index: '"e1"', records: { "my-tool": PENDING } });
   });
 
-  it("drops only resolution records — a source record for the same name survives", async () => {
+  it("re-stamps the header with the snapshot it was given", async () => {
+    await savePendingRecords([PENDING], [], '"e1"');
+    await savePendingRecords([], [], '"e2"');
+
+    // Nothing to write, so nothing changed — the header still names e1.
+    expect((await loadPendingRecords()).index).toBe('"e1"');
+  });
+
+  it("leaves the header alone when a source is recorded", async () => {
+    await savePendingRecords([PENDING], [], '"e1"');
+    await recordSkillProvenance("anthropics/skills", "pdf");
+
+    // An install says nothing about the snapshot the pending records were
+    // verified against, so it must not invalidate them.
+    expect((await loadPendingRecords()).index).toBe('"e1"');
+  });
+
+  it("drops only pending records — a source record for the same name survives", async () => {
     seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-    await saveResolutionRecords(
-      [{ name: "pdf", epoch: 1, candidates: [] }],
+    await savePendingRecords(
+      [{ kind: "pending", name: "pdf", repos: ["fork/skills"] }],
       ["pdf"],
+      '"e1"',
     );
 
-    const resolutions = await loadResolutionRecords();
-    expect(resolutions).toEqual({});
+    expect((await loadPendingRecords()).records).toEqual({});
     const map = await reconcileProvenance(["pdf"]);
     expect(map.pdf?.repo).toBe("anthropics/skills");
   });
 
-  it("resolution records are pruned with their skill", async () => {
-    await saveResolutionRecords([{ name: "my-tool", epoch: 1, candidates: [] }], []);
+  it("pending records are pruned with their skill", async () => {
+    await savePendingRecords([PENDING], [], '"e1"');
     await reconcileProvenance(["other"]);
 
-    expect(await loadResolutionRecords()).toEqual({});
+    expect((await loadPendingRecords()).records).toEqual({});
   });
 
-  it("dismissSkillSource replaces the source record with a dismissal", async () => {
+  it("reports no snapshot identity when the file names none", async () => {
     seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-    await dismissSkillSource("pdf", "anthropics/skills", 7);
+    expect((await loadPendingRecords()).index).toBeUndefined();
+  });
+});
+
+describe("dismissSkillSource", () => {
+  beforeEach(() => resetMockProvenance());
+  afterEach(() => resetMockProvenance());
+
+  it("replaces the source record with the cut", async () => {
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
+    await dismissSkillSource("pdf", "anthropics/skills");
 
     // The source is gone from the reconcile answer…
     expect(await reconcileProvenance(["pdf"])).toEqual({});
-    // …and the dismissal is persisted on the resolution record.
-    expect(await loadResolutionRecords()).toEqual({
-      pdf: { name: "pdf", epoch: 7, dismissed: ["anthropics/skills"] },
+    // …and the cut is persisted as a pending record.
+    expect((await loadPendingRecords()).records).toEqual({
+      pdf: { kind: "pending", name: "pdf", repos: ["anthropics/skills"] },
     });
   });
 
-  it("dismissSkillSource accumulates repos and runs before any source record", async () => {
-    await dismissSkillSource("pdf", "a/skills", 7);
-    await recordSkillProvenance("b/skills", "pdf", undefined, "confirm");
-    await dismissSkillSource("pdf", "b/skills", 8);
-    await dismissSkillSource("pdf", "a/skills", 8);
+  it("accumulates repos, and runs before any source record", async () => {
+    await dismissSkillSource("pdf", "a/skills");
+    await recordSkillProvenance("b/skills", "pdf", "confirm");
+    await dismissSkillSource("pdf", "b/skills");
+    await dismissSkillSource("pdf", "a/skills");
+    await dismissSkillSource("pdf", "c/skills");
 
-    expect(await loadResolutionRecords()).toEqual({
-      pdf: { name: "pdf", epoch: 8, dismissed: ["b/skills", "a/skills"] },
+    expect((await loadPendingRecords()).records.pdf).toEqual({
+      kind: "pending",
+      name: "pdf",
+      repos: ["b/skills", "a/skills", "c/skills"],
     });
     expect(await reconcileProvenance(["pdf"])).toEqual({});
+  });
+
+  it("keeps the ranking the cut was made against", async () => {
+    // The user's cut does not invalidate work already done: dropping the
+    // candidates would make every cut re-rank from scratch.
+    await savePendingRecords([PENDING], [], '"e1"');
+    await dismissSkillSource("my-tool", "a/skills");
+
+    expect((await loadPendingRecords()).records["my-tool"]).toEqual({
+      ...PENDING,
+      repos: ["a/skills"],
+    });
   });
 });

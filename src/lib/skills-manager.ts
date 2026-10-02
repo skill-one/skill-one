@@ -229,10 +229,9 @@ export async function unlinkAgents(agents: string[]): Promise<LinkResult> {
 
 /**
  * Read the raw provenance ledger (`.skill-one.jsonl` inside the global skills
- * directory; the legacy JSON document is returned while it still exists).
- * Returns `null` when neither file exists yet; parsing is the frontend's job
- * (see `lib/provenance.ts`), which also owns the tolerance policy for corrupt
- * or outdated content.
+ * directory). Returns `null` when it does not exist yet; parsing is the
+ * frontend's job (see `lib/provenance.ts`), which also owns the tolerance
+ * policy for unreadable content.
  */
 export async function readProvenanceRaw(): Promise<string | null> {
   requireTauri();
@@ -291,44 +290,20 @@ export interface SkillFingerprint {
 }
 
 /**
- * The content identity of an installed skill: the skills.sh upstream hash
- * (the exact identity matched against registry revs) plus the fingerprint
- * that says when the hash can be reused without re-reading any bytes
- * (`lib/skill_hash.rs` on the backend).
- */
-export interface SkillContent {
-  hash: string;
-  fingerprint: SkillFingerprint;
-}
-
-/**
- * Compute the content identity of an installed skill's directory (a full walk
- * that reads every file's bytes). `null` when the name is not installed; the
- * frontend treats an error the same way — analysis is always a best-effort
- * signal, never a failure.
- */
-export async function analyzeSkill(name: string): Promise<SkillContent | null> {
-  requireTauri();
-  try {
-    return await invoke<SkillContent | null>("analyze_skill", { name });
-  } catch (e) {
-    console.warn(`skill hash: failed to analyze ${name}`, e);
-    return null;
-  }
-}
-
-/**
- * Stat-only fingerprint of an installed skill's directory — the cheap
- * validity check that lets the ledger reuse a stored hash across restarts.
+ * Stat-only fingerprint of an installed skill's directory (`dir_fingerprint.rs`
+ * on the backend) — the cheap change detector the provenance ledger uses to
+ * decide whether a cached candidate list still describes this directory. No
+ * file bytes are read.
+ *
  * `null` when the name is not installed or the stat walk fails; the caller
- * falls back to a full analysis, so this is never fatal.
+ * treats both the same way — re-rank from scratch — so this is never fatal.
  */
 export async function skillFingerprint(name: string): Promise<SkillFingerprint | null> {
   requireTauri();
   try {
     return await invoke<SkillFingerprint | null>("skill_fingerprint", { name });
   } catch (e) {
-    console.warn(`skill hash: failed to fingerprint ${name}`, e);
+    console.warn(`skill fingerprint: failed to fingerprint ${name}`, e);
     return null;
   }
 }

@@ -6,8 +6,8 @@
 use tauri::Listener;
 
 mod activity;
+mod dir_fingerprint;
 mod provenance;
-mod skill_hash;
 mod skills;
 mod tray;
 mod update_channel;
@@ -37,7 +37,6 @@ pub fn run() {
             skills::read_skill_md,
             skills::write_skill_md,
             skills::open_skill_dir,
-            skills::analyze_skill,
             skills::skill_fingerprint,
             provenance::read_provenance,
             provenance::write_provenance,

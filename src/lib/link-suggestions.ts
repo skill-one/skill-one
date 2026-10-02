@@ -17,13 +17,17 @@
  * Every outcome is cached at two levels so the work is paid once, not per
  * reconcile pass or app restart:
  *
- * - **Session memo** (`resolved`): cleared when the served snapshot changes.
- * - **Ledger** (`ResolutionRecord` in `.skill-one.jsonl`, persisted): the
- *   namesake verdict is stamped with the snapshot `epoch`, the computed hash
- *   is guarded by a stat-only directory `fingerprint`, and the ranked
- *   candidates carry the equality key of their ranking input. A restart thus
- *   re-runs nothing while snapshot and content are unchanged; a new snapshot
- *   only re-runs the cheap lookup, reusing the stored hash for matching.
+ * - **Session memo** (`resolved`): cleared when the served dataset changes.
+ * - **Ledger** (`PendingRecord` in `.skill-one.jsonl`, persisted): the ranking
+ *   is stamped with the served snapshot's identity, guarded by a stat-only
+ *   directory `fingerprint`, and keyed by a digest of its ranking input. A
+ *   restart re-runs nothing while the snapshot and the directory are unchanged.
+ *
+ * Only outcomes worth a line are persisted. A dead end — no same-slug entry —
+ * is one in-memory query that cannot go stale between runs, so it is recomputed
+ * instead of cached; a name with no candidates left in the ledger is the format
+ * working as intended, not a loss. What does get written is the ranking waiting
+ * on the user and the repos they cut, which is a decision rather than a cache.
  *
  * Namesake lookup goes through the registry worker's search (`searchSkills`,
  * filtered to exact slug equality client-side). When the registry is not ready
@@ -33,18 +37,18 @@
 
 import type { Skill } from "../types/skill";
 import { getRegistrySnapshot, searchSkills } from "./registry/client";
-import { analyzeSkill, skillFingerprint } from "./skills-manager";
+import { skillFingerprint } from "./skills-manager";
 import { isTauri } from "./tauri";
 import { descriptionSimilarity } from "./description-similarity";
 import {
   dismissSkillSource,
-  loadResolutionRecords,
+  loadPendingRecords,
   recordSkillProvenanceBatch,
-  saveResolutionRecords,
+  savePendingRecords,
 } from "./provenance";
 import type {
+  PendingRecord,
   PersistedCandidate,
-  ResolutionRecord,
   SkillFingerprint,
 } from "./provenance";
 import type { SourceLinkReason } from "./activity";
@@ -122,16 +126,16 @@ export function rankNamesakes(
 
 /**
  * The user cut a skill's source association (detail drawer): the source
- * record is replaced by a resolution record dismissing `repo` — the auto-link
- * tier never links it back on its own — and the session memo is cleared so
- * the next reconcile pass re-runs the lookup and surfaces the remaining
- * candidates.
+ * record is replaced by a pending record listing the repo in `repos` — the
+ * auto-link tier never links it back on its own — and the session memo is
+ * cleared so the next reconcile pass re-runs the lookup and surfaces what
+ * remains.
  */
 export async function unlinkSkillSource(
   name: string,
   repo: string,
 ): Promise<void> {
-  await dismissSkillSource(name, repo, getRegistrySnapshot().epoch);
+  await dismissSkillSource(name, repo);
   resolved.delete(name);
 }
 
@@ -153,15 +157,40 @@ export async function findLinkCandidates(
 }
 
 /**
- * Equality key of a ranking input: the full namesake list's identity fields
- * (the repo and the descriptions the similarity reads). A fresh lookup with
- * the same key ranks identically over unchanged content.
+ * A short stable digest of the ranking input: the full namesake list's
+ * identity fields (the repo and the descriptions the similarity reads). A
+ * fresh lookup carrying the same digest ranks identically over unchanged
+ * content, so the stored ranking is revived instead of recomputed.
+ *
+ * A digest rather than the canonical string itself, which was longer than the
+ * five candidates it guards. Two independent 32-bit string hashes give 64 bits
+ * — ample for the handful of records one ledger holds, and this is a cache key
+ * rather than a security primitive, where a collision would cost a re-ranking.
  */
-function namesakesKey(namesakes: Skill[]): string {
-  return namesakes
+function rankingKey(namesakes: Skill[]): string {
+  const canonical = namesakes
     .map((s) => [s.repo, s.description, s.descriptionZh ?? ""].join("\u0000"))
     .toSorted()
     .join("\u0001");
+  return fnv1a(canonical) + djb2(canonical);
+}
+
+/** FNV-1a, 32-bit. */
+function fnv1a(input: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    h = Math.imul(h ^ input.charCodeAt(i), 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
+/** djb2, 32-bit — a different mixing function, so the two halves disagree. */
+function djb2(input: string): string {
+  let h = 0x1505;
+  for (let i = 0; i < input.length; i++) {
+    h = (Math.imul(h, 33) + input.charCodeAt(i)) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
 }
 
 function toPersisted(candidate: LinkCandidate): PersistedCandidate {
@@ -201,48 +230,48 @@ function sameFingerprint(a: SkillFingerprint, b: SkillFingerprint): boolean {
  *
  * Per-skill outcomes are memoized for the session (`resolved`) and persisted
  * in the ledger, so repeated reconcile passes — and app restarts — neither
- * re-query the worker nor re-walk skill directories until the served snapshot
- * or the skill's content changes.
+ * re-query the worker nor re-rank anything until the served snapshot or the
+ * skill's own content changes.
  */
 export async function resolveAssociations(
   unlinked: Array<{ name: string; description?: string }>,
 ): Promise<{ linked: string[]; suggestions: LinkSuggestions }> {
-  const epoch = getRegistrySnapshot().epoch;
-  const stored = await loadResolutionRecords();
+  // The identity both sides must agree on before a stored ranking may be
+  // reused. Absent on either side — a file with no header, a snapshot the
+  // source could not name — and nothing stored is trusted.
+  const served = getRegistrySnapshot().index?.etag;
+  const stored = await loadPendingRecords();
+  const verifiedIndex = served !== undefined && stored.index === served ? served : null;
   const linked: string[] = [];
   const matched: Array<{
     repo: string;
     name: string;
     reason: SourceLinkReason;
   }> = [];
-  const upserts = new Map<string, ResolutionRecord>();
+  const upserts = new Map<string, PendingRecord>();
   const drops = new Set<string>();
 
   await Promise.all(
     unlinked.map(async (skill) => {
       if (resolved.has(skill.name)) return; // dead end or cached candidates
 
-      const cached = stored[skill.name];
-      // A user-dismissed repo (cut via the detail drawer) must never ride the
+      const cached = stored.records[skill.name];
+      // A repo the user cut (via the detail drawer) must never ride the
       // cache: the lookup re-runs so the suppression applies to the fresh
-      // ranking, and the dismissal is carried into whatever outcome is stored.
-      const dismissed = new Set(cached?.dismissed ?? []);
-      if (cached && cached.epoch === epoch && dismissed.size === 0) {
-        // Already verified against this snapshot. A dead end is
-        // content-independent — "no namesakes" cannot change until the
-        // snapshot does. Candidates are content-dependent (the ranking reads
-        // the local description), so their reuse revalidates the fingerprint.
-        if (!cached.candidates?.length) {
-          resolved.set(skill.name, []);
-          return;
-        }
+      // ranking, and the cut is carried into whatever outcome is stored.
+      const cut = new Set(cached?.repos ?? []);
+      if (cached && verifiedIndex !== null && cut.size === 0 && cached.candidates?.length) {
+        // Verified against the snapshot now being served. The ranking itself
+        // is content-dependent (it reads the local description), so its reuse
+        // revalidates the directory. The browser mock has no real files, so
+        // there the stored ranking stands in as-is.
         if (!isTauri()) {
           resolved.set(skill.name, reviveCandidates(skill.name, cached.candidates));
           return;
         }
         if (cached.fingerprint) {
-          const fingerprint = await skillFingerprint(skill.name);
-          if (fingerprint && sameFingerprint(fingerprint, cached.fingerprint)) {
+          const stat = await skillFingerprint(skill.name);
+          if (stat && sameFingerprint(stat, cached.fingerprint)) {
             resolved.set(skill.name, reviveCandidates(skill.name, cached.candidates));
             return;
           }
@@ -251,65 +280,50 @@ export async function resolveAssociations(
       }
 
       // Step 1 — the cheap filter: without same-slug entries there is no
-      // association to make and no reason to walk the skill's directory.
+      // association to make and no reason to look at the skill's directory.
       const namesakes = await findNamesakes(skill.name);
       if (namesakes.length === 0) {
+        // A dead end is one in-memory query that cannot go stale between
+        // runs, so it earns no line: it is recomputed next time. The user's
+        // own cuts do earn one — a future snapshot that re-introduces a cut
+        // repo must not auto-link it behind their back — and a cache this
+        // run did not reproduce is dropped rather than left to rot.
         resolved.set(skill.name, []);
-        upserts.set(skill.name, {
-          name: skill.name,
-          epoch,
-          candidates: [],
-          // A dead end still remembers the dismissal, so a future snapshot
-          // that re-introduces the repo cannot auto-link it behind the
-          // user's back.
-          ...(dismissed.size > 0 ? { dismissed: [...dismissed] } : {}),
-        });
+        if (cut.size > 0) {
+          upserts.set(skill.name, { kind: "pending", name: skill.name, repos: [...cut] });
+        } else if (cached) {
+          drops.add(skill.name);
+        }
         return;
       }
 
-      // Step 2 — content check. The directory is analyzed (hash +
-      // fingerprint in one walk) so the ledger can guard the ranking by the
-      // stat-only fingerprint: a stored hash reused while the fingerprint
-      // says the directory is unchanged lets a restart skip re-ranking. The
-      // registry no longer publishes per-skill hashes, so the hash itself
-      // matches nothing — it is bookkeeping, not an identity. Hashing needs
-      // the native shell (the browser mock has no real files), so outside
-      // Tauri this step degrades to suggestions only.
-      let hash: string | null = null;
-      let fingerprint: SkillFingerprint | null = null;
-      let contentVerified = false;
-      if (isTauri()) {
-        if (cached?.hash && cached?.fingerprint) {
-          const stat = await skillFingerprint(skill.name);
-          if (stat && sameFingerprint(stat, cached.fingerprint)) {
-            hash = cached.hash;
-            fingerprint = cached.fingerprint;
-            contentVerified = true;
-          }
-        }
-        if (hash == null) {
-          const analyzed = await analyzeSkill(skill.name);
-          hash = analyzed?.hash ?? null;
-          fingerprint = analyzed?.fingerprint ?? null;
-        }
-      }
+      // Step 2 — the directory's current state, stat-only. A stored ranking is
+      // only reusable while this fingerprint still matches disk, and a
+      // fingerprint is exactly what a fresh record needs to be reusable later,
+      // so one stat call answers both. No file bytes are read: the registry
+      // publishes no per-skill hash for a content hash to match, so walking
+      // the directory would buy nothing. Outside Tauri there are no real
+      // files to stat, and the record simply carries no fingerprint.
+      const fingerprint = isTauri() ? await skillFingerprint(skill.name) : null;
+      const unchanged =
+        fingerprint !== null &&
+        cached?.fingerprint !== undefined &&
+        sameFingerprint(fingerprint, cached.fingerprint);
 
       // Step 3 — ranked candidates. A near-identical description (≥ threshold)
       // is treated as the same skill and linked without asking; only below the
       // threshold is the decision left to the user. Re-ranking is skipped when
-      // the ranking input is unchanged (same namesakes over verified-unchanged
-      // content) — the stored ranking is revived instead.
-      const key = namesakesKey(namesakes);
+      // the ranking input is unchanged (same namesakes over unchanged content)
+      // — the stored ranking is revived instead.
+      const key = rankingKey(namesakes);
       const ranked =
-        contentVerified && cached?.namesakesKey === key && cached.candidates?.length
+        unchanged && cached?.key === key && cached.candidates?.length
           ? reviveCandidates(skill.name, cached.candidates)
           : rankNamesakes(namesakes, skill.description ?? "");
       // The auto-link candidate is the best-ranked namesake the user has not
-      // dismissed; a dismissed top stays in `ranked` as a manual candidate.
-      const top = ranked.find((c) => !dismissed.has(c.skill.repo));
+      // cut; a cut top stays in `ranked` as a manual candidate.
+      const top = ranked.find((c) => !cut.has(c.skill.repo));
       if (top && top.similarity >= SIMILARITY_AUTO_LINK_THRESHOLD) {
-        // No content hash is verified by a description match, so the version
-        // marker stays unset — same as a user-confirmed link.
         matched.push({ repo: top.skill.repo, name: skill.name, reason: "description" });
         linked.push(skill.name);
         resolved.set(skill.name, []);
@@ -318,19 +332,18 @@ export async function resolveAssociations(
       }
       resolved.set(skill.name, ranked);
       upserts.set(skill.name, {
+        kind: "pending",
         name: skill.name,
-        epoch,
-        ...(hash != null ? { hash } : {}),
+        key,
         ...(fingerprint ? { fingerprint } : {}),
-        namesakesKey: key,
         candidates: ranked.map(toPersisted),
-        ...(dismissed.size > 0 ? { dismissed: [...dismissed] } : {}),
+        ...(cut.size > 0 ? { repos: [...cut] } : {}),
       });
     }),
   );
 
   if (matched.length > 0) await recordSkillProvenanceBatch(matched);
-  await saveResolutionRecords([...upserts.values()], [...drops]);
+  await savePendingRecords([...upserts.values()], [...drops], served);
 
   // Assemble suggestions from the memoized candidates (linked names were
   // parked with an empty list, so they never appear here).
@@ -345,11 +358,12 @@ export async function resolveAssociations(
 }
 
 /**
- * Per-skill resolution memoization for the current snapshot: `[]` marks a
- * dead end (no namesakes, hashing unavailable) or a linked skill; a
- * non-empty array holds the cached candidates. Cleared when the served
- * snapshot changes — a fresh snapshot can carry new namesakes. Across
- * restarts the persisted ledger takes over this role.
+ * Per-skill resolution memoization for the current run: `[]` marks a dead end
+ * (no namesakes) or a linked skill; a non-empty array holds the candidates
+ * found for it. Cleared when the served dataset changes — a fresh dataset can
+ * carry new namesakes. It is deliberately session-scoped: surviving a restart
+ * is the persisted ledger's job, keyed to the snapshot's identity rather than
+ * to this counter.
  */
 const resolved = new Map<string, LinkCandidate[]>();
 

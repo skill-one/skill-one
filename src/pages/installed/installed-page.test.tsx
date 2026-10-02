@@ -63,7 +63,7 @@ beforeEach(() => {
 /** The persisted ledger's record for `name` (the store is JSONL). */
 function ledgerRecord(
   name: string,
-): { name: string; repo?: string } | undefined {
+): { name: string; kind?: string; repo?: string; repos?: string[] } | undefined {
   return (localStorage.getItem("skill-one.provenance") ?? "")
     .split("\n")
     .filter((line) => line.trim())
@@ -757,11 +757,15 @@ describe("InstalledPage", () => {
       within(dialog).getByRole("button", { name: "更改 pdf 关联的来源" }),
     );
     await user.click(screen.getByRole("button", { name: "解除关联" }));
+    // The cut is recorded as a pending record, and the ranking the link was
+    // made from survives it — the user's decision does not throw away work.
     await waitFor(() =>
       expect(ledgerRecord("pdf")).toMatchObject({
-        dismissed: ["anthropics/skills"],
+        kind: "pending",
+        repos: ["anthropics/skills"],
       }),
     );
+    expect(ledgerRecord("pdf")).not.toHaveProperty("repo");
     expect(await within(dialog).findByText("本地安装")).toBeInTheDocument();
   }, 20_000);
 
