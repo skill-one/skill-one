@@ -21,6 +21,7 @@ import { INTERACTIVE_CLASS } from "../../components/skill-card";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillInstalledTime } from "../../components/skill-installed-time";
 import { SkillPopularity } from "../../components/skill-popularity";
+import { SkillTokenEstimate } from "../../components/skill-token-estimate";
 import { Card } from "../../components/ui/card";
 import {
   Tooltip,
@@ -112,13 +113,14 @@ export function SkillRow({
    * ordered by. `popularity` (the default) states the registry's blended
    * figure, the order the store browses in and the installed list's default;
    * `installedAt` states the install's own clock, the figure the installed
-   * list's 安装时间 sort orders by. The two are told apart by data, not by
-   * surface: the blend is a registry fact, so it renders only on a
-   * store-backed row, while the stamp is a local fact every install carries
-   * (and one no recording at all renders nothing — an absent fact, not a
-   * zero).
+   * list's 安装时间 sort orders by; `tokens` states the description's
+   * estimated context cost, the figure the Token 占用 sort weighs. The three
+   * are told apart by data, not by surface: the blend is a registry fact, so
+   * it renders only on a store-backed row, while the stamp and the estimate
+   * are local facts every install carries (either rendering nothing when its
+   * record is missing — an absent fact, not a zero).
    */
-  fact?: "popularity" | "installedAt";
+  fact?: "popularity" | "installedAt" | "tokens";
 }) {
   // Absent means backed: every row a collection page lists comes from the
   // registry, and the flag only ever unsets a caller with no store entry.
@@ -238,6 +240,12 @@ export function SkillRow({
               skill={skill}
               align="end"
               className="w-24 justify-end"
+            />
+          ) : fact === "tokens" ? (
+            <SkillTokenEstimate
+              skill={skill}
+              align="end"
+              className="w-16 justify-end"
             />
           ) : (
             storeBacked && (

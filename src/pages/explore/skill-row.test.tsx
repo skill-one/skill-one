@@ -4,6 +4,7 @@ import { screen } from "@testing-library/react";
 import { SkillRow } from "./skill-row";
 import { TooltipProvider } from "../../components/ui/tooltip";
 import { renderWithRouter } from "../../test/test-utils";
+import { estimateTokens } from "../../lib/token-estimate";
 import type { SkillView } from "../../lib/skill-view";
 
 /**
@@ -29,7 +30,10 @@ const domainLive: SkillView = {
   url: "https://www.skills.sh/open.feishu.cn/lark-skill-maker",
 };
 
-function renderRow(skill: SkillView, fact?: "popularity" | "installedAt") {
+function renderRow(
+  skill: SkillView,
+  fact?: "popularity" | "installedAt" | "tokens",
+) {
   return renderWithRouter(
     <TooltipProvider>
       <ul>
@@ -104,5 +108,25 @@ describe("SkillRow figure slot", () => {
     renderRow({ ...installed, installedAt: null }, "installedAt");
     expect(screen.queryByLabelText(/^安装于 /)).toBeNull();
     expect(screen.queryByLabelText(/^热度 /)).toBeNull();
+  });
+
+  it("states the token estimate when the list answers by token cost", () => {
+    renderRow(installed, "tokens");
+    // The trigger keeps the rail's shared grammar — icon over a bare figure —
+    // and the accessible name spells the basis out. The count is the same
+    // estimate the drawer states, computed here off the shared helper.
+    expect(
+      screen.getByText(String(estimateTokens(installed.description))),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/预估 Token 数/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^热度 /)).toBeNull();
+    expect(screen.queryByLabelText(/^安装于 /)).toBeNull();
+  });
+
+  it("renders nothing in the slot when there is no description to cost", () => {
+    // An empty description costs nothing to state; the slot stays silent
+    // rather than printing a zero.
+    renderRow({ ...installed, description: "" }, "tokens");
+    expect(screen.queryByLabelText(/预估 Token 数/)).toBeNull();
   });
 });

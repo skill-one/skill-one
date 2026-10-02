@@ -36,6 +36,7 @@
   "sort": {
     "byPopularity": "热度",
     "byInstalled": "安装时间",
+    "byTokens": "Token 占用",
     "byRepo": "按仓库"
   },
   "action": {
@@ -209,6 +210,7 @@
     "installedAtHint": "技能目录的创建时间；从 agent 目录收编的技能保留其原始时间。",
     "tokensLabel": "{{count}} tokens",
     "tokensHint": "agent 加载英文 description 时的预估开销。基于词数 + 标点数的启发式估算，按 o200k 词表校准，仅供横向比较（误差约 ±10%）。",
+    "tokensShortHint": "Skill 英文描述的预估 Token 数",
     "saved": "已保存 {{name}}",
     "saveFailed": "保存失败",
     "noBody": "（SKILL.md 无正文内容）",

@@ -94,8 +94,9 @@ function renderPage(route = "/installed") {
 /**
  * Picks a sort from the merged control — the only way the installed list now
  * changes shape or order. `label` names the menu item: 热度 (the default:
- * skill rows, most-popular first), 安装时间 (skill rows, newest first) or
- * 按仓库 (repository cards, most-starred first).
+ * skill rows, most-popular first), 安装时间 (skill rows, newest first),
+ * Token 占用 (skill rows, heaviest description first) or 按仓库 (repository
+ * cards, most-starred first).
  */
 async function pickSort(
   user: ReturnType<typeof userEvent.setup>,
@@ -1411,6 +1412,43 @@ describe("InstalledPage", () => {
     setSort("installed", "popularity");
     await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
     expect(screen.queryByLabelText(/^安装于 /)).toBeNull();
+  });
+
+  it("orders the skill unit by token cost and states each row's estimate", { timeout: 15000 }, async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("pdf");
+
+    await pickSort(user, "Token 占用");
+
+    // The estimate is a local fact — the description's own cost, no store
+    // entry needed — so every row with a description states one, as a bare
+    // figure under the coin icon. The short hint is matched exactly: jsdom
+    // never runs the sort menu's closing animation, so its content stays
+    // mounted, and a substring of "Token" would match the menu's own text
+    // through it.
+    await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
+    const estimates = screen
+      .getAllByLabelText("Skill 英文描述的预估 Token 数")
+      .map((node) => node.textContent ?? "");
+
+    // The order is the estimate's own: heaviest first, non-increasing down
+    // the list (pdf's long description leads the mock installs).
+    const figures = estimates.map(Number);
+    expect(figures.length).toBeGreaterThanOrEqual(5);
+    expect(figures[0]).toBeGreaterThan(figures[1]);
+    for (let i = 0; i < figures.length - 1; i += 1) {
+      expect(figures[i]).toBeGreaterThanOrEqual(figures[i + 1]);
+    }
+
+    // Picking 热度 re-answers the list and its slots together: the estimates
+    // leave with the ordering they belonged to. (No store entry resolves
+    // here, so the rows state no blend either.)
+    setSort("installed", "popularity");
+    await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
+    expect(
+      screen.queryByLabelText("Skill 英文描述的预估 Token 数"),
+    ).toBeNull();
   });
 
   it("orders one source's several installs by time instead of folding them", async () => {
