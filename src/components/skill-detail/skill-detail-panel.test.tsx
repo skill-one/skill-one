@@ -257,12 +257,12 @@ describe("SkillDetailPanel", () => {
     // line's avatar and repo already say who published it) and no license.
     expect(screen.queryByText("Anthropic")).not.toBeInTheDocument();
     expect(screen.queryByText("MIT")).not.toBeInTheDocument();
-    // One install figure, exactly like the list rows: the skill's own count,
-    // compacted, with the exact number on the title and the wording for
-    // assistive tech hidden inside it.
-    expect(screen.getByText("3M")).toBeInTheDocument();
-    expect(screen.getByText("安装量")).toHaveClass("sr-only");
-    expect(screen.getByTitle("2,991,984 次安装")).toBeInTheDocument();
+    // The same popularity figure the list rows show: the blend on the
+    // trigger, its accessible name spelling out the two counts it blends.
+    expect(screen.getByText("712.4K")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("热度 712.4K：安装 3M · Star 169.6K"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("169.6K")).not.toBeInTheDocument();
     // The exact path is provenance detail: hidden behind the 源 tip by
     // default, and an unhashed entry's tip carries no version lines at all.
@@ -459,8 +459,9 @@ describe("SkillDetailPanel", () => {
     ).not.toBeInTheDocument();
     // The registry backs this skill, so its figure is real and shown — the same
     // one its card shows.
-    expect(screen.getByText("安装量")).toBeInTheDocument();
-    expect(screen.getByText("3M")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("热度 712.4K：安装 3M · Star 169.6K"),
+    ).toBeInTheDocument();
     // The recorded repo still drives everything it can: the source link.
     expect(
       screen.getByRole("link", { name: "anthropics/skills" }),

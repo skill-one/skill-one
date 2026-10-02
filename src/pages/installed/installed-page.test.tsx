@@ -20,7 +20,7 @@ import {
 } from "../../lib/mock-local";
 import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
 import { resetLinkSuggestions } from "../../lib/link-suggestions";
-import { setUnit } from "../../lib/list-view";
+import { setSort } from "../../lib/list-view";
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -53,10 +53,12 @@ beforeEach(() => {
   lookupSkills.mockResolvedValue({ entries: [] });
   getGroups.mockResolvedValue({ groups: [], total: 0 });
   resetLinkSuggestions();
-  // The app's default unit is the skill rows, but these tests read the
-  // installed list as repository cards — the reading they were written
-  // against; the ones that want the other unit click the switch themselves.
-  setUnit("installed", "repo");
+  // The merged sort control answers both what the list is made of and what
+  // order it reads in; these tests read it as repository cards — the reading
+  // most were written against; the ones that want the skill rows pick the
+  // sort themselves. Module state outlives a test, so the choice is reset
+  // here rather than inherited.
+  setSort("installed", "repo");
 });
 
 /** The persisted ledger's record for `name` (the store is JSONL). */
@@ -87,6 +89,20 @@ function renderPage(route = "/installed") {
     </>,
     { route },
   );
+}
+
+/**
+ * Picks a sort from the merged control — the only way the installed list now
+ * changes shape or order. `label` names the menu item: 热度 (the default:
+ * skill rows, most-popular first), 安装时间 (skill rows, newest first) or
+ * 按仓库 (repository cards, most-starred first).
+ */
+async function pickSort(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+) {
+  await user.click(screen.getByRole("button", { name: "排序方式" }));
+  await user.click(await screen.findByRole("menuitemradio", { name: label }));
 }
 
 describe("InstalledPage", () => {
@@ -849,7 +865,9 @@ describe("InstalledPage", () => {
     // repository row has no room for.
     await user.click(screen.getByRole("button", { name: "查看 pdf 详情" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("3M")).toBeInTheDocument();
+    expect(
+      within(dialog).getByLabelText("热度 712.4K：安装 3M · Star 169.6K"),
+    ).toBeInTheDocument();
     expect(within(dialog).getByText("内容创作")).toBeInTheDocument();
   });
 
@@ -1149,6 +1167,95 @@ describe("InstalledPage", () => {
     ).toEqual(["查看 pdf 详情", "查看 frontend-design 详情"]);
   });
 
+  it("leads the repository shape with the most-starred repository", async () => {
+    // zoo/a holds one install of a 400-starred skill; zoo/b two installs of
+    // a 50-starred one; the pool has no figure at all. The 按仓库 sort
+    // orders the cards by the repository's stars — not by how many skills it
+    // placed or how fresh they are — and the figure-less pool trails.
+    seedMockProvenance({
+      pdf: { repo: "zoo/a" },
+      docx: { repo: "zoo/b" },
+      pptx: { repo: "zoo/b" },
+    });
+    lookupSkills.mockResolvedValue({
+      entries: [
+        {
+          name: "pdf",
+          repo: "zoo/a",
+          description: "PDF documents.",
+          stars: 400,
+          downloads: 1,
+          path: "skills/zoo/a/pdf",
+        },
+        {
+          name: "docx",
+          repo: "zoo/b",
+          description: "Word documents.",
+          stars: 50,
+          downloads: 1,
+          path: "skills/zoo/b/docx",
+        },
+        {
+          name: "pptx",
+          repo: "zoo/b",
+          description: "Slide decks.",
+          stars: 50,
+          downloads: 1,
+          path: "skills/zoo/b/pptx",
+        },
+      ],
+    });
+    renderPage();
+    await screen.findByText("zoo/a");
+
+    // beforeEach picked the sort, and the trigger names what is on screen.
+    expect(screen.getByRole("button", { name: "排序方式" })).toHaveTextContent(
+      "按仓库",
+    );
+    await waitFor(() =>
+      expect(cardBarNames()).toEqual(["zoo/a", "zoo/b", "本地安装"]),
+    );
+  });
+
+  it("keeps each repository card's rows newest-first under the repository sort", async () => {
+    // The 按仓库 sort orders the *cards* by stars; inside a card, the rows
+    // still answer to the card's own clock — the fresh install leads the
+    // preview instead of hiding past the cap.
+    seedMockProvenance({
+      pdf: { repo: "acme/tools" },
+      "frontend-design": { repo: "acme/tools" },
+    });
+    lookupSkills.mockResolvedValue({
+      entries: [
+        {
+          name: "pdf",
+          repo: "acme/tools",
+          description: "PDF documents.",
+          stars: 400,
+          downloads: 1,
+          path: "skills/acme/tools/pdf",
+        },
+        {
+          name: "frontend-design",
+          repo: "acme/tools",
+          description: "Design guidance.",
+          stars: 400,
+          downloads: 1,
+          path: "skills/acme/tools/frontend-design",
+        },
+      ],
+    });
+    renderPage();
+    await screen.findByText("acme/tools");
+
+    const card = document.querySelector('[data-repo="acme/tools"]');
+    expect(
+      within(card as HTMLElement)
+        .getAllByRole("button", { name: /查看 .+ 详情/ })
+        .map((node) => node.getAttribute("aria-label")),
+    ).toEqual(["查看 pdf 详情", "查看 frontend-design 详情"]);
+  });
+
   it("walks the drawer in the cards' newest-first order", async () => {
     const user = userEvent.setup();
     seedMockProvenance({
@@ -1222,7 +1329,7 @@ describe("InstalledPage", () => {
     renderPage();
     await screen.findByText("pdf");
 
-    await user.click(screen.getByRole("button", { name: "列表" }));
+    await pickSort(user, "安装时间");
 
     // One row per install, uncapped: this is the whole list, so the unit that
     // reads it one skill at a time reads all of it.
@@ -1244,7 +1351,7 @@ describe("InstalledPage", () => {
     renderPage();
     await screen.findByText("pdf");
 
-    await user.click(screen.getByRole("button", { name: "列表" }));
+    await pickSort(user, "安装时间");
     await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
 
     // One flat list, newest first: pdf landed today, docx three days ago,
@@ -1279,7 +1386,7 @@ describe("InstalledPage", () => {
     seedStoreEntries({ pdf: 30, docx: 20, pptx: 10, "mcp-builder": 5 });
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "列表" }));
+    await pickSort(user, "安装时间");
 
     // Every install keeps its own row, across the day groups...
     expect(
@@ -1289,6 +1396,86 @@ describe("InstalledPage", () => {
     expect(
       screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
     ).toBeNull();
+  });
+
+  it("re-orders the skill unit by popularity from the sort menu", async () => {
+    const user = userEvent.setup();
+    // Four installs carry a store figure, spread against their install ages:
+    // docx (50) most-installed but 3 days old, pdf (30) fresh, pptx (20),
+    // mcp-builder (5); code-review and frontend-design resolve no entry, so
+    // they carry the adapter's honest zero. The entries share one star count,
+    // so the blend ranks exactly as the install counts do.
+    seedRunSource();
+    seedStoreEntries({ docx: 50, pdf: 30, pptx: 20, "mcp-builder": 5 });
+    renderPage();
+    // Picking 热度 both shapes the list as skill rows and orders it — the
+    // one control answers both questions. It is the default pick, so the
+    // menu marks it on arrival too.
+    await pickSort(user, "热度");
+    await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
+    expect(screen.getByRole("button", { name: "排序方式" })).toHaveTextContent(
+      "热度",
+    );
+
+    // Most-popular first, regardless of how fresh the install is; the
+    // figure-less installs sink below every figure, and among themselves
+    // they keep the install-time order the list was answering in.
+    expect(
+      screen
+        .getAllByRole("button", { name: /查看 .+ 详情/ })
+        .map((node) => node.getAttribute("aria-label")),
+    ).toEqual([
+      "查看 docx 详情",
+      "查看 pdf 详情",
+      "查看 pptx 详情",
+      "查看 mcp-builder 详情",
+      "查看 Code Review 详情",
+      "查看 frontend-design 详情",
+    ]);
+  });
+
+  it("keeps the search answer in relevance order while the sort is popularity", async () => {
+    const user = userEvent.setup();
+    seedRunSource();
+    seedStoreEntries({ docx: 50, pdf: 30, pptx: 20, "mcp-builder": 5 });
+    renderPage();
+    await user.click(screen.getByRole("button", { name: "排序方式" }));
+    await user.click(await screen.findByRole("menuitemradio", { name: "热度" }));
+    await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
+
+    // A search re-answers the list by relevance — the better ranking while a
+    // query is live — so the sort stands down rather than re-ranking hits.
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByRole("button", { name: /查看 .+ 详情/ })
+          .map((node) => node.getAttribute("aria-label")),
+      ).toEqual(["查看 pdf 详情"]),
+    );
+  });
+
+  it("stands the sort control down while searching, like the chips", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("pdf");
+    expect(screen.getByRole("button", { name: "排序方式" })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+    // The control would offer a choice the search answer does not honor, so
+    // it leaves the row with the chips — and returns when the search clears.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "排序方式" }),
+      ).not.toBeInTheDocument(),
+    );
+    await user.clear(screen.getByLabelText("搜索 Skill"));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "排序方式" }),
+      ).toBeInTheDocument(),
+    );
   });
 
   it("counts skills rather than repositories in the skill unit's chips", async () => {
@@ -1308,7 +1495,7 @@ describe("InstalledPage", () => {
       "2",
     );
 
-    await user.click(screen.getByRole("button", { name: "列表" }));
+    await pickSort(user, "安装时间");
 
     // The same chip now weighs skills, and 全部 every install.
     await waitFor(() =>
@@ -1331,7 +1518,7 @@ describe("InstalledPage", () => {
 
     // Switching units clears the scope with it: the two units weigh a domain
     // differently, so a scope set in one need not mean anything in the other.
-    await user.click(screen.getByRole("button", { name: "网格" }));
+    await pickSort(user, "按仓库");
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
         "2",
@@ -1342,7 +1529,7 @@ describe("InstalledPage", () => {
   it("answers a search with rows in the skill unit", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "列表" }));
+    await pickSort(user, "安装时间");
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
@@ -1361,7 +1548,7 @@ describe("InstalledPage", () => {
   it("walks the skill unit's newest-first time order in the detail drawer", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "列表" }));
+    await pickSort(user, "安装时间");
 
     // The walk follows the newest-first time order: after code-review (200
     // days) the next install is frontend-design (400) — one press lands there,

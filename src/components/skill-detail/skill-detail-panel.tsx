@@ -31,7 +31,7 @@ import {
   formatUnixDate,
 } from "../../lib/utils";
 import { DomainBadge } from "../domain-badge";
-import { SkillInstalls } from "../skill-installs";
+import { SkillPopularity } from "../skill-popularity";
 import { Button } from "../ui/button";
 import {
   SheetContent,
@@ -528,9 +528,10 @@ export function SkillDetailPanel({
   // facts — a registry-backed store row, an unindexed local install, a disk
   // read — leaves no dangling separator.
   const metaItems = [
-    // The same install figure the list rows show. Shown for exactly the
-    // skills whose card shows it — the registry-backed ones.
-    showStats && shown ? <SkillInstalls key="installs" skill={shown} /> : null,
+    // The same blended popularity figure the list rows show; hover/focus
+    // breaks it into installs and stars. Shown for exactly the skills whose
+    // card shows it — the registry-backed ones.
+    showStats && shown ? <SkillPopularity key="installs" skill={shown} /> : null,
     // Provenance reads the index row, not the fetched file, so the 源 tip
     // renders before — and without — the English SKILL.md's fetch.
     shown && !fromDisk && filePath ? (
