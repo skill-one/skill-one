@@ -533,7 +533,7 @@ describe("ExplorePage", () => {
     expect(revealed.querySelector("span.grid")).toHaveClass("grid-cols-[1fr]");
   });
 
-  it("lists skills by install count and leaves a short run whole", async () => {
+  it("lists skills by install count, one row per skill", async () => {
     const user = userEvent.setup();
     harness.reset();
     harness.init();
@@ -578,19 +578,15 @@ describe("ExplorePage", () => {
     await screen.findByText("o/one");
     await user.click(screen.getByRole("button", { name: "列表" }));
 
-    // ...and the skill unit with one row per skill, most installed first. o/one's
-    // three skills are a run, but below the fold threshold it is listed whole —
-    // every row stands on its own, and no fold row appears.
+    // ...and the skill unit with one row per skill, most installed first.
+    // A source's several skills each keep their own row.
     await waitFor(() => expect(cardOrder()).toEqual(["r1", "r2", "r3", "z1"]));
     expect(repoCards(container).length).toBe(0);
-    expect(
-      screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
-    ).toBeNull();
     // Each row keeps only its source's owner face — the repo path itself is gone.
     expect(container.querySelectorAll('[data-slot="avatar"]')).toHaveLength(4);
   });
 
-  it("folds a run of four or more and unfolds it on a press", async () => {
+  it("keeps a prolific repository's rows flat instead of folding them", async () => {
     const user = userEvent.setup();
     harness.reset();
     harness.init();
@@ -640,25 +636,14 @@ describe("ExplorePage", () => {
     renderExplorePage();
 
     await user.click(screen.getByRole("button", { name: "列表" }));
-    await waitFor(() => expect(cardOrder()).toEqual(["r1", "z1"]));
-
-    // o/one's four-skill run folds its three hidden rows into one line whose
-    // figure is the run's own combined installs (50 + 40 + 30 + 20), not the
-    // whole registry's and not a figure carried over from another run.
-    const fold = screen.getByRole("button", { name: /还有 3 个来自 o\/one/ });
-    expect(fold).toHaveTextContent("共 140");
-    expect(fold).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("button", { name: "查看 r2 详情" })).toBeNull();
-
-    // A press unfolds them in place, in rank order, and marks the row open.
-    await user.click(fold);
     await waitFor(() =>
       expect(cardOrder()).toEqual(["r1", "r2", "r3", "r4", "z1"]),
     );
-    expect(screen.getByRole("button", { name: /收起/ })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    // No fold row stands in for a source's back catalogue: every skill of the
+    // run is listed, each as its own row.
+    expect(
+      screen.queryByRole("button", { name: /还有 \d+ 个来自/ }),
+    ).toBeNull();
   });
 
   it("files skills by their own domain in the skill unit", async () => {

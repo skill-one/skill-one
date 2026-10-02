@@ -184,11 +184,6 @@
     "noMatchSkill": "没有符合条件的 skill",
     "noMatchRepo": "没有符合条件的仓库"
   },
-  "run": {
-    "moreFrom": "还有 {{count}} 个来自",
-    "moreFromAria": "还有 {{count}} 个来自 {{repo}}",
-    "total": "共 {{count}}"
-  },
   "popover": {
     "skillCount": "{{count}} 个技能",
     "loadFailed": "技能列表加载失败",

@@ -26,9 +26,20 @@ import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
 import { SkillRow } from "./skill-row";
-import { SkillRun, buildSkillRuns, byInstalls } from "./skill-run";
 import { RepoCard } from "./repo-card";
 import { SearchResults } from "./search-results";
+
+/**
+ * The skill unit's order: most installed first, then by source and name —
+ * so equal figures still read in a stable, traceable order.
+ */
+const byInstalls = (
+  a: { skill: { repo: string; name: string; downloads: number } },
+  b: { skill: { repo: string; name: string; downloads: number } },
+): number =>
+  b.skill.downloads - a.skill.downloads ||
+  a.skill.repo.localeCompare(b.skill.repo) ||
+  a.skill.name.localeCompare(b.skill.name);
 
 /**
  * How many repository cards mount with the page, and how many more mount each
@@ -159,14 +170,8 @@ export function ExplorePage() {
     return list.toSorted(byInstalls);
   }, [unit, allSkills, selectedDomain]);
 
-  // Consecutive skills from one repository, gathered into runs (see
-  // `buildSkillRuns`): a repository that ships several close-ranked skills can
-  // show its best and fold the rest behind a single "+N more" row.
-  const skillGroups = useMemo(
-    () => buildSkillRuns(activeSkills),
-    [activeSkills],
-  );
-
+  // Consecutive skills from one repository stay listed where the ranking puts
+  // them: one row per skill, whatever its source.
   // The filter's chips for the current unit — repositories per domain, or skills
   // per domain: the two units file the same data differently. Both lead with the
   // biggest domain, ties broken by the taxonomy's own order. A skill rides every
@@ -202,11 +207,10 @@ export function ExplorePage() {
       : null;
 
   // How many entries the browse answer lists, and how many are revealed: one
-  // repository card, or one skill run — a repository's consecutive skills fold
-  // into a single entry (see `skillGroups`), so the run, not the skill, is what
-  // the reveal counts. A search does not reveal — the unified search view
-  // renders its whole answer.
-  const itemCount = unit === "skill" ? skillGroups.length : browseRepos.length;
+  // skill, or one repository card. A search does not reveal — the unified
+  // search view renders its whole answer.
+  const itemCount =
+    unit === "skill" ? activeSkills.length : browseRepos.length;
   const renderedCount = Math.min(visibleCount, itemCount);
   const allRendered = renderedCount >= itemCount;
 
@@ -227,9 +231,7 @@ export function ExplorePage() {
   // the current intersection, so a bottom edge that stays visible loads the
   // next chunk without a further scroll, until everything is mounted. The
   // count is what changes on an extension, so it is what re-arms the
-  // observer — a folded run makes this load-bearing: the next chunk mounts
-  // inside the folded panel (no visible growth), so the sentinel never
-  // leaves the view and only a re-arm can keep the reveal moving.
+  // observer.
   useEffect(() => {
     const node = sentinelRef.current;
     if (!node || allRendered) return;
@@ -249,9 +251,6 @@ export function ExplorePage() {
   // closed. Clicking a row while the panel is open simply swaps the selection,
   // so switching skills never replays the slide-in animation.
   const [selected, setSelected] = useState<string | null>(null);
-  // Which folds the reader has opened, by the run head's key. The rows a fold
-  // hides are still part of the answer — only the rendering changes.
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   // The panel walks the flat skill list of the browse answer, unwrapped: the
   // listed skills in the skill unit, and every skill of the listed repositories
   // in the repository unit. One repository per group means no skill appears
@@ -266,8 +265,7 @@ export function ExplorePage() {
   // install button, which an already-installed row carries as a badge).
   const installedRows = useInstalledSearchRows(query);
   // Anything that re-answers the list resets what only described the old one:
-  // the revealed depth (it belongs to the list it was revealed for), the opened
-  // folds (a run's head key belongs to the answer that produced it) and the
+  // the revealed depth (it belongs to the list it was revealed for) and the
   // detail panel (its skill may not be in the new answer at all).
   //
   // The controls are shared with the other list now, so this watches the answer
@@ -282,7 +280,6 @@ export function ExplorePage() {
     if (shownAnswer.current === signature) return;
     shownAnswer.current = signature;
     setSelected(null);
-    setOpenGroups((open) => (Object.keys(open).length === 0 ? open : {}));
     setView((v) =>
       v.visibleCount === INITIAL_GROUPS
         ? v
@@ -351,8 +348,8 @@ export function ExplorePage() {
               // The unified search answer: three sections — what this machine
               // has, what the store carries, what skills.sh answers live — one
               // shared implementation both searchable lists render (see
-              // `SearchResults`). Keyed by the answer's definition, so no stale
-              // fold or selection survives into a differently-shaped answer.
+              // `SearchResults`). Keyed by the answer's definition, so no
+              // stale selection survives into a differently-shaped answer.
               <SearchResults
                 key={`${unit}:${query}`}
                 unit={unit}
@@ -399,37 +396,18 @@ export function ExplorePage() {
                 {unit === "skill" ? (
                   // The skill unit: one row per skill, in install order — the
                   // same row a repository's own page lists, so a skill reads
-                  // the same wherever it is found. A repository whose skills
-                  // land in consecutive ranks folds all but the best behind
-                  // one row (`SkillRun`), so a prolific repository does not
-                  // flood the ranking with near-duplicates.
+                  // the same wherever it is found.
                   <ul className={SKILL_ROW_LIST_CLASS}>
-                    {skillGroups.slice(0, renderedCount).map((group) => {
-                      const headKey = skillKey(group.items[0].skill);
+                    {activeSkills.slice(0, renderedCount).map((hit, index) => {
+                      const key = skillKey(hit.skill);
                       return (
-                        <SkillRun
-                          key={headKey}
-                          group={group}
-                          open={!!openGroups[headKey]}
-                          renderRow={(hit, index) => {
-                            const key = skillKey(hit.skill);
-                            return (
-                              <SkillRow
-                                key={key}
-                                skill={hit.skill}
-                                matched={hit.matched}
-                                index={index}
-                                selected={key === selected}
-                                onSelect={() => setSelected(key)}
-                              />
-                            );
-                          }}
-                          onToggle={() =>
-                            setOpenGroups((prev) => ({
-                              ...prev,
-                              [headKey]: !prev[headKey],
-                            }))
-                          }
+                        <SkillRow
+                          key={key}
+                          skill={hit.skill}
+                          matched={hit.matched}
+                          index={index}
+                          selected={key === selected}
+                          onSelect={() => setSelected(key)}
                         />
                       );
                     })}

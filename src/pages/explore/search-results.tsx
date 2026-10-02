@@ -21,7 +21,6 @@ import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-dr
 import { Placeholder } from "../../components/placeholder";
 import { SkeletonList } from "../../components/skeleton-list";
 import { buildLiveRepoGroups } from "./live-groups";
-import { buildSkillRuns, SkillRun } from "./skill-run";
 import { SkillRow } from "./skill-row";
 import { RepoCard } from "./repo-card";
 
@@ -145,13 +144,6 @@ export function SearchResults({
   // for the live rows' highlight.
   const liveTerms = useMemo(() => query.split(/\s+/).filter(Boolean), [query]);
 
-  // Which folds the reader has opened, by section and run head's key: a run's
-  // head key belongs to the section that produced it, and the same repository
-  // may run in two sections at once.
-  const [openRuns, setOpenRuns] = useState<Record<string, boolean>>({});
-  const toggleRun = (key: string) =>
-    setOpenRuns((prev) => ({ ...prev, [key]: !prev[key] }));
-
   // The open skill, addressed by the section it was opened in plus its
   // identity — see the component note above.
   const [selected, setSelected] = useState<{
@@ -173,11 +165,6 @@ export function SearchResults({
       (a, b) => b.items.length - a.items.length || a.repo.localeCompare(b.repo),
     );
   }, [installed]);
-
-  // The installed runs, in the order the installed index answered.
-  const installedRuns = useMemo(() => buildSkillRuns(installed), [installed]);
-  // The store's runs, in the relevance order the worker answered.
-  const storeRuns = useMemo(() => buildSkillRuns(storeHits), [storeHits]);
 
   // The drawer's per-section walk: each section is its own prev/next domain,
   // with the surface its rows were opened from.
@@ -246,40 +233,29 @@ export function SearchResults({
             >
               {unit === "skill" ? (
                 <ul className={SKILL_ROW_LIST_CLASS}>
-                  {installedRuns.map((group) => {
-                    const headKey = `installed:${skillKey(group.items[0].skill)}`;
+                  {installed.map((row, index) => {
+                    const key = skillKey(row.skill);
                     return (
-                      <SkillRun
-                        key={headKey}
-                        group={group}
-                        open={!!openRuns[headKey]}
-                        renderRow={(row, index) => {
-                          const key = skillKey(row.skill);
-                          return (
-                            <SkillRow
-                              key={key}
-                              skill={row.skill}
-                              matched={row.matched}
-                              index={index}
-                              // The installed list is not a leaderboard: its
-                              // figures come from the store, and the installs
-                              // it cannot place would leave the podium on
-                              // alphabetical order. The numbers merely count.
-                              ranked={false}
-                              selected={
-                                selected?.section === "installed" &&
-                                selected.key === key
-                              }
-                              muted={row.muted}
-                              extra={row.extra}
-                              action={row.action}
-                              onSelect={() =>
-                                setSelected({ section: "installed", key })
-                              }
-                            />
-                          );
-                        }}
-                        onToggle={() => toggleRun(headKey)}
+                      <SkillRow
+                        key={key}
+                        skill={row.skill}
+                        matched={row.matched}
+                        index={index}
+                        // The installed list is not a leaderboard: its
+                        // figures come from the store, and the installs
+                        // it cannot place would leave the podium on
+                        // alphabetical order. The numbers merely count.
+                        ranked={false}
+                        selected={
+                          selected?.section === "installed" &&
+                          selected.key === key
+                        }
+                        muted={row.muted}
+                        extra={row.extra}
+                        action={row.action}
+                        onSelect={() =>
+                          setSelected({ section: "installed", key })
+                        }
                       />
                     );
                   })}
@@ -356,32 +332,21 @@ export function SearchResults({
                 />
               ) : unit === "skill" ? (
                 <ul className={SKILL_ROW_LIST_CLASS}>
-                  {storeRuns.map((group) => {
-                    const headKey = `store:${skillKey(group.items[0].skill)}`;
+                  {storeHits.map((hit, index) => {
+                    const key = skillKey(hit.skill);
                     return (
-                      <SkillRun
-                        key={headKey}
-                        group={group}
-                        open={!!openRuns[headKey]}
-                        renderRow={(hit, index) => {
-                          const key = skillKey(hit.skill);
-                          return (
-                            <SkillRow
-                              key={key}
-                              skill={hit.skill}
-                              matched={hit.matched}
-                              index={index}
-                              selected={
-                                selected?.section === "store" &&
-                                selected.key === key
-                              }
-                              onSelect={() =>
-                                setSelected({ section: "store", key })
-                              }
-                            />
-                          );
-                        }}
-                        onToggle={() => toggleRun(headKey)}
+                      <SkillRow
+                        key={key}
+                        skill={hit.skill}
+                        matched={hit.matched}
+                        index={index}
+                        selected={
+                          selected?.section === "store" &&
+                          selected.key === key
+                        }
+                        onSelect={() =>
+                          setSelected({ section: "store", key })
+                        }
                       />
                     );
                   })}
