@@ -59,7 +59,8 @@ skill-one/
 │   │   ├── collapsible-section.tsx # 所有分组列表共用的吸顶可折叠分组头
 │   │   ├── drill-down-head.tsx # 列表内页面的头行：返回控件 + 实体身份
 │   │   ├── list-facets.tsx # 当前列表内容区首行的分类 chips（含「更多」浮层）
-│   │   ├── list-sort-select.tsx # 两个列表共用的排序菜单——热度、安装时间（已安装页）或按仓库
+│   │   ├── list-sort-select.tsx # 列表的排序菜单——热度，加上安装时间与 Token 占用（仅已安装页）
+│   │   ├── list-unit-toggle.tsx # 两个列表共用的形态开关——skill 行或仓库卡片，一对分段按钮
 │   │   ├── agent-icon.tsx  # agent 品牌图标
 │   │   ├── owner-avatar.tsx# owner 头像（元信息行的作者头像）
 │   │   ├── repo-hover-card.tsx # 作者头像 + 其仓库信息浮窗
