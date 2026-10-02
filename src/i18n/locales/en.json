@@ -234,9 +234,6 @@
   "advanced": {
     "title": "Advanced settings",
     "description": "Configure the download source for skill data (index, SKILL.md details, and installs all follow this setting).",
-    "display": "Display",
-    "repoPreviewCount": "Skills previewed on repository card",
-    "repoPreviewAria": "Number of skills previewed on repository card",
     "cdnTitle": "CDN base",
     "cdnSaved": "Saved",
     "cdnHintBefore": "Empty = connect to GitHub directly first (",

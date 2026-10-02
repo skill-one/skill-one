@@ -10,7 +10,6 @@ import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entrie
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
-import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
 import {
   installedSkillView,
   skillKey,
@@ -192,10 +191,6 @@ export function InstalledPage() {
   // install count), so the installed list can show the store's card for
   // the skills the ledger placed. Empty for tool installs — nothing to resolve.
   const storeEntries = useInstalledStoreEntries(linked);
-
-  // How many rows a card lists before its bar is the only way to the rest — the
-  // reader's own choice, shared with the store's cards.
-  const maxSkills = useRepoCardLimit();
 
   const list = useMemo(() => skills ?? [], [skills]);
 
@@ -635,7 +630,6 @@ export function InstalledPage() {
                     // switch's state has its evidence.
                     action: <SkillEnableSwitch skill={row.skill} />,
                   }))}
-                  maxSkills={maxSkills}
                   hasQuery={isSearching}
                   selected={selected}
                   onOpenSkill={setSelectedKey}

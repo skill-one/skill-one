@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useRepoSections } from "../../hooks/use-repo-sections";
-import { useRepoCardLimit } from "../../hooks/use-repo-card-limit";
 import { useViewMemory } from "../../hooks/use-view-memory";
 import { skillKey } from "../../lib/skill-view";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
@@ -83,10 +82,6 @@ export function ExplorePage() {
   // Worker progress: the climbing count, the streaming/indexing flags and
   // the retry action for a failed download.
   const stats = useRegistryStats();
-
-  // How many skills each repository card previews — the reader's choice, set in
-  // Settings; a change there re-renders this list live.
-  const maxSkills = useRepoCardLimit();
 
   // What the reader is looking for, how the list reads, and which domain they
   // scoped the browse to: all three are shared with the installed list, so they
@@ -423,7 +418,6 @@ export function ExplorePage() {
                         repo={group.title}
                         stars={group.stars}
                         skills={group.skills}
-                        maxSkills={maxSkills}
                         selected={selected}
                         onOpenSkill={setSelected}
                       />

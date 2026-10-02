@@ -9,11 +9,6 @@ import {
   getIndexRef,
   setCdnBase,
 } from "../lib/cdn-config";
-import {
-  REPO_CARD_LIMITS,
-  setRepoCardLimit,
-  type RepoCardLimit,
-} from "../lib/repo-card-preview";
 import { reloadRegistry } from "../lib/registry/client";
 import { checkForRegistryUpdate } from "../lib/registry/refresh";
 import type {
@@ -21,7 +16,6 @@ import type {
   RevalidateStatus,
 } from "../lib/registry/protocol";
 import { useRegistrySnapshot } from "../hooks/use-registry-snapshot";
-import { useRepoCardLimit } from "../hooks/use-repo-card-limit";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -31,7 +25,6 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Input } from "./ui/input";
-import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
 /** i18n keys for how the served snapshot got here. */
 const INDEX_ORIGIN_KEY: Record<IndexOrigin, ParseKeys> = {
@@ -50,9 +43,9 @@ const CHECK_KEY: Record<RevalidateStatus, ParseKeys> = {
 /**
  * Second-level settings dialog, reached from the settings popover's 高级设置
  * row. It holds the sections that do not fit the one-glance popover: the
- * repository-card preview size, the configurable CDN download source and the
- * registry snapshot currently in use. (The home graph's own presentation
- * flips from a toggle on the home page itself.)
+ * configurable CDN download source and the registry snapshot currently in
+ * use. (The home graph's own presentation flips from a toggle on the home
+ * page itself.)
  *
  * The CDN base is persisted to localStorage; `""` means "direct GitHub first"
  * (with the default CDN as a fallback). SKILL.md / install fetches read the
@@ -82,9 +75,6 @@ export function AdvancedSettingsDialog({
   // Only the served snapshot identity drives this card; count climbs and
   // progress flags during a streaming download must not re-render the dialog.
   const index = useRegistrySnapshot((s) => s.index);
-  // The preview size, read live so the control reflects the current value and
-  // a change re-renders the list already on screen.
-  const repoCardLimit = useRepoCardLimit();
 
   const apply = (next: string) => {
     const previous = getCdnBase();
@@ -132,37 +122,6 @@ export function AdvancedSettingsDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="-mr-2 flex max-h-[65vh] flex-col gap-4 overflow-y-auto pr-2">
-          <div className="rounded-xl border border-border/70 bg-card p-4">
-            <h3 className="text-[13px] font-medium text-foreground">
-              {t("advanced.display")}
-            </h3>
-            <div className="mt-3">
-              <p className="mb-1.5 text-xs text-muted-foreground">
-                {t("advanced.repoPreviewCount")}
-              </p>
-              <ToggleGroup
-                variant="outline"
-                spacing={0}
-                value={[String(repoCardLimit)]}
-                onValueChange={(values) => {
-                  const next = values[0];
-                  if (next) setRepoCardLimit(Number(next) as RepoCardLimit);
-                }}
-                aria-label={t("advanced.repoPreviewAria")}
-              >
-                {REPO_CARD_LIMITS.map((limit) => (
-                  <ToggleGroupItem
-                    key={limit}
-                    value={String(limit)}
-                    className="px-3"
-                  >
-                    {limit}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
-          </div>
-
           <div className="rounded-xl border border-border/70 bg-card p-4">
             <div className="flex items-baseline justify-between gap-3">
               <label

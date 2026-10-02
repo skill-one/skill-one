@@ -19,10 +19,6 @@ import {
   fetchSkillZhDetail,
 } from "../../lib/skill-detail-api";
 import { searchSkillsSh } from "../../lib/skills-sh";
-import {
-  DEFAULT_REPO_CARD_LIMIT,
-  setRepoCardLimit,
-} from "../../lib/repo-card-preview";
 import { setUnit } from "../../lib/list-view";
 import {
   REPO_CARD_SKELETON_CLASS,
@@ -248,10 +244,6 @@ beforeEach(() => {
   // null and the English body leads.
   vi.mocked(fetchSkillZhDetail).mockReset();
   vi.mocked(fetchSkillZhDetail).mockResolvedValue(null);
-  // The preview cap is the reader's own setting; a test that changes it puts
-  // it back, so no other test inherits the change (act() because the reset
-  // notifies live readers — see the settings-popover suite's note).
-  act(() => setRepoCardLimit(DEFAULT_REPO_CARD_LIMIT));
   // The app's default unit is the skill rows, but most tests here read the
   // store list as repository cards — the reading they were written against;
   // the ones that want the other unit click the switch themselves.
@@ -298,31 +290,31 @@ describe("ExplorePage", () => {
     expect(harness.downloads).toBe(1);
   });
 
-  it("caps a repository's rows at the default preview and reveals the rest in place", async () => {
+  it("caps a repository's rows at the folded limit and reveals the rest in place", async () => {
     const user = userEvent.setup();
-    // One repository with eight skills: three on the card (the default preview),
-    // five behind it.
+    // One repository with twelve skills: ten on the card (five rows of the
+    // two-column body), two behind the cap.
     harness.init();
-    harness.pushAll(makeSkills(8, 0));
+    harness.pushAll(makeSkills(12, 0));
     harness.complete();
     renderExplorePage();
 
-    // The cap is what keeps one big repository from pushing every other card
-    // off the screen; the bar carries the repository's *total*, so a capped list
-    // reads as "these of them" — and the rest is one press away in place.
-    expect(await screen.findByText("skill-2")).toBeInTheDocument();
-    expect(screen.queryByText("skill-3")).not.toBeInTheDocument();
+    // The cap is what keeps one big repository from running the whole screen;
+    // the bar carries the *increment*, so a capped list reads as "these of
+    // them" — and the rest is one press away in place.
+    expect(await screen.findByText("skill-9")).toBeInTheDocument();
+    expect(screen.queryByText("skill-10")).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
-    ).toHaveLength(3);
+    ).toHaveLength(10);
     await user.click(
       screen.getByRole("button", {
-        name: `展开 ${BATCH_REPO} 的全部 8 个 skill`,
+        name: `展开 ${BATCH_REPO} 的全部 12 个 skill`,
       }),
     );
     expect(
       screen.getAllByRole("button", { name: /^查看 skill-\d+ 详情/ }),
-    ).toHaveLength(8);
+    ).toHaveLength(12);
   });
 
   it("lets a search ignore the domain filter", async () => {
@@ -1100,49 +1092,13 @@ describe("ExplorePage", () => {
     // A search's rows are matches, uncapped — every one of them is already on
     // screen, so the bar carries no figure.
     expect(within(fresh as HTMLElement).queryByText(/个 skill/)).toBeNull();
-    // Uncapped is not narrow: seven rows outrun the preview cap, so the card
-    // takes the open card's own footprint on its own — full grid row, body in
-    // two balanced columns — exactly the layout the store's expansion gives.
-    const item = (fresh as HTMLElement).closest("li")!;
-    expect(item).toHaveClass("col-span-full");
+    // Uncapped is not unshaped: the card's body runs in two balanced columns,
+    // the same layout the folded preview and the expansion use.
     const body = (fresh as HTMLElement).querySelector(
       '[data-slot="card-content"] ul',
     )!;
     expect(body).toHaveClass("grid-flow-col");
     expect(body).toHaveStyle({ gridTemplateRows: "repeat(4, auto)" });
-  });
-
-  it("measures a search card's width by the reader's own preview cap", async () => {
-    const user = userEvent.setup();
-    // Four skills in one repository: over the default cap of three — the
-    // setting, not a fixed figure, is the threshold the wide footprint reads.
-    setRepoCardLimit(3);
-    harness.init();
-    harness.pushAll(makeSkills(4, 0));
-    harness.complete();
-    renderExplorePage();
-    await screen.findByText("skill-0");
-
-    await user.type(await searchField(), "skill-");
-
-    const card = await waitFor(() => {
-      const el = document.querySelector(
-        '[data-repo="acme/batch"]',
-      ) as HTMLElement | null;
-      expect(el).not.toBeNull();
-      // The browse card under this cap holds three rows; only the search
-      // answer lists the repository whole, so four rows mean the swap landed.
-      expect(el!.querySelectorAll('button[aria-label^="查看"]')).toHaveLength(
-        4,
-      );
-      return el!;
-    });
-    // Past the cap, the search card takes the open card's own footprint —
-    // full grid row, body in two balanced columns over ceil(4/2) rows.
-    expect(card.closest("li")).toHaveClass("col-span-full");
-    const body = card.querySelector('[data-slot="card-content"] ul')!;
-    expect(body).toHaveClass("grid-flow-col");
-    expect(body).toHaveStyle({ gridTemplateRows: "repeat(2, auto)" });
   });
 
   it("opens a live row on skills.sh instead of the detail panel", async () => {
@@ -1578,12 +1534,12 @@ describe("ExplorePage", () => {
     const { container } = renderExplorePage();
     await screen.findByText("skill-0");
 
-    const list = container.querySelector("ul.grid")!;
+    const list = container.querySelector("ul.flex")!;
     expect(list.className).toContain(REPO_LIST_CLASS);
-    // One repository card in the list, three rows in the card: the list run is
-    // the cap, not the full 50-skill repository.
+    // One repository card in the list, ten rows in the card: the list run is
+    // the folded cap, not the full 50-skill repository.
     expect(list.children).toHaveLength(1);
-    expect(list.querySelectorAll("li li")).toHaveLength(3);
+    expect(list.querySelectorAll("li li")).toHaveLength(10);
 
     // Opening the drawer overlays the list: its classes — and with them its
     // layout and scroll position — stay exactly the same while the drawer is
@@ -1598,7 +1554,7 @@ describe("ExplorePage", () => {
     );
     expect(list.className).toContain(REPO_LIST_CLASS);
     expect(list.children).toHaveLength(1);
-    expect(list.querySelectorAll("li li")).toHaveLength(3);
+    expect(list.querySelectorAll("li li")).toHaveLength(10);
   });
 });
 
@@ -1630,10 +1586,11 @@ describe("ExplorePage streaming", () => {
 
     // The card paints from the partial data (its capped rows, then the tail) and
     // grows in place as more of the stream lands, without disturbing the card
-    // the reader already has open.
+    // the reader already has open. Sixty-five skills stream in; the folded cap
+    // holds ten of them and the bar's offer accounts for the rest.
     expect(await screen.findByText("skill-0")).toBeInTheDocument();
-    expect(screen.getByText("skill-2")).toBeInTheDocument();
-    expect(screen.queryByText("skill-3")).not.toBeInTheDocument();
+    expect(screen.getByText("skill-9")).toBeInTheDocument();
+    expect(screen.queryByText("skill-10")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", {
         name: `展开 ${BATCH_REPO} 的全部 ${STREAM_BATCH + 5} 个 skill`,

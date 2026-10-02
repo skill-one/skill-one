@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { RepoCard } from "./repo-card";
+import { RepoCard, FOLDED_LIMIT } from "./repo-card";
 import {
   fetchInstalledSkills,
   installSkillFromSource,
@@ -38,21 +38,32 @@ function hit(name: string, extras: Partial<Skill> = {}): SearchHit {
   };
 }
 
-/** Eight skills, most installed first — one more than the card's cap, so the
+/** Twelve skills, most installed first — two more than the folded cap, so the
  *  tail has something to account for. */
-const skills: SearchHit[] = [
-  hit("pdf", {
-    downloads: 3_000,
-    profile: { domain: ["office-productivity"] },
-  }),
-  hit("docx", { downloads: 2_000 }),
-  hit("pptx", { downloads: 1_000 }),
-  hit("xlsx", { downloads: 500 }),
-  hit("slides", { downloads: 400 }),
-  hit("canvas", { downloads: 300 }),
-  hit("figma", { downloads: 200 }),
-  hit("notion", { downloads: 100 }),
+const NAMES = [
+  "pdf",
+  "docx",
+  "pptx",
+  "xlsx",
+  "slides",
+  "canvas",
+  "figma",
+  "notion",
+  "mail",
+  "map",
+  "chat",
+  "calendar",
 ];
+const skills: SearchHit[] = NAMES.map((name, index) =>
+  hit(name, {
+    downloads: 3_000 - index * 100,
+    // One classified skill, so the glyph slot's coverage has a witness.
+    ...(name === "pdf" ? { profile: { domain: ["office-productivity"] } } : {}),
+  }),
+);
+const FOLDED_ROWS_COUNT = Math.ceil(FOLDED_LIMIT / 2);
+const foldedNames = NAMES.slice(0, FOLDED_LIMIT);
+const hiddenNames = NAMES.slice(FOLDED_LIMIT);
 
 /** The card as a list item, the way every surface mounts it. */
 function renderCard(overrides: Parameters<typeof RepoCard>[0] | object = {}) {
@@ -94,7 +105,7 @@ describe("RepoCard", () => {
     ).not.toBeNull();
     expect(header).toContainElement(
       screen.getByRole("button", {
-        name: `展开 ${REPO} 的全部 8 个 skill`,
+        name: `展开 ${REPO} 的全部 ${NAMES.length} 个 skill`,
       }),
     );
 
@@ -102,14 +113,14 @@ describe("RepoCard", () => {
     // toggle: what the repository is, how big it is, and the offer of the rest
     // without leaving the list.
     const bar = screen.getByRole("button", {
-      name: `展开 ${REPO} 的全部 8 个 skill`,
+      name: `展开 ${REPO} 的全部 ${NAMES.length} 个 skill`,
     });
     expect(bar).toHaveAttribute("aria-expanded", "false");
     expect(within(bar).getByText(REPO)).toBeInTheDocument();
     expect(within(bar).getByText(formatCount(STARS))).toBeInTheDocument();
     // The toggle's figure is the *increment* — the exact number of rows a
-    // press reveals, read straight off the three on screen.
-    const offer = within(bar).getByText("5");
+    // press reveals, read straight off the ten on screen.
+    const offer = within(bar).getByText(String(hiddenNames.length));
     expect(offer.tagName).toBe("SPAN");
     // ...and the repository's own figure rides the repository's own name, at
     // the front of the bar, rather than out in the offer's cluster — where it
@@ -129,7 +140,7 @@ describe("RepoCard", () => {
   it("lists the repository's skills in order, under a glyph and a description", () => {
     renderCard();
 
-    expect(rowNames()).toEqual(["pdf", "docx", "pptx"]);
+    expect(rowNames()[0]).toBe("pdf");
     const pdf = screen.getByRole("button", { name: "查看 pdf 详情" });
     // The classification rides the row as its glyph, the name is the row's own
     // strong element, and the description follows it on the same line.
@@ -137,33 +148,31 @@ describe("RepoCard", () => {
     expect(pdf).toHaveTextContent("pdf does something useful.");
   });
 
-  it("caps the list at the default three rows and offers the rest on the bar", () => {
-    renderCard();
+  it("caps the folded preview at five two-column rows (ten skills)", () => {
+    const { container } = renderCard();
 
-    // The default preview holds three rows; past the cap a skill is not rendered.
-    expect(rowNames()).toEqual(["pdf", "docx", "pptx"]);
-    expect(screen.queryByText("xlsx")).not.toBeInTheDocument();
-    // The bar's figure is the *increment*: five rows behind the cap, which is
+    // The folded preview holds ten rows — five rows of the two-column body;
+    // past the cap a skill is not rendered.
+    expect(rowNames()).toEqual(foldedNames);
+    for (const name of hiddenNames) {
+      expect(screen.queryByText(name)).not.toBeInTheDocument();
+    }
+    // The body is one list laid out column-major over ceil(10/2) rows, so the
+    // rows split evenly — five down the left, five down the right — and DOM
+    // order (the reading order) stays most-installed first.
+    const body = container.querySelector('[data-slot="card-content"] ul')!;
+    expect(body).toHaveClass("grid");
+    expect(body).toHaveClass("grid-flow-col");
+    expect(body).toHaveClass("auto-cols-fr");
+    expect(body).toHaveStyle({
+      gridTemplateRows: `repeat(${FOLDED_ROWS_COUNT}, auto)`,
+    });
+    // The bar's figure is the *increment*: the rows behind the cap, which is
     // exactly what a press on the toggle reveals.
     const bar = screen.getByRole("button", {
-      name: `展开 ${REPO} 的全部 8 个 skill`,
+      name: `展开 ${REPO} 的全部 ${NAMES.length} 个 skill`,
     });
-    expect(within(bar).getByText("5")).toBeInTheDocument();
-  });
-
-  it("honours a smaller preview size", () => {
-    renderCard({ maxSkills: 2 });
-
-    expect(rowNames()).toEqual(["pdf", "docx"]);
-    expect(screen.queryByText("pptx")).not.toBeInTheDocument();
-  });
-
-  it("honours a larger preview size", () => {
-    renderCard({ maxSkills: 7 });
-
-    expect(rowNames()).toHaveLength(7);
-    expect(screen.getByText("figma")).toBeInTheDocument();
-    expect(screen.queryByText("notion")).not.toBeInTheDocument();
+    expect(within(bar).getByText(String(hiddenNames.length))).toBeInTheDocument();
   });
 
   it("renders a one-skill repository with the same body and the same bar", () => {
@@ -182,16 +191,7 @@ describe("RepoCard", () => {
 
     // The cap protects a browse from one big repository; under a search it
     // would hide hits the reader asked for, so it stands down.
-    expect(rowNames()).toEqual([
-      "pdf",
-      "docx",
-      "pptx",
-      "xlsx",
-      "slides",
-      "canvas",
-      "figma",
-      "notion",
-    ]);
+    expect(rowNames()).toEqual(NAMES);
   });
 
   it("opens one skill from its row and marks the row the panel shows", () => {
@@ -355,42 +355,30 @@ describe("RepoCard", () => {
     expect(onFooter).toHaveBeenCalledOnce();
   });
 
-  it("expands in place past its cap, spanning the row in two balanced columns", async () => {
+  it("expands in place past its cap, revealing every row in the two columns", async () => {
     const user = userEvent.setup();
     const { container } = renderCard();
 
     await user.click(
       screen.getByRole("button", {
-        name: `展开 ${REPO} 的全部 8 个 skill`,
+        name: `展开 ${REPO} 的全部 ${NAMES.length} 个 skill`,
       }),
     );
 
     // The reveal: every skill the cap was holding, right here — no navigation.
-    expect(rowNames()).toEqual([
-      "pdf",
-      "docx",
-      "pptx",
-      "xlsx",
-      "slides",
-      "canvas",
-      "figma",
-      "notion",
-    ]);
+    expect(rowNames()).toEqual(NAMES);
 
-    // The open card takes the whole grid row, whatever the auto-fill came to.
-    const item = container.querySelector("ul > li") as HTMLElement;
-    expect(item).toHaveClass("col-span-full");
-
-    // The body is one list laid out column-major over ceil(8/2) rows, so the
-    // rows split evenly — four down the left, four down the right — and DOM
+    // The body is one list laid out column-major over ceil(12/2) rows, so the
+    // rows split evenly — six down the left, six down the right — and DOM
     // order (the reading order) stays most-installed first. The count puts two
     // columns on the grid; `auto-cols-fr` makes each half the card's width.
     const body = container.querySelector('[data-slot="card-content"] ul')!;
     expect(body).toHaveClass("grid");
     expect(body).toHaveClass("grid-flow-col");
     expect(body).toHaveClass("auto-cols-fr");
-    expect(body).not.toHaveClass("flex-col");
-    expect(body).toHaveStyle({ gridTemplateRows: "repeat(4, auto)" });
+    expect(body).toHaveStyle({
+      gridTemplateRows: `repeat(${Math.ceil(NAMES.length / 2)}, auto)`,
+    });
 
     // The toggle reads its own state: the figure becomes the card's total —
     // the fact the open card exists to show, beside the minus that folds it.
@@ -398,8 +386,12 @@ describe("RepoCard", () => {
       name: `收起 ${REPO} 的 skill 列表`,
     });
     expect(bar).toHaveAttribute("aria-expanded", "true");
-    expect(within(bar).getByText("8 个 skill")).toBeInTheDocument();
-    expect(within(bar).queryByText("5")).not.toBeInTheDocument();
+    expect(
+      within(bar).getByText(`${NAMES.length} 个 skill`),
+    ).toBeInTheDocument();
+    expect(
+      within(bar).queryByText(String(hiddenNames.length)),
+    ).not.toBeInTheDocument();
   });
 
   it("folds back to the capped preview on a second press", async () => {
@@ -408,65 +400,38 @@ describe("RepoCard", () => {
 
     const bar = () =>
       screen.getByRole("button", {
-        name: `展开 ${REPO} 的全部 8 个 skill`,
+        name: `展开 ${REPO} 的全部 ${NAMES.length} 个 skill`,
       });
     await user.click(bar());
     await user.click(
       screen.getByRole("button", { name: `收起 ${REPO} 的 skill 列表` }),
     );
 
-    expect(rowNames()).toEqual(["pdf", "docx", "pptx"]);
-    expect(screen.queryByText("notion")).not.toBeInTheDocument();
+    expect(rowNames()).toEqual(foldedNames);
+    expect(screen.queryByText("chat")).not.toBeInTheDocument();
     expect(bar()).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("takes the store's expanded layout on its own when a search outruns the cap", () => {
+  it("keeps the same two-column body while a search is live", () => {
     const { container } = renderCard({ hasQuery: true });
 
     // Every match is on screen — no toggle, because nothing is held back.
-    expect(rowNames()).toEqual([
-      "pdf",
-      "docx",
-      "pptx",
-      "xlsx",
-      "slides",
-      "canvas",
-      "figma",
-      "notion",
-    ]);
+    expect(rowNames()).toEqual(NAMES);
     expect(
       screen.queryByRole("button", {
-        name: `展开 ${REPO} 的全部 8 个 skill`,
+        name: `展开 ${REPO} 的全部 ${NAMES.length} 个 skill`,
       }),
     ).toBeNull();
     expect(screen.queryByText(/个 skill/)).toBeNull();
 
-    // But "uncapped" is not "narrow": past the cap the card takes the open
-    // card's own footprint — the whole grid row (two lanes at the default
-    // window) with the body split into two balanced columns, exactly the
-    // layout the store's expansion reveals.
-    const item = container.querySelector("ul > li") as HTMLElement;
-    expect(item).toHaveClass("col-span-full");
-    const card = item.querySelector('[data-slot="card"]') as HTMLElement;
-    expect(card.className).not.toMatch(/shadow-/);
+    // Uncapped is not unshaped: the search card's rows run in the same
+    // balanced columns the folded preview and the expansion use.
     const body = container.querySelector('[data-slot="card-content"] ul')!;
     expect(body).toHaveClass("grid");
     expect(body).toHaveClass("grid-flow-col");
     expect(body).toHaveClass("auto-cols-fr");
-    expect(body).toHaveStyle({ gridTemplateRows: "repeat(4, auto)" });
-  });
-
-  it("keeps the plain lane under a search while the card fits within the cap", () => {
-    const { container } = renderCard({ hasQuery: true, maxSkills: 8 });
-
-    // A search card no bigger than the cap reads like any other card: one
-    // lane, rows stacked, no open-card footprint to carry.
-    expect(rowNames()).toHaveLength(8);
-    const item = container.querySelector("ul > li") as HTMLElement;
-    expect(item).not.toHaveClass("col-span-full");
-    const body = container.querySelector('[data-slot="card-content"] ul')!;
-    expect(body).toHaveClass("flex");
-    expect(body).toHaveClass("flex-col");
-    expect(body).not.toHaveStyle({ gridTemplateRows: "repeat(4, auto)" });
+    expect(body).toHaveStyle({
+      gridTemplateRows: `repeat(${Math.ceil(NAMES.length / 2)}, auto)`,
+    });
   });
 });

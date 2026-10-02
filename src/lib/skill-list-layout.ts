@@ -51,26 +51,18 @@ export const SKILL_ROW_LIST_CLASS = "flex flex-col gap-4";
 export const SKILL_ROW_SKELETON_CLASS = "h-[58px] rounded-xl";
 
 /**
- * The store's repository view: one card per repository, so a column is sized
- * for a repository rather than for a single skill. 440px is the narrowest
- * column that still prints a skill's name, its one-line description and its
- * install button on one row — measured, not guessed: at 440px every row of
- * `RepoCard` fits without overflowing, and a long name truncates rather than
- * pushing the description out.
- *
- * The cards are top-aligned and take their own height: a repository with two
- * skills is a short card, not a tall one wearing its row-mate's blank space.
- * (`items-start` is all it is — still one plain grid, still rendering
- * identically on every platform; no masonry feature to gate on.)
+ * The repository view: one full-width card per repository, stacked — every
+ * card takes the whole row and splits its skills across two balanced columns
+ * inside (see `RepoCard`), so one column is sized for a repository rather
+ * than for a single skill. A stack, not a multi-column grid: the card's own
+ * body is where the two columns live.
  */
-export const REPO_LIST_CLASS =
-  "grid gap-4 grid-cols-[repeat(auto-fill,minmax(440px,1fr))] items-start";
+export const REPO_LIST_CLASS = "flex flex-col gap-4";
 
 /**
  * Placeholder standing in for one repository card while a list loads, at the
- * same lane width the real cards get. Measured off a rendered card at the
- * largest preview cap the advanced settings offer (7 skills, 257px) — a grid row
- * is as tall as its tallest card, and the reader can raise the cap but not past
- * what the advanced settings offer.
+ * full width the real cards get. Measured off a rendered folded card showing
+ * its five two-column rows (`RepoCard`'s FOLDED_ROWS) — the tallest a folded
+ * card runs before its bar's toggle takes over.
  */
-export const REPO_CARD_SKELETON_CLASS = "h-[257px] rounded-xl";
+export const REPO_CARD_SKELETON_CLASS = "h-[200px] rounded-xl";

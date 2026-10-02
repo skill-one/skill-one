@@ -6,7 +6,6 @@ import { Minus, Plus, Star } from "lucide-react";
 import { useAppLocale } from "../../i18n/use-language";
 import { skillDescription } from "../../lib/i18n-content";
 import { domainEmoji } from "../../data/domains";
-import { DEFAULT_REPO_CARD_LIMIT } from "../../lib/repo-card-preview";
 import {
   isInstallableSkill,
   isLiveSkill,
@@ -31,6 +30,16 @@ import { Card, CardContent, CardHeader } from "../../components/ui/card";
  * leads or lags.
  */
 const EXPAND_TRANSITION = { duration: 0.25, ease: "easeOut" } as const;
+
+/**
+ * How many rows a folded card lists: five rows of the two-column body — ten
+ * skills — past which the bar's toggle is the way to the rest. The figure
+ * bounds the card's height: a repository with one skill and one with fifty
+ * have to read as the same kind of object, so the list grows with the
+ * repository only up to a point and then stops.
+ */
+const FOLDED_ROWS = 5;
+export const FOLDED_LIMIT = FOLDED_ROWS * 2;
 
 /**
  * The card surface and its header as projection nodes. The surface is what
@@ -98,18 +107,13 @@ export interface RepoCardRow {
  * **Expansion** answers the commonest question the card leaves open ("what
  * else is in here?") without leaving the list: a card whose cap is hiding rows
  * turns its bar into a toggle, and a press reveals every row in place — the
- * card spans the full grid row (`col-span-full`) and its body splits into two
- * balanced columns, so the reveal reads at the width of the list rather than of
- * one lane. Auto-placement drops an opened right-lane card at the next row
- * start, and the whole reflow — the card's glide into its new footprint, the
- * row-mates stepping aside — runs as one motion layout transition, so the
- * move reads as motion rather than as a teleport (and is skipped entirely for
- * readers who ask for reduced motion). A second press folds the card back. A
- * card with nothing behind its cap — or one under a live search, whose every
- * row is already on screen — keeps the bar as a plain label: a toggle is worth
- * a press only when it would reveal something. Under a search the wide
- * footprint is not a toggle's work at all: a card holding more rows than the
- * cap simply *is* open, and takes the full-row, two-column layout on its own.
+ * body already runs in two balanced columns, so the reveal reads at the width
+ * of the list rather than of one lane. A second press folds the card back to
+ * its five-row preview. A card with nothing behind its cap — or one under a
+ * live search, whose every row is already on screen — keeps the bar as a plain
+ * label: a toggle is worth a press only when it would reveal something. Under
+ * a search the cap is not a toggle's work at all: a card simply lists every
+ * match in the same two-column body.
  *
  * The bar is the card's only repository-level control, and it deliberately does
  * not carry an "open on GitHub" button or any route out of the list: the card
@@ -149,12 +153,9 @@ export interface RepoCardRow {
  * reveals both, so the bar never means two different folds. Open, the group
  * reads as its own: a hairline, then the group's marker row (a minus over
  * the count, the fold's way back) before the rows begin, so the two lists
- * never read as one. An open group widens the card — the same full-row,
- * two-column footprint the bar's expansion takes, with the uninstalled rows
- * splitting into balanced columns like the installed ones — so the reveal
- * reads at the width of the list. The installed rows keep their order, the
- * uninstalled ones live below the divider, and a second press folds them all
- * back.
+ * never read as one. The group's rows run in the same balanced columns the
+ * installed rows do, the installed ones keep their order, the uninstalled
+ * ones live below the divider, and a second press folds them all back.
  *
  * Because the button is only ever *shown* on intent, it does not take part in
  * the row's layout: it floats over the row's right edge, so a name and a
@@ -178,12 +179,9 @@ export interface RepoCardRow {
  *
  * `hasQuery` is the one thing a search changes: a repository's rows are then
  * *matches*, and hiding a match behind the cap would defeat the search, so the
- * list stops capping itself while a query is live — every match is on screen.
- * But "uncapped" is not "narrow": a big repository would otherwise read as one
- * tall lane, so under a search the cap keeps a second job — it is the measure
- * of *big*. A card holding more rows than the cap takes the open card's own
- * footprint on its own (spanning the full grid row, body in two balanced
- * columns), with no toggle, because nothing is held back to reveal.
+ * list stops capping itself while a query is live — every match is on screen,
+ * in the same two-column body, and the bar stays a plain label because there
+ * is nothing left to reveal.
  *
  * The selected row (the skill in the detail panel) is marked in place. A skill
  * past the cap cannot be marked — it has no row to mark — which is a fact about
@@ -194,7 +192,6 @@ export function RepoCard({
   repo,
   stars,
   skills,
-  maxSkills = DEFAULT_REPO_CARD_LIMIT,
   hasQuery = false,
   selected = null,
   onOpenSkill,
@@ -211,15 +208,6 @@ export function RepoCard({
   /** The repository's rows, in the order the grouping produced (most
    *  installed first). */
   skills: RepoCardRow[];
-  /**
-   * How many of the repository's skills to list before the bar's toggle is the
-   * way to the rest — the reader's own choice, set in Settings (see
-   * `lib/repo-card-preview`). The figure bounds the card's height: a repository
-   * with one skill and one with fifty have to read as the same kind of object,
-   * so the list grows with the repository only up to a point and then stops —
-   * past it, the bar's plus figure states exactly how many rows a press adds.
-   */
-  maxSkills?: number;
   /** Whether a search is live; see the note above about the cap. */
   hasQuery?: boolean;
   /** `skillKey` of the skill in the detail panel, when one is open. */
@@ -269,31 +257,23 @@ export function RepoCard({
   // The owner segment is what the dataset hosts an avatar for; a repository
   // group always has one (a bare-host source is its own owner).
   const [owner] = repo.split("/");
-  const shown = hasQuery || expanded ? skills : skills.slice(0, maxSkills);
+  // A folded card previews the first FOLDED_LIMIT rows — five rows of the
+  // two-column body — and a search stands the cap down: its rows are matches,
+  // and hiding a match would defeat the search (see the note on `hasQuery`).
+  const shown = hasQuery || expanded ? skills : skills.slice(0, FOLDED_LIMIT);
   // A card can only expand past its cap when the cap is actually holding
-  // something back: a search already lists everything (the cap stands down,
-  // see the note on `hasQuery`), and a card within its cap has no rest to
-  // reveal — both keep the bar's 「＋ N」 figure off unless uninstalled
-  // siblings stand behind the badge.
-  const canExpand = !hasQuery && skills.length > maxSkills;
-  // The wide footprint, from any of the three sources: the reader's own
-  // toggle in browse, a search answer that outruns the cap, or an open
-  // uninstalled group — a press that reveals more skills is a press that
-  // earns the room, and the wide layout is the same one the bar's expansion
-  // uses (full grid row, two-column body), so both offers land identically.
-  const wide =
-    (canExpand && expanded) ||
-    (hasQuery && skills.length > maxSkills) ||
-    (hasUninstalled && expanded);
-  // The toggle is also a transition. Opening a right-lane card re-plumbs the
-  // whole grid — the card jumps to a full row start, every card after it
-  // shifts, the open card's box doubles in width — and a hard cut between the
-  // two layouts reads as teleporting. So the card is a `motion` layout
-  // element: the reflow becomes one shared transition, the open card gliding
-  // into its full-row footprint while its old row-mates step aside, all off
-  // one FLIP pass (cheap — transforms only, measured once per reflow, and
-  // nothing animates until a layout actually changes). Motion is dropped
-  // entirely for readers who ask for reduced motion: they get the cut.
+  // something back: a search already lists everything (the cap stands down),
+  // and a card within its cap has no rest to reveal — both keep the bar's
+  // 「＋ N」 figure off unless uninstalled siblings stand behind the badge.
+  const canExpand = !hasQuery && skills.length > FOLDED_LIMIT;
+  // The toggle is also a transition. Folding and unfolding changes the card's
+  // height — every card after it shifts while the rows appear or leave — and
+  // a hard cut reads as a jump. So the card is a `motion` layout element: the
+  // reflow becomes one shared transition, the card's box easing to its new
+  // height while its neighbours step aside, all off one FLIP pass (cheap —
+  // transforms only, measured once per reflow, and nothing animates until a
+  // layout actually changes). Motion is dropped entirely for readers who ask
+  // for reduced motion: they get the cut.
   const reducedMotion = useReducedMotion();
   // A transitioning card rides above its neighbours. During collapse the
   // cards after it step back up while its box is still shrinking — and since
@@ -398,7 +378,7 @@ export function RepoCard({
   ) : (
     <span className="flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 font-medium text-foreground tabular-nums transition-colors group-hover/head:bg-accent">
       <Plus className="size-3" aria-hidden />
-      {skills.length - maxSkills}
+      {skills.length - FOLDED_LIMIT}
     </span>
   );
   // The bar's right cluster — badge, then chip — as one group pushed to the
@@ -417,13 +397,6 @@ export function RepoCard({
     <li
       className={cn(
         "relative flex flex-col",
-        // An open card takes the whole row the grid offers — every track of
-        // it, whatever the auto-fill came to (`1 / -1` is what `col-span-full`
-        // means), so the revealed rows read at the width of the list rather
-        // than of one lane. Auto-flow then lays the cards that follow under
-        // the open one; a card that was the open one's row-mate moves down
-        // with them.
-        wide && "col-span-full",
         // While transitioning, the card rides above the neighbours it glides
         // over (its own transform already lifts it into a stacking context;
         // this raises it past the ones that merely shift).
@@ -521,33 +494,21 @@ export function RepoCard({
           {/* A row is the unit of the body, and it is deliberately not a card:
               the repository is the card, and a skill inside it is one line of
               its content. The horizontal bleed lets the hover highlight read as
-              a row band rather than as a box inside the card's padding. On a
-              wide card — toggled open in browse, or wide by its own count
-              under a search — the rows run in two balanced columns — the
-              upper half of the list down the left, the rest down the right, so
-              a full-width card does not turn every row into a full-width
-              sweep. `grid-flow-col` over `ceil(n/2)` rows is what balances
-              them: the items fill column-major, so the split is by count and
-              stays put no matter how tall the individual rows run. Each row
-              carries `layout="position"`: while the surface scales up around
-              them, the rows themselves never stretch — they keep their size,
-              glide into the two-column arrangement, and the region beyond
-              them simply shows up as the surface grows past it (the card's
-              own overflow clipping is the reveal mask). */}
+              a row band rather than as a box inside the card's padding. The
+              rows always run in two balanced columns — the upper half of the
+              list down the left, the rest down the right — so a full-width
+              card never turns every row into a full-width sweep.
+              `grid-flow-col` over `ceil(n/2)` rows is what balances them: the
+              items fill column-major, so the split is by count and stays put
+              no matter how tall the individual rows run. Each row carries
+              `layout="position"`: while rows appear or leave around it, the
+              rows themselves never stretch — they keep their size and glide
+              into place (the card's own overflow clipping is the mask). */}
           <ul
-            className={cn(
-              "-mx-1.5",
-              wide
-                ? "grid grid-flow-col auto-cols-fr gap-x-8"
-                : "flex flex-col",
-            )}
-            style={
-              wide
-                ? {
-                    gridTemplateRows: `repeat(${Math.ceil(shown.length / 2)}, auto)`,
-                  }
-                : undefined
-            }
+            className="grid grid-flow-col auto-cols-fr gap-x-8 -mx-1.5"
+            style={{
+              gridTemplateRows: `repeat(${Math.ceil(shown.length / 2)}, auto)`,
+            }}
           >
             {shown.map(({ skill, matched, muted, extra, action }) => {
               const key = skillKey(skill);
@@ -712,23 +673,10 @@ export function RepoCard({
               </button>
               <ul
                 aria-label={t("state.uninstalledListAria", { name })}
-                className={cn(
-                  "-mx-1.5",
-                  // The same body the installed rows use on a wide card:
-                  // column-major fill over a balanced row count, so a
-                  // full-width card never turns every row into a
-                  // full-width sweep — whichever press widened the card.
-                  wide
-                    ? "grid grid-flow-col auto-cols-fr gap-x-8"
-                    : "flex flex-col",
-                )}
-                style={
-                  wide
-                    ? {
-                        gridTemplateRows: `repeat(${Math.ceil(uninstalled.length / 2)}, auto)`,
-                      }
-                    : undefined
-                }
+                className="grid grid-flow-col auto-cols-fr gap-x-8 -mx-1.5"
+                style={{
+                  gridTemplateRows: `repeat(${Math.ceil(uninstalled.length / 2)}, auto)`,
+                }}
               >
                 {uninstalled.map((skill) => (
                   <li
