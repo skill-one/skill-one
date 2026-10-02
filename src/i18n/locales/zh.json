@@ -234,9 +234,6 @@
   "advanced": {
     "title": "高级设置",
     "description": "配置技能数据的下载源（索引、SKILL.md 详情、安装统一生效）。",
-    "display": "显示",
-    "repoPreviewCount": "仓库卡片预览数",
-    "repoPreviewAria": "仓库卡片预览数量",
     "cdnTitle": "CDN 基址",
     "cdnSaved": "已保存",
     "cdnHintBefore": "留空 = 优先直连 GitHub（",
