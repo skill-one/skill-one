@@ -1,4 +1,5 @@
 import type { Skill } from "../types/skill";
+import { popularity } from "./popularity";
 import { buildSearchIndex } from "./search-index";
 import type { SearchHit } from "./registry/protocol";
 
@@ -14,7 +15,7 @@ import type { SearchHit } from "./registry/protocol";
  *
  * The ranking layered on top of the shared relevance order:
  * - an exact or prefix name hit ranks above everything else, whatever its BM25
- *   score, and those name hits are ordered by install count among themselves: a
+ *   score, and those name hits are ordered by popularity among themselves: a
  *   registry search is usually someone typing a name they already have in
  *   mind, so once the name matches the open question is which of the namesakes
  *   they meant.
@@ -26,7 +27,7 @@ export type SkillSearch = (query: string) => SearchHit[];
 // Name tiers, applied as an ordering key rather than a score multiplier: an
 // exact or prefix name hit is a far stronger signal than any BM25 combination
 // can express, so folding it into the score would only trade one fragile
-// constant for another. 0 sorts first, and within a tier installs decide.
+// constant for another. 0 sorts first, and within a tier popularity decides.
 const TIER = { exact: 0, prefix: 1, rest: 2 } as const;
 
 /**
@@ -70,16 +71,18 @@ export function buildSkillSearch(skills: Skill[]): SkillSearch {
         tier: nameTier(normalizedNames[id], normalizedQuery),
       }))
       // Name tier first (exact, then prefix, then the rest); within a tier
-      // installs decide, with BM25 as the final tie-break. Inside the name
+      // popularity decides, with BM25 as the final tie-break. Inside the name
       // tiers every hit is named by the query already, so the open question is
       // which of the namesakes was meant. The rest are names that carry the
-      // terms without starting with them, where the more installed skill is the
-      // better answer than a more textually dense one — so installs lead there
-      // too.
+      // terms without starting with them, where the more popular skill is the
+      // better answer than a more textually dense one — so the blend leads
+      // there too. The figure is the same one the rows display (`lib/
+      // popularity.ts`), so the ranking and the numbers beside the rows cannot
+      // disagree.
       .toSorted(
         (a, b) =>
           a.tier - b.tier ||
-          b.skill.downloads - a.skill.downloads ||
+          popularity(b.skill) - popularity(a.skill) ||
           b.score - a.score,
       )
       .map(({ skill, matched }) => ({ skill, matched }));

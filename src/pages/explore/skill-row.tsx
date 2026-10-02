@@ -19,7 +19,7 @@ import {
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { INTERACTIVE_CLASS } from "../../components/skill-card";
 import { SkillInstallButton } from "../../components/skill-install-button";
-import { SkillInstalls } from "../../components/skill-installs";
+import { SkillPopularity } from "../../components/skill-popularity";
 import { Card } from "../../components/ui/card";
 import {
   Tooltip,
@@ -40,7 +40,7 @@ export type { SkillMatched };
  * glyph, then *what is it* (the name) over *what does it do* (the description),
  * and finally the facts as a quiet cluster on the far right: the source's owner
  * face — the repository's own name lives on the detail panel, so the row keeps
- * only the face — the install figure, and the corner action. A row is read one
+ * only the face — the popularity figure, and the corner action. A row is read one
  * at a time, top to bottom, which is exactly what a list is for — the ordinals
  * give the eye a single column to run down, and the facts line up so two rows
  * can be compared without re-reading them.
@@ -193,8 +193,8 @@ export function SkillRow({
         </div>
 
         {/* The facts cluster, pushed to the far end and kept whole: the source's
-            owner face, then the install figure — both short and fixed, so the
-            description keeps the width it needs. The face drops out on a
+            owner face, then the popularity figure — both short and fixed, so
+            the description keeps the width it needs. The face drops out on a
             repository's own page (see `showSource`): the head already names it,
             and 48 identical copies only crowd the names. A skill with no source
             at all states it in words instead, there being no face to stand for
@@ -217,7 +217,11 @@ export function SkillRow({
             ? extra ?? <span className="truncate">{t("common.localInstall")}</span>
             : extra}
           {storeBacked && (
-            <SkillInstalls skill={skill} className="w-16 justify-end" />
+            <SkillPopularity
+              skill={skill}
+              align="end"
+              className="w-16 justify-end"
+            />
           )}
         </div>
 

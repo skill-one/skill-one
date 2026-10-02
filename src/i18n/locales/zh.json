@@ -10,11 +10,11 @@
     "unknownError": "未知错误",
     "noDescription": "暂无描述",
     "coverAria": "{{name}} 封面图",
-    "installsTitle": "{{count}} 次安装",
-    "installs": "安装量",
+    "popularityAria": "热度 {{blended}}：安装 {{installed}} · Star {{starred}}",
     "searchSkills": "搜索 Skill",
     "indexBuilding": "索引构建中…",
     "listUnit": "视图",
+    "listSort": "排序方式",
     "back": "返回",
     "viewDetailAria": "查看 {{name}} 详情",
     "expand": "展开",
@@ -36,6 +36,11 @@
   "unit": {
     "byRepo": "网格",
     "bySkill": "列表"
+  },
+  "sort": {
+    "byPopularity": "热度",
+    "byInstalled": "安装时间",
+    "byRepo": "按仓库"
   },
   "action": {
     "install": "安装",

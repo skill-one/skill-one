@@ -28,7 +28,9 @@ import { SearchResults } from "../explore/search-results";
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage } from "../../lib/utils";
 import { buildSearchIndex } from "../../lib/search-index";
-import { setQuery, setScope, setUnit } from "../../lib/list-view";
+import { setQuery, setScope, setSort } from "../../lib/list-view";
+import type { ListUnit } from "../../lib/list-view";
+import { popularity } from "../../lib/popularity";
 import type { SkillMatched } from "../../components/skill-card";
 import type { Skill } from "../../types/skill";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
@@ -40,7 +42,7 @@ import {
 } from "../../lib/install-time";
 import { SkeletonList } from "../../components/skeleton-list";
 import { ListFacets } from "../../components/list-facets";
-import { ListUnitToggle } from "../../components/list-unit-toggle";
+import { ListSortSelect } from "../../components/list-sort-select";
 import { LinkSuggestionBadge } from "./link-suggestion-badge";
 import type { LinkCandidate } from "../../lib/link-suggestions";
 import { RepoCard } from "../explore/repo-card";
@@ -91,35 +93,84 @@ function starsOf(group: RepoGroup): number | undefined {
 }
 
 /**
- * The installed list — the management counterpart of the store's 全部 page, in
- * the same two units, switched on the list's own first row exactly as the
- * store's are:
+ * The comparator behind the 热度 sort: the registry's blended
+ * installs-and-stars figure, most-popular first, and an equal figure falls
+ * back to the install's own clock, newest first — the order the list was born
+ * answering in, so the fallback never surprises. `popularityOf` reads a plain
+ * number (a row the registry does not back carries no figure at all and reads
+ * 0: such a row simply sinks, never borrowing stars it cannot show).
+ */
+function compareByPopularity<T>(
+  popularityOf: (item: T) => number,
+  timeOf: (item: T) => number | null | undefined,
+  tieBreak: (a: T, b: T) => number = () => 0,
+): (a: T, b: T) => number {
+  return (a, b) => {
+    const pa = popularityOf(a);
+    const pb = popularityOf(b);
+    if (pa !== pb) return pb - pa;
+    return compareByInstalledTime(timeOf, tieBreak)(a, b);
+  };
+}
+
+/** A row's name, the tie-break both sorts share inside the flat lists. */
+const byName = (a: Row, b: Row) => a.skill.name.localeCompare(b.skill.name);
+
+/**
+ * The comparator behind the 按仓库 sort: the most-starred repository leads,
+ * and the figure-less cards — the source-less pool, or a source the registry
+ * no longer lists — sink below every figure. Cards the stars cannot separate
+ * (equal figures, all figures absent) fall back to the newest-install order
+ * the repository reading was born with, then to the name.
+ */
+function compareByStars<T>(
+  figureOf: (item: T) => number | undefined,
+  fallback: (a: T, b: T) => number,
+): (a: T, b: T) => number {
+  return (a, b) => {
+    const sa = figureOf(a);
+    const sb = figureOf(b);
+    if (sa == null && sb == null) return fallback(a, b);
+    if (sa == null) return 1;
+    if (sb == null) return -1;
+    if (sa !== sb) return sb - sa;
+    return fallback(a, b);
+  };
+}
+
+/**
+ * The installed list — the management counterpart of the store's 全部 page.
+ * One control on the list's own first row answers both what the screen is
+ * made of and what order it reads in — three sorts, where the third carries
+ * the shape the old unit switch used to pick:
  *
- * - **按仓库**: one card per source repository, ordered by its *newest*
- *   install (newest first, so a card near the top has something new in it),
- *   listing that repository's installed skills in the same newest-first order
- *   (up to the preview size set in Advanced Settings, 3 by default; that newest install
- *   is therefore always inside the preview). Installs no recorded source
- *   vouches for have no repository to belong to, so they pool into one card of
- *   their own rather than inventing one — the same shape, with its bar stating
- *   本地安装 in place of a repository it would have to make up, and opening
- *   the page that lists the pool whole.
- * - **按技能**: one row per install, newest first, so "what did I add
- *   lately" reads top to bottom. Either unit's search re-answers it in
- *   relevance order. Nothing caps the skill rows: that unit is the whole
- *   list, so the unit that reads it one skill at a time reads all of them.
+ * - **按热度** (the default): one row per install, the registry's blended
+ *   installs-and-stars figure leading — the same figure every row displays,
+ *   so the order and the numbers beside it can never disagree.
+ * - **按仓库**: one card per source repository, led by the most-starred
+ *   repository (cards the stars cannot separate keep the newest-install
+ *   order), listing that repository's installed skills newest-first (up to
+ *   the preview size set in Advanced Settings, 3 by default). Installs no
+ *   recorded source vouches for have no repository to belong to, so they pool
+ *   into one card of their own rather than inventing one — the same shape,
+ *   with its bar stating 本地安装 in place of a repository it would have to
+ *   make up, and opening the page that lists the pool whole.
+ * - **按安装时间**: one row per install — the installs' own clock, newest
+ *   first, so "what did I add lately" reads top to bottom. Nothing caps the
+ *   skill rows: that shape is the whole list.
  *
- * What the page adds to the store's surfaces is what only an installed skill
- * has: enablement — at two granularities, one per repository card: the bar's
- * group switch (a press enables or disables every skill of that card; a mixed
- * card reads as half on) and each row's own switch, revealed on hover in the
- * same floating slot the store's install buttons live in — the dimming of a
- * disabled row, and the migration badge beside an install whose source the
- * ledger cannot vouch for. A card also names what its repository still has
- * that this machine does not: a badge on the card's bar states the count of
- * uninstalled siblings, and a press on the bar unfolds them (each with the
- * store's install button) as their own group under the divider.
- * The skill unit carries its per-row switch, and both units feed the same
+ * A search re-answers any of the three in relevance order. What the page adds
+ * to the store's surfaces is what only an installed skill has: enablement —
+ * at two granularities, one per repository card: the bar's group switch (a
+ * press enables or disables every skill of that card; a mixed card reads as
+ * half on) and each row's own switch, revealed on hover in the same floating
+ * slot the store's install buttons live in — the dimming of a disabled row,
+ * and the migration badge beside an install whose source the ledger cannot
+ * vouch for. A card also names what its repository still has that this
+ * machine does not: a badge on the card's bar states the count of uninstalled
+ * siblings, and a press on the bar unfolds them (each with the store's
+ * install button) as their own group under the divider.
+ * The skill shape carries its per-row switch, and every sort feeds the same
  * detail drawer, so what a skill looks like never depends on how the list is
  * ordered.
  */
@@ -154,7 +205,11 @@ export function InstalledPage() {
   // than held here. The full installed list is already in memory, so everything
   // below filters on the main thread.
   const search = useListQuery();
-  const { unit, scope } = useDestinationView("installed");
+  const { scope, sort = "popularity" } = useDestinationView("installed");
+  // The sort *is* the reading here: the repository shape is its third option,
+  // so the unit the rest of the page renders by is derived, not stored — the
+  // old unit switch's two answers now live inside the one control.
+  const unit: ListUnit = sort === "repo" ? "repo" : "skill";
   const domain = scope ?? null;
   // Open skill in the shared detail drawer, tracked by identity rather than by
   // index: the provenance and store-entry queries land asynchronously and
@@ -169,15 +224,15 @@ export function InstalledPage() {
   // not be in the new answer at all.
   //
   // The controls are shared with the other list now, so this watches the answer
-  // instead of each control. Switching the unit still lands here as one change,
-  // because the list view drops the scope with the unit (`lib/list-view`).
-  const shownAnswer = useRef(`${query}\u0000${unit}\u0000${domain ?? "all"}`);
+  // instead of each control. The sort carries the unit (it is derived above),
+  // so one field here covers both switches' old answers.
+  const shownAnswer = useRef(`${query}\u0000${domain ?? "all"}\u0000${sort}`);
   useEffect(() => {
-    const answer = `${query}\u0000${unit}\u0000${domain ?? "all"}`;
+    const answer = `${query}\u0000${domain ?? "all"}\u0000${sort}`;
     if (shownAnswer.current === answer) return;
     shownAnswer.current = answer;
     setSelectedKey(null);
-  }, [query, unit, domain]);
+  }, [query, domain, sort]);
 
   // Deep link from the menu bar popover: `/installed?skill=<name>` pre-fills
   // the search box, which ranks the targeted skill near the top (its name is
@@ -242,10 +297,11 @@ export function InstalledPage() {
 
   // One card per source repository: the skills no recorded source vouches for
   // pool into the one card that stands for them, so every installed skill still
-  // lives somewhere. Inside each card the installs read newest-first (the same
-  // order the card's preview caps, so the newest install is the first row
-  // rather than hidden past the cap), and the cards themselves are name-ordered
-  // here purely as the stable base the list's time ordering ties break against.
+  // lives somewhere. Inside each card the installs read newest-first — the
+  // card's own clock, whatever sort the cards themselves answer to — so the
+  // newest install is the first row rather than hidden past the preview cap.
+  // The cards themselves are name-ordered here purely as the stable base the
+  // star and time orderings tie break against.
   const cards = useMemo<RepoGroup[]>(() => {
     const byRepo = new Map<string, Row[]>();
     for (const row of rows) {
@@ -258,19 +314,20 @@ export function InstalledPage() {
       items: items.toSorted(
         compareByInstalledTime(
           (row) => row.skill.installedAt,
-          (a, b) => a.skill.name.localeCompare(b.skill.name),
+          byName,
         ),
       ),
     })).toSorted((a, b) => a.repo.localeCompare(b.repo));
   }, [rows]);
 
-  // The skill unit's flat order: the installs newest-first by their recorded
-  // install time (see `lib/install-time`), scoped to the chosen domain by
-  // membership, since a skill's own classification is what the chip row counts
-  // here. Installs the platform recorded no birth time for settle last. A
-  // search is left exactly as the index answered it: relevance is a ranking
-  // too, and the better one while a query is live — the same order the store
-  // keeps there.
+  // The skill unit's flat order: the installs in the chosen sort's order —
+  // the registry's popularity blend (the default), or newest-first by the
+  // recorded install time (see `lib/install-time`) — scoped to the chosen
+  // domain by membership, since a skill's own classification is what the chip
+  // row counts here. Installs the platform recorded no birth time for settle
+  // last in the time order. A search is left exactly as the index answered it:
+  // relevance is a ranking too, and the better one while a query is live — the
+  // same order the store keeps there.
   const activeRows = useMemo(() => {
     if (unit !== "skill") return [];
     if (isSearching) return rows;
@@ -279,9 +336,15 @@ export function InstalledPage() {
         ? rows
         : rows.filter((row) => domainsOf(row.skill).includes(domain));
     return scoped.toSorted(
-      compareByInstalledTime((row) => row.skill.installedAt),
+      sort === "installed"
+        ? compareByInstalledTime((row) => row.skill.installedAt)
+        : compareByPopularity(
+            (row) => popularity(row.skill),
+            (row) => row.skill.installedAt,
+            byName,
+          ),
     );
-  }, [unit, rows, isSearching, domain]);
+  }, [unit, rows, isSearching, domain, sort]);
 
   // Each row's ordinal in the flat order, so numbering runs continuously
   // across the groups rather than restarting per bucket.
@@ -313,11 +376,14 @@ export function InstalledPage() {
     });
   }, [unit, rows, cards]);
 
-  // The repository unit's flat order: the cards by their *newest* install —
-  // a card near the top has something new in it — newest first, ties broken by
-  // the name order `cards` was built in, and scoped to the chosen domain by
-  // membership, since a card rides every domain its rows belong to. Cards whose
-  // installs all lack a birth time settle last.
+  // The repository shape's flat order — the sort's own answer over cards:
+  // by their repository's stars (the 按仓库 option; the figure-less pool and
+  // unlisted sources sink, and cards the stars cannot separate keep the
+  // newest-install order), by the popularity blend of the installs and stars
+  // their skills add up to, or by their *newest* install — a card near the top
+  // has something new in it. Scoped to the chosen domain by membership, since
+  // a card rides every domain its rows belong to. Cards whose installs all
+  // lack a birth time settle last in the time order.
   const activeCards = useMemo<RepoGroup[]>(() => {
     if (unit !== "repo" || isSearching) return [];
     const scoped =
@@ -326,13 +392,33 @@ export function InstalledPage() {
         : cards.filter((card) =>
             card.items.some((row) => domainsOf(row.skill).includes(domain)),
           );
-    return scoped.toSorted(
-      compareByInstalledTime(
-        (card) => newestInstallTime(card.items, (row) => row.skill.installedAt),
-        (a, b) => a.repo.localeCompare(b.repo),
-      ),
+    const byNewestInstall = compareByInstalledTime<RepoGroup>(
+      (card) => newestInstallTime(card.items, (row) => row.skill.installedAt),
+      (a, b) => a.repo.localeCompare(b.repo),
     );
-  }, [unit, isSearching, cards, domain]);
+    return scoped.toSorted(
+      sort === "repo"
+        ? compareByStars((card) => starsOf(card), byNewestInstall)
+        : sort === "installed"
+          ? byNewestInstall
+          : compareByPopularity(
+              (card) =>
+                popularity({
+                  downloads: card.items.reduce(
+                    (sum, row) => sum + row.skill.downloads,
+                    0,
+                  ),
+                  stars: card.items.reduce(
+                    (sum, row) => sum + row.skill.stars,
+                    0,
+                  ),
+                }),
+              (card) =>
+                newestInstallTime(card.items, (row) => row.skill.installedAt),
+              (a, b) => a.repo.localeCompare(b.repo),
+            ),
+    );
+  }, [unit, isSearching, cards, domain, sort]);
 
   // The registry's own grouping — every skill it lists, per repository — so
   // each card can also name the repository's skills this machine does not
@@ -380,7 +466,8 @@ export function InstalledPage() {
     total: itemCount,
     initial: INITIAL_CARDS,
     step: CARD_CHUNK,
-    resetKey: `${unit}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}`,
+    // The sort carries the unit, so one field names the whole shape change.
+    resetKey: `${sort}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}`,
   });
   const shownRows = activeRows.slice(0, renderedCount);
   const shownCards = activeCards.slice(0, renderedCount);
@@ -414,12 +501,11 @@ export function InstalledPage() {
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
       {/* The list's own first row: the classifications that hold an install
           (one press to scope the list; 全部 clears it), and — closing the row —
-          the unit switch, this page's own status control. The chips are a
+          the sort switch, this page's own status control. The chips are a
           browse control — a search re-orders the list by relevance and ignores
-          them — so they stand down while a search is live; the switch stays,
-          because the shape the search answer reads in does not depend on what
-          they happen to be looking at. The chips count what the unit lists, so
-          the figures and the list they scope can never disagree. */}
+          them — so they stand down while a search is live. The chips count
+          what the shape on screen lists, so the figures and the list they
+          scope can never disagree. */}
       <div className="mb-3 flex min-w-0 items-center gap-3">
         {!isSearching && rows.length > 0 && (
           <ListFacets
@@ -430,10 +516,18 @@ export function InstalledPage() {
           />
         )}
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <ListUnitToggle
-            unit={unit}
-            onChange={(next) => setUnit("installed", next)}
-          />
+          {/* The one control for both what the screen is made of and what
+              order it reads in — the old unit switch's repository shape is
+              the sort menu's third answer. It stands down with the chips
+              while a search is live: a search re-orders the list by
+              relevance, and its answer reads in the shape the sort already
+              chose. */}
+          {!isSearching && (
+            <ListSortSelect
+              sort={sort}
+              onChange={(next) => setSort("installed", next)}
+            />
+          )}
         </div>
       </div>
 

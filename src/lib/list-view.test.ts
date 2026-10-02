@@ -5,6 +5,7 @@ import {
   resetListView,
   setQuery,
   setScope,
+  setSort,
   setUnit,
   subscribeListView,
 } from "./list-view";
@@ -90,6 +91,67 @@ describe("list view", () => {
     setScope("store", null);
     expect(getListView().views.store).not.toHaveProperty("scope");
     expect(getListView().views.installed.scope).toBe("writing");
+  });
+
+  it("reads no sort until the reader picks one, and the default stays absent", () => {
+    expect(getListView().views.installed).not.toHaveProperty("sort");
+
+    setSort("installed", "installed");
+    expect(getListView().views.installed.sort).toBe("installed");
+
+    // Picking the default back removes it again, exactly as it is never stored.
+    setSort("installed", "popularity");
+    expect(getListView().views.installed).not.toHaveProperty("sort");
+  });
+
+  it("persists a sort choice under the list's own key, default excluded", () => {
+    setSort("installed", "installed");
+    expect(window.localStorage.getItem("skill-one.listSort.installed")).toBe(
+      "installed",
+    );
+
+    setSort("installed", "popularity");
+    expect(
+      window.localStorage.getItem("skill-one.listSort.installed"),
+    ).toBeNull();
+  });
+
+  it("starts from a stored sort, ignoring an unreadable one", async () => {
+    window.localStorage.setItem("skill-one.listSort.installed", "installed");
+    window.localStorage.setItem("skill-one.listSort.store", "nonsense");
+
+    const { getListView: stored } = await freshListView();
+    expect(stored().views.installed.sort).toBe("installed");
+    expect(stored().views.store).not.toHaveProperty("sort");
+  });
+
+  it("reads the installed list's old unit choice as its repository sort", async () => {
+    // A reader who had the installed list in repository cards keeps that
+    // reading under the merged control's third sort.
+    window.localStorage.setItem("skill-one.listUnit.installed", "repo");
+    const { getListView: migrated } = await freshListView();
+    expect(migrated().views.installed.sort).toBe("repo");
+
+    // The store keeps its unit switch, so its stored unit is not a sort.
+    window.localStorage.setItem("skill-one.listUnit.store", "repo");
+    const { getListView: untouched } = await freshListView();
+    expect(untouched().views.store).not.toHaveProperty("sort");
+    expect(untouched().views.store.unit).toBe("repo");
+  });
+
+  it("keeps the sort through a unit switch and a scope change, then forgets it", () => {
+    setSort("installed", "installed");
+    setUnit("installed", "repo");
+    expect(getListView().views.installed.sort).toBe("installed");
+
+    setScope("installed", "development");
+    expect(getListView().views.installed.sort).toBe("installed");
+
+    resetListView();
+    expect(getListView().views.installed).not.toHaveProperty("sort");
+    expect(
+      window.localStorage.getItem("skill-one.listSort.installed"),
+    ).toBeNull();
   });
 
   it("notifies subscribers, and only when something moved", () => {
