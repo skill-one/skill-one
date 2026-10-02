@@ -601,14 +601,13 @@ describe("InstalledPage", () => {
     });
 
     // Opening the uninstalled group is a reveal: the group's rows run in the
-    // same balanced columns the installed ones do — one row of them here, so
-    // the two columns carry one row.
+    // same two columns the installed ones do — one row of them here, so the
+    // two columns carry one row.
     await user.click(offer());
     const section = screen.getByRole("list", {
       name: "anthropics/skills 的未安装 skill",
     });
-    expect(section).toHaveClass("grid-flow-col");
-    expect(section).toHaveStyle({ gridTemplateRows: "repeat(1, auto)" });
+    expect(section).toHaveClass("grid-cols-2");
 
     // Folding the group hides it again. (Open, the bar's aria speaks of
     // collapsing, so the fold presses the button by its other name.)

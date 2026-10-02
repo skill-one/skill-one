@@ -1177,13 +1177,12 @@ describe("ExplorePage", () => {
     // A search's rows are matches, uncapped — every one of them is already on
     // screen, so the bar carries no figure.
     expect(within(fresh as HTMLElement).queryByText(/个 skill/)).toBeNull();
-    // Uncapped is not unshaped: the card's body runs in two balanced columns,
-    // the same layout the folded preview and the expansion use.
+    // Uncapped is not unshaped: the card's body runs in two columns filled
+    // row-major, the same layout the folded preview and the expansion use.
     const body = (fresh as HTMLElement).querySelector(
       '[data-slot="card-content"] ul',
     )!;
-    expect(body).toHaveClass("grid-flow-col");
-    expect(body).toHaveStyle({ gridTemplateRows: "repeat(4, auto)" });
+    expect(body).toHaveClass("grid-cols-2");
   });
 
   it("opens a live row on skills.sh instead of the detail panel", async () => {
