@@ -191,9 +191,9 @@ function renderExplorePage() {
   return render(
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-        {/* The real app mounts pages inside the shell: the header above them, with
-            the two controls both lists share in it. The page's own first row — its
-            domain chips — is its own and renders with it. */}
+        {/* The real app mounts pages inside the shell, the header above them.
+            The list's own controls — the search field, the domain picker, the
+            sort switch — stand on the page's first row and render with it. */}
         <HashRouter>
           <AppHeader />
           <ExplorePage />
@@ -243,7 +243,7 @@ async function pickSort(
 
 /**
  * Picks a domain scope from the 分类 picker. `label` names the menu item —
- * 全部 or a domain's display label. The menu closes on the pick, so each
+ * 全部 or a domain's display label. The popup closes on the pick, so each
  * scope change reopens it.
  */
 async function pickDomain(
@@ -258,9 +258,9 @@ async function pickDomain(
 
 /**
  * Opens the 分类 picker without picking, to read its menu of scopes; the
- * menu mounts asynchronously, so the caller's queries can be synchronous.
+ * popup mounts asynchronously, so the caller's queries can be synchronous.
  */
-async function openDomainMenu(user: ReturnType<typeof userEvent.setup>) {
+async function openDomainSelect(user: ReturnType<typeof userEvent.setup>) {
   await user.click(
     await screen.findByRole("button", { name: "分类" }),
   );
@@ -299,9 +299,9 @@ beforeEach(() => {
   );
 });
 
-// Base UI's menus mount, position and exit asynchronously; under a loaded
+// Base UI's popups mount, position and exit asynchronously; under a loaded
 // CI machine those steps can exceed the default 5s per test. Give the
-// menu-driven interactions in this file more headroom.
+// popup-driven interactions in this file more headroom.
 vi.setConfig({ testTimeout: 15_000 });
 
 describe("ExplorePage", () => {
@@ -332,7 +332,7 @@ describe("ExplorePage", () => {
     expect(harness.downloads).toBe(1);
   });
 
-  it("answers the sort menu with the two orders its rows can state", async () => {
+  it("answers the sort select with the two orders its rows can state", async () => {
     const user = userEvent.setup();
     harness.reset();
     harness.init();
@@ -356,8 +356,8 @@ describe("ExplorePage", () => {
     ]);
     harness.complete();
     const { unmount } = renderExplorePage();
-    // The beforeEach pick has the list in repository cards; the menu reads it
-    // back into rows. The store's menu carries only the two orders its rows
+    // The beforeEach pick has the list in repository cards; the select reads it
+    // back into rows. The store's own orders carry only the two its rows
     // display — the install clock is the installed list's answer, not this
     // list's.
     await user.click(
@@ -377,7 +377,7 @@ describe("ExplorePage", () => {
       "热度",
     );
     await waitFor(() => expect(cardOrder()).toEqual(["few", "star"]));
-    // The menu's exit never settles under jsdom, so the second pick mounts
+    // The popup's exit never settles under jsdom, so the second pick mounts
     // the page again rather than reopening a closing popup — and the pick
     // survives the remount, because the choice lives in the shared view.
     unmount();
@@ -499,7 +499,7 @@ describe("ExplorePage", () => {
     harness.complete();
     const { container } = renderExplorePage();
 
-    // The list opens on 全部: one card per repository, and a menu item for
+    // The list opens on 全部: one card per repository, and an option for
     // every domain that holds one — plus 未分类 for the repository nothing
     // classified, which is a different claim from the dataset's own 其他 and
     // so takes an item of its own.
@@ -509,7 +509,7 @@ describe("ExplorePage", () => {
     expect(screen.getByRole("button", { name: "分类" })).toHaveTextContent(
       "3",
     );
-    await openDomainMenu(user);
+    await openDomainSelect(user);
     expect(
       screen.getByRole("menuitemradio", { name: /开发编程/ }),
     ).toBeInTheDocument();
@@ -575,7 +575,7 @@ describe("ExplorePage", () => {
 
     // An answer and a blank, told apart in the picker: the leftovers box for
     // 其他, the question mark for 未分类, each counting its own.
-    await openDomainMenu(user);
+    await openDomainSelect(user);
     const other = screen.getByRole("menuitemradio", { name: /^其他/ });
     const unclassified = screen.getByRole("menuitemradio", {
       name: /^未分类/,
@@ -771,7 +771,7 @@ describe("ExplorePage", () => {
 
     // The picker counts skills, not repositories: `beta` answers both domains,
     // so testing holds two while no repository leads with it.
-    await openDomainMenu(user);
+    await openDomainSelect(user);
     const testing = screen.getByRole("menuitemradio", {
       name: /^测试与质量/,
     });

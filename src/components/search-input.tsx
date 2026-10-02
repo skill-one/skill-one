@@ -1,6 +1,11 @@
 import { useEffect, useRef } from "react";
 import { Search } from "lucide-react";
 
+import {
+  setSearchField,
+  takeSearchRequest,
+} from "../lib/search-shortcut";
+import { cn } from "../lib/utils";
 import { Input } from "./ui/input";
 import { Kbd, KbdGroup } from "./ui/kbd";
 
@@ -12,15 +17,22 @@ const isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform);
  * names what is being searched and doubles as the accessible label, so the
  * visible hint and the announced one can never drift apart.
  *
- * It closes the header's row, just before the window's settings entry, and it
- * is open all the time: a field that has to be asked for first is a field the
- * reader has to look for first, and searching is the first thing a reader does
- * to a list of eight thousand. The magnifier is decorative and never the click
- * target — the field under it is.
+ * It opens its list's own row, the one the scope and the order stand on (see
+ * `ListToolbar`), and is open all the time: a field that has to be asked for
+ * first is a field the reader has to look for first, and searching is the first
+ * thing a reader does to a list of eight thousand. The magnifier is decorative
+ * and never the click target — the field under it is.
  *
- * Cmd/Ctrl+K calls the field from anywhere: the field is on every route, so
- * the shortcut is too. The listener lives with the field, so the shortcut
- * exists exactly where the field does.
+ * The field is where it is because it is a control of a list: it narrows the
+ * list below it, so it belongs to that list's row, not to the window's chrome.
+ * Cmd/Ctrl+K still reaches it from anywhere (see `lib/search-shortcut`), which
+ * is what keeps a shortcut that never leaves the row from being a shortcut into
+ * a row. The field registers itself on the way in and answers a shortcut that
+ * arrived before it — the reader who pressed Cmd/Ctrl+K on the agents graph is
+ * standing in the store's list a moment later, in the field, not looking for it.
+ *
+ * The caller sizes the field (`className`): how wide the search sits in its row
+ * is that row's decision, not this field's.
  */
 export function SearchInput({
   value,
@@ -28,6 +40,7 @@ export function SearchInput({
   label,
   disabled = false,
   placeholder,
+  className,
 }: {
   value: string;
   /** Receives the raw field value; debouncing is the caller's. */
@@ -38,25 +51,26 @@ export function SearchInput({
   disabled?: boolean;
   /** Overrides the `${label}...` hint, e.g. to say why the field is locked. */
   placeholder?: string;
+  className?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        const field = inputRef.current;
-        if (!field || field.disabled) return;
-        field.focus();
-        field.select();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    const field = inputRef.current;
+    if (!field) return;
+    setSearchField(field);
+    // A shortcut pressed where this list was not on screen waits for the field
+    // rather than for a keystroke: the reader asked to search, and the list they
+    // landed on is the one holding the answer.
+    if (takeSearchRequest() && !field.disabled) {
+      field.focus();
+      field.select();
+    }
+    return () => setSearchField(null);
   }, []);
 
   return (
-    <div className="relative w-56 shrink-0">
+    <div className={cn("relative", className)}>
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         ref={inputRef}

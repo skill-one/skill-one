@@ -11,6 +11,7 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { useAutoLinkAgents } from "./hooks/use-auto-link-agents";
 import { useRegistryRefresh } from "./hooks/use-registry-refresh";
 import { useScheduledCheck } from "./hooks/use-scheduled-check";
+import { useSearchShortcut } from "./hooks/use-search-shortcut";
 import { createQueryClient } from "./lib/query-client";
 import { checkForUpdate } from "./lib/update-store";
 import { isTauri } from "./lib/tauri";
@@ -73,6 +74,7 @@ export default function App() {
       <TooltipProvider delay={300}>
         <HashRouter>
           <PopoverNavigation />
+          <SearchShortcut />
           <AppUpdateWatcher />
           <RegistryAutoRefresh />
           <AgentAutoLink />
@@ -101,6 +103,17 @@ export default function App() {
       </TooltipProvider>
     </PersistQueryClientProvider>
   );
+}
+
+/**
+ * Cmd/Ctrl+K, the app-wide way into a list search. The field is a control of a
+ * list and stands on that list's row (see `ListToolbar`), so the shortcut is
+ * answered from the shell — see `useSearchShortcut`, which carries the whole of
+ * it and nothing else.
+ */
+function SearchShortcut() {
+  useSearchShortcut();
+  return null;
 }
 
 /**

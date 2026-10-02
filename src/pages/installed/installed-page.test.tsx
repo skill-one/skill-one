@@ -78,8 +78,9 @@ function ledgerRecord(
 
 /**
  * The page as the app mounts it: inside the shell, under the route the deep link
- * arrives on. The header carries the two controls both lists share, so a page
- * mounted alone could be typed into but not searched.
+ * arrives on. The list's own row carries the controls the page answers to — the
+ * search field among them — so a page mounted alone could be listed but not
+ * searched.
  */
 function renderPage(route = "/installed") {
   return renderWithRouter(
@@ -108,7 +109,7 @@ async function pickSort(
 
 /**
  * Picks a domain scope from the 分类 picker. `label` names the menu item —
- * 全部 or a domain's display label. The menu closes on the pick, so each
+ * 全部 or a domain's display label. The popup closes on the pick, so each
  * scope change reopens it.
  */
 async function pickDomain(
@@ -123,9 +124,9 @@ async function pickDomain(
 
 /**
  * Opens the 分类 picker without picking, to read its menu of scopes; the
- * menu mounts asynchronously, so the caller's queries can be synchronous.
+ * popup mounts asynchronously, so the caller's queries can be synchronous.
  */
-async function openDomainMenu(user: ReturnType<typeof userEvent.setup>) {
+async function openDomainSelect(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("button", { name: "分类" }));
   await screen.findByRole("menuitemradio", { name: /^全部/ });
 }
@@ -146,12 +147,12 @@ describe("InstalledPage", () => {
 
     // The browse bar leads with 全部: an install no store entry covers has no
     // classification either, and that is not the dataset's 其他 — nobody has
-    // looked at it at all. The picker states the whole count, and its menu
+    // looked at it at all. The picker states the whole count, and its list
     // carries 未分类 and nothing for 其他.
     expect(
       await screen.findByRole("button", { name: "分类" }),
     ).toHaveTextContent("1");
-    await openDomainMenu(user);
+    await openDomainSelect(user);
     expect(
       screen.getByRole("menuitemradio", { name: /^未分类/ }),
     ).toBeInTheDocument();
@@ -892,9 +893,9 @@ describe("InstalledPage", () => {
     renderPage();
 
     // The resolved entry is what classifies the install, so an item for its
-    // domain joins the picker's menu — and the card's bar prints the
+    // domain joins the picker's list — and the card's bar prints the
     // repository's stars, the same figure the store's own cards carry.
-    await openDomainMenu(user);
+    await openDomainSelect(user);
     expect(
       screen.getByRole("menuitemradio", { name: /^内容创作/ }),
     ).toBeInTheDocument();
@@ -1437,7 +1438,7 @@ describe("InstalledPage", () => {
     // leave with the ordering they belonged to. (No store entry resolves
     // here, so the rows state no blend either — an absent fact, not a zero.)
     // The switch goes through the same `setSort` call the menu item's change
-    // makes — jsdom never runs the menu's closing animation, so its content
+    // makes — jsdom never runs the popup's closing animation, so its content
     // stays mounted and a second open/close cycle cannot be clicked through.
     setSort("installed", "popularity");
     await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
@@ -1454,8 +1455,8 @@ describe("InstalledPage", () => {
     // The estimate is a local fact — the description's own cost, no store
     // entry needed — so every row with a description states one, as a bare
     // figure under the coin icon. The short hint is matched exactly: jsdom
-    // never runs the sort menu's closing animation, so its content stays
-    // mounted, and a substring of "Token" would match the menu's own text
+    // never runs the sort select's closing animation, so its content stays
+    // mounted, and a substring of "Token" would match the select's own text
     // through it.
     await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
     const estimates = screen
@@ -1502,7 +1503,7 @@ describe("InstalledPage", () => {
     ).toBeNull();
   });
 
-  it("re-orders the skill unit by popularity from the sort menu", async () => {
+  it("re-orders the skill unit by popularity from the sort select", async () => {
     const user = userEvent.setup();
     // Four installs carry a store figure, spread against their install ages:
     // docx (50) most-installed but 3 days old, pdf (30) fresh, pptx (20),
@@ -1514,7 +1515,7 @@ describe("InstalledPage", () => {
     renderPage();
     // Picking 热度 both shapes the list as skill rows and orders it — the
     // one control answers both questions. It is the default pick, so the
-    // menu marks it on arrival too.
+    // select marks it on arrival too.
     await pickSort(user, "热度");
     await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
     expect(screen.getByRole("button", { name: "排序方式" })).toHaveTextContent(
@@ -1559,26 +1560,26 @@ describe("InstalledPage", () => {
     );
   });
 
-  it("stands the sort control down while searching, like the chips", async () => {
+  it("locks the sort control while searching, like the picker", async () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("pdf");
-    expect(screen.getByRole("button", { name: "排序方式" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "排序方式" })).toBeEnabled();
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
-    // The control would offer a choice the search answer does not honor, so
-    // it leaves the row with the chips — and returns when the search clears.
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "排序方式" }),
-      ).not.toBeInTheDocument(),
-    );
-    await user.clear(screen.getByLabelText("搜索 Skill"));
+    // The control would offer a choice the search answer does not honour, so it
+    // says so where it stands — and unlocks when the search clears. It does not
+    // leave the row: the search field it stands beside would move under the
+    // reader's cursor on every keystroke.
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "排序方式" }),
-      ).toBeInTheDocument(),
+      ).toBeDisabled(),
+    );
+    await user.clear(screen.getByLabelText("搜索 Skill"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "排序方式" })).toBeEnabled(),
     );
   });
 
@@ -1594,13 +1595,13 @@ describe("InstalledPage", () => {
     // The repository unit weighs a domain by repositories: one source holds
     // both classified installs, so 内容创作 counts 1 beside 全部's 2 cards.
     // The figures arrive with the store's lookup, so the trigger is waited
-    // out before the menu is read.
+    // out before the select is read.
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "分类" })).toHaveTextContent(
         "2",
       ),
     );
-    await openDomainMenu(user);
+    await openDomainSelect(user);
     expect(
       screen.getByRole("menuitemradio", { name: /^内容创作/ }),
     ).toHaveTextContent("1");
@@ -1612,7 +1613,7 @@ describe("InstalledPage", () => {
     await pickSort(user, "安装时间");
 
     // The same domain now weighs skills, and 全部 every install.
-    await openDomainMenu(user);
+    await openDomainSelect(user);
     expect(
       screen.getByRole("menuitemradio", { name: /^内容创作/ }),
     ).toHaveTextContent("2");
@@ -1631,7 +1632,7 @@ describe("InstalledPage", () => {
 
     // Back in the repository unit, 全部 counts cards again.
     await pickSort(user, "按仓库");
-    await openDomainMenu(user);
+    await openDomainSelect(user);
     expect(screen.getByRole("menuitemradio", { name: /^全部/ })).toHaveTextContent(
       "2",
     );
@@ -1676,20 +1677,19 @@ describe("InstalledPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("stands the category bar down while searching", async () => {
+  it("locks the category picker while searching", async () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("pdf");
-    expect(screen.getByRole("button", { name: "分类" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "分类" })).toBeEnabled();
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
     // A search re-orders the list by relevance and ignores the scope, so the
-    // picker goes away with it — exactly as it does in the store.
+    // picker says so where it stands — exactly as it does in the store — and
+    // the row keeps its shape while the field is being typed into.
     await waitFor(() =>
-      expect(
-        screen.queryByRole("button", { name: "分类" }),
-      ).not.toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: "分类" })).toBeDisabled(),
     );
   });
 });

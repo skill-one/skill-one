@@ -27,7 +27,7 @@ import { SearchResults } from "../explore/search-results";
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage } from "../../lib/utils";
 import { buildSearchIndex } from "../../lib/search-index";
-import { setQuery, setScope, setSort } from "../../lib/list-view";
+import { setQuery } from "../../lib/list-view";
 import type { ListUnit } from "../../lib/list-view";
 import { popularity } from "../../lib/popularity";
 import { estimateTokens } from "../../lib/token-estimate";
@@ -41,8 +41,7 @@ import {
   newestInstallTime,
 } from "../../lib/install-time";
 import { SkeletonList } from "../../components/skeleton-list";
-import { ListFacets } from "../../components/list-facets";
-import { ListSortSelect } from "../../components/list-sort-select";
+import { ListToolbar } from "../../components/list-toolbar";
 import { LinkSuggestionBadge } from "./link-suggestion-badge";
 import type { LinkCandidate } from "../../lib/link-suggestions";
 import { RepoCard } from "../explore/repo-card";
@@ -512,37 +511,22 @@ export function InstalledPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The list's own first row: the classifications that hold an install
-          (one press to scope the list; 全部 clears it), and — closing the row —
-          the sort switch, this page's own status control. The picker is a
-          browse control — a search re-orders the list by relevance and ignores
-          it — so it stands down while a search is live. It counts what the
-          shape on screen lists, so the figures and the list they scope can
-          never disagree. */}
-      <div className="mb-3 flex min-w-0 items-center gap-3">
-        {!isSearching && rows.length > 0 && (
-          <ListFacets
-            facets={facets}
-            total={totalCount}
-            selected={domain}
-            onSelect={(key) => setScope("installed", key)}
-          />
-        )}
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          {/* The one control for both what the screen is made of and what
-              order it reads in — the old unit switch's repository shape is
-              the sort menu's third answer. It stands down with the picker
-              while a search is live: a search re-orders the list by
-              relevance, and its answer reads in the shape the sort already
-              chose. */}
-          {!isSearching && (
-            <ListSortSelect
-              sort={sort}
-              onChange={(next) => setSort("installed", next)}
-            />
-          )}
-        </div>
-      </div>
+      {/* The list's own first row, and the only row above the answer: the search
+          field, the classifications that hold an install (one press to scope the
+          list; 全部 clears it), and this page's own status control — the sort
+          switch, which answers both what order the list reads in and what shape
+          it reads as. The picker is a browse control — a search re-orders the
+          list by relevance and ignores the scope — so it locks while a search
+          is live, as does the sort. It counts what the shape on screen lists,
+          so the figures and the list they scope can never disagree. The row's
+          arrangement is `ListToolbar`'s to answer; the page hands over its
+          counts and whether a query is live. */}
+      <ListToolbar
+        destination="installed"
+        facets={facets}
+        total={totalCount}
+        searching={isSearching}
+      />
 
       {/* The list — repository cards or skill rows; the modal detail drawer
           overlays either without reflowing it or moving its scroll position. */}
