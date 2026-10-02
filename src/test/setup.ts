@@ -17,6 +17,17 @@ class ResizeObserverMock {
 }
 globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
 
+// jsdom runs no CSS engine, so a popup's exit animation never fires the
+// transition/animation events Base UI waits for — a closed menu would stay
+// in the accessibility tree forever and every later query would answer with
+// the stale copy. Base UI ships the switch for exactly this: with animations
+// disabled it unmounts a closed popup at once, so a picker that answers one
+// pick after another always sees a fresh menu.
+// The flag is declared in Base UI's own `global.d.ts`, which this project's
+// tsconfig does not pull in — hence the widened handle.
+(globalThis as unknown as Record<string, unknown>).BASE_UI_ANIMATIONS_DISABLED =
+  true;
+
 // Base UI also queries matchMedia for responsive behavior. Return a static
 // match object with the minimal surface it reads.
 if (typeof window !== "undefined" && !window.matchMedia) {

@@ -241,6 +241,32 @@ async function pickSort(
   await user.click(await screen.findByRole("menuitemradio", { name: label }));
 }
 
+/**
+ * Picks a domain scope from the 分类 picker. `label` names the menu item —
+ * 全部 or a domain's display label. The menu closes on the pick, so each
+ * scope change reopens it.
+ */
+async function pickDomain(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string | RegExp,
+) {
+  await user.click(
+    await screen.findByRole("button", { name: "分类" }),
+  );
+  await user.click(await screen.findByRole("menuitemradio", { name: label }));
+}
+
+/**
+ * Opens the 分类 picker without picking, to read its menu of scopes; the
+ * menu mounts asynchronously, so the caller's queries can be synchronous.
+ */
+async function openDomainMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(
+    await screen.findByRole("button", { name: "分类" }),
+  );
+  await screen.findByRole("menuitemradio", { name: /^全部/ });
+}
+
 beforeEach(() => {
   // Fresh cache per test; retries are off so a rejected fetch surfaces an
   // error state immediately instead of being retried silently.
@@ -279,14 +305,14 @@ beforeEach(() => {
 vi.setConfig({ testTimeout: 15_000 });
 
 describe("ExplorePage", () => {
-  it("keeps the domain chips in the content, not in the header", async () => {
+  it("keeps the domain picker in the content, not in the header", async () => {
     bootRegistry(4);
     renderExplorePage();
 
-    const chip = await screen.findByRole("button", { name: /全部/ });
-    // They narrow the list they sit on, so they open the list's own content
+    const picker = await screen.findByRole("button", { name: "分类" });
+    // It narrows the list it sits on, so it opens the list's own content
     // rather than sharing the shell's row with the controls both lists use.
-    expect(document.querySelector("header")?.contains(chip)).toBe(false);
+    expect(document.querySelector("header")?.contains(picker)).toBe(false);
   });
 
   it("leads the repository view with one card per repository", async () => {
@@ -424,7 +450,7 @@ describe("ExplorePage", () => {
     renderExplorePage();
 
     // Scope the browse list to one domain...
-    await user.click(await screen.findByRole("button", { name: /开发编程/ }));
+    await pickDomain(user, /开发编程/);
     await waitFor(() =>
       expect(screen.queryByText("lint")).not.toBeInTheDocument(),
     );
@@ -438,7 +464,7 @@ describe("ExplorePage", () => {
     ).toBeInTheDocument();
   });
 
-  it("scopes the browse list to one domain when its chip is pressed", async () => {
+  it("scopes the browse list to one domain when it is picked", async () => {
     const user = userEvent.setup();
     harness.reset();
     harness.init();
@@ -473,28 +499,31 @@ describe("ExplorePage", () => {
     harness.complete();
     const { container } = renderExplorePage();
 
-    // The list opens on 全部: one card per repository, and a chip for every
-    // domain that holds one — plus 未分类 for the repository nothing classified,
-    // which is a different claim from the dataset's own 其他 and so takes a chip
-    // of its own.
+    // The list opens on 全部: one card per repository, and a menu item for
+    // every domain that holds one — plus 未分类 for the repository nothing
+    // classified, which is a different claim from the dataset's own 其他 and
+    // so takes an item of its own.
     const cards = () => repoCards(container);
     await screen.findByText("redis");
     expect(cards()).toHaveLength(3);
-    expect(screen.getByRole("button", { name: /^全部/ })).toHaveTextContent(
+    expect(screen.getByRole("button", { name: "分类" })).toHaveTextContent(
       "3",
     );
+    await openDomainMenu(user);
     expect(
-      screen.getByRole("button", { name: /开发编程/ }),
+      screen.getByRole("menuitemradio", { name: /开发编程/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /测试与质量/ }),
+      screen.getByRole("menuitemradio", { name: /测试与质量/ }),
     ).toBeInTheDocument();
-    const unclassified = screen.getByRole("button", { name: /^未分类/ });
+    const unclassified = screen.getByRole("menuitemradio", {
+      name: /^未分类/,
+    });
     expect(unclassified).toHaveTextContent("❓");
-    expect(screen.queryByRole("button", { name: /^其他/ })).toBeNull();
+    expect(screen.queryByRole("menuitemradio", { name: /^其他/ })).toBeNull();
 
-    // Pressing a domain scopes the list to its repositories alone.
-    await user.click(screen.getByRole("button", { name: /开发编程/ }));
+    // Picking a domain scopes the list to its repositories alone.
+    await user.click(screen.getByRole("menuitemradio", { name: /开发编程/ }));
     await waitFor(() =>
       expect(screen.queryByText("lint")).not.toBeInTheDocument(),
     );
@@ -502,8 +531,8 @@ describe("ExplorePage", () => {
     expect(screen.queryByText("orphan")).not.toBeInTheDocument();
     expect(cards()).toHaveLength(1);
 
-    // The unclassified chip scopes to the repository no classification covers.
-    await user.click(screen.getByRole("button", { name: /^未分类/ }));
+    // The 未分类 item scopes to the repository no classification covers.
+    await pickDomain(user, /^未分类/);
     await waitFor(() =>
       expect(screen.queryByText("redis")).not.toBeInTheDocument(),
     );
@@ -511,7 +540,7 @@ describe("ExplorePage", () => {
     expect(cards()).toHaveLength(1);
 
     // 全部 clears the scope again.
-    await user.click(screen.getByRole("button", { name: /^全部/ }));
+    await pickDomain(user, /^全部/);
     expect(await screen.findByText("lint")).toBeInTheDocument();
     expect(cards()).toHaveLength(3);
   });
@@ -544,14 +573,18 @@ describe("ExplorePage", () => {
     harness.complete();
     renderExplorePage();
 
-    // An answer and a blank, told apart in the chip bar: the leftovers box for
+    // An answer and a blank, told apart in the picker: the leftovers box for
     // 其他, the question mark for 未分类, each counting its own.
-    const other = await screen.findByRole("button", { name: /^其他/ });
-    const unclassified = screen.getByRole("button", { name: /^未分类/ });
+    await openDomainMenu(user);
+    const other = screen.getByRole("menuitemradio", { name: /^其他/ });
+    const unclassified = screen.getByRole("menuitemradio", {
+      name: /^未分类/,
+    });
     expect(other).toHaveTextContent("📦");
     expect(unclassified).toHaveTextContent("❓");
     expect(other).toHaveTextContent("1");
     expect(unclassified).toHaveTextContent("1");
+    await user.keyboard("{Escape}");
 
     // The repository unit's card rows mark them the same way …
     const strayCardRow = screen.getByRole("button", {
@@ -572,36 +605,6 @@ describe("ExplorePage", () => {
     expect(
       screen.getByRole("button", { name: "查看 orphan 详情" }),
     ).toHaveTextContent("❓");
-  });
-
-  it("keeps a domain chip's label collapsed until the chip is chosen", async () => {
-    const user = userEvent.setup();
-    harness.reset();
-    harness.init();
-    harness.pushAll([
-      {
-        name: "redis",
-        repo: "acme/dev",
-        description: "",
-        stars: 300,
-        downloads: 300,
-        path: "skills/redis",
-        profile: { domain: ["development"] },
-      },
-    ]);
-    harness.complete();
-    renderExplorePage();
-
-    // The label is in the DOM (so the chip is named) but clipped to nothing at
-    // rest — only the glyph shows.
-    const chip = await screen.findByRole("button", { name: /开发编程/ });
-    expect(chip.querySelector("span.grid")).toHaveClass("grid-cols-[0fr]");
-    expect(chip.querySelector("span.grid")).not.toHaveClass("grid-cols-[1fr]");
-
-    // Choosing the chip unfolds its label for good, so the scope always reads.
-    await user.click(chip);
-    const revealed = screen.getByRole("button", { name: /开发编程/ });
-    expect(revealed.querySelector("span.grid")).toHaveClass("grid-cols-[1fr]");
   });
 
   it("lists skills by install count, one row per skill", async () => {
@@ -766,9 +769,12 @@ describe("ExplorePage", () => {
       expect(cardOrder()).toEqual(["alpha", "beta", "gamma", "delta"]),
     );
 
-    // The chip counts skills, not repositories: `beta` answers both domains, so
-    // testing holds two while no repository leads with it.
-    const testing = screen.getByRole("button", { name: /测试与质量/ });
+    // The picker counts skills, not repositories: `beta` answers both domains,
+    // so testing holds two while no repository leads with it.
+    await openDomainMenu(user);
+    const testing = screen.getByRole("menuitemradio", {
+      name: /^测试与质量/,
+    });
     expect(testing).toHaveTextContent("2");
 
     // Scoping to testing keeps every skill that belongs to it — including the
