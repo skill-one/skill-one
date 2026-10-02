@@ -31,24 +31,27 @@ export type Destination = "store" | "installed";
  * How a list orders itself while no search is live. `popularity` is the
  * registry's blended installs-and-stars figure (`lib/popularity.ts`), the
  * figure every row displays; `installed` is the install's own clock (newest
- * first); `repo` reads the list as repository cards at all, the cards led by
- * the most-starred repository. On both lists the sort *is* the whole reading —
- * the repository option is the shape the unit switch used to pick, merged into
- * this one control — so a page renders by the unit its sort implies.
+ * first); `tokens` is the skill's estimated context cost (`lib/token-estimate`,
+ * heaviest first); `repo` reads the list as repository cards at all, the cards
+ * led by the most-starred repository. On both lists the sort *is* the whole
+ * reading — the repository option is the shape the unit switch used to pick,
+ * merged into this one control — so a page renders by the unit its sort
+ * implies, and each row displays the figure its list answers in.
  */
-export type ListSort = "installed" | "popularity" | "repo";
+export type ListSort = "installed" | "popularity" | "tokens" | "repo";
 
 /**
  * The orders each list answers in. The installed list carries the install's
- * own clock as its middle option; the store has no install of its own to
- * clock, so it answers in the two orders its rows can state. The repository
- * option carries the shape the old unit switch picked on either list, so one
- * control now answers both "what does the screen look like" and "what order
- * does it read in".
+ * own clock and the token estimate among its options — both facts only an
+ * on-disk record has; the store has neither install of its own to clock nor a
+ * locally measured cost to weigh, so it answers in the two orders its rows can
+ * state. The repository option carries the shape the old unit switch picked on
+ * either list, so one control now answers both "what does the screen look
+ * like" and "what order does it read in".
  */
 export const LIST_SORTS: Readonly<Record<Destination, readonly ListSort[]>> = {
   store: ["popularity", "repo"],
-  installed: ["popularity", "installed", "repo"],
+  installed: ["popularity", "installed", "tokens", "repo"],
 };
 
 /**

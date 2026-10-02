@@ -19,7 +19,9 @@ import {
 import { OwnerAvatar } from "../../components/owner-avatar";
 import { INTERACTIVE_CLASS } from "../../components/skill-card";
 import { SkillInstallButton } from "../../components/skill-install-button";
+import { SkillInstalledTime } from "../../components/skill-installed-time";
 import { SkillPopularity } from "../../components/skill-popularity";
+import { SkillTokenEstimate } from "../../components/skill-token-estimate";
 import { Card } from "../../components/ui/card";
 import {
   Tooltip,
@@ -40,7 +42,8 @@ export type { SkillMatched };
  * glyph, then *what is it* (the name) over *what does it do* (the description),
  * and finally the facts as a quiet cluster on the far right: the source's owner
  * face — the repository's own name lives on the detail panel, so the row keeps
- * only the face — the popularity figure, and the corner action. A row is read one
+ * only the face — the figure the list answers in (`fact`), and the corner
+ * action. A row is read one
  * at a time, top to bottom, which is exactly what a list is for — the ordinals
  * give the eye a single column to run down, and the facts line up so two rows
  * can be compared without re-reading them.
@@ -74,6 +77,7 @@ export function SkillRow({
   muted = false,
   extra,
   ranked = true,
+  fact = "popularity",
 }: {
   /** The skill to render, from the registry or from the installed list. */
   skill: SkillView;
@@ -103,6 +107,20 @@ export function SkillRow({
    * — prints plain numbers.
    */
   ranked?: boolean;
+  /**
+   * Which fact the fixed figure slot states — the figure the list answers in,
+   * so the number beside a row is always the one the list above it was
+   * ordered by. `popularity` (the default) states the registry's blended
+   * figure, the order the store browses in and the installed list's default;
+   * `installedAt` states the install's own clock, the figure the installed
+   * list's 安装时间 sort orders by; `tokens` states the description's
+   * estimated context cost, the figure the Token 占用 sort weighs. The three
+   * are told apart by data, not by surface: the blend is a registry fact, so
+   * it renders only on a store-backed row, while the stamp and the estimate
+   * are local facts every install carries (either rendering nothing when its
+   * record is missing — an absent fact, not a zero).
+   */
+  fact?: "popularity" | "installedAt" | "tokens";
 }) {
   // Absent means backed: every row a collection page lists comes from the
   // registry, and the flag only ever unsets a caller with no store entry.
@@ -193,17 +211,18 @@ export function SkillRow({
         </div>
 
         {/* The facts cluster, pushed to the far end and kept whole: the source's
-            owner face, then the popularity figure — both short and fixed, so
-            the description keeps the width it needs. The face drops out on a
-            repository's own page (see `showSource`): the head already names it,
-            and 48 identical copies only crowd the names. A skill with no source
-            at all states it in words instead, there being no face to stand for
-            it. The classification lives on the leading glyph, so it is not
-            repeated here. The figure takes a fixed right-aligned slot, sized
-            to the format's longest rendering (four digits, a point, a suffix —
-            "169.6K"): the digits then end on one edge at the row's far right,
-            where magnitudes are compared, and the face left of it sits in a
-            column of its own instead of drifting with the digits' width. */}
+            owner face, then the figure the list answers in — both short and
+            fixed, so the description keeps the width it needs. The face drops
+            out on a repository's own page (see `showSource`): the head already
+            names it, and 48 identical copies only crowd the names. A skill with
+            no source at all states it in words instead, there being no face to
+            stand for it. The classification lives on the leading glyph, so it is
+            not repeated here. The figure takes a fixed right-aligned slot,
+            sized to the format's longest rendering ("169.6K" for the blend,
+            a relative age like "12个月前" for the stamp): the digits then end
+            on one edge at the row's far right, where magnitudes are compared,
+            and the face left of it sits in a column of its own instead of
+            drifting with the digits' width. */}
         <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
           {showSource && owner && (
             <OwnerAvatar
@@ -216,12 +235,26 @@ export function SkillRow({
           {showSource && !owner
             ? extra ?? <span className="truncate">{t("common.localInstall")}</span>
             : extra}
-          {storeBacked && (
-            <SkillPopularity
+          {fact === "installedAt" ? (
+            <SkillInstalledTime
+              skill={skill}
+              align="end"
+              className="w-24 justify-end"
+            />
+          ) : fact === "tokens" ? (
+            <SkillTokenEstimate
               skill={skill}
               align="end"
               className="w-16 justify-end"
             />
+          ) : (
+            storeBacked && (
+              <SkillPopularity
+                skill={skill}
+                align="end"
+                className="w-16 justify-end"
+              />
+            )
           )}
         </div>
 

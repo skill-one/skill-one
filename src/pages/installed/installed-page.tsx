@@ -30,6 +30,7 @@ import { buildSearchIndex } from "../../lib/search-index";
 import { setQuery, setScope, setSort } from "../../lib/list-view";
 import type { ListUnit } from "../../lib/list-view";
 import { popularity } from "../../lib/popularity";
+import { estimateTokens } from "../../lib/token-estimate";
 import type { SkillMatched } from "../../components/skill-card";
 import type { Skill } from "../../types/skill";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
@@ -140,7 +141,7 @@ function compareByStars<T>(
 /**
  * The installed list — the management counterpart of the store's 全部 page.
  * One control on the list's own first row answers both what the screen is
- * made of and what order it reads in — three sorts, where the third carries
+ * made of and what order it reads in — four sorts, where the last carries
  * the shape the old unit switch used to pick:
  *
  * - **按热度** (the default): one row per install, the registry's blended
@@ -155,10 +156,18 @@ function compareByStars<T>(
  *   with its bar stating 本地安装 in place of a repository it would have to
  *   make up, and opening the page that lists the pool whole.
  * - **按安装时间**: one row per install — the installs' own clock, newest
- *   first, so "what did I add lately" reads top to bottom. Nothing caps the
+ *   first, so "what did I add lately" reads top to bottom. Each row states
+ *   its own stamp where the default sort prints the blend, so the figure a
+ *   row shows is always the one the list is ordered by. Nothing caps the
  *   skill rows: that shape is the whole list.
+ * - **按 Token 占用**: one row per install — the description's estimated
+ *   context cost heaviest first (see `lib/token-estimate`), so "what does
+ *   keeping this skill cost" reads top to bottom. Each row states its own
+ *   estimate where the other sorts print their figures; ties fall back to
+ *   the install's clock, and a description-less install honestly reads last
+ *   at zero.
  *
- * A search re-answers any of the three in relevance order. What the page adds
+ * A search re-answers any of the four in relevance order. What the page adds
  * to the store's surfaces is what only an installed skill has: enablement —
  * at two granularities, one per repository card: the bar's group switch (a
  * press enables or disables every skill of that card; a mixed card reads as
@@ -316,13 +325,16 @@ export function InstalledPage() {
   }, [rows]);
 
   // The skill unit's flat order: the installs in the chosen sort's order —
-  // the registry's popularity blend (the default), or newest-first by the
-  // recorded install time (see `lib/install-time`) — scoped to the chosen
-  // domain by membership, since a skill's own classification is what the
-  // picker counts here. Installs the platform recorded no birth time for settle
-  // last in the time order. A search is left exactly as the index answered it:
-  // relevance is a ranking too, and the better one while a query is live — the
-  // same order the store keeps there.
+  // the registry's popularity blend (the default), newest-first by the
+  // recorded install time (see `lib/install-time`), or heaviest-first by the
+  // description's estimated token cost (see `lib/token-estimate` — the same
+  // estimate the detail drawer states, an empty description honestly reading
+  // 0 rather than sinking) — scoped to the chosen domain by membership, since
+  // a skill's own classification is what the picker counts here. Installs
+  // the platform recorded no birth time for settle last in the time order. A
+  // search is left exactly as the index answered it: relevance is a ranking
+  // too, and the better one while a query is live — the same order the store
+  // keeps there.
   const activeRows = useMemo(() => {
     if (unit !== "skill") return [];
     if (isSearching) return rows;
@@ -333,8 +345,14 @@ export function InstalledPage() {
     return scoped.toSorted(
       sort === "installed"
         ? compareByInstalledTime((row) => row.skill.installedAt)
-        : compareByPopularity(
-            (row) => popularity(row.skill),
+        : // The token sort borrows the popularity comparator's shape — a
+          // figure descending, ties to the install's clock — with the token
+          // estimate in the figure slot. A description-less skill reads 0,
+          // which is its true cost, not a fabrication.
+          compareByPopularity(
+            sort === "tokens"
+              ? (row) => estimateTokens(row.skill.description ?? "")
+              : (row) => popularity(row.skill),
             (row) => row.skill.installedAt,
             byName,
           ),
@@ -584,9 +602,11 @@ export function InstalledPage() {
               }
             />
           ) : unit === "skill" ? (
-            // The skill unit: one row per install, newest first. The same row
-            // a repository's own page lists, so a skill reads the same
-            // wherever it is found.
+            // The skill unit: one row per install, in the sort's own order.
+            // The same row a repository's own page lists, so a skill reads the
+            // same wherever it is found — and the figure each row states is
+            // the one this list answers in: the install's own clock under the
+            // 按安装时间 sort, the popularity blend otherwise.
             <ul className={SKILL_ROW_LIST_CLASS}>
               {shownRows.map((row) => {
                 const key = skillKey(row.skill);
@@ -601,6 +621,13 @@ export function InstalledPage() {
                     // it cannot place at all would leave the podium on
                     // alphabetical order. The numbers merely count.
                     ranked={false}
+                    fact={
+                      sort === "installed"
+                        ? "installedAt"
+                        : sort === "tokens"
+                          ? "tokens"
+                          : "popularity"
+                    }
                     selected={key === selected}
                     muted={!row.enabled}
                     extra={rowExtra(row, "label")}

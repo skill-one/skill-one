@@ -9,6 +9,7 @@
     "noDescription": "No description",
     "coverAria": "{{name}} cover",
     "popularityAria": "Popularity {{blended}}: {{installed}} installs · {{starred}} stars",
+    "installedTimeAria": "Installed {{relative}}, on {{exact}}",
     "searchSkills": "Search skills",
     "indexBuilding": "Building index…",
     "listSort": "Sort by",
@@ -33,6 +34,7 @@
   "sort": {
     "byPopularity": "Popularity",
     "byInstalled": "Install time",
+    "byTokens": "Token usage",
     "byRepo": "By repository"
   },
   "action": {
@@ -206,6 +208,7 @@
     "installedAtHint": "Creation time of the skill directory; skills adopted from an agent directory keep their original timestamp.",
     "tokensLabel": "{{count}} tokens",
     "tokensHint": "Estimated cost of the English description when an agent loads it. A words-and-punctuation heuristic calibrated against the o200k tokenizer — a comparison figure, roughly ±10% accurate.",
+    "tokensShortHint": "Estimated tokens of the skill's English description",
     "saved": "Saved {{name}}",
     "saveFailed": "Save failed",
     "noBody": "(SKILL.md has no body content)",
