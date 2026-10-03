@@ -266,7 +266,7 @@ describe("provenance browser store", () => {
   it("round-trips a recorded install through the persisted ledger", async () => {
     await recordSkillProvenance("anthropics/skills", "pdf");
 
-    const map = await reconcileProvenance(["pdf"]);
+    const { sources: map } = await reconcileProvenance(["pdf"]);
     expect(map.pdf).toEqual({ repo: "anthropics/skills", via: "install" });
   });
 
@@ -283,7 +283,7 @@ describe("provenance browser store", () => {
   it("a recorded entry for a name that is not installed gets pruned", async () => {
     seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
 
-    const map = await reconcileProvenance(["docx"]);
+    const { sources: map } = await reconcileProvenance(["docx"]);
     expect(map).toEqual({});
   });
 
@@ -292,7 +292,7 @@ describe("provenance browser store", () => {
     await reconcileProvenance(["docx"]);
 
     // A later reconcile against the same disk state stays pruned.
-    const map = await reconcileProvenance(["docx"]);
+    const { sources: map } = await reconcileProvenance(["docx"]);
     expect(map).toEqual({});
   });
 
@@ -300,7 +300,7 @@ describe("provenance browser store", () => {
     seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
     await removeSkillProvenance("pdf");
 
-    const map = await reconcileProvenance(["pdf"]);
+    const { sources: map } = await reconcileProvenance(["pdf"]);
     expect(map).toEqual({});
   });
 
@@ -308,7 +308,7 @@ describe("provenance browser store", () => {
     seedMockProvenance({ pdf: { repo: "old/repo" } });
     await recordSkillProvenance("new/repo", "pdf");
 
-    const map = await reconcileProvenance(["pdf"]);
+    const { sources: map } = await reconcileProvenance(["pdf"]);
     expect(map.pdf?.repo).toBe("new/repo");
   });
 
@@ -316,20 +316,20 @@ describe("provenance browser store", () => {
     await savePendingRecords([{ kind: "pending", name: "pdf", repos: ["fork/skills"] }], [], '"e1"');
     await recordSkillProvenanceBatch([{ repo: "fork/skills", name: "pdf", reason: "description" }]);
 
-    const map = await reconcileProvenance(["pdf"]);
+    const { sources: map } = await reconcileProvenance(["pdf"]);
     expect(map.pdf).toEqual({ repo: "fork/skills", via: "description" });
     expect((await loadPendingRecords()).records).toEqual({});
   });
 
   it("records how the source was established via `via`", async () => {
     await recordSkillProvenance("anthropics/skills", "pdf");
-    expect((await reconcileProvenance(["pdf"])).pdf?.via).toBe("install");
+    expect((await reconcileProvenance(["pdf"])).sources.pdf?.via).toBe("install");
 
     await recordSkillProvenance("fork/skills", "pdf", "confirm");
-    expect((await reconcileProvenance(["pdf"])).pdf?.via).toBe("confirm");
+    expect((await reconcileProvenance(["pdf"])).sources.pdf?.via).toBe("confirm");
 
     await recordSkillProvenanceBatch([{ repo: "o/r", name: "pdf", reason: "description" }]);
-    expect((await reconcileProvenance(["pdf"])).pdf?.via).toBe("description");
+    expect((await reconcileProvenance(["pdf"])).sources.pdf?.via).toBe("description");
   });
 
   it("keeps no timestamp: when a link happened is the activity log's fact", async () => {
@@ -376,7 +376,7 @@ describe("pending records", () => {
     );
 
     expect((await loadPendingRecords()).records).toEqual({});
-    const map = await reconcileProvenance(["pdf"]);
+    const { sources: map } = await reconcileProvenance(["pdf"]);
     expect(map.pdf?.repo).toBe("anthropics/skills");
   });
 
@@ -402,7 +402,7 @@ describe("dismissSkillSource", () => {
     await dismissSkillSource("pdf", "anthropics/skills");
 
     // The source is gone from the reconcile answer…
-    expect(await reconcileProvenance(["pdf"])).toEqual({});
+    expect((await reconcileProvenance(["pdf"])).sources).toEqual({});
     // …and the cut is persisted as a pending record.
     expect((await loadPendingRecords()).records).toEqual({
       pdf: { kind: "pending", name: "pdf", repos: ["anthropics/skills"] },
@@ -421,7 +421,27 @@ describe("dismissSkillSource", () => {
       name: "pdf",
       repos: ["b/skills", "a/skills", "c/skills"],
     });
-    expect(await reconcileProvenance(["pdf"])).toEqual({});
+    expect((await reconcileProvenance(["pdf"])).sources).toEqual({});
+  });
+
+  it("hands the cut to the surfaces that offer the namesake list", async () => {
+    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
+    await dismissSkillSource("pdf", "anthropics/skills");
+
+    // The repo stays on the candidate list — re-picking it is the user's own
+    // act of re-identification — so what the surfaces need is the fact that it
+    // was already refused, not its absence.
+    const { sources, cut } = await reconcileProvenance(["pdf"]);
+    expect(sources).toEqual({});
+    expect(cut).toEqual({ pdf: ["anthropics/skills"] });
+  });
+
+  it("reports no cut for a skill that only has a ranking pending", async () => {
+    // A pending record without `repos` is a suggestion, not a refusal — it must
+    // not show up as an empty cut for every unlinked skill.
+    await savePendingRecords([PENDING], [], '"e1"');
+
+    expect((await reconcileProvenance(["pdf"])).cut).toEqual({});
   });
 
   it("keeps the ranking the cut was made against", async () => {

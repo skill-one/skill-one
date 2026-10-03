@@ -135,6 +135,32 @@ describe("LinkSuggestionBadge — label variant (default)", () => {
     expect(screen.queryByText("本地描述")).not.toBeInTheDocument();
   });
 
+  it("marks a repo the user already cut, and still offers it", async () => {
+    const user = userEvent.setup();
+    // A cut keeps its repo among the candidates — re-picking it is the user's
+    // own act of re-identification — so the row says which ones they refused
+    // instead of presenting them as if they were new.
+    renderBadge({ cutRepos: ["fork/pdf-skills"] });
+
+    await user.click(
+      screen.getByRole("button", { name: "关联 pdf 的商店来源" }),
+    );
+
+    // Exactly one row is marked: the cut one, not the whole list.
+    const marked = screen.getAllByTitle("已忽略");
+    expect(marked).toHaveLength(1);
+    expect(marked[0].closest("button")).toHaveTextContent("fork/pdf-skills");
+
+    // And it is still a pickable candidate, not a disabled row.
+    const row = screen.getByRole("button", { name: /fork\/pdf-skills/ });
+    await user.click(row);
+    expect(recordSkillProvenance).toHaveBeenCalledWith(
+      "fork/pdf-skills",
+      "pdf",
+      "confirm",
+    );
+  });
+
   it("records the picked candidate as a confirmed link and closes the popover", async () => {
     const user = userEvent.setup();
     renderBadge();

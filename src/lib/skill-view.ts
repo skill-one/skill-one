@@ -106,6 +106,14 @@ export interface SkillView extends Skill {
    */
   via?: SourceLinkReason;
   /**
+   * Installed skills only: the source repos this skill's user has cut. The repo
+   * stays among the namesake candidates — re-picking it is the user's own act
+   * of re-identification — so every surface that offers that list marks it
+   * rather than presenting a repo they already refused as if it were new.
+   * Absent when nothing was cut.
+   */
+  cutRepos?: string[];
+  /**
    * Installed skills only: when the skill's directory landed on disk, as Unix
    * seconds (UTC) — absent for registry-only rows and for filesystems that
    * record no creation time (agents-skills 0.16).
@@ -143,6 +151,7 @@ export function installedSkillView(
   skill: InstalledSkill,
   provenance?: Record<string, SkillProvenance>,
   entry?: Skill,
+  cut?: readonly string[],
 ): SkillView {
   const ledger = provenance?.[skill.name];
   return {
@@ -158,6 +167,9 @@ export function installedSkillView(
     // link) — the fact that tells a store install from a linked third-party
     // copy on the shared surfaces.
     ...(ledger?.via ? { via: ledger.via } : {}),
+    // The repos this skill's user has cut, for the surfaces that offer its
+    // namesake candidates to mark.
+    ...(cut && cut.length > 0 ? { cutRepos: [...cut] } : {}),
     description: skill.description,
     // The translated description comes from the registry entry; the on-disk
     // record carries no translation.

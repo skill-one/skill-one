@@ -35,6 +35,13 @@ export interface ProvenanceState {
    * those keep the plain local-install presentation.
    */
   suggestions: LinkSuggestions;
+  /**
+   * Repos the user cut, per skill. A cut keeps its repo on the candidate list
+   * — re-picking it is the user's own act of re-identification — so the
+   * surfaces that offer the list mark it: a repo the user already refused reads
+   * as new again otherwise.
+   */
+  cut: Record<string, string[]>;
 }
 
 /**
@@ -49,7 +56,7 @@ export async function fetchProvenanceState(
   installed: InstalledSkill[],
 ): Promise<ProvenanceState> {
   const names = installed.map((s) => s.name);
-  let linked = await reconcileProvenance(names);
+  let { sources: linked, cut } = await reconcileProvenance(names);
 
   const unlinked = installed.filter((s) => !linked[s.name]);
   let suggestions: LinkSuggestions = {};
@@ -64,7 +71,7 @@ export async function fetchProvenanceState(
     // the new entries up.
     const resolved = await resolveAssociations(unlinked);
     if (resolved.linked.length > 0) {
-      linked = await reconcileProvenance(names);
+      ({ sources: linked, cut } = await reconcileProvenance(names));
     }
     suggestions = resolved.suggestions;
   }
@@ -74,7 +81,7 @@ export async function fetchProvenanceState(
   // and for anything the app itself installed.
   await logSkillDiscoveries(names, (name) => linked[name] != null);
 
-  return { linked, suggestions };
+  return { linked, suggestions, cut };
 }
 
 /**
