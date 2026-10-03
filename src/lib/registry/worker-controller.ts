@@ -140,6 +140,13 @@ export function createRegistryController(
   // ref by a `store.find` is O(n·m), so instead the earliest matching skill
   // per key is indexed once and every request is a pair of map reads.
   let lookupCache: { version: number; map: Map<string, Skill> } | null = null;
+  // Name → every skill filed under it, cached per data version, for the
+  // `namesakes` query. Same shape as the lookup index and the same reason to
+  // exist — it replaces an answer the caller would otherwise have to retrieve
+  // one query at a time — but keyed by name alone and holding *every* namesake
+  // rather than the first, because "which repo did this skill come from" is
+  // exactly the question a same-slug family cannot answer on its own.
+  let namesakeCache: { version: number; map: Map<string, Skill[]> } | null = null;
 
   /**
    * Drop every derived cache and bump the data version they are addressed
@@ -149,6 +156,7 @@ export function createRegistryController(
     dataVersion++;
     orderCache = null;
     lookupCache = null;
+    namesakeCache = null;
   };
 
   const emitProgress = () => {
@@ -458,10 +466,12 @@ export function createRegistryController(
 
   /**
    * The lookup index for one data version, built lazily. A skill is keyed
-   * by its repo+name and by its repo+path basename (a locally installed
-   * skill's SKILL.md name may differ from the registry skillId); the first
-   * skill in registry order wins each key, mirroring what a `store.find`
-   * over the same condition would answer.
+   * by its repo+name and by its repo+path basename — the source repository's
+   * own directory name, which for 2.1% of published rows is not the slug, and
+   * is the only thing that matches an install whose slug a slugifier cannot
+   * reproduce (`stitch::generate-design`); the first skill in registry order
+   * wins each key, mirroring what a `store.find` over the same condition
+   * would answer.
    */
   const lookupIndex = (): Map<string, Skill> => {
     if (complete && lookupCache?.version === dataVersion) {
@@ -492,6 +502,66 @@ export function createRegistryController(
         (ref) => byKey.get(`${ref.repo}\u0000${ref.name}`) ?? null,
       ),
     };
+  };
+
+  /**
+   * The name → namesakes index for one data version, built lazily. Unlike
+   * `lookupIndex` it keeps every skill filed under a name, in registry order:
+   * the caller ranks them itself, and "first wins" would silently answer a
+   * question it is not being asked.
+   *
+   * Filed under the slug *and* under the directory basename, because the two
+   * are not the same string: measured over the published snapshot, 173 of
+   * 8,214 rows (2.1%) carry a `dir` whose basename differs from the id's slug,
+   * and for 10 of the 11 rows where `slugify(frontmatter name)` also fails to
+   * reproduce the slug (`stitch::generate-design` and friends keep their
+   * colons, where a slugifier makes dashes), the directory name is the only
+   * key that matches a local install. Both keys exist in `lookupIndex` for the
+   * same reason, and an ambiguous basename — 21 directory names are shared by
+   * more than one slug — simply widens the candidate list a user confirms
+   * rather than picking for them.
+   *
+   * Only built over a settled dataset. A partial one would hand back a
+   * half-populated family and let the association pass conclude "this slug
+   * exists nowhere" from a stream that has not finished arriving — a conclusion
+   * its caller persists. (The caller's own `ready` gate is the real guard;
+   * this is the belt to that braces.)
+   */
+  const namesakeIndex = (): Map<string, Skill[]> => {
+    if (complete && namesakeCache?.version === dataVersion) {
+      return namesakeCache.map;
+    }
+    const map = new Map<string, Skill[]>();
+    const file = (key: string, skill: Skill) => {
+      if (!key) return;
+      const family = map.get(key);
+      if (family) {
+        // A skill filed under both keys must not appear twice in its own family.
+        if (!family.includes(skill)) family.push(skill);
+      } else {
+        map.set(key, [skill]);
+      }
+    };
+    for (const skill of store) {
+      file(skill.name, skill);
+      file(skill.path?.split("/").pop() ?? "", skill);
+    }
+    namesakeCache = { version: dataVersion, map };
+    return map;
+  };
+
+  /**
+   * Every registry entry filed under each requested name, in request order.
+   *
+   * An exact-key question — "is there a skill called exactly `pdf-exporter`?"
+   * — answered by one batched map read per name, rather than by a full-text
+   * search per name whose hits the caller would discard down to the exact
+   * matches. Empty for a name the registry does not list.
+   */
+  const namesakes = (names: string[]) => {
+    if (!complete) return { entries: names.map(() => []) };
+    const byName = namesakeIndex();
+    return { entries: names.map((name) => byName.get(name) ?? []) };
   };
 
   return {
@@ -606,6 +676,9 @@ export function createRegistryController(
             break;
           case "lookupSkills":
             data = lookupSkills(message.payload.refs);
+            break;
+          case "namesakes":
+            data = namesakes(message.payload.names);
             break;
         }
         post({ type: "result", id: message.id, ok: true, data });

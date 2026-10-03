@@ -863,6 +863,121 @@ describe("createRegistryController — lookup", () => {
   });
 });
 
+describe("createRegistryController — namesakes", () => {
+  /** Ask for a whole pass of names at once, the way the linker does. */
+  function ask(t: ReturnType<typeof setup>, id: number, names: string[]) {
+    t.controller.handle({ type: "namesakes", id, payload: { names } });
+    return resultData<{ entries: Skill[][] }>(
+      t.recorded.results[id - 1],
+    ).entries;
+  }
+
+  it("answers every requested name in one query, each family whole", async () => {
+    const t = setup({
+      skills: [
+        { ...skill(0), name: "pdf", repo: "acme/skills" },
+        { ...skill(1), name: "pdf", repo: "fork/skills" },
+        { ...skill(2), name: "csv", repo: "acme/skills" },
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    // In request order, one array per name. A same-slug family comes back
+    // whole and in registry order — unlike `lookupSkills`, "first wins" would
+    // answer a question the caller is not asking: which repo did this skill
+    // come from is precisely what it has to decide.
+    expect(ask(t, 1, ["pdf", "csv", "totally-custom"]).map((e) => e.map((s) => s.repo))).toEqual([
+      ["acme/skills", "fork/skills"],
+      ["acme/skills"],
+      [],
+    ]);
+  });
+
+  it("answers nothing until the dataset settles", async () => {
+    // The association pass persists what it concludes, so a half-arrived
+    // stream must never read as "this slug exists nowhere".
+    const t = setup();
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.push({ ...skill(0), name: "pdf", repo: "acme/skills" });
+    expect(ask(t, 1, ["pdf"])).toEqual([[]]);
+
+    t.complete();
+    await t.flush();
+    expect(ask(t, 2, ["pdf"])).toEqual([[expect.objectContaining({ name: "pdf" })]]);
+  });
+
+  it("finds a skill by the directory it lands in, not only by its slug", async () => {
+    // The published snapshot's real shape: 173 of 8,214 rows spell the slug
+    // differently from the directory basename, and for the `stitch::` rows no
+    // slugifier reproduces the slug either — so a local install is only
+    // findable by the directory name. Matching on the slug alone would answer
+    // "this skill exists nowhere" and the association pass would persist that.
+    const t = setup({
+      skills: [
+        {
+          ...skill(0),
+          name: "stitch::generate-design",
+          repo: "google-labs-code/stitch-skills",
+          path: "skills/google-labs-code/stitch-skills/generate-design",
+        },
+        { ...skill(1), name: "plain", repo: "acme/skills", path: "skills/acme/plain" },
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    // Both keys answer; neither skill appears twice in its own family.
+    expect(ask(t, 1, ["generate-design"]).map((e) => e.map((s) => s.name))).toEqual([
+      ["stitch::generate-design"],
+    ]);
+    expect(ask(t, 2, ["stitch::generate-design"]).map((e) => e.length)).toEqual([1]);
+    expect(ask(t, 3, ["plain"]).map((e) => e.map((s) => s.name))).toEqual([["plain"]]);
+  });
+
+  it("widens rather than picks when a directory name is shared by two slugs", async () => {
+    // 21 directory names in the snapshot are published under more than one
+    // slug. Handing the user both is the point; choosing one for them would be
+    // the ambiguity this index exists to hand over.
+    const t = setup({
+      skills: [
+        { ...skill(0), name: "kling-cli", repo: "a/kling", path: "skills/a/skills" },
+        { ...skill(1), name: "weread-skills", repo: "b/weread", path: "skills/b/skills" },
+      ],
+    });
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    expect(ask(t, 1, ["skills"]).map((e) => e.map((s) => s.name))).toEqual([
+      ["kling-cli", "weread-skills"],
+    ]);
+  });
+
+  it("rebuilds the name index as the registry lands", async () => {
+    const t = setup();
+    t.controller.init({ cdnBase: "test" });
+    await t.flush();
+
+    t.push({ ...skill(0), name: "alpha", repo: "acme/alpha" });
+    t.push({ ...skill(1), name: "beta", repo: "acme/beta" });
+    t.complete();
+    await t.flush();
+
+    expect(ask(t, 1, ["beta"])).toEqual([[expect.objectContaining({ name: "beta" })]]);
+
+    // A new dataset version must not be answered from the old index.
+    t.controller.reload({ cdnBase: "test" });
+    await t.flush();
+    t.push({ ...skill(2), name: "gamma", repo: "acme/gamma" });
+    t.complete();
+    await t.flush();
+
+    expect(ask(t, 2, ["beta", "gamma"]).map((e) => e.length)).toEqual([0, 1]);
+  });
+});
+
 describe("createRegistryController — failures", () => {
   it("resets to an empty registry and surfaces the error without prior data", async () => {
     const t = setup();

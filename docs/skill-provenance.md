@@ -173,21 +173,36 @@ only when the registry snapshot is ready. It runs cheap-first.
 ### Step 1 — the namesake filter
 
 A skill with no same-slug registry entry is a plain local skill: nothing to
-associate, and no reason to look at its directory at all. This is one in-memory
-query against the worker's search index, which is why its "no namesakes"
+associate, and no reason to look at its directory at all. This is one map read
+per name against the worker's name index, which is why its "no namesakes"
 verdict earns no line in the ledger — see the format section above.
+
+The whole pass asks for every outstanding name in **one** query. It is an
+exact-key question ("a skill called exactly this, and which repos publish
+it"), so it is answered from a name index rather than by a name search per
+skill whose hits the caller would discard down to the exact matches. A skill
+the ledger already answers never enters the query at all — see the fast path
+in `link-suggestions.ts`.
 
 ### Step 2 — description auto-link, then ranked candidates
 
 The remaining namesakes are ranked by description similarity (token Jaccard;
 Han text is compared as character bigrams, the same trick the shared search
-index uses).
+index uses). Equal scores are broken by `popularity` — the same figure, and the
+same namesake tie-break, the store's own search ranking uses. Without it, the
+fork clusters below would make the top slot a function of registry order.
 
-**Auto-link at ≥ 90%.** When the best namesake's similarity reaches
-`SIMILARITY_AUTO_LINK_THRESHOLD` (0.9), the wording is close enough to call
-the two skills the same, so the association is written into the ledger
-automatically — no prompt, and the card shows the source repo the same way a
-native install does.
+**Auto-link at ≥ 90%, when exactly one namesake clears it.** When a single
+namesake reaches `SIMILARITY_AUTO_LINK_THRESHOLD` (0.9), the wording is close
+enough to call the two skills the same, so the association is written into the
+ledger automatically — no prompt, and the card shows the source repo the same
+way a native install does.
+
+**Two namesakes clearing it — surfaced for confirmation.** This is the fork case
+the threshold cannot resolve, and it is not rare (measured below): identical
+wording scores the same on both sides, so any choice would be a coin flip the
+user never sees. Rather than tie-break it silently, the pass leaves it to the
+user, exactly as it does below the threshold.
 
 **Below 90% — surfaced for confirmation.** The ranking is stored as a pending
 record, so a restart revives it instead of redoing the similarity math, and the
@@ -205,11 +220,23 @@ Why 90% and not a stricter floor? Measured against the published snapshot
 have ≥2 *different* repos carrying byte-identical descriptions — 525 skills.
 Every identical-description cluster spans multiple repos (forks copy the
 frontmatter verbatim), so a perfect description match is ambiguous by
-construction: it can select a fork as readily as the origin. The 90% threshold
-deliberately trades the rare silent mislink (wrong source link, wrong update
-stream) for far fewer prompts on genuinely identical skills — the one case
-where the user would confirm the obvious anyway — while still leaving anything
-below 90% to the user's judgement.
+construction: it can select a fork as readily as the origin. Two rules follow
+from that, and they pull in opposite directions on purpose:
+
+- **The threshold trades silent mislinks for prompts.** 90% means far fewer
+  prompts on genuinely identical skills — the one case where the user would
+  confirm the obvious anyway — while leaving anything below 90% to the user's
+  judgement.
+- **A tie is never broken on the user's behalf.** Where the wording cannot
+  separate two candidates, the ambiguity is surfaced instead of resolved. On
+  that 525-skill measurement this is the difference between a silent wrong link
+  (wrong source, wrong update stream) on up to half the cluster and a
+  confirmation prompt — so the mislink this threshold still permits is the one
+  case where the descriptions *did* separate the candidates.
+
+The uniqueness rule reads the top `MAX_CANDIDATES` (5) namesakes, which is what
+the ranking keeps: a sixth namesake at the same score would have to exist for it
+to matter, and a slug family that wide is not one this dataset has.
 
 ## Re-selecting and cutting a source in the detail drawer
 
@@ -233,6 +260,10 @@ never chain it back on their own — the user's cut is a decision, not a cache.
 Everything else the record already knew stays: the candidates, the fingerprint
 and the ranking digest survive, so re-deciding later costs nothing. The cut
 repo still surfaces among the manual candidates, since picking it again is the
-user's own act of re-identification. Inside a running session the suggestion
+user's own act of re-identification — and it is **marked** there ("已忽略"),
+because a repo the user just refused reads as new again otherwise. The cut
+travels to the surfaces as part of the same reconciliation that returns the
+sources (`reconcileProvenance`), so what a row shows and what the ledger says
+cannot come from two different reads. Inside a running session the suggestion
 memo is cleared, so the next reconcile pass immediately re-runs the lookup and
 offers what remains.

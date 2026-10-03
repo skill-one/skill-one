@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronDown, Loader2 } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Button } from "../ui/button";
 import { toast } from "../ui/toast";
-import { LinkCandidateList } from "../link-candidate-list";
+import { LinkCandidatePopover } from "../link-candidate-popover";
 import {
   findLinkCandidates,
   unlinkSkillSource,
 } from "../../lib/link-suggestions";
-import { recordSkillProvenance } from "../../lib/provenance";
+import { useConfirmSkillSource } from "../../hooks/use-confirm-skill-source";
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { errorMessage, cn } from "../../lib/utils";
 import type { SkillView } from "../../lib/skill-view";
@@ -27,9 +27,14 @@ import type { SkillView } from "../../lib/skill-view";
  */
 export function SourceLinkMenu({ skill }: { skill: SkillView }) {
   const [open, setOpen] = useState(false);
-  const [pendingRepo, setPendingRepo] = useState<string | null>(null);
+  // Cutting is its own write, so it carries its own flag rather than borrowing
+  // the pick's: the two never overlap, and the button has to read as busy while
+  // the ledger is being rewritten under it.
+  const [unlinking, setUnlinking] = useState(false);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { pendingRepo, confirm } = useConfirmSkillSource(skill.name);
+  const busy = pendingRepo != null || unlinking;
 
   // Candidates are the popover's own lookup, fetched when it opens and keyed
   // by the current repo so a re-link refetches with the new exclusion. The
@@ -44,26 +49,11 @@ export function SourceLinkMenu({ skill }: { skill: SkillView }) {
   });
 
   const pick = async (repo: string) => {
-    setPendingRepo(repo);
-    try {
-      // A confirmed pick is recorded into the ledger like a native install;
-      // the user's choice is the act of identification.
-      await recordSkillProvenance(repo, skill.name, "confirm");
-      await markSkillsChanged(queryClient);
-      toast.add({ title: t("migration.migrated", { repo }), type: "success" });
-      setOpen(false);
-    } catch (e) {
-      toast.add({
-        title: errorMessage(e, t("migration.migrateFailed")),
-        type: "error",
-      });
-    } finally {
-      setPendingRepo(null);
-    }
+    if (await confirm(repo)) setOpen(false);
   };
 
   const unlink = async () => {
-    setPendingRepo(skill.repo);
+    setUnlinking(true);
     try {
       await unlinkSkillSource(skill.name, skill.repo);
       await markSkillsChanged(queryClient);
@@ -71,11 +61,11 @@ export function SourceLinkMenu({ skill }: { skill: SkillView }) {
       setOpen(false);
     } catch (e) {
       toast.add({
-        title: errorMessage(e, t("migration.migrateFailed")),
+        title: errorMessage(e, t("sourceLink.failed")),
         type: "error",
       });
     } finally {
-      setPendingRepo(null);
+      setUnlinking(false);
     }
   };
 
@@ -98,53 +88,37 @@ export function SourceLinkMenu({ skill }: { skill: SkillView }) {
         }
       />
       <PopoverContent align="start" sideOffset={6} className="w-80 gap-2 p-3">
-        <div className="flex flex-col gap-0.5">
-          <p className="text-xs font-medium">{t("migration.badge")}</p>
-          <p className="text-[11px] text-muted-foreground">
-            {t("migration.subtitle", { name: skill.name })}
-          </p>
-        </div>
-
-        {/* The source currently on record — pinned and marked, so a
-            re-selection always reads against it. */}
-        <div className="flex items-center gap-1.5 rounded-md bg-muted/60 px-2 py-1.5">
-          <Check className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
-            {skill.repo}
-          </span>
-          <span className="shrink-0 text-[10px] text-muted-foreground">
-            {t("detail.currentSource")}
-          </span>
-        </div>
-
-        {candidatesPending ? (
-          <div className="flex items-center justify-center py-3 text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-          </div>
-        ) : candidates && candidates.length > 0 ? (
-          <LinkCandidateList
-            candidates={candidates}
-            pendingRepo={pendingRepo}
-            onPick={(candidate) => void pick(candidate.skill.repo)}
-          />
-        ) : (
-          <p className="px-2 text-[11px] text-muted-foreground">
-            {t("detail.noOtherSources")}
-          </p>
-        )}
-
-        <p className="text-[10px] text-muted-foreground">
-          {t("migration.footnote")}
-        </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 justify-start px-2 text-[11px] text-destructive hover:text-destructive"
-          disabled={pendingRepo != null}
-          onClick={() => void unlink()}
-        >
-          {t("detail.unlinkSource")}
-        </Button>
+        <LinkCandidatePopover
+          name={skill.name}
+          candidates={candidatesPending ? null : (candidates ?? [])}
+          emptyLabel={t("detail.noOtherSources")}
+          pendingRepo={pendingRepo}
+          onPick={(repo) => void pick(repo)}
+          beforeList={
+            /* The source currently on record — pinned and marked, so a
+               re-selection always reads against it. */
+            <div className="flex items-center gap-1.5 rounded-md bg-muted/60 px-2 py-1.5">
+              <Check className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
+                {skill.repo}
+              </span>
+              <span className="shrink-0 text-[10px] text-muted-foreground">
+                {t("detail.currentSource")}
+              </span>
+            </div>
+          }
+          afterList={
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 justify-start px-2 text-[11px] text-destructive hover:text-destructive"
+              disabled={busy}
+              onClick={() => void unlink()}
+            >
+              {t("detail.unlinkSource")}
+            </Button>
+          }
+        />
       </PopoverContent>
     </Popover>
   );

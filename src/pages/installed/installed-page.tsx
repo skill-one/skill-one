@@ -214,6 +214,7 @@ export function InstalledPage() {
   const { data: provenanceState } = useSkillProvenance();
   const linked = provenanceState?.linked;
   const suggestions = provenanceState?.suggestions;
+  const cut = provenanceState?.cut;
 
   // The registry entries behind those recorded sources, keyed by skill name:
   // the store facts an on-disk record never carries (classification, the
@@ -296,7 +297,12 @@ export function InstalledPage() {
   const rows = useMemo<Row[]>(() => {
     if (!hits) {
       return list.map((skill) => ({
-        skill: installedSkillView(skill, linked, storeEntries[skill.name]),
+        skill: installedSkillView(
+          skill,
+          linked,
+          storeEntries[skill.name],
+          cut?.[skill.name],
+        ),
         enabled: skill.enabled,
         suggestion: suggestions?.[skill.name],
       }));
@@ -306,12 +312,13 @@ export function InstalledPage() {
         hit.doc,
         linked,
         storeEntries[hit.doc.name],
+        cut?.[hit.doc.name],
       ),
       enabled: hit.doc.enabled,
       suggestion: suggestions?.[hit.doc.name],
       matched: hit.matched,
     }));
-  }, [hits, list, linked, storeEntries, suggestions]);
+  }, [cut, hits, list, linked, storeEntries, suggestions]);
 
   // Linking or unlinking a source inside the detail drawer changes the
   // skill's identity (the unlinked `/name` key becomes `repo/name` and
@@ -572,6 +579,7 @@ export function InstalledPage() {
         name={row.skill.name}
         localDescription={row.skill.description}
         candidates={row.suggestion ?? []}
+        cutRepos={row.skill.cutRepos}
         variant={variant}
       />
     ) : undefined;

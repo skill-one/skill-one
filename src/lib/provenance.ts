@@ -439,14 +439,35 @@ export async function dismissSkillSource(name: string, repo: string): Promise<vo
 }
 
 /**
- * Reconcile the ledger with the on-disk truth and return the current
- * name→source map. Called whenever the installed list is (re)loaded: skills
- * removed outside the app stop claiming a source, and stale pending records
- * for removed skills are pruned with them.
+ * What one reconciliation knows about the installed list: which store entries
+ * the skills are linked to, and which repos the user has cut for the ones that
+ * are not.
+ *
+ * Both come out of the same pass over one read of the ledger, because they are
+ * the two halves of one association — a skill is either linked to a repo or
+ * waiting behind a cut — and a caller that had to reconcile twice to learn both
+ * could read a state that never existed.
+ */
+export interface ReconciledProvenance {
+  /** Skills the app has a source for: name → `{repo, via?}`. */
+  sources: Record<string, SkillProvenance>;
+  /**
+   * Repos the user cut, per skill. The auto-link tier never links these back,
+   * so the surfaces that offer a namesake mark them rather than offering a repo
+   * they already refused as if it were new.
+   */
+  cut: Record<string, string[]>;
+}
+
+/**
+ * Reconcile the ledger with the on-disk truth and return what it now says.
+ * Called whenever the installed list is (re)loaded: skills removed outside the
+ * app stop claiming a source, and stale pending records for removed skills are
+ * pruned with them.
  */
 export async function reconcileProvenance(
   installedNames: readonly string[],
-): Promise<Record<string, SkillProvenance>> {
+): Promise<ReconciledProvenance> {
   const ledger = await loadLedger();
   const installed = new Set(installedNames);
   let changed = false;
@@ -459,14 +480,18 @@ export async function reconcileProvenance(
   }
   if (changed) await saveLedger(ledger);
   const sources: Record<string, SkillProvenance> = {};
+  const cut: Record<string, string[]> = {};
   for (const record of ledger.records.values()) {
-    if (record.kind !== "source") continue;
-    sources[record.name] = {
-      repo: record.repo,
-      ...(record.via !== undefined ? { via: record.via } : {}),
-    };
+    if (record.kind === "source") {
+      sources[record.name] = {
+        repo: record.repo,
+        ...(record.via !== undefined ? { via: record.via } : {}),
+      };
+    } else if (record.repos?.length) {
+      cut[record.name] = [...record.repos];
+    }
   }
-  return sources;
+  return { sources, cut };
 }
 
 // ---------------------------------------------------- pending record storage

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { TriangleAlert } from "lucide-react";
 
@@ -13,12 +12,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "../../components/ui/tooltip";
-import { toast } from "../../components/ui/toast";
-import { LinkCandidateList } from "../../components/link-candidate-list";
-
-import { recordSkillProvenance } from "../../lib/provenance";
-import { markSkillsChanged } from "../../hooks/use-installed-skills";
-import { cn, errorMessage } from "../../lib/utils";
+import { LinkCandidatePopover } from "../../components/link-candidate-popover";
+import { useConfirmSkillSource } from "../../hooks/use-confirm-skill-source";
+import { cn } from "../../lib/utils";
 import type { LinkCandidate } from "../../lib/link-suggestions";
 
 /**
@@ -41,39 +37,23 @@ export function LinkSuggestionBadge({
   name,
   localDescription,
   candidates,
+  cutRepos,
   variant = "label",
 }: {
   name: string;
   /** The local skill's own description, shown for comparison. */
   localDescription?: string;
   candidates: LinkCandidate[];
+  /** Repos this skill's user has cut; their rows are marked, not hidden. */
+  cutRepos?: readonly string[];
   variant?: LinkSuggestionVariant;
 }) {
   const [open, setOpen] = useState(false);
-  const [pendingRepo, setPendingRepo] = useState<string | null>(null);
-  const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { pendingRepo, confirm } = useConfirmSkillSource(name);
 
-  const pick = async (candidate: LinkCandidate) => {
-    setPendingRepo(candidate.skill.repo);
-    try {
-      // A confirmed pick is recorded into the ledger like a native install;
-      // the user's choice is the act of identification.
-      await recordSkillProvenance(candidate.skill.repo, name, "confirm");
-      await markSkillsChanged(queryClient);
-      toast.add({
-        title: t("migration.migrated", { repo: candidate.skill.repo }),
-        type: "success",
-      });
-      setOpen(false);
-    } catch (e) {
-      toast.add({
-        title: errorMessage(e, t("migration.migrateFailed")),
-        type: "error",
-      });
-    } finally {
-      setPendingRepo(null);
-    }
+  const pick = async (repo: string) => {
+    if (await confirm(repo)) setOpen(false);
   };
 
   // No candidate to link: the label variant stays a plain source statement,
@@ -88,7 +68,7 @@ export function LinkSuggestionBadge({
     variant === "label" ? (
       <button
         type="button"
-        aria-label={t("migration.triggerAria", { name })}
+        aria-label={t("sourceLink.triggerAria", { name })}
         // The card/row body behind the trigger opens the detail drawer;
         // opening the popover or picking must not do that.
         onClick={(e) => e.stopPropagation()}
@@ -109,7 +89,7 @@ export function LinkSuggestionBadge({
     ) : (
       <button
         type="button"
-        aria-label={t("migration.triggerAria", { name })}
+        aria-label={t("sourceLink.triggerAria", { name })}
         onClick={(e) => e.stopPropagation()}
         className={cn(
           "inline-flex size-4 shrink-0 cursor-pointer items-center justify-center",
@@ -134,37 +114,18 @@ export function LinkSuggestionBadge({
           onClick={(e) => e.stopPropagation()}
           className="w-80 gap-2 p-3"
         >
-          <div className="flex flex-col gap-0.5">
-            <p className="text-xs font-medium">{t("migration.badge")}</p>
-            <p className="text-[11px] text-muted-foreground">
-              {t("migration.subtitle", { name })}
-            </p>
-          </div>
-
-          {/* The local description is the fact candidates compare against. */}
-          {localDescription?.trim() ? (
-            <div className="rounded-md bg-muted/60 px-2 py-1.5">
-              <p className="pb-0.5 text-[10px] font-medium text-muted-foreground">
-                {t("migration.localLabel")}
-              </p>
-              <p className="line-clamp-2 text-[11px] leading-snug text-foreground/90">
-                {localDescription}
-              </p>
-            </div>
-          ) : null}
-
-          <LinkCandidateList
+          <LinkCandidatePopover
+            name={name}
+            localDescription={localDescription}
             candidates={candidates}
+            cutRepos={cutRepos}
+            emptyLabel={t("detail.noOtherSources")}
             pendingRepo={pendingRepo}
-            onPick={(candidate) => void pick(candidate)}
+            onPick={(repo) => void pick(repo)}
           />
-
-          <p className="text-[10px] text-muted-foreground">
-            {t("migration.footnote")}
-          </p>
         </PopoverContent>
       </Popover>
-      <TooltipContent>{t("migration.tooltip")}</TooltipContent>
+      <TooltipContent>{t("sourceLink.tooltip")}</TooltipContent>
     </Tooltip>
   );
 }

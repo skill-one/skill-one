@@ -669,6 +669,7 @@ export function SkillDetailPanel({
                   name={shown.name}
                   localDescription={shown.description}
                   candidates={suggestion ?? []}
+                  cutRepos={shown.cutRepos}
                 />
               </SheetDescription>
             ) : (

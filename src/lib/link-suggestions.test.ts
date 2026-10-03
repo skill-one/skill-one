@@ -15,7 +15,7 @@ import type { Skill } from "../types/skill";
 import type { PendingRecord, StoredPending } from "./provenance";
 
 const {
-  searchSkills,
+  namesakeSkills,
   getRegistrySnapshot,
   skillFingerprint,
   recordSkillProvenanceBatch,
@@ -24,7 +24,7 @@ const {
   dismissSkillSource,
   isTauri,
 } = vi.hoisted(() => ({
-  searchSkills: vi.fn(),
+  namesakeSkills: vi.fn(),
   getRegistrySnapshot: vi.fn(),
   skillFingerprint: vi.fn(),
   recordSkillProvenanceBatch: vi.fn(),
@@ -34,7 +34,7 @@ const {
   isTauri: vi.fn(),
 }));
 
-vi.mock("./registry/client", () => ({ searchSkills, getRegistrySnapshot }));
+vi.mock("./registry/client", () => ({ namesakeSkills, getRegistrySnapshot }));
 vi.mock("./tauri", () => ({ isTauri }));
 vi.mock("./skills-manager", () => ({
   skillFingerprint,
@@ -66,12 +66,23 @@ function namesake(repo: string, overrides: Partial<Skill> = {}): Skill {
   };
 }
 
-/** A ready registry serving `entries` under the given snapshot identity. */
+/**
+ * A ready registry serving `entries` under the given snapshot identity. The
+ * worker's name index is what answers namesake lookups here: entries are
+ * filed under their own name, and a name nothing was filed under comes back
+ * empty.
+ */
 function mockReady(entries: Skill[], etag: string = ETAG) {
   getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 1, index: { etag } });
-  searchSkills.mockResolvedValue({
-    hits: entries.map((skill) => ({ skill, matched: {} })),
-  });
+  const byName = new Map<string, Skill[]>();
+  for (const skill of entries) {
+    const family = byName.get(skill.name);
+    if (family) family.push(skill);
+    else byName.set(skill.name, [skill]);
+  }
+  namesakeSkills.mockImplementation(async (names: string[]) => ({
+    entries: names.map((name) => byName.get(name) ?? []),
+  }));
 }
 
 /** Nothing stored yet: no header, no records. */
@@ -157,6 +168,27 @@ describe("rankNamesakes", () => {
     expect(ranked[0].similarity).toBe(1);
   });
 
+  it("breaks an equal-similarity tie by popularity", () => {
+    // Two forks of the same wording score identically, so the order decides
+    // which one a threshold decision would pick. The store's namesake ranking
+    // breaks the same tie the same way; here it is what makes the answer
+    // stable rather than a function of registry order.
+    const ranked = rankNamesakes(
+      [
+        namesake("quiet/skills", { downloads: 10, stars: 10 }),
+        namesake("popular/skills", { downloads: 5000, stars: 900 }),
+      ],
+      "Read and manipulate PDF files.",
+    );
+
+    expect(ranked.map((c) => c.skill.repo)).toEqual([
+      "popular/skills",
+      "quiet/skills",
+    ]);
+    // The tie-break never reorders across scores.
+    expect(ranked.map((c) => c.similarity)).toEqual([1, 1]);
+  });
+
   it("caps the candidate list", () => {
     const ranked = rankNamesakes(
       Array.from({ length: 10 }, (_, i) =>
@@ -219,8 +251,12 @@ describe("resolveAssociations", () => {
 
   it("links a matching description regardless of any content hash", async () => {
     // The registry carries no per-skill hash, so a description match is the
-    // only auto-link there is.
-    mockReady([namesake("anthropics/skills"), namesake("fork/skills")]);
+    // only auto-link there is. The second namesake is worded differently, so
+    // exactly one candidate clears the threshold.
+    mockReady([
+      namesake("anthropics/skills"),
+      namesake("fork/skills", { description: "entirely different wording" }),
+    ]);
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and manipulate PDF files." },
@@ -231,6 +267,62 @@ describe("resolveAssociations", () => {
     expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
       { repo: "anthropics/skills", name: "pdf", reason: "description" },
     ]);
+  });
+
+  it("auto-links nothing when two namesakes match equally well", async () => {
+    // The fork case the threshold cannot resolve: identical wording on both
+    // sides scores the same, so the descriptions cannot say which repo this
+    // skill came from. Picking one silently would be a coin flip the user
+    // never sees, so the choice goes to them instead.
+    mockReady([namesake("anthropics/skills"), namesake("fork/skills")]);
+
+    const { linked, suggestions } = await resolveAssociations([
+      { name: "pdf", description: "Read and manipulate PDF files." },
+    ]);
+
+    expect(
+      suggestions.pdf.map((c) => c.similarity),
+    ).toEqual([1, 1]);
+    expect(linked).toEqual([]);
+    expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
+    // Both stay on offer — the fork is still a legitimate manual pick.
+    expect(suggestions.pdf.map((c) => c.skill.repo)).toEqual([
+      "anthropics/skills",
+      "fork/skills",
+    ]);
+  });
+
+  it("looks every unlinked skill up in one query", async () => {
+    mockReady([
+      namesake("a/skills", { name: "pdf" }),
+      namesake("b/skills", { name: "csv", description: "Read and convert CSV files." }),
+    ]);
+    skillFingerprint.mockResolvedValue({ mtimeMs: 1, size: 2 });
+
+    await resolveAssociations([
+      { name: "pdf", description: "Read and convert PDF files." },
+      { name: "csv", description: "Read and convert CSV files." },
+      { name: "totally-custom", description: "nothing here" },
+    ]);
+
+    // One round trip for the whole pass, carrying every name that still needs
+    // an answer — the dead end included, since only the worker knows it.
+    expect(namesakeSkills).toHaveBeenCalledTimes(1);
+    expect(namesakeSkills).toHaveBeenCalledWith(["pdf", "csv", "totally-custom"]);
+  });
+
+  it("asks for nothing when the ledger already answers every skill", async () => {
+    mockReady([namesake("anthropics/skills")]);
+    mockLedger({ records: { pdf: pending() } });
+    skillFingerprint.mockResolvedValue({ mtimeMs: 1000, size: 200 });
+
+    await resolveAssociations([
+      { name: "pdf", description: "Read and convert PDF files." },
+    ]);
+
+    // The fast path's whole point: a restart that the ledger fully covers
+    // costs no registry query at all.
+    expect(namesakeSkills).not.toHaveBeenCalled();
   });
 
   it("offers ranked suggestions when the description misses", async () => {
@@ -280,7 +372,7 @@ describe("resolveAssociations", () => {
     ]);
 
     // No worker query, no re-ranking: the ledger answers.
-    expect(searchSkills).not.toHaveBeenCalled();
+    expect(namesakeSkills).not.toHaveBeenCalled();
     expect(skillFingerprint).toHaveBeenCalledTimes(1);
     expect(linked).toEqual([]);
     expect(suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
@@ -295,7 +387,7 @@ describe("resolveAssociations", () => {
     await resolveAssociations([{ name: "pdf", description: "Read and convert PDF files." }]);
 
     // A new dataset can carry other namesakes, so the lookup re-runs…
-    expect(searchSkills).toHaveBeenCalledTimes(1);
+    expect(namesakeSkills).toHaveBeenCalledTimes(1);
     // …and the record is re-stamped with the snapshot it now belongs to.
     expect(savePendingRecords).toHaveBeenCalledWith(
       [expect.objectContaining({ name: "pdf" })],
@@ -312,7 +404,7 @@ describe("resolveAssociations", () => {
 
     await resolveAssociations([{ name: "pdf", description: "Read and convert PDF files." }]);
 
-    expect(searchSkills).toHaveBeenCalledTimes(1);
+    expect(namesakeSkills).toHaveBeenCalledTimes(1);
   });
 
   it("re-ranks when the stored fingerprint no longer matches the disk", async () => {
@@ -325,7 +417,7 @@ describe("resolveAssociations", () => {
       { name: "pdf", description: "Read and convert PDF files." },
     ]);
 
-    expect(searchSkills).toHaveBeenCalledTimes(1);
+    expect(namesakeSkills).toHaveBeenCalledTimes(1);
     expect(suggestions.pdf).toHaveLength(1);
   });
 
@@ -386,7 +478,7 @@ describe("resolveAssociations", () => {
   it("re-checks a settled skill once the served dataset changes", async () => {
     mockReady([namesake("a/skills")]);
     await resolveAssociations([{ name: "pdf" }]);
-    expect(searchSkills).toHaveBeenCalledTimes(1);
+    expect(namesakeSkills).toHaveBeenCalledTimes(1);
 
     // A new dataset can publish namesakes the previous one lacked, so the
     // memoized dead end must not survive it.
@@ -394,7 +486,7 @@ describe("resolveAssociations", () => {
     getRegistrySnapshot.mockReturnValue({ ready: true, epoch: 2, index: { etag: '"e2"' } });
     noteRegistryEpoch(2);
     await resolveAssociations([{ name: "pdf" }]);
-    expect(searchSkills).toHaveBeenCalledTimes(2);
+    expect(namesakeSkills).toHaveBeenCalledTimes(2);
   });
 
   it("stores no fingerprint outside Tauri (the mock has no real files)", async () => {
@@ -419,7 +511,7 @@ describe("resolveAssociations", () => {
     expect(linked).toEqual([]);
     expect(suggestions).toEqual({});
     expect(skillFingerprint).not.toHaveBeenCalled();
-    expect(searchSkills).not.toHaveBeenCalled();
+    expect(namesakeSkills).not.toHaveBeenCalled();
     // A registry that is not ready has no snapshot to stamp and no verdict to
     // record, so the pass produces nothing — the stored records stay exactly
     // as they are until it answers, rather than being stamped with nothing.
@@ -519,11 +611,11 @@ describe("unlinkSkillSource", () => {
     mockReady([namesake("anthropics/skills")]);
     // Warm the memo with a dead end.
     await resolveAssociations([{ name: "totally-custom" }]);
-    expect(searchSkills).toHaveBeenCalledTimes(1);
+    expect(namesakeSkills).toHaveBeenCalledTimes(1);
 
     await unlinkSkillSource("totally-custom", "a/skills");
     await resolveAssociations([{ name: "totally-custom" }]);
 
-    expect(searchSkills).toHaveBeenCalledTimes(2);
+    expect(namesakeSkills).toHaveBeenCalledTimes(2);
   });
 });

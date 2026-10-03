@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { isTauri, searchSkills, getRegistrySnapshot, skillFingerprint } = vi.hoisted(
+const { isTauri, namesakeSkills, getRegistrySnapshot, skillFingerprint } = vi.hoisted(
   () => ({
     isTauri: vi.fn(),
-    searchSkills: vi.fn(),
+    namesakeSkills: vi.fn(),
     getRegistrySnapshot: vi.fn(),
     skillFingerprint: vi.fn(),
   }),
 );
 
 vi.mock("../lib/tauri", () => ({ isTauri }));
-vi.mock("../lib/registry/client", () => ({ searchSkills, getRegistrySnapshot }));
+vi.mock("../lib/registry/client", () => ({ namesakeSkills, getRegistrySnapshot }));
 // A stateful stand-in for the on-disk ledger file, so the real provenance
 // persistence round-trips inside the test.
 const { readProvenanceRaw, writeProvenanceRaw, resetLedgerFile } = vi.hoisted(
@@ -69,7 +69,7 @@ function mockRegistry() {
     epoch: 1,
     index: { etag: '"e1"' },
   });
-  searchSkills.mockResolvedValue({ hits: [NAMESAKE] });
+  namesakeSkills.mockResolvedValue({ entries: [[NAMESAKE.skill]] });
 }
 
 beforeEach(() => {
@@ -97,7 +97,7 @@ describe("fetchProvenanceState", () => {
     const rerun = await runQueryFn([installed("pdf", "Read PDF files.")]);
     expect(rerun.linked.pdf?.repo).toBe("anthropics/skills");
     // The second run reads the ledger and does no association work at all.
-    expect(searchSkills).toHaveBeenCalledTimes(1);
+    expect(namesakeSkills).toHaveBeenCalledTimes(1);
   });
 
   it("offers ranked suggestions when the description does not match", async () => {
@@ -131,6 +131,6 @@ describe("fetchProvenanceState", () => {
     expect(state.linked).toEqual({});
     expect(state.suggestions).toEqual({});
     expect(skillFingerprint).not.toHaveBeenCalled();
-    expect(searchSkills).not.toHaveBeenCalled();
+    expect(namesakeSkills).not.toHaveBeenCalled();
   });
 });

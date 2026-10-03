@@ -15,10 +15,17 @@ import { OwnerAvatar } from "./owner-avatar";
  */
 export function LinkCandidateList({
   candidates,
+  cutRepos,
   pendingRepo,
   onPick,
 }: {
   candidates: LinkCandidate[];
+  /**
+   * Repos this skill's user has cut. Their rows stay clickable — re-picking
+   * one is the user's own act of re-identification — but say so, because the
+   * alternative is a repo they explicitly refused presenting as if it were new.
+   */
+  cutRepos?: readonly string[];
   /** The repo whose write is in flight — that row shows a spinner. */
   pendingRepo: string | null;
   onPick: (candidate: LinkCandidate) => void;
@@ -29,6 +36,7 @@ export function LinkCandidateList({
     <ul className="max-h-72 overflow-y-auto">
       {candidates.map(({ skill, similarity }) => {
         const pending = pendingRepo === skill.repo;
+        const cut = cutRepos?.includes(skill.repo) ?? false;
         return (
           <li key={skill.repo}>
             <button
@@ -53,12 +61,18 @@ export function LinkCandidateList({
                 {pending ? (
                   <Loader2
                     className="size-3 shrink-0 animate-spin text-muted-foreground"
-                    aria-hidden
-                  />
+                    aria-hidden />
+                  ) : cut ? (
+                  <span
+                    className="shrink-0 text-[10px] text-muted-foreground/80"
+                    title={t("sourceLink.cutBadge")}
+                  >
+                    {t("sourceLink.cutBadge")}
+                  </span>
                 ) : skill.stars > 0 ? (
                   <span
                     className="inline-flex shrink-0 items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground"
-                    title={t("migration.starsTitle")}
+                    title={t("sourceLink.starsTitle")}
                   >
                     <Star className="size-2.5" aria-hidden />
                     {formatCount(skill.stars)}
@@ -69,7 +83,7 @@ export function LinkCandidateList({
                 {skillDescription(skill, locale)}
               </span>
               <span className="text-[10px] text-muted-foreground/70">
-                {t("migration.similarity", {
+                {t("sourceLink.similarity", {
                   percent: Math.round(similarity * 100),
                 })}
               </span>

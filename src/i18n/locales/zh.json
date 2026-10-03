@@ -159,13 +159,14 @@
   "agentLink": {
     "noAgents": "未检测到可用的 agent"
   },
-  "migration": {
-    "migrated": "已关联来源：{{repo}}",
-    "migrateFailed": "关联来源失败",
+  "sourceLink": {
+    "linked": "已关联来源：{{repo}}",
+    "failed": "关联来源失败",
     "triggerAria": "关联 {{name}} 的商店来源",
-    "badge": "关联来源",
+    "title": "关联来源",
     "subtitle": "为「{{name}}」选择来源仓库",
     "tooltip": "关联来源，不改动本地文件",
+    "cutBadge": "已忽略",
     "localLabel": "本地描述",
     "starsTitle": "仓库星标数",
     "similarity": "描述相似 {{percent}}%",

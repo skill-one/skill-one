@@ -117,9 +117,11 @@ function toSkill(raw: RawSkill, starsFor: StarsFor | undefined): Skill {
     // to 0.
     downloads: raw.installs ?? 0,
     // The skill's files live in the snapshot at `skills/<dir>`; `dir` is the
-    // row's own spelling of where they are and wins over the id. The
-    // basename equals the skill name, so a locally installed copy still
-    // matches its registry entry.
+    // row's own spelling of where they are and wins over the id. Its basename
+    // is the source repository's own directory name, which is *not* the slug:
+    // 173 of 8,214 published rows (2.1%) spell the two differently. A local
+    // copy is matched by its slug, so the basename is a second key rather than
+    // a restatement of the first — see `lookupIndex` and `namesakeIndex`.
     path: `skills/${text(raw.dir) || raw.id}`,
     // The skill's page on skills.sh is derivable from the id.
     url: `https://www.skills.sh/${raw.id}`,
