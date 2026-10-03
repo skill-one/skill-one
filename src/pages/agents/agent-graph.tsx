@@ -448,8 +448,13 @@ function HubDisk({
         transform: "translate(-50%, -50%)",
       }}
     >
+      {/* `figure`, not a bare div: the jar is a self-contained figure with a
+          caption (the legend below), and the role is what makes its
+          `aria-label` reach assistive tech at all — `aria-label` on a generic
+          div is silently dropped, which is also why tests query it by role
+          rather than by a test id. */}
       <div
-        data-testid="agent-hub"
+        role="figure"
         aria-label={t("agents.hub.diskAria", { total, enabled: enabled.length })}
         className="relative"
       >

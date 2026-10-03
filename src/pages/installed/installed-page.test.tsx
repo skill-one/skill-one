@@ -1074,10 +1074,12 @@ describe("InstalledPage", () => {
   // by each card's newest install.
 
   /** The cards in list order, named by the repository each one stands for
-   *  (the pool card, which has no repository, names itself). */
-  function cardBarNames(): string[] {
+   *  (the pool card, which has no repository, names itself). The cards render
+   *  inside the sheet's portal, so the caller hands in the render's
+   *  `baseElement` — the only handle that reaches them. */
+  function cardBarNames(scope: ParentNode): string[] {
     return Array.from(
-      document.querySelectorAll('[data-slot="card"][data-repo]'),
+      scope.querySelectorAll('[data-slot="card"][data-repo]'),
     ).map((card) => card.getAttribute("data-repo") || "本地安装");
   }
 
@@ -1092,13 +1094,17 @@ describe("InstalledPage", () => {
       "code-review": { repo: "acme/tools" },
       "frontend-design": { repo: "acme/tools" },
     });
-    renderPage();
+    const { baseElement } = renderPage();
 
     await screen.findByText("zoo/new");
     // One flat list, newest install first: the fresh repository leads, the
     // pool follows on the age of its newest member, the all-old repository
     // trails.
-    expect(cardBarNames()).toEqual(["zoo/new", "本地安装", "acme/tools"]);
+    expect(cardBarNames(baseElement)).toEqual([
+      "zoo/new",
+      "本地安装",
+      "acme/tools",
+    ]);
   });
 
   it("orders a card by its newest install and lists that install first", async () => {
@@ -1110,14 +1116,14 @@ describe("InstalledPage", () => {
       pdf: { repo: "acme/tools" },
       "frontend-design": { repo: "acme/tools" },
     });
-    renderPage();
+    const { baseElement } = renderPage();
 
     await screen.findByText("acme/tools");
     // The pool (newest docx, 3 days) is the other, older card.
-    expect(cardBarNames()).toEqual(["acme/tools", "本地安装"]);
+    expect(cardBarNames(baseElement)).toEqual(["acme/tools", "本地安装"]);
 
     // Inside the card, newest first.
-    const card = document.querySelector('[data-repo="acme/tools"]');
+    const card = baseElement.querySelector('[data-repo="acme/tools"]');
     expect(
       within(card as HTMLElement)
         .getAllByRole("button", { name: /查看 .+ 详情/ })
@@ -1163,7 +1169,7 @@ describe("InstalledPage", () => {
         },
       ],
     });
-    renderPage();
+    const { baseElement } = renderPage();
     await screen.findByText("zoo/a");
 
     // beforeEach picked the card shape, and the pressed toggle says so. A card
@@ -1178,7 +1184,11 @@ describe("InstalledPage", () => {
       screen.queryByRole("button", { name: "排序方式" }),
     ).not.toBeInTheDocument();
     await waitFor(() =>
-      expect(cardBarNames()).toEqual(["zoo/a", "zoo/b", "本地安装"]),
+      expect(cardBarNames(baseElement)).toEqual([
+        "zoo/a",
+        "zoo/b",
+        "本地安装",
+      ]),
     );
   });
 
@@ -1210,10 +1220,10 @@ describe("InstalledPage", () => {
         },
       ],
     });
-    renderPage();
+    const { baseElement } = renderPage();
     await screen.findByText("acme/tools");
 
-    const card = document.querySelector('[data-repo="acme/tools"]');
+    const card = baseElement.querySelector('[data-repo="acme/tools"]');
     expect(
       within(card as HTMLElement)
         .getAllByRole("button", { name: /查看 .+ 详情/ })

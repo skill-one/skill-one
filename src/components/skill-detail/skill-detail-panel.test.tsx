@@ -230,7 +230,11 @@ describe("SkillDetailPanel", () => {
 
   it("shows skill info and the fetched SKILL.md", async () => {
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderDrawer({});
+    // The drawer is portalled out of the render container, so everything it
+    // owns — including the absence assertions below — is only reachable
+    // through `baseElement`. Scoping the negatives to `container` would make
+    // them pass no matter what the drawer rendered.
+    const { baseElement } = renderDrawer({});
 
     // Await the async detail content first; the rest renders with it.
     expect(
@@ -251,7 +255,7 @@ describe("SkillDetailPanel", () => {
         .getByRole("link", { name: "anthropics/skills" })
         .querySelector('[data-slot="avatar"]'),
     ).toBeNull();
-    expect(document.querySelector('[data-slot="avatar"]')).not.toBeNull();
+    expect(baseElement.querySelector('[data-slot="avatar"]')).not.toBeNull();
     expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
     // The meta line is quiet dot-separated text: no author badge (the repo
     // line's avatar and repo already say who published it) and no license.
@@ -335,7 +339,7 @@ describe("SkillDetailPanel", () => {
   it("reads pure local skills from disk without store-only header parts", async () => {
     const user = userEvent.setup();
     mockFetchLocalSkillDetail.mockResolvedValue(localDetail);
-    renderDrawer({ skill: localSkill });
+    const { baseElement } = renderDrawer({ skill: localSkill });
 
     expect(await screen.findByText("Local skill body.")).toBeInTheDocument();
     expect(mockFetchLocalSkillDetail).toHaveBeenCalledWith("my-tool");
@@ -355,7 +359,7 @@ describe("SkillDetailPanel", () => {
     expect(screen.queryByText("安装量")).not.toBeInTheDocument();
     expect(screen.queryByTitle(/次安装/)).not.toBeInTheDocument();
     // No description → nothing to estimate, so no token figure either.
-    expect(document.querySelector('[data-slot="token-estimate"]')).toBeNull();
+    expect(baseElement.querySelector('[data-slot="token-estimate"]')).toBeNull();
   });
 
   it("opens the source link through the system browser on click", async () => {
@@ -404,10 +408,12 @@ describe("SkillDetailPanel", () => {
   it("closes via clicking the overlay", async () => {
     const user = userEvent.setup();
     mockFetchSkillDetail.mockResolvedValue(detail);
-    renderDrawer({});
+    // The overlay is portalled out of the render container, so it takes
+    // `baseElement` to be reachable at all.
+    const { baseElement } = renderDrawer({});
 
     await screen.findByText("Use this skill for PDFs.");
-    const overlay = document.querySelector('[data-slot="sheet-overlay"]');
+    const overlay = baseElement.querySelector('[data-slot="sheet-overlay"]');
     expect(overlay).not.toBeNull();
     await user.click(overlay!);
     await vi.waitFor(() =>
@@ -489,12 +495,12 @@ describe("SkillDetailPanel", () => {
   });
 
   it("shows no install date for a registry row", async () => {
-    renderDrawer({});
+    const { baseElement } = renderDrawer({});
     await screen.findByText("Use this skill for PDFs.");
 
     // A store row describes a skill the reader does not have on disk, so there
     // is no install to date.
-    expect(document.querySelector('[data-slot="installed-at"]')).toBeNull();
+    expect(baseElement.querySelector('[data-slot="installed-at"]')).toBeNull();
   });
 
   it("estimates the English description's token cost in the meta line", async () => {

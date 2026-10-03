@@ -11,7 +11,10 @@ import { Sheet, SheetContent, SheetTitle } from "./sheet";
  */
 describe("Sheet", () => {
   it("renders the default Base UI overlay treatment", () => {
-    render(
+    // The sheet renders through a portal, so its nodes are siblings of the
+    // render container, not descendants: `baseElement` is the handle that
+    // covers both, where `container` would miss them entirely.
+    const { baseElement } = render(
       <Sheet open>
         <SheetContent>
           <SheetTitle>Test sheet</SheetTitle>
@@ -19,7 +22,7 @@ describe("Sheet", () => {
       </Sheet>,
     );
 
-    const overlay = document.querySelector('[data-slot="sheet-overlay"]');
+    const overlay = baseElement.querySelector('[data-slot="sheet-overlay"]');
     expect(overlay).not.toBeNull();
     expect(overlay).toHaveClass("bg-black/10");
     expect(overlay).toHaveClass("supports-backdrop-filter:backdrop-blur-xs");
@@ -33,7 +36,7 @@ describe("Sheet", () => {
    * instead, and a leftover full height would run it under the header again.
    */
   it("clears the app header at the top", () => {
-    render(
+    const { baseElement } = render(
       <Sheet open>
         <SheetContent>
           <SheetTitle>Test sheet</SheetTitle>
@@ -41,11 +44,11 @@ describe("Sheet", () => {
       </Sheet>,
     );
 
-    const overlay = document.querySelector('[data-slot="sheet-overlay"]');
+    const overlay = baseElement.querySelector('[data-slot="sheet-overlay"]');
     expect(overlay).toHaveClass("top-header");
     expect(overlay).not.toHaveClass("inset-0");
 
-    const content = document.querySelector('[data-slot="sheet-content"]');
+    const content = baseElement.querySelector('[data-slot="sheet-content"]');
     expect(content).toHaveAttribute("data-side", "right");
     expect(content).toHaveClass("data-[side=right]:top-header");
     expect(content).toHaveClass("data-[side=right]:bottom-0");

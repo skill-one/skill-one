@@ -63,10 +63,12 @@ describe("CollapsibleSection", () => {
 
     // The chevron's state class rides the Collapsible root's data-open
     // attribute: down 90° while open, the class present from first paint.
-    const chevron = document.querySelector("svg.lucide-chevron-right");
+    // Scoped to the trigger that owns it, rather than the whole document.
+    const trigger = screen.getByRole("button", { name: /今天/ });
+    const chevron = trigger.querySelector("svg");
     expect(chevron).toHaveClass("group-data-[open]/section:rotate-90");
 
-    await user.click(screen.getByRole("button", { name: /今天/ }));
+    await user.click(trigger);
     // Folded: the trigger flips its state and the body leaves the view, but
     // the count stays on the header so the folded section states its size.
     expect(screen.getByRole("button", { name: /今天/ })).toHaveAttribute(
@@ -90,7 +92,11 @@ describe("CollapsibleSection", () => {
     // The glyph is decorative: the title still names the section. (The
     // accessible name carries no whitespace between the title span and the
     // badge.)
-    expect(document.querySelector("svg.lucide-hard-drive")).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("button", { name: /今天\s*3 个 skill/ })
+        .querySelector("svg.lucide-hard-drive"),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /今天\s*3 个 skill/ }),
     ).toBeInTheDocument();

@@ -50,8 +50,11 @@ jobs:
       - name: Lint (type-aware)
         run: pnpm lint:types
 
+      # `test:coverage`, not `test:run`: the run is what enforces the
+      # thresholds in `vite.config.ts`. Plain `vitest run` passes even when
+      # coverage has fallen off a cliff, which makes the thresholds decorative.
       - name: Test
-        run: pnpm test:run
+        run: pnpm test:coverage
 
   # The commands in src-tauri are only exercised at runtime by the app, so a
   # signature or handler-list mistake would otherwise surface at release time.

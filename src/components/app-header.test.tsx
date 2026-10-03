@@ -36,11 +36,14 @@ function renderHeader(route = "/") {
   );
 }
 
-/** The header element itself, which is what the row and its drag region are about. */
+/**
+ * The header element itself, which is what the row and its drag region are
+ * about. A top-level `<header>` maps to the `banner` role, so this is a
+ * semantic query rather than a `document.querySelector("header")` that would
+ * reach past the render into whatever else the document holds.
+ */
 function header(): HTMLElement {
-  const element = document.querySelector("header");
-  if (!element) throw new Error("no header rendered");
-  return element;
+  return screen.getByRole("banner");
 }
 
 describe("AppHeader", () => {

@@ -187,7 +187,11 @@ const cardOrder = () =>
     .map((el) => el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""));
 
 /** The repository cards mounted under a scope, by the `data-repo` each Card
- *  carries — the stable fact every card has, expandable or not. */
+ *  carries — the stable fact every card has, expandable or not. The default
+ *  scope is the document body because the cards render inside the sheet's
+ *  portal, which is a sibling of the render container rather than a descendant
+ *  of it; a caller holding a container passes it when it knows the cards are
+ *  still in the tree. */
 const repoCards = (scope: ParentNode = document.body) =>
   scope.querySelectorAll('[data-slot="card"][data-repo]');
 
@@ -274,7 +278,7 @@ describe("ExplorePage", () => {
     const picker = await screen.findByRole("button", { name: "分类" });
     // It narrows the list it sits on, so it opens the list's own content
     // rather than sharing the shell's row with the controls both lists use.
-    expect(document.querySelector("header")?.contains(picker)).toBe(false);
+    expect(screen.queryByRole("banner")?.contains(picker)).toBe(false);
   });
 
   it("leads the repository view with one card per repository", async () => {
@@ -741,7 +745,7 @@ describe("ExplorePage", () => {
     // headers over it — and the reveal paces that grid: the first chunk mounts
     // with the page, scrolling to the sentinel mounts the rest.
     bootGadgetRegistry();
-    renderExplorePage();
+    const { container } = renderExplorePage();
 
     const cardCount = () => repoCards().length;
     const triggerSentinel = () =>
@@ -756,9 +760,10 @@ describe("ExplorePage", () => {
     // Only the first chunk mounts at first, in one flat grid.
     await screen.findByText("gadget-master");
     expect(cardCount()).toBe(6);
-    expect(document.querySelector("ul.grid")).toBeInTheDocument();
-    // No group sections anywhere: the ranking is the only order.
-    expect(document.querySelector("section[aria-label]")).toBeNull();
+    expect(container.querySelector("ul.grid")).toBeInTheDocument();
+    // No group sections anywhere: the ranking is the only order. Scoped to the
+    // render, so a section appearing outside it would not slip past.
+    expect(container.querySelector("section[aria-label]")).toBeNull();
 
     // Revealing to the bottom mounts every card, keeping each one once.
     await waitFor(() => {
@@ -918,13 +923,15 @@ describe("ExplorePage", () => {
   it("closes the panel via the overlay and Escape", async () => {
     const user = userEvent.setup();
     bootRegistry(50);
-    renderExplorePage();
+    // The overlay is portalled out of the render container, so reaching it
+    // takes `baseElement`.
+    const { baseElement } = renderExplorePage();
     await screen.findByText("skill-0");
 
     // Clicking the overlay closes the drawer.
     await user.click(screen.getByText("skill-0"));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    await user.click(document.querySelector('[data-slot="sheet-overlay"]')!);
+    await user.click(baseElement.querySelector('[data-slot="sheet-overlay"]')!);
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );

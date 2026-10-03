@@ -64,14 +64,16 @@ describe("SearchInput", () => {
   });
 
   it("leaves the keyboard alone — there is no shortcut to the field", () => {
-    renderSearchField({ value: "pdf" });
+    const { container } = renderSearchField({ value: "pdf" });
     const field = screen.getByLabelText("搜索 Skill");
 
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
 
     expect(field).not.toHaveFocus();
-    expect(document.querySelector("kbd")).toBeNull();
+    // Scoped to what this component rendered, so the claim is about the
+    // field's own output rather than about whatever the document holds.
+    expect(container.querySelector("kbd")).toBeNull();
   });
 
   it("takes the size the row gives it", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach, vi } from "vitest";
+import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 
@@ -11,15 +11,26 @@ import { AgentGraph, HOVER_MS } from "./agent-graph";
 // The icon dataset is a runtime fetch; these are graph-behavior tests, so
 // every node resolves to no candidates and draws its Bot fallback — except
 // where a test overrides the mock to exercise a resolved icon.
-const useAgentIconMock = vi.hoisted(() =>
-  vi.fn(
-    (): {
+//
+// The default is re-armed in `beforeEach` and wiped in `afterEach` rather than
+// restored at the end of the one test that overrides it: a reset that lives
+// inside a test body is skipped the moment an assertion above it fails, and the
+// leaked mock then cascades into every test that follows.
+const { useAgentIconMock, NO_ICON } = vi.hoisted(() => {
+  const noIcon = {
+    candidates: [] as string[],
+    mono: false,
+    ground: undefined as "dark" | "light" | undefined,
+  };
+  return {
+    NO_ICON: noIcon,
+    useAgentIconMock: vi.fn((): {
       candidates: string[];
       mono: boolean;
       ground?: "dark" | "light";
-    } => ({ candidates: [], mono: false, ground: undefined }),
-  ),
-);
+    } => ({ ...noIcon })),
+  };
+});
 vi.mock("../../hooks/use-agent-icons", () => ({
   useAgentIcon: useAgentIconMock,
 }));
@@ -46,7 +57,12 @@ const agents: AgentStatus[] = [
   agent({ name: "windsurf", display: "Windsurf", canonical: true }),
 ];
 
+beforeEach(() => {
+  useAgentIconMock.mockImplementation(() => ({ ...NO_ICON }));
+});
+
 afterEach(() => {
+  useAgentIconMock.mockReset();
   resetMockAgentStatus();
   window.localStorage.clear();
 });
@@ -58,6 +74,13 @@ async function hoverAgent(
 ) {
   await user.hover(screen.getByRole("button", { name }));
 }
+
+/**
+ * The jar's accessible name. It is a `figure` labelled by
+ * `agents.hub.diskAria`, so tests reach it by role + name — no test id, and
+ * the same pairing is what makes the label reach a screen reader.
+ */
+const HUB = /共享中心/;
 
 describe("AgentGraph", () => {
   it("draws one quiet ribbon per agent, classified by its link state", () => {
@@ -228,12 +251,6 @@ describe("AgentGraph", () => {
     expect(tile.className).toContain("rounded-[22.5%]");
     expect(tile.className).not.toContain("rounded-full");
     expect(tile.querySelector("img")).toBeInTheDocument();
-    useAgentIconMock.mockClear();
-    useAgentIconMock.mockImplementation(() => ({
-      candidates: [],
-      mono: false,
-      ground: undefined,
-    }));
   });
 
   it("dims an unlinked agent's face so it reads as switched off", () => {
@@ -299,7 +316,7 @@ describe("AgentGraph", () => {
     // The jar states its one figure in its own border line — the legend —
     // and nothing else; the attention count rides the corner only when
     // something needs it. The browse/manage routes are deliberately absent.
-    const disk = await screen.findByTestId("agent-hub");
+    const disk = await screen.findByRole("figure", { name: HUB });
     expect(disk).toHaveTextContent("6 个 skills");
     expect(disk).toHaveTextContent("1 个待处理");
     expect(screen.queryByRole("link", { name: "商店" })).toBeNull();
@@ -333,7 +350,7 @@ describe("AgentGraph", () => {
     // before reading it.
     const disk = await waitFor(() => {
       // Both conditions together: a jar holding exactly pdf.
-      const el = screen.getByTestId("agent-hub");
+      const el = screen.getByRole("figure", { name: HUB });
       expect(el.querySelector('[data-skill="pdf"]')).not.toBeNull();
       expect(el.querySelector('[data-skill="docx"]')).toBeNull();
       return el;
@@ -358,11 +375,15 @@ describe("AgentGraph", () => {
 
     await waitFor(() => {
       expect(
-        document.querySelector('[data-testid="agent-hub"] [data-skill="docx"]'),
+        screen
+          .getByRole("figure", { name: HUB })
+          .querySelector('[data-skill="docx"]'),
       ).not.toBeNull();
     });
     expect(
-      document.querySelector('[data-testid="agent-hub"] [data-skill="pdf"]'),
+      screen
+        .getByRole("figure", { name: HUB })
+        .querySelector('[data-skill="pdf"]'),
     ).not.toBeNull();
   });
 });

@@ -46,14 +46,21 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html", "lcov"],
       // Measure what ships: pages, components, hooks and lib. Test files, the
-      // setup helpers, type-only modules and the browser mock (a test double,
-      // never shipped) are not the subject.
+      // setup helpers and type-only modules are not the subject.
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
         "**/*.test.{ts,tsx}",
         "**/src/test/**",
         "**/src/types/**",
+        // A test double, but not an unshipped one: `lib/local-skills`
+        // imports it statically and serves the browser build through it
+        // whenever `isTauri()` is false, so the `else` arms it backs are real
+        // shipped code. Excluding it keeps the report about the app rather
+        // than about its stand-in for the Rust backend — the Tauri branch it
+        // shadows is what `lib/skills-manager.test.ts` and the command tests
+        // in `src-tauri` cover instead.
         "**/src/lib/mock-local.ts",
+        // Types only; emits no runtime code to cover.
         "**/src/lib/registry/protocol.ts",
       ],
       thresholds: {
