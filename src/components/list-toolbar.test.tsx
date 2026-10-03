@@ -34,11 +34,23 @@ function renderRow(props: Partial<Parameters<typeof ListToolbar>[0]> = {}) {
   return renderWithRouter(row(props));
 }
 
-/** The trailing cluster, where the two switches are docked. */
-function cluster(): HTMLElement {
+/** The trailing group, where the two switches a live search overrides are docked. */
+function docked(): HTMLElement {
   const element = screen.getByRole("button", { name: "排序方式" }).parentElement;
-  if (!element) throw new Error("no cluster rendered");
+  if (!element) throw new Error("no trailing group rendered");
   return element;
+}
+
+/** The shape switch's own group, which stands in the row rather than in `docked`. */
+function shapeSwitch(): HTMLElement {
+  return screen.getByRole("group", { name: "列表布局" });
+}
+
+/** Whether `after` sits later in the document than `before`. */
+function standsAfter(before: HTMLElement, after: HTMLElement): boolean {
+  return Boolean(
+    before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING,
+  );
 }
 
 beforeEach(() => {
@@ -47,58 +59,61 @@ beforeEach(() => {
 });
 
 describe("ListToolbar", () => {
-  it("reads left to right as the reading does: query, scope, order", () => {
+  it("leads with the field and the shape, then docks the two a search overrides", () => {
     renderRow();
 
     const field = screen.getByLabelText("搜索 Skill");
+    const shape = screen.getByRole("button", { name: "列表" });
     const picker = screen.getByRole("button", { name: "分类" });
     const sort = screen.getByRole("button", { name: "排序方式" });
 
-    // Search names what the reader wants, the picker narrows the answer, the
-    // switch says what order it reads in — the pipeline in that order, with the
-    // field on the leading edge and the two view controls docked to the
-    // trailing one, which is where list toolbars put them everywhere.
-    expect(
-      field.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      picker.compareDocumentPosition(sort) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    // Left to right the row reads: the field names what the reader wants, the
+    // shape says what that answer is made of — the two a live search still
+    // answers into, which is why they keep the field's company. The scope and
+    // the order, the two a search overrides, follow as their own group.
+    expect(standsAfter(field, shape)).toBe(true);
+    expect(standsAfter(shape, picker)).toBe(true);
+    expect(standsAfter(picker, sort)).toBe(true);
   });
 
-  it("stands the three as one tight group, and leaves the slack over", () => {
+  it("leads with a tight field-and-shape group and anchors the other pair to the far edge", () => {
     renderRow();
 
     // The field takes the same `max-w-sm` box the component library caps its
-    // own fields at, and the two facts about the answer stand right beside it —
-    // one cluster, read as a single toolbar, with the row's slack left over.
-    // Nothing here invents a width: the input's own `w-full` does the filling.
+    // own fields at, with the shape at its own width right beside it, and the
+    // scope and the order are pushed out by `ml-auto` — the arrangement every
+    // list toolbar settles on (MUI's density and columns, Ant's 列设置,
+    // Airtable's sort and view options), rather than the one tight leading
+    // cluster that left the row's slack after it.
     expect(screen.getByLabelText("搜索 Skill").parentElement).toHaveClass(
       "w-full",
       "max-w-sm",
     );
-    // Nothing pushes the pair to the far edge: that is the arrangement this row
-    // deliberately does not take, and `ml-auto` is how it would be taken.
-    expect(cluster()).not.toHaveClass("ml-auto");
-    expect(cluster().parentElement).toBe(
+    expect(shapeSwitch().parentElement).toBe(
       screen.getByLabelText("搜索 Skill").parentElement?.parentElement,
     );
+    expect(docked()).toHaveClass("ml-auto");
+    expect(docked().parentElement).toBe(
+      screen.getByLabelText("搜索 Skill").parentElement?.parentElement,
+    );
+    expect(docked()).not.toContainElement(shapeSwitch());
   });
 
-  it("never lets the two view controls be the ones squeezed", () => {
+  it("never lets the three switches be the ones squeezed", () => {
     renderRow();
 
     // On a narrow window the field gives way before the switches do — they are
     // two short words, and a truncated "排序方…" is worse than a shorter field.
-    for (const name of ["分类", "排序方式"]) {
+    for (const name of ["列表", "分类", "排序方式"]) {
       expect(screen.getByRole("button", { name })).toHaveClass("shrink-0");
     }
-    expect(cluster()).toHaveClass("shrink-0");
+    expect(shapeSwitch()).toHaveClass("shrink-0");
+    expect(docked()).toHaveClass("shrink-0");
   });
 
   it("locks the other two while a search is live, and leaves the row standing", () => {
     const { rerender } = renderRow();
-    const before = cluster().parentElement;
+    const before = docked().parentElement;
 
     // A row that emptied itself on the first keystroke would pull the field out
     // from under the reader's cursor, so the other two say so where they stand:
@@ -107,7 +122,7 @@ describe("ListToolbar", () => {
 
     expect(screen.getByRole("button", { name: "分类" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "排序方式" })).toBeDisabled();
-    expect(cluster().parentElement).toBe(before);
+    expect(docked().parentElement).toBe(before);
   });
 
   it("keeps the field open under a live search — it is what is answering", () => {
@@ -167,7 +182,7 @@ describe("ListToolbar", () => {
     expect(screen.getByRole("group", { name: "列表布局" })).toBeInTheDocument();
   });
 
-  it("reads the shape as its own answer, and keeps the order beside it", async () => {
+  it("reads the shape as its own answer, whichever way the row is arranged", async () => {
     const user = userEvent.setup();
     renderRow();
 

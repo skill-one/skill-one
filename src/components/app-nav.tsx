@@ -56,8 +56,9 @@ function belongsTo(roots: readonly string[], pathname: string): boolean {
 }
 
 /**
- * The app's navigation: the three destinations as one segmented control in the
- * window's header, beside the brand.
+ * The app's navigation: the three destinations as one segmented control at the
+ * leading edge of the window's header, opposite the settings and under the
+ * centred brand.
  *
  * A small, fixed set of peer places is the case this shape is for: macOS puts
  * them in a toolbar segmented control (the toolbar style of
@@ -70,7 +71,7 @@ function belongsTo(roots: readonly string[], pathname: string): boolean {
  * the brand alone. Two entries are named by their word (商店 · 已安装); the home
  * is a mark, because its word would name a role rather than a place and a
  * compact mark keeps the row short — the word rides its accessible name and
- * hover tip instead, the arrangement `DrillDownHead` uses for the same reason.
+ * hover tip instead, a mark carrying its name rather than a word naming a role.
  *
  * Links rather than a toggle group: these are places, with history and a reader
  * who can arrive on a page inside one — so the active state says
