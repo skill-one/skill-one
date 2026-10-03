@@ -26,10 +26,10 @@ export const SKILLS_CHANGED_EVENT = "skills-changed";
 export const INSTALLED_PATH = "/installed";
 
 /**
- * Deep link into the installed page with the search box pre-filled with
- * `name`, so the clicked skill ranks near the top of the filtered list (its
- * name is the whole query) and the box stays editable.
+ * Deep link onto the search page with the question in its URL, so the clicked
+ * skill ranks near the top of the answer (its name is the whole query) and the
+ * header's box stays editable.
  */
 export function skillPath(name: string): string {
-  return `${INSTALLED_PATH}?skill=${encodeURIComponent(name)}`;
+  return `/search?q=${encodeURIComponent(name)}`;
 }

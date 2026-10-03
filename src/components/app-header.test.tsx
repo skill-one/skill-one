@@ -17,9 +17,12 @@ beforeEach(() => {
  * probe that records where the router ended up — the header's own links navigate.
  */
 let currentPath: string;
+let currentSearch: string;
 
 function LocationProbe() {
-  currentPath = useLocation().pathname;
+  const location = useLocation();
+  currentPath = location.pathname;
+  currentSearch = location.search;
   return null;
 }
 
@@ -79,29 +82,26 @@ describe("AppHeader", () => {
     );
   });
 
-  it("closes the row with the settings entry, and holds no field of its own", () => {
+  it("closes the row with the search field and the settings entry", () => {
     renderHeader("/explore");
 
-    // Settings answer to the window, so they are the one action the chrome
-    // keeps. The list's own controls moved down to the list (see
-    // `ListToolbar`), so the row has no input left in it.
+    // The field is here because it answers on every route: it is a jump pad
+    // into the search page from anywhere, not a control for one list.
+    expect(screen.getByLabelText("搜索 Skill")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
-    expect(header().querySelector("input")).toBeNull();
   });
 
-  it("leaves the list's controls to the page", () => {
+  it("leaves the list's own controls to the page", () => {
     renderHeader("/explore");
 
-    // The search field, the scope picker and the sort switch each answer to one
-    // list, so each belongs to the row above that list — not to chrome that is
-    // the same on every route, where they would answer for a list that is not
-    // the one on screen.
-    expect(screen.queryByLabelText("搜索 Skill")).toBeNull();
+    // The scope picker and the sort switch each answer to one list, so each
+    // belongs to the row above that list (see `ListToolbar`) — not to chrome
+    // that is the same on every route.
     expect(screen.queryByRole("button", { name: "分类" })).toBeNull();
     expect(screen.queryByRole("button", { name: "排序方式" })).toBeNull();
   });
 
-  it("keeps the navigation and settings on a page inside a list", () => {
+  it("keeps the navigation, the field and settings on a page inside a list", () => {
     renderHeader("/repo/acme/tools");
 
     // The way out of a drill-down is that page's own head, not the window's
@@ -111,9 +111,44 @@ describe("AppHeader", () => {
     expect(screen.getByRole("link", { name: "商店" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "返回" })).toBeNull();
-    // The field belongs to a list, and this route is inside one rather than
-    // being one — so there is nothing here to search.
-    expect(screen.queryByLabelText("搜索 Skill")).toBeNull();
+    // The field is the window's, so it is here on a drill-down too: the
+    // question it asks is asked of every collection at once.
+    expect(screen.getByLabelText("搜索 Skill")).toBeInTheDocument();
+  });
+
+  it("holds an empty field on a browse route, and the URL's question on the search page", () => {
+    // A browse page holds no question, so its copy of the field is empty…
+    const { unmount } = renderHeader("/explore");
+    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("");
+    unmount();
+
+    // …while on the search page the field mirrors the question in the URL, which
+    // is what makes a search shareable.
+    renderHeader("/search?q=pdf");
+    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
+  });
+
+  it("pushes the search page on the first keystroke, then edits it in place", async () => {
+    const user = userEvent.setup();
+    renderHeader("/explore");
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+    // The first keystroke leaves the browse page for the search page, so the
+    // back button has somewhere to return to; later letters edit that one
+    // question in place rather than opening an entry per keystroke.
+    expect(currentPath).toBe("/search");
+    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
+  });
+
+  it("edits the URL in place on the search page itself, and empties it for no question", async () => {
+    const user = userEvent.setup();
+    renderHeader("/search?q=pdf");
+
+    await user.clear(screen.getByLabelText("搜索 Skill"));
+
+    // An empty question drops the parameter rather than pinning `?q=` to nothing.
+    expect(currentSearch).toBe("");
   });
 
   it("carries the reader between the two lists", async () => {

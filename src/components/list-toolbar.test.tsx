@@ -59,89 +59,42 @@ beforeEach(() => {
 });
 
 describe("ListToolbar", () => {
-  it("leads with the field and the shape, then docks the two a search overrides", () => {
+  it("leads with the shape and docks the reading pair to the far edge", () => {
     renderRow();
 
-    const field = screen.getByLabelText("搜索 Skill");
     const shape = screen.getByRole("button", { name: "列表" });
     const picker = screen.getByRole("button", { name: "分类" });
     const sort = screen.getByRole("button", { name: "排序方式" });
 
-    // Left to right the row reads: the field names what the reader wants, the
-    // shape says what that answer is made of — the two a live search still
-    // answers into, which is why they keep the field's company. The scope and
-    // the order, the two a search overrides, follow as their own group.
-    expect(standsAfter(field, shape)).toBe(true);
+    // Left to right the row reads: the shape says what the answer is made of,
+    // then the scope and the order that say how it is narrowed and which way it
+    // reads — the pair the tools dock to the trailing edge (MUI's density and
+    // columns, Airtable's sort and view options, GitHub's sort on issues).
     expect(standsAfter(shape, picker)).toBe(true);
     expect(standsAfter(picker, sort)).toBe(true);
   });
 
-  it("leads with a tight field-and-shape group and anchors the other pair to the far edge", () => {
+  it("anchors the reading pair to the far edge, clear of the shape", () => {
     renderRow();
 
-    // The field takes the same `max-w-sm` box the component library caps its
-    // own fields at, with the shape at its own width right beside it, and the
-    // scope and the order are pushed out by `ml-auto` — the arrangement every
-    // list toolbar settles on (MUI's density and columns, Ant's 列设置,
-    // Airtable's sort and view options), rather than the one tight leading
-    // cluster that left the row's slack after it.
-    expect(screen.getByLabelText("搜索 Skill").parentElement).toHaveClass(
-      "w-full",
-      "max-w-sm",
-    );
-    expect(shapeSwitch().parentElement).toBe(
-      screen.getByLabelText("搜索 Skill").parentElement?.parentElement,
-    );
+    // The shape keeps its own width on the leading edge, and the scope and the
+    // order are pushed out by `ml-auto` — so the row lands where those toolbars
+    // land instead of trailing slack after one tight cluster.
+    expect(shapeSwitch().parentElement).toBe(docked().parentElement);
     expect(docked()).toHaveClass("ml-auto");
-    expect(docked().parentElement).toBe(
-      screen.getByLabelText("搜索 Skill").parentElement?.parentElement,
-    );
     expect(docked()).not.toContainElement(shapeSwitch());
   });
 
-  it("never lets the three switches be the ones squeezed", () => {
+  it("never lets the switches be squeezed", () => {
     renderRow();
 
-    // On a narrow window the field gives way before the switches do — they are
-    // two short words, and a truncated "排序方…" is worse than a shorter field.
+    // Every switch is two or three short words, and a truncated "排序方…" is
+    // worse than anything else on the row giving ground.
     for (const name of ["列表", "分类", "排序方式"]) {
       expect(screen.getByRole("button", { name })).toHaveClass("shrink-0");
     }
     expect(shapeSwitch()).toHaveClass("shrink-0");
     expect(docked()).toHaveClass("shrink-0");
-  });
-
-  it("locks the other two while a search is live, and leaves the row standing", () => {
-    const { rerender } = renderRow();
-    const before = docked().parentElement;
-
-    // A row that emptied itself on the first keystroke would pull the field out
-    // from under the reader's cursor, so the other two say so where they stand:
-    // the very same elements, in the very same row.
-    rerender(row({ searching: true }));
-
-    expect(screen.getByRole("button", { name: "分类" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "排序方式" })).toBeDisabled();
-    expect(docked().parentElement).toBe(before);
-  });
-
-  it("keeps the field open under a live search — it is what is answering", () => {
-    renderRow({ searching: true });
-
-    // Only the other two stand down: the field is the reader's own, and a
-    // search that locked its own field could not be typed into.
-    expect(screen.getByLabelText("搜索 Skill")).toBeEnabled();
-  });
-
-  it("hands the switches back when the search clears", () => {
-    const { rerender } = renderRow({ searching: true });
-
-    expect(screen.getByRole("button", { name: "分类" })).toBeDisabled();
-
-    rerender(row());
-
-    expect(screen.getByRole("button", { name: "分类" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "排序方式" })).toBeEnabled();
   });
 
   it("holds the scope, the shape and the order in the shared view, not in the row", async () => {
@@ -228,17 +181,6 @@ describe("ListToolbar", () => {
     expect(screen.getByRole("button", { name: "排序方式" })).toBeInTheDocument();
   });
 
-  it("keeps the shape live while a search is live, unlike the scope", () => {
-    renderRow({ searching: true });
-
-    // A search answers in sections and those sections are read in the shape the
-    // reader chose, so that choice is honoured while a query is live — and the
-    // switch that carries it stays open.
-    expect(screen.getByRole("button", { name: "分类" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "排序方式" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "卡片" })).toBeEnabled();
-  });
-
   it("keeps each list's own scope, shape and order to itself", async () => {
     const user = userEvent.setup();
     const { unmount } = renderRow();
@@ -273,20 +215,4 @@ describe("ListToolbar", () => {
     expect(screen.getByRole("button", { name: "分类" })).toBeInTheDocument();
   });
 
-  it("locks the store's field until the index over the registry is ready", () => {
-    registrySnapshot.ready = false;
-    renderRow({ destination: "store", sorts: ["popularity"] });
-
-    // A query must never be answered over a partially downloaded registry, and
-    // the field says why it is closed instead of sitting there mute.
-    expect(screen.getByLabelText("搜索 Skill")).toBeDisabled();
-    expect(screen.getByPlaceholderText("索引构建中…")).toBeInTheDocument();
-  });
-
-  it("leaves the installed list's field open — that list is already in memory", () => {
-    registrySnapshot.ready = false;
-    renderRow();
-
-    expect(screen.getByLabelText("搜索 Skill")).toBeEnabled();
-  });
 });

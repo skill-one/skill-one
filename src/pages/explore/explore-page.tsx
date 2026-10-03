@@ -5,8 +5,7 @@ import { useRepoSections } from "../../hooks/use-repo-sections";
 import { useViewMemory } from "../../hooks/use-view-memory";
 import { skillKey } from "../../lib/skill-view";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
-import { useDebouncedValue } from "../../hooks/use-debounced-value";
-import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
+import { useDestinationView } from "../../hooks/use-list-view";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import { LIST_SORTS } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
@@ -24,7 +23,6 @@ import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-dr
 import { Placeholder } from "../../components/placeholder";
 import { SkillRow } from "./skill-row";
 import { RepoCard } from "./repo-card";
-import { SearchResults } from "./search-results";
 
 /**
  * The skill unit's order: most installed first, then by source and name —
@@ -92,24 +90,18 @@ export function ExplorePage() {
   // are read from the shared view rather than held here. The shape and the order
   // are two answers again — the store's list is one of skill rows or of
   // repository cards, read in the one order a list of skills can be read in.
-  const search = useListQuery();
   const {
     scope,
     sort = "popularity",
     unit = "skill",
   } = useDestinationView("store");
-  // The filter is a browse control: a search re-orders the whole registry by
-  // relevance, so it ignores the filter (and the filter bar locks).
   const selectedDomain = scope ?? null;
-
-  const query = useDebouncedValue(search).trim();
-  const isSearching = query.length > 0;
 
   // The answer this page is showing, named by the controls that produced it.
   // The depth below is remembered against it: the controls can re-answer the
   // list without the page ever being unmounted, and a depth revealed for one
   // answer is not a place the reader is at under another.
-  const signature = `${query}\u0000${unit}\u0000${sort}\u0000${selectedDomain ?? "all"}`;
+  const signature = `${unit}\u0000${sort}\u0000${selectedDomain ?? "all"}`;
 
   // How deep the list had been revealed, remembered per history entry: a
   // drill-down — into a repository's page and back — unmounts this page, and
@@ -131,14 +123,14 @@ export function ExplorePage() {
   // It is both the filter's facet set (a domain, and how many repositories it
   // holds) and, when one is chosen, that domain's own list. A search's answer
   // is not fetched here — the shared search view fetches for itself (see
-  // `SearchResults`), so browse and search never fetch together.
+  // `SearchResults`).
   const {
     data: sectionsData,
     isLoading: sectionsLoading,
     isError: sectionsError,
     error: sectionsErrorObj,
     refetch: refetchSections,
-  } = useRepoSections(!isSearching);
+  } = useRepoSections();
 
   // The browse list: the chosen domain's repositories, or — with no filter —
   // every domain's, re-filed into one ranking. A repository's leading domain is
@@ -200,11 +192,7 @@ export function ExplorePage() {
   // A download failure only owns the screen while there is nothing to show;
   // with data on screen (cache / previous source) the error surfaces in the
   // footer count instead of blanking the page.
-  const activeError = isSearching
-    ? null
-    : sectionsError
-      ? sectionsErrorObj
-      : null;
+  const activeError = sectionsError ? sectionsErrorObj : null;
   const failure =
     stats.count === 0 && !stats.complete
       ? (stats.error ??
@@ -212,8 +200,7 @@ export function ExplorePage() {
       : null;
 
   // How many entries the browse answer lists, and how many are revealed: one
-  // skill, or one repository card. A search does not reveal — the unified
-  // search view renders its whole answer.
+  // skill, or one repository card.
   const itemCount =
     unit === "skill" ? activeSkills.length : browseRepos.length;
   const renderedCount = Math.min(visibleCount, itemCount);
@@ -291,19 +278,18 @@ export function ExplorePage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
       {/* The list's own first row, and the only row above the answer: the
-          search field, the domain picker that scopes the list (全部 clears it),
-          and the sort switch that says what order — and which shape — it reads
-          in. All three read and write the shared view, so what they leave behind
-          is still here on the way back. The page hands the row its counts and
-          whether a query is live; the row's own arrangement is `ListToolbar`'s
-          to answer. The counts follow the unit the sort implies: the repository
-          unit weighs a domain by repositories, the skill unit by skills. */}
+          domain picker that scopes the list (全部 clears it), the shape switch,
+          and the sort switch that says what order it reads in. All three read
+          and write the shared view, so what they leave behind is still here on
+          the way back. The page hands the row its counts; the row's own
+          arrangement is `ListToolbar`'s to answer. The counts follow the unit
+          the sort implies: the repository unit weighs a domain by repositories,
+          the skill unit by skills. */}
       <ListToolbar
         destination="store"
         facets={facets}
         total={totalCount}
         sorts={LIST_SORTS.store}
-        searching={isSearching}
       />
 
       {/* The list; the modal detail drawer overlays it without reflowing it or
@@ -337,20 +323,6 @@ export function ExplorePage() {
                   {t("action.retry")}
                 </Button>
               </Placeholder>
-            ) : isSearching ? (
-              // The search answer: two sections — what the store's own index
-              // carries, what skills.sh answers live — one shared
-              // implementation both searchable lists render (see
-              // `SearchResults`). The store never lists what this machine
-              // happens to have installed: an already-installed row wears the
-              // install badge instead. Keyed by the answer's definition, so no
-              // stale selection survives into a differently-shaped answer.
-              <SearchResults
-                key={`${unit}:${query}`}
-                unit={unit}
-                query={query}
-                destination="store"
-              />
             ) : loading ? (
               // A viewport's worth of card- or row-shaped skeletons, per the
               // unit: switching to this page paints its final layout instantly
@@ -370,9 +342,7 @@ export function ExplorePage() {
               />
             ) : itemCount === 0 ? (
               <Placeholder
-                message={
-                  query ? t("state.noMatch", { query }) : t("state.noSkills")
-                }
+                message={t("state.noSkills")}
               />
             ) : (
               <div

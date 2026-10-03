@@ -134,7 +134,7 @@ describe("App routing", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps one search across both lists", async () => {
+  it("answers the header's question on the search page, and keeps it in the URL", async () => {
     const user = userEvent.setup();
     render(
       <I18nProvider>
@@ -142,24 +142,25 @@ describe("App routing", () => {
       </I18nProvider>,
     );
 
-    // The home's field is the store's, and the store's index is not ready in
-    // this test, so open the installed list — whose field is always open —
-    // and type there: the question follows the reader between the lists.
-    await user.click(screen.getByRole("link", { name: /^已安装$/ }));
-    await user.type(await screen.findByLabelText("搜索 Skill"), "pdf");
+    // The header's field is a jump pad: the first keystroke leaves the home for
+    // the search page and carries the question into its URL.
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
-    await user.click(screen.getByRole("link", { name: /商店/ }));
-    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
-
-    await user.click(screen.getByRole("link", { name: /^已安装$/ }));
-
-    // Still the reader's question, and live on the list it was typed on: the
-    // installed list answers it. The page debounces the field it reads, so the
-    // answer lands a beat after the value does.
-    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
     await waitFor(() =>
-      expect(screen.queryByText("docx")).not.toBeInTheDocument(),
+      expect(window.location.hash).toContain("/search?q=pdf"),
     );
-    expect(screen.getByText("pdf")).toBeInTheDocument();
+    // Typing does not spam the history: the field keeps editing the one
+    // question in place rather than pushing an entry per letter.
+    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
+
+    // The installed list is a pure browse surface: it holds no question, so
+    // arriving there leaves the search behind rather than answering it. (What
+    // the field does with the draft it carried is `AppHeader`'s own business,
+    // asserted there.)
+    await user.click(screen.getByRole("link", { name: /^已安装$/ }));
+
+    await waitFor(() =>
+      expect(window.location.hash).toContain("/installed"),
+    );
   });
 });

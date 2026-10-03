@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getListView,
   resetListView,
-  setQuery,
   setScope,
   setSort,
   setUnit,
@@ -21,23 +20,13 @@ describe("list view", () => {
     return import("./list-view");
   };
 
-  it("starts with one empty query and both lists answering by popularity", () => {
+  it("starts with both lists answering by popularity", () => {
     // The default stays absent from the view, so a fresh list reads exactly
-    // as it did before the sort control existed.
+    // as it did before the sort control existed. There is no query here at all:
+    // the question lives in the search page's URL (see `components/app-header`).
     expect(getListView()).toEqual({
-      query: "",
       views: { store: {}, installed: {} },
     });
-  });
-
-  it("holds one query, not one per list", () => {
-    setQuery("pdf");
-
-    // Both lists read the same field, so both get the same answer to it — that
-    // is the whole point of the shared query.
-    expect(getListView().query).toBe("pdf");
-    expect(getListView().views.store).not.toHaveProperty("query");
-    expect(getListView().views.installed).not.toHaveProperty("query");
   });
 
   it("keeps each list's scope to itself, and clears one with null", () => {
@@ -146,25 +135,22 @@ describe("list view", () => {
     const listener = vi.fn();
     const unsubscribe = subscribeListView(listener);
 
-    setQuery("pdf");
+    setUnit("store", "repo");
     expect(listener).toHaveBeenCalledTimes(1);
-    setQuery("pdf");
+    setUnit("store", "repo");
     expect(listener).toHaveBeenCalledTimes(1);
 
-    setUnit("store", "repo");
+    setScope("store", "development");
+    expect(listener).toHaveBeenCalledTimes(2);
+    setScope("store", "development");
     expect(listener).toHaveBeenCalledTimes(2);
 
-    setScope("store", "development");
-    expect(listener).toHaveBeenCalledTimes(3);
-    setScope("store", "development");
-    expect(listener).toHaveBeenCalledTimes(3);
-
     setSort("store", "popularity");
-    expect(listener).toHaveBeenCalledTimes(4);
+    expect(listener).toHaveBeenCalledTimes(3);
 
     unsubscribe();
     resetListView();
-    expect(listener).toHaveBeenCalledTimes(4);
+    expect(listener).toHaveBeenCalledTimes(3);
   });
 
   it("leaves the list that did not change referentially stable", () => {
@@ -172,7 +158,6 @@ describe("list view", () => {
 
     setUnit("store", "repo");
     setScope("store", "development");
-    setQuery("pdf");
 
     // A control re-renders on every change; a list whose own view did not move
     // must not re-render its readers with it.
