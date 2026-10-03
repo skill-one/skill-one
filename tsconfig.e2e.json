@@ -1,0 +1,20 @@
+{
+  // The Playwright specs run in a browser, so they need the DOM lib — unlike
+  // `vite.config.ts` and `playwright.config.ts`, which run in Node. Keeping
+  // them in a separate project is what stops the two environments' globals
+  // from leaking into each other's type checking: with one shared config, either
+  // `window` is undefined in the specs or `process` is undefined in the
+  // configs, and the fix is always to loosen something.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["e2e/**/*.ts"]
+}

@@ -17,8 +17,7 @@
     "types": ["node"]
   },
   // `vite.config.ts` carries the coverage thresholds, `playwright.config.ts`
-  // the E2E server and browser settings, and `e2e/` the specs themselves — all
-  // TypeScript nothing else compiles, so they are typechecked here rather than
-  // left to rot unnoticed.
-  "include": ["vite.config.ts", "playwright.config.ts", "e2e/**/*.ts"]
+  // the E2E server and browser settings. Both run in Node, so both are checked
+  // here. The E2E specs are browser code and live in `tsconfig.e2e.json`.
+  "include": ["vite.config.ts", "playwright.config.ts"]
 }
