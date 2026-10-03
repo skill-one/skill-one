@@ -3,6 +3,7 @@ import type {
   GroupsData,
   GroupsRequest,
   IndexInfo,
+  NamesakesData,
   RegistryWorkerMessage,
   RepoSectionsData,
   RevalidateResult,
@@ -117,6 +118,7 @@ function request(
     | "getGroups"
     | "getRepoSections"
     | "lookupSkills"
+    | "namesakes"
     | "revalidate",
   payload?: unknown,
 ): Promise<unknown> {
@@ -179,6 +181,19 @@ export function lookupSkills(refs: SkillRef[]): Promise<{
   return request("lookupSkills", { refs }) as Promise<{
     entries: Array<Skill | null>;
   }>;
+}
+
+/**
+ * Every registry entry filed under each requested name, in request order
+ * (empty for a name the registry does not list).
+ *
+ * The one batched way to ask "which repos publish a skill called exactly
+ * this?" — a question the association pass asks about every unlinked skill at
+ * once, and which a name search answers only by discarding most of its hits.
+ * Answers empty until the dataset settles, like `searchSkills`.
+ */
+export function namesakeSkills(names: string[]): Promise<NamesakesData> {
+  return request("namesakes", { names }) as Promise<NamesakesData>;
 }
 
 /**

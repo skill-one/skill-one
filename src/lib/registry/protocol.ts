@@ -32,6 +32,20 @@ export interface GroupsRequest {
 }
 
 /**
+ * The answer to a batched exact-slug lookup — the association pass's namesake
+ * step: one entry per requested name, in request order, holding every registry
+ * entry filed under exactly that name (empty for a name the registry does not
+ * list).
+ *
+ * An array rather than a lookup table because this crosses the boundary as
+ * plain JSON: the caller lines the answers up against the names it sent, the
+ * same way `lookupSkills` reports per-ref misses.
+ */
+export interface NamesakesData {
+  entries: Skill[][];
+}
+
+/**
  * One group of the grouped answer: a repository bucket and the skills inside
  * it, with the display facts its card shows.
  */
@@ -145,7 +159,8 @@ export type RegistryQuery =
   | { type: "searchSkills"; id: number; payload: { query: string } }
   | { type: "getGroups"; id: number; payload: GroupsRequest }
   | { type: "getRepoSections"; id: number }
-  | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } };
+  | { type: "lookupSkills"; id: number; payload: { refs: SkillRef[] } }
+  | { type: "namesakes"; id: number; payload: { names: string[] } };
 
 /** Everything the main thread can send the worker. */
 export type RegistryRequest = RegistryCommand | RegistryQuery;
