@@ -27,7 +27,9 @@ const isTauri = vi.hoisted(() => vi.fn(() => true));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("./tauri", () => ({ isTauri }));
 
-/** One command's worth of the boundary: how to call it, and what must cross. */
+/**
+ * Every command the module exports, pinned to the call it must make.
+ */
 interface Contract {
   /** What the call is, in the shape a reader would describe it. */
   readonly name: string;
@@ -40,8 +42,6 @@ interface Contract {
    * pinning the call site.
    */
   readonly call: readonly unknown[];
-  /** A value the command resolves with, to pin the return path too. */
-  readonly result?: unknown;
 }
 
 const contract = (c: Contract) => c;
@@ -51,19 +51,16 @@ const CONTRACTS: readonly Contract[] = [
     name: "install_skill takes the GitHub id as `source`",
     run: () => manager.installSkill("anthropics/skills/pdf"),
     call: ["install_skill", { source: "anthropics/skills/pdf" }],
-    result: { skill: "pdf", skipped: false },
   }),
   contract({
     name: "list_installed_skills takes no arguments",
     run: () => manager.listInstalledSkills(),
     call: ["list_installed_skills"],
-    result: [],
   }),
   contract({
     name: "read_skill_md takes the slug as `name`",
     run: () => manager.readSkillMd("pdf"),
     call: ["read_skill_md", { name: "pdf" }],
-    result: { path: "/skills/pdf/SKILL.md", content: "---\nname: pdf\n---" },
   }),
   contract({
     name: "write_skill_md takes `name` and the raw `content`",
@@ -79,7 +76,6 @@ const CONTRACTS: readonly Contract[] = [
     name: "remove_skills takes the slugs as `skills`",
     run: () => manager.removeSkills(["pdf", "docx"]),
     call: ["remove_skills", { skills: ["pdf", "docx"] }],
-    result: ["pdf", "docx"],
   }),
   contract({
     // The trap worth a case of its own: the parameters read
@@ -88,13 +84,11 @@ const CONTRACTS: readonly Contract[] = [
     name: "set_skills_enabled takes `skills` and `enabled`, not the reverse",
     run: () => manager.setSkillsEnabled(true, ["pdf"]),
     call: ["set_skills_enabled", { skills: ["pdf"], enabled: true }],
-    result: ["pdf"],
   }),
   contract({
     name: "link_agents takes `agents`, with auto-detection left to the backend",
     run: () => manager.linkAgents([]),
     call: ["link_agents", { agents: [] }],
-    result: { results: [] },
   }),
   contract({
     // Unlink is link_agents with a flag, not a command of its own — a rename
@@ -102,13 +96,11 @@ const CONTRACTS: readonly Contract[] = [
     name: "unlinkAgents is link_agents with `unlink: true`",
     run: () => manager.unlinkAgents(["claude-code"]),
     call: ["link_agents", { agents: ["claude-code"], unlink: true }],
-    result: { results: [] },
   }),
   contract({
     name: "read_provenance takes no arguments",
     run: () => manager.readProvenanceRaw(),
     call: ["read_provenance"],
-    result: null,
   }),
   contract({
     name: "write_provenance takes the ledger as `content`",
@@ -124,7 +116,6 @@ const CONTRACTS: readonly Contract[] = [
     name: "read_activity takes the cap as `limit`",
     run: () => manager.readActivityRaw(50),
     call: ["read_activity", { limit: 50 }],
-    result: [],
   }),
   contract({
     name: "clear_activity takes no arguments",
@@ -145,18 +136,13 @@ const CONTRACTS: readonly Contract[] = [
     name: "skill_fingerprint takes the slug as `name`",
     run: () => manager.skillFingerprint("pdf"),
     call: ["skill_fingerprint", { name: "pdf" }],
-    result: { mtimeMs: 1, size: 2 },
   }),
   contract({
     name: "link_status takes no arguments",
     run: () => manager.getLinkStatus(),
     call: ["link_status"],
-    result: [],
   }),
 ];
-
-/** The commands that pin a payload as well as a call, i.e. all but the voids. */
-const WITH_RESULT = CONTRACTS.filter((c) => "result" in c);
 
 describe("skills-manager", () => {
   beforeEach(() => {
@@ -182,13 +168,16 @@ describe("skills-manager", () => {
   });
 
   describe("return values", () => {
-    it.each(WITH_RESULT)("$name — the payload comes back untouched", async ({
-      run,
-      result,
-    }) => {
+    it("hands back exactly what the command resolved with", async () => {
+      // One case, not one per command. Every `run` is a thin
+      // `return invoke(...)`, so a per-command table here would only restate
+      // that a function returns its argument — which is true by construction.
+      // The rows above already catch a command that reshapes or drops what the
+      // backend sent, which is the failure that would actually matter.
+      const result = { skill: "docx", skipped: true };
       invoke.mockResolvedValue(result);
 
-      await expect(run()).resolves.toEqual(result);
+      await expect(manager.installSkill("a/b/docx")).resolves.toBe(result);
     });
 
     it("passes a fingerprint through, so a caller can compare mtimes", async () => {

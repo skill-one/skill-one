@@ -130,8 +130,14 @@ export function AppHeader() {
     >
       <AppNav />
       {/* The mark rides over the row rather than in it, so the padding's
-          asymmetry cannot drag it off the window's centre. */}
-      <div className="absolute inset-0 flex items-center justify-center">
+          asymmetry cannot drag it off the window's centre.
+
+          `pointer-events-none` because this wrapper is `inset-0` — it spans the
+          whole header, not just the mark — and it paints after the nav, so
+          without this it swallows every click meant for the nav links. The mark
+          itself opts back in below, since it is a link home. jsdom has no
+          pointer-event hit testing, so only the end-to-end suite can see this. */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <Brand />
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -179,7 +185,10 @@ function Brand() {
   return (
     <Link
       to="/"
-      className="flex shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      // Opts back into the pointer events its wrapper opts out of, so the mark
+      // stays a link home while the rest of the header it overlays does not
+      // intercept anything.
+      className="pointer-events-auto flex shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
       <img
         src="/skill-one-transparent.png"

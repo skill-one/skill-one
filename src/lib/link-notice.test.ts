@@ -54,6 +54,9 @@ describe("formatLinkMessage", () => {
     ).toBeNull();
   });
 
+  // One table for both halves of the mapping. They used to be two tests — a
+  // kind-per-status table and a separate loop asserting every status names the
+  // agent — which walked the same seven rows twice to say two things per row.
   it.each([
     ["linked", "success"],
     ["alreadyLinked", "success"],
@@ -62,26 +65,13 @@ describe("formatLinkMessage", () => {
     ["refused", "warning"],
     ["notLinked", "warning"],
     ["failed", "error"],
-  ] as const)("reports %s as a %s notice", (status, kind) => {
-    expect(notice(result(status))?.kind).toBe(kind);
-  });
+  ] as const)("reports %s as a %s notice that names the agent", (status, kind) => {
+    const n = notice(result(status, { display: "Cursor" }));
 
-  it("names the agent in every message that carries one", () => {
-    // The one line every status shares: the toast has to say which agent it
-    // is about, or a link run over several agents is unreadable.
-    for (const status of [
-      "linked",
-      "alreadyLinked",
-      "skipped",
-      "unlinked",
-      "refused",
-      "notLinked",
-      "failed",
-    ] as const) {
-      expect(notice(result(status, { display: "Cursor" }))?.text).toContain(
-        "Cursor",
-      );
-    }
+    expect(n?.kind).toBe(kind);
+    // The one line every status shares: a toast has to say which agent it is
+    // about, or a link run over several agents is unreadable.
+    expect(n?.text).toContain("Cursor");
   });
 
   describe("a link that moved things", () => {

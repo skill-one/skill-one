@@ -69,17 +69,31 @@ to nothing.
 developer's own dev server, and not 5273, which belongs to the Tauri dev-test
 config.
 
-The web build is the right target here because of what it can and cannot prove.
-It renders the real shell, resolves real routes, mounts real CSS and answers
-with `lib/mock-local`'s stand-in for the Rust backend, which is a different
-claim from "this component renders given these props". Tailwind classes, hash
-routing, focus order and layout only have to hold together at this layer.
+It is one test, and that is a considered number rather than a starting point.
 
-What it does **not** do is exercise the Tauri commands. In a browser
-`isTauri()` is false, so every install, removal and link goes through the mock
-and the Rust side is never reached. That gap is covered from the other two
-directions instead — the call side and the command logic above — so no single
-test crosses the boundary and the contract is still pinned from both ends.
+The jsdom suite cannot see whether the app is *operable*. It replaces the
+document, so nothing is hit-tested, nothing is laid out, nothing has to be
+clickable. That gap was not hypothetical: the header centres its brand mark
+with an `absolute inset-0` wrapper, and that wrapper painted over the nav and
+swallowed every click on it. The app was unusable — no navigation at all —
+while all fourteen header component tests stayed green. A single click test
+catches that class of bug, and it is the only assertion in the suite that a
+browser can make and jsdom cannot.
+
+Everything a browser *could* say that the fast suite already says was removed.
+The drawer's Escape dismissal, focus and Enter, the catch-all redirect, and
+nested-control validity all have faster tests that make the same claim:
+`skill-detail-panel.test.tsx`, `App.test.tsx`, and axe in `src/test/a11y.ts`.
+Screenshot baselines went the same way — two committed images to maintain, a
+platform- and font-version-sensitive comparison, and no bug class that the click
+does not already surface.
+
+What this layer does **not** do is exercise the Tauri commands. In a browser
+`isTauri()` is false, so every install, removal and link goes through
+`lib/mock-local` and the Rust side is never reached. That gap is covered from
+the other two directions instead — the call side and the command logic above —
+so no single test crosses the boundary and the contract is still pinned from
+both ends.
 
 Driving the real Rust backend from a browser test is not available on macOS:
 `tauri-driver` supports Windows and Linux only, and Tauri's documented macOS
@@ -87,21 +101,6 @@ route (`@wdio/tauri-service` with `driverProvider: "embedded"`) requires
 adding `tauri-plugin-wdio-webdriver` and `tauri-plugin-wdio` to the
 application — test hooks inside the shipped binary. That trade was declined;
 see the commit history for the discussion.
-
-### Visual regression
-
-`e2e/*.png` holds committed Playwright screenshot baselines for the installed
-list and the detail drawer. They are the expected result, so a genuine visual
-change has to be reviewed rather than absorbed by a re-run:
-
-```bash
-pnpm test:e2e:update   # rewrite the baselines after an intended change
-```
-
-The browser is pinned to Chromium and `reducedMotion` is on, because a
-baseline is only comparable against the same renderer and the same animation
-state. Font rendering still differs across platforms, so treat a one-pixel
-baseline diff on a new machine as a signal to regenerate, not as a defect.
 
 ## Coverage policy
 

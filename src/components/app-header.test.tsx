@@ -62,11 +62,19 @@ describe("AppHeader", () => {
     // The mark is a title, not a leading item: it is centred over the header's
     // own box instead of sharing a flex line whose leading padding (`pl-24`,
     // for the traffic lights) is twice its trailing one.
-    const overlay = screen.getByRole("link", { name: "Skill One" })
-      .parentElement;
+    const brand = screen.getByRole("link", { name: "Skill One" });
+    const overlay = brand.parentElement;
     expect(overlay?.className).toContain("absolute");
     expect(overlay?.className).toContain("inset-0");
     expect(overlay?.className).toContain("justify-center");
+
+    // `inset-0` spans the header's whole width, not the mark's, and the
+    // overlay paints after the nav — so without this it sat on top of every
+    // nav link and swallowed its clicks. The app was unusable while every test
+    // in this file stayed green, because jsdom does no hit testing. The mark
+    // opts back in, since it is a link home.
+    expect(overlay).toHaveClass("pointer-events-none");
+    expect(brand).toHaveClass("pointer-events-auto");
 
     // The row still leads with the destinations, and closes with the actions.
     expect(header().firstElementChild?.tagName).toBe("NAV");
