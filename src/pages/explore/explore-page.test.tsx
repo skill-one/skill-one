@@ -323,6 +323,23 @@ beforeEach(() => {
 // CI machine those steps can exceed the default 5s per test. Give the
 // popup-driven interactions in this file more headroom.
 describe("ExplorePage", () => {
+  it("states the registry's own size in both units, in either shape", async () => {
+    bootRegistry(42);
+    const user = userEvent.setup();
+    renderExplorePage();
+
+    // One figure per unit, on the row's slack, and — unlike the `全部` count
+    // beside it — the same pair in both shapes: a readout that followed the shape
+    // would repeat what the picker already says.
+    await screen.findByText("skill-0");
+    const corpus = () => screen.getByText(/个 skill/).closest("p");
+    expect(corpus()).toHaveTextContent(/42 个 skill\s*·\s*1 个仓库/);
+
+    await user.click(screen.getByRole("button", { name: "卡片" }));
+
+    expect(corpus()).toHaveTextContent(/42 个 skill\s*·\s*1 个仓库/);
+  });
+
   it("keeps the domain picker in the content, not in the header", async () => {
     bootRegistry(4);
     renderExplorePage();

@@ -299,12 +299,16 @@ export function ExplorePage() {
           counts and whether the question has settled; the row's own arrangement
           is `ListToolbar`'s to answer. The counts follow the unit the sort
           implies: the repository unit weighs a domain by repositories, the skill
-          unit by skills. */}
+          unit by skills. The corpus's own two figures — every skill and every
+          repository the registry holds — ride the row's slack, and are derived
+          from this one answer, so the row's readout and its scope cannot disagree
+          about how much there is. */}
       <ListToolbar
         destination="store"
         facets={facets}
         total={totalCount}
         sorts={LIST_SORTS.store}
+        corpus={{ skills: allSkills.length, repos: sectionsData?.total ?? 0 }}
         searching={isSearching}
       />
 

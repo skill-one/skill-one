@@ -90,6 +90,27 @@ describe("ListToolbar", () => {
     expect(docked()).not.toContainElement(shapeSwitch());
   });
 
+  it("carries the corpus's two figures in the slack, and never as an answer", () => {
+    renderRow({ corpus: { skills: 8013, repos: 1240 } });
+
+    // The row's slack is where the size of what is being read belongs: after the
+    // shape it qualifies and before the pair that reads the answer, in the gap
+    // the row already keeps. It is a readout, so the shape still leads and the
+    // scope and the order still dock to the far edge around it.
+    const line = screen.getByText(/个 skill/).closest("p") as HTMLElement;
+    expect(line).toHaveTextContent(/8K 个 skill\s*·\s*1\.2K 个仓库/);
+    expect(standsAfter(shapeSwitch(), line)).toBe(true);
+    expect(standsAfter(line, docked())).toBe(true);
+  });
+
+  it("states no size on a row that is given no corpus", () => {
+    renderRow();
+
+    // A list holding nothing to count states nothing: an empty figure would be a
+    // claim about a corpus the row cannot see.
+    expect(screen.queryByText(/个 skill/)).toBeNull();
+  });
+
   it("never lets the switches be squeezed", () => {
     renderRow();
 
