@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Boxes, Users } from "lucide-react";
+import { Boxes, PowerOff, Users } from "lucide-react";
 
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
@@ -44,6 +44,8 @@ import { LinkSuggestionBadge } from "./link-suggestion-badge";
 import type { LinkCandidate } from "../../lib/link-suggestions";
 import { RepoCard } from "../explore/repo-card";
 import { SearchResults } from "../explore/search-results";
+import { CollapsibleSection } from "../../components/collapsible-section";
+import { splitByEnabled } from "../../lib/enabled-split";
 
 /**
  * How many repository cards mount with the page, and how many more mount each
@@ -115,6 +117,13 @@ function compareByPopularity<T>(
 const byName = (a: Row, b: Row) => a.skill.name.localeCompare(b.skill.name);
 
 /**
+ * Whether a row's skill takes part in the collection. Named once at module level
+ * so the two splits below can depend on it: a predicate rebuilt on every render
+ * would be a new identity each time, and a `useMemo` keyed on it would never hit.
+ */
+const isRowEnabled = (row: Row) => row.enabled;
+
+/**
  * The comparator behind the 按仓库 sort: the most-starred repository leads,
  * and the figure-less cards — the source-less pool, or a source the registry
  * no longer lists — sink below every figure. Cards the stars cannot separate
@@ -179,6 +188,19 @@ function compareByStars<T>(
  * The skill shape carries its per-row switch, and every sort feeds the same
  * detail drawer, so what a skill looks like never depends on how the list is
  * ordered.
+ *
+ * One thing about the order is not the reader's to pick: in the skill shape a
+ * disabled install is parked below every live one, in a titled section of its
+ * own, under all three orders alike. It is parked rather than sorted because it
+ * is not competing — a skill switched off takes no part in the collection, so
+ * letting the popularity blend put it above a live skill would rank something
+ * the reader has already set aside. The three orders still say everything about
+ * the live half, and each half keeps its own order inside the section, so
+ * "which of these did I install last" is still answerable among the parked ones.
+ * The repository shape has no such split: a card is a repository, its rows are
+ * what the bar's group switch acts on, and a half-on card is a fact the card
+ * exists to state. (A search is out of it too — relevance already re-answers the
+ * whole list, and the search view groups by *source*, not by state.)
  */
 
 export function InstalledPage() {
@@ -501,15 +523,43 @@ export function InstalledPage() {
   const shownRows = activeRows.slice(0, renderedCount);
   const shownCards = activeCards.slice(0, renderedCount);
 
+  // The skill unit's answer, divided by whether a skill takes part at all: the
+  // live installs first, the parked ones in a section of their own below. The
+  // split runs over the sorted rows rather than inside the sort, so it holds for
+  // every order the list offers (and for one added later) without any comparator
+  // knowing about it — see `lib/enabled-split`. Each half keeps the order the
+  // sort gave it, so switching to 按安装时间 re-orders within the parked section
+  // exactly as it re-orders the live one.
+  //
+  // Two splits, one per question. The rendered one runs over the *revealed* rows
+  // so the progressive reveal still bounds what is mounted: the parked section
+  // grows as the reader scrolls, and its badge counts what it actually holds.
+  // The drawer's runs over the whole answer, because the drawer walks every skill
+  // the list holds, not the prefix that happens to be on screen.
+  const splitRows = useMemo(() => splitByEnabled(shownRows, isRowEnabled), [
+    shownRows,
+  ]);
+  const splitActive = useMemo(
+    () => splitByEnabled(activeRows, isRowEnabled),
+    [activeRows],
+  );
+
   // The drawer walks every skill of the answer on screen, in the order the unit
   // lists it: a card's preview cap and the progressive reveal are rendering
   // choices, not the list's extent.
+  //
+  // In the skill unit it walks the *split* order, so the row ←/→ lands on is the
+  // row below or above the one on screen. Walking the raw sort order instead
+  // would make the walk disagree with the list the moment anything is parked —
+  // pressing → on the last live row would jump to a skill drawn far above it.
   const detailSkills = useMemo(
     () =>
       unit === "skill"
-        ? activeRows.map((row) => row.skill)
+        ? [...splitActive.enabled, ...splitActive.disabled].map(
+            (row) => row.skill,
+          )
         : activeCards.flatMap((card) => card.items.map((row) => row.skill)),
-    [unit, activeRows, activeCards],
+    [unit, splitActive, activeCards],
   );
 
   // The link affordance is only meaningful while the source is unknown: an
@@ -525,6 +575,41 @@ export function InstalledPage() {
         variant={variant}
       />
     ) : undefined;
+
+  /**
+   * One row of the skill unit. Shared by the live list and the parked section so
+   * a skill reads the same in both — the only thing that says which half it is in
+   * is the half it is drawn under, never the row itself. The ordinal still comes
+   * from the flat order, so numbering runs 1…N straight through both halves
+   * rather than restarting at the section.
+   */
+  const renderSkillRow = (row: Row) => {
+    const key = skillKey(row.skill);
+    return (
+      <SkillRow
+        key={key}
+        skill={row.skill}
+        index={rowOrdinals.get(key) ?? 0}
+        // An installed list is not a leaderboard: the figures
+        // it does carry come from the store, and the installs
+        // it cannot place at all would leave the podium on
+        // alphabetical order. The numbers merely count.
+        ranked={false}
+        fact={
+          sort === "installed"
+            ? "installedAt"
+            : sort === "tokens"
+              ? "tokens"
+              : "popularity"
+        }
+        selected={key === selected}
+        muted={!row.enabled}
+        extra={rowExtra(row, "label")}
+        action={<SkillEnableSwitch skill={row.skill} />}
+        onSelect={() => setSelectedKey(key)}
+      />
+    );
+  };
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
@@ -609,40 +694,42 @@ export function InstalledPage() {
               }
             />
           ) : unit === "skill" ? (
-            // The skill unit: one row per install, in the sort's own order.
-            // The same row a repository's own page lists, so a skill reads the
-            // same wherever it is found — and the figure each row states is
-            // the one this list answers in: the install's own clock under the
-            // 按安装时间 sort, the popularity blend otherwise.
-            <ul className={SKILL_ROW_LIST_CLASS}>
-              {shownRows.map((row) => {
-                const key = skillKey(row.skill);
-                return (
-                  <SkillRow
-                    key={key}
-                    skill={row.skill}
-                    index={rowOrdinals.get(key) ?? 0}
-                    // An installed list is not a leaderboard: the figures
-                    // it does carry come from the store, and the installs
-                    // it cannot place at all would leave the podium on
-                    // alphabetical order. The numbers merely count.
-                    ranked={false}
-                    fact={
-                      sort === "installed"
-                        ? "installedAt"
-                        : sort === "tokens"
-                          ? "tokens"
-                          : "popularity"
-                    }
-                    selected={key === selected}
-                    muted={!row.enabled}
-                    extra={rowExtra(row, "label")}
-                    action={<SkillEnableSwitch skill={row.skill} />}
-                    onSelect={() => setSelectedKey(key)}
-                  />
-                );
-              })}
-            </ul>
+            // The skill unit: one row per install, in the sort's own order —
+            // the live installs first, then the parked ones in a section of
+            // their own. The same row a repository's own page lists, so a skill
+            // reads the same wherever it is found — and the figure each row
+            // states is the one this list answers in: the install's own clock
+            // under the 按安装时间 sort, the popularity blend otherwise.
+            //
+            // The section is drawn only when something is parked: a list with
+            // nothing disabled is exactly the list this page always drew, and an
+            // absent section reads quieter than a zero. Its fold is the reader's
+            // own ("not working with these right now"), so it is left to survive
+            // a change of sort or scope — both of which only re-order or narrow
+            // rows that stay parked. It is not keyed by the answer, and a scope
+            // that parks nothing unmounts the section outright, so the next time
+            // one appears it starts open.
+            <>
+              {splitRows.enabled.length > 0 && (
+                <ul className={SKILL_ROW_LIST_CLASS}>
+                  {splitRows.enabled.map(renderSkillRow)}
+                </ul>
+              )}
+              {splitRows.disabled.length > 0 && (
+                <CollapsibleSection
+                  className="border-t border-border/60 pt-6"
+                  icon={PowerOff}
+                  title={t("list.disabled")}
+                  count={t("state.skillCount", {
+                    count: splitRows.disabled.length,
+                  })}
+                >
+                  <ul className={SKILL_ROW_LIST_CLASS}>
+                    {splitRows.disabled.map(renderSkillRow)}
+                  </ul>
+                </CollapsibleSection>
+              )}
+            </>
           ) : (
             // The repository unit: one card per repository, ordered by each
             // card's newest install. The card itself lists its installs

@@ -41,6 +41,9 @@
     "list": "List",
     "cards": "Cards"
   },
+  "list": {
+    "disabled": "Disabled"
+  },
   "action": {
     "install": "Install",
     "installing": "Installing",

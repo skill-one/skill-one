@@ -1665,6 +1665,255 @@ describe("InstalledPage", () => {
   });
 
   /**
+   * The one thing about the skill unit's order the reader does not get to pick:
+   * a disabled install is parked below every live one, in a section of its own,
+   * under all three orders alike. Enablement is not a fourth order — it is a
+   * partition of whichever order was chosen — so the tests below hold the
+   * *relative* claim ("no parked row above a live row") rather than a snapshot of
+   * one order, and pin the concrete order only where it is knowable up front.
+   */
+  describe("the parked section in the skill unit", () => {
+    /** The skill rows on screen, in the order the document draws them — which is
+     *  the order the reader reads, across both groups. */
+    function rowNames(): string[] {
+      return screen
+        .getAllByRole("button", { name: /查看 .+ 详情/ })
+        .map((node) => node.getAttribute("aria-label") ?? "");
+    }
+
+    /** The parked group: the section `CollapsibleSection` draws, reached by its
+     *  own name rather than by position, so a test states which group it means. */
+    function parkedSection(): HTMLElement {
+      return screen.getByRole("region", { name: "已禁用" });
+    }
+
+    /** The section's disclosure trigger — the rows below it are cards that also
+     *  answer to the button role, so the trigger is named rather than "the
+     *  button in there". */
+    function parkedHeader(): HTMLElement {
+      return within(parkedSection()).getByRole("button", { name: /已禁用/ });
+    }
+
+    /** The ordinal each row prints, in the same document order as `rowNames`. */
+    function rowOrdinalsIn(scope: ParentNode): string[] {
+      return Array.from(scope.querySelectorAll("li span.w-6")).map(
+        (span) => span.textContent ?? "",
+      );
+    }
+
+    /** Every install except the two named ones, in the mock's own order. */
+    const LIVE = ["pptx", "mcp-builder", "Code Review", "frontend-design"];
+    /** The two installs these cases park: the newest and the second newest, so
+     *  by install clock they are the two rows that would otherwise lead. */
+    const PARKED = ["pdf", "docx"];
+
+    /** The invariant, stated once: the live installs keep the head of the list,
+     *  the parked ones the whole tail, and neither group borrows a row from the
+     *  other. Written as a position claim rather than a full snapshot because
+     *  that is the part every order shares — which rows lead is each order's own
+     *  business, and is what the sort's own cases are for. */
+    async function expectParkedBelowLive() {
+      await waitFor(() => expect(rowNames()).toHaveLength(6));
+      expect(rowNames().slice(0, LIVE.length)).toEqual(
+        LIVE.map((name) => `查看 ${name} 详情`),
+      );
+      expect(rowNames().slice(LIVE.length)).toEqual(
+        PARKED.map((name) => `查看 ${name} 详情`),
+      );
+    }
+
+    beforeEach(() => {
+      setMockSkillEnabled("pdf", false);
+      setMockSkillEnabled("docx", false);
+    });
+
+    it("parks the disabled installs below the live ones under every order", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+
+      // The default order, and the case that shows the invariant is not merely
+      // "the disabled rows happen to be last": the two parked installs are the
+      // two *newest*, so by install clock — and, with no store figures seeded,
+      // by the popularity fallback too — they are the two rows that would lead
+      // the list. They read fourth and fifth instead.
+      await screen.findByText("frontend-design");
+      expect(rowNames()).toEqual([
+        ...LIVE.map((name) => `查看 ${name} 详情`),
+        ...PARKED.map((name) => `查看 ${name} 详情`),
+      ]);
+
+      await pickSort(user, "安装时间");
+      await expectParkedBelowLive();
+    });
+
+    it("parks them just the same under the popularity blend", async () => {
+      // The same claim under the order the list opens in, restated so a change
+      // to one order's comparator cannot quietly undo the invariant.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      await expectParkedBelowLive();
+    });
+
+    it("parks them just the same under the token order", async () => {
+      // And under the third. The invariant is a property of the pipeline, so the
+      // assertion that matters is the relative one and it has to hold for an
+      // order nobody wrote a case for — which is why each order gets its own
+      // short case rather than one case looping over all three.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      await pickSort(user, "Token 占用");
+      await expectParkedBelowLive();
+    });
+
+    it("holds each group to the order the reader picked", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      // 按安装时间, newest first. The parked section is ordered by the same
+      // clock as the live list — parking a skill does not cost it its place
+      // among the other parked ones, which is the whole reason the split runs
+      // after the sort rather than replacing it.
+      await pickSort(user, "安装时间");
+      await waitFor(() =>
+        expect(
+          within(parkedSection()).getAllByRole("button", { name: /查看 .+ 详情/ }),
+        ).toHaveLength(2),
+      );
+      expect(rowNames()).toEqual([
+        ...LIVE.map((name) => `查看 ${name} 详情`),
+        ...PARKED.map((name) => `查看 ${name} 详情`),
+      ]);
+    });
+
+    it("numbers the rows straight through both groups", async () => {
+      // The ordinal is a position in the flat answer, not a position within its
+      // own group: the two parked rows keep 1 and 2 rather than restarting at 1
+      // under the section, so the number a row states is the one the sort gave
+      // it and the two halves cannot renumber each other.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+      await pickSort(user, "安装时间");
+
+      await waitFor(() =>
+        expect(rowOrdinalsIn(document.body)).toEqual([
+          "3",
+          "4",
+          "5",
+          "6",
+          "1",
+          "2",
+        ]),
+      );
+    });
+
+    it("states the parked count on the section's own header", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      // The badge rides the header whether or not the section is open, so a
+      // folded section still says how much it holds.
+      expect(parkedHeader()).toHaveTextContent("已禁用");
+      expect(parkedHeader()).toHaveTextContent("2 个 skill");
+    });
+
+    it("draws no section at all while nothing is parked", async () => {
+      // An absent section reads quieter than a zero: with every install live the
+      // list is exactly the list this page always drew. The two installs this
+      // group parks are handed back, since a list with nothing parked is the
+      // only state in which the section must not appear.
+      setMockSkillEnabled("pdf", true);
+      setMockSkillEnabled("docx", true);
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      expect(
+        screen.queryByRole("region", { name: "已禁用" }),
+      ).not.toBeInTheDocument();
+      // One list, not two: the live rows are not wrapped in a section of their
+      // own just because the other half exists.
+      expect(rowNames()).toHaveLength(6);
+    });
+
+    it("folds the parked rows away and back without losing them", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+      const parked = () =>
+        within(parkedSection()).queryAllByRole("button", { name: /查看 .+ 详情/ });
+
+      expect(parked()).toHaveLength(2);
+      await user.click(parkedHeader());
+      expect(parked()).toHaveLength(0);
+      // The live list is untouched by the fold — only the parked half was ever
+      // hidden.
+      expect(rowNames()).toHaveLength(4);
+
+      await user.click(parkedHeader());
+      expect(parked()).toHaveLength(2);
+    });
+
+    it("keeps a parked skill in the drawer's walk while its section is folded", async () => {
+      // Folding hides content visually only. The drawer walks the whole answer
+      // rather than the mounted prefix, so a folded skill is still reachable —
+      // which is what lets a reader turn one back on without unfolding the
+      // section first.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+      await pickSort(user, "安装时间");
+      await waitFor(() => expect(parkedSection()).toBeInTheDocument());
+      await user.click(parkedHeader());
+
+      // Opened from the last live row, so the walk's next step is the question:
+      // the first parked one, not a skill drawn far above this one. The drawer
+      // reads the split order for exactly this reason.
+      await user.click(
+        screen.getByRole("button", { name: "查看 frontend-design 详情" }),
+      );
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      expect(await within(dialog).findByText("pdf")).toBeInTheDocument();
+    });
+
+    it("leaves the repository unit alone", async () => {
+      // A card is a repository, its rows are what the bar's group switch acts
+      // on, and a half-on card is a fact the card exists to state. Parking a
+      // skill per-row inside a card would split the very rows one press has to
+      // act on together, so the invariant is deliberately scoped to the skill
+      // shape.
+      renderPage();
+
+      await screen.findByText("本地安装");
+      expect(
+        screen.queryByRole("region", { name: "已禁用" }),
+      ).not.toBeInTheDocument();
+      // The pool card still lists both parked installs, dimmed but present.
+      expect(
+        within(
+          screen.getByRole("button", { name: "查看 pdf 详情" }).closest("li")!,
+        ).getByText("pdf"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  /**
    * The list's own question, asked from its own first row: what this machine
    * has, in the installed index's own relevance order, with the registry's
    * answer below it as a cheap supplement and skills.sh behind a press.
