@@ -13,16 +13,18 @@ const STALE_MS = 5 * 60 * 1000;
 
 /**
  * The store's live skills.sh search, one query per search text. Disabled below
- * the endpoint's own floor, so an empty or one-character field never asks.
+ * the endpoint's own floor, so an empty or one-character field never asks —
+ * and disabled outright by `enabled`, so a list that answers from this machine's
+ * own records (the installed list) never asks it at all.
  *
  * Failures are neither retried nor surfaced: the live answer is a supplement,
  * and the local one stands on its own without it.
  */
-export function useSkillsShSearch(query: string) {
+export function useSkillsShSearch(query: string, enabled = true) {
   return useQuery({
     queryKey: [SKILLS_SH_SEARCH_QUERY_PREFIX, query],
     queryFn: ({ signal }) => searchSkillsSh(query, signal),
-    enabled: isSearchableQuery(query),
+    enabled: enabled && isSearchableQuery(query),
     staleTime: STALE_MS,
     retry: false,
   });

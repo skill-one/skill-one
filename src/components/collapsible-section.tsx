@@ -56,9 +56,9 @@ function keepHeaderUnderPointer(header: HTMLElement) {
 
 /**
  * One collapsible section of a grouped answer — the shell the search answer's
- * three sources (本地已安装, 应用商店, skills.sh) draw their headers through.
- * Source grouping is worth acting on — a reader may want one source's answer
- * alone — so these sections keep the full header treatment: the header row
+ * one supplement (skills.sh) draws its header through. A supplement is worth
+ * acting on — a reader may want that other source's answer alone, or fold it
+ * away — so the section keeps the full header treatment: the header row
  * pins to the top
  * of the scrolling container while its section passes, and the whole row
  * folds and unfolds the section — the count badge stays on the header either

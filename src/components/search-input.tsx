@@ -4,7 +4,7 @@ import { cn } from "../lib/utils";
 import { Input } from "./ui/input";
 
 /**
- * The list search field: a rounded input with a leading magnifier. `label`
+ * The list search field: a shadcn `Input` with a leading magnifier. `label`
  * names what is being searched and doubles as the accessible label, so the
  * visible hint and the announced one can never drift apart.
  *
@@ -14,8 +14,12 @@ import { Input } from "./ui/input";
  * thing a reader does to a list of eight thousand. The magnifier is decorative
  * and never the click target — the field under it is.
  *
- * The caller sizes the field (`className`): how wide the search sits in its row
- * is that row's decision, not this field's.
+ * It states **no style of its own**: the height, radius, border and focus ring
+ * are all `Input`'s defaults, so the field can never drift from the library or
+ * from the controls standing beside it in the toolbar. The single utility it
+ * adds is the left padding the magnifier needs, and the caller sizes the field
+ * (`className`): how wide the search sits in its row is that row's decision,
+ * not this field's.
  */
 export function SearchInput({
   value,
@@ -45,7 +49,11 @@ export function SearchInput({
         placeholder={placeholder ?? `${label}...`}
         aria-label={label}
         disabled={disabled}
-        className="h-8 rounded-full pl-9"
+        // shadcn's own defaults for everything a field brings (height, radius,
+        // border, focus ring): this component states no style of its own. The
+        // one utility here is the left padding the leading magnifier needs —
+        // the default's `px-2.5` would sit the placeholder under the glyph.
+        className="pl-9"
       />
     </div>
   );

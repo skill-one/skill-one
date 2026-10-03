@@ -30,7 +30,7 @@ import { buildSearchIndex } from "../../lib/search-index";
 import { setQuery } from "../../lib/list-view";
 import { popularity } from "../../lib/popularity";
 import { estimateTokens } from "../../lib/token-estimate";
-import type { SkillMatched } from "../../components/skill-card";
+import type { SkillMatched } from "../../components/highlighted-text";
 import type { Skill } from "../../types/skill";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
@@ -539,17 +539,18 @@ export function InstalledPage() {
           ) : list.length === 0 ? (
             <Placeholder icon={Boxes} message={t("state.noInstalled")} />
           ) : isSearching ? (
-            // The unified search answer: three sections — what this machine
-            // has (the rows above, injected with the enable switch, the dimmed
-            // disabled install and the migration badge that only this surface
-            // knows), what the store carries, what skills.sh answers live. One
-            // shared implementation with the store's page (see
-            // `SearchResults`); keyed by the answer's definition, so no stale
-            // fold or selection survives into a differently-shaped answer.
+            // The search answer: the shared search view's installed section —
+            // what this machine has, with the enable switch, the dimmed disabled
+            // install and the migration badge that only this surface knows. The
+            // store's own sections are not part of an installed list's answer, and
+            // its two remote queries stand down with them. Keyed by the answer's
+            // definition, so no stale fold or selection survives into a
+            // differently-shaped answer.
             <SearchResults
               key={`${unit}:${query}`}
               unit={unit}
               query={query}
+              destination="installed"
               installed={rows.map((row) => ({
                 skill: row.skill,
                 matched: row.matched,
@@ -557,7 +558,6 @@ export function InstalledPage() {
                 extra: rowExtra(row, "label"),
                 action: <SkillEnableSwitch skill={row.skill} />,
               }))}
-              installedSurface
             />
           ) : itemCount === 0 ? (
             <Placeholder

@@ -7,7 +7,6 @@ import { skillKey } from "../../lib/skill-view";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
-import { useInstalledSearchRows } from "../../hooks/use-installed-search";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import { LIST_SORTS } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
@@ -131,7 +130,7 @@ export function ExplorePage() {
   // The browse answer: every repository once, filed under its leading domain.
   // It is both the filter's facet set (a domain, and how many repositories it
   // holds) and, when one is chosen, that domain's own list. A search's answer
-  // is not fetched here — the unified search view fetches for itself (see
+  // is not fetched here — the shared search view fetches for itself (see
   // `SearchResults`), so browse and search never fetch together.
   const {
     data: sectionsData,
@@ -167,7 +166,7 @@ export function ExplorePage() {
 
   // The skill unit's browse list: the browse answer by install count, scoped
   // to the chosen domain by membership. A search re-answers this list in
-  // relevance order inside the unified search view instead.
+  // relevance order inside the shared search view instead.
   const activeSkills = useMemo(() => {
     if (unit !== "skill") return [];
     const list = selectedDomain
@@ -260,16 +259,12 @@ export function ExplorePage() {
   // The panel walks the flat skill list of the browse answer, unwrapped: the
   // listed skills in the skill unit, and every skill of the listed repositories
   // in the repository unit. One repository per group means no skill appears
-  // twice. A search walks inside the unified search view instead, which owns
+  // twice. A search walks inside the shared search view instead, which owns
   // its own selection and drawer.
   const flatSkills = useMemo(() => {
     if (unit === "skill") return activeSkills.map((hit) => hit.skill);
     return browseRepos.flatMap((group) => group.skills.map((hit) => hit.skill));
   }, [unit, activeSkills, browseRepos]);
-  // The installed answer the unified search view opens with: the installed
-  // index's own hits, render-ready with the store's default action (the
-  // install button, which an already-installed row carries as a badge).
-  const installedRows = useInstalledSearchRows(query);
   // Anything that re-answers the list resets what only described the old one:
   // the revealed depth (it belongs to the list it was revealed for) and the
   // detail panel (its skill may not be in the new answer at all).
@@ -343,19 +338,18 @@ export function ExplorePage() {
                 </Button>
               </Placeholder>
             ) : isSearching ? (
-              // The unified search answer: three sections — what this machine
-              // has, what the store carries, what skills.sh answers live — one
-              // shared implementation both searchable lists render (see
-              // `SearchResults`). Keyed by the answer's definition, so no
+              // The search answer: two sections — what the store's own index
+              // carries, what skills.sh answers live — one shared
+              // implementation both searchable lists render (see
+              // `SearchResults`). The store never lists what this machine
+              // happens to have installed: an already-installed row wears the
+              // install badge instead. Keyed by the answer's definition, so no
               // stale selection survives into a differently-shaped answer.
               <SearchResults
                 key={`${unit}:${query}`}
                 unit={unit}
                 query={query}
-                installed={installedRows.map((row) => ({
-                  skill: row.skill,
-                  matched: row.matched,
-                }))}
+                destination="store"
               />
             ) : loading ? (
               // A viewport's worth of card- or row-shaped skeletons, per the
@@ -441,7 +435,7 @@ export function ExplorePage() {
       {/* Modal detail drawer for the browse answer; the wiring (open/close,
           prev/next bounds) is shared with the installed page. It walks the
           flat skill list, rendered or not yet rendered. A
-          search walks inside the unified search view instead, which owns its
+          search walks inside the shared search view instead, which owns its
           own drawer. */}
       <SkillDetailDrawer
         skills={flatSkills}

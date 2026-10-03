@@ -26,20 +26,17 @@ configure({ asyncUtilTimeout: 5000 });
 
 // The provenance hook consults the registry for namesake candidates and the
 // page looks up the store entries behind recorded sources; both mocks answer
-// "nothing found" by default so the worker-less test env stays silent, and the
-// link-suggestion / store-stats tests below override them. The unified search
-// view also asks the registry's grouped search for its store section; the mock
-// answers empty by default, so that section hides.
-const { searchSkills, lookupSkills, getGroups, registrySnapshot } = vi.hoisted(
-  () => ({
+// "nothing found" by default so the worker-less test env stays silent.
+const { searchSkills, lookupSkills, getGroups, registrySnapshot, searchSkillsSh } =
+  vi.hoisted(() => ({
     searchSkills: vi.fn(),
     lookupSkills: vi.fn(),
     getGroups: vi.fn(),
     // One stable object: the page reads it through useSyncExternalStore, which
     // treats a fresh snapshot on every call as an infinite render loop.
     registrySnapshot: { ready: true, epoch: 1 },
-  }),
-);
+    searchSkillsSh: vi.fn(),
+  }));
 vi.mock("../../lib/registry/client", () => ({
   searchSkills,
   lookupSkills,
@@ -48,10 +45,22 @@ vi.mock("../../lib/registry/client", () => ({
   subscribeRegistry: () => () => {},
 }));
 
+/**
+ * The live skills.sh search is stubbed at the module boundary so the installed
+ * list can be held to never asking it: an installed search answers from this
+ * machine's own records, so the store's two remote sources stand down with
+ * their sections. `isSearchableQuery` stays real.
+ */
+vi.mock("../../lib/skills-sh", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/skills-sh")>()),
+  searchSkillsSh,
+}));
+
 beforeEach(() => {
   searchSkills.mockResolvedValue({ hits: [] });
   lookupSkills.mockResolvedValue({ entries: [] });
   getGroups.mockResolvedValue({ groups: [], total: 0 });
+  searchSkillsSh.mockResolvedValue([]);
   resetLinkSuggestions();
   // The shape and the order are two answers again; these tests read the list as
   // repository cards — the shape most were written against — and the ones that
@@ -59,6 +68,38 @@ beforeEach(() => {
   // choice is reset here rather than inherited.
   setUnit("installed", "repo");
 });
+
+/**
+ * The store's grouped answer to a search for `name`: one repository carrying
+ * one skill of that name under a recorded source — a namesake of what the
+ * machine has installed, which is what an installed search's store section is
+ * for.
+ */
+function storeAnswerFor(name: string) {
+  return {
+    groups: [
+      {
+        key: "acme/skills",
+        title: "acme/skills",
+        stars: 12,
+        skills: [
+          {
+            skill: {
+              id: `acme/skills/${name}`,
+              name,
+              repo: "acme/skills",
+              description: "PDF 文档读取、生成、合并、拆分与标注。",
+              stars: 12,
+              downloads: 30,
+            },
+            matched: { name: [name] },
+          },
+        ],
+      },
+    ],
+    total: 1,
+  };
+}
 
 /** The persisted ledger's record for `name` (the store is JSONL). */
 function ledgerRecord(
@@ -808,9 +849,6 @@ describe("InstalledPage", () => {
         '[data-slot="card-header"] [data-slot="avatar"]',
       ),
     ).toHaveLength(0);
-    expect(
-      container.querySelectorAll('[data-slot="skill-cover"]'),
-    ).toHaveLength(0);
   });
 
   it("names a recorded source in the card's bar, with the owner's face", async () => {
@@ -1093,7 +1131,9 @@ describe("InstalledPage", () => {
     // a term index does not.
     await user.clear(screen.getByLabelText("搜索 Skill"));
     await user.type(screen.getByLabelText("搜索 Skill"), "df");
-    expect(await screen.findByText(/未找到匹配/)).toBeInTheDocument();
+    // The empty state says so in this list's own words: it is about what this
+    // machine has, and the store's answer stands below it.
+    expect(await screen.findByText(/本机没有匹配/)).toBeInTheDocument();
   });
 
   it("shows a no-match empty state for a search with no results", async () => {
@@ -1103,27 +1143,90 @@ describe("InstalledPage", () => {
 
     await user.type(screen.getByLabelText("搜索 Skill"), "zzz");
 
-    expect(await screen.findByText(/未找到匹配/)).toBeInTheDocument();
+    expect(await screen.findByText(/本机没有匹配/)).toBeInTheDocument();
   });
 
-  it("answers a search with the store section beside the installs", async () => {
+  it("answers a search with this machine's installs, and never asks the live source", async () => {
     const user = userEvent.setup();
+    // The store's index answers this query too — cheap and certain, so it is
+    // simply there below the installed answer.
+    getGroups.mockResolvedValue(storeAnswerFor("pdf"));
     renderPage();
     await screen.findByText("pdf");
 
     await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
-    // The installed answer leads, in the installed index's own relevance
-    // order, and only it: docx does not match.
-    const installed = await screen.findByRole("region", { name: "本地已安装" });
-    expect(within(installed).getByText("pdf")).toBeInTheDocument();
-    expect(within(installed).queryByText("docx")).not.toBeInTheDocument();
-    // The store's section answers the same question from its own index; the
-    // mocked registry carries nothing, so its section stays empty and hidden
-    // rather than reading as a zero.
+    // The installed answer is the whole answer, in the installed index's own
+    // relevance order: docx does not match. It carries no header either — this
+    // list is the source, so its own rows say so by being on screen. (Waited
+    // out: until the query settles, the browse list behind it still holds
+    // docx, and the answer has no header that could scope the assertion.)
+    await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
+    expect(screen.getByText("pdf")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "本地已安装" }),
+    ).not.toBeInTheDocument();
+    // The store's index is cheap and certain, so its answer is simply there
+    // below the installed one — a titled section, open by default, counted.
+    const store = await screen.findByRole("region", { name: "应用商店" });
+    expect(within(store).getByText("1 个仓库")).toBeInTheDocument();
+    // The live source is the one thing a search waits for: it is on screen as
+    // a press, and nothing has pressed it.
+    expect(
+      screen.getByRole("button", { name: "展开 skills.sh 的结果" }),
+    ).toBeInTheDocument();
+    expect(searchSkillsSh).not.toHaveBeenCalled();
+  });
+
+  it("opens the installed surface's own drawer from a searched row", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("pdf");
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+    await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
+    await pickUnit(user, "列表");
+
+    // The install the row carries is what this list manages, so the drawer it
+    // opens wears the installed surface: no store install CTA — the skill is
+    // already home, and the panel says so with the switch, not with a button.
+    await user.click(await screen.findByRole("button", { name: "查看 pdf 详情" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("dialog")).queryByRole("button", { name: /安装/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("brings the store's answer in a default-open section, each row in its own surface", async () => {
+    const user = userEvent.setup();
+    // The store's index answers the same query with a namesake of an installed
+    // skill — the same name under a recorded source, which is exactly what the
+    // section below is for.
+    getGroups.mockResolvedValue(storeAnswerFor("pdf"));
+    renderPage();
+    await screen.findByText("pdf");
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+    await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
+    await pickUnit(user, "列表");
+
+    // Asked for nothing: the registry's index is already in memory, so its
+    // answer is on screen under the installed one, with a count, open.
+    const store = await screen.findByRole("region", { name: "应用商店" });
+    expect(within(store).getByText("1 个 skill")).toBeInTheDocument();
+    // Two answers, two rows of the same name — the install above, the store
+    // entry below it.
     await waitFor(() =>
-      expect(screen.queryByRole("region", { name: "应用商店" })).toBeNull(),
+      expect(
+        screen.getAllByRole("button", { name: "查看 pdf 详情" }),
+      ).toHaveLength(2),
     );
+    // The store row wears the store's surface: the install CTA the installed
+    // surface never offers.
+    await user.click(screen.getAllByRole("button", { name: "查看 pdf 详情" })[1]);
+    expect(
+      await within(await screen.findByRole("dialog")).findByRole("button", {
+        name: "已安装",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("scopes the list to a classification from the picker", async () => {

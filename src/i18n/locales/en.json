@@ -106,10 +106,11 @@
     "updateNow": "Update now"
   },
   "search": {
-    "installed": "Installed on this machine",
     "store": "Store",
     "skillsSh": "skills.sh official search",
     "searching": "Searching…",
+    "liveResults": "Show the skills.sh results",
+    "liveResultsHide": "Hide the skills.sh results",
     "searchingLive": "Searching the store and skills.sh live results…"
   },
   "link": {
@@ -175,6 +176,7 @@
   "state": {
     "loadFailed": "Failed to load: {{message}}",
     "noMatch": "No skills matching “{{query}}”",
+    "noInstalledMatch": "Nothing installed here matches “{{query}}”",
     "noSkills": "No skills yet",
     "repoCount": "{{count}} repositories",
     "skillCount": "{{count}} skills",
