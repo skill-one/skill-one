@@ -67,10 +67,55 @@ export default defineConfig({
         // A couple of points under today's figures: tight enough to catch a
         // real drop, loose enough that touching one file cannot fail CI.
         // Raise them as coverage improves.
-        statements: 80,
-        branches: 77,
-        functions: 77,
-        lines: 82,
+        //
+        // Vitest counts glob-matched files into this total as well, so the
+        // groups below do not replace the global floor — they add floors where
+        // a drop would actually matter, which the total alone can absorb.
+        // Each group states all four metrics because a glob inherits neither
+        // these numbers nor `perFile`.
+        //
+        // The groups are deliberately non-overlapping (`src/lib/*.ts` stops at
+        // the directory boundary rather than also matching `src/lib/registry`)
+        // so no file is checked against two bars at once.
+        statements: 84,
+        branches: 80,
+        functions: 82,
+        lines: 86,
+
+        // Core logic: the install, registry and provenance layer plus the
+        // Tauri boundary — where the app's behaviour actually lives. A drop
+        // here is a regression whatever the total says.
+        "src/lib/*.ts": {
+          statements: 88,
+          branches: 82,
+          functions: 87,
+          lines: 90,
+        },
+        // Streaming, cache and worker plumbing. I/O-bound, and largely driven
+        // through `worker-controller`, so it holds a lower floor of its own
+        // rather than being held to the core layer's.
+        "src/lib/registry/**": {
+          statements: 78,
+          branches: 78,
+          functions: 70,
+          lines: 79,
+        },
+        // React state hooks, where an uncovered branch is a stale render.
+        "src/hooks/**": {
+          statements: 93,
+          branches: 86,
+          functions: 91,
+          lines: 95,
+        },
+        // Upstream shadcn/Base UI wrappers. The project policy is to take
+        // them unmodified rather than hand-roll, so their coverage is not ours
+        // to raise — a floor, not a target.
+        "src/components/ui/**": {
+          statements: 62,
+          branches: 72,
+          functions: 66,
+          lines: 62,
+        },
       },
     },
   },
