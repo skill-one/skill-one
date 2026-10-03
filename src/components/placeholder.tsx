@@ -6,6 +6,12 @@ import { cn } from "../lib/utils";
 /**
  * Centered "nothing to show" state with an optional retry action, shared by
  * every list page (search misses, load failures, empty lists).
+ *
+ * `data-slot="placeholder"` is the hook that tells this state apart from a
+ * quiet inline one: a page that answers a search with a full-height empty state
+ * above live results is making a claim its contents contradict, and that is a
+ * distinction worth asserting by name rather than by the wording it happens to
+ * be using this week.
  */
 export function Placeholder({
   icon: Icon = SearchX,
@@ -25,6 +31,7 @@ export function Placeholder({
 }) {
   return (
     <div
+      data-slot="placeholder"
       className={cn(
         "flex h-full min-h-[320px] flex-col items-center justify-center gap-2 pb-[12vh] text-muted-foreground",
         className,

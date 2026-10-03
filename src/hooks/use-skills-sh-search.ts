@@ -6,25 +6,29 @@ import { isSearchableQuery, searchSkillsSh } from "../lib/skills-sh";
 export const SKILLS_SH_SEARCH_QUERY_PREFIX = "skills-sh-search";
 
 /**
- * How long a live answer is reused. The section supplements the store, so
- * revisiting a search the reader already ran should not re-ask the endpoint.
+ * How long a live answer is reused. Revisiting a search the reader already ran
+ * should not re-ask the endpoint, and a five-minute window covers the typing
+ * and retyping that happens while a reader refines one question.
  */
 const STALE_MS = 5 * 60 * 1000;
 
 /**
- * The store's live skills.sh search, one query per search text. Disabled below
- * the endpoint's own floor, so an empty or one-character field never asks —
- * and disabled outright by `enabled`, so a list that answers from this machine's
- * own records (the installed list) never asks it at all.
+ * The live skills.sh search, one query per search text, asked for as soon as a
+ * search is live: a reader who typed a question wants the whole answer, so the
+ * one cross-network source is no longer gated behind a press.
  *
- * Failures are neither retried nor surfaced: the live answer is a supplement,
- * and the local one stands on its own without it.
+ * Disabled below the endpoint's own floor, so an empty or one-character field
+ * never asks — the query the reader typed is not yet a question the endpoint
+ * can answer.
+ *
+ * Failures are neither retried nor surfaced: the live answer is one group among
+ * several, and the local ones stand on their own without it.
  */
-export function useSkillsShSearch(query: string, enabled = true) {
+export function useSkillsShSearch(query: string) {
   return useQuery({
     queryKey: [SKILLS_SH_SEARCH_QUERY_PREFIX, query],
     queryFn: ({ signal }) => searchSkillsSh(query, signal),
-    enabled: enabled && isSearchableQuery(query),
+    enabled: isSearchableQuery(query),
     staleTime: STALE_MS,
     retry: false,
   });
