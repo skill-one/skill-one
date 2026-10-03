@@ -41,13 +41,32 @@ function header(): HTMLElement {
 }
 
 describe("AppHeader", () => {
-  it("leads with the brand and the destinations", () => {
+  it("leads with the destinations and centres the brand", () => {
     renderHeader("/explore");
 
     expect(screen.getByText("Skill One")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "首页" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "商店" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "已安装" })).toBeInTheDocument();
+  });
+
+  it("rides the brand over the row, so the lights' padding cannot push it off centre", () => {
+    renderHeader("/explore");
+
+    // The mark is a title, not a leading item: it is centred over the header's
+    // own box instead of sharing a flex line whose leading padding (`pl-24`,
+    // for the traffic lights) is twice its trailing one.
+    const overlay = screen.getByRole("link", { name: "Skill One" })
+      .parentElement;
+    expect(overlay?.className).toContain("absolute");
+    expect(overlay?.className).toContain("inset-0");
+    expect(overlay?.className).toContain("justify-center");
+
+    // The row still leads with the destinations, and closes with the actions.
+    expect(header().firstElementChild?.tagName).toBe("NAV");
+    expect(header().lastElementChild).toContainElement(
+      screen.getByRole("button", { name: "设置" }),
+    );
   });
 
   it("points the brand at the home, the agents graph", () => {
@@ -86,8 +105,8 @@ describe("AppHeader", () => {
     renderHeader("/repo/acme/tools");
 
     // The way out of a drill-down is that page's own head, not the window's
-    // chrome (see `DrillDownHead`); the destinations stay, so the reader can
-    // see which list the page belongs to and leave for the other one.
+    // chrome; the destinations stay, so the reader can see which list the page
+    // belongs to and leave for the other one.
     expect(screen.getByText("Skill One")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "商店" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "设置" })).toBeInTheDocument();

@@ -6,21 +6,31 @@ import { AppNav } from "./app-nav";
 import { SettingsMenu } from "./settings-menu";
 
 /**
- * The app's chrome, one row: the brand and the destinations at the leading edge
- * and the window's settings closing it, with the window's drag region over the
- * lot.
+ * The app's chrome, one row: the destinations at the leading edge, the brand
+ * dead centre and the window's settings closing it, with the window's drag
+ * region over the lot.
  *
  * One row and no more, and nothing in it that belongs to a page. The row opens
- * with the brand and the segmented navigation (see `AppNav`) — the mark names the
- * window, the control says which of its two lists is on screen — and it closes
- * with the actions. Settings stay, because they are the window's and answer on
- * every route. Everything else a page needs belongs to that page: the search
- * field, the scope picker and the sort switch are the list's own controls and
- * stand on the list's own row above the answer they shape (see `ListToolbar`),
- * and the way out of a drill-down is drawn by the page it leaves (see
- * `DrillDownHead`). The leading edge is kept clear of the lights by the padding
- * (`pl-24`: the native 20pt leading inset + 52pt of buttons + air), so on macOS
- * the brand starts just past them, the way a unified toolbar's items do.
+ * with the segmented navigation (see `AppNav`) — the control says which of its
+ * lists is on screen — closes with the actions, and carries the mark in the
+ * middle, the way a unified toolbar's title does. Settings stay, because they
+ * are the window's and answer on every route. Everything else a page needs
+ * belongs to that page: the search field, the scope picker and the sort switch
+ * are the list's own controls and stand on the list's own row above the answer
+ * they shape (see `ListToolbar`). The leading edge is kept clear of the lights
+ * by the padding (`pl-24`: the native 20pt leading inset + 52pt of buttons +
+ * air), so on macOS the navigation starts just past them, the way a unified
+ * toolbar's items do.
+ *
+ * The mark is centred on the *window*, not on the row's free space: it is taken
+ * out of the flow and centred over the header's padding box
+ * (`absolute inset-0 … items-center justify-center`), because the padding is
+ * lopsided — the lights push the leading edge out to `pl-24` while the trailing
+ * one is `pr-8` — so three in-flow columns, or `ml-auto` on the far end, would
+ * sit the mark visibly right of centre. Overlaying is safe because the window's
+ * floor is `minWidth: 1150` (see `tauri.conf.json`), which leaves the mark's own
+ * width clear of the navigation at the far end of the range; below that the row
+ * would have to drop one of the two.
  *
  * The window runs `titleBarStyle: "Overlay"`, so macOS keeps its own title bar
  * — a transparent strip the webview shows through — and parks the traffic
@@ -53,8 +63,12 @@ export function AppHeader() {
         isTauri() ? "pl-24" : "pl-8",
       )}
     >
-      <Brand />
       <AppNav />
+      {/* The mark rides over the row rather than in it, so the padding's
+          asymmetry cannot drag it off the window's centre. */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <Brand />
+      </div>
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         <SettingsMenu />
       </div>

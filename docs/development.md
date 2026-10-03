@@ -54,17 +54,15 @@ skill-one/
 ├── src/                    # Frontend (React + TypeScript)
 │   ├── components/         # Components shared across pages
 │   │   ├── ui/             # shadcn/ui components
-│   │   ├── app-header.tsx  # The app's chrome, one row: brand + destinations leading, search + settings closing
+│   │   ├── app-header.tsx  # The app's chrome, one row: destinations leading, brand centred, settings closing
 │   │   ├── app-nav.tsx     # The app's navigation: the two destinations as a header segmented control
 │   │   ├── collapsible-section.tsx # Sticky, foldable group header shared by every grouped list
-│   │   ├── drill-down-head.tsx # A page inside a list, as its head: the way back + the entity
 │   │   ├── list-facets.tsx # The scope chips opening a list's content (+ the 更多 flyout)
 │   │   ├── list-sort-select.tsx # The order menu a list answers in — popularity, plus install time and token cost (installed list only)
 │   │   ├── list-unit-toggle.tsx # The shape switch both lists answer in — skill rows or repository cards, as a pair of toggles
 │   │   ├── agent-icon.tsx  # Agent brand icons
 │   │   ├── owner-avatar.tsx# Owner avatar (the metadata rail's author chip)
 │   │   ├── repo-hover-card.tsx # Author chip + its repository hover card
-│   │   ├── skill-cover.tsx # Skill's own image slot (author initial; detail drawer only)
 │   │   ├── skill-detail/    # Shared skill detail panel + modal drawer
 │   │   ├── settings-popover.tsx # Settings flyout anchored to the header's trailing edge
 │   │   ├── advanced-settings-dialog.tsx # Second-level settings (CDN base + data source)

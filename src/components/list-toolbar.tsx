@@ -24,29 +24,32 @@ const DEFAULT_SORT: ListSort = "popularity";
 const DEFAULT_UNIT: ListUnit = "skill";
 
 /**
- * A list's own first row: the controls every list is read through, in the order
- * the reading happens — **query, then scope, then shape, then order**. Search
- * names what the reader wants, the picker narrows the answer to a slice of it,
- * the shape says what that slice is made of, and the order says which way it
- * reads, so the row reads left to right as the pipeline it is — the one thing
- * about a list toolbar that every tool settles on the same way (GitHub's issue
- * lists, Linear, Ant Design Pro's table, MUI's `Toolbar`). How wide each one is,
- * and how far apart they stand, is this row's own decision.
+ * A list's own first row: the controls every list is read through, standing as
+ * **two groups** — the field and the shape on the leading edge, the scope and the
+ * order docked to the trailing one. What each control *does* is the reading
+ * pipeline every tool agrees on (GitHub's issue lists, Linear, Ant Design Pro's
+ * table, MUI's `Toolbar`): search names what the reader wants, the picker narrows
+ * the answer to a slice of it, the shape says what that slice is made of, and the
+ * order says which way it reads. Where each one stands is this row's own
+ * decision, and it follows from what a live search does to it.
  *
  * They sit on the list's row rather than in the window's chrome because they are
  * that list's controls: each is only meaningful above the answer it shapes, and
  * a search field in the header is a field whose list is one route away.
  *
- * They stand as **one tight group on the leading edge** — the field filling the
- * standard `max-w-sm` box the component library caps its own fields at, the view
- * controls at their own widths right beside it — so the row reads as a single
- * control cluster: the eye lands on the field, and the facts standing next to it
- * are the ones the reader reaches for about the same answer. The row's slack is
- * left over at the trailing edge, which is right: the thing that fills this
- * width is the list below, not the row's own controls, and a group split across
- * the full width would read as two regions rather than one toolbar. Only on a
- * window too narrow to hold the group does the field give ground, never the
- * controls.
+ * **The field and the shape lead, because those are the two a search does not
+ * override.** While a query is live the scope and the order lock (see below) and
+ * the shape stays open, so the shape keeps the field's company: the leading group
+ * is the pair that still answers into a search, and the trailing group is the
+ * pair a search takes over. Docking that pair to the trailing edge is also where
+ * the tools put the controls that read the answer — MUI's density and columns,
+ * Ant Design Pro's 密度 and 列设置, Airtable's sort and view options, GitHub's
+ * sort on the issue list — so the row lands where those rows land instead of
+ * trailing 700px of slack. The field keeps the standard `max-w-sm` box the
+ * component library caps its own fields at, the shape its own width beside it,
+ * and the slack between the two groups is the row's, to be spent on nothing. Only
+ * on a window too narrow to hold both groups does the field give ground, never
+ * the controls.
  *
  * The shape is a **pair of toggles** rather than a third menu, because it is the
  * one answer here that has exactly two values and is about the screen rather than
@@ -65,7 +68,9 @@ const DEFAULT_UNIT: ListUnit = "skill";
  * gone says ("not while this is live") while holding the row still, which is why
  * the stand-down is a lock and not an unmount. The shape is exempt: a search
  * answers in sections and those sections are read in the shape the reader chose,
- * so that choice is honoured while a query is live and its switch stays open.
+ * so that choice is honoured while a query is live and its switch stays open —
+ * and it stands on the leading edge for the same reason, next to the field whose
+ * answer it is shaping.
  *
  * A list that answers in one order shows no order control at all: the store's only
  * order is the figure its own rows display, and a menu of one is a control that
@@ -132,7 +137,15 @@ export function ListToolbar({
         disabled={waiting}
         placeholder={waiting ? t("common.indexBuilding") : undefined}
       />
-      <div className="flex shrink-0 items-center gap-2">
+      <ListUnitToggle
+        unit={unit}
+        onChange={(next) => setUnit(destination, next)}
+      />
+      {/* The two a live search overrides, docked to the trailing edge — which is
+          where the tools put the controls that read the answer: MUI's density
+          and columns, Ant Design Pro's 列设置, Airtable's sort and view
+          options. */}
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         {scopable && (
           <ListFacets
             facets={facets}
@@ -142,10 +155,6 @@ export function ListToolbar({
             onSelect={(key) => setScope(destination, key)}
           />
         )}
-        <ListUnitToggle
-          unit={unit}
-          onChange={(next) => setUnit(destination, next)}
-        />
         {sortable && (
           <ListSortSelect
             sort={sort}
