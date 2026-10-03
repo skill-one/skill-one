@@ -13,7 +13,15 @@ const { isTauri, readSkillMd, writeSkillMd } = vi.hoisted(() => ({
 }));
 
 vi.mock("./tauri", () => ({ isTauri }));
-vi.mock("./skills-manager", () => ({ readSkillMd, writeSkillMd }));
+vi.mock("./skills-manager", () => ({
+  readSkillMd,
+  writeSkillMd,
+  // The activity log's append path: saving a SKILL.md records an event, and the
+  // write itself is not what this suite is about. Left out, `logActivity`
+  // throws inside its own try/catch and only warns, so the omission would pass
+  // silently while every save stopped being logged.
+  appendActivityRaw: vi.fn(),
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();

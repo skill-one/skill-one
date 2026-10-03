@@ -15,7 +15,14 @@ const { isTauri, installSkill, installMockSkill, recordSkillProvenance } =
   }));
 
 vi.mock("./tauri", () => ({ isTauri }));
-vi.mock("./skills-manager", () => ({ installSkill }));
+vi.mock("./skills-manager", () => ({
+  installSkill,
+  // The activity log's append path: installing records an event, and the
+  // write itself is not what this suite is about. Left out, `logActivity`
+  // throws inside its own try/catch and only warns, so the omission would pass
+  // silently while every install stopped being logged.
+  appendActivityRaw: vi.fn(),
+}));
 vi.mock("./mock-local", () => ({ installMockSkill }));
 vi.mock("./provenance", () => ({ recordSkillProvenance }));
 

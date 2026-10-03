@@ -190,10 +190,7 @@ mod tests {
         for n in 1..=5 {
             append_line_at(&active, &format!("line-{n}")).expect("append");
         }
-        assert_eq!(
-            read_tail_at(&active, 2).unwrap(),
-            vec!["line-4", "line-5"]
-        );
+        assert_eq!(read_tail_at(&active, 2).unwrap(), vec!["line-4", "line-5"]);
     }
 
     #[test]

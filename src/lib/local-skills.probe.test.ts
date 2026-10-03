@@ -14,6 +14,10 @@ vi.mock("./skills-manager", () => ({
   unlinkAgents: vi.fn(),
   listInstalledSkills: vi.fn(),
   removeSkills: vi.fn(),
+  // The activity log's append path, present for the same reason as in the
+  // other suites that stub this module: `logActivity` swallows a missing export
+  // with a warning, so an omission here would pass silently.
+  appendActivityRaw: vi.fn(),
 }));
 
 describe("fetchAgentStatus (Tauri)", () => {

@@ -118,7 +118,10 @@ mod tests {
 
         // The link is neither followed nor counted, so a link farm cannot
         // inflate the fingerprint into a permanent "changed" verdict.
-        assert_eq!(fingerprint_skill_dir(dir.path()).expect("fingerprint"), before);
+        assert_eq!(
+            fingerprint_skill_dir(dir.path()).expect("fingerprint"),
+            before
+        );
     }
 
     #[test]
@@ -145,7 +148,10 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         assert_eq!(
             fingerprint_skill_dir(dir.path()).expect("fingerprint"),
-            DirFingerprint { mtime_ms: 0.0, size: 0 }
+            DirFingerprint {
+                mtime_ms: 0.0,
+                size: 0
+            }
         );
     }
 

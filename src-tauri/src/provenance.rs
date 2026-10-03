@@ -61,8 +61,8 @@ pub async fn read_provenance() -> Result<Option<String>, String> {
 #[tauri::command]
 pub async fn write_provenance(content: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || write_ledger_at(&ledger_path()?, &content))
-    .await
-    .map_err(|e| format!("write provenance task failed: {e}"))?
+        .await
+        .map_err(|e| format!("write provenance task failed: {e}"))?
 }
 
 /// Reveal the ledger's directory (the global skills directory) in the system

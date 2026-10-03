@@ -15,7 +15,14 @@ const {
 }));
 
 vi.mock("./tauri", () => ({ isTauri }));
-vi.mock("./skills-manager", () => ({ removeSkills }));
+vi.mock("./skills-manager", () => ({
+  removeSkills,
+  // The activity log's append path: a removal records an event, and the write
+  // itself is not what this suite is about. Left out, `logActivity` throws
+  // inside its own try/catch and only warns, so the omission would pass
+  // silently while every removal stopped being logged.
+  appendActivityRaw: vi.fn(),
+}));
 vi.mock("./mock-local", () => ({ removeMockSkill }));
 vi.mock("./provenance", () => ({ removeSkillProvenanceBatch }));
 
