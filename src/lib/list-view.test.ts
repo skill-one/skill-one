@@ -123,21 +123,11 @@ describe("list view", () => {
     expect(stored().views.store).not.toHaveProperty("sort");
   });
 
-  it("reads a stored shape from either era of the control", async () => {
-    // The shape key is written again, so a reader who had a list in repository
-    // cards reads that back as the shape…
+  it("reads a stored shape from its own key", async () => {
     window.localStorage.setItem("skill-one.listUnit.installed", "repo");
-    const { getListView: fromUnitKey } = await freshListView();
-    expect(fromUnitKey().views.installed.unit).toBe("repo");
-    expect(fromUnitKey().views.installed).not.toHaveProperty("sort");
-
-    // …and so does one who read the shape as the merged control's repository
-    // sort, which is where that era of the key left it.
-    window.localStorage.removeItem("skill-one.listUnit.installed");
-    window.localStorage.setItem("skill-one.listSort.store", "repo");
-    const { getListView: fromMergedSort } = await freshListView();
-    expect(fromMergedSort().views.store.unit).toBe("repo");
-    expect(fromMergedSort().views.store).not.toHaveProperty("sort");
+    const { getListView: stored } = await freshListView();
+    expect(stored().views.installed.unit).toBe("repo");
+    expect(stored().views.installed).not.toHaveProperty("sort");
   });
 
   it("keeps the sort through a scope change, then forgets it on reset", () => {

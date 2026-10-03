@@ -135,8 +135,7 @@ if (typeof Element !== "undefined") {
 //
 // - the `history` keeps its entries, and with them react-router's own index
 //   (`history.state.idx`), so a test that navigated would leave the next one
-//   with an entry behind it that it never visited — which is what
-//   `useReturn` reads to decide whether there is anywhere to go back to;
+//   with an entry behind it that it never visited;
 // - and react-router keys its entries in that same state, with one exception:
 //   the entry a window *starts* on is keyed `"default"`, the same key in every
 //   window. Per window that is exactly right — there is one such entry — but

@@ -25,7 +25,7 @@
 const CJK = /[\u3400-\u4dbf\u4e00-\u9fff]/g;
 
 /** ASCII word runs — letters, digits, and in-word apostrophes/hyphens. */
-const WORD = /[A-Za-z0-9'’\-]+/g;
+const WORD = /[A-Za-z0-9'’-]+/g;
 
 /**
  * Estimate how many tokens `text` costs. An empty (or whitespace-only) string
@@ -38,6 +38,6 @@ export function estimateTokens(text: string): number {
   const words = (rest.match(WORD) ?? []).length;
   // Everything that is neither a word nor whitespace — the same exclusions
   // as WORD, so in-word apostrophes and hyphens do not count twice.
-  const punct = (rest.match(/[^\sA-Za-z0-9'’\-]/g) ?? []).length;
+  const punct = (rest.match(/[^\sA-Za-z0-9'’-]/g) ?? []).length;
   return Math.ceil(cjk * 0.75 + words + punct);
 }

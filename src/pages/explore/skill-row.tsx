@@ -17,7 +17,6 @@ import {
   type SkillMatched,
 } from "../../components/highlighted-text";
 import { OwnerAvatar } from "../../components/owner-avatar";
-import { INTERACTIVE_CLASS } from "../../components/skill-card";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillInstalledTime } from "../../components/skill-installed-time";
 import { SkillPopularity } from "../../components/skill-popularity";
@@ -30,6 +29,14 @@ import {
 } from "../../components/ui/tooltip";
 
 export type { SkillMatched };
+
+/**
+ * The lift and ring an interactive card gets on hover and focus. Shared by every
+ * surface that answers a click with a card, so a list row and the cards it sits
+ * among cannot animate differently.
+ */
+const INTERACTIVE_CLASS =
+  "cursor-pointer transition-all duration-150 hover:-translate-y-px hover:border-border hover:bg-accent/40 hover:shadow-[0_8px_24px_-16px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /**
  * One skill in a collection page's list — a repository's own skills, or the

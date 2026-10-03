@@ -1,7 +1,16 @@
 import { QueryClient } from "@tanstack/react-query";
 
 /**
- * Shared QueryClient factory for both windows (main app + menu bar popover).
+ * The QueryClient factory each window builds its own client from — main app and
+ * menu bar popover.
+ *
+ * *One factory, one client per window, deliberately not a shared singleton*: the
+ * popover is a separate webview with its own JS context, so a module-level
+ * singleton would hand each window a different instance anyway while claiming
+ * they were the same. What actually crosses the window boundary is the installed
+ * list, and it does so as an event — writes broadcast `SKILLS_CHANGED_EVENT`
+ * (`hooks/use-installed-skills.ts`) and the popover invalidates on it plus on
+ * focus (`popover/use-skills-live-sync.ts`).
  *
  * Cached registry data is served for 10 minutes without re-fetching
  * (`staleTime`); beyond that it is shown first and revalidated in the

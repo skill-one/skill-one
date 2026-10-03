@@ -62,7 +62,7 @@ GitHub 星数**不**随技能行发布：它们存放在下文的 `repos.jsonl` 
 
 ## 技能目录（skills/）
 
-索引行与 `skills/` 目录按该行的 `dir` 联接：`skills/<dir>/` 存放该技能自己的 `SKILL.md`、数据集的类型化答案（`domain.json`）以及中文页 `SKILL.zh.md`。应用只读索引行，从不抓取 `domain.json`。技能没有封面插图：详情抽屉的图片位置显示作者首字母（见 [src/components/skill-cover.tsx](../src/components/skill-cover.tsx)）。卡片列表则完全不显示图片——每行重复一个字母方块只是 48px 承载不了任何事实的装饰——所以每张卡以技能名领头，来源以文字写在卡片栏上。
+索引行与 `skills/` 目录按该行的 `dir` 联接：`skills/<dir>/` 存放该技能自己的 `SKILL.md`、数据集的类型化答案（`domain.json`）以及中文页 `SKILL.zh.md`。应用只读索引行，从不抓取 `domain.json`。技能没有封面插图，卡片列表也不显示图片——每行重复一个字母方块只是 48px 承载不了任何事实的装饰——所以每张卡以技能名领头，来源以文字写在卡片栏上。
 
 应用把每行映射到 `Skill` 模型：`name = id 的 slug`、`id = 该行的 id`、`repo = {owner}/{repo}`、`path = skills/<dir>`（快照内目录，用于详情抓取与 basename 匹配）、`url = https://www.skills.sh/{id}`（推导得出）、`descriptionZh = description_zh`、`profile = { domain: [domain], confidence }`——`stars` 由联接的 `repos.jsonl` 行提供（未联接时为 0）。name 仍是 slug 而非该行的 frontmatter `name`：slug 是所有消费方共享的唯一 skills.sh 身份——本地安装副本叫这个名字（agents-skills 按 slugify 后的 frontmatter `name` 匹配安装）、skills.sh 实时搜索回报的也是它。但原始拼写不再被丢弃：当 frontmatter `name` 经 slug 化后与 slug 不同时，该行会以 `displayName` 携带它，界面用它渲染技能标题；`id` 本身也随行携带，安装时原样发给后端，不再由 repo 与 slug 重新拼接。快照不再发布每技能的内容哈希或首次抓取时间，模型因此不再携带 `rev`/`firstSeenAt`。
 

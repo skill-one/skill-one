@@ -2,7 +2,3 @@ allowBuilds:
   esbuild: false
 minimumReleaseAgeExclude:
   - '@tauri-apps/plugin-updater@2.11.0'
-  - cn@0.3.0
-  - framer-motion@13.4.4
-  - motion-dom@13.4.4
-  - motion@13.4.4

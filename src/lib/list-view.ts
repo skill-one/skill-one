@@ -106,10 +106,7 @@ const DEFAULT_SORT: ListSort = "popularity";
 const DEFAULT_UNIT: ListUnit = "skill";
 
 /**
- * One key per list, so each keeps its own answer under its own name. The shape
- * key is written again: it was merged into the sort key while the two shared one
- * control, and a stored shape is honoured once more — a `repo` sort left by that
- * era is read as the shape it was standing for.
+ * One key per list, so each keeps its own answer under its own name.
  */
 const UNIT_KEY_PREFIX = "skill-one.listUnit.";
 const SORT_KEY_PREFIX = "skill-one.listSort.";
@@ -125,11 +122,6 @@ function readStoredSort(destination: Destination): ListSort | undefined {
 }
 
 function readStoredUnit(destination: Destination): ListUnit | undefined {
-  // One-time reading of the merged era: that control carried the shape as its
-  // repository option, so a stored `repo` sort is read as the shape it stood
-  // for. The stale key is left behind — reading it again would answer the same
-  // thing, and a reader who has since changed the shape has written over it.
-  if (storage.getItem(SORT_KEY_PREFIX + destination) === "repo") return "repo";
   return storage.getItem(UNIT_KEY_PREFIX + destination) === "repo"
     ? "repo"
     : undefined;

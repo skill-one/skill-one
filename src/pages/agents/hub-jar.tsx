@@ -240,9 +240,13 @@ export function HubJar({
   const cardRefs = useRef<Array<HTMLSpanElement | null>>([]);
   // The effect reads the roster through a ref and keys on its signature, so
   // a parent re-render (a hovered agent, a badge) never restarts the rain —
-  // only a changed roster or jar does.
+  // only a changed roster or jar does. Syncing the ref in an effect rather than
+  // during render keeps the ref out of the render phase; declared first, it has
+  // already written by the time the simulation effect below reads it.
   const skillsRef = useRef(skills);
-  skillsRef.current = skills;
+  useLayoutEffect(() => {
+    skillsRef.current = skills;
+  }, [skills]);
   const signature = skills.map((skill) => skill.name).join("\n");
   const scale = jarCardScale(skills.length);
   // Roster-aware faces so same-prefix siblings split across hues (a cheap

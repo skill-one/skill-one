@@ -288,8 +288,17 @@ function FieldRows({
  */
 function FieldValue({ value, locale }: { value: unknown; locale: string }) {
   if (value === null) return <span className="font-mono">null</span>;
-  if (typeof value !== "object") {
+  if (typeof value === "string") {
+    return <span className="break-all font-mono">{value}</span>;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
     return <span className="break-all font-mono">{String(value)}</span>;
+  }
+  if (typeof value !== "object") {
+    // `bigint`, `symbol` and `undefined` — not something `JSON.parse` produces,
+    // but still primitives here rather than a structure to walk into. Their type
+    // is what names them, which also keeps `undefined` reading as `undefined`.
+    return <span className="font-mono">{typeof value}</span>;
   }
   if (Array.isArray(value)) {
     if (value.length === 0) return <span className="font-mono">[]</span>;
