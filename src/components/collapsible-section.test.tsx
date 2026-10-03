@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HardDrive } from "lucide-react";
 
+import { expectNoA11yViolations } from "../test/a11y";
 import { CollapsibleSection } from "./collapsible-section";
 
 function renderSection(
@@ -109,5 +110,27 @@ describe("CollapsibleSection", () => {
       "false",
     );
     expect(screen.queryByText("section body")).not.toBeInTheDocument();
+  });
+
+  it("carries no accessibility violation open or folded", async () => {
+    // The trigger, the count badge and the decorative glyph all sit in one
+    // accessible name, and the icon must not add a second one. Checked in
+    // both states because folding unmounts the panel, which is the state a
+    // stale landmark or a dangling `aria-controls` would show up in.
+    const { container, rerender } = renderSection({ icon: HardDrive });
+    await expectNoA11yViolations(container);
+
+    await userEvent.setup().click(screen.getByRole("button", { name: /今天/ }));
+    rerender(
+      <CollapsibleSection
+        title="今天"
+        count="3 个 skill"
+        icon={HardDrive}
+        defaultOpen={false}
+      >
+        <div>section body</div>
+      </CollapsibleSection>,
+    );
+    await expectNoA11yViolations(container);
   });
 });

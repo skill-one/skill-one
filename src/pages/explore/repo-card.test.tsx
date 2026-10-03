@@ -228,35 +228,49 @@ describe("RepoCard", () => {
     expect(onOpenSkill).not.toHaveBeenCalled();
   });
 
-  it("keeps the install button out of the way until the row is pointed at", () => {
+  it("keeps the install button reachable without hovering the row", async () => {
+    const user = userEvent.setup();
+    vi.mocked(installSkillFromSource).mockResolvedValue(undefined);
     renderCard();
 
     // A card's worth of always-on buttons would be the loudest thing on the
-    // card, so the action waits for the row to be hovered or focused — but it
-    // stays in the layout rather than being `hidden`, so the row keeps its
-    // height and nothing shifts under the pointer.
+    // card, so the action waits for the row to be hovered or focused. Deferring
+    // it is only acceptable if a keyboard can still reach it, which is what
+    // this checks: the button is in the tree, is visible, and takes focus and
+    // activation without a pointer ever touching the row.
     const install = screen.getAllByRole("button", { name: "安装" })[0];
-    // The reveal rides the button's wrapper: the button owns `opacity` for its
-    // own states (an installed one is `disabled:opacity-50`, which is more
-    // specific than a bare `opacity-0` and would otherwise win).
-    const reveal = install.parentElement as HTMLElement;
-    expect(reveal).toHaveClass("opacity-0");
-    expect(reveal).toHaveClass("group-hover/row:opacity-100");
-    // An installed badge is a state rather than an invitation, so the wrapper
-    // also reveals from the button's own `data-state` — the row below covers it.
-    expect(reveal).toHaveClass("has-data-[state=installed]:opacity-100");
-    // Focus, either on the row or on the button inside it, reveals it too — so
-    // a keyboard walk still sees the action of the row it stands on.
-    expect(reveal).toHaveClass("group-focus-within/row:opacity-100");
-    expect(install).not.toHaveClass("hidden");
-    // Floating, not laid out: the row's name and description get its whole
-    // width in the state a reader compares skills in, and the button dissolves
-    // the text it covers rather than pushing it aside.
-    expect(reveal).toHaveClass("absolute");
-    expect(reveal).toHaveClass("bg-gradient-to-l");
-    expect(
-      screen.getAllByRole("button", { name: "查看 pdf 详情" })[0],
-    ).toHaveClass("flex-1");
+
+    // Present and visible — a `hidden` or `display: none` button would be gone
+    // from the accessibility tree, which is what makes hover-reveal a trap.
+    expect(install).toBeVisible();
+
+    // Walked to with the keyboard rather than focused directly: the card's
+    // expand-head and every row come first, so reaching the button at all is
+    // the claim being made. A single Tab would only prove that *something* on
+    // the card is focusable.
+    for (let hop = 0; hop < 30 && install !== document.activeElement; hop++) {
+      await user.tab();
+    }
+    expect(install).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(installSkillFromSource).toHaveBeenCalled();
+  });
+
+  it("takes the install button out of the row's flow", () => {
+    renderCard();
+
+    // The button floats over the row's text rather than sitting beside it, so
+    // the name and description keep the row's full width in the state a reader
+    // compares skills in.
+    //
+    // Asserted as the class rather than as geometry on purpose: jsdom runs no
+    // CSS engine, so `getComputedStyle` reports `position: static` whatever the
+    // stylesheet says. Here the utility class *is* the available evidence, and
+    // it is the load-bearing one — the gradient and the flex share are
+    // decoration on top of it, so they are left unasserted rather than pinned.
+    const install = screen.getAllByRole("button", { name: "安装" })[0];
+    expect(install.parentElement).toHaveClass("absolute");
   });
 
   it("keeps an installed skill's badge on screen without a hover", async () => {

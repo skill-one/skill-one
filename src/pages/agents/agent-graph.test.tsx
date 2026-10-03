@@ -45,6 +45,23 @@ function agent(overrides: Partial<AgentStatus>): AgentStatus {
   };
 }
 
+/**
+ * The mock registry's installed set. Named here so a test can talk about "all
+ * but one" without repeating the list, and so a change to `mock-local`'s
+ * fixture is picked up rather than silently narrowing what a test covers.
+ */
+const INSTALLED = [
+  "pdf",
+  "docx",
+  "pptx",
+  "mcp-builder",
+  "code-review",
+  "frontend-design",
+] as const;
+
+/** Every installed skill except `pdf` — the set the jar tests park. */
+const PARKED = INSTALLED.filter((name) => name !== "pdf");
+
 const agents: AgentStatus[] = [
   agent({ name: "claude-code", display: "Claude Code", linked: true }),
   agent({
@@ -331,23 +348,15 @@ describe("AgentGraph", () => {
     }
   });
 
-  it("jars only the enabled skills, and says when none are", async () => {
+  it("jars only the enabled skills", async () => {
     // One skill left enabled: it alone fills the jar, the parked ones stay
     // out. The enabled-share badge keeps stating the facts.
-    for (const name of [
-      "docx",
-      "pptx",
-      "mcp-builder",
-      "code-review",
-      "frontend-design",
-    ]) {
-      setMockSkillEnabled(name, false);
-    }
-    const first = renderWithRouter(<AgentGraph agents={agents} />);
+    for (const name of PARKED) setMockSkillEnabled(name, false);
+    renderWithRouter(<AgentGraph agents={agents} />);
 
     // The persisted query cache may answer the first paint with the previous
-    // state; wait for the refetch to land — only pdf stays in the jar —
-    // before reading it.
+    // state; wait for the refetch to land — only pdf stays in the jar — before
+    // reading it.
     const disk = await waitFor(() => {
       // Both conditions together: a jar holding exactly pdf.
       const el = screen.getByRole("figure", { name: HUB });
@@ -355,35 +364,23 @@ describe("AgentGraph", () => {
       expect(el.querySelector('[data-skill="docx"]')).toBeNull();
       return el;
     });
-    expect(disk.querySelector('[data-skill="pdf"]')).not.toBeNull();
-    for (const name of [
-      "docx",
-      "pptx",
-      "mcp-builder",
-      "code-review",
-      "frontend-design",
-    ]) {
+    for (const name of PARKED) {
       expect(disk.querySelector(`[data-skill="${name}"]`)).toBeNull();
     }
+  });
 
-    // Nothing enabled at all: the jar holds every installed skill rather
-    // than reading as broken — a fresh install is a full jar too. (The store
-    // mutation lands between mounts; the hub reads it on the next one.)
-    first.unmount();
-    setMockSkillEnabled("pdf", false);
+  it("jars every installed skill when none are enabled", async () => {
+    // Nothing enabled at all: the jar holds every installed skill rather than
+    // reading as broken — a fresh install is a full jar too, so the empty
+    // enabled-set must not look like a failure.
+    for (const name of INSTALLED) setMockSkillEnabled(name, false);
     renderWithRouter(<AgentGraph agents={agents} />);
 
-    await waitFor(() => {
-      expect(
-        screen
-          .getByRole("figure", { name: HUB })
-          .querySelector('[data-skill="docx"]'),
-      ).not.toBeNull();
+    const disk = await waitFor(() => {
+      const el = screen.getByRole("figure", { name: HUB });
+      expect(el.querySelector('[data-skill="pdf"]')).not.toBeNull();
+      return el;
     });
-    expect(
-      screen
-        .getByRole("figure", { name: HUB })
-        .querySelector('[data-skill="pdf"]'),
-    ).not.toBeNull();
+    expect(disk.querySelector('[data-skill="docx"]')).not.toBeNull();
   });
 });

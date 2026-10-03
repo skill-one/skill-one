@@ -292,25 +292,39 @@ describe("InstalledPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    for (let remaining = 6; remaining > 0; remaining--) {
-      // The cards only answer to a role query once the panel has closed, so
-      // each turn of the loop also proves the previous uninstall dismissed it.
-      // Six skills fit the folded cap, so every removal shrinks the visible
-      // list by one.
+    const cards = () =>
+      screen.queryAllByRole("button", { name: /查看 .+ 详情/ });
+    // Bounded by the list as it stands, so a removal that does not take effect
+    // fails on the turn it went wrong instead of spinning to the timeout. Read
+    // after the first paint, since the list arrives asynchronously.
+    await waitFor(() => expect(cards().length).toBeGreaterThan(0));
+
+    for (let remaining = cards().length; remaining > 0; remaining--) {
+      // Each turn removes the skill it opened rather than "one skill", so a
+      // component that dropped the wrong one fails here instead of passing on a
+      // count that happened to match.
       const [first] = await screen.findAllByRole("button", {
         name: /查看 .+ 详情/,
       });
+      const name = first
+        .getAttribute("aria-label")!
+        .replace(/^查看 | 详情$/g, "");
+
       await user.click(first);
       await user.click(await screen.findByRole("button", { name: "移除" }));
       const ask = await screen.findByRole("dialog", {
-        name: /移除 .+？/,
+        name: `移除 ${name}？`,
       });
       await user.click(within(ask).getByRole("button", { name: "移除" }));
+
+      // The panel closes with the skill it removed, so the name that was opened
+      // is the name that must be gone from the list.
       await waitFor(() =>
         expect(
-          screen.queryAllByRole("button", { name: /查看 .+ 详情/ }),
-        ).toHaveLength(remaining - 1),
+          screen.queryByRole("button", { name: `查看 ${name} 详情` }),
+        ).not.toBeInTheDocument(),
       );
+      expect(cards()).toHaveLength(remaining - 1);
     }
 
     expect(await screen.findByText("还没有安装任何技能")).toBeInTheDocument();

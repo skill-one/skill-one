@@ -298,8 +298,13 @@ describe("ExplorePage", () => {
     expect(harness.downloads).toBe(1);
   });
 
-  it("answers the shape switch with the two arrangements, and orders only by popularity", async () => {
-    const user = userEvent.setup();
+  /**
+   * Two single-skill repositories whose stars and installs disagree: `few` is
+   * the most installed, `star` the most starred. A shape that ordered by the
+   * wrong figure puts them in opposite orders, so each arrangement can be told
+   * apart from the other by the order alone.
+   */
+  function bootRankedRegistry() {
     harness.reset();
     harness.init();
     harness.pushAll([
@@ -321,32 +326,65 @@ describe("ExplorePage", () => {
       },
     ]);
     harness.complete();
-    const { unmount } = renderExplorePage();
+  }
+
+  it("offers no sort control, because the store has only one order", async () => {
+    bootRankedRegistry();
+    renderExplorePage();
+    await screen.findByText("few");
+
     // The store's only order is the figure its own rows display, so it has no
-    // order control to press — what it has instead is the shape, and both of its
-    // arrangements stand on the row.
+    // order control to press — what it has instead is the shape, and both of
+    // its arrangements stand on the row.
     expect(
       screen.queryByRole("button", { name: "排序方式" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("orders the row shape by install count, most installed first", async () => {
+    const user = userEvent.setup();
+    bootRankedRegistry();
+    renderExplorePage();
+    await screen.findByText("few");
 
     await pickUnit(user, "列表");
-    await screen.findByText("few");
+
     // 列表 is one row per skill, most installed first — the figure each row
     // shows, so the order and the numbers beside it cannot disagree.
     await waitFor(() => expect(cardOrder()).toEqual(["few", "star"]));
+  });
+
+  it("orders the card shape by stars, most-starred repository first", async () => {
+    const user = userEvent.setup();
+    bootRankedRegistry();
+    renderExplorePage();
+    await screen.findByText("few");
+
+    await pickUnit(user, "卡片");
+
+    // 卡片 is one card per repository, led by the most-starred one — however
+    // few installs its skills claim, which is the opposite of the row order.
+    await waitFor(() => expect(cardOrder()).toEqual(["star", "few"]));
+    expect(repoCards()).toHaveLength(2);
+  });
+
+  it("remembers the chosen shape after the page goes away", async () => {
+    const user = userEvent.setup();
+    bootRankedRegistry();
+    const { unmount } = renderExplorePage();
+    await screen.findByText("few");
+
+    await pickUnit(user, "列表");
+    await waitFor(() => expect(cardOrder()).toEqual(["few", "star"]));
+
     // The choice lives in the shared view, so it survives the page going away.
     unmount();
     renderExplorePage();
-    expect(screen.getByRole("button", { name: "列表" })).toHaveAttribute(
+
+    expect(await screen.findByRole("button", { name: "列表" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-
-    await pickUnit(user, "卡片");
-    // 卡片 is one card per repository, led by the most-starred one — however
-    // few installs its skills claim.
-    await waitFor(() => expect(cardOrder()).toEqual(["star", "few"]));
-    expect(repoCards()).toHaveLength(2);
   });
 
   it("caps a repository's rows at the folded limit and reveals the rest in place", async () => {
