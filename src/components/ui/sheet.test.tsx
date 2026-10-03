@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
+import { expectNoA11yViolations } from "../../test/a11y";
 import { Sheet, SheetContent, SheetTitle } from "./sheet";
 
 /**
@@ -54,5 +55,29 @@ describe("Sheet", () => {
     expect(content).toHaveClass("data-[side=right]:bottom-0");
     expect(content).not.toHaveClass("data-[side=right]:h-full");
     expect(content).not.toHaveClass("data-[side=right]:inset-y-0");
+  });
+
+  it("names the dialog it opens, and audits clean", async () => {
+    // A modal sheet is a dialog, and a dialog with no accessible name is
+    // announced as just "dialog" — so the title wiring is the thing to prove.
+    // Both halves come from Base UI's own popup, which is exactly the wiring a
+    // hand-written role query can quietly stop matching.
+    const { baseElement } = render(
+      <Sheet open>
+        <SheetContent>
+          <SheetTitle>Installed skills</SheetTitle>
+        </SheetContent>
+      </Sheet>,
+    );
+
+    expect(
+      await screen.findByRole("dialog", { name: "Installed skills" }),
+    ).toBeInTheDocument();
+
+    // Audited over `baseElement` because the sheet portals out of the render
+    // container; scoping to `container` would audit an empty node. This is also
+    // what covers the background being correctly hidden from assistive tech
+    // while the dialog is up.
+    await expectNoA11yViolations(baseElement);
   });
 });
