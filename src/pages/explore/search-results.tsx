@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, Globe, Loader2, Store, Users } from "lucide-react";
+import { ChevronDown, Globe, Loader2, Store } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
@@ -30,10 +30,10 @@ import { SkillRow } from "./skill-row";
 import { RepoCard } from "./repo-card";
 
 /**
- * The search answer, read wherever a list asks the shared query. Every surface
- * answers in the same three layers, and which layer each source falls into is a
+ * The search answer, read wherever a list asks the shared query. Both surfaces
+ * answer in the same three layers, and which layer each source falls into is a
  * fact about that source rather than about the list — which is what makes the
- * two surfaces read as one behaviour instead of two:
+ * two read as one behaviour instead of two:
  *
  * 1. **The list's own answer**, laid out plainly, with no header: this list *is*
  *    the source, so its rows say where they came from by being on screen, and a
@@ -67,13 +67,6 @@ import { RepoCard } from "./repo-card";
  * action), and the page alone knows the ledger and the link suggestions behind
  * them.
  */
-
-/**
- * Which surface is asking the shared question. The two lists each have their own
- * answer; the independent search page asks of every collection at once, which is
- * why it is a value here rather than a fourth rendering path.
- */
-export type SearchDestination = Destination | "search";
 
 /** One render-ready row of the installed section. */
 export interface SearchRow {
@@ -150,12 +143,12 @@ export function SearchResults({
   query: string;
   /**
    * Which surface is asking — and so which source leads the answer, and which
-   * read as a supplement below it (see the component note). `"search"` is the
-   * independent search page, where the question is asked of every collection
-   * at once: the registry leads, and this machine's own installs read beside it
-   * as one more supplement rather than as the answer.
+   * read as a supplement below it (see the component note). The store leads with
+   * the registry's index and asks nothing of this machine's records; the
+   * installed list leads with what it has and reads the registry below as one
+   * more source.
    */
-  destination: SearchDestination;
+  destination: Destination;
   /**
    * The installed answer, render-ready. The installed list hands one over as its
    * own answer and the search page as a supplement; the store's answer holds no
@@ -218,7 +211,7 @@ export function SearchResults({
   // the installed list's reveal puts the store's own rows under its own rows
   // (see the component note), and those two answers wear different surfaces.
   const [opened, setOpened] = useState<{
-    answer: "own" | "store" | "installed";
+    answer: "own" | "store";
     key: string;
   } | null>(null);
 
@@ -253,19 +246,7 @@ export function SearchResults({
     skills: storeSkills,
     surface: "store",
   } as const;
-  // The search page's third answer: this machine's own installs, worn in the
-  // installed surface (the enable switch) because that is what manages them.
-  const installedBlock = {
-    answer: "installed",
-    skills: installed.map((row) => row.skill),
-    surface: "installed",
-  } as const;
-  const drawer =
-    opened?.answer === "store"
-      ? storeBlock
-      : opened?.answer === "installed"
-        ? installedBlock
-        : ownBlock;
+  const drawer = opened?.answer === "store" ? storeBlock : ownBlock;
 
   // Loading, empty, searching — all three about the list's *own* answer, which
   // is the only one on screen by default. It renders progressively (a local
@@ -280,11 +261,10 @@ export function SearchResults({
   const searching = storeLoading || liveSearching;
 
   /**
-   * Which answer a row belongs to: the asking surface's own, the store's reveal,
-   * or — on the search page, which asks of every collection at once — this
-   * machine's installs answering beside the registry's.
+   * Which answer a row belongs to: the asking list's own, or the store's reveal
+   * below the installed list's.
    */
-  type Answer = "own" | "store" | "installed";
+  type Answer = "own" | "store";
   // Rows address the selection the way they are addressed — which answer they
   // belong to, plus their own key — so neither has to restate the other's.
   const isOpen = (answer: Answer, key: string) =>
@@ -428,66 +408,6 @@ export function SearchResults({
         )
       ) : (
         ownAnswer
-      )}
-
-      {/* What this machine has, on the search page: the third source, asked at
-          the same time as the other two. Cheap and in memory, so it sits here
-          as a titled supplement rather than behind the skills.sh press — which
-          is the whole point of the page: one question, every collection. */}
-      {destination === "search" && installed.length > 0 && (
-        <CollapsibleSection
-          className="border-t border-border/60 pt-6"
-          icon={Users}
-          title={t("search.installed")}
-          count={
-            unit === "repo"
-              ? t("state.repoCount", { count: installedCards.length })
-              : t("state.skillCount", { count: installed.length })
-          }
-        >
-          {unit === "skill" ? (
-            <ul className={SKILL_ROW_LIST_CLASS}>
-              {installed.map((row, index) => {
-                const key = skillKey(row.skill);
-                return (
-                  <SkillRow
-                    key={key}
-                    skill={row.skill}
-                    matched={row.matched}
-                    index={index}
-                    ranked={false}
-                    selected={isOpen("installed", key)}
-                    muted={row.muted}
-                    extra={row.extra}
-                    action={row.action}
-                    onSelect={openRow("installed", key)}
-                  />
-                );
-              })}
-            </ul>
-          ) : (
-            <ul className={REPO_LIST_CLASS}>
-              {installedCards.map((card) => (
-                <RepoCard
-                  key={card.repo || LOCAL_POOL_KEY}
-                  repo={card.repo}
-                  skills={card.items.map((row) => ({
-                    skill: row.skill,
-                    matched: row.matched,
-                    muted: row.muted,
-                    extra: row.extra,
-                    action: row.action,
-                  }))}
-                  hasQuery
-                  selected={
-                    opened?.answer === "installed" ? opened.key : null
-                  }
-                  onOpenSkill={openCard("installed")}
-                />
-              ))}
-            </ul>
-          )}
-        </CollapsibleSection>
       )}
 
       {/* The registry's index as a supplement — the installed list's second

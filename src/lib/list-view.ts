@@ -1,29 +1,31 @@
 /**
  * The controls both browse lists show, held in one place because they mean one
- * thing per list: how the list reads — its order, its shape, the slice of the
+ * thing per list: what the reader is looking for — the question a search
+ * answers — and how the list reads: its order, its shape, the slice of the
  * taxonomy it is narrowed to. A page reads the slice it needs out of here and
  * answers with it; the page showing the list writes.
  *
- * **Search is deliberately not in here.** The question lives in the search
- * page's own URL (`?q=`, see `components/app-header`), so a search is
- * shareable, the back button is the way out of it, and the two lists are pure
- * browse surfaces that hold no question at all.
+ * **Each list holds its own question**, because the two answers to it are
+ * different answers: the store searches the registry, the installed list
+ * searches what this machine has. One shared field would mean a question asked
+ * on one list silently re-answering the other — the one thing a per-list
+ * reading cannot do.
  *
  * Module-level rather than a context because the two lists are never mounted
  * together — each page renders its own copy of the controls while the other is
- * gone — so the state has to outlive the page that set it. (It is also plain
- * state rather than a render-time value, the same reason `lib/view-memory` and
- * the registry client's snapshot are module-level.)
+ * gone — so the state has to outlive the page that set it: a question typed on
+ * one list is still in its field when the reader comes back to it. (It is also
+ * plain state rather than a render-time value, the same reason `lib/view-memory`
+ * and the registry client's snapshot are module-level.)
  *
  * What is *not* here is everything that is one page's own business: the
- * revealed depth, the scroll position, which folds are open, and the search
- * page's own shape switch — which must not move either browse list's reading.
- * Those belong to the page that renders them, and stay there.
+ * revealed depth, the scroll position, and which folds are open. Those belong
+ * to the page that renders them, and stay there.
  *
  * Each list's order and shape persist across sessions in `localStorage` (via the
  * guarded `storage` wrapper — a blocked write costs persistence and nothing
- * else); the scopes stay session-only, because a taxonomy slice chosen is this
- * visit's business.
+ * else); the questions and the scopes stay session-only, because a question
+ * asked and a taxonomy slice chosen are this visit's business.
  */
 
 import { storage } from "./storage";
@@ -68,8 +70,15 @@ export const LIST_SORTS: Readonly<Record<Destination, readonly ListSort[]>> = {
  */
 export type ListUnit = "repo" | "skill";
 
-/** One list's own reading: what order it answers in, what shape it takes, and what it is narrowed to. */
+/** One list's own reading: what it answers, in what order, in what shape, narrowed to what. */
 export interface DestinationView {
+  /**
+   * What the reader is looking for, raw as typed — the field is controlled by
+   * it, so the word under the cursor never lags a keystroke behind. Absent is
+   * no question: the list browses. A page debounces this into the settled query
+   * it actually answers (see `useDebouncedValue`).
+   */
+  query?: string;
   /**
    * The sort the list answers in while no search is live. Absent is
    * `popularity` — the default: the figure the rows display is the order the
@@ -165,18 +174,41 @@ export function subscribeListView(listener: () => void): () => void {
 
 /**
  * One list's view, built with the absent-by-default fields genuinely absent:
- * a fresh list reads exactly as it did before `sort` (and any scope) existed.
+ * a fresh list reads exactly as it did before `sort` (and any scope or
+ * question) existed.
  */
 function buildView(
+  query: string | undefined,
   sort: ListSort | undefined,
   scope: string | undefined,
   unit: ListUnit | undefined,
 ): DestinationView {
   const view: DestinationView = {};
+  if (query !== undefined) view.query = query;
   if (sort !== undefined) view.sort = sort;
   if (scope !== undefined) view.scope = scope;
   if (unit !== undefined) view.unit = unit;
   return view;
+}
+
+/**
+ * What one list is being asked for. Session-only, and per list: the store's
+ * question is answered by the registry and the installed list's by this
+ * machine's own records, so neither can answer the other's — which is also why
+ * a question set on one list must not empty the other's field. The raw value is
+ * kept as typed; the page debounces it into the query it answers with.
+ */
+export function setQuery(destination: Destination, query: string): void {
+  const { query: current, sort, scope, unit } = state.views[destination];
+  if (query === (current ?? "")) return;
+  publish({
+    ...state,
+    views: {
+      ...state.views,
+      // Absent for no question at all, exactly as the default order is absent.
+      [destination]: buildView(query === "" ? undefined : query, sort, scope, unit),
+    },
+  });
 }
 
 /**
@@ -189,7 +221,7 @@ function buildView(
  */
 export function setSort(destination: Destination, sort: ListSort): void {
   if (!LIST_SORTS[destination].includes(sort)) return;
-  const { scope, unit, sort: current } = state.views[destination];
+  const { query, scope, unit, sort: current } = state.views[destination];
   if (sort === current) return;
   if (sort === DEFAULT_SORT) storage.removeItem(SORT_KEY_PREFIX + destination);
   else storage.setItem(SORT_KEY_PREFIX + destination, sort);
@@ -199,6 +231,7 @@ export function setSort(destination: Destination, sort: ListSort): void {
       ...state.views,
       // The default stays absent, exactly as it is never stored.
       [destination]: buildView(
+        query,
         sort === DEFAULT_SORT ? undefined : sort,
         scope,
         unit,
@@ -214,7 +247,7 @@ export function setSort(destination: Destination, sort: ListSort): void {
  * to read it in cards tomorrow.
  */
 export function setUnit(destination: Destination, unit: ListUnit): void {
-  const { scope, sort, unit: current } = state.views[destination];
+  const { query, scope, sort, unit: current } = state.views[destination];
   if (unit === current) return;
   if (unit === DEFAULT_UNIT) storage.removeItem(UNIT_KEY_PREFIX + destination);
   else storage.setItem(UNIT_KEY_PREFIX + destination, unit);
@@ -224,6 +257,7 @@ export function setUnit(destination: Destination, unit: ListUnit): void {
       ...state.views,
       // Absent for the default shape, exactly as the default order is.
       [destination]: buildView(
+        query,
         sort,
         scope,
         unit === DEFAULT_UNIT ? undefined : unit,
@@ -234,13 +268,13 @@ export function setUnit(destination: Destination, unit: ListUnit): void {
 
 /** Narrow one list to a scope, or — with `null` — to every scope. */
 export function setScope(destination: Destination, scope: string | null): void {
-  const { sort, unit, scope: current } = state.views[destination];
+  const { query, sort, unit, scope: current } = state.views[destination];
   if ((scope ?? undefined) === current) return;
   publish({
     ...state,
     views: {
       ...state.views,
-      [destination]: buildView(sort, scope ?? undefined, unit),
+      [destination]: buildView(query, sort, scope ?? undefined, unit),
     },
   });
 }

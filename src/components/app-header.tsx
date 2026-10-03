@@ -1,47 +1,26 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
-import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 
 import { cn } from "../lib/utils";
 import { isTauri } from "../lib/tauri";
 import { AppNav } from "./app-nav";
-import { SearchInput } from "./search-input";
 import { SettingsMenu } from "./settings-menu";
-
-/** The search page's own route: one question, asked of every collection at once. */
-export const SEARCH_PATH = "/search";
-
-/** The query parameter that question is carried in. */
-export const SEARCH_QUERY_PARAM = "q";
-
-/**
- * Where a question asked from anywhere in the app is answered.
- *
- * Built as a path rather than a route with a state, because the question has
- * to be shareable and the back button has to be the way out of it — which means
- * it has to be in the URL (see `SearchPage`, which reads this parameter).
- */
-export function searchPath(query: string): string {
-  return `${SEARCH_PATH}?${SEARCH_QUERY_PARAM}=${encodeURIComponent(query)}`;
-}
 
 /**
  * The app's chrome, one row: the destinations at the leading edge, the brand
  * dead centre and the window's settings closing it, with the window's drag
  * region over the lot.
  *
- * One row and no more, and nothing in it that belongs to a page — except the
- * search field, which belongs to the window because it answers on every route:
- * it is a jump pad into the search page from anywhere, and the question it holds
- * there is the URL's (see `searchPath`). The row opens with the segmented
- * navigation (see `AppNav`) — the control says which of its lists is on screen —
- * closes with the actions, and carries the mark in the middle, the way a unified
- * toolbar's title does. Settings stay, because they are the window's and answer on
- * every route. Everything else a list needs belongs to that list: the scope picker
- * and the sort switch stand on the list's own row above the answer they shape
- * (see `ListToolbar`). The leading edge is kept clear of the lights by the padding
- * (`pl-24`: the native 20pt leading inset + 52pt of buttons + air), so on macOS
- * the navigation starts just past them, the way a unified toolbar's items do.
+ * One row and no more, and nothing in it that belongs to a page. Settings stay
+ * because they are the window's and answer on every route; everything a list
+ * needs belongs to that list — its question and the scope, shape and order that
+ * read the answer all stand on the list's own first row (see `ListToolbar`), so
+ * a search field in here would be a field whose list is one route away. The row
+ * opens with the segmented navigation (see `AppNav`) — the control says which of
+ * its lists is on screen — closes with the settings, and carries the mark in the
+ * middle, the way a unified toolbar's title does. The leading edge is kept clear
+ * of the lights by the padding (`pl-24`: the native 20pt leading inset + 52pt of
+ * buttons + air), so on macOS the navigation starts just past them, the way a
+ * unified toolbar's items do.
  *
  * The mark is centred on the *window*, not on the row's free space: it is taken
  * out of the flow and centred over the header's padding box
@@ -73,53 +52,6 @@ export function searchPath(query: string): string {
  * nothing inside loses its own click.
  */
 export function AppHeader() {
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const onSearchPage = pathname === SEARCH_PATH;
-
-  // A browse page holds no question, so its field is a local draft: without one,
-  // the controlled empty value would reset the DOM mid-word on the very
-  // navigation the first keystroke triggers, dropping fast keystrokes.
-  const [draft, setDraft] = useState("");
-  useEffect(() => {
-    // The URL owns the question on the search page; drop whatever draft the
-    // jump pad held, so a later return to a browse page starts empty. Clearing
-    // only on the search page's own commits matters: an intermediate browse
-    // commit still in flight must not clobber the draft its navigation carries.
-    // The functional update keeps this a no-op (no extra render) once empty.
-    if (pathname === SEARCH_PATH) setDraft((d) => (d === "" ? d : ""));
-  }, [pathname]);
-
-  // The field mirrors the URL's question on the search page and the draft
-  // everywhere else: a browse page holds no question, so leaving the search page
-  // (a destination, the back button) reads as leaving the search.
-  const value = onSearchPage
-    ? (searchParams.get(SEARCH_QUERY_PARAM) ?? "")
-    : draft;
-
-  // The header sits outside the routed subtree, so navigating here never remounts
-  // the field mid-word. The first keystroke pushes the search page (so back returns
-  // to the browse page); the rest — and every edit on the search page itself —
-  // replace in place, so typing does not spam the history with one entry per
-  // letter.
-  const onQuery = (next: string) => {
-    if (onSearchPage) {
-      setSearchParams(
-        next ? { [SEARCH_QUERY_PARAM]: next } : {},
-        { replace: true },
-      );
-      return;
-    }
-    setDraft(next);
-    if (!next) return;
-    if (draft === "") void navigate(searchPath(next));
-    else void navigate(searchPath(next), { replace: true });
-  };
-
-  // `h-header` (3rem) is half of the alignment above: the window config's
-  // traffic-light `y` is this height over two, plus wry's 2px offset
-  // (48 / 2 + 2 = 26).
   return (
     <header
       data-tauri-drag-region="deep"
@@ -141,39 +73,9 @@ export function AppHeader() {
         <Brand />
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        <HeaderSearch value={value} onQuery={onQuery} />
         <SettingsMenu />
       </div>
     </header>
-  );
-}
-
-/**
- * The search field: a jump pad into the search page on every route, the page's
- * own question editor on the search page itself.
- *
- * The field never locks: the installed answer is memory and lands first, and the
- * store's and live sections hold their places with skeletons while their answers
- * are in flight — so a question typed before the index is ready waits for its
- * answer instead of being refused.
- */
-function HeaderSearch({
-  value,
-  onQuery,
-}: {
-  value: string;
-  /** Receives the raw field value; debouncing is the search page's. */
-  onQuery: (value: string) => void;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <SearchInput
-      className="w-64"
-      value={value}
-      onChange={onQuery}
-      label={t("common.searchSkills")}
-    />
   );
 }
 
