@@ -87,6 +87,22 @@ const rowNames = () =>
       row.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""),
     );
 
+/**
+ * Assert the card body lays its rows out across two columns.
+ *
+ * Folded preview, expansion and the uncapped search card all claim the same
+ * shape, so the claim is written once here and each of those tests says it
+ * still holds in its own state. The evidence is the utility class because
+ * jsdom runs no CSS engine — a grid's column count is otherwise unobservable,
+ * and asserting the rendered geometry would only ever see `static`.
+ */
+function expectTwoColumnBody(container: HTMLElement) {
+  expect(container.querySelector('[data-slot="card-content"] ul')).toHaveClass(
+    "grid",
+    "grid-cols-2",
+  );
+}
+
 describe("RepoCard", () => {
   beforeEach(() => {
     vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
@@ -159,9 +175,7 @@ describe("RepoCard", () => {
     // The body is one list laid out across then down over two columns: the
     // first row holds the list's first two skills, and DOM order (the reading
     // order) stays most-installed first — the same order folded or expanded.
-    const body = container.querySelector('[data-slot="card-content"] ul')!;
-    expect(body).toHaveClass("grid");
-    expect(body).toHaveClass("grid-cols-2");
+    expectTwoColumnBody(container);
     // The bar's figure is the *increment*: the rows behind the cap, which is
     // exactly what a press on the toggle reveals.
     const bar = screen.getByRole("button", {
@@ -380,9 +394,7 @@ describe("RepoCard", () => {
     // The body is one list laid out across then down over two columns, so the
     // expanded rows keep the same reading order the folded preview had — the
     // first row holds the list's first two skills, the next row the next two.
-    const body = container.querySelector('[data-slot="card-content"] ul')!;
-    expect(body).toHaveClass("grid");
-    expect(body).toHaveClass("grid-cols-2");
+    expectTwoColumnBody(container);
 
     // The toggle reads its own state: the figure becomes the card's total —
     // the fact the open card exists to show, beside the minus that folds it.
@@ -430,8 +442,6 @@ describe("RepoCard", () => {
 
     // Uncapped is not unshaped: the search card's rows run in the same
     // across-then-down two columns the folded preview and the expansion use.
-    const body = container.querySelector('[data-slot="card-content"] ul')!;
-    expect(body).toHaveClass("grid");
-    expect(body).toHaveClass("grid-cols-2");
+    expectTwoColumnBody(container);
   });
 });

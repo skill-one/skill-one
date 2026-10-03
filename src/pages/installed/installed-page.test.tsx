@@ -1368,7 +1368,7 @@ describe("InstalledPage", () => {
     ).toBeNull();
   });
 
-  it("shows each row's install stamp under the time sort, the blend under popularity", { timeout: 15000 }, async () => {
+  it("shows each row's install stamp under the time sort, the blend under popularity", async () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("pdf");
@@ -1396,7 +1396,7 @@ describe("InstalledPage", () => {
     expect(screen.queryByLabelText(/^安装于 /)).toBeNull();
   });
 
-  it("orders the skill unit by token cost and states each row's estimate", { timeout: 15000 }, async () => {
+  it("orders the skill unit by token cost and states each row's estimate", async () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("pdf");

@@ -79,10 +79,15 @@ describe("parseLedger", () => {
     expect([...ledger.keys()]).toEqual(["pdf", "my-tool"]);
   });
 
-  it("returns an empty ledger for null, blank and invalid JSON", () => {
-    expect(parseLedger(null).records.size).toBe(0);
-    expect(parseLedger("").records.size).toBe(0);
-    expect(parseLedger("not json {").records.size).toBe(0);
+  // Table-driven so a failure names the input that broke rather than only
+  // reporting that a size was not zero — the three used to be three bare
+  // expects in one `it`, all of which reported identically.
+  it.each([
+    ["null", null],
+    ["an empty string", ""],
+    ["truncated JSON", "not json {"],
+  ] as const)("returns an empty ledger for %s", (_label, raw) => {
+    expect(parseLedger(raw).records.size).toBe(0);
   });
 
   it("rejects records without a usable name or of an unknown kind", () => {
@@ -227,10 +232,12 @@ describe("ledgerLines", () => {
     expect(ledgerLines(JSON.stringify(SOURCE))).toEqual([{ line: 1, record: SOURCE }]);
   });
 
-  it("returns no lines for null, blank and whitespace input", () => {
-    expect(ledgerLines(null)).toEqual([]);
-    expect(ledgerLines("")).toEqual([]);
-    expect(ledgerLines("  \n  ")).toEqual([]);
+  it.each([
+    ["null", null],
+    ["an empty string", ""],
+    ["whitespace only", "  \n  "],
+  ] as const)("returns no lines for %s", (_label, raw) => {
+    expect(ledgerLines(raw)).toEqual([]);
   });
 });
 

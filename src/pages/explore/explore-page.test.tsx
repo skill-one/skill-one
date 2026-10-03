@@ -268,8 +268,6 @@ beforeEach(() => {
 // Base UI's popups mount, position and exit asynchronously; under a loaded
 // CI machine those steps can exceed the default 5s per test. Give the
 // popup-driven interactions in this file more headroom.
-vi.setConfig({ testTimeout: 15_000 });
-
 describe("ExplorePage", () => {
   it("keeps the domain picker in the content, not in the header", async () => {
     bootRegistry(4);
