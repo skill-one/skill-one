@@ -128,14 +128,16 @@ pnpm dlx shadcn@latest add <component>
 
 ## 测试
 
-分两层，每层补齐另一层覆盖不到的部分：
+各层划分与每层存在的理由，见 [testing.zh-CN.md](testing.zh-CN.md)。
 
 | 层 | 工具 | 命令 | 覆盖范围 |
 | --- | --- | --- | --- |
 | 单元 / 组件 | Vitest + Testing Library（jsdom） | `pnpm test` / `test:run` | 纯逻辑与组件的隔离行为 |
 | 覆盖率门禁 | Vitest（`@vitest/coverage-v8`） | `pnpm test:coverage` | 校验 `vite.config.ts` 中的阈值 |
+| 命令逻辑 | `cargo test` | `cd src-tauri && cargo test` | Tauri 命令层，跑在沙箱化的 `Manager` 上 |
+| 端到端 | Playwright | `pnpm test:e2e` | 浏览器中组装起来的应用，以及视觉基线 |
 
-组件测试与 `src/lib` 下的单元测试均遵循「一个文件对应一个 `*.test.ts(x)`」的约定，可通过 `pnpm test:run` 一键运行。
+组件测试与 `src/lib` 下的单元测试均遵循「一个文件对应一个 `*.test.ts(x)`」的约定，可通过 `pnpm test:run` 一键运行。端到端用例位于 `e2e/`，通过 `tsconfig.node.json` 参与类型检查。
 
 ## 内容安全策略（CSP）
 

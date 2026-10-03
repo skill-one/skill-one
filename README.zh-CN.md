@@ -59,4 +59,4 @@ Homebrew 安装会被排除在应用内更新之外：应用识别到 cask 后�
 
 ## 开发
 
-面向开发者的构建、架构与测试说明见 [docs/development.zh-CN.md](docs/development.zh-CN.md)。更新器链路见 [docs/auto-update.zh-CN.md](docs/auto-update.zh-CN.md)。活动日志见 [docs/activity-log.zh-CN.md](docs/activity-log.zh-CN.md)。
+面向开发者的构建、架构与测试说明见 [docs/development.zh-CN.md](docs/development.zh-CN.md)。测试分层见 [docs/testing.zh-CN.md](docs/testing.zh-CN.md)。更新器链路见 [docs/auto-update.zh-CN.md](docs/auto-update.zh-CN.md)。活动日志见 [docs/activity-log.zh-CN.md](docs/activity-log.zh-CN.md)。

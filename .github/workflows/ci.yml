@@ -56,6 +56,17 @@ jobs:
       - name: Test
         run: pnpm test:coverage
 
+      # The unit and component suites answer "does this behave". This one
+      # answers "does the assembled app": real router, real CSS, real layout,
+      # with the browser stand-in for the Rust backend. Its screenshot
+      # baselines are committed, so a genuine visual change has to be reviewed
+      # rather than absorbed by a re-run.
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test (end to end)
+        run: pnpm test:e2e
+
   # The commands in src-tauri are only exercised at runtime by the app, so a
   # signature or handler-list mistake would otherwise surface at release time.
   # macos-14 matches the release runner, which avoids installing the Linux

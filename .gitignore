@@ -17,6 +17,13 @@ src-tauri/gen/schemas
 # Test output
 coverage
 
+# Playwright run artifacts. The screenshot baselines are NOT ignored: they are
+# the expected result, so `e2e/*.png` is committed the way a snapshot would be.
+test-results
+playwright-report
+blob-report
+.playwright
+
 # Ignore dotfiles and dot-directories by default; re-include the few that
 # belong in version control (.gitignore files, the GitHub workflows, the
 # linter config).

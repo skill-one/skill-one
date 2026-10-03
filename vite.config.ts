@@ -15,6 +15,11 @@ const srcDir = path.dirname(fileURLToPath(import.meta.url));
 // this dev server and duplicate React in a vitest run. Ignore them in both
 // the test runner and the dev server watcher.
 const worktreeGlob = "**/.worktrees/**";
+// The Playwright suite. Vitest's default `include` is
+// `**/*.{test,spec}.?(c|m)[jt]s?(x)`, so `e2e/*.spec.ts` matches it as
+// readily as `*.test.ts` does — without this the specs load under jsdom and
+// fail on `test.describe`, which is where this line's value came from.
+const playwrightGlob = "e2e/**";
 
 // The watcher needs the same ignore anchored at this config's directory (the
 // project root). Vitest resolves `exclude` relative to the root, so the bare
@@ -41,7 +46,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
-    exclude: [...configDefaults.exclude, worktreeGlob],
+    exclude: [...configDefaults.exclude, worktreeGlob, playwrightGlob],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

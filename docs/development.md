@@ -128,14 +128,16 @@ Two conventions matter when touching them:
 
 ## Testing
 
-Two layers, each covering what the other cannot:
+The layers, and why each exists, are documented in [testing.md](testing.md).
 
 | Layer | Tool | Command | Covers |
 | --- | --- | --- | --- |
 | Unit / component | Vitest + Testing Library (jsdom) | `pnpm test` / `test:run` | Pure logic and components in isolation |
 | Coverage gate | Vitest (`@vitest/coverage-v8`) | `pnpm test:coverage` | Enforces the thresholds in `vite.config.ts` |
+| Command logic | `cargo test` | `cd src-tauri && cargo test` | The Tauri command layer, against a sandboxed `Manager` |
+| End to end | Playwright | `pnpm test:e2e` | The assembled app in a browser, plus visual baselines |
 
-Component tests and unit tests under `src/lib` follow the "one file, one `*.test.ts(x)`" convention and can be run in one go with `pnpm test:run`.
+Component tests and unit tests under `src/lib` follow the "one file, one `*.test.ts(x)`" convention and can be run in one go with `pnpm test:run`. End-to-end specs live in `e2e/` and are typechecked through `tsconfig.node.json`.
 
 ## Content Security Policy
 

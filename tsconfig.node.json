@@ -10,7 +10,15 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    // Node types for the config files' `process`; Playwright's own types come
+    // from the triple-slash reference in playwright.config.ts and the explicit
+    // import in each spec.
+    "types": ["node"]
   },
-  "include": ["vite.config.ts"]
+  // `vite.config.ts` carries the coverage thresholds, `playwright.config.ts`
+  // the E2E server and browser settings, and `e2e/` the specs themselves — all
+  // TypeScript nothing else compiles, so they are typechecked here rather than
+  // left to rot unnoticed.
+  "include": ["vite.config.ts", "playwright.config.ts", "e2e/**/*.ts"]
 }

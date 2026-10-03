@@ -61,4 +61,4 @@ After launching the app, use the 商店 / 我的 switch in the window header to 
 
 ## Development
 
-For developer-facing build, architecture, and testing docs, see [docs/development.md](docs/development.md). The updater pipeline is documented in [docs/auto-update.md](docs/auto-update.md). The activity log is documented in [docs/activity-log.md](docs/activity-log.md).
+For developer-facing build, architecture, and testing docs, see [docs/development.md](docs/development.md). The test layers are documented in [docs/testing.md](docs/testing.md). The updater pipeline is documented in [docs/auto-update.md](docs/auto-update.md). The activity log is documented in [docs/activity-log.md](docs/activity-log.md).

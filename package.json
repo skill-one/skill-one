@@ -20,6 +20,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:update": "playwright test --update-snapshots",
     "sync:agents": "node scripts/sync-agents-info.mjs"
   },
   "dependencies": {
