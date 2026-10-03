@@ -159,13 +159,14 @@
   "agentLink": {
     "noAgents": "No available agents detected"
   },
-  "migration": {
-    "migrated": "Source linked: {{repo}}",
-    "migrateFailed": "Failed to link source",
+  "sourceLink": {
+    "linked": "Source linked: {{repo}}",
+    "failed": "Failed to link source",
     "triggerAria": "Link {{name}} to its store source",
-    "badge": "Link source",
+    "title": "Link source",
     "subtitle": "Choose the source repository for {{name}}",
     "tooltip": "Link source — local files unchanged",
+    "cutBadge": "Ignored",
     "localLabel": "Local description",
     "starsTitle": "Repository stars",
     "similarity": "{{percent}}% similar description",
