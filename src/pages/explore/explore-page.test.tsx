@@ -42,8 +42,7 @@ configure({ asyncUtilTimeout: 5000 });
 /**
  * The registry client is replaced by a real-controller-driven harness, so
  * the page tests exercise the exact RPC/event contract the worker speaks —
- * including streaming progress, the search field's unlock on `ready`, and the
- * ready-epoch invalidation.
+ * including streaming progress and the ready-epoch invalidation.
  */
 vi.mock("../../lib/registry/client", async () => {
   const { createRegistryHarness, createRegistryClientMock } =
@@ -169,8 +168,10 @@ function renderExplorePage() {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         {/* The real app mounts pages inside the shell, the header above them.
-            The list's own controls — the search field, the domain picker, the
-            sort switch — stand on the page's first row and render with it. */}
+            The list's own controls — the shape switch, the domain picker, the
+            sort switch — stand on the page's first row and render with it. The
+            search field is not among them: it lives in the chrome, since it
+            answers on every route (see `list-toolbar.tsx`). */}
         <HashRouter>
           <AppHeader />
           <ExplorePage />

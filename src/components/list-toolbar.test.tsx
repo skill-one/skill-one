@@ -34,7 +34,9 @@ function renderRow(props: Partial<Parameters<typeof ListToolbar>[0]> = {}) {
   return renderWithRouter(row(props));
 }
 
-/** The trailing group, where the two switches a live search overrides are docked. */
+/** The trailing group, where the reading pair is docked: the scope and the
+ *  order. Not the shape, and not anything a search used to override — the
+ *  search field left this row when the question moved to its own page. */
 function docked(): HTMLElement {
   const element = screen.getByRole("button", { name: "排序方式" }).parentElement;
   if (!element) throw new Error("no trailing group rendered");
