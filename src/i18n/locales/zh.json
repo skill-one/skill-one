@@ -41,6 +41,9 @@
     "list": "列表",
     "cards": "卡片"
   },
+  "list": {
+    "disabled": "已禁用"
+  },
   "action": {
     "install": "安装",
     "installing": "安装中",
