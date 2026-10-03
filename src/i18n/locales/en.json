@@ -111,8 +111,7 @@
     "searching": "Searching…",
     "liveResults": "Show the skills.sh results",
     "liveResultsHide": "Hide the skills.sh results",
-    "searchingLive": "Searching the store and skills.sh live results…",
-    "installed": "Installed here"
+    "searchingLive": "Searching the store and skills.sh live results…"
   },
   "link": {
     "agentFailed": "{{name}} failed",

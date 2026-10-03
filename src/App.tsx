@@ -33,11 +33,6 @@ const AgentsPage = lazy(() =>
     default: m.AgentsPage,
   })),
 );
-const SearchPage = lazy(() =>
-  import("./pages/search/search-page").then((m) => ({
-    default: m.SearchPage,
-  })),
-);
 
 const queryClient = createQueryClient();
 
@@ -96,10 +91,10 @@ export default function App() {
                       the header leads. */}
                   <Route path="/" element={<AgentsPage />} />
                   <Route path="/explore" element={<ExplorePage />} />
-                  {/* One question asked of every collection at once; the question
-                      itself is carried in the URL (`?q=`), so it is shareable and
-                      the back button is the way out of it. */}
-                  <Route path="/search" element={<SearchPage />} />
+                  {/* Both lists ask their own question from their own first
+                      row, and each answers from its own source: the store's
+                      field searches the registry, the installed list's searches
+                      what this machine has (see `ListToolbar`). */}
                   <Route path="/installed" element={<InstalledPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

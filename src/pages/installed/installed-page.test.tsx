@@ -20,7 +20,12 @@ import {
 } from "../../lib/mock-local";
 import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
 import { resetLinkSuggestions } from "../../lib/link-suggestions";
-import { setSort, setUnit } from "../../lib/list-view";
+import {
+  getListView,
+  resetListView,
+  setSort,
+  setUnit,
+} from "../../lib/list-view";
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -62,14 +67,13 @@ beforeEach(() => {
   getGroups.mockResolvedValue({ groups: [], total: 0 });
   searchSkillsSh.mockResolvedValue([]);
   resetLinkSuggestions();
-  // The shape and the order are two answers again; these tests read the list as
-  // repository cards — the shape most were written against — and the ones that
-  // want the skill rows pick it themselves. Module state outlives a test, so the
-  // choice is reset here rather than inherited.
+  // The question, the shape and the order are module state that outlives the
+  // page, so each case starts from a list that asks nothing. These tests read
+  // the list as repository cards — the shape most were written against — and
+  // the ones that want the skill rows pick it themselves.
+  resetListView();
   setUnit("installed", "repo");
 });
-
-
 
 /** The persisted ledger's record for `name` (the store is JSONL). */
 function ledgerRecord(
@@ -1602,5 +1606,319 @@ describe("InstalledPage", () => {
       ).toBeInTheDocument();
     });
 
+  });
+
+  /**
+   * The list's own question, asked from its own first row: what this machine
+   * has, in the installed index's own relevance order, with the registry's
+   * answer below it as a cheap supplement and skills.sh behind a press.
+   */
+  describe("the list's own search", () => {
+    /**
+     * The store's grouped answer to a search for `name`: one repository
+     * carrying one skill of that name under a recorded source — a namesake of
+     * what the machine has installed, which is what an installed search's store
+     * section is for.
+     */
+    function storeAnswerFor(name: string) {
+      return {
+        groups: [
+          {
+            key: "acme/skills",
+            title: "acme/skills",
+            stars: 12,
+            skills: [
+              {
+                skill: {
+                  id: `acme/skills/${name}`,
+                  name,
+                  repo: "acme/skills",
+                  description: "PDF 文档读取、生成、合并、拆分与标注。",
+                  stars: 12,
+                  downloads: 30,
+                },
+                matched: { name: [name] },
+              },
+            ],
+          },
+        ],
+        total: 1,
+      };
+    }
+
+    /** The four installs the one-source cases gather into one source. */
+    const RUN_SOURCE = ["pdf", "docx", "pptx", "mcp-builder"];
+
+    /** Records one source for every name of the set. */
+    function seedRunSource(repo = "acme/tools") {
+      seedMockProvenance(
+        Object.fromEntries(RUN_SOURCE.map((name) => [name, { repo }])),
+      );
+    }
+
+    it("pre-fills the field from the ?skill= deep link", async () => {
+      // The menu bar popover deep links to /installed?skill=<name>; the page
+      // must land with that skill asked for and consume the param.
+      renderPage("/installed?skill=pdf");
+
+      expect(await screen.findByLabelText("搜索 Skill")).toHaveValue("pdf");
+      expect(await screen.findByText("pdf")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.queryByText("docx")).not.toBeInTheDocument(),
+      );
+    });
+
+    it("filters skills by search text", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByText("pdf");
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+      // The debounce settles before the answer narrows.
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+        ).toHaveLength(1),
+      );
+      expect(screen.queryByText("docx")).not.toBeInTheDocument();
+
+      await user.clear(screen.getByLabelText("搜索 Skill"));
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+        ).toHaveLength(6),
+      );
+    });
+
+    it("highlights matched terms on a searched card, like the store's list", async () => {
+      const user = userEvent.setup();
+      const { container } = renderPage();
+      await screen.findByText("pdf");
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+      // The installed list's index reports matched terms per field exactly as
+      // the registry's worker does, so the shared card marks them the same way.
+      await waitFor(() =>
+        expect(container.querySelector("mark")).toHaveTextContent("pdf"),
+      );
+    });
+
+    it("renders no marks outside a search", async () => {
+      const { container } = renderPage();
+
+      await screen.findByText("pdf");
+      expect(container.querySelector("mark")).toBeNull();
+    });
+
+    it("searches Chinese text but not a fragment inside a word", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByText("pdf");
+
+      // The descriptions here are Chinese and carry no word separators; the
+      // shared index splits Han text into character bigrams, so a phrase still
+      // answers — pdf (「PDF 文档读取…」) and docx (「…Word 文档。」).
+      await user.type(screen.getByLabelText("搜索 Skill"), "文档");
+      expect(await screen.findByText("pdf")).toBeInTheDocument();
+      expect(screen.getByText("docx")).toBeInTheDocument();
+
+      // "df" sits inside the term "pdf": the substring filter used to answer it,
+      // a term index does not.
+      await user.clear(screen.getByLabelText("搜索 Skill"));
+      await user.type(screen.getByLabelText("搜索 Skill"), "df");
+      // The empty state says so in this list's own words: it is about what this
+      // machine has, and the store's answer stands below it.
+      expect(await screen.findByText(/本机没有匹配/)).toBeInTheDocument();
+    });
+
+    it("shows a no-match empty state for a search with no results", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByText("pdf");
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "zzz");
+
+      expect(await screen.findByText(/本机没有匹配/)).toBeInTheDocument();
+    });
+
+    it("answers with this machine's installs, and never asks the live source", async () => {
+      const user = userEvent.setup();
+      // The store's index answers this query too — cheap and certain, so it is
+      // simply there below the installed answer.
+      getGroups.mockResolvedValue(storeAnswerFor("pdf"));
+      renderPage();
+      await screen.findByText("pdf");
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+      // The installed answer is the whole answer, in the installed index's own
+      // relevance order: docx does not match. It carries no header either — this
+      // list is the source, so its own rows say so by being on screen. (Waited
+      // out: until the query settles, the browse list behind it still holds
+      // docx, and the answer has no header that could scope the assertion.)
+      await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
+      expect(screen.getByText("pdf")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("region", { name: "本地已安装" }),
+      ).not.toBeInTheDocument();
+      // The store's index is cheap and certain, so its answer is simply there
+      // below the installed one — a titled section, open by default, counted.
+      const store = await screen.findByRole("region", { name: "应用商店" });
+      expect(within(store).getByText("1 个仓库")).toBeInTheDocument();
+      // The live source is the one thing a search waits for: it is on screen as
+      // a press, and nothing has pressed it.
+      expect(
+        screen.getByRole("button", { name: "展开 skills.sh 的结果" }),
+      ).toBeInTheDocument();
+      expect(searchSkillsSh).not.toHaveBeenCalled();
+    });
+
+    it("opens the installed surface's own drawer from a searched row", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByText("pdf");
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+      await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
+      await pickUnit(user, "列表");
+
+      // The install the row carries is what this list manages, so the drawer it
+      // opens wears the installed surface: no store install CTA — the skill is
+      // already home, and the panel says so with the switch, not with a button.
+      await user.click(await screen.findByRole("button", { name: "查看 pdf 详情" }));
+      expect(await screen.findByRole("dialog")).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("dialog")).queryByRole("button", { name: /安装/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("brings the store's answer in a default-open section, each row in its own surface", async () => {
+      const user = userEvent.setup();
+      // The store's index answers the same query with a namesake of an installed
+      // skill — the same name under a recorded source, which is exactly what the
+      // section below is for.
+      getGroups.mockResolvedValue(storeAnswerFor("pdf"));
+      renderPage();
+      await screen.findByText("pdf");
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+      await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
+      await pickUnit(user, "列表");
+
+      // Asked for nothing: the registry's index is already in memory, so its
+      // answer is on screen under the installed one, with a count, open.
+      const store = await screen.findByRole("region", { name: "应用商店" });
+      expect(within(store).getByText("1 个 skill")).toBeInTheDocument();
+      // Two answers, two rows of the same name — the install above, the store
+      // entry below it.
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole("button", { name: "查看 pdf 详情" }),
+        ).toHaveLength(2),
+      );
+      // The store row wears the store's surface: the install CTA the installed
+      // surface never offers.
+      await user.click(screen.getAllByRole("button", { name: "查看 pdf 详情" })[1]);
+      expect(
+        await within(await screen.findByRole("dialog")).findByRole("button", {
+          name: "已安装",
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps the answer in relevance order while the sort is popularity", async () => {
+      const user = userEvent.setup();
+      seedRunSource();
+      seedStoreEntries({ docx: 50, pdf: 30, pptx: 20, "mcp-builder": 5 });
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "热度");
+      await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
+
+      // A search re-answers the list by relevance — the better ranking while a
+      // question is live — so the sort stands down rather than re-ranking hits.
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+      await waitFor(() =>
+        expect(
+          screen
+            .getAllByRole("button", { name: /查看 .+ 详情/ })
+            .map((node) => node.getAttribute("aria-label")),
+        ).toEqual(["查看 pdf 详情"]),
+      );
+    });
+
+    it("answers with rows in the skill unit", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "安装时间");
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+      // The match comes back as a row rather than a card, and as the only row: a
+      // search re-answers the list by relevance in either unit.
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
+        ).toHaveLength(1),
+      );
+      expect(
+        screen.getByRole("button", { name: "查看 pdf 详情" }),
+      ).toBeInTheDocument();
+    });
+
+    it("locks the sort control while searching, like the picker", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByText("pdf");
+      // The rows are the shape that has an order to lock: the cards have none.
+      await pickUnit(user, "列表");
+      expect(screen.getByRole("button", { name: "排序方式" })).toBeEnabled();
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+      // The control would offer a choice the search answer does not honour, so it
+      // says so where it stands — and unlocks when the question clears. It does
+      // not leave the row: the field it stands beside would move under the
+      // reader's cursor on every keystroke.
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "排序方式" }),
+        ).toBeDisabled(),
+      );
+      await user.clear(screen.getByLabelText("搜索 Skill"));
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "排序方式" })).toBeEnabled(),
+      );
+    });
+
+    it("locks the category picker while searching", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByText("pdf");
+      expect(screen.getByRole("button", { name: "分类" })).toBeEnabled();
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+      // A search re-orders the list by relevance and ignores the scope, so the
+      // picker says so where it stands — exactly as it does in the store — and
+      // the row keeps its shape while the field is being typed into.
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "分类" })).toBeDisabled(),
+      );
+    });
+
+    it("keeps this list's question to itself, and out of the store's", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByText("pdf");
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+      // The two lists answer the same word from two different sources, so one
+      // list's question never becomes the other's (see `lib/list-view`).
+      expect(getListView().views.installed.query).toBe("pdf");
+      expect(getListView().views.store).not.toHaveProperty("query");
+    });
   });
   });

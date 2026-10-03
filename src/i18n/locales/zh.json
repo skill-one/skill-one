@@ -111,8 +111,7 @@
     "searching": "搜索中…",
     "liveResults": "展开 skills.sh 的结果",
     "liveResultsHide": "收起 skills.sh 的结果",
-    "searchingLive": "正在搜索应用商店与 skills.sh 的实时结果…",
-    "installed": "本地已安装"
+    "searchingLive": "正在搜索应用商店与 skills.sh 的实时结果…"
   },
   "link": {
     "agentFailed": "{{name}} 失败",

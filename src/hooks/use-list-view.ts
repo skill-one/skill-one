@@ -14,8 +14,22 @@ import {
  * re-render over another destination's edits.
  */
 
-/** One list's own reading: its order, its shape and its scope. */
+/** One list's own reading: its question, its order, its shape and its scope. */
 export function useDestinationView(destination: Destination): DestinationView {
   const read = () => getListView().views[destination];
   return useSyncExternalStore(subscribeListView, read, read);
+}
+
+/**
+ * What one list is being asked for, as typed (see `setQuery`). Empty is the
+ * absent question, so the field's controlled value never has to know about the
+ * store's own absent-by-default shape.
+ *
+ * Read through the same destination view rather than off a field of its own, so
+ * one subscription carries the whole answer: a list's readers re-render when
+ * that list moves, and not when the other one does.
+ */
+export function useListQuery(destination: Destination): string {
+  const { query } = useDestinationView(destination);
+  return query ?? "";
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import App from "./App";
@@ -134,7 +134,7 @@ describe("App routing", () => {
     ).toBeInTheDocument();
   });
 
-  it("answers the header's question on the search page, and keeps it in the URL", async () => {
+  it("asks each list its question on the list's own row", async () => {
     const user = userEvent.setup();
     render(
       <I18nProvider>
@@ -142,25 +142,18 @@ describe("App routing", () => {
       </I18nProvider>,
     );
 
-    // The header's field is a jump pad: the first keystroke leaves the home for
-    // the search page and carries the question into its URL.
-    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+    // The window's chrome holds no question: a field there would be a field
+    // whose list is one route away, so it belongs to the list itself.
+    expect(screen.queryByLabelText("搜索 Skill")).toBeNull();
 
-    await waitFor(() =>
-      expect(window.location.hash).toContain("/search?q=pdf"),
-    );
-    // Typing does not spam the history: the field keeps editing the one
-    // question in place rather than pushing an entry per letter.
-    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
-
-    // The installed list is a pure browse surface: it holds no question, so
-    // arriving there leaves the search behind rather than answering it. (What
-    // the field does with the draft it carried is `AppHeader`'s own business,
-    // asserted there.)
     await user.click(screen.getByRole("link", { name: /^已安装$/ }));
+    const field = await screen.findByLabelText("搜索 Skill");
+    await user.type(field, "pdf");
 
-    await waitFor(() =>
-      expect(window.location.hash).toContain("/installed"),
-    );
+    // Asking stays on the list that answers it — no route change and no query
+    // parameter: the question is that list's own state (see `lib/list-view`),
+    // and the list answers it right there.
+    expect(window.location.hash).toContain("/installed");
+    expect(field).toHaveValue("pdf");
   });
 });

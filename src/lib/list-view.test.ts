@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getListView,
   resetListView,
+  setQuery,
   setScope,
   setSort,
   setUnit,
@@ -22,11 +23,61 @@ describe("list view", () => {
 
   it("starts with both lists answering by popularity", () => {
     // The default stays absent from the view, so a fresh list reads exactly
-    // as it did before the sort control existed. There is no query here at all:
-    // the question lives in the search page's URL (see `components/app-header`).
+    // as it did before the sort control existed — and a fresh list asks nothing:
+    // the question is absent exactly as the default order is.
     expect(getListView()).toEqual({
       views: { store: {}, installed: {} },
     });
+  });
+
+  it("keeps each list's own question, and forgets an empty one", () => {
+    setQuery("store", "pdf");
+    setQuery("installed", "writer");
+
+    // The two answers are two answers: the registry's index and this machine's
+    // own installs. One shared field would mean a question asked on one list
+    // silently re-answering the other.
+    expect(getListView().views.store.query).toBe("pdf");
+    expect(getListView().views.installed.query).toBe("writer");
+
+    // Clearing the field asks nothing, and asks it as absent rather than as an
+    // empty string the view would then have to keep special-casing.
+    setQuery("store", "");
+    expect(getListView().views.store).not.toHaveProperty("query");
+    expect(getListView().views.installed.query).toBe("writer");
+  });
+
+  it("keeps a question through the shape, the scope and the order", () => {
+    setQuery("installed", "pdf");
+
+    setUnit("installed", "repo");
+    setScope("installed", "development");
+    setSort("installed", "tokens");
+
+    // One list's reading is one answer: which entries are on screen, how they
+    // are made of, how they are narrowed and which way they read never come
+    // apart from each other — nor from what the reader is looking for.
+    expect(getListView().views.installed).toEqual({
+      query: "pdf",
+      sort: "tokens",
+      scope: "development",
+      unit: "repo",
+    });
+  });
+
+  it("keeps a question out of storage, and out of a fresh session's view", async () => {
+    setQuery("store", "pdf");
+    setUnit("store", "repo");
+
+    // The shape and the order are choices about how a list reads tomorrow, so
+    // they persist. A question asked is this visit's business — it leaves with
+    // the session, and nothing under the list's keys records it.
+    expect(window.localStorage.getItem("skill-one.listQuery.store")).toBeNull();
+    expect(window.localStorage.getItem("skill-one.listUnit.store")).toBe("repo");
+
+    const { getListView: stored } = await freshListView();
+    expect(stored().views.store.unit).toBe("repo");
+    expect(stored().views.store).not.toHaveProperty("query");
   });
 
   it("keeps each list's scope to itself, and clears one with null", () => {

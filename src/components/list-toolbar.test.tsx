@@ -35,8 +35,8 @@ function renderRow(props: Partial<Parameters<typeof ListToolbar>[0]> = {}) {
 }
 
 /** The trailing group, where the reading pair is docked: the scope and the
- *  order. Not the shape, and not anything a search used to override — the
- *  search field left this row when the question moved to its own page. */
+ *  order — the two a live search overrides, so the two that lock under one. Not
+ *  the field, and not the shape. */
 function docked(): HTMLElement {
   const element = screen.getByRole("button", { name: "排序方式" }).parentElement;
   if (!element) throw new Error("no trailing group rendered");
@@ -61,17 +61,20 @@ beforeEach(() => {
 });
 
 describe("ListToolbar", () => {
-  it("leads with the shape and docks the reading pair to the far edge", () => {
+  it("leads with the field and the shape, and docks the reading pair to the far edge", () => {
     renderRow();
 
+    const field = screen.getByLabelText("搜索 Skill");
     const shape = screen.getByRole("button", { name: "列表" });
     const picker = screen.getByRole("button", { name: "分类" });
     const sort = screen.getByRole("button", { name: "排序方式" });
 
-    // Left to right the row reads: the shape says what the answer is made of,
-    // then the scope and the order that say how it is narrowed and which way it
-    // reads — the pair the tools dock to the trailing edge (MUI's density and
-    // columns, Airtable's sort and view options, GitHub's sort on issues).
+    // Left to right the row reads: the question, then the shape that says what
+    // the answer is made of, then the scope and the order that say how it is
+    // narrowed and which way it reads — the pair the tools dock to the trailing
+    // edge (MUI's density and columns, Airtable's sort and view options, GitHub's
+    // sort on issues).
+    expect(standsAfter(field, shape)).toBe(true);
     expect(standsAfter(shape, picker)).toBe(true);
     expect(standsAfter(picker, sort)).toBe(true);
   });
@@ -217,4 +220,67 @@ describe("ListToolbar", () => {
     expect(screen.getByRole("button", { name: "分类" })).toBeInTheDocument();
   });
 
+  it("leads with the field, right of nothing and left of the shape", () => {
+    renderRow();
+
+    const field = screen.getByLabelText("搜索 Skill");
+    const shape = screen.getByRole("button", { name: "列表" });
+
+    // The question and the shape are the pair a live search does not override,
+    // so they lead the row together; the field is first because it is the
+    // question everything else on the row answers into.
+    expect(standsAfter(field, shape)).toBe(true);
+    expect(standsAfter(shape, screen.getByRole("button", { name: "分类" }))).toBe(
+      true,
+    );
+  });
+
+  it("holds each list's own question, and never the other's", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderRow();
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+    unmount();
+    renderRow({ destination: "store", sorts: ["popularity"] });
+
+    // The store's field answers the registry and the installed list's answers
+    // what this machine has — two answers, so neither inherits the other's
+    // question (see `lib/list-view`).
+    expect(getListView().views.installed.query).toBe("pdf");
+    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("");
+  });
+
+  it("locks the scope and the order while a question is live", () => {
+    renderRow({ searching: true });
+
+    // A search re-ranks the list by relevance and ignores the taxonomy slice, so
+    // a pick now would promise narrowing and ranking the answer does not have.
+    // Locked, not removed: the row holds still under the reader's cursor.
+    expect(screen.getByRole("button", { name: "分类" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "排序方式" })).toBeDisabled();
+    // The shape is not one of the two a search overrides, so it stays open: a
+    // search is read in either arrangement.
+    expect(screen.getByRole("button", { name: "卡片" })).toBeEnabled();
+  });
+
+  it("locks the store's field until its index exists, and says why", () => {
+    registrySnapshot.ready = false;
+    renderRow({ destination: "store", sorts: ["popularity"] });
+
+    // A question answered over a half-downloaded registry answers wrongly, so the
+    // store waits for the index — and states the wait rather than refusing in
+    // silence. The installed list is already in memory and never waits.
+    expect(screen.getByLabelText("搜索 Skill")).toBeDisabled();
+    expect(screen.getByLabelText("搜索 Skill")).toHaveAttribute(
+      "placeholder",
+      "索引构建中…",
+    );
+  });
+
+  it("asks the installed list before the index is ready, it being in memory", () => {
+    registrySnapshot.ready = false;
+    renderRow();
+
+    expect(screen.getByLabelText("搜索 Skill")).toBeEnabled();
+  });
 });

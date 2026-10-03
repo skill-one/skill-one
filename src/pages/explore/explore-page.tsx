@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useRepoSections } from "../../hooks/use-repo-sections";
 import { useViewMemory } from "../../hooks/use-view-memory";
 import { skillKey } from "../../lib/skill-view";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
-import { useDestinationView } from "../../hooks/use-list-view";
+import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import { LIST_SORTS } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
@@ -21,6 +22,7 @@ import { ListToolbar } from "../../components/list-toolbar";
 import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
+import { SearchResults } from "./search-results";
 import { SkillRow } from "./skill-row";
 import { RepoCard } from "./repo-card";
 
@@ -90,18 +92,28 @@ export function ExplorePage() {
   // are read from the shared view rather than held here. The shape and the order
   // are two answers again — the store's list is one of skill rows or of
   // repository cards, read in the one order a list of skills can be read in.
+  const search = useListQuery("store");
   const {
     scope,
     sort = "popularity",
     unit = "skill",
   } = useDestinationView("store");
+  // The filter is a browse control: a search re-orders the whole registry by
+  // relevance and ignores the scope (and the filter bar locks while it is
+  // live), so the scope is not part of the answer's definition.
   const selectedDomain = scope ?? null;
+
+  // The field is answered as it is typed, the list on the settled word: the
+  // question the reader reads while typing is their own, not a half-word they
+  // have already committed to.
+  const query = useDebouncedValue(search).trim();
+  const isSearching = query.length > 0;
 
   // The answer this page is showing, named by the controls that produced it.
   // The depth below is remembered against it: the controls can re-answer the
   // list without the page ever being unmounted, and a depth revealed for one
   // answer is not a place the reader is at under another.
-  const signature = `${unit}\u0000${sort}\u0000${selectedDomain ?? "all"}`;
+  const signature = `${query}\u0000${unit}\u0000${sort}\u0000${selectedDomain ?? "all"}`;
 
   // How deep the list had been revealed, remembered per history entry: a
   // drill-down — into a repository's page and back — unmounts this page, and
@@ -130,7 +142,7 @@ export function ExplorePage() {
     isError: sectionsError,
     error: sectionsErrorObj,
     refetch: refetchSections,
-  } = useRepoSections();
+  } = useRepoSections(!isSearching);
 
   // The browse list: the chosen domain's repositories, or — with no filter —
   // every domain's, re-filed into one ranking. A repository's leading domain is
@@ -278,18 +290,22 @@ export function ExplorePage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
       {/* The list's own first row, and the only row above the answer: the
-          domain picker that scopes the list (全部 clears it), the shape switch,
-          and the sort switch that says what order it reads in. All three read
-          and write the shared view, so what they leave behind is still here on
-          the way back. The page hands the row its counts; the row's own
-          arrangement is `ListToolbar`'s to answer. The counts follow the unit
-          the sort implies: the repository unit weighs a domain by repositories,
-          the skill unit by skills. */}
+          field that names what the reader is looking for, the domain picker that
+          scopes the browse (全部 clears it), the shape switch, and the sort switch
+          that says what order it reads in. All four read and write the shared
+          view, so what they leave behind is still here on the way back — and the
+          scope and the order lock while a question is live, because a search
+          answers by relevance and ignores both. The page hands the row its
+          counts and whether the question has settled; the row's own arrangement
+          is `ListToolbar`'s to answer. The counts follow the unit the sort
+          implies: the repository unit weighs a domain by repositories, the skill
+          unit by skills. */}
       <ListToolbar
         destination="store"
         facets={facets}
         total={totalCount}
         sorts={LIST_SORTS.store}
+        searching={isSearching}
       />
 
       {/* The list; the modal detail drawer overlays it without reflowing it or
@@ -323,6 +339,18 @@ export function ExplorePage() {
                   {t("action.retry")}
                 </Button>
               </Placeholder>
+            ) : isSearching ? (
+              // The search answer: the shared search view's store surface —
+              // the registry's own index in the shape on screen, with skills.sh
+              // folded below it behind its press. Keyed by the answer's
+              // definition, so no stale fold or selection survives into a
+              // differently-shaped answer.
+              <SearchResults
+                key={`${unit}:${query}`}
+                unit={unit}
+                query={query}
+                destination="store"
+              />
             ) : loading ? (
               // A viewport's worth of card- or row-shaped skeletons, per the
               // unit: switching to this page paints its final layout instantly
