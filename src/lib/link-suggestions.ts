@@ -8,11 +8,13 @@
  *    skill's name. None? The skill is a plain local skill, nothing more to
  *    do (and, importantly, no disk walk either).
  * 2. **Description auto-link or candidate suggestions** — the namesakes are
- *    ranked by description similarity. At/above `SIMILARITY_AUTO_LINK_THRESHOLD`
- *    the wording is close enough to call it the same skill, so the association
- *    is written automatically (no prompt). Below the threshold the decision is
- *    left to the user: the ranked candidates are surfaced for confirmation and
- *    nothing is written until they pick one.
+ *    ranked by description similarity. A single namesake at/above
+ *    `SIMILARITY_AUTO_LINK_THRESHOLD` means the wording is close enough to
+ *    call it the same skill, so the association is written automatically (no
+ *    prompt). Below the threshold — or with several namesakes clearing it,
+ *    which identical fork wording makes routine — the decision is left to the
+ *    user: the ranked candidates are surfaced for confirmation and nothing is
+ *    written until they pick one.
  *
  * Every outcome is cached at two levels so the work is paid once, not per
  * reconcile pass or app restart:
@@ -29,17 +31,19 @@
  * working as intended, not a loss. What does get written is the ranking waiting
  * on the user and the repos they cut, which is a decision rather than a cache.
  *
- * Namesake lookup goes through the registry worker's search (`searchSkills`,
- * filtered to exact slug equality client-side). When the registry is not ready
- * (still streaming, or a test environment with no worker) every lookup degrades
- * to "no candidates" — the UI then shows the plain local-install presentation.
+ * Namesake lookup is one batched query for the whole pass, answered from the
+ * worker's name index (`namesakes`) rather than by a name search per skill.
+ * When the registry is not ready (still streaming, or a test environment with
+ * no worker) every lookup degrades to "no candidates" — the UI then shows the
+ * plain local-install presentation.
  */
 
 import type { Skill } from "../types/skill";
-import { getRegistrySnapshot, searchSkills } from "./registry/client";
+import { getRegistrySnapshot, namesakeSkills } from "./registry/client";
 import { skillFingerprint } from "./skills-manager";
 import { isTauri } from "./tauri";
 import { descriptionSimilarity } from "./description-similarity";
+import { popularity } from "./popularity";
 import {
   dismissSkillSource,
   loadPendingRecords,
@@ -67,17 +71,39 @@ export interface LinkCandidate {
  */
 export type LinkSuggestions = Record<string, LinkCandidate[]>;
 
-/** Registry entries whose exact slug equals `name`. Empty when unavailable. */
-async function findNamesakes(name: string): Promise<Skill[]> {
-  // The search index answers only once the registry is ready; before that
-  // (and in worker-less test environments) there are simply no candidates.
-  if (!getRegistrySnapshot().ready) return [];
+/**
+ * Registry entries filed under each of `names`, keyed by name. A name with no
+ * entry is absent from the map — which is what "no namesake" means to every
+ * caller.
+ *
+ * One batched query for the whole list, because this is an exact-key question
+ * ("a skill called exactly this, and which repos publish it") that the worker
+ * answers from a name index. It used to be a name search per skill whose hits
+ * were filtered down to the exact matches, which cost a full BM25 pass and a
+ * page of crossed-boundary objects per skill to throw nearly all of away.
+ *
+ * The key is the skill's slug *or* the source repository's directory name,
+ * whichever the registry filed it under (see `namesakeIndex`) — so a skill
+ * published as `stitch::generate-design` is still found by the directory it
+ * lands in.
+ */
+async function findNamesakes(
+  names: readonly string[],
+): Promise<Map<string, Skill[]>> {
+  const byName = new Map<string, Skill[]>();
+  // The search index answers only once the registry is ready; before that (and
+  // in worker-less test environments) there are simply no candidates.
+  if (names.length === 0 || !getRegistrySnapshot().ready) return byName;
   try {
-    const { hits } = await searchSkills(name);
-    return hits.map((h) => h.skill).filter((s) => s.name === name);
+    const { entries } = await namesakeSkills([...names]);
+    names.forEach((name, i) => {
+      const family = entries[i];
+      if (family && family.length > 0) byName.set(name, family);
+    });
   } catch {
-    return [];
+    // A failed lookup reads as "no candidates", like an empty answer.
   }
+  return byName;
 }
 
 /** Beyond a few candidates the user is better off searching the store. */
@@ -110,6 +136,13 @@ function bestSimilarity(localDescription: string, skill: Skill): number {
  * capped. No similarity floor: a low score hides nothing — candidates sort
  * to the bottom of the list, and dropping them could hide the one correct
  * repo (e.g. when the local description is missing or worded differently).
+ *
+ * Equal scores are broken by `popularity` — the same figure, and the same
+ * tie-break, the store's own namesake ranking uses. It matters because the
+ * ranking's first job is to be *stable*: forks copy frontmatter verbatim, so a
+ * same-slug family routinely carries two byte-identical descriptions, and
+ * without a tie-break `toSorted`'s stability would hand the top slot to
+ * whichever namesake the registry happened to list first.
  */
 export function rankNamesakes(
   namesakes: Skill[],
@@ -120,7 +153,10 @@ export function rankNamesakes(
       skill,
       similarity: bestSimilarity(localDescription, skill),
     }))
-    .toSorted((a, b) => b.similarity - a.similarity)
+    .toSorted(
+      (a, b) =>
+        b.similarity - a.similarity || popularity(b.skill) - popularity(a.skill),
+    )
     .slice(0, MAX_CANDIDATES);
 }
 
@@ -150,8 +186,8 @@ export async function findLinkCandidates(
   description?: string,
   opts?: { excludeRepo?: string },
 ): Promise<LinkCandidate[]> {
-  const namesakes = await findNamesakes(name);
-  return rankNamesakes(namesakes, description ?? "").filter(
+  const byName = await findNamesakes([name]);
+  return rankNamesakes(byName.get(name) ?? [], description ?? "").filter(
     (c) => !opts?.excludeRepo || c.skill.repo !== opts.excludeRepo,
   );
 }
@@ -251,37 +287,54 @@ export async function resolveAssociations(
   const upserts = new Map<string, PendingRecord>();
   const drops = new Set<string>();
 
-  await Promise.all(
-    unlinked.map(async (skill) => {
-      if (resolved.has(skill.name)) return; // dead end or cached candidates
-
-      const cached = stored.records[skill.name];
-      // A repo the user cut (via the detail drawer) must never ride the
-      // cache: the lookup re-runs so the suppression applies to the fresh
-      // ranking, and the cut is carried into whatever outcome is stored.
-      const cut = new Set(cached?.repos ?? []);
-      if (cached && verifiedIndex !== null && cut.size === 0 && cached.candidates?.length) {
-        // Verified against the snapshot now being served. The ranking itself
-        // is content-dependent (it reads the local description), so its reuse
-        // revalidates the directory. The browser mock has no real files, so
-        // there the stored ranking stands in as-is.
-        if (!isTauri()) {
-          resolved.set(skill.name, reviveCandidates(skill.name, cached.candidates));
-          return;
-        }
-        if (cached.fingerprint) {
-          const stat = await skillFingerprint(skill.name);
-          if (stat && sameFingerprint(stat, cached.fingerprint)) {
+  // Pass 1 — a skill whose stored ranking still describes it is answered from
+  // the ledger, without asking the registry anything. Two passes over the list
+  // rather than one, because "does this skill still need a lookup" is only
+  // known once its directory has been stat-ed, and the point of the fast path
+  // is precisely not to pay for that on the skills the ledger already answers.
+  const outstanding = (
+    await Promise.all(
+      unlinked.map(async (skill) => {
+        if (resolved.has(skill.name)) return null; // dead end or cached candidates
+        const cached = stored.records[skill.name];
+        // A repo the user cut (via the detail drawer) must never ride the
+        // cache: the lookup re-runs so the suppression applies to the fresh
+        // ranking, and the cut is carried into whatever outcome is stored.
+        const cut = new Set(cached?.repos ?? []);
+        if (
+          cached &&
+          verifiedIndex !== null &&
+          cut.size === 0 &&
+          cached.candidates?.length
+        ) {
+          // Verified against the snapshot now being served. The ranking itself
+          // is content-dependent (it reads the local description), so its reuse
+          // revalidates the directory. The browser mock has no real files, so
+          // there the stored ranking stands in as-is.
+          if (!isTauri()) {
             resolved.set(skill.name, reviveCandidates(skill.name, cached.candidates));
-            return;
+            return null;
+          }
+          const stat = await skillFingerprint(skill.name);
+          if (cached.fingerprint && stat && sameFingerprint(stat, cached.fingerprint)) {
+            resolved.set(skill.name, reviveCandidates(skill.name, cached.candidates));
+            return null;
           }
         }
-        // Stale content or no fingerprint to check — fall through and redo.
-      }
+        return { skill, cached, cut };
+      }),
+    )
+  ).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
+  // Pass 2 — one query for every name the ledger did not answer, in registry
+  // order per name.
+  const byName = await findNamesakes(outstanding.map((entry) => entry.skill.name));
+
+  await Promise.all(
+    outstanding.map(async ({ skill, cached, cut }) => {
       // Step 1 — the cheap filter: without same-slug entries there is no
       // association to make and no reason to look at the skill's directory.
-      const namesakes = await findNamesakes(skill.name);
+      const namesakes = byName.get(skill.name) ?? [];
       if (namesakes.length === 0) {
         // A dead end is one in-memory query that cannot go stale between
         // runs, so it earns no line: it is recomputed next time. The user's
@@ -320,11 +373,20 @@ export async function resolveAssociations(
         unchanged && cached?.key === key && cached.candidates?.length
           ? reviveCandidates(skill.name, cached.candidates)
           : rankNamesakes(namesakes, skill.description ?? "");
-      // The auto-link candidate is the best-ranked namesake the user has not
-      // cut; a cut top stays in `ranked` as a manual candidate.
-      const top = ranked.find((c) => !cut.has(c.skill.repo));
-      if (top && top.similarity >= SIMILARITY_AUTO_LINK_THRESHOLD) {
-        matched.push({ repo: top.skill.repo, name: skill.name, reason: "description" });
+      // Auto-linking takes the one candidate that clears the threshold on its
+      // own. Two of them clearing it means the wording cannot tell them apart —
+      // forks copy frontmatter verbatim — so the decision goes to the user
+      // rather than to a tie-break that would only guess (see `rankNamesakes`).
+      // A cut top stays in `ranked` as a manual candidate.
+      const cleared = ranked.filter(
+        (c) => !cut.has(c.skill.repo) && c.similarity >= SIMILARITY_AUTO_LINK_THRESHOLD,
+      );
+      if (cleared.length === 1) {
+        matched.push({
+          repo: cleared[0].skill.repo,
+          name: skill.name,
+          reason: "description",
+        });
         linked.push(skill.name);
         resolved.set(skill.name, []);
         drops.add(skill.name);

@@ -32,9 +32,9 @@ configure({ asyncUtilTimeout: 5000 });
 // The provenance hook consults the registry for namesake candidates and the
 // page looks up the store entries behind recorded sources; both mocks answer
 // "nothing found" by default so the worker-less test env stays silent.
-const { searchSkills, lookupSkills, getGroups, registrySnapshot, searchSkillsSh } =
+const { namesakeSkills, lookupSkills, getGroups, registrySnapshot, searchSkillsSh } =
   vi.hoisted(() => ({
-    searchSkills: vi.fn(),
+    namesakeSkills: vi.fn(),
     lookupSkills: vi.fn(),
     getGroups: vi.fn(),
     // One stable object: the page reads it through useSyncExternalStore, which
@@ -43,7 +43,7 @@ const { searchSkills, lookupSkills, getGroups, registrySnapshot, searchSkillsSh 
     searchSkillsSh: vi.fn(),
   }));
 vi.mock("../../lib/registry/client", () => ({
-  searchSkills,
+  namesakeSkills,
   lookupSkills,
   getGroups,
   getRegistrySnapshot: () => registrySnapshot,
@@ -63,7 +63,7 @@ vi.mock("../../lib/skills-sh", async (importOriginal) => ({
 }));
 
 beforeEach(() => {
-  searchSkills.mockResolvedValue({ hits: [] });
+  namesakeSkills.mockResolvedValue({ entries: [] });
   lookupSkills.mockResolvedValue({ entries: [] });
   getGroups.mockResolvedValue({ groups: [], total: 0 });
   searchSkillsSh.mockResolvedValue([]);
@@ -826,18 +826,17 @@ describe("InstalledPage", () => {
       const user = userEvent.setup();
       // One same-slug store entry with a dissimilar description: offered as a
       // candidate, never auto-linked.
-      searchSkills.mockResolvedValue({
-        hits: [
-          {
-            skill: {
+      namesakeSkills.mockResolvedValue({
+        entries: [
+          [
+            {
               name: "pdf",
               repo: "anthropics/skills",
               description: "Spreadsheet editing and cell formulas.",
               stars: 1,
               downloads: 2,
             },
-            matched: {},
-          },
+          ],
         ],
       });
       renderPage();
@@ -1071,10 +1070,10 @@ describe("InstalledPage", () => {
       // enough (< 90%) from the installed skill's: because it is below the
       // auto-link threshold, the card offers the association for the user to
       // confirm instead of linking silently.
-      searchSkills.mockResolvedValue({
-        hits: [
-          {
-            skill: {
+      namesakeSkills.mockResolvedValue({
+        entries: [
+          [
+            {
               name: "pdf",
               repo: "anthropics/skills",
               description: "Convert PDF files to images and text.",
@@ -1082,10 +1081,8 @@ describe("InstalledPage", () => {
               downloads: 99,
               path: "skills/anthropics/skills/pdf",
             },
-            matched: {},
-          },
+          ],
         ],
-        total: 1,
       });
       renderPage();
 
@@ -1116,10 +1113,10 @@ describe("InstalledPage", () => {
     it("auto-links a tool-installed skill whose description matches a namesake", async () => {
       // Identical wording (≥ 90% similarity) is treated as the same skill and
       // linked automatically — no 关联来源 badge or confirm dialog ever appears.
-      searchSkills.mockResolvedValue({
-        hits: [
-          {
-            skill: {
+      namesakeSkills.mockResolvedValue({
+        entries: [
+          [
+            {
               name: "pdf",
               repo: "anthropics/skills",
               description: "PDF 文档读取、生成、合并、拆分与标注。",
@@ -1127,10 +1124,8 @@ describe("InstalledPage", () => {
               downloads: 99,
               path: "skills/anthropics/skills/pdf",
             },
-            matched: {},
-          },
+          ],
         ],
-        total: 1,
       });
       renderPage();
 
