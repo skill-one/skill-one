@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Boxes, Users } from "lucide-react";
 
@@ -7,8 +6,7 @@ import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
-import { useDebouncedValue } from "../../hooks/use-debounced-value";
-import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
+import { useDestinationView } from "../../hooks/use-list-view";
 import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
 import {
   installedSkillView,
@@ -23,14 +21,10 @@ import {
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
-import { SearchResults } from "../explore/search-results";
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage } from "../../lib/utils";
-import { buildSearchIndex } from "../../lib/search-index";
-import { setQuery } from "../../lib/list-view";
 import { popularity } from "../../lib/popularity";
 import { estimateTokens } from "../../lib/token-estimate";
-import type { SkillMatched } from "../../components/highlighted-text";
 import type { Skill } from "../../types/skill";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
@@ -67,8 +61,6 @@ interface Row {
   skill: SkillView;
   enabled: boolean;
   suggestion?: LinkCandidate[];
-  /** Search-hit highlights, so a searched name reads like the store's. */
-  matched?: SkillMatched;
 }
 
 /** One card's worth of installs: a repository, or the source-less pool. */
@@ -208,7 +200,6 @@ export function InstalledPage() {
   // one of skill rows or of repository cards, and each reads in its own orders.
   // The full installed list is already in memory, so everything below filters on
   // the main thread.
-  const search = useListQuery();
   const { scope, sort = "popularity", unit = "skill" } =
     useDestinationView("installed");
   const domain = scope ?? null;
@@ -218,8 +209,6 @@ export function InstalledPage() {
   // time could point at a different skill a moment later. The drawer resolves
   // the key against its own list, and a key it cannot find keeps it closed.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const query = useDebouncedValue(search).trim();
-  const isSearching = query.length > 0;
 
   // Anything that re-answers the list resets the detail panel: its skill may
   // not be in the new answer at all.
@@ -227,54 +216,27 @@ export function InstalledPage() {
   // The controls are shared with the other list now, so this watches the answer
   // instead of each control. The sort carries the unit (it is derived above),
   // so one field here covers both switches' old answers.
-  const shownAnswer = useRef(`${query}\u0000${domain ?? "all"}\u0000${sort}`);
+  const shownAnswer = useRef(`${domain ?? "all"}\u0000${sort}`);
   useEffect(() => {
-    const answer = `${query}\u0000${domain ?? "all"}\u0000${sort}`;
+    const answer = `${domain ?? "all"}\u0000${sort}`;
     if (shownAnswer.current === answer) return;
     shownAnswer.current = answer;
     setSelectedKey(null);
-  }, [query, domain, sort]);
-
-  // Deep link from the menu bar popover: `/installed?skill=<name>` pre-fills
-  // the search box, which ranks the targeted skill near the top (its name is
-  // the whole query, and the name field is boosted) along with any sibling
-  // whose terms it shares. The param is consumed (removed) once applied so a
-  // refresh stays on the page.
-  const [searchParams, setSearchParams] = useSearchParams();
-  useEffect(() => {
-    const target = searchParams.get("skill");
-    if (!target) return;
-    setQuery(target);
-    setSearchParams({}, { replace: true });
-  }, [searchParams, setSearchParams]);
-
-  // The store's single search entry point, over the installed list: a skill is
-  // found by name, every query term must match, a mistyped word does not.
-  // Installed lists are short, so the index is cheap to build here and rebuild
-  // when the list changes — unlike the registry, which builds the same index in
-  // the worker. The matched terms the index reports ride along to the rows,
-  // exactly as the store's hits do.
-  const searchInstalled = useMemo(() => buildSearchIndex(list), [list]);
-  const hits = useMemo(
-    () => (query ? searchInstalled(query) : null),
-    [query, searchInstalled],
-  );
+  }, [domain, sort]);
 
   // One view per listed skill: the on-disk record merged with the store entry
   // its recorded source resolved to. Both the rows and the drawer read these
   // objects, so the two can never disagree about what a skill looks like, and
   // the store's facts are present exactly when the registry holds an entry.
-  const rows = useMemo<Row[]>(() => {
-    const entries = hits
-      ? hits.map((hit) => ({ skill: hit.doc, matched: hit.matched }))
-      : list.map((skill) => ({ skill, matched: undefined }));
-    return entries.map(({ skill, matched }) => ({
-      skill: installedSkillView(skill, linked, storeEntries[skill.name]),
-      enabled: skill.enabled,
-      suggestion: suggestions?.[skill.name],
-      matched,
-    }));
-  }, [hits, list, linked, storeEntries, suggestions]);
+  const rows = useMemo<Row[]>(
+    () =>
+      list.map((skill) => ({
+        skill: installedSkillView(skill, linked, storeEntries[skill.name]),
+        enabled: skill.enabled,
+        suggestion: suggestions?.[skill.name],
+      })),
+    [list, linked, storeEntries, suggestions],
+  );
 
   // Linking or unlinking a source inside the detail drawer changes the
   // skill's identity (the unlinked `/name` key becomes `repo/name` and
@@ -328,13 +290,9 @@ export function InstalledPage() {
   // estimate the detail drawer states, an empty description honestly reading
   // 0 rather than sinking) — scoped to the chosen domain by membership, since
   // a skill's own classification is what the picker counts here. Installs
-  // the platform recorded no birth time for settle last in the time order. A
-  // search is left exactly as the index answered it: relevance is a ranking
-  // too, and the better one while a query is live — the same order the store
-  // keeps there.
+  // the platform recorded no birth time for settle last in the time order.
   const activeRows = useMemo(() => {
     if (unit !== "skill") return [];
-    if (isSearching) return rows;
     const scoped =
       domain === null
         ? rows
@@ -354,7 +312,7 @@ export function InstalledPage() {
             byName,
           ),
     );
-  }, [unit, rows, isSearching, domain, sort]);
+  }, [unit, rows, domain, sort]);
 
   // Each row's ordinal in the flat order, so numbering runs continuously
   // across the groups rather than restarting per bucket.
@@ -392,7 +350,7 @@ export function InstalledPage() {
   // newest-install order). Scoped to the chosen domain by membership, since a
   // card rides every domain its rows belong to.
   const activeCards = useMemo<RepoGroup[]>(() => {
-    if (unit !== "repo" || isSearching) return [];
+    if (unit !== "repo") return [];
     const scoped =
       domain === null
         ? cards
@@ -412,7 +370,7 @@ export function InstalledPage() {
     return scoped.toSorted(
       compareByStars((card) => starsOf(card), byNewestInstall),
     );
-  }, [unit, isSearching, cards, domain]);
+  }, [unit, cards, domain]);
 
   // The registry's own grouping — every skill it lists, per repository — so
   // each card can also name the repository's skills this machine does not
@@ -424,7 +382,7 @@ export function InstalledPage() {
   // resolve by. The source-less pool has no repository to ask about.
   const { data: registryGroups } = useRegistryGroups(
     "",
-    unit === "repo" && !isSearching && list.length > 0,
+    unit === "repo" && list.length > 0,
   );
 
   const uninstalledByRepo = useMemo(() => {
@@ -461,7 +419,7 @@ export function InstalledPage() {
     initial: INITIAL_CARDS,
     step: CARD_CHUNK,
     // The sort carries the unit, so one field names the whole shape change.
-    resetKey: `${sort}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}`,
+    resetKey: `${sort}\u0000${domain ?? "all"}\u0000${list.length}`,
   });
   const shownRows = activeRows.slice(0, renderedCount);
   const shownCards = activeCards.slice(0, renderedCount);
@@ -493,21 +451,17 @@ export function InstalledPage() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The list's own first row, and the only row above the answer: the search
-          field, the classifications that hold an install (one press to scope the
-          list; 全部 clears it), and this page's own status control — the sort
-          switch, which answers both what order the list reads in and what shape
-          it reads as. The picker is a browse control — a search re-orders the
-          list by relevance and ignores the scope — so it locks while a search
-          is live, as does the sort. It counts what the shape on screen lists,
-          so the figures and the list they scope can never disagree. The row's
+      {/* The list's own first row, and the only row above the answer: the
+          classifications that hold an install (one press to scope the list;
+          全部 clears it), the shape switch, and the sort switch that says what
+          order the list reads in. It counts what the shape on screen lists, so
+          the figures and the list they scope can never disagree. The row's
           arrangement is `ListToolbar`'s to answer; the page hands over its
-          counts and whether a query is live. */}
+          counts. */}
       <ListToolbar
         destination="installed"
         facets={facets}
         total={totalCount}
-        searching={isSearching}
       />
 
       {/* The list — repository cards or skill rows; the modal detail drawer
@@ -538,27 +492,6 @@ export function InstalledPage() {
             />
           ) : list.length === 0 ? (
             <Placeholder icon={Boxes} message={t("state.noInstalled")} />
-          ) : isSearching ? (
-            // The search answer: the shared search view's installed section —
-            // what this machine has, with the enable switch, the dimmed disabled
-            // install and the migration badge that only this surface knows. The
-            // store's own sections are not part of an installed list's answer, and
-            // its two remote queries stand down with them. Keyed by the answer's
-            // definition, so no stale fold or selection survives into a
-            // differently-shaped answer.
-            <SearchResults
-              key={`${unit}:${query}`}
-              unit={unit}
-              query={query}
-              destination="installed"
-              installed={rows.map((row) => ({
-                skill: row.skill,
-                matched: row.matched,
-                muted: !row.enabled,
-                extra: rowExtra(row, "label"),
-                action: <SkillEnableSwitch skill={row.skill} />,
-              }))}
-            />
           ) : itemCount === 0 ? (
             <Placeholder
               message={
@@ -580,7 +513,6 @@ export function InstalledPage() {
                   <SkillRow
                     key={key}
                     skill={row.skill}
-                    matched={row.matched}
                     index={rowOrdinals.get(key) ?? 0}
                     // An installed list is not a leaderboard: the figures
                     // it does carry come from the store, and the installs
@@ -615,7 +547,6 @@ export function InstalledPage() {
                   stars={starsOf(card)}
                   skills={card.items.map((row) => ({
                     skill: row.skill,
-                    matched: row.matched,
                     muted: !row.enabled,
                     extra: rowExtra(row, "icon"),
                     // Each row's own enable switch, in the card's floating
@@ -623,7 +554,6 @@ export function InstalledPage() {
                     // switch's state has its evidence.
                     action: <SkillEnableSwitch skill={row.skill} />,
                   }))}
-                  hasQuery={isSearching}
                   selected={selected}
                   onOpenSkill={setSelectedKey}
                   uninstalled={

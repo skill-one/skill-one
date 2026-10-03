@@ -1,25 +1,29 @@
 /**
- * The controls both lists show, held in one place because they mean one thing:
- * there is a single search field and a single sort switch, and the state behind
- * them cannot belong to either page. A page reads the slice it needs out of
- * here and answers with it; the page showing the list writes.
+ * The controls both browse lists show, held in one place because they mean one
+ * thing per list: how the list reads — its order, its shape, the slice of the
+ * taxonomy it is narrowed to. A page reads the slice it needs out of here and
+ * answers with it; the page showing the list writes.
+ *
+ * **Search is deliberately not in here.** The question lives in the search
+ * page's own URL (`?q=`, see `components/app-header`), so a search is
+ * shareable, the back button is the way out of it, and the two lists are pure
+ * browse surfaces that hold no question at all.
  *
  * Module-level rather than a context because the two lists are never mounted
  * together — each page renders its own copy of the controls while the other is
- * gone — so the state has to outlive the page that set it. That the state
- * outlives the page is the point, not a side effect: a query typed on one list
- * is still there on the other, which is what one field shared by two lists
- * means. (It is also plain state rather than a render-time value, the same
- * reason `lib/view-memory` and the registry client's snapshot are module-level.)
+ * gone — so the state has to outlive the page that set it. (It is also plain
+ * state rather than a render-time value, the same reason `lib/view-memory` and
+ * the registry client's snapshot are module-level.)
  *
  * What is *not* here is everything that is one page's own business: the
- * revealed depth, the scroll position, which folds are open. Those belong to
- * the page that renders the list, and stay there.
+ * revealed depth, the scroll position, which folds are open, and the search
+ * page's own shape switch — which must not move either browse list's reading.
+ * Those belong to the page that renders them, and stay there.
  *
  * Each list's order and shape persist across sessions in `localStorage` (via the
  * guarded `storage` wrapper — a blocked write costs persistence and nothing
- * else); the query and the scopes stay session-only, because a question asked
- * and a taxonomy slice chosen are this visit's business.
+ * else); the scopes stay session-only, because a taxonomy slice chosen is this
+ * visit's business.
  */
 
 import { storage } from "./storage";
@@ -88,13 +92,6 @@ export interface DestinationView {
 
 /** Everything the shared controls say. */
 export interface ListViewState {
-  /**
-   * What the reader is looking for — one query, both lists. Switching lists
-   * answers the same question about the other collection instead of silently
-   * emptying the field, which is what a query per page would look like: two
-   * searches, two places, no way to tell which one is in charge.
-   */
-  query: string;
   /** Per list, because how a list reads is that list's answer to give. */
   views: Readonly<Record<Destination, DestinationView>>;
 }
@@ -143,7 +140,7 @@ function initialViews(): Record<Destination, DestinationView> {
   };
 }
 
-const INITIAL: ListViewState = { query: "", views: initialViews() };
+const INITIAL: ListViewState = { views: initialViews() };
 
 let state = INITIAL;
 const subscribers = new Set<() => void>();
@@ -164,12 +161,6 @@ export function subscribeListView(listener: () => void): () => void {
   return () => {
     subscribers.delete(listener);
   };
-}
-
-/** Point both lists at a new question. */
-export function setQuery(query: string): void {
-  if (query === state.query) return;
-  publish({ ...state, query });
 }
 
 /**
@@ -260,5 +251,5 @@ export function resetListView(): void {
     storage.removeItem(UNIT_KEY_PREFIX + destination);
     storage.removeItem(SORT_KEY_PREFIX + destination);
   }
-  publish({ query: "", views: initialViews() });
+  publish({ views: initialViews() });
 }
