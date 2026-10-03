@@ -107,11 +107,9 @@
   },
   "search": {
     "store": "Store",
+    "installed": "Installed",
     "skillsSh": "skills.sh official search",
-    "searching": "Searching…",
-    "liveResults": "Show the skills.sh results",
-    "liveResultsHide": "Hide the skills.sh results",
-    "searchingLive": "Searching the store and skills.sh live results…"
+    "searching": "Searching…"
   },
   "link": {
     "agentFailed": "{{name}} failed",
@@ -176,7 +174,9 @@
   "state": {
     "loadFailed": "Failed to load: {{message}}",
     "noMatch": "No skills matching “{{query}}”",
-    "noInstalledMatch": "Nothing installed here matches “{{query}}”",
+    "noSourceMatch": "Nothing on this machine, in the store, or on skills.sh matches “{{query}}”",
+    "noIndexMatch": "The store’s data has nothing matching “{{query}}” yet",
+    "noInstalledMatch": "Nothing installed on this machine matches “{{query}}”",
     "noSkills": "No skills yet",
     "repoCount": "{{count}} repositories",
     "sourceRepoCount": "{{count}} source repositories",

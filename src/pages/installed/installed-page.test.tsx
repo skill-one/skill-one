@@ -51,10 +51,11 @@ vi.mock("../../lib/registry/client", () => ({
 }));
 
 /**
- * The live skills.sh search is stubbed at the module boundary so the installed
- * list can be held to never asking it: an installed search answers from this
- * machine's own records, so the store's two remote sources stand down with
- * their sections. `isSearchableQuery` stays real.
+ * The live skills.sh search is stubbed at the module boundary so no case here
+ * touches the network: the shared search answer asks it as the query settles on
+ * every surface, and the default answer is "nothing here either", which is what
+ * keeps the empty state's cases honest. `isSearchableQuery` stays real, so the
+ * endpoint's own floor is still exercised.
  */
 vi.mock("../../lib/skills-sh", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../lib/skills-sh")>()),
@@ -1780,12 +1781,13 @@ describe("InstalledPage", () => {
       expect(screen.getByText("docx")).toBeInTheDocument();
 
       // "df" sits inside the term "pdf": the substring filter used to answer it,
-      // a term index does not.
+      // a term index does not. Every source has now answered empty, so the empty
+      // state speaks for the whole search rather than for this machine alone.
       await user.clear(screen.getByLabelText("搜索 Skill"));
       await user.type(screen.getByLabelText("搜索 Skill"), "df");
-      // The empty state says so in this list's own words: it is about what this
-      // machine has, and the store's answer stands below it.
-      expect(await screen.findByText(/本机没有匹配/)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/本机、应用商店与 skills\.sh 都没有匹配/),
+      ).toBeInTheDocument();
     });
 
     it("shows a no-match empty state for a search with no results", async () => {
@@ -1795,10 +1797,12 @@ describe("InstalledPage", () => {
 
       await user.type(screen.getByLabelText("搜索 Skill"), "zzz");
 
-      expect(await screen.findByText(/本机没有匹配/)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/本机、应用商店与 skills\.sh 都没有匹配/),
+      ).toBeInTheDocument();
     });
 
-    it("answers with this machine's installs, and never asks the live source", async () => {
+    it("answers with this machine's installs, the store below, and skills.sh last", async () => {
       const user = userEvent.setup();
       // The store's index answers this query too — cheap and certain, so it is
       // simply there below the installed answer.
@@ -1808,26 +1812,111 @@ describe("InstalledPage", () => {
 
       await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
-      // The installed answer is the whole answer, in the installed index's own
-      // relevance order: docx does not match. It carries no header either — this
-      // list is the source, so its own rows say so by being on screen. (Waited
-      // out: until the query settles, the browse list behind it still holds
-      // docx, and the answer has no header that could scope the assertion.)
+      // The installed answer leads, in the installed index's own relevance
+      // order: docx does not match. (Waited out: until the query settles, the
+      // browse list behind it still holds docx, and the answer has no section
+      // of its own that could scope the assertion.)
       await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
       expect(screen.getByText("pdf")).toBeInTheDocument();
-      expect(
-        screen.queryByRole("region", { name: "本地已安装" }),
-      ).not.toBeInTheDocument();
+      // The own group now carries the source's name and count, like every other
+      // group: three sources answer one question, and the reader is told which
+      // is which.
+      const own = await screen.findByRole("region", { name: "已安装" });
+      expect(within(own).getByText("1 个仓库")).toBeInTheDocument();
       // The store's index is cheap and certain, so its answer is simply there
-      // below the installed one — a titled section, open by default, counted.
+      // below the installed one — a titled group, open by default, counted.
       const store = await screen.findByRole("region", { name: "应用商店" });
       expect(within(store).getByText("1 个仓库")).toBeInTheDocument();
-      // The live source is the one thing a search waits for: it is on screen as
-      // a press, and nothing has pressed it.
+      // The order is trust and cost: what this machine has leads, the daily
+      // snapshot follows, and skills.sh's reach — asked below — would come last.
       expect(
-        screen.getByRole("button", { name: "展开 skills.sh 的结果" }),
+        own.compareDocumentPosition(store) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      // The live source has nothing to add, so it is absent rather than open
+      // and zero — an absent group reads quieter than a header over nothing.
+      expect(
+        screen.queryByRole("region", { name: "skills.sh 官方搜索" }),
+      ).not.toBeInTheDocument();
+      // It was still asked: one query, one request, and its empty answer is
+      // what let the empty state speak.
+      expect(searchSkillsSh).toHaveBeenCalledWith("pdf", expect.anything());
+    });
+
+    it("lets the live source carry the answer when this machine has none", async () => {
+      const user = userEvent.setup();
+      // skills.sh holds the one skill the installed index cannot find.
+      searchSkillsSh.mockResolvedValue([
+        {
+          name: "pdf",
+          id: "acme/pdfs/pdf",
+          repo: "acme/pdfs",
+          description: "",
+          stars: 0,
+          downloads: 42,
+          url: "https://www.skills.sh/acme/pdfs/pdf",
+          storeBacked: false,
+        },
+      ]);
+      renderPage();
+      await screen.findByText("pdf");
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "nomatch");
+
+      // Nothing here and nothing in the store matched, so the whole-search
+      // empty state has not earned the right to speak — a page that says "no
+      // matches" above a full page of results is lying about its own contents.
+      expect(
+        screen.queryByText(/本机、应用商店与 skills\.sh 都没有匹配/),
+      ).not.toBeInTheDocument();
+      // The empty groups are absent; the live one is the whole answer, and it
+      // says which source it is.
+      expect(
+        screen.queryByRole("region", { name: "已安装" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("region", { name: "应用商店" }),
+      ).not.toBeInTheDocument();
+      const live = await screen.findByRole("region", {
+        name: "skills.sh 官方搜索",
+      });
+      // **The scope change is stated, not left to be noticed.** The reader
+      // searched 「已安装」; rows under no 「已安装」 header would read as
+      // installs until they looked up and found another source's name. So the
+      // own source leaves one quiet line in the slot its group would have held,
+      // and the line is not a header over an empty panel — it is a sentence.
+      const note = screen.getByText("本机没有匹配“nomatch”的 Skill");
+      expect(note).toBeInTheDocument();
+      expect(
+        note.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      // It is **centred** in the answer column, as one unit with its glyph —
+      // `pl-6` would put half of itself inside the centring and land the line
+      // 12px right of true centre, which reads as "almost centred" rather than
+      // as either. The class is the claim here: jsdom lays nothing out, so
+      // centring is pinned by what asks for it rather than by a measurement.
+      expect(note).toHaveClass("justify-center");
+      expect(note.className).not.toContain("pl-");
+      // The glyph is what still names the scope, so it travels with the
+      // sentence rather than being left behind at the column edge.
+      expect(note.querySelector("svg")).not.toBeNull();
+    });
+
+    it("stands the quiet scope line down when the whole search found nothing", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByText("pdf");
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "zzz");
+
+      // Every source answered empty, so the one sentence that speaks for all of
+      // them is enough; a second line about this machine alone would be the same
+      // fact said twice.
+      expect(
+        await screen.findByText(/本机、应用商店与 skills\.sh 都没有匹配/),
       ).toBeInTheDocument();
-      expect(searchSkillsSh).not.toHaveBeenCalled();
+      expect(
+        screen.queryByText("本机没有匹配“zzz”的 Skill"),
+      ).not.toBeInTheDocument();
     });
 
     it("opens the installed surface's own drawer from a searched row", async () => {
