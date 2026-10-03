@@ -195,6 +195,58 @@ describe("InstalledPage", () => {
   });
 
 
+  describe("the corpus readout", () => {
+    it("states every install and every recorded source, in the source's own words", async () => {
+      renderPage();
+
+      // Six installs, none with a recorded source: the row states both figures,
+      // and the repository one is worded as *sources* because a machine holding
+      // installs holds no repository of its own — the pool card is a card, not a
+      // repository.
+      await screen.findByText("pdf");
+      expect(
+        screen.getByText(/个 skill/).closest("p"),
+      ).toHaveTextContent(/6 个 skill\s*·\s*0 个来源仓库/);
+    });
+
+    it("counts a recorded source once, whatever it contributed", async () => {
+      renderPage();
+
+      // The ledger is seeded right after the mount, which is when the page's
+      // own read of it happens. Two installs out of one repository are one
+      // source: the figure counts where the installs came from, not how many
+      // there are.
+      seedMockProvenance({
+        pdf: { repo: "anthropics/skills" },
+        docx: { repo: "anthropics/skills" },
+      });
+
+      await screen.findByText("anthropics/skills");
+      await waitFor(() =>
+        expect(
+          screen.getByText(/个 skill/).closest("p"),
+        ).toHaveTextContent(/6 个 skill\s*·\s*1 个来源仓库/),
+      );
+    });
+
+    it("states the whole install list while a search narrows the answer", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByText("pdf");
+
+      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+
+      // The corpus is what is installed, not what this question matched: the
+      // figures stay put while the scope and the order lock, because they are
+      // about this machine rather than about the answer on screen.
+      await waitFor(() =>
+        expect(
+          screen.getByText(/个 skill/).closest("p"),
+        ).toHaveTextContent(/6 个 skill\s*·\s*0 个来源仓库/),
+      );
+    });
+  });
+
   describe("repository cards", () => {
     it("gives every source-less install a home in one repository-style card", async () => {
       const user = userEvent.setup();
@@ -889,9 +941,12 @@ describe("InstalledPage", () => {
 
       // The sourced skill gets a card of its own, and its bar names the
       // repository: the owner's face and the repo path. One skill, nothing to
-      // reveal — so no figure rides the bar.
+      // reveal — so no figure rides the bar. (The row's own corpus readout does
+      // state skills; the claim is about the bar, so the search is scoped to it.)
       await screen.findByText("anthropics/skills");
-      expect(screen.queryByText(/个 skill/)).toBeNull();
+      for (const bar of container.querySelectorAll('[data-slot="card-header"]')) {
+        expect(bar).not.toHaveTextContent(/个 skill/);
+      }
       // The other five keep the pool card, whose bar names no repository.
       expect(screen.getAllByText("本地安装")).toHaveLength(1);
       // Only the sourced card can name an owner, so it carries the only face.

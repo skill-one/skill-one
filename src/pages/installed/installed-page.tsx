@@ -466,6 +466,23 @@ export function InstalledPage() {
   // skill.
   const totalCount = unit === "skill" ? rows.length : cards.length;
 
+  // What this machine holds, in both units at once. The skill figure is the
+  // install list itself, and the source figure is the ledger's own — read
+  // beside the list rather than off the rows, which a live search narrows: the
+  // corpus is what is installed, not what this question matched. A record with
+  // no repository is not a source (an install this app could not place), so the
+  // pool is left out — the pool's card is still on screen; the count only says
+  // what it counts.
+  const corpusRepos = useMemo(
+    () =>
+      new Set(
+        Object.values(linked ?? {})
+          .map((record) => record.repo)
+          .filter(Boolean),
+      ).size,
+    [linked],
+  );
+
   // Progressive rendering: only the first `renderedCount` items are mounted;
   // an IntersectionObserver on the sentinel below the list extends the count
   // while the reader scrolls. A new answer (a search, a scope, a unit, a
@@ -518,12 +535,19 @@ export function InstalledPage() {
           reads in. The scope and the order lock while a question is live — a
           search re-ranks by relevance and ignores both. The row counts what the
           shape on screen lists, so the figures and the list they scope can never
-          disagree. The row's arrangement is `ListToolbar`'s to answer; the page
-          hands over its counts and whether the question has settled. */}
+          disagree. The corpus's own two figures — every install, and every
+          recorded source they came from — ride the row's slack. The row's
+          arrangement is `ListToolbar`'s to answer; the page hands over its counts
+          and whether the question has settled. */}
       <ListToolbar
         destination="installed"
         facets={facets}
         total={totalCount}
+        corpus={{
+          skills: list.length,
+          repos: corpusRepos,
+          variant: "installed",
+        }}
         searching={isSearching}
       />
 
