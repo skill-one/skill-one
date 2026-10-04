@@ -196,4 +196,22 @@ describe("LinkSuggestionMark", () => {
 
     expect(onCardClick).not.toHaveBeenCalled();
   });
+
+  it("renders a labeled interactive pill when labeled is true and candidates exist", () => {
+    renderMark({ labeled: true });
+
+    const trigger = screen.getByRole("button", { name: "关联 pdf 的商店来源" });
+    expect(trigger).toHaveTextContent("第三方安装");
+    expect(trigger).toHaveTextContent("可关联商店来源");
+  });
+
+  it("renders a plain labeled span when labeled is true and candidates are empty", () => {
+    renderMark({ labeled: true, candidates: [] });
+
+    expect(
+      screen.queryByRole("button", { name: "关联 pdf 的商店来源" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("第三方安装")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "第三方安装" })).toBeInTheDocument();
+  });
 });

@@ -47,6 +47,7 @@ export function LinkSuggestionMark({
   candidates,
   cutRepos,
   className,
+  labeled = false,
 }: {
   /** The skill whose source is unknown; also what the trigger is named for. */
   name: string;
@@ -57,6 +58,8 @@ export function LinkSuggestionMark({
   cutRepos?: readonly string[];
   /** Sized by the surface that owns the face's slot — a row, a square, a bar. */
   className?: string;
+  /** Whether to render a labeled pill button (e.g. in the detail drawer). */
+  labeled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
@@ -67,7 +70,14 @@ export function LinkSuggestionMark({
   };
 
   if (candidates.length === 0) {
-    return <ThirdPartyMark className={className} />;
+    return labeled ? (
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <ThirdPartyMark className={className} />
+        <span className="truncate">{t("common.thirdPartyInstall")}</span>
+      </span>
+    ) : (
+      <ThirdPartyMark className={className} />
+    );
   }
 
   // The mark, pressed. It is a real button so the keyboard reaches it and the
@@ -76,7 +86,26 @@ export function LinkSuggestionMark({
   // Linear trigger composition: PopoverTrigger and TooltipTrigger each merge
   // their props onto the next element, so both end up on the button (a Root
   // component as a merged child swallows the props).
-  const trigger = (
+  const trigger = labeled ? (
+    <button
+      type="button"
+      aria-label={t("sourceLink.triggerAria", { name })}
+      onClick={(e) => e.stopPropagation()}
+      className={cn(
+        "group/trigger inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300",
+        "cursor-pointer transition-colors hover:bg-amber-500/20 hover:border-amber-500/40",
+        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+      )}
+    >
+      <span className={cn(THIRD_PARTY_MARK_CLASS, className)}>
+        <ThirdPartyMarkGlyph />
+      </span>
+      <span className="truncate">{t("common.thirdPartyInstall")}</span>
+      <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-normal text-amber-600 dark:text-amber-400 underline decoration-amber-500/40 underline-offset-2">
+        · {t("sourceLink.linkSuggestionAction")}
+      </span>
+    </button>
+  ) : (
     <button
       type="button"
       aria-label={t("sourceLink.triggerAria", { name })}

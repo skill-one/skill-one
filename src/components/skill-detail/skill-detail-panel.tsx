@@ -732,13 +732,16 @@ export function SkillDetailPanel({
                     candidates={suggestion ?? []}
                     cutRepos={shown.cutRepos}
                     className="size-4"
+                    labeled
                   />
                 ) : (
-                  <ThirdPartyMark className="size-4" />
+                  <span className="inline-flex items-center gap-1.5">
+                    <ThirdPartyMark className="size-4" />
+                    <span className="truncate">
+                      {t("common.thirdPartyInstall")}
+                    </span>
+                  </span>
                 )}
-                <span className="truncate">
-                  {t("common.thirdPartyInstall")}
-                </span>
               </SheetDescription>
             )}
           </div>

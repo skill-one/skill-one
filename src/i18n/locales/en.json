@@ -203,6 +203,7 @@
     "linked": "Source linked: {{repo}}",
     "failed": "Failed to link source",
     "triggerAria": "Link {{name}} to its store source",
+    "linkSuggestionAction": "Link to store available",
     "title": "Link source",
     "subtitle": "Choose the source repository for {{name}}",
     "tooltip": "Link source — local files unchanged",

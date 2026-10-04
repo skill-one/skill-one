@@ -203,6 +203,7 @@
     "linked": "已关联来源：{{repo}}",
     "failed": "关联来源失败",
     "triggerAria": "关联 {{name}} 的商店来源",
+    "linkSuggestionAction": "可关联商店来源",
     "title": "关联来源",
     "subtitle": "为「{{name}}」选择来源仓库",
     "tooltip": "关联来源，不改动本地文件",
