@@ -1,12 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { act, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { toast } from "../../components/ui/toast";
 import { renderWithRouter } from "../../test/test-utils";
 import { getExcludedAgents } from "../../lib/agent-link-preferences";
-import { agentLinkState } from "../../lib/agent-link-state";
-import { setAgentsLayout } from "../../lib/agents-layout-preference";
 import { resetMockAgentStatus } from "../../lib/mock-local";
 import { AgentsPage } from "./agents-page";
 
@@ -16,33 +14,20 @@ function renderPage() {
 
 afterEach(() => {
   resetMockAgentStatus();
-  // Link exclusions and the layout choice live in localStorage; neither must
-  // leak across tests. The layout module also keeps a session fallback, so it
-  // is restored to the default alongside the storage clear.
   window.localStorage.clear();
-  setAgentsLayout("columns");
 });
 
 describe("AgentsPage", () => {
-  it("states the linked count in the head and nothing else", async () => {
+  it("renders all detected agent pills and the central hub without redundant top headers", async () => {
     renderPage();
-    const { fetchAgentStatus } = await import("../../lib/local-skills");
 
-    // The head is one figure — how many agents are linked — in the page's own
-    // type; the skill totals stay on the hub card at the picture's centre, and
-    // no state chrome floats above the graph.
-    const agents = await fetchAgentStatus();
-    // The head counts what the picture shows: the canonical agent is
-    // effectively linked without ever reporting linked=true, so the figure
-    // derives from `agentLinkState`, not the raw wire field.
-    const linked = agents.filter(
-      (a) => agentLinkState(a) === "linked",
-    ).length;
-    const heading = await screen.findByRole("heading", { level: 1 });
-    expect(heading).toHaveTextContent(`已连接 ${linked} 个 agents`);
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    // Central hub is present with brand title and unified stats
+    expect(await screen.findByText("SkillOne 共享中心")).toBeInTheDocument();
 
-    // Every agent is one bare icon, reachable by its name.
+    // Redundant top level-1 heading removed; status indicator lives in central hub
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+
+    // Every agent is rendered as a clean pill reachable by its name
     for (const name of [
       "Claude Code",
       "Codex",
@@ -58,8 +43,6 @@ describe("AgentsPage", () => {
 
   it("flags, on the hub, the agent whose own directory already holds content", async () => {
     renderPage();
-    // The hub carries the attention count; the icon's edge and ribbon carry
-    // the warning itself.
     expect(await screen.findByText(/1 个待处理/)).toBeInTheDocument();
   });
 
@@ -109,62 +92,8 @@ describe("AgentsPage", () => {
   it("leaves a canonical agent's icon inert", async () => {
     renderPage();
 
-    // A canonical agent uses its native skills directory, so it cannot be
-    // switched off: the icon is disabled and reads as pressed.
     const card = await screen.findByRole("button", { name: "Windsurf" });
     expect(card).toBeDisabled();
     expect(card).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("replays the entrance instead of hard-cutting on a layout switch", async () => {
-    const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole("button", { name: "Claude Code" });
-
-    // The toggle remounts the picture for the new presentation: the node
-    // element itself is replaced, so the entrance cascade replays.
-    const before = screen.getByRole("button", { name: "Claude Code" });
-    await user.click(screen.getByRole("button", { name: "切换到星座" }));
-
-    // The press persists…
-    expect(window.localStorage.getItem("skill-one.agentsLayout")).toBe(
-      "constellation",
-    );
-    // …and the picture remounts for the new presentation: the node element
-    // itself is replaced, so the entrance cascade replays instead of jumping.
-    expect(screen.getByRole("button", { name: "Claude Code" })).not.toBe(
-      before,
-    );
-    expect(
-      screen.getByRole("button", { name: "切换到分列" }),
-    ).toBeInTheDocument();
-  });
-
-  it("re-renders when the layout preference changes elsewhere", async () => {
-    const { container } = renderPage();
-    await screen.findByRole("button", { name: "Claude Code" });
-
-    // Columns first: the ribbon runs a horizontal S-curve.
-    const d = () =>
-      container
-        .querySelector('svg g[data-agent="claude-code"] path')
-        ?.getAttribute("d") ?? "";
-    const before = d();
-    expect(before).toMatch(/^M .* C .*$/);
-
-    try {
-      await act(async () => {
-        setAgentsLayout("constellation");
-      });
-
-      // Constellation re-lays the same agent onto the Vogel spiral.
-      expect(d()).not.toBe(before);
-    } finally {
-      // The preference module keeps a session fallback: restore the default
-      // so later suites read a clean store.
-      await act(async () => {
-        setAgentsLayout("columns");
-      });
-    }
   });
 });

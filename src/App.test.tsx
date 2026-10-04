@@ -78,7 +78,7 @@ describe("App routing", () => {
     expect(persisterWiring.calls).toBe(1);
 
     // The default route is the home, the agents graph; wait for it to settle.
-    await screen.findByRole("heading", { name: /已连接 \d+ 个 agents/ });
+    await screen.findByText("SkillOne 共享中心");
   });
 
   it("opens the agents graph at the root route", async () => {
@@ -88,10 +88,9 @@ describe("App routing", () => {
       </I18nProvider>,
     );
 
-    // The home is the agents page: its head states the idea before any data
-    // lands.
+    // The home is the agents page with the central SkillOne hub.
     expect(
-      await screen.findByRole("heading", { name: /已连接 \d+ 个 agents/ }),
+      await screen.findByText("SkillOne 共享中心"),
     ).toBeInTheDocument();
   });
 
@@ -124,7 +123,7 @@ describe("App routing", () => {
     );
 
     expect(
-      await screen.findByRole("heading", { name: /已连接 \d+ 个 agents/ }),
+      await screen.findByText("SkillOne 共享中心"),
     ).toBeInTheDocument();
   });
 

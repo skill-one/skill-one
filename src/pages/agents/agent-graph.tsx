@@ -15,17 +15,14 @@ import { AgentDetailDialog } from "./agent-detail-dialog";
 import {
   layoutAgents,
   resolveGraphWidth,
-  HUB_CARD_HALF,
   HUB_CARD_HALF_COLUMNS,
-  type AgentsLayoutMode,
   type NodeLayout,
 } from "./agent-graph-layout";
 
 /**
- * Entrance stagger for one node: in columns mode a whole column lands at
- * once and columns cascade outer-to-inner (ending at the hub); the
- * constellation keeps the per-agent ripple. Callers add their own base
- * (nodes 0.15s, ribbons 0.1s) on top.
+ * Entrance stagger for one node: a whole column lands at once and
+ * columns cascade outer-to-inner (ending at the hub). Callers add
+ * their own base (nodes 0.15s, ribbons 0.1s) on top.
  */
 function enterStagger(col: number | undefined, index: number): number {
   if (col !== undefined) return col * 0.12;
@@ -49,17 +46,10 @@ interface ShimmerFlow {
 }
 
 /**
- * The agents graph: detected agents distributed around the SkillOne hub.
- * Visual representation of the central skill sharing ecosystem with
- * dedicated switch controls and inspection dialogs for safety.
+ * The agents graph: detected agents distributed symmetrically in dual columns
+ * around the SkillOne hub card with dedicated switch controls and inspection dialogs.
  */
-export function AgentGraph({
-  agents,
-  mode = "columns",
-}: {
-  agents: AgentStatus[];
-  mode?: AgentsLayoutMode;
-}) {
+export function AgentGraph({ agents }: { agents: AgentStatus[] }) {
   const [ref, size] = useElementSize();
   const [active, setActive] = useState<string | null>(null);
   const [pulse, setPulse] = useState<Pulse>("idle");
@@ -90,16 +80,15 @@ export function AgentGraph({
 
   const graphWidth = resolveGraphWidth(size.width);
   const layout = useMemo(
-    () => layoutAgents(agents, graphWidth, size.height, mode),
-    [agents, graphWidth, size.height, mode],
+    () => layoutAgents(agents, graphWidth, size.height),
+    [agents, graphWidth, size.height],
   );
 
-  const hubWidth =
-    mode === "columns" ? HUB_CARD_HALF_COLUMNS * 2 : HUB_CARD_HALF * 2;
+  const hubWidth = HUB_CARD_HALF_COLUMNS * 2;
 
   return (
     <div ref={ref} className="h-full w-full overflow-hidden" data-pulse={pulse}>
-      <div key={mode} className="relative" style={{ width: layout.width }}>
+      <div className="relative" style={{ width: layout.width }}>
         <svg
           width={layout.width}
           height={layout.height}
@@ -376,13 +365,7 @@ function AgentNode({
       initial={
         reduceMotion
           ? undefined
-          : node.side
-            ? { opacity: 0, x: node.side === "left" ? -10 : 10 }
-            : {
-                opacity: 0,
-                x: Math.cos(node.angle ?? 0) * 10,
-                y: Math.sin(node.angle ?? 0) * 10,
-              }
+          : { opacity: 0, x: node.side === "left" ? -10 : 10 }
       }
       animate={{ opacity: 1, x: 0 }}
       transition={
