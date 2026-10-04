@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Boxes, Power, PowerOff, Users, type LucideIcon } from "lucide-react";
+import { Boxes, PowerOff, Users } from "lucide-react";
 
 import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
@@ -197,6 +197,10 @@ function compareByStars<T>(
  * the reader has already set aside. The three orders still say everything about
  * the live half, and each half keeps its own order inside the section, so
  * "which of these did I install last" is still answerable among the parked ones.
+ * Only the parked half is named: the live rows *are* the list, so a header over
+ * them would label the page with its own subject, and the section that does
+ * need a header starts folded — the count it carries is what says there is
+ * something set aside.
  * The repository shape has no such split: a card is a repository, its rows are
  * what the bar's group switch acts on, and a half-on card is a fact the card
  * exists to state. (A search is out of it too — relevance already re-answers the
@@ -526,16 +530,18 @@ export function InstalledPage() {
 
   // Whether the answer is cut in two, and — when it is — the number each row
   // prints: where it stands *within its own group*, counted from 1 in each. The
-  // two halves are two named sections, so each is numbered as the list it is.
+  // parked half is a section of its own, with a header that states how much it
+  // holds, so it numbers itself as the list it is rather than continuing the
+  // live list above it.
   //
   // Counting across the split instead would be the alternative, and it is wrong
   // here for a reason worth stating: the flat order interleaves the halves, so
-  // the live section would carry the gaps where a parked row used to sit (2, 4,
+  // the live list would carry the gaps where a parked row used to sit (2, 4,
   // 5, 6) and the parked section would hold the very numbers the live one gave
-  // up (1, 3). A group that starts at 2, followed by a group that starts at 1,
-  // reads as one list with rows gone missing — the opposite of what two named
-  // sections are for. Each group also numbers the order its own sort gave it,
-  // which is the only order a reader looking at that group can see.
+  // up (1, 3). A run that jumps 1, 2, 4 and then restarts at 1 reads as one list
+  // with rows gone missing — the opposite of what the section's own run is for.
+  // Each group also numbers the order its own sort gave it, which is the only
+  // order a reader looking at that group can see.
   //
   // The count survives the progressive reveal: `splitByEnabled` preserves each
   // group's order, so the revealed prefix is a prefix of the whole group and a
@@ -620,35 +626,15 @@ export function InstalledPage() {
   };
 
   /**
-   * One half of the skill unit, in the shell its place in the answer calls for:
-   * a bare list while the answer is whole, a titled and counted section once the
-   * split cuts it in two. Both halves are drawn through here so they cannot
-   * drift apart in anything but their glyph, their title and the hairline that
-   * separates them — a reader who compares the two headers is meant to be
-   * reading two counts of the same kind of thing.
-   *
-   * The section's own fold is the reader's ("not working with these right now"),
-   * so it is left to survive a change of sort or scope — both of which only
-   * re-order or narrow rows. It is not keyed by the answer, and a scope that
-   * parks nothing unmounts both sections outright, so the next time one appears
-   * it starts open.
+   * One half of the skill unit, drawn as the bare list it is. The live rows wear
+   * no section at all: they are the page's list, and a header naming them would
+   * label the answer with the subject it already answers. The parked half wraps
+   * the same rows in a section of its own (see the render below), so a skill
+   * reads identically wherever it is drawn — only its surroundings differ.
    */
-  const skillGroup = (
-    group: Row[],
-    section?: { icon: LucideIcon; title: string; className?: string },
-  ) =>
-    section ? (
-      <CollapsibleSection
-        className={section.className}
-        icon={section.icon}
-        title={section.title}
-        count={t("state.skillCount", { count: group.length })}
-      >
-        <ul className={SKILL_ROW_LIST_CLASS}>{group.map(renderSkillRow)}</ul>
-      </CollapsibleSection>
-    ) : (
-      <ul className={SKILL_ROW_LIST_CLASS}>{group.map(renderSkillRow)}</ul>
-    );
+  const skillRows = (group: Row[]) => (
+    <ul className={SKILL_ROW_LIST_CLASS}>{group.map(renderSkillRow)}</ul>
+  );
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
@@ -727,32 +713,36 @@ export function InstalledPage() {
             />
           ) : unit === "skill" ? (
             // The skill unit: one row per install, in the sort's own order —
-            // the live installs first, then the parked ones below. The same row
-            // a repository's own page lists, so a skill reads the same wherever
+            // the live installs first as the bare list, then the parked ones
+            // below under the one header that names them. The same row a
+            // repository's own page lists, so a skill reads the same wherever
             // it is found — and the figure each row states is the one this list
             // answers in: the install's own clock under the 按安装时间 sort, the
             // popularity blend otherwise.
             //
-            // Both halves are named once the split exists, and only then: two
-            // headers of the same shape are what tell the reader that the
-            // continuous run of numbers below each one is its own list, rather
-            // than one list that stops and starts. With nothing parked there is
-            // no cut to describe, and an absent header reads quieter than a
+            // The parked section exists only once something is parked, and it
+            // starts folded: those skills were set aside, so on arrival the
+            // page is the live list alone and the header's count is what says
+            // there is more below. An absent section still reads quieter than a
             // zero-count one.
             <>
-              {splitRows.enabled.length > 0 &&
-                skillGroup(
-                  splitRows.enabled,
-                  split
-                    ? { icon: Power, title: t("list.enabled") }
-                    : undefined,
-                )}
-              {split &&
-                skillGroup(splitRows.disabled, {
-                  icon: PowerOff,
-                  title: t("list.disabled"),
-                  className: "border-t border-border/60 pt-6",
-                })}
+              {splitRows.enabled.length > 0 && skillRows(splitRows.enabled)}
+              {split && (
+                <CollapsibleSection
+                  icon={PowerOff}
+                  title={t("list.disabled")}
+                  count={t("state.skillCount", {
+                    count: splitRows.disabled.length,
+                  })}
+                  // The fold is the reader's ("not working with these right
+                  // now"), so it is left to survive a change of sort or scope —
+                  // both of which only re-order or narrow rows.
+                  defaultOpen={false}
+                  className="border-t border-border/60 pt-6"
+                >
+                  {skillRows(splitRows.disabled)}
+                </CollapsibleSection>
+              )}
             </>
           ) : (
             // The repository unit: one card per repository, led by the
