@@ -319,11 +319,12 @@ export function SearchResults({
             skill={row.skill}
             matched={row.matched}
             index={index}
-            // The installed list is not a leaderboard: its
-            // figures come from the store, and the installs
-            // it cannot place would leave the podium on
-            // alphabetical order. The numbers merely count.
-            ranked={false}
+            // The same rows, and the same marks, as the installed list's own
+            // answer: a row numbers its position in the order the reader picked
+            // and the first three of that order wear the podium. A search narrows
+            // the list, it does not re-rank it — the order here is the installed
+            // list's order restricted to the matches, so the numbering and the
+            // podium are the ones the list itself would print.
             selected={isOpen("own", key)}
             muted={row.muted}
             extra={row.extra}

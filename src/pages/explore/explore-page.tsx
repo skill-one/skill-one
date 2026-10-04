@@ -71,7 +71,9 @@ interface ExploreView {
  *   never disagree.
  * - **按仓库**: one card per repository, led by the registry's own ranking
  *   (`byRepoRank`, the most-starred repository first), each card's preview
- *   listing its skills most-installed first.
+ *   listing its skills most-installed first, and each card stating its own place
+ *   in the stack — the cards take the whole row each, so the figure column the
+ *   skill unit's rows carry is available here too.
  *
  * The reader searches and scopes either reading from the list's own first row
  * (`ListToolbar`); a search re-answers in relevance order across the whole
@@ -405,13 +407,16 @@ export function ExplorePage() {
                 ) : (
                   // The repository unit: one flat grid, the browse answer
                   // scoped by the domain filter, in the ranking `byRepoRank`
-                  // defines.
+                  // defines — the most-starred repository first, which is the
+                  // figure the card's own bar prints, so the order and the
+                  // numbers above it cannot disagree.
                   <ul className={REPO_LIST_CLASS}>
-                    {browseRepos.slice(0, renderedCount).map((group) => (
+                    {browseRepos.slice(0, renderedCount).map((group, index) => (
                       <RepoCard
                         key={group.key}
                         repo={group.title}
                         stars={group.stars}
+                        index={index}
                         skills={group.skills}
                         selected={selected}
                         onOpenSkill={setSelected}

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
 
 import { SkillRow } from "./skill-row";
+import { RepoCard } from "./repo-card";
 import { TooltipProvider } from "../../components/ui/tooltip";
 import { renderWithRouter } from "../../test/test-utils";
 import { estimateTokens } from "../../lib/token-estimate";
+import { MEDAL_CLASSES } from "../../lib/ordinal";
 import type { SkillView } from "../../lib/skill-view";
 
 /**
@@ -33,11 +35,18 @@ const domainLive: SkillView = {
 function renderRow(
   skill: SkillView,
   fact?: "popularity" | "installedAt" | "tokens",
+  ranked = true,
 ) {
   return renderWithRouter(
     <TooltipProvider>
       <ul>
-        <SkillRow skill={skill} index={0} fact={fact} onSelect={() => {}} />
+        <SkillRow
+          skill={skill}
+          index={0}
+          fact={fact}
+          ranked={ranked}
+          onSelect={() => {}}
+        />
       </ul>
     </TooltipProvider>,
   );
@@ -128,5 +137,83 @@ describe("SkillRow figure slot", () => {
     // rather than printing a zero.
     renderRow({ ...installed, description: "" }, "tokens");
     expect(screen.queryByLabelText(/预估 Token 数/)).toBeNull();
+  });
+});
+
+describe("the ordinal mark, shared with the repository card", () => {
+  // The row is the reference shape: the card adopted the row's number rather
+  // than inventing one, so this is where the shared mark is pinned. The two
+  // surfaces are asserted against *each other* rather than against a class
+  // string, because the claim is that there is only one mark — a copy of the
+  // classes would satisfy a literal check while letting the two drift apart the
+  // next time either surface is restyled.
+  const row = { ...repoLive, name: "pdf", description: "A skill." };
+
+  /** The card's bar leads with the ordinal; the row's gutter leads with it. */
+  function cardOrdinal(container: HTMLElement): Element {
+    return container.querySelector(
+      '[data-slot="card-header"]',
+    )!.firstElementChild!.firstElementChild!;
+  }
+  const rowOrdinal = (container: HTMLElement) =>
+    container.querySelector("li span")!;
+
+  const renderCard = (at: { index?: number } = { index: 0 }) =>
+    renderWithRouter(
+      <ul>
+        <RepoCard
+          repo="anthropics/skills"
+          index={at.index}
+          skills={[{ skill: row }]}
+          onOpenSkill={() => {}}
+        />
+      </ul>,
+    );
+
+  it("is one mark, not two that look alike", () => {
+    // Both surfaces at their defaults — a ranked row and a card that states its
+    // place — so the whole class is the shared mark and nothing else: same box,
+    // same scale, same ink, podium included. A future restyle of either surface
+    // that touched the number would break this, which is the point: the two
+    // shapes of one list must not drift apart, because the shape toggle is a view
+    // choice and not a change to the list. A mark that appeared in one shape and
+    // vanished in the other would tell the reader nothing.
+    const { container: asRow } = renderRow(row);
+    const { container: asCard } = renderCard();
+
+    expect(cardOrdinal(asCard).className).toBe(rowOrdinal(asRow).className);
+  });
+
+  it("medals the leading three on the card, as the row does", () => {
+    // The card orders by the stars its bar prints and prints them, which is the
+    // row shape's own pattern — order by a figure, state it, and colour the top
+    // three. So the first card wears gold exactly as the first row does, and the
+    // ink is a position rather than a decoration that the view switch toggles.
+    const { container: card1 } = renderCard({ index: 0 });
+    const { container: card2 } = renderCard({ index: 1 });
+    const { container: card4 } = renderCard({ index: 3 });
+    const ink = (c: HTMLElement) => cardOrdinal(c).className;
+
+    expect(ink(card1)).toContain(MEDAL_CLASSES[0]);
+    expect(ink(card2)).toContain(MEDAL_CLASSES[1]);
+    // Fourth place is out of the podium, in either shape.
+    expect(ink(card4)).toContain("text-muted-foreground");
+    for (const medal of MEDAL_CLASSES) {
+      expect(ink(card4)).not.toContain(medal);
+    }
+  });
+
+  it("is as wide as the card's owner face, so every card's name starts level", () => {
+    // The alignment the fixed width buys on a card: the number's box and the
+    // face's box are both 24px, so the repository name lands on one offset in
+    // every card — including the source-less pool card, which leads with a name
+    // where a repository leads with a face.
+    const { container } = renderCard();
+
+    const ordinal = cardOrdinal(container);
+    expect(ordinal).toHaveTextContent("1");
+    expect(ordinal).toHaveClass("w-6", "text-sm");
+    const face = container.querySelector('[data-slot="avatar"]')!;
+    expect(face).toHaveClass("size-6");
   });
 });
