@@ -159,7 +159,11 @@ came from X" needs to see the record the app is not acting on too.
   falls back to the skill's own initial whenever no cover can be addressed.
   What an unlinked install wears in that slot is `ThirdPartyMark`
   (`components/third-party-mark.tsx`): the owner's own round box, hairline
-  border and muted fill, holding an amber folder glyph at 72% of the box. It is
+  border and muted fill, holding an amber broken-chain glyph at 72% of the box.
+  The chain is the mark's whole story — the tooltip says 未关联来源, and when
+  candidates exist the same box is the way to link, so a glyph from the link
+  family is the one whose meaning and whose press agree; broken rather than
+  solid, because a solid chain would state the opposite of the fact. It is
   the mark's shape rather than its hue that keeps the column aligned — a row, a
   square and a repository card's bar all size that column off the same box — and
   amber is what keeps it from reading as an avatar that failed to load, which is
@@ -264,7 +268,7 @@ carries the re-selection affordances:
   same round box the plain statement wears, so linking never changes the
   layout — only the hover (the amber deepens) and the tooltip, which names what
   a press does. The amber alert triangle that used to ride beside the mark is
-  gone: the folder glyph already says 「装了，但说不出是谁装的」, and the alert was
+  gone: the broken-chain glyph already says 「装了，但说不出是谁装的」, and the alert was
   the only one of the two that did anything, which made it the half a reader
   had to learn to aim at. With no candidate there is nothing to offer, so the
   mark stays a plain statement and the drawer keeps the words beside it.

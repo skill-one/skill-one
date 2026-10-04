@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { FolderDown } from "lucide-react";
+import { Unlink } from "lucide-react";
 
 import {
   Tooltip,
@@ -24,14 +24,20 @@ export const THIRD_PARTY_MARK_CLASS =
   "flex shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500/80";
 
 /**
- * A folder being written to, sized to the box it sits in rather than to a pixel
- * constant — the same glyph at a row's 20px, a square's 16px and a card bar's
+ * A broken chain, sized to the box it sits in rather than to a pixel constant —
+ * the same glyph at a row's 20px, a square's 16px and a card bar's
  * 24px, so one mark scales across every surface that wears it. At 58% of a 16px
  * square it was a three-pixel smudge; 72% leaves a hairline of breathing room
  * on the tightest box while still reading as a glyph rather than a picture.
+ *
+ * The chain is the mark's whole story: the tooltip says 未关联来源, and when
+ * candidates exist this same box is the way to link — a glyph from the link
+ * family is the one whose meaning and whose press agree. A solid chain would
+ * state the opposite of the fact; a broken one states the fact without
+ * implying the skill itself is at fault.
  */
 export function ThirdPartyMarkGlyph() {
-  return <FolderDown className="size-[72%]" aria-hidden />;
+  return <Unlink className="size-[72%]" aria-hidden />;
 }
 
 /**
