@@ -162,9 +162,10 @@ async function pickUnit(
 }
 
 /**
- * Picks a grouping for the rows: 热度 (the default, most-popular first)
- * or 安装时间 (newest first). Each groups the rows ten at a time. The
- * control is there for the per-skill shapes only — the cards are led by their
+ * Picks a grouping for the rows: 热度 (the default, most-popular first),
+ * 安装时间 (newest first), or 标签 (filed under the classification, biggest
+ * group first). Each groups the rows into titled sections. The control is
+ * there for the per-skill shapes only — the cards are led by their
  * repository's stars and say so themselves.
  */
 async function pickSort(
@@ -1685,7 +1686,7 @@ describe("InstalledPage", () => {
       );
     });
 
-    it("offers exactly the two groupings from the menu", async () => {
+    it("offers exactly the three groupings from the menu", async () => {
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
@@ -1697,7 +1698,7 @@ describe("InstalledPage", () => {
         within(menu)
           .getAllByRole("menuitemradio")
           .map((item) => item.textContent),
-      ).toEqual(["热度", "安装时间"]);
+      ).toEqual(["热度", "安装时间", "标签"]);
       await user.keyboard("{Escape}");
     });
   });
@@ -1761,6 +1762,195 @@ describe("InstalledPage", () => {
         .map((node) => node.getAttribute("aria-label"));
       expect(names).toHaveLength(4);
       expect(names.at(-1)).toBe("查看 pdf 详情");
+    });
+  });
+
+  /**
+   * Under the tag grouping the sections are the classifications themselves:
+   * the user's own tag where one was picked, else the store's domain, else
+   * 未分类 — each install filed under its leading key only, the groups read
+   * biggest first with the taxonomy's own order breaking the ties, and the
+   * rows inside a section keeping the popularity order the default grouping
+   * answers in.
+   */
+  describe("the tag sections in the skill unit", () => {
+    /** The rows a region lists, named as their detail buttons name them. */
+    function rowsOf(region: HTMLElement): (string | null)[] {
+      return within(region)
+        .getAllByRole("button", { name: /查看 .+ 详情/ })
+        .map((node) => node.getAttribute("aria-label"));
+    }
+
+    /**
+     * A recorded source and a store classification for every install but
+     * frontend-design, unevenly spread: three under 开发编程, one each under
+     * 数据分析 and 内容创作, and the one tool install unclassified — a clear
+     * winner for the count order, a tie for the taxonomy rank to break, and
+     * 未分类 reading last. `downloads` weights the within-section popularity
+     * order the way the default grouping would read it.
+     */
+    function seedClassifiedInstalls(downloads: Record<string, number> = {}) {
+      seedMockProvenance({
+        pdf: { repo: "acme/one" },
+        docx: { repo: "acme/two" },
+        pptx: { repo: "acme/three" },
+        "mcp-builder": { repo: "acme/four" },
+        "code-review": { repo: "acme/five" },
+      });
+      const domains: Record<string, string[]> = {
+        pdf: ["development"],
+        docx: ["development"],
+        pptx: ["development"],
+        "mcp-builder": ["data-analysis"],
+        "code-review": ["content-creation"],
+      };
+      lookupSkills.mockImplementation(
+        async (refs: Array<{ repo: string; name: string }>) => ({
+          entries: refs.map((ref) => ({
+            name: ref.name,
+            repo: ref.repo,
+            description: `${ref.name} 的商店描述`,
+            stars: 1200,
+            downloads: downloads[ref.name] ?? 0,
+            path: `skills/${ref.repo}/${ref.name}`,
+            profile: { domain: domains[ref.name] ?? [] },
+          })),
+        }),
+      );
+    }
+
+    it("files each install under its classification, biggest group first", async () => {
+      seedClassifiedInstalls();
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "标签");
+      await screen.findByText("frontend-design");
+
+      // The counts each header states, and the taxonomy's own rank breaking
+      // the one-way tie (数据分析 before 内容创作), with the skill nothing
+      // classified reading last under its own header.
+      expect(
+        screen.getByRole("region", { name: "开发编程" }),
+      ).toHaveTextContent("3 个 skill");
+      expect(
+        screen.getByRole("region", { name: "数据分析" }),
+      ).toHaveTextContent("1 个 skill");
+      expect(
+        screen.getByRole("region", { name: "内容创作" }),
+      ).toHaveTextContent("1 个 skill");
+      expect(
+        screen.getByRole("region", { name: "未分类" }),
+      ).toHaveTextContent("1 个 skill");
+      // The section order is the count order, not the taxonomy's — and an
+      // empty classification (测试与质量) draws no section at all.
+      expect(
+        screen.queryByRole("region", { name: "测试与质量" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getAllByRole("region").map((region) => region.ariaLabel),
+      ).toEqual(["开发编程", "数据分析", "内容创作", "未分类"]);
+    });
+
+    it("files a tagged install under the user's tag, not the store's domain", async () => {
+      seedClassifiedInstalls();
+      // The single select overrides the store's answer: pdf carries a hand
+      // file even though the store classified it under 开发编程.
+      seedMockCustomTags(
+        [{ key: "效率工具", label: "效率工具", emoji: "⚡" }],
+        { pdf: "效率工具" },
+      );
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "标签");
+      await screen.findByText("frontend-design");
+
+      // pdf moved out of the store's classification into the user's own
+      // section, which the badges and this grouping read alike.
+      const dev = screen.getByRole("region", { name: "开发编程" });
+      expect(rowsOf(dev)).toEqual([
+        "查看 docx 详情",
+        "查看 pptx 详情",
+      ]);
+      expect(dev).toHaveTextContent("2 个 skill");
+      expect(
+        rowsOf(screen.getByRole("region", { name: "效率工具" })),
+      ).toEqual(["查看 pdf 详情"]);
+    });
+
+    it("files a multi-domain install under its leading classification only", async () => {
+      seedMockProvenance({
+        pdf: { repo: "acme/one" },
+        docx: { repo: "acme/two" },
+      });
+      // One store entry naming two domains: the grouping files the skill
+      // under the first, the way the row badge reads its leading key.
+      lookupSkills.mockImplementation(
+        async (refs: Array<{ repo: string; name: string }>) => ({
+          entries: refs.map((ref) => ({
+            name: ref.name,
+            repo: ref.repo,
+            description: `${ref.name} 的商店描述`,
+            stars: 1200,
+            downloads: 0,
+            path: `skills/${ref.repo}/${ref.name}`,
+            profile:
+              ref.name === "pdf"
+                ? { domain: ["development", "data-analysis"] }
+                : { domain: ["data-analysis"] },
+          })),
+        }),
+      );
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "标签");
+      await screen.findByText("frontend-design");
+
+      // pdf reads once — under 开发编程 — and never again under 数据分析,
+      // which holds docx alone (the other four installs carry no store
+      // entry, so they pool under 未分类).
+      expect(
+        rowsOf(screen.getByRole("region", { name: "开发编程" })),
+      ).toEqual(["查看 pdf 详情"]);
+      expect(
+        rowsOf(screen.getByRole("region", { name: "数据分析" })),
+      ).toEqual(["查看 docx 详情"]);
+      expect(
+        screen.getAllByRole("button", { name: "查看 pdf 详情" }),
+      ).toHaveLength(1);
+    });
+
+    it("orders each section by popularity and numbers it from its own top", async () => {
+      seedClassifiedInstalls({ docx: 50, pdf: 30, pptx: 10 });
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "标签");
+      await screen.findByText("frontend-design");
+
+      // Within a section the rows keep the popularity order the default
+      // grouping answers in — the same figure the rows themselves display.
+      const dev = screen.getByRole("region", { name: "开发编程" });
+      expect(rowsOf(dev)).toEqual([
+        "查看 docx 详情",
+        "查看 pdf 详情",
+        "查看 pptx 详情",
+      ]);
+      // The ordinal run restarts per section: the tag's own top three wear
+      // the podium, and 数据分析's single row wears gold again — the number
+      // states a place within the tag, not across the whole list.
+      const inks = Array.from(
+        dev.querySelectorAll("li span.w-6"),
+      ).map((span) => span.className);
+      expect(inks[0]).toContain(MEDAL_CLASSES[0]);
+      expect(inks[1]).toContain(MEDAL_CLASSES[1]);
+      expect(inks[2]).toContain(MEDAL_CLASSES[2]);
+      const solo = screen.getByRole("region", { name: "数据分析" });
+      expect(
+        solo.querySelectorAll("li span.w-6")[0].className,
+      ).toContain(MEDAL_CLASSES[0]);
     });
   });
 
