@@ -1623,70 +1623,37 @@ describe("InstalledPage", () => {
       }
     }
 
-    it("keeps every section open on arrival, and folds one on a press", async () => {
+    it("renders live installs as a continuous flat list without rank grouping", async () => {
       seedEighteenInstalls();
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
-      const first = await screen.findByRole("region", { name: "1–10" });
 
-      // Reveal the whole answer the way scrolling would: two sentinel fires
-      // carry the run from its first chunk past both sections.
+      // Under popularity sort, artificial rank sections ("1–10", "11–18") are omitted.
+      expect(screen.queryByRole("region", { name: "1–10" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "11–18" })).not.toBeInTheDocument();
+
+      // Progressive reveal carries all 18 installs into one flat list.
+      triggerReveal();
       triggerReveal();
       await waitFor(() =>
-        expect(within(first).getAllByRole("listitem")).toHaveLength(10),
-      );
-      triggerReveal();
-      const second = await screen.findByRole("region", { name: "11–18" });
-      await waitFor(() =>
-        expect(within(second).getAllByRole("listitem")).toHaveLength(8),
-      );
-      // Both sections open on arrival, each holding its own ten (and eight).
-      expect(
-        within(first).getByRole("button", { name: /^1–10/ }),
-      ).toHaveAttribute("aria-expanded", "true");
-      expect(
-        within(second).getByRole("button", { name: /^11–18/ }),
-      ).toHaveAttribute("aria-expanded", "true");
-      expect(within(first).getAllByRole("listitem")).toHaveLength(10);
-      expect(within(second).getAllByRole("listitem")).toHaveLength(8);
-      // The badges state what each section actually lists.
-      expect(
-        within(first).getByRole("button", { name: /^1–10/ }),
-      ).toHaveTextContent("10 个 skill");
-      expect(
-        within(second).getByRole("button", { name: /^11–18/ }),
-      ).toHaveTextContent("8 个 skill");
-
-      // A press folds the section, folding unmounts its panel, and a second
-      // press brings the rows back.
-      await user.click(within(second).getByRole("button", { name: /^11–18/ }));
-      await waitFor(() =>
-        expect(
-          within(second).getByRole("button", { name: /^11–18/ }),
-        ).toHaveAttribute("aria-expanded", "false"),
-      );
-      expect(within(second).queryAllByRole("listitem")).toHaveLength(0);
-      await user.click(within(second).getByRole("button", { name: /^11–18/ }));
-      await waitFor(() =>
-        expect(within(second).getAllByRole("listitem")).toHaveLength(8),
+        expect(screen.getAllByRole("listitem")).toHaveLength(18),
       );
     });
 
-    it("groups the grid squares the same way", async () => {
+    it("renders live installs as a continuous flat grid without rank grouping", async () => {
       seedEighteenInstalls();
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "网格");
-      const first = await screen.findByRole("region", { name: "1–10" });
+
+      expect(screen.queryByRole("region", { name: "1–10" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "11–18" })).not.toBeInTheDocument();
+
+      triggerReveal();
       triggerReveal();
       await waitFor(() =>
-        expect(within(first).getAllByRole("listitem")).toHaveLength(10),
-      );
-      triggerReveal();
-      const second = await screen.findByRole("region", { name: "11–18" });
-      await waitFor(() =>
-        expect(within(second).getAllByRole("listitem")).toHaveLength(8),
+        expect(screen.getAllByRole("listitem")).toHaveLength(18),
       );
     });
 
@@ -2147,10 +2114,9 @@ describe("InstalledPage", () => {
       return screen.getByRole("region", { name: "已禁用" });
     }
 
-    /** The first rank section: four live installs fit it, so it is the one the
-     *  live rows read through. */
-    function rankSection(): HTMLElement {
-      return screen.getByRole("region", { name: "1–4" });
+    /** The live list of installs under popularity sort, which renders flat without rank sections. */
+    function liveList(): HTMLElement {
+      return document.querySelector("ul") as HTMLElement;
     }
 
     /** The section's disclosure trigger — the rows below it are cards that also
@@ -2322,7 +2288,7 @@ describe("InstalledPage", () => {
       await screen.findByText("frontend-design");
       await revealParked(user);
 
-      expect(rowOrdinalsIn(rankSection())).toEqual(["1", "2", "3", "4"]);
+      expect(rowOrdinalsIn(liveList())).toEqual(["1", "2", "3", "4"]);
       expect(rowOrdinalsIn(parkedSection())).toEqual(["1", "2"]);
     });
 
@@ -2343,7 +2309,7 @@ describe("InstalledPage", () => {
 
       // Whatever is revealed is numbered as a plain run from 1 — no gaps, and no
       // dependence on rows that are not mounted yet.
-      for (const group of [rankSection(), parkedSection()]) {
+      for (const group of [liveList(), parkedSection()]) {
         expect(rowOrdinalsIn(group)).toEqual(
           Array.from({ length: group.querySelectorAll("li").length }, (_, i) =>
             String(i + 1),
@@ -2364,27 +2330,24 @@ describe("InstalledPage", () => {
       expect(parkedHeader()).toHaveTextContent("2 个 skill");
     });
 
-    it("wraps the live rows in one rank section while nothing spills past it", async () => {
-      // Four live installs fit the first section of ten, so the page draws one
-      // rank section for them — its header naming the range it covers and its
-      // badge stating what it actually lists. The parked half keeps its own
-      // section below, and the count on it is what says there is anything to
-      // see.
+    it("renders live rows flat while parking disabled ones below", async () => {
+      // Four live installs render flat under popularity sort without rank
+      // slicing. The parked half keeps its own section below, and the count
+      // on it is what says there is anything to see.
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
       await revealParked(user);
 
-      const firstRank = screen.getByRole("region", { name: "1–4" });
       expect(
-        within(firstRank).getAllByRole("button", {
+        screen.queryByRole("region", { name: "1–4" }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(liveList()).getAllByRole("button", {
           name: /查看 .+ 详情/,
         }),
       ).toHaveLength(LIVE.length);
-      expect(
-        within(firstRank).getByRole("button", { name: /1–4/ }),
-      ).toHaveTextContent("4 个 skill");
       // The parked half is the one that is named, and it states its own size.
       expect(parkedSection()).toBeInTheDocument();
       expect(parkedHeader()).toHaveTextContent("2 个 skill");
@@ -2461,8 +2424,8 @@ describe("InstalledPage", () => {
 
     it("draws no parked section while nothing is parked", async () => {
       // An absent section reads quieter than a zero: with every install live
-      // the parked section must not appear. The rank sections are the answer's
-      // own shape and stay; the six installs all fit the first one.
+      // the parked section must not appear. Under popularity sort, live
+      // installs render directly as a flat list with no rank sections.
       setMockSkillEnabled("pdf", true);
       setMockSkillEnabled("docx", true);
       const user = userEvent.setup();
@@ -2476,15 +2439,13 @@ describe("InstalledPage", () => {
       expect(
         screen.queryByRole("region", { name: "已启用" }),
       ).not.toBeInTheDocument();
-      // All six rows sit in the first rank section, in one list.
+      expect(
+        screen.queryByRole("region", { name: "1–6" }),
+      ).not.toBeInTheDocument();
+      // All six rows sit in one flat list.
       expect(rowNames()).toHaveLength(6);
-      const firstRank = screen.getByRole("region", { name: "1–6" });
-      const lists = new Set(
-        Array.from(
-          firstRank.querySelectorAll('[data-slot="card"]'),
-        ).map((row) => row.closest("ul")),
-      );
-      expect(lists.size).toBe(1);
+      const lists = document.querySelectorAll("ul");
+      expect(lists.length).toBe(1);
     });
 
     it("keeps a parked skill in the drawer's walk while its section is folded", async () => {

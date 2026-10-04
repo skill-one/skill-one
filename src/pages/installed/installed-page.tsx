@@ -48,7 +48,7 @@ import {
 } from "../../lib/skill-list-layout";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
-import { errorMessage } from "../../lib/utils";
+import { cn, errorMessage } from "../../lib/utils";
 import { popularity } from "../../lib/popularity";
 import type { Skill } from "../../types/skill";
 import type { SkillMatched } from "../../components/highlighted-text";
@@ -82,13 +82,6 @@ const SKELETON_CARDS = 8;
 
 /** Placeholder rows while the on-disk list is first read, in the skill unit. */
 const SKELETON_ROWS = 12;
-
-/**
- * How many installs one per-skill section holds. The list reads in titled
- * sections of this size, in the chosen grouping's order — the section's
- * header names the rank range it covers.
- */
-const GROUP_SIZE = 10;
 
 /**
  * The time buckets the install-clock grouping files installs into, newest
@@ -632,18 +625,13 @@ export function InstalledPage() {
   // row's number never shifts under the reader as more is revealed.
   const split = splitRows.disabled.length > 0;
 
-  // The live answer, divided into titled sections in the chosen grouping's
-  // order — the shared shell the parked half draws through
-  // (`CollapsibleSection`). 按热度分组 slices the ordinal run into ranges of
-  // ten ("1–10", "11–20", … — computed from the *whole* live answer, so a
-  // header never shifts while the progressive reveal fills its section);
-  // 按安装时间分组 files each install into the time bucket its age falls in
-  // (今天 / 昨天 / 最近 7 天 / 最近 30 天 / 更早); 按标签分组 files each
-  // install under its leading classification — the user's tag where one was
-  // picked, else the store's domain, else 未分类 — and reads the tags
-  // biggest first, ties falling back to the taxonomy's own order and then to
-  // the label (the same ordering the store's facet chips answer in). Empty
-  // sections are not drawn — an absent bucket reads quieter than a zero. The
+  // The live answer, divided into titled sections when the chosen grouping
+  // provides semantic buckets (按安装时间分组 files each install into the time
+  // bucket its age falls in: 今天 / 昨天 / 最近 7 天 / 最近 30 天 / 更早;
+  // 按标签分组 files each install under its leading classification).
+  // Under the default popularity sort, live installs render directly without
+  // artificial grouping.
+  // Empty sections are not drawn — an absent bucket reads quieter than a zero. The
   // count beside a header states what the section actually lists right now.
   const sections = useMemo(() => {
     const live = splitRows.enabled;
@@ -705,16 +693,7 @@ export function InstalledPage() {
         rows: buckets[index],
       })).filter((section) => section.rows.length > 0);
     }
-    const liveTotal = splitActive.enabled.length;
-    const groups: { title: string; rows: Row[] }[] = [];
-    for (let start = 0; start < live.length; start += GROUP_SIZE) {
-      const last = Math.min(start + GROUP_SIZE, liveTotal);
-      groups.push({
-        title: start + 1 === last ? `${start + 1}` : `${start + 1}–${last}`,
-        rows: live.slice(start, start + GROUP_SIZE),
-      });
-    }
-    return groups;
+    return [];
   }, [splitRows, splitActive, sort, t, locale]);
 
   // Whether the answer is cut in two, and — when it is — the number each row
@@ -1156,33 +1135,34 @@ export function InstalledPage() {
               ))}
             </ul>
           ) : (
-            // The per-skill shapes: one row or one square per install, the
-            // live installs divided into titled sections — rank ranges of ten
-            // under the popularity grouping, time buckets (今天 / 昨天 /
-            // 最近 7 天 / 最近 30 天 / 更早) under the install clock, the
-            // classifications themselves under the tag grouping — then
-            // the parked ones below under the one header that names them.
-            // The same entries a repository's own page lists, so a skill
-            // reads the same wherever it is found — and the figure each
-            // entry states is the one this list answers in: the install's
-            // own clock under the time grouping, the popularity blend
-            // otherwise.
+            // The per-skill shapes: one row or one square per install. Under
+            // the popularity sort, live installs render directly as a continuous
+            // flat list without artificial grouping slices. Under the install clock
+            // or tag sort, live installs are divided into titled collapsible
+            // sections (time buckets: 今天 / 昨天 / 最近 7 天 / 最近 30 天 / 更早;
+            // or classifications).
+            // Parked (disabled) installs sit below under their own collapsible section.
             //
             // The parked section exists only once something is parked, and it
             // starts folded: those skills were set aside, so on arrival the
-            // page is the live sections alone and the header's count is what
+            // page is the live list alone and the header's count is what
             // says there is more below. An absent section still reads quieter
             // than a zero-count one.
             <>
-              {sections.map((section) => (
-                <CollapsibleSection
-                  key={section.title}
-                  title={section.title}
-                  count={t("state.skillCount", { count: section.rows.length })}
-                >
-                  {skillEntries(section.rows)}
-                </CollapsibleSection>
-              ))}
+              {sort === "popularity"
+                ? splitRows.enabled.length > 0 &&
+                  skillEntries(splitRows.enabled)
+                : sections.map((section) => (
+                    <CollapsibleSection
+                      key={section.title}
+                      title={section.title}
+                      count={t("state.skillCount", {
+                        count: section.rows.length,
+                      })}
+                    >
+                      {skillEntries(section.rows)}
+                    </CollapsibleSection>
+                  ))}
               {split && (
                 <CollapsibleSection
                   icon={PowerOff}
@@ -1194,7 +1174,10 @@ export function InstalledPage() {
                   // now"), so it is left to survive a change of grouping —
                   // which only re-orders or re-slices rows.
                   defaultOpen={false}
-                  className="border-t border-border/60 pt-6"
+                  className={cn(
+                    "border-t border-border/60 pt-6",
+                    splitRows.enabled.length > 0 && "mt-6",
+                  )}
                 >
                   {skillEntries(splitRows.disabled)}
                 </CollapsibleSection>
