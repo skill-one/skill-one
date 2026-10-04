@@ -219,33 +219,44 @@ export const SkillRow = memo(function SkillRow({
           muted && "opacity-60",
         )}
       >
-        {/* Floating selection checkbox: visible on row hover or when selection mode is active */}
-        {checkable && (
-          <span
-            className={cn(
-              "mr-2 -ml-0.5 flex shrink-0 items-center transition-opacity",
-              selectionMode || checked
-                ? "opacity-100 pointer-events-auto"
-                : "opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto group-focus-within/row:opacity-100 group-focus-within/row:pointer-events-auto",
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-          >
-            <Checkbox
-              checked={checked}
-              onCheckedChange={(c) => onCheckChange?.(Boolean(c))}
-              aria-label={t("multiSelect.selectSkillAria", {
-                name: skillDisplayName(skill),
-              })}
-            />
-          </span>
-        )}
-        {/* The list's one addition: where this skill stands in the collection,
-            top three medalled when the list is ranked. The box is `Ordinal`'s,
-            shared with the repository card's bar so the two shapes of one list
-            number their entries the same way. */}
-        <Ordinal index={index} ranked={ranked} />
+        {/* Leading position: Ordinal number and hoverable/selectable Checkbox in the exact same spot */}
+        <div className="relative flex size-6 shrink-0 items-center justify-center">
+          <Ordinal
+            index={index}
+            ranked={ranked}
+            className={
+              checkable
+                ? cn(
+                    "transition-opacity duration-150",
+                    selectionMode || checked
+                      ? "opacity-0 pointer-events-none"
+                      : "opacity-100 group-hover/row:opacity-0 group-focus-within/row:opacity-0 pointer-events-auto",
+                  )
+                : undefined
+            }
+          />
+          {checkable && (
+            <span
+              className={cn(
+                "absolute inset-0 flex items-center justify-center transition-opacity duration-150",
+                selectionMode || checked
+                  ? "opacity-100 pointer-events-auto"
+                  : "opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto group-focus-within/row:opacity-100 group-focus-within/row:pointer-events-auto",
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+            >
+              <Checkbox
+                checked={checked}
+                onCheckedChange={(c) => onCheckChange?.(Boolean(c))}
+                aria-label={t("multiSelect.selectSkillAria", {
+                  name: skillDisplayName(skill),
+                })}
+              />
+            </span>
+          )}
+        </div>
 
         {/* The classification leads the row. The tip names the domain, its scope
             and any other domains the skill belongs to — and answers for a skill
