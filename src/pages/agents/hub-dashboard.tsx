@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Compass, Layers, Loader2, Sparkles } from "lucide-react";
+import { Compass, Layers, Loader2 } from "lucide-react";
 
 import type { AgentStatus, InstalledSkill } from "../../lib/skills-manager";
 import { agentLinkState } from "../../lib/agent-link-state";
@@ -28,7 +28,8 @@ interface HubDashboardProps {
 
 /**
  * Modern dashboard card acting as the SkillOne core hub.
- * Replaces the heavy physics jar with a clean, actionable status center.
+ * Replaces the heavy physics jar with a clean, highly scalable status center.
+ * Adapts gracefully whether there are 3 skills or 100+ skills installed.
  */
 export function HubDashboard({
   agents,
@@ -62,6 +63,30 @@ export function HubDashboard({
     return domainEmoji(storeEntries[name]?.profile?.domain) ?? "⚡";
   };
 
+  // When skills are numerous (e.g. 16+ or 100+), group domain statistics for overview
+  const domainSummary = useMemo(() => {
+    if (enabled.length <= 16) return [];
+    const counts = new Map<string, number>();
+    for (const skill of enabled) {
+      const domainList = storeEntries[skill.name]?.profile?.domain;
+      const primaryKey = domainList && domainList.length > 0 ? domainList[0] : "other";
+      counts.set(primaryKey, (counts.get(primaryKey) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([key, count]) => ({
+        key,
+        emoji: domainEmoji([key]) ?? "📦",
+        count,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4); // Top 4 domains
+  }, [enabled, storeEntries]);
+
+  // Scalable chip rendering limit
+  const maxVisibleChips = 20;
+  const visibleSkills = enabled.slice(0, maxVisibleChips);
+  const overflowCount = enabled.length - visibleSkills.length;
+
   return (
     <Card
       role="figure"
@@ -88,12 +113,17 @@ export function HubDashboard({
 
       <CardHeader className="p-3.5 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Sparkles className="size-4" />
+          {/* Brand Logo & Hub Title */}
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/60 p-1">
+              <img
+                src="/skill-one-transparent.png"
+                alt="Skill One"
+                className="size-5 shrink-0 object-contain"
+              />
             </div>
             <div>
-              <CardTitle className="text-sm font-semibold leading-none">
+              <CardTitle className="text-sm font-semibold leading-none text-foreground">
                 {t("agents.hub.title")}
               </CardTitle>
               <p className="mt-1 text-[11px] text-muted-foreground">
@@ -121,8 +151,8 @@ export function HubDashboard({
         </div>
       </CardHeader>
 
-      <CardContent className="p-3.5 pt-0 space-y-3">
-        {/* Active Skills List / Flow */}
+      <CardContent className="p-3.5 pt-0 space-y-2.5">
+        {/* Active Skills List / Flow Container */}
         <div className="rounded-lg border border-border/60 bg-muted/40 p-2">
           {loading ? (
             <div className="flex h-16 items-center justify-center">
@@ -133,39 +163,77 @@ export function HubDashboard({
               {t("agents.hub.noneEnabled")}
             </div>
           ) : (
-            <div className="flex max-h-20 flex-wrap gap-1.5 overflow-y-auto pr-1">
-              {enabled.slice(0, 16).map((skill) => (
-                <Tooltip key={skill.name}>
-                  <TooltipTrigger
-                    render={
-                      <button
-                        type="button"
-                        data-skill={skill.name}
-                        onClick={() => navigate("/installed")}
-                        className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-card px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:border-primary/50 hover:bg-accent/50 cursor-pointer"
+            <div className="space-y-1.5">
+              {/* Domain Summary Bar when 16+ or 100+ skills */}
+              {domainSummary.length > 0 && (
+                <div className="flex items-center gap-2 border-b border-border/40 pb-1.5 text-[10px] text-muted-foreground">
+                  <span className="shrink-0 font-medium text-foreground/80">
+                    {t("agents.hub.activeSkills")}:
+                  </span>
+                  <div className="flex items-center gap-1.5 truncate">
+                    {domainSummary.map((d) => (
+                      <span
+                        key={d.key}
+                        className="inline-flex items-center gap-0.5 rounded bg-background/80 px-1 py-0.5 font-medium tabular-nums"
                       >
-                        <span className="text-[12px] leading-none">
-                          {getEmoji(skill.name)}
-                        </span>
-                        <span className="max-w-[90px] truncate">
-                          {skill.displayName ?? skill.name}
-                        </span>
-                      </button>
-                    }
-                  />
-                  <TooltipContent side="top">
-                    {skill.displayName ?? skill.name} · {t("agents.hub.openSkill")}
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-              {enabled.length > 16 && (
-                <Badge
-                  variant="outline"
-                  className="px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
-                >
-                  +{enabled.length - 16}
-                </Badge>
+                        <span>{d.emoji}</span>
+                        <span>{d.count}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
+
+              {/* Skill Chips Flow */}
+              <div className="flex max-h-20 flex-wrap gap-1.5 overflow-y-auto pr-1">
+                {visibleSkills.map((skill) => (
+                  <Tooltip key={skill.name}>
+                    <TooltipTrigger
+                      render={
+                        <button
+                          type="button"
+                          data-skill={skill.name}
+                          onClick={() => navigate("/installed")}
+                          className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-card px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:border-primary/50 hover:bg-accent/50 cursor-pointer"
+                        >
+                          <span className="text-[12px] leading-none">
+                            {getEmoji(skill.name)}
+                          </span>
+                          <span className="max-w-[85px] truncate">
+                            {skill.displayName ?? skill.name}
+                          </span>
+                        </button>
+                      }
+                    />
+                    <TooltipContent side="top">
+                      {skill.displayName ?? skill.name} · {t("agents.hub.openSkill")}
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+
+                {/* Interactive Overflow Button: Clicking navigates to /installed */}
+                {overflowCount > 0 && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Link
+                          to="/installed"
+                          aria-label={t("agents.hub.viewAll", {
+                            count: enabled.length,
+                          })}
+                          className="inline-flex items-center gap-0.5 rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                        >
+                          <span>+{overflowCount}</span>
+                          <span className="text-[9px]">全部 →</span>
+                        </Link>
+                      }
+                    />
+                    <TooltipContent side="top">
+                      {t("agents.hub.viewAll", { count: enabled.length })}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
             </div>
           )}
         </div>
