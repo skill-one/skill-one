@@ -42,6 +42,16 @@ const SORT_LABELS: { sort: ListSort; labelKey: ParseKeys }[] = [
  * switch locks where it stands rather than offering a choice that does nothing
  * — and rather than leaving the row, which would move the field beside it on
  * every keystroke.
+ *
+ * So the trigger reads **value first, mark last**: the order holds the leading
+ * edge, because that is the part the reader came to read, and the mark that says
+ * "this is about order" takes the trailing slot the row's other menu (`ListFacets`,
+ * with its chevron) keeps its affordance in — the two now read as one family
+ * rather than as a labelled button beside a chevronned one. `data-icon` is the
+ * library's own convention for which end the glyph stands at
+ * (`buttonVariants` reads it to tighten the padding on that side), so the mark is
+ * announced as the trailing one rather than left for a reader of the stylesheet
+ * to work out.
  */
 export function ListSortSelect({
   sort,
@@ -92,8 +102,12 @@ export function ListSortSelect({
           />
         }
       >
-        <ArrowUpDown aria-hidden />
         {t(current.labelKey)}
+        {/* The mark, and the library's word for where it stands: `data-icon` goes
+            on the glyph and the button reads it with `has-` (`buttonVariants`
+            tightens the padding on the glyph's side), so the mark is declared
+            trailing rather than left for a reader of the stylesheet to infer. */}
+        <ArrowUpDown data-icon="inline-end" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-36">
         <DropdownMenuRadioGroup

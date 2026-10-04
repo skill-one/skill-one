@@ -80,4 +80,41 @@ describe("AppNav", () => {
       "page",
     );
   });
+
+  it("wears the segmented look: a muted track with the marked half raised", () => {
+    renderNav("/installed");
+
+    const track = screen.getByRole("navigation", { name: "主导航" });
+    const marked = screen.getByRole("link", { name: "已安装" });
+    const idle = screen.getByRole("link", { name: "商店" });
+
+    // The shared recipe (see `segmented`), which is the header's own look
+    // promoted to the app's: a muted bed with the marked half raised out of it
+    // in the surface colour under one quiet shadow. The nav is where the look was
+    // decided — the list's shape switch now wears the same one, so the two
+    // segmented controls in the window are recognisably siblings.
+    expect(track).toHaveClass("bg-muted");
+    expect(marked).toHaveClass("bg-background");
+    expect(marked).toHaveClass("shadow-sm");
+    expect(marked).toHaveClass("text-foreground");
+    expect(idle).toHaveClass("text-foreground/60");
+    expect(idle).not.toHaveClass("bg-background");
+    expect(idle).not.toHaveClass("shadow-sm");
+  });
+
+  it("raises exactly the one half the reader is in", () => {
+    renderNav("/repo/anthropics/skills");
+
+    // The marked half is raised and the other two are not, so the raised look
+    // says which pane is on screen rather than that a control was pressed.
+    expect(screen.getByRole("link", { name: "商店" })).toHaveClass(
+      "bg-background",
+    );
+    expect(screen.getByRole("link", { name: "首页" })).not.toHaveClass(
+      "bg-background",
+    );
+    expect(screen.getByRole("link", { name: "已安装" })).not.toHaveClass(
+      "bg-background",
+    );
+  });
 });

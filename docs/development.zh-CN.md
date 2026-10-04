@@ -56,6 +56,7 @@ skill-one/
 │   │   ├── ui/             # shadcn/ui 组件
 │   │   ├── app-header.tsx  # 应用外壳，单行：行首入口导航，品牌居中，行尾设置
 │   │   ├── app-nav.tsx     # 应用导航：两个入口做成 header 里的分段控件
+│   │   ├── segmented.ts    # 全应用唯一一份分段控件外观（cva），header 入口导航与列表形态开关共用
 │   │   ├── collapsible-section.tsx # 所有分组列表共用的吸顶可折叠分组头
 │   │   ├── list-facets.tsx # 当前列表内容区首行的分类 chips（含「更多」浮层）
 │   │   ├── list-sort-select.tsx # 列表的排序菜单——热度，加上安装时间与 Token 占用（仅已安装页）

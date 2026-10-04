@@ -56,6 +56,7 @@ skill-one/
 │   │   ├── ui/             # shadcn/ui components
 │   │   ├── app-header.tsx  # The app's chrome, one row: destinations leading, brand centred, settings closing
 │   │   ├── app-nav.tsx     # The app's navigation: the two destinations as a header segmented control
+│   │   ├── segmented.ts    # One segmented look (cva) shared by the header's destinations and a list's shape switch
 │   │   ├── collapsible-section.tsx # Sticky, foldable group header shared by every grouped list
 │   │   ├── list-facets.tsx # The scope chips opening a list's content (+ the 更多 flyout)
 │   │   ├── list-sort-select.tsx # The order menu a list answers in — popularity, plus install time and token cost (installed list only)

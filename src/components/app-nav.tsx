@@ -4,6 +4,7 @@ import type { ParseKeys } from "i18next";
 import { House, type LucideIcon } from "lucide-react";
 
 import { cn } from "../lib/utils";
+import { segmentedItemVariants, segmentedTrackVariants } from "./segmented";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface NavItem {
@@ -78,14 +79,16 @@ function belongsTo(roots: readonly string[], pathname: string): boolean {
  * `aria-current="page"` over a route *family* (see `owns`) instead of a pressed
  * button. The active segment is raised from the track (background against the
  * muted bed, one quiet shadow) — the segmented control's own way of saying
- * which pane is on screen.
+ * which pane is on screen, and the look `segmented` now shares with a list's
+ * shape switch, so the two segmented controls in this window are siblings rather
+ * than two designs that drifted apart.
  */
 export function AppNav() {
   const { t } = useTranslation();
   return (
     <nav
       aria-label={t("nav.mainAria")}
-      className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5"
+      className={segmentedTrackVariants()}
     >
       {navItems.map((item) => (
         <NavSegment key={item.path} item={item} />
@@ -106,12 +109,14 @@ function NavSegment({ item }: { item: NavItem }) {
   const { pathname } = useLocation();
   const isActive = belongsTo(item.owns, pathname);
 
+  // The look is the shared segmented recipe, and only the state is this nav's:
+  // a link knows which pane it is while it renders, so the raised look is a class
+  // on the element rather than a selector the library owns. Height, padding and
+  // text size stay here — the chrome's own density, not the recipe's.
   const className = cn(
-    "flex h-7 items-center rounded-md text-[13px] font-medium transition-colors",
-    item.icon ? "px-2" : "px-3",
-    isActive
-      ? "bg-background text-foreground shadow-sm"
-      : "text-muted-foreground hover:text-foreground",
+    segmentedItemVariants({ active: isActive ? "chosen" : "off" }),
+    "h-7 px-3 text-[13px]",
+    item.icon ? "px-2" : undefined,
   );
 
   if (item.icon) {
