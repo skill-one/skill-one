@@ -397,7 +397,11 @@
     "rename": "重命名",
     "renameAria": "重命名标签 {{label}}",
     "save": "保存",
-    "cancel": "取消"
+    "cancel": "取消",
+    "confirmDeleteTitle": "删除标签",
+    "confirmDeleteDesc": "标签「{{name}}」正被 {{count}} 个技能使用，删除后这些技能将恢复默认分类。确定要删除吗？",
+    "inUseCount": "正在被 {{count}} 个技能使用",
+    "editingTag": "正在重命名：{{name}}"
   },
   "multiSelect": {
     "selectedCount": "已选 {{count}} 项",

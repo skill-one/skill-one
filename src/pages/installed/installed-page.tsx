@@ -27,7 +27,12 @@ import {
   removeInstalledSkills,
   setManySkillsEnabled,
 } from "../../lib/local-skills";
-import { setManySkillTags } from "../../lib/provenance";
+import { saveCustomTagDef, setManySkillTags } from "../../lib/provenance";
+import {
+  collectTakenTagKeys,
+  validateNewTag,
+  type TagValidationError,
+} from "../../lib/custom-tags";
 import {
   installedSkillView,
   skillKey,
@@ -832,11 +837,13 @@ export function InstalledPage() {
       key: def.key,
       label: def.label,
       emoji: def.emoji,
+      isCustom: true,
     }));
     const systemDefs = DOMAINS.map((dom) => ({
       key: dom.key,
       label: domainLabel(dom.key, locale),
       emoji: domainEmoji([dom.key]),
+      isCustom: false,
     }));
     return [...customDefs, ...systemDefs];
   }, [customTags, locale]);
@@ -901,6 +908,44 @@ export function InstalledPage() {
     setBulkLoading(true);
     try {
       await setManySkillTags(selectedNames, tagKey);
+      await markSkillsChanged(queryClient);
+      toast.add({
+        title: t("multiSelect.tagSuccess", { count: selectedNames.length }),
+        type: "success",
+      });
+      clearSelection();
+    } catch (e) {
+      toast.add({
+        title: errorMessage(e, t("tag.failed")),
+        type: "error",
+      });
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleCreateAndApplyTag = async (label: string) => {
+    const selectedNames = getSelectedNames();
+    if (selectedNames.length === 0) return;
+    const taken = collectTakenTagKeys(
+      (customTags?.tagDefs ?? []).map((def) => def.key),
+    );
+    const checked = validateNewTag(label, taken);
+    if (!checked.ok) {
+      const errMap: Record<TagValidationError, string> = {
+        empty: t("tag.errorEmpty"),
+        tooLong: t("tag.errorTooLong"),
+        reserved: t("tag.errorReserved"),
+        duplicate: t("tag.errorDuplicate"),
+        emojiLong: t("tag.errorEmojiLong"),
+      };
+      toast.add({ title: errMap[checked.error], type: "error" });
+      return;
+    }
+    setBulkLoading(true);
+    try {
+      await saveCustomTagDef(checked.key, label.trim());
+      await setManySkillTags(selectedNames, checked.key);
       await markSkillsChanged(queryClient);
       toast.add({
         title: t("multiSelect.tagSuccess", { count: selectedNames.length }),
@@ -1187,6 +1232,7 @@ export function InstalledPage() {
           onEnable={handleBulkEnable}
           onDisable={handleBulkDisable}
           onTag={handleBulkTag}
+          onCreateTag={handleCreateAndApplyTag}
           availableTags={availableTags}
           onDelete={handleBulkDelete}
           loading={bulkLoading}

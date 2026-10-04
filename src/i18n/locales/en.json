@@ -397,7 +397,11 @@
     "rename": "Rename",
     "renameAria": "Rename tag {{label}}",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "confirmDeleteTitle": "Delete Tag",
+    "confirmDeleteDesc": "Tag \"{{name}}\" is currently used by {{count}} skill(s). Deleting it will restore their default category. Are you sure?",
+    "inUseCount": "Used by {{count}} skill(s)",
+    "editingTag": "Renaming: {{name}}"
   },
   "multiSelect": {
     "selectedCount": "{{count}} selected",

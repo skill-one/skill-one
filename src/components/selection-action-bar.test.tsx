@@ -75,4 +75,59 @@ describe("SelectionActionBar", () => {
 
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
+
+  it("renders tag options grouped by custom/system and selects a tag", async () => {
+    const user = userEvent.setup();
+    const onTag = vi.fn();
+
+    renderWithRouter(
+      <SelectionActionBar
+        count={2}
+        totalCount={5}
+        onSelectAll={() => {}}
+        onClear={() => {}}
+        availableTags={[
+          { key: "my-tag", label: "My Tag", emoji: "🏷️", isCustom: true },
+          { key: "dev", label: "Development", emoji: "💻", isCustom: false },
+        ]}
+        onTag={onTag}
+      />,
+    );
+
+    const tagBtn = screen.getByRole("button", { name: /加标签|tag/i });
+    await user.click(tagBtn);
+
+    expect(await screen.findByText("My Tag")).toBeInTheDocument();
+    expect(screen.getByText("Development")).toBeInTheDocument();
+
+    await user.click(screen.getByText("My Tag"));
+    expect(onTag).toHaveBeenCalledWith("my-tag");
+  });
+
+  it("supports inline tag creation from the tag popover", async () => {
+    const user = userEvent.setup();
+    const onCreateTag = vi.fn();
+
+    renderWithRouter(
+      <SelectionActionBar
+        count={2}
+        totalCount={5}
+        onSelectAll={() => {}}
+        onClear={() => {}}
+        availableTags={[{ key: "my-tag", label: "My Tag", isCustom: true }]}
+        onTag={() => {}}
+        onCreateTag={onCreateTag}
+      />,
+    );
+
+    const tagBtn = screen.getByRole("button", { name: /加标签|tag/i });
+    await user.click(tagBtn);
+
+    const input = screen.getByPlaceholderText(/新建标签|new tag/i);
+    await user.type(input, "Work");
+    const createBtn = screen.getByRole("button", { name: /^新建$|^create$/i });
+    await user.click(createBtn);
+
+    expect(onCreateTag).toHaveBeenCalledWith("Work");
+  });
 });

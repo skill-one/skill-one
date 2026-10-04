@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 import { Separator } from "./ui/separator";
 import {
   Dialog,
@@ -31,6 +32,7 @@ export interface SelectionTagOption {
   key: string;
   label: string;
   emoji?: string;
+  isCustom?: boolean;
 }
 
 export interface SelectionActionBarProps {
@@ -48,6 +50,8 @@ export interface SelectionActionBarProps {
   onDisable?: () => void;
   /** Fired when picking a tag for bulk assignment. null means reset tag. */
   onTag?: (tagKey: string | null) => void;
+  /** Fired when creating and immediately assigning a new custom tag. */
+  onCreateTag?: (label: string) => Promise<void> | void;
   /** List of tags available to assign. */
   availableTags?: SelectionTagOption[];
   /** Fired when bulk removal is confirmed. */
@@ -69,6 +73,7 @@ export function SelectionActionBar({
   onEnable,
   onDisable,
   onTag,
+  onCreateTag,
   availableTags = [],
   onDelete,
   loading = false,
@@ -76,9 +81,22 @@ export function SelectionActionBar({
   const { t } = useTranslation();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [newTagDraft, setNewTagDraft] = useState("");
 
   const visible = count > 0;
   const isAllSelected = count > 0 && count === totalCount;
+
+  const customTags = availableTags.filter((t) => t.isCustom !== false);
+  const systemTags = availableTags.filter((t) => t.isCustom === false);
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = newTagDraft.trim();
+    if (!val || !onCreateTag) return;
+    await onCreateTag(val);
+    setNewTagDraft("");
+    setTagPopoverOpen(false);
+  };
 
   return (
     <>
@@ -150,7 +168,7 @@ export function SelectionActionBar({
                 </Button>
               )}
 
-              {onTag && availableTags.length > 0 && (
+              {(onTag || onCreateTag) && (
                 <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
                   <PopoverTrigger
                     render={
@@ -169,38 +187,94 @@ export function SelectionActionBar({
                   <PopoverContent
                     align="center"
                     side="top"
-                    className="w-56 p-1.5 text-xs"
+                    className="w-60 p-2 text-xs"
                   >
+                    {onCreateTag && (
+                      <form
+                        onSubmit={handleCreateSubmit}
+                        className="mb-2 flex items-center gap-1.5"
+                      >
+                        <Input
+                          value={newTagDraft}
+                          onChange={(e) => setNewTagDraft(e.target.value)}
+                          placeholder={t("tag.newPlaceholder")}
+                          className="h-7 text-xs flex-1"
+                          disabled={loading}
+                        />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs shrink-0"
+                          disabled={loading || !newTagDraft.trim()}
+                        >
+                          {t("tag.create")}
+                        </Button>
+                      </form>
+                    )}
+
                     <div className="max-h-60 overflow-y-auto space-y-0.5">
                       <Button
                         variant="ghost"
                         size="sm"
                         className="w-full justify-start text-xs font-normal h-7"
                         onClick={() => {
-                          onTag(null);
+                          onTag?.(null);
                           setTagPopoverOpen(false);
                         }}
                       >
                         {t("tag.clear")}
                       </Button>
-                      <Separator className="my-1" />
-                      {availableTags.map((tag) => (
-                        <Button
-                          key={tag.key}
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start text-xs font-normal h-7 gap-1.5"
-                          onClick={() => {
-                            onTag(tag.key);
-                            setTagPopoverOpen(false);
-                          }}
-                        >
-                          <span className="text-sm leading-none">
-                            {tag.emoji ?? domainEmoji([tag.key])}
-                          </span>
-                          <span className="truncate">{tag.label}</span>
-                        </Button>
-                      ))}
+
+                      {customTags.length > 0 && (
+                        <>
+                          <div className="px-2 pt-1.5 pb-0.5 text-[10px] font-medium text-muted-foreground/70">
+                            {t("tag.customGroup")}
+                          </div>
+                          {customTags.map((tag) => (
+                            <Button
+                              key={tag.key}
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start text-xs font-normal h-7 gap-1.5"
+                              onClick={() => {
+                                onTag?.(tag.key);
+                                setTagPopoverOpen(false);
+                              }}
+                            >
+                              <span className="text-sm leading-none">
+                                {tag.emoji ?? domainEmoji([tag.key])}
+                              </span>
+                              <span className="truncate">{tag.label}</span>
+                            </Button>
+                          ))}
+                        </>
+                      )}
+
+                      {systemTags.length > 0 && (
+                        <>
+                          <div className="px-2 pt-2 pb-0.5 text-[10px] font-medium text-muted-foreground/70">
+                            {t("tag.systemGroup")}
+                          </div>
+                          {systemTags.map((tag) => (
+                            <Button
+                              key={tag.key}
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start text-xs font-normal h-7 gap-1.5"
+                              onClick={() => {
+                                onTag?.(tag.key);
+                                setTagPopoverOpen(false);
+                              }}
+                            >
+                              <span className="text-sm leading-none">
+                                {tag.emoji ?? domainEmoji([tag.key])}
+                              </span>
+                              <span className="truncate">{tag.label}</span>
+                            </Button>
+                          ))}
+                        </>
+                      )}
                     </div>
                   </PopoverContent>
                 </Popover>

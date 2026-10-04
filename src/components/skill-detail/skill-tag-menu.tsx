@@ -1,8 +1,7 @@
-import { useMemo, useState, type ReactElement } from "react";
+import { useRef, useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Check, Pencil, RotateCcw, Smile, X } from "lucide-react";
-
 import { DOMAINS, domainLabel } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useCustomTags } from "../../hooks/use-custom-tags";
@@ -21,6 +20,14 @@ import {
   setSkillTag,
 } from "../../lib/provenance";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { toast } from "../ui/toast";
@@ -65,19 +72,26 @@ export function SkillTagMenu({
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{
+    key: string;
+    label: string;
+    count: number;
+  } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const locale = useAppLocale();
   const { data: customTags } = useCustomTags();
   const defs = customTags?.tagDefs ?? [];
-  // Tags currently filing a skill: only an unused tag offers its delete, so
-  // removing one can never orphan a choice — the menu never asks "and the N
-  // skills using it?" because the question cannot arise.
-  const usedTags = useMemo(() => {
-    const used = new Set<string>();
-    for (const tag of Object.values(customTags?.skillTags ?? {})) used.add(tag);
-    return used;
-  }, [customTags]);
+
+  const getTagUsedCount = (key: string) => {
+    let count = 0;
+    for (const tag of Object.values(customTags?.skillTags ?? {})) {
+      if (tag === key) count += 1;
+    }
+    return count;
+  };
 
   const errorText = (error: TagValidationError): string => {
     switch (error) {
@@ -182,6 +196,9 @@ export function SkillTagMenu({
     setDraft(label);
     setMarkDraft(emoji ?? "");
     setPickerOpen(false);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
   };
 
   const cancelEdit = () => {
@@ -215,243 +232,334 @@ export function SkillTagMenu({
     );
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        // Closing discards the form: a half-typed rename never survives into
-        // the next open, so the row always reads as what the ledger holds.
-        if (!next) cancelEdit();
-        setOpen(next);
-      }}
-    >
-      {/* The badge itself is the trigger — a press chooses the tag, so there
-          is no second affordance beside it. The badge root is a span, so it
-          nests inside the button without an interactive-descendant problem,
-          and its own hover tooltip (the classification's scope) still reads
-          on hover. */}
-      <PopoverTrigger
-        render={
-          <button
-            type="button"
-            aria-label={t("tag.editAria", { name: skillName })}
-            title={t("tag.edit")}
-            className={cn(
-              "inline-flex cursor-pointer items-center rounded-4xl transition-colors",
-              "hover:bg-muted/60",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            )}
-          >
-            {trigger}
-          </button>
-        }
-      />
-      <PopoverContent align="start" sideOffset={6} className="w-80 gap-2 p-3">
-        <p className="px-1 text-[11px] font-medium text-muted-foreground">
-          {t("tag.title")}
-        </p>
-        {/* Creation leads: the list below scrolls past a dozen system
-            domains, so a form parked at the end would hide the one action a
-            first-time reader opened the menu for. Picking still costs
-            nothing extra — one compact row above it. */}
-        <form
-          className="flex items-center gap-1.5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void create();
-          }}
-        >
-          {/* The mark toggle wears the choice itself — a picked emoji, else
-              the smile that opens the picker. A set mark grows a clear
-              beside it, back to the label's first character; two inputs
-              remain, not three. */}
-          <button
-            type="button"
-            disabled={busy}
-            aria-label={t("tag.pickEmoji")}
-            title={t("tag.pickEmoji")}
-            aria-pressed={pickerOpen}
-            onClick={() => setPickerOpen((next) => !next)}
-            className={cn(
-              "inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md",
-              "text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-              pickerOpen && "bg-muted text-foreground",
-            )}
-          >
-            {markDraft ? (
-              <span aria-hidden="true" className="text-[15px] leading-none">
-                {markDraft}
-              </span>
-            ) : (
-              <Smile className="size-3.5" aria-hidden />
-            )}
-          </button>
-          {markDraft && (
+    <>
+      <Popover
+        open={open}
+        onOpenChange={(next) => {
+          // Closing discards the form: a half-typed rename never survives into
+          // the next open, so the row always reads as what the ledger holds.
+          if (!next) cancelEdit();
+          setOpen(next);
+        }}
+      >
+        <PopoverTrigger
+          render={
             <button
               type="button"
-              disabled={busy}
-              aria-label={t("tag.clearEmoji")}
-              title={t("tag.clearEmoji")}
-              onClick={() => setMarkDraft("")}
+              aria-label={t("tag.editAria", { name: skillName })}
+              title={t("tag.edit")}
               className={cn(
-                "-ml-1 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded",
-                "text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
+                "group/tag-btn inline-flex cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 transition-colors",
+                "hover:bg-muted/80 text-muted-foreground hover:text-foreground",
                 "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               )}
             >
-              <X className="size-3" aria-hidden />
+              {trigger}
+              <Pencil className="size-2.5 opacity-40 transition-opacity group-hover/tag-btn:opacity-100" aria-hidden />
             </button>
-          )}
-          <Input
-            value={draft}
-            disabled={busy}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={t("tag.newPlaceholder")}
-            aria-label={t("tag.newPlaceholder")}
-            className="h-7 text-[12px]"
-          />
-          {editingKey != null && (
+          }
+        />
+        <PopoverContent align="start" sideOffset={6} className="w-80 gap-2 p-3">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              {editingKey != null
+                ? t("tag.editingTag", {
+                    name: defs.find((d) => d.key === editingKey)?.label ?? "",
+                  })
+                : t("tag.title")}
+            </p>
+            {editingKey != null && (
+              <span className="text-[10px] text-muted-foreground">
+                {t("tag.rename")}
+              </span>
+            )}
+          </div>
+          {/* Creation leads: the list below scrolls past a dozen system
+              domains, so a form parked at the end would hide the one action a
+              first-time reader opened the menu for. Picking still costs
+              nothing extra — one compact row above it. */}
+          <form
+            className="flex items-center gap-1.5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void create();
+            }}
+          >
+            {/* The mark toggle wears the choice itself — a picked emoji, else
+                the smile that opens the picker. A set mark grows a clear
+                beside it, back to the label's first character; two inputs
+                remain, not three. */}
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              <PopoverTrigger
+                render={
+                  <button
+                    type="button"
+                    disabled={busy}
+                    aria-label={t("tag.pickEmoji")}
+                    title={t("tag.pickEmoji")}
+                    aria-pressed={pickerOpen}
+                    className={cn(
+                      "inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md",
+                      "text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                      pickerOpen && "bg-muted text-foreground",
+                    )}
+                  >
+                    {markDraft ? (
+                      <span aria-hidden="true" className="text-[15px] leading-none">
+                        {markDraft}
+                      </span>
+                    ) : (
+                      <Smile className="size-3.5" aria-hidden />
+                    )}
+                  </button>
+                }
+              />
+              <PopoverContent
+                side="bottom"
+                align="start"
+                sideOffset={4}
+                className="w-auto p-1 border shadow-lg bg-popover"
+              >
+                <EmojiPickerPanel
+                  onPick={(emoji) => {
+                    setMarkDraft(emoji);
+                    setPickerOpen(false);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+            {markDraft && (
+              <button
+                type="button"
+                disabled={busy}
+                aria-label={t("tag.clearEmoji")}
+                title={t("tag.clearEmoji")}
+                onClick={() => setMarkDraft("")}
+                className={cn(
+                  "-ml-1 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded",
+                  "text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
+                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                )}
+              >
+                <X className="size-3" aria-hidden />
+              </button>
+            )}
+            <Input
+              ref={inputRef}
+              value={draft}
+              disabled={busy}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={
+                editingKey != null ? t("tag.rename") : t("tag.newPlaceholder")
+              }
+              aria-label={t("tag.newPlaceholder")}
+              className="h-7 text-[12px]"
+            />
+            {editingKey != null && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 shrink-0 px-2 text-[12px]"
+                disabled={busy}
+                onClick={cancelEdit}
+              >
+                {t("tag.cancel")}
+              </Button>
+            )}
             <Button
-              type="button"
+              type="submit"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-[12px]"
+              disabled={busy || draft.trim().length === 0}
+            >
+              {editingKey != null ? t("tag.save") : t("tag.create")}
+            </Button>
+          </form>
+          <div className="max-h-64 overflow-y-auto">
+            {/* Custom tags lead, when any exist: they are the labels the reader
+                coined themselves, so the menu answers with them before the
+                system domains. With none defined the system list stands alone,
+                headers and all, exactly as before. */}
+            {defs.length > 0 && (
+              <>
+                <p className="px-2 pt-1 pb-0.5 text-[10px] text-muted-foreground/70">
+                  {t("tag.customGroup")}
+                </p>
+                {defs.map((def) => {
+                  const count = getTagUsedCount(def.key);
+                  return (
+                    <div key={def.key} className="group flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void pick(def.key)}
+                        className={cn(
+                          itemClass(
+                            effectiveKey === def.key || editingKey === def.key,
+                          ),
+                          "w-auto min-w-0 flex-1",
+                        )}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="text-[13px] leading-none"
+                        >
+                          {def.emoji ?? defaultTagMark(def.label)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {def.label}
+                        </span>
+                        {count > 0 && (
+                          <span className="text-[10px] text-muted-foreground/60 mr-1">
+                            {count}
+                          </span>
+                        )}
+                        {effectiveKey === def.key && (
+                          <Check className="size-3 shrink-0" aria-hidden />
+                        )}
+                      </button>
+                      {/* The pencil stays for used tags too: renaming moves every
+                          assignment along, so unlike deletion it needs no unused
+                          guard. It toggles — a second press backs out. */}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        aria-label={t("tag.renameAria", { label: def.label })}
+                        title={t("tag.rename")}
+                        aria-pressed={editingKey === def.key}
+                        onClick={() =>
+                          editingKey === def.key
+                            ? cancelEdit()
+                            : startEdit(def.key, def.label, def.emoji)
+                        }
+                        className={cn(
+                          "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded",
+                          "text-muted-foreground/60 transition-all hover:bg-muted hover:text-foreground",
+                          "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                          editingKey === def.key &&
+                            "bg-muted text-foreground opacity-100",
+                        )}
+                      >
+                        <Pencil className="size-3" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        aria-label={t("tag.deleteAria", { label: def.label })}
+                        title={t("tag.delete")}
+                        onClick={() => {
+                          if (count > 0) {
+                            setConfirmDelete({
+                              key: def.key,
+                              label: def.label,
+                              count,
+                            });
+                          } else {
+                            void remove(def.key);
+                          }
+                        }}
+                        className={cn(
+                          "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded",
+                          "text-muted-foreground/60 transition-all hover:bg-destructive/10 hover:text-destructive",
+                          "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                        )}
+                      >
+                        <X className="size-3" aria-hidden />
+                      </button>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            <p
+              className={cn(
+                "px-2 pb-0.5 text-[10px] text-muted-foreground/70",
+                defs.length > 0 ? "pt-2" : "pt-1",
+              )}
+            >
+              {t("tag.systemGroup")}
+            </p>
+            {DOMAINS.map((domain) => (
+              <button
+                key={domain.key}
+                type="button"
+                disabled={busy}
+                onClick={() => void pick(domain.key)}
+                className={itemClass(effectiveKey === domain.key)}
+              >
+                <span aria-hidden="true" className="text-[13px] leading-none">
+                  {domain.emoji}
+                </span>
+                <span className="min-w-0 flex-1 truncate">
+                  {domainLabel(domain.key, locale)}
+                </span>
+                {effectiveKey === domain.key && (
+                  <Check className="size-3 shrink-0" aria-hidden />
+                )}
+              </button>
+            ))}
+          </div>
+          {assignedKey != null && (
+            <Button
               variant="ghost"
               size="sm"
-              className="h-7 shrink-0 px-2 text-[12px]"
+              className="h-7 justify-start px-2 text-[11px]"
               disabled={busy}
-              onClick={cancelEdit}
+              onClick={() => void clear()}
+            >
+              <RotateCcw className="size-3" aria-hidden />
+              {t("tag.clear")}
+            </Button>
+          )}
+        </PopoverContent>
+      </Popover>
+      <Dialog
+        open={confirmDelete != null}
+        onOpenChange={(next) => {
+          if (!next) setConfirmDelete(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("tag.confirmDeleteTitle")}</DialogTitle>
+            <DialogDescription>
+              {confirmDelete &&
+                t("tag.confirmDeleteDesc", {
+                  name: confirmDelete.label,
+                  count: confirmDelete.count,
+                })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => setConfirmDelete(null)}
             >
               {t("tag.cancel")}
             </Button>
-          )}
-          <Button
-            type="submit"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-[12px]"
-            disabled={busy || draft.trim().length === 0}
-          >
-            {editingKey != null ? t("tag.save") : t("tag.create")}
-          </Button>
-        </form>
-        {pickerOpen && (
-          <EmojiPickerPanel
-            onPick={(emoji) => {
-              setMarkDraft(emoji);
-              setPickerOpen(false);
-            }}
-          />
-        )}
-        <div className="max-h-64 overflow-y-auto">
-          {/* Custom tags lead, when any exist: they are the labels the reader
-              coined themselves, so the menu answers with them before the
-              system domains. With none defined the system list stands alone,
-              headers and all, exactly as before. */}
-          {defs.length > 0 && (
-            <>
-              <p className="px-2 pt-1 pb-0.5 text-[10px] text-muted-foreground/70">
-                {t("tag.customGroup")}
-              </p>
-              {defs.map((def) => (
-                <div key={def.key} className="group flex items-center gap-0.5">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void pick(def.key)}
-                    className={cn(itemClass(effectiveKey === def.key || editingKey === def.key), "w-auto min-w-0 flex-1")}
-                  >
-                    <span aria-hidden="true" className="text-[13px] leading-none">
-                      {def.emoji ?? defaultTagMark(def.label)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{def.label}</span>
-                    {effectiveKey === def.key && (
-                      <Check className="size-3 shrink-0" aria-hidden />
-                    )}
-                  </button>
-                  {/* The pencil stays for used tags too: renaming moves every
-                      assignment along, so unlike deletion it needs no unused
-                      guard. It toggles — a second press backs out. */}
-                  <button
-                    type="button"
-                    disabled={busy}
-                    aria-label={t("tag.renameAria", { label: def.label })}
-                    title={t("tag.rename")}
-                    aria-pressed={editingKey === def.key}
-                    onClick={() =>
-                      editingKey === def.key
-                        ? cancelEdit()
-                        : startEdit(def.key, def.label, def.emoji)
-                    }
-                    className={cn(
-                      "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded",
-                      "text-muted-foreground/60 transition-all hover:bg-muted hover:text-foreground",
-                      "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                      editingKey === def.key && "bg-muted text-foreground opacity-100",
-                    )}
-                  >
-                    <Pencil className="size-3" aria-hidden />
-                  </button>
-                  {!usedTags.has(def.key) && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      aria-label={t("tag.deleteAria", { label: def.label })}
-                      title={t("tag.delete")}
-                      onClick={() => void remove(def.key)}
-                      className={cn(
-                        "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded",
-                        "text-muted-foreground/60 transition-all hover:bg-destructive/10 hover:text-destructive",
-                        "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
-                        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                      )}
-                    >
-                      <X className="size-3" aria-hidden />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </>
-          )}
-          <p
-            className={cn(
-              "px-2 pb-0.5 text-[10px] text-muted-foreground/70",
-              defs.length > 0 ? "pt-2" : "pt-1",
-            )}
-          >
-            {t("tag.systemGroup")}
-          </p>
-          {DOMAINS.map((domain) => (
-            <button
-              key={domain.key}
-              type="button"
+            <Button
+              variant="destructive"
+              size="sm"
               disabled={busy}
-              onClick={() => void pick(domain.key)}
-              className={itemClass(effectiveKey === domain.key)}
+              onClick={async () => {
+                if (!confirmDelete) return;
+                const keyToDelete = confirmDelete.key;
+                setConfirmDelete(null);
+                await remove(keyToDelete);
+              }}
             >
-              <span aria-hidden="true" className="text-[13px] leading-none">
-                {domain.emoji}
-              </span>
-              <span className="min-w-0 flex-1 truncate">
-                {domainLabel(domain.key, locale)}
-              </span>
-              {effectiveKey === domain.key && (
-                <Check className="size-3 shrink-0" aria-hidden />
-              )}
-            </button>
-          ))}
-        </div>
-        {assignedKey != null && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 justify-start px-2 text-[11px]"
-            disabled={busy}
-            onClick={() => void clear()}
-          >
-            <RotateCcw className="size-3" aria-hidden />
-            {t("tag.clear")}
-          </Button>
-        )}
-      </PopoverContent>
-    </Popover>
+              {t("tag.delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
