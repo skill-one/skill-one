@@ -12,7 +12,6 @@ import {
   type ListSort,
   type ListUnit,
 } from "../lib/list-view";
-import { ListCorpus } from "./list-corpus";
 import { ListFacets, type Facet } from "./list-facets";
 import { ListSortSelect } from "./list-sort-select";
 import { ListUnitToggle } from "./list-unit-toggle";
@@ -65,11 +64,9 @@ const DEFAULT_UNIT: ListUnit = "skill";
  * order is the figure its own rows display, and a menu of one is a control that
  * costs a press to say what the rows are already saying.
  *
- * The row's slack — the stretch between the two groups, which nothing else wants
- * — carries the corpus's two figures (see `ListCorpus`): a readout rather than a
- * fifth control, and the one thing on the row that answers about the corpus
- * instead of about the answer, which is why it stays put while the shape changes
- * and while a question is live.
+ * The row's slack — the stretch between the two groups — is left empty rather
+ * than filled with a figure: the row states the answer, not the size of what it
+ * was answered from, so there is nothing to say here.
  *
  * The store's field is locked until the worker's index over the registry exists:
  * a question answered over a half-downloaded registry answers wrongly, and the
@@ -81,15 +78,14 @@ const DEFAULT_UNIT: ListUnit = "skill";
  * (see `lib/list-view`): the question, the picker, the shape and the order write
  * this list's own slice of the view, and a list the reader left and came back to
  * is still scoped, shaped and sorted as they left it. So a page hands over only
- * what it alone knows — the counts and the orders its rows can state, the size of
- * the corpus it reads, plus whether a question has settled.
+ * what it alone knows — the counts and the orders its rows can state, plus
+ * whether a question has settled.
  */
 export function ListToolbar({
   destination,
   facets,
   total,
   sorts,
-  corpus,
   searching = false,
 }: {
   /** The list this row belongs to; its own question, order, shape and scope. */
@@ -103,15 +99,6 @@ export function ListToolbar({
    * can state.
    */
   sorts?: readonly ListSort[];
-  /**
-   * How much there is to read from, both units at once; see `ListCorpus` for why
-   * it does not follow the shape. Absent is a row that states no size.
-   */
-  corpus?: {
-    skills: number;
-    repos: number;
-    variant?: "registry" | "installed";
-  };
   /**
    * Whether a question has settled — the page's debounced, trimmed answer, not
    * the raw field value, which would lock the row on the first keystroke of a
@@ -153,11 +140,6 @@ export function ListToolbar({
         unit={unit}
         onChange={(next) => setUnit(destination, next)}
       />
-      {/* The corpus's own two figures, in the slack the row already keeps: the
-          size of what is being read, which is neither the question nor any of the
-          three answers beside it — and the one figure here that does not move
-          when the shape does. */}
-      {corpus && <ListCorpus {...corpus} />}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {scopable && (
           <ListFacets

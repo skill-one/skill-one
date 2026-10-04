@@ -183,7 +183,6 @@
     "noInstalledMatch": "本机没有匹配“{{query}}”的 Skill",
     "noSkills": "暂无技能",
     "repoCount": "{{count}} 个仓库",
-    "sourceRepoCount": "{{count}} 个来源仓库",
     "skillCount": "{{count}} 个 skill",
     "expandRepoAria": "展开 {{name}} 的全部 {{count}} 个 skill",
     "collapseRepoAria": "收起 {{name}} 的 skill 列表",

@@ -183,7 +183,6 @@
     "noInstalledMatch": "Nothing installed on this machine matches “{{query}}”",
     "noSkills": "No skills yet",
     "repoCount": "{{count}} repositories",
-    "sourceRepoCount": "{{count}} source repositories",
     "skillCount": "{{count}} skills",
     "expandRepoAria": "Show all {{count}} skills from {{name}}",
     "collapseRepoAria": "Collapse the skill list of {{name}}",
