@@ -817,10 +817,10 @@ export function InstalledPage() {
         skill: row.skill,
         matched: row.matched,
         muted: !row.enabled,
-        extra: rowExtra(row, "size-5"),
+        extra: unit !== "repo" ? rowExtra(row, "size-5") : undefined,
         action: <SkillEnableSwitch skill={row.skill} />,
       })),
-    [rows, rowExtra],
+    [rows, rowExtra, unit],
   );
 
   const queryClient = useQueryClient();
@@ -1136,7 +1136,6 @@ export function InstalledPage() {
                   skills={card.items.map((row) => ({
                     skill: row.skill,
                     muted: !row.enabled,
-                    extra: rowExtra(row, "size-5"),
                     // Each row's own enable switch, in the card's floating
                     // hover slot; the disabled rows stay dimmed so the group
                     // switch's state has its evidence.

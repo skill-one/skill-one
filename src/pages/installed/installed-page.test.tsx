@@ -1171,6 +1171,7 @@ describe("InstalledPage", () => {
         ],
       });
       renderPage();
+      await pickUnit(user, "列表");
 
       const badge = await screen.findByRole("button", {
         name: "关联 pdf 的商店来源",
@@ -1188,6 +1189,7 @@ describe("InstalledPage", () => {
       // The association becomes indistinguishable from a native install: pdf now
       // lives in its own repository card, whose bar names the source, and the
       // affordance is gone.
+      await pickUnit(user, "仓库");
       expect(await screen.findByText("anthropics/skills")).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "关联 pdf 的商店来源" }),
