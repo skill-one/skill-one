@@ -236,6 +236,22 @@ const cardOrder = () =>
     .getAllByRole("button", { name: /查看 .+ 详情/ })
     .map((el) => el.getAttribute("aria-label")?.replace(/^查看 | 详情$/g, ""));
 
+/**
+ * The figure each mounted card's bar leads with, in DOM order: the card's own
+ * place in the list. Read by *position* — the first thing in the bar's identity —
+ * because that is the claim being made about it, and because a card that states
+ * no place then reads as the empty face slot rather than as a number.
+ */
+const cardOrdinals = (scope: ParentNode = document.body) =>
+  Array.from(
+    scope.querySelectorAll('[data-slot="card"][data-repo]'),
+  ).map(
+    (card) =>
+      card
+        .querySelector('[data-slot="card-header"]')
+        ?.firstElementChild?.firstElementChild?.textContent?.trim() ?? "",
+  );
+
 /** The repository cards mounted under a scope, by the `data-repo` each Card
  *  carries — the stable fact every card has, expandable or not. The default
  *  scope is the document body because the cards render inside the sheet's
@@ -417,6 +433,22 @@ describe("ExplorePage", () => {
     // few installs its skills claim, which is the opposite of the row order.
     await waitFor(() => expect(cardOrder()).toEqual(["star", "few"]));
     expect(repoCards()).toHaveLength(2);
+  });
+
+  it("states each card's own place in the stack, in the order it is read", async () => {
+    const user = userEvent.setup();
+    bootRankedRegistry();
+    renderExplorePage();
+    await screen.findByText("few");
+
+    await pickUnit(user, "卡片");
+
+    // The cards take the whole row each, so the figure column the row shape's
+    // ordinals make is available here too — and it counts the order the reader is
+    // actually in, which is the stars the leading card prints. The number leads
+    // the bar, ahead of the face, so a scan down the stack gets the shape of the
+    // answer before it reads a single name.
+    await waitFor(() => expect(cardOrdinals()).toEqual(["1", "2"]));
   });
 
   it("remembers the chosen shape after the page goes away", async () => {

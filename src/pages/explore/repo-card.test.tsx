@@ -8,6 +8,7 @@ import {
   installSkillFromSource,
 } from "../../lib/local-skills";
 import { skillKey } from "../../lib/skill-view";
+import { MEDAL_CLASSES } from "../../lib/ordinal";
 import { formatCount } from "../../lib/utils";
 import type { SearchHit } from "../../lib/registry/protocol";
 import type { Skill } from "../../types/skill";
@@ -106,6 +107,97 @@ function expectTwoColumnBody(container: HTMLElement) {
 describe("RepoCard", () => {
   beforeEach(() => {
     vi.mocked(fetchInstalledSkills).mockResolvedValue([]);
+  });
+
+  /**
+   * The element a card's bar leads with, in the slot the list row gives the same
+   * number. Read by *position* rather than by class, because the claim under test
+   * is that the number leads: with none in hand the identity starts at the face
+   * (or, for the source-less pool, at the name), and the same read says so.
+   */
+  function ordinalOf(container: HTMLElement): Element {
+    return container
+      .querySelector('[data-slot="card-header"]')!
+      .firstElementChild!.firstElementChild!;
+  }
+
+  /** What that leading element states. */
+  function leadingFigure(container: HTMLElement): string {
+    return ordinalOf(container).textContent?.trim() ?? "";
+  }
+
+  describe("the card's own place in the list", () => {
+    it("leads the bar with its place, ahead of the face", () => {
+      const { container } = renderCard({ index: 0 });
+
+      // The number is the first thing in the bar, so a scan down the stack reads
+      // a column of figures before it starts reading names — the same job the
+      // list row's ordinal does, which is why it takes the same leading slot.
+      const identity = container
+        .querySelector('[data-slot="card-header"]')!
+        .firstElementChild!;
+      const [figure, face] = Array.from(identity.children);
+      expect(figure).toHaveTextContent("1");
+      expect(face).toHaveAttribute("data-slot", "avatar");
+    });
+
+    it("counts from one, so the card a caller calls index 0 says 1", () => {
+      // Zero-based in, one-based out — the convention `SkillRow` and
+      // `ordinalClass` already share, so a number means the same thing wherever
+      // in the app it is printed.
+      const { container } = renderCard({ index: 2 });
+
+      expect(leadingFigure(container)).toBe("3");
+    });
+
+    it("prints no slot at all when the caller states no place", () => {
+      // A search's groups are not a ranked list of repositories — their order is
+      // the relevance order their first hit arrived in — so the caller hands over
+      // no number and the bar starts at the face, with nothing left of an empty
+      // slot to imply a count of zero.
+      const { container } = renderCard();
+
+      const identity = container
+        .querySelector('[data-slot="card-header"]')!
+        .firstElementChild!;
+      expect(identity.firstElementChild).toHaveAttribute("data-slot", "avatar");
+      expect(identity.textContent).not.toMatch(/^\d/);
+    });
+
+    it("crowns the leading three, the way the row shape crowns its own", () => {
+      // Stating a place is claiming a seat in a ranking, and the card's ranking is
+      // the stars its bar prints a few glyphs along — the row shape's own pattern
+      // (order by a figure, print it, colour the top three), not a decoration
+      // invented for cards. So the podium travels with the shape toggle instead
+      // of vanishing on one of its two settings.
+      const podiumOf = (index: number) => {
+        const { container, unmount } = renderCard({ index });
+        const ink = ordinalOf(container).className;
+        unmount();
+        return ink;
+      };
+
+      expect(podiumOf(0)).toContain(MEDAL_CLASSES[0]);
+      expect(podiumOf(1)).toContain(MEDAL_CLASSES[1]);
+      expect(podiumOf(2)).toContain(MEDAL_CLASSES[2]);
+
+      // Fourth place is out of the podium, and says so quietly.
+      const fourth = podiumOf(3);
+      expect(fourth).toContain("text-muted-foreground");
+      for (const medal of MEDAL_CLASSES) {
+        expect(fourth).not.toContain(medal);
+      }
+    });
+
+    it("numbers the source-less pool too, which has no face to lead", () => {
+      // The number is about the card's place, not about its identity, so the
+      // pool card — the installed list's skills no recorded source vouches for,
+      // which draws a name where a repository would draw an avatar — carries it
+      // just as the named cards do.
+      const { container } = renderCard({ repo: "", index: 3 });
+
+      expect(leadingFigure(container)).toBe("4");
+    });
   });
 
   it("leads with the repository's own bar and signs the rows under it", () => {

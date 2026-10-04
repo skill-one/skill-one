@@ -15,6 +15,7 @@ import {
 } from "../../lib/skill-view";
 import type { Skill } from "../../types/skill";
 import { cn, formatCount } from "../../lib/utils";
+import { Ordinal } from "../../components/ordinal";
 
 import {
   HighlightedText,
@@ -84,10 +85,11 @@ export interface RepoCardRow {
  *
  * The card is a repository with its skills inside it, and the single bar along
  * the top names the card; the body under it lists the skills (most-installed
- * first, the repository's own leaders). The bar reads left to right as two
- * clusters, split by what each fact is *about*: the repository — avatar,
- * `owner/repo`, its star count — and then, on an expandable card, the offer
- * (「＋ 3」): a plus drawn as an icon over the exact number of rows a press
+ * first, the repository's own leaders). The bar reads left to right as the card's
+ * own ordinal — where a caller ranking a list of repositories hands one over —
+ * and then two clusters, split by what each fact is *about*: the repository —
+ * avatar, `owner/repo`, its star count — and then, on an expandable card, the
+ * offer (「＋ 3」): a plus drawn as an icon over the exact number of rows a press
  * reveals. Everything in the left cluster answers "which repository is this",
  * the offer answers "what happens if I press", as one mark rather than as
  * arithmetic to parse. A card whose every row is already on screen shows no
@@ -193,6 +195,7 @@ export interface RepoCardRow {
 export function RepoCard({
   repo,
   stars,
+  index,
   skills,
   hasQuery = false,
   selected = null,
@@ -207,6 +210,22 @@ export function RepoCard({
   repo: string;
   /** The repository's GitHub stars, when the grouping knows them. */
   stars?: number;
+  /**
+   * Zero-based position in the list of repositories; the bar prints `index + 1`.
+   * Absent leaves the number off, which is the right answer wherever the card is
+   * not one item of a ranked list of repositories — a search's groups, whose
+   * order is the relevance order their first hit arrived in and not a magnitude
+   * any figure on the card states.
+   *
+   * Stating a place is also the card claiming it sits in a ranking, so the number
+   * wears the same podium the row shape's leading entries wear. That is the row
+   * shape's own pattern rather than a decoration invented here: a list ordered by
+   * a figure prints that figure and colours its top three, and the card orders by
+   * the stars it prints a few glyphs along. Ink that appeared in one shape and
+   * vanished in the other would be a mark the reader could not rely on, since the
+   * shape toggle is a view choice and not a change to the list.
+   */
+  index?: number;
   /** The repository's rows, in the order the grouping produced (most
    *  installed first). */
   skills: RepoCardRow[];
@@ -300,12 +319,24 @@ export function RepoCard({
   // The bar's own name: the repository when there is one, and the label for the
   // installed list's pool of skills no source vouches for when there is not.
   const name = repo || t("common.localInstall");
-  // The bar's identity: the face, the name, the repository's weight. Shared by
-  // the toggle and the plain label — who this is and how big it is read the
-  // same whichever state the card is in. (The hover underline only arms inside
-  // the toggle's `group/head`; a label never underlines.)
+  // The bar's identity: the card's own ordinal, the face, the name, the
+  // repository's weight. Shared by the toggle and the plain label — where this
+  // is in the list, who this is and how big it is are read the same whichever
+  // state the card is in. (The hover underline only arms inside the toggle's
+  // `group/head`; a label never underlines.)
   const barIdentity = (
     <>
+      {/* Where this repository sits in the list the reader is scrolling, in the
+          very same mark the list row wears (`Ordinal`) — a card and a row are
+          two shapes of one list, so they number their entries the same way, down
+          to the podium on the leading three. The 24px box is the width of the
+          owner face below it, which is what makes every card's name start at the
+          same offset.
+
+          A card drawn outside a ranked list of repositories (a search's groups,
+          whose order is the relevance order their first hit arrived in) passes no
+          `index` and draws no slot at all, so the identity starts at the face. */}
+      {index !== undefined && <Ordinal index={index} />}
       {/* The identity is a size step above the rows: a 24px face and a
           14px name against the rows' 13px names and 13px glyphs. The bar
           sits under a hairline at the top of the card, so the step is

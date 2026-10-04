@@ -581,11 +581,13 @@ export function InstalledPage() {
         key={key}
         skill={row.skill}
         index={rowOrdinals.get(key) ?? 0}
-        // An installed list is not a leaderboard: the figures
-        // it does carry come from the store, and the installs
-        // it cannot place at all would leave the podium on
-        // alphabetical order. The numbers merely count.
-        ranked={false}
+        // The row numbers its position in the order the reader picked, and the
+        // first three of that order wear the podium — the same mark in every unit
+        // and in both shapes, so an installed skill reads the same wherever it is
+        // listed. The claim is about the *chosen* order, not about weight: under
+        // 按安装时间 the podium is the three newest installs, under Token 占用 the
+        // three heaviest, and this list is content to call either a ranking,
+        // because that is the order the reader asked to read by.
         fact={
           sort === "installed"
             ? "installedAt"
@@ -715,15 +717,20 @@ export function InstalledPage() {
               )}
             </>
           ) : (
-            // The repository unit: one card per repository, ordered by each
-            // card's newest install. The card itself lists its installs
-            // newest-first.
+            // The repository unit: one card per repository, led by the
+            // repository's own stars (the figure the card itself prints, so the
+            // order and the numbers above it cannot disagree), ties broken by
+            // each card's newest install. The card itself lists its installs
+            // newest-first. Each card states its own place in that stack, the
+            // same number the skill unit's rows carry — the cards take the whole
+            // row each, so a column of them is a column the eye can run down.
             <ul className={REPO_LIST_CLASS}>
-              {shownCards.map((card) => (
+              {shownCards.map((card, index) => (
                 <RepoCard
                   key={card.repo || LOCAL_POOL_KEY}
                   repo={card.repo}
                   stars={starsOf(card)}
+                  index={index}
                   skills={card.items.map((row) => ({
                     skill: row.skill,
                     muted: !row.enabled,

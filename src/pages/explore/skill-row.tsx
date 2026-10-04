@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAppLocale } from "../../i18n/use-language";
 import { skillDescription } from "../../lib/i18n-content";
-import { ordinalClass } from "../../lib/ordinal";
+import { Ordinal } from "../../components/ordinal";
 import {
   isInstallableSkill,
   isLiveSkill,
@@ -167,17 +167,10 @@ export function SkillRow({
         )}
       >
         {/* The list's one addition: where this skill stands in the collection,
-            top three medalled when the list is ranked. A fixed-width, centred
-            box keeps every name in the list starting at the same offset whether
-            the number is one or four digits. */}
-        <span
-          className={cn(
-            "w-6 shrink-0 text-center text-sm",
-            ordinalClass(index, ranked),
-          )}
-        >
-          {index + 1}
-        </span>
+            top three medalled when the list is ranked. The box is `Ordinal`'s,
+            shared with the repository card's bar so the two shapes of one list
+            number their entries the same way. */}
+        <Ordinal index={index} ranked={ranked} />
 
         {/* The classification leads the row. The tip names the domain, its scope
             and any other domains the skill belongs to — and answers for a skill

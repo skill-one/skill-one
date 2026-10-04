@@ -20,6 +20,7 @@ import {
 } from "../../lib/mock-local";
 import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
 import { resetLinkSuggestions } from "../../lib/link-suggestions";
+import { MEDAL_CLASSES } from "../../lib/ordinal";
 import {
   getListView,
   resetListView,
@@ -196,6 +197,68 @@ describe("InstalledPage", () => {
   });
 
   describe("repository cards", () => {
+    /**
+     * The stack top to bottom, each card paired with the figure its bar leads
+     * with: the card's own place in the list. The ordinal is read by *position*
+     * — the first thing in the bar's identity — because that is the claim being
+     * made about it, and because a card that stated no place would then read as
+     * the face's (empty) slot rather than as a number.
+     */
+    function cardStack(container: HTMLElement) {
+      return Array.from(
+        container.querySelectorAll('[data-slot="card"][data-repo]'),
+      ).map((card) => ({
+        repo: card.getAttribute("data-repo") ?? "",
+        ordinal:
+          card
+            .querySelector('[data-slot="card-header"]')
+            ?.firstElementChild?.firstElementChild?.textContent?.trim() ?? "",
+      }));
+    }
+
+    it("numbers the cards in the stars order their own bars already print", async () => {
+      // Two recorded sources of different weights, so the stack has an order
+      // worth stating. The cards are led by the repository's own stars — the
+      // figure the leading card's bar prints a few glyphs along — so the number
+      // restates what the list is already answering in rather than introducing an
+      // order of its own.
+      seedMockProvenance({
+        pdf: { repo: "acme/big" },
+        docx: { repo: "acme/small" },
+      });
+      // Only the two sourced installs resolve to a store entry, so the pool keeps
+      // no figure at all — which is a fact about the pool (nobody recorded a
+      // source to look up), not a figure of zero.
+      lookupSkills.mockImplementation(
+        async (refs: Array<{ repo: string; name: string }>) => ({
+          entries: refs
+            .filter((ref) => ref.repo !== "")
+            .map((ref) => ({
+              name: ref.name,
+              repo: ref.repo,
+              description: `${ref.name} 的商店描述`,
+              stars: ref.repo === "acme/big" ? 9_000 : 500,
+              downloads: 0,
+              path: `skills/${ref.repo}/${ref.name}`,
+              profile: { domain: ["development"] },
+            })),
+        }),
+      );
+      const { container } = renderPage();
+
+      await screen.findByText("acme/big");
+      // Heaviest first, and the pool last because it has no stars to weigh — the
+      // same order the bars themselves imply. It is numbered all the same: it is
+      // third in this list, and a card without a figure is a card without a
+      // weight, not a card without a place.
+      expect(cardStack(container)).toEqual([
+        { repo: "acme/big", ordinal: "1" },
+        { repo: "acme/small", ordinal: "2" },
+        { repo: "", ordinal: "3" },
+      ]);
+    });
+
+
     it("gives every source-less install a home in one repository-style card", async () => {
       const user = userEvent.setup();
       renderPage();
@@ -1603,6 +1666,91 @@ describe("InstalledPage", () => {
       ).toBeInTheDocument();
     });
 
+  });
+
+  /**
+   * The installed list's rows and the repository cards it also lists share one
+   * ordinal mark, podium included: a row numbers its position in the order the
+   * reader picked and the first three of that order are coloured. The claim is
+   * about the *chosen* order rather than about weight, so it is stated per order
+   * — including the two orders that are not a contest in the ordinary sense,
+   * which is the point of the claim being about the reader's choice.
+   */
+  describe("the installed rows' podium", () => {
+    /** Each row's ordinal ink, in document order. */
+    function inks(): string[] {
+      return Array.from(document.querySelectorAll("li span.w-6")).map(
+        (span) => span.className,
+      );
+    }
+
+    const podium = (position: number) => inks()[position];
+
+    it("colours the leading three under the default order", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      // 热度 is a ranking and the row prints the figure it ranks by, so the first
+      // three wear gold, silver and bronze — the same ink the store's rows and the
+      // repository cards wear, because it is the same mark.
+      expect(podium(0)).toContain(MEDAL_CLASSES[0]);
+      expect(podium(1)).toContain(MEDAL_CLASSES[1]);
+      expect(podium(2)).toContain(MEDAL_CLASSES[2]);
+      // Fourth place is out of the podium, in either list.
+      expect(podium(3)).toContain("text-muted-foreground");
+    });
+
+    it("still colours them under the install clock", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      // 按安装时间 reads as a timeline, so this is where a medal is most easily
+      // over-read as a weight. The list is content to call its own order a ranking
+      // anyway: the reader picked the order, and the number states a place in
+      // exactly that. Its own case, so relaxing one comparator cannot quietly
+      // relax the claim for the others.
+      await pickSort(user, "安装时间");
+      await waitFor(() => expect(podium(0)).toContain(MEDAL_CLASSES[0]));
+      expect(podium(1)).toContain(MEDAL_CLASSES[1]);
+      expect(podium(2)).toContain(MEDAL_CLASSES[2]);
+    });
+
+    it("still colours them under the token cost", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      // And the third order, which weighs the description rather than the skill.
+      // Same claim, restated, for the same reason.
+      await pickSort(user, "Token 占用");
+      await waitFor(() => expect(podium(0)).toContain(MEDAL_CLASSES[0]));
+      expect(podium(1)).toContain(MEDAL_CLASSES[1]);
+      expect(podium(2)).toContain(MEDAL_CLASSES[2]);
+    });
+
+    it("wears the same mark as the repository cards beside it", async () => {
+      // The two shapes of this list, on one page: the rows above and the cards
+      // the shape toggle offers are numbered by one component, so switching the
+      // shape cannot change the ink.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+      const rowInk = podium(0);
+
+      await pickUnit(user, "卡片");
+      await waitFor(() =>
+        expect(
+          document.querySelector('[data-slot="card-header"]')!.firstElementChild!
+            .firstElementChild!.className,
+        ).toBe(rowInk),
+      );
+    });
   });
 
   /**
