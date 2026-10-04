@@ -12,7 +12,7 @@
     "installedTimeAria": "安装于 {{relative}}（{{exact}}）",
     "searchSkills": "搜索 Skill",
     "indexBuilding": "索引构建中…",
-    "listSort": "排序方式",
+    "listSort": "分组方式",
     "listLayout": "列表布局",
     "back": "返回",
     "viewDetailAria": "查看 {{name}} 详情",
@@ -33,9 +33,8 @@
     "installed": "已安装"
   },
   "sort": {
-    "byPopularity": "热度",
-    "byInstalled": "安装时间",
-    "byTokens": "Token 占用"
+    "byPopularity": "按热度分组",
+    "byInstalled": "按安装时间分组"
   },
   "unit": {
     "list": "列表",
@@ -43,7 +42,12 @@
     "repos": "仓库"
   },
   "list": {
-    "disabled": "已禁用"
+    "disabled": "已禁用",
+    "bucketToday": "今天",
+    "bucketYesterday": "昨天",
+    "bucketLast7": "最近 7 天",
+    "bucketLast30": "最近 30 天",
+    "bucketEarlier": "更早"
   },
   "action": {
     "install": "安装",

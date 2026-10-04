@@ -52,14 +52,14 @@ describe("list view", () => {
 
     setUnit("installed", "repo");
     setScope("installed", "development");
-    setSort("installed", "tokens");
+    setSort("installed", "installed");
 
     // One list's reading is one answer: which entries are on screen, how they
     // are made of, how they are narrowed and which way they read never come
     // apart from each other — nor from what the reader is looking for.
     expect(getListView().views.installed).toEqual({
       query: "pdf",
-      sort: "tokens",
+      sort: "installed",
       scope: "development",
       unit: "repo",
     });

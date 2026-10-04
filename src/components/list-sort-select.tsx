@@ -17,15 +17,15 @@ import {
 const SORT_LABELS: { sort: ListSort; labelKey: ParseKeys }[] = [
   { sort: "popularity", labelKey: "sort.byPopularity" },
   { sort: "installed", labelKey: "sort.byInstalled" },
-  { sort: "tokens", labelKey: "sort.byTokens" },
 ];
 
 /**
  * The sort switch of a list that answers in more than one order — the installed
- * list today. A labelled menu rather than a row of segmented controls: the
- * orders are *facts* the list is read through (whose figure, whose clock, whose
- * cost), not toggles, so they name themselves in words and stay out of the row
- * until opened.
+ * list today, where the order doubles as the grouping (the answer reads in
+ * sections of ten in the chosen order). A labelled menu rather than a row of
+ * segmented controls: the orders are *facts* the list is read through (whose
+ * figure, whose clock), not toggles, so they name themselves in words and stay
+ * out of the row until opened.
  *
  * Only ever about the order. The shape the list is read in — repository cards
  * or skill rows — used to ride along here as a "按仓库" option, which made this

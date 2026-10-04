@@ -5,7 +5,6 @@ import { SkillRow } from "./skill-row";
 import { RepoCard } from "./repo-card";
 import { TooltipProvider } from "../../components/ui/tooltip";
 import { renderWithRouter } from "../../test/test-utils";
-import { estimateTokens } from "../../lib/token-estimate";
 import { MEDAL_CLASSES } from "../../lib/ordinal";
 import type { SkillView } from "../../lib/skill-view";
 
@@ -52,7 +51,7 @@ const domainLive: SkillView = {
 
 function renderRow(
   skill: SkillView,
-  fact?: "popularity" | "installedAt" | "tokens",
+  fact?: "popularity" | "installedAt",
   ranked = true,
 ) {
   return renderWithRouter(
@@ -209,8 +208,8 @@ describe("SkillRow figure slot", () => {
   });
 
   it("states the stamp on a row the store cannot back, too", () => {
-    // The source-less pool is exactly the row the 按安装时间 sort still
-    // orders by time — a local fact no registry entry is needed for.
+    // The source-less pool is exactly the row the 按安装时间分组 grouping
+    // still orders by time — a local fact no registry entry is needed for.
     renderRow(localPool, "installedAt");
     expect(screen.getByLabelText(/^安装于 3天前/)).toBeInTheDocument();
   });
@@ -228,25 +227,6 @@ describe("SkillRow figure slot", () => {
     expect(screen.queryByLabelText(/^热度 /)).toBeNull();
   });
 
-  it("states the token estimate when the list answers by token cost", () => {
-    renderRow(installed, "tokens");
-    // The trigger keeps the rail's shared grammar — icon over a bare figure —
-    // and the accessible name spells the basis out. The count is the same
-    // estimate the drawer states, computed here off the shared helper.
-    expect(
-      screen.getByText(String(estimateTokens(installed.description))),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText(/预估 Token 数/)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/^热度 /)).toBeNull();
-    expect(screen.queryByLabelText(/^安装于 /)).toBeNull();
-  });
-
-  it("renders nothing in the slot when there is no description to cost", () => {
-    // An empty description costs nothing to state; the slot stays silent
-    // rather than printing a zero.
-    renderRow({ ...installed, description: "" }, "tokens");
-    expect(screen.queryByLabelText(/预估 Token 数/)).toBeNull();
-  });
 });
 
 describe("the ordinal mark, shared with the repository card", () => {

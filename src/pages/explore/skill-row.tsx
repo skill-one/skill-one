@@ -21,7 +21,6 @@ import { OwnerAvatar } from "../../components/owner-avatar";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillInstalledTime } from "../../components/skill-installed-time";
 import { SkillPopularity } from "../../components/skill-popularity";
-import { SkillTokenEstimate } from "../../components/skill-token-estimate";
 import { Card } from "../../components/ui/card";
 import {
   Tooltip,
@@ -134,14 +133,13 @@ export const SkillRow = memo(function SkillRow({
    * ordered by. `popularity` (the default) states the registry's blended
    * figure, the order the store browses in and the installed list's default;
    * `installedAt` states the install's own clock, the figure the installed
-   * list's 安装时间 sort orders by; `tokens` states the description's
-   * estimated context cost, the figure the Token 占用 sort weighs. The three
-   * are told apart by data, not by surface: the blend is a registry fact, so
-   * it renders only on a store-backed row, while the stamp and the estimate
-   * are local facts every install carries (either rendering nothing when its
-   * record is missing — an absent fact, not a zero).
+   * list's 安装时间 grouping orders by. The two are told apart by data, not
+   * by surface: the blend is a registry fact, so it renders only on a
+   * store-backed row, while the stamp is a local fact every install carries
+   * (rendering nothing when its record is missing — an absent fact, not a
+   * zero).
    */
-  fact?: "popularity" | "installedAt" | "tokens";
+  fact?: "popularity" | "installedAt";
 }) {
   // The row's own identity, and the one handler it needs to answer a click with
   // it — built here so a caller can pass a handler it already had.
@@ -262,12 +260,6 @@ export const SkillRow = memo(function SkillRow({
               skill={skill}
               align="end"
               className="w-24 justify-end"
-            />
-          ) : fact === "tokens" ? (
-            <SkillTokenEstimate
-              skill={skill}
-              align="end"
-              className="w-16 justify-end"
             />
           ) : (
             storeBacked && (

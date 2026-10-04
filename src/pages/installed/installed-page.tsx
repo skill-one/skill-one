@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
+import type { ParseKeys } from "i18next";
 import { Boxes, PowerOff, Users } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
@@ -10,14 +11,13 @@ import { useCustomTags } from "../../hooks/use-custom-tags";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
-import { consumeKeepSelection, setQuery } from "../../lib/list-view";
+import { setQuery } from "../../lib/list-view";
 import { buildSearchIndex } from "../../lib/search-index";
 import {
   installedSkillView,
   skillKey,
   type SkillView,
 } from "../../lib/skill-view";
-import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
@@ -30,7 +30,6 @@ import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-dr
 import { Placeholder } from "../../components/placeholder";
 import { errorMessage } from "../../lib/utils";
 import { popularity } from "../../lib/popularity";
-import { estimateTokens } from "../../lib/token-estimate";
 import type { Skill } from "../../types/skill";
 import type { SkillMatched } from "../../components/highlighted-text";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
@@ -63,6 +62,33 @@ const SKELETON_CARDS = 8;
 
 /** Placeholder rows while the on-disk list is first read, in the skill unit. */
 const SKELETON_ROWS = 12;
+
+/**
+ * How many installs one per-skill section holds. The list reads in titled
+ * sections of this size, in the chosen grouping's order — the section's
+ * header names the rank range it covers.
+ */
+const GROUP_SIZE = 10;
+
+/**
+ * The time buckets the install-clock grouping files installs into, newest
+ * first. Each bucket holds the installs whose age (in whole days) falls below
+ * its bound and above the previous one's — rolling windows, so 昨天 means "a
+ * day or two old", not a calendar date. The last bucket takes everything
+ * older, and an install whose record carries no timestamp reads last (see
+ * `compareByInstalledTime`) and files there too: an unreadable clock is not a
+ * fresh one.
+ */
+const TIME_BUCKETS: { titleKey: ParseKeys; maxAgeDays: number | null }[] = [
+  { titleKey: "list.bucketToday", maxAgeDays: 1 },
+  { titleKey: "list.bucketYesterday", maxAgeDays: 2 },
+  { titleKey: "list.bucketLast7", maxAgeDays: 7 },
+  { titleKey: "list.bucketLast30", maxAgeDays: 30 },
+  { titleKey: "list.bucketEarlier", maxAgeDays: null },
+];
+
+/** One day, in seconds — `installedAt` is a Unix-seconds stamp. */
+const DAY_SECONDS = 86_400;
 
 /** React-key identity of the pool card: skills no recorded source vouches for. */
 const LOCAL_POOL_KEY = "local";
@@ -159,10 +185,11 @@ function compareByStars<T>(
 /**
  * The installed list — the management counterpart of the store's 全部 page.
  * One control on the list's own first row answers both what the screen is
- * made of and what order it reads in — four sorts, where the last carries
- * the shape the old unit switch used to pick:
+ * made of and how it reads — and in the per-skill shapes, the reading is a
+ * *grouping*: the answer arrives in titled sections of ten rows each, in the
+ * chosen order:
  *
- * - **按热度** (the default): one row per install, the registry's blended
+ * - **按热度分组** (the default): one row per install, the registry's blended
  *   installs-and-stars figure leading — the same figure every row displays,
  *   so the order and the numbers beside it can never disagree.
  * - **按仓库**: one card per source repository, led by the most-starred
@@ -172,50 +199,45 @@ function compareByStars<T>(
  *   recorded source vouches for have no repository to belong to, so they pool
  *   into one card of their own rather than inventing one — the same shape,
  *   with its bar stating 本地安装 in place of a repository it would have to
- *   make up, and opening the page that lists the pool whole.
- * - **按安装时间**: one row per install — the installs' own clock, newest
+ *   make up, and opening the page that lists the pool whole. The repository
+ *   shape does not group: a card is already a section of its own.
+ * - **按安装时间分组**: one row per install — the installs' own clock, newest
  *   first, so "what did I add lately" reads top to bottom. Each row states
- *   its own stamp where the default sort prints the blend, so the figure a
- *   row shows is always the one the list is ordered by. Nothing caps the
- *   skill rows: that shape is the whole list.
- * - **按 Token 占用**: one row per install — the description's estimated
- *   context cost heaviest first (see `lib/token-estimate`), so "what does
- *   keeping this skill cost" reads top to bottom. Each row states its own
- *   estimate where the other sorts print their figures; ties fall back to
- *   the install's clock, and a description-less install honestly reads last
- *   at zero.
+ *   its own stamp where the default grouping prints the blend, so the figure
+ *   a row shows is always the one the list is ordered by. The sections are
+ *   the time itself: 今天 / 昨天 / 最近 7 天 / 最近 30 天 / 更早, an
+ *   install with no recorded stamp reading last under 更早.
  *
- * A search re-answers any of the four in relevance order. What the page adds
- * to the store's surfaces is what only an installed skill has: enablement —
- * at two granularities, one per repository card: the bar's group switch (a
- * press enables or disables every skill of that card; a mixed card reads as
- * half on) and each row's own switch, revealed on hover in the same floating
- * slot the store's install buttons live in — the dimming of a disabled row,
- * and the migration badge beside an install whose source the ledger cannot
- * vouch for. A card also names what its repository still has that this
- * machine does not: a badge on the card's bar states the count of uninstalled
- * siblings, and a press on the bar unfolds them (each with the store's
- * install button) as their own group under the divider.
- * The skill shape carries its per-row switch, and every sort feeds the same
- * detail drawer, so what a skill looks like never depends on how the list is
- * ordered.
+ * Each section's header names what it holds — the rank range it covers
+ * ("1–10", "11–20", …) under the popularity grouping, the bucket's span of
+ * time under the install clock — with the count it actually lists beside it;
+ * every section starts open, and a press on the header folds it. An empty
+ * bucket draws no section at all. A search stands the sections down and
+ * re-answers in relevance order. What the page adds to the store's surfaces
+ * is what only an installed skill has: enablement — at two granularities,
+ * one per repository card: the bar's group switch (a press enables or
+ * disables every skill of that card; a mixed card reads as half on) and each
+ * row's own switch, revealed on hover in the same floating slot the store's
+ * install buttons live in — the dimming of a disabled row, and the migration
+ * badge beside an install whose source the ledger cannot vouch for. A card
+ * also names what its repository still has that this machine does not: a
+ * badge on the card's bar states the count of uninstalled siblings, and a
+ * press on the bar unfolds them (each with the store's install button) as
+ * their own group under the divider.
+ * The skill shape carries its per-row switch, and every grouping feeds the
+ * same detail drawer, so what a skill looks like never depends on how the
+ * list is grouped.
  *
- * One thing about the order is not the reader's to pick: in the skill shape a
- * disabled install is parked below every live one, in a titled section of its
- * own, under all three orders alike. It is parked rather than sorted because it
- * is not competing — a skill switched off takes no part in the collection, so
- * letting the popularity blend put it above a live skill would rank something
- * the reader has already set aside. The three orders still say everything about
- * the live half, and each half keeps its own order inside the section, so
- * "which of these did I install last" is still answerable among the parked ones.
- * Only the parked half is named: the live rows *are* the list, so a header over
- * them would label the page with its own subject, and the section that does
- * need a header starts folded — the count it carries is what says there is
- * something set aside.
- * The repository shape has no such split: a card is a repository, its rows are
- * what the bar's group switch acts on, and a half-on card is a fact the card
- * exists to state. (A search is out of it too — relevance already re-answers the
- * whole list, and the search view groups by *source*, not by state.)
+ * One thing about the order is not the reader's to pick: in the per-skill
+ * shapes a disabled install is parked below every live one, in a titled
+ * section of its own, under both groupings alike. It is parked rather than
+ * sorted because it is not competing — a skill switched off takes no part in
+ * the collection, so letting the popularity blend put it above a live skill
+ * would rank something the reader has already set aside. Both groupings still
+ * say everything about the live sections, and the parked half keeps its own
+ * order inside its section, so "which of these did I install last" is still
+ * answerable among the parked ones. The parked section starts folded — the
+ * count it carries is what says there is something set aside.
  */
 
 export function InstalledPage() {
@@ -236,10 +258,10 @@ export function InstalledPage() {
   // `markSkillsChanged`). A choice overrides the store's classification for
   // that skill — the single select — so a hand-placed local install files
   // where the user filed it instead of pooling under 未分类.
-  const { data: customTags, isFetching: tagsFetching } = useCustomTags();
+  const { data: customTags } = useCustomTags();
   const assignments = customTags?.skillTags ?? EMPTY_SKILL_TAGS;
   // The tag state folded into one string, so any choice, new tag or removal
-  // re-answers the list and resets the reveal exactly like a scope change.
+  // re-answers the list and resets the reveal like any answer change.
   const tagSig = useMemo(() => {
     const defs = (customTags?.tagDefs ?? [])
       .map((def) => def.key)
@@ -258,11 +280,11 @@ export function InstalledPage() {
 
   const list = useMemo(() => skills ?? [], [skills]);
 
-  // What the reader is looking for, how the list reads, and which
-  // classification they scoped it to: all three are shared with the store's
-  // list (see `lib/list-view`), so they are read from the shared view rather
-  // than held here. The shape and the order are two answers again: the list is
-  // one of skill rows or of repository cards, and each reads in its own orders.
+  // What the reader is looking for and how the list reads: both are shared
+  // with the store's list (see `lib/list-view`), so they are read from the
+  // shared view rather than held here. The shape and the order are two
+  // answers again: the list is one of skill rows or of repository cards, and
+  // each reads in its own orders.
   // The full installed list is already in memory, so everything below filters on
   // the main thread.
   //
@@ -270,15 +292,11 @@ export function InstalledPage() {
   // the reader reads while typing is their own, not a half-word they have
   // already committed to. The field is what settles it (see `SearchInput`), so
   // this page is woken by a question and never by a keystroke. A live question
-  // re-answers the list by relevance, which is why the scope and the order lock
-  // beside the field (see `ListToolbar`).
+  // re-answers the list by relevance, which is why the order locks beside the
+  // field (see `ListToolbar`).
   const query = useListQuery("installed").trim();
-  const {
-    scope,
-    sort = "popularity",
-    unit = "skill",
-  } = useDestinationView("installed");
-  const domain = scope ?? null;
+  const { sort = "popularity", unit = "skill" } =
+    useDestinationView("installed");
   const isSearching = query.length > 0;
   // Open skill in the shared detail drawer, tracked by identity rather than by
   // index: the provenance and store-entry queries land asynchronously and
@@ -289,22 +307,16 @@ export function InstalledPage() {
 
   // Anything that re-answers the list resets the detail panel: its skill may
   // not be in the new answer at all. The shape is its own answer now, so the
-  // unit joins the sort and the scope here. Tag choices stay out of it on
-  // purpose: they are made inside the drawer, so resetting on them would
-  // close the panel over the very pick it was opened for (see below). The
-  // one caller that moves the answer with the open skill — renaming the tag
-  // the list is scoped to — says so through `keepSelection`, and that one
-  // change keeps the drawer on the skill it still lists.
-  const shownAnswer = useRef(
-    `${query}\u0000${domain ?? "all"}\u0000${sort}\u0000${unit}`,
-  );
+  // unit joins the sort here. Tag choices stay out of it on purpose: they are
+  // made inside the drawer, so resetting on them would close the panel over
+  // the very pick it was opened for (see below).
+  const shownAnswer = useRef(`${query}\u0000${sort}\u0000${unit}`);
   useEffect(() => {
-    const answer = `${query}\u0000${domain ?? "all"}\u0000${sort}\u0000${unit}`;
+    const answer = `${query}\u0000${sort}\u0000${unit}`;
     if (shownAnswer.current === answer) return;
     shownAnswer.current = answer;
-    if (consumeKeepSelection("installed")) return;
     setSelectedKey(null);
-  }, [query, domain, sort, unit]);
+  }, [query, sort, unit]);
 
   // Deep link from the menu bar popover: `/installed?skill=<name>` asks the
   // list's own question, which ranks the targeted skill near the top of the
@@ -340,8 +352,8 @@ export function InstalledPage() {
   //
   // The user's tag choice is applied here, once, as the view's classification:
   // a skill filed under a tag carries that tag as its `profile`, so the
-  // filter, the facets, the badges and the glyphs below all answer the choice
-  // through the same `domainsOf` they already read — no second code path.
+  // badges and the glyphs below all answer the choice through the same
+  // classification the detail drawer reads — no second code path.
   const rows = useMemo<Row[]>(() => {
     const withTag = (skill: SkillView): SkillView => {
       const tag = assignments[skill.name];
@@ -421,76 +433,34 @@ export function InstalledPage() {
     })).toSorted((a, b) => a.repo.localeCompare(b.repo));
   }, [rows]);
 
-  // The skill unit's flat order: the installs in the chosen sort's order —
-  // the registry's popularity blend (the default), newest-first by the
-  // recorded install time (see `lib/install-time`), or heaviest-first by the
-  // description's estimated token cost (see `lib/token-estimate` — the same
-  // estimate the detail drawer states, an empty description honestly reading
-  // 0 rather than sinking) — scoped to the chosen domain by membership, since
-  // a skill's own classification is what the picker counts here. Installs
-  // the platform recorded no birth time for settle last in the time order. A
-  // search is left exactly as the index answered it: relevance is a ranking
-  // too, and the better one while a question is live — the same order the
-  // store keeps there.
+  // The skill unit's flat order: the installs in the chosen grouping's order —
+  // the registry's popularity blend (the default) or newest-first by the
+  // recorded install time (see `lib/install-time`). Installs the platform
+  // recorded no birth time for settle last in the time order. A search is left
+  // exactly as the index answered it: relevance is a ranking too, and the
+  // better one while a question is live — the same order the store keeps there.
   const activeRows = useMemo(() => {
     if (unit === "repo") return [];
     if (isSearching) return rows;
-    const scoped =
-      domain === null
-        ? rows
-        : rows.filter((row) => domainsOf(row.skill).includes(domain));
-    return scoped.toSorted(
+    return rows.toSorted(
       sort === "installed"
         ? compareByInstalledTime((row) => row.skill.installedAt)
-        : // The token sort borrows the popularity comparator's shape — a
-          // figure descending, ties to the install's clock — with the token
-          // estimate in the figure slot. A description-less skill reads 0,
-          // which is its true cost, not a fabrication.
-          compareByPopularity(
-            sort === "tokens"
-              ? (row) => estimateTokens(row.skill.description ?? "")
-              : (row) => popularity(row.skill),
+        : compareByPopularity(
+            (row) => popularity(row.skill),
             (row) => row.skill.installedAt,
             byName,
           ),
     );
-  }, [unit, rows, isSearching, domain, sort]);
-
-  // The category facets of the unit on screen: how many *repositories* a domain
-  // holds, or how many *skills*. A repository rides every domain its rows belong
-  // to and a skill every domain it belongs to; either way one nothing classified
-  // holds the 未分类 item of its own, apart from the dataset's 其他. Rows and
-  // grid squares file the same installs the same way, so both weigh skills —
-  // only the repository shape weighs repositories, which is exactly why the
-  // count follows the unit.
-  const facets = useMemo(() => {
-    if (unit === "repo") {
-      return domainFacets(cards, (card) => {
-        const keys = new Set<string>();
-        for (const row of card.items) {
-          for (const key of domainsOf(row.skill)) keys.add(key);
-        }
-        return Array.from(keys);
-      });
-    }
-    return domainFacets(rows, (row) => domainsOf(row.skill));
-  }, [unit, rows, cards]);
+  }, [unit, rows, isSearching, sort]);
 
   // The repository shape's flat order — the sort's own answer over cards:
   // by their repository's stars (the 按仓库 option; the figure-less pool and
   // unlisted sources sink, and cards the stars cannot separate keep the
-  // newest-install order). Scoped to the chosen domain by membership, since a
-  // card rides every domain its rows belong to. A search answers in the shared
-  // search view instead, in the shape on screen — the cards here are the browse
-  // answer's, and relevance ranks skills, not repositories.
+  // newest-install order). A search answers in the shared search view instead,
+  // in the shape on screen — the cards here are the browse answer's, and
+  // relevance ranks skills, not repositories.
   const activeCards = useMemo<RepoGroup[]>(() => {
     if (unit !== "repo" || isSearching) return [];
-    const scoped =
-      domain === null
-        ? cards
-        : cards.filter((card) =>
-            card.items.some((row) => domainsOf(row.skill).includes(domain)),
-          );
     // Cards are led by the repository's own stars, and that is the whole of
     // their order: a card is a repository, so the figure it answers in is the
     // repository's. The three orders the row shape offers say nothing about it —
@@ -501,10 +471,10 @@ export function InstalledPage() {
       (card) => newestInstallTime(card.items, (row) => row.skill.installedAt),
       (a, b) => a.repo.localeCompare(b.repo),
     );
-    return scoped.toSorted(
+    return cards.toSorted(
       compareByStars((card) => starsOf(card), byNewestInstall),
     );
-  }, [unit, isSearching, cards, domain]);
+  }, [unit, isSearching, cards]);
 
   // The registry's own grouping — every skill it lists, per repository — so
   // each card can also name the repository's skills this machine does not
@@ -537,14 +507,11 @@ export function InstalledPage() {
   // card per repository — the entry, not a bucket, is what the reveal counts,
   // because an entry is what every shape lists.
   const itemCount = unit === "repo" ? activeCards.length : activeRows.length;
-  // What the 全部 item counts, in the unit on screen: every repository, or every
-  // skill.
-  const totalCount = unit === "repo" ? cards.length : rows.length;
 
   // Progressive rendering: only the first `renderedCount` items are mounted;
   // an IntersectionObserver on the sentinel below the list extends the count
-  // while the reader scrolls. A new answer (a search, a scope, a unit, a
-  // reshaped list) re-seeds the run to the same depth.
+  // while the reader scrolls. A new answer (a search, a unit, a reshaped list)
+  // re-seeds the run to the same depth.
   const {
     count: renderedCount,
     sentinelRef,
@@ -553,7 +520,7 @@ export function InstalledPage() {
     total: itemCount,
     initial: INITIAL_CARDS,
     step: CARD_CHUNK,
-    resetKey: `${unit}\u0000${sort}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}\u0000${tagSig}`,
+    resetKey: `${unit}\u0000${sort}\u0000${query}\u0000${list.length}\u0000${tagSig}`,
   });
   const shownRows = activeRows.slice(0, renderedCount);
   const shownCards = activeCards.slice(0, renderedCount);
@@ -625,40 +592,11 @@ export function InstalledPage() {
     [unit, splitActive, activeCards],
   );
 
-  // A tag write lands in two renders — the ledger change, then the refetched
-  // assignments — and pairing the new scope with the not-yet-reloaded choices
-  // transiently files the open skill outside the answer (a rename moves the
-  // scope first, the assignments follow). Closing the drawer over that render
-  // would unmount and remount it for a change the next render undoes, so the
-  // verdict waits: while the tags reload, the selected skill is pinned into
-  // the walk from the unscoped rows. Once the answer settles the drawer is
-  // either legitimately listed (a rename — it stays open, badge answered) or
-  // gone for good (a clear — the effect below closes it).
-  const drawerSkills = useMemo(() => {
-    if (!tagsFetching || selectedName == null) return detailSkills;
-    if (detailSkills.some((skill) => skill.name === selectedName)) {
-      return detailSkills;
-    }
-    const pinned = rows.find((row) => row.skill.name === selectedName)?.skill;
-    return pinned ? [...detailSkills, pinned] : detailSkills;
-  }, [detailSkills, rows, selectedName, tagsFetching]);
-
   // A retag lands while the drawer is open on the skill being filed, so it
-  // must not reset the selection like a scope or sort change does: the
-  // drawer stays and its badge answers the new choice live. The one case
-  // that closes it is filing the open skill out of the answer on screen —
-  // leaving the stale key would pop the drawer back open the next time the
-  // answer contains the skill again (e.g. clearing the scope). While the
-  // tags reload the verdict waits: the render pairing a just-moved scope
-  // with not-yet-reloaded assignments is a transition, not an exit.
-  useEffect(() => {
-    if (tagsFetching) return;
-    if (selectedName == null) return;
-    const stillListed = detailSkills.some(
-      (skill) => skill.name === selectedName,
-    );
-    if (!stillListed) setSelectedKey(null);
-  }, [tagSig, detailSkills, selectedName, tagsFetching]);
+  // must not reset the selection the way a sort change does: the drawer
+  // stays and its badge answers the new choice live. Tag choices never file
+  // the open skill out of this answer — the list no longer narrows by
+  // classification — so the drawer walks the answer as it is.
 
   // The link affordance is only meaningful while the source is unknown: an
   // install the ledger placed has a repository to point at. In the skill unit
@@ -697,11 +635,12 @@ export function InstalledPage() {
   );
 
   /**
-   * One row of the skill unit. Shared by the live section and the parked one so
-   * a skill reads the same in both — the only thing that says which half it is in
-   * is the half it is drawn under, never the row itself. The ordinal is its
-   * position within that half, which is why the row is rendered by the same code
-   * both ways: neither the row nor this function knows which group it is for.
+   * One row of the skill unit. Shared by every rank section and the parked one
+   * so a skill reads the same in all of them — the only thing that says which
+   * section it is in is the section it is drawn under, never the row itself.
+   * The ordinal is its position among the live installs, which is why the row
+   * is rendered by the same code everywhere: neither the row nor this function
+   * knows which section it is for.
    */
   const renderSkillRow = (row: Row) => {
     const key = skillKey(row.skill);
@@ -711,19 +650,13 @@ export function InstalledPage() {
         skill={row.skill}
         index={rowOrdinals.get(key) ?? 0}
         // The row numbers its position in the order the reader picked, and the
-        // first three of that order wear the podium — the same mark in every unit
-        // and in both shapes, so an installed skill reads the same wherever it is
-        // listed. The claim is about the *chosen* order, not about weight: under
-        // 按安装时间 the podium is the three newest installs, under Token 占用 the
-        // three heaviest, and this list is content to call either a ranking,
-        // because that is the order the reader asked to read by.
-        fact={
-          sort === "installed"
-            ? "installedAt"
-            : sort === "tokens"
-              ? "tokens"
-              : "popularity"
-        }
+        // first three of that order wear the podium — the same mark in every
+        // unit and in both shapes, so an installed skill reads the same
+        // wherever it is listed. The claim is about the *chosen* order, not
+        // about weight: under 按安装时间分组 the podium is the three newest
+        // installs, and this list is content to call that a ranking, because
+        // that is the order the reader asked to read by.
+        fact={sort === "installed" ? "installedAt" : "popularity"}
         selected={key === selected}
         muted={!row.enabled}
         extra={rowExtra(row, "label")}
@@ -743,13 +676,7 @@ export function InstalledPage() {
       <SkillGridCard
         key={key}
         skill={row.skill}
-        fact={
-          sort === "installed"
-            ? "installedAt"
-            : sort === "tokens"
-              ? "tokens"
-              : "popularity"
-        }
+        fact={sort === "installed" ? "installedAt" : "popularity"}
         selected={key === selected}
         muted={!row.enabled}
         extra={rowExtra(row, "label")}
@@ -760,12 +687,8 @@ export function InstalledPage() {
   };
 
   /**
-   * One half of the per-skill shapes, drawn as the bare list it is — rows or
-   * squares per the shape on screen. The live entries wear no section at all:
-   * they are the page's list, and a header naming them would label the answer
-   * with the subject it already answers. The parked half wraps the same
-   * entries in a section of its own (see the render below), so a skill reads
-   * identically wherever it is drawn — only its surroundings differ.
+   * One section's worth of the per-skill shapes, drawn as the list it is —
+   * rows or squares per the shape on screen.
    */
   const skillEntries = (group: Row[]) =>
     unit === "grid" ? (
@@ -774,21 +697,60 @@ export function InstalledPage() {
       <ul className={SKILL_ROW_LIST_CLASS}>{group.map(renderSkillRow)}</ul>
     );
 
+  // The live answer, divided into titled sections in the chosen grouping's
+  // order — the shared shell the parked half draws through
+  // (`CollapsibleSection`). 按热度分组 slices the ordinal run into ranges of
+  // ten ("1–10", "11–20", … — computed from the *whole* live answer, so a
+  // header never shifts while the progressive reveal fills its section);
+  // 按安装时间分组 files each install into the time bucket its age falls in
+  // (今天 / 昨天 / 最近 7 天 / 最近 30 天 / 更早). Empty sections are not
+  // drawn — an absent bucket reads quieter than a zero. The count beside a
+  // header states what the section actually lists right now.
+  const sections = useMemo(() => {
+    const live = splitRows.enabled;
+    if (live.length === 0) return [];
+    if (sort === "installed") {
+      const buckets: Row[][] = TIME_BUCKETS.map(() => []);
+      for (const row of live) {
+        const stamp = row.skill.installedAt;
+        const ageDays =
+          stamp == null ? null : (Date.now() / 1000 - stamp) / DAY_SECONDS;
+        const index =
+          ageDays == null
+            ? TIME_BUCKETS.length - 1
+            : TIME_BUCKETS.findIndex(
+                (bucket) =>
+                  bucket.maxAgeDays !== null && ageDays < bucket.maxAgeDays,
+              );
+        buckets[index === -1 ? TIME_BUCKETS.length - 1 : index].push(row);
+      }
+      return TIME_BUCKETS.map((bucket, index) => ({
+        title: t(bucket.titleKey),
+        rows: buckets[index],
+      })).filter((section) => section.rows.length > 0);
+    }
+    const liveTotal = splitActive.enabled.length;
+    const groups: { title: string; rows: Row[] }[] = [];
+    for (let start = 0; start < live.length; start += GROUP_SIZE) {
+      const last = Math.min(start + GROUP_SIZE, liveTotal);
+      groups.push({
+        title: start + 1 === last ? `${start + 1}` : `${start + 1}–${last}`,
+        rows: live.slice(start, start + GROUP_SIZE),
+      });
+    }
+    return groups;
+  }, [splitRows, splitActive, sort, t]);
+
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
       {/* The list's own first row, and the only row above the answer: the
-          field that names what the reader is looking for, the classifications
-          that hold an install (one press to scope the browse; 全部 clears it),
-          the shape switch, and the sort switch that says what order the list
-          reads in. The scope and the order lock while a question is live — a
-          search re-ranks by relevance and ignores both. The row counts what the
-          shape on screen lists, so the figures and the list they scope can never
-          disagree. The row's arrangement is `ListToolbar`'s to answer; the page hands
-          over its counts and whether the question has settled. */}
+          field that names what the reader is looking for, the shape switch,
+          and the sort switch that says what order the list reads in. The
+          order locks while a question is live — a search re-ranks by
+          relevance. The row's arrangement is `ListToolbar`'s to answer; the
+          page hands over whether the question has settled. */}
       <ListToolbar
         destination="installed"
-        facets={facets}
-        total={totalCount}
         searching={isSearching}
       />
 
@@ -881,21 +843,32 @@ export function InstalledPage() {
               ))}
             </ul>
           ) : (
-            // The per-skill shapes: one row or one square per install, the live
-            // installs first as the bare list, then the parked ones below under
-            // the one header that names them. The same entries a repository's
-            // own page lists, so a skill reads the same wherever it is found —
-            // and the figure each entry states is the one this list answers in:
-            // the install's own clock under the 按安装时间 sort, the popularity
-            // blend otherwise.
+            // The per-skill shapes: one row or one square per install, the
+            // live installs divided into titled sections — rank ranges of ten
+            // under the popularity grouping, time buckets (今天 / 昨天 /
+            // 最近 7 天 / 最近 30 天 / 更早) under the install clock — then
+            // the parked ones below under the one header that names them.
+            // The same entries a repository's own page lists, so a skill
+            // reads the same wherever it is found — and the figure each
+            // entry states is the one this list answers in: the install's
+            // own clock under the time grouping, the popularity blend
+            // otherwise.
             //
             // The parked section exists only once something is parked, and it
             // starts folded: those skills were set aside, so on arrival the
-            // page is the live list alone and the header's count is what says
-            // there is more below. An absent section still reads quieter than a
-            // zero-count one.
+            // page is the live sections alone and the header's count is what
+            // says there is more below. An absent section still reads quieter
+            // than a zero-count one.
             <>
-              {splitRows.enabled.length > 0 && skillEntries(splitRows.enabled)}
+              {sections.map((section) => (
+                <CollapsibleSection
+                  key={section.title}
+                  title={section.title}
+                  count={t("state.skillCount", { count: section.rows.length })}
+                >
+                  {skillEntries(section.rows)}
+                </CollapsibleSection>
+              ))}
               {split && (
                 <CollapsibleSection
                   icon={PowerOff}
@@ -904,8 +877,8 @@ export function InstalledPage() {
                     count: splitRows.disabled.length,
                   })}
                   // The fold is the reader's ("not working with these right
-                  // now"), so it is left to survive a change of sort or scope —
-                  // both of which only re-order or narrow rows.
+                  // now"), so it is left to survive a change of grouping —
+                  // which only re-orders or re-slices rows.
                   defaultOpen={false}
                   className="border-t border-border/60 pt-6"
                 >
@@ -928,7 +901,7 @@ export function InstalledPage() {
           the skill. (Selection by identity is what makes that swap impossible
           in the first place — see `SkillDetailDrawer`.) */}
       <SkillDetailDrawer
-        skills={drawerSkills}
+        skills={detailSkills}
         selected={selected}
         onSelect={setSelectedKey}
         onRemoved={() => setSelectedKey(null)}

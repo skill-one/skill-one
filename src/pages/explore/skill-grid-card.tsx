@@ -19,7 +19,6 @@ import { OwnerAvatar } from "../../components/owner-avatar";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillInstalledTime } from "../../components/skill-installed-time";
 import { SkillPopularity } from "../../components/skill-popularity";
-import { SkillTokenEstimate } from "../../components/skill-token-estimate";
 import { Card } from "../../components/ui/card";
 import {
   Tooltip,
@@ -71,7 +70,7 @@ export function SkillGridCard({
    * number beside a square is always the one the list above it was ordered
    * by. Same contract as `SkillRow`'s `fact`.
    */
-  fact?: "popularity" | "installedAt" | "tokens";
+  fact?: "popularity" | "installedAt";
 }) {
   const storeBacked = skill.storeBacked !== false;
   const [owner] = skill.repo.split("/");
@@ -155,8 +154,6 @@ export function SkillGridCard({
           <span className="ml-auto flex shrink-0 items-center">
             {fact === "installedAt" ? (
               <SkillInstalledTime skill={skill} align="end" />
-            ) : fact === "tokens" ? (
-              <SkillTokenEstimate skill={skill} align="end" />
             ) : (
               storeBacked && <SkillPopularity skill={skill} align="end" />
             )}

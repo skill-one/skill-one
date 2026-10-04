@@ -26,7 +26,7 @@ describe("ListSortSelect", () => {
   it("leads with the order on screen and trails the mark that names it", () => {
     renderSort();
 
-    const trigger = screen.getByRole("button", { name: "排序方式" });
+    const trigger = screen.getByRole("button", { name: "分组方式" });
     const [first, last] = [parts(trigger)[0], parts(trigger).at(-1)];
 
     // The value leads, because it is the one thing the reader must always be
@@ -35,14 +35,14 @@ describe("ListSortSelect", () => {
     // puts its chevron in, and the two now read as one family on the row rather
     // than as a labelled button beside a chevronned one.
     expect(first).toHaveProperty("nodeType", Node.TEXT_NODE);
-    expect(first?.textContent).toBe("安装时间");
+    expect(first?.textContent).toBe("按安装时间分组");
     expect(last?.nodeName).toBe("svg");
   });
 
   it("tells the library its mark is the trailing one, and keeps it decorative", () => {
     renderSort();
 
-    const trigger = screen.getByRole("button", { name: "排序方式" });
+    const trigger = screen.getByRole("button", { name: "分组方式" });
     const mark = parts(trigger).at(-1);
 
     // `data-icon="inline-end"` is the library's own convention for a control
@@ -52,6 +52,6 @@ describe("ListSortSelect", () => {
     // the accessible name — the order is already the button's own label.
     expect(mark).toHaveAttribute("data-icon", "inline-end");
     expect(mark).toHaveAttribute("aria-hidden", "true");
-    expect(trigger).toHaveAccessibleName("排序方式");
+    expect(trigger).toHaveAccessibleName("分组方式");
   });
 });

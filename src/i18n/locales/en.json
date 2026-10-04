@@ -12,7 +12,7 @@
     "installedTimeAria": "Installed {{relative}}, on {{exact}}",
     "searchSkills": "Search skills",
     "indexBuilding": "Building index…",
-    "listSort": "Sort by",
+    "listSort": "Group by",
     "listLayout": "List layout",
     "back": "Back",
     "viewDetailAria": "View {{name}} details",
@@ -33,9 +33,8 @@
     "installed": "Installed"
   },
   "sort": {
-    "byPopularity": "Popularity",
-    "byInstalled": "Install time",
-    "byTokens": "Token usage"
+    "byPopularity": "By popularity",
+    "byInstalled": "By install time"
   },
   "unit": {
     "list": "List",
@@ -43,7 +42,12 @@
     "repos": "Repos"
   },
   "list": {
-    "disabled": "Disabled"
+    "disabled": "Disabled",
+    "bucketToday": "Today",
+    "bucketYesterday": "Yesterday",
+    "bucketLast7": "Last 7 days",
+    "bucketLast30": "Last 30 days",
+    "bucketEarlier": "Earlier"
   },
   "action": {
     "install": "Install",

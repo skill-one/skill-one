@@ -6,8 +6,6 @@ import { Check, Pencil, RotateCcw, Smile, X } from "lucide-react";
 import { DOMAINS, domainLabel } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useCustomTags } from "../../hooks/use-custom-tags";
-import { useDestinationView } from "../../hooks/use-list-view";
-import { setScope } from "../../lib/list-view";
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import {
   collectTakenTagKeys,
@@ -71,9 +69,6 @@ export function SkillTagMenu({
   const { t } = useTranslation();
   const locale = useAppLocale();
   const { data: customTags } = useCustomTags();
-  // The installed list's own scope: renaming the tag it is scoped to follows
-  // the rename, so the answer does not empty out from under the reader.
-  const { scope } = useDestinationView("installed");
   const defs = customTags?.tagDefs ?? [];
   // Tags currently filing a skill: only an unused tag offers its delete, so
   // removing one can never orphan a choice — the menu never asks "and the N
@@ -171,12 +166,6 @@ export function SkillTagMenu({
         // A real rename moves every assignment along in the same ledger
         // pass, so no skill is ever left pointing at the old key.
         await renameCustomTagDef(editingKey, checked.key, label, mark.emoji);
-        // The scoped answer follows the rename: without this the scope would
-        // name a tag that no longer exists and empty the list. The keep flag
-        // carries the open skill across the scope change (see the page).
-        if (scope === editingKey) {
-          setScope("installed", checked.key, { keepSelection: true });
-        }
       }
       await markSkillsChanged(queryClient);
       cancelEdit();
