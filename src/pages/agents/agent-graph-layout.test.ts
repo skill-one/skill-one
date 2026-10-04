@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AgentStatus } from "../../lib/skills-manager";
 import {
+  COL_GAP,
   DEFAULT_GRAPH_HEIGHT,
   DEFAULT_GRAPH_WIDTH,
   GOLDEN_ANGLE,
@@ -421,7 +422,7 @@ describe("layoutAgents columns mode", () => {
       "columns",
     );
     const [a, b] = layout.nodes.filter((n) => n.side === "left");
-    expect(b.y - a.y).toBe(a.height + 14);
+    expect(b.y - a.y).toBe(a.height + COL_GAP);
     expect(a.width).toBe(a.height + NODE_LABEL_GAP + NODE_LABEL_WIDTH);
   });
 });

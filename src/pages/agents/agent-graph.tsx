@@ -406,7 +406,7 @@ function AgentNode({
         onFocus={() => onHover(agent.name)}
         onBlur={() => onHover(null)}
         className={cn(
-          "pointer-events-auto relative flex w-full cursor-pointer items-center gap-1.5 rounded-lg border bg-card pr-2 pl-1.5 outline-none transition-colors",
+          "pointer-events-auto relative flex w-full cursor-pointer items-center gap-1.5 rounded-lg border bg-card pr-1.5 pl-1.5 outline-none transition-colors",
           "hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-default",
           state === "warning"
             ? "border-amber-500/50 bg-amber-500/5 hover:border-amber-500/70"
@@ -418,7 +418,7 @@ function AgentNode({
       >
         <span
           className="shrink-0"
-          style={{ width: node.height - 12, height: node.height - 12 }}
+          style={{ width: node.height - 10, height: node.height - 10 }}
         >
           <AgentIcon
             agentName={agent.name}
@@ -427,7 +427,7 @@ function AgentNode({
           />
         </span>
 
-        <span className="min-w-0 flex-1 truncate text-left text-[12px] font-medium">
+        <span className="min-w-0 flex-1 truncate text-left text-[11.5px] font-medium">
           {agent.display}
         </span>
 
@@ -447,12 +447,12 @@ function AgentNode({
               onOpenDetail(agent);
             }
           }}
-          className="flex shrink-0 items-center justify-center size-5 rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+          className="flex shrink-0 items-center justify-center size-4.5 rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground cursor-pointer"
         >
           {state === "warning" ? (
-            <AlertCircle className="size-3.5 text-amber-500" />
+            <AlertCircle className="size-3 text-amber-500" />
           ) : (
-            <Info className="size-3.5" />
+            <Info className="size-3" />
           )}
         </span>
 

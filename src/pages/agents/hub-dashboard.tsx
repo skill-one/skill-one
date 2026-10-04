@@ -35,7 +35,7 @@ export function HubDashboard({
   skills,
   loading = false,
   className,
-  width = 380,
+  width = 480,
 }: HubDashboardProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -77,11 +77,11 @@ export function HubDashboard({
         emoji: domainEmoji([key]) ?? "📦",
         count,
       }))
-      .sort((a, b) => b.count - a.count)
+      .toSorted((a, b) => b.count - a.count)
       .slice(0, 4);
   }, [enabled, storeEntries]);
 
-  const maxVisibleChips = 20;
+  const maxVisibleChips = 50;
   const visibleSkills = enabled.slice(0, maxVisibleChips);
   const overflowCount = enabled.length - visibleSkills.length;
 
@@ -152,17 +152,17 @@ export function HubDashboard({
 
       <CardContent className="p-3.5 pt-0 space-y-2.5">
         {/* Active Skills List / Flow Container — light, blended background */}
-        <div className="rounded-lg border border-border/40 bg-muted/25 p-2">
+        <div className="rounded-lg border border-border/40 bg-muted/25 p-2.5 min-h-[140px] flex flex-col justify-center">
           {loading ? (
-            <div className="flex h-16 items-center justify-center">
+            <div className="flex h-28 items-center justify-center">
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
             </div>
           ) : enabled.length === 0 ? (
-            <div className="flex h-16 items-center justify-center text-xs text-muted-foreground">
+            <div className="flex h-28 items-center justify-center text-xs text-muted-foreground">
               {t("agents.hub.noneEnabled")}
             </div>
           ) : (
-            <div className="space-y-1.5">
+            <div className="space-y-2 my-auto">
               {/* Domain Summary Bar when 16+ skills */}
               {domainSummary.length > 0 && (
                 <div className="flex items-center gap-2 border-b border-border/30 pb-1.5 text-[10px] text-muted-foreground">
@@ -184,7 +184,7 @@ export function HubDashboard({
               )}
 
               {/* Skill Chips Flow */}
-              <div className="flex max-h-20 flex-wrap gap-1.5 overflow-y-auto pr-1">
+              <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto pr-1">
                 {visibleSkills.map((skill) => (
                   <Tooltip key={skill.name}>
                     <TooltipTrigger
@@ -198,7 +198,7 @@ export function HubDashboard({
                           <span className="text-[12px] leading-none">
                             {getEmoji(skill.name)}
                           </span>
-                          <span className="max-w-[85px] truncate">
+                          <span className="max-w-[110px] truncate">
                             {skill.displayName ?? skill.name}
                           </span>
                         </button>

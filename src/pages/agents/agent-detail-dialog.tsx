@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
@@ -70,7 +71,7 @@ export function AgentDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md gap-5">
+      <DialogContent className="max-w-md gap-4">
         <DialogHeader className="gap-2">
           <div className="flex items-center gap-3">
             <span className="size-10 shrink-0">
@@ -185,32 +186,33 @@ export function AgentDetailDialog({
           </div>
         </div>
 
-        {/* Synced Skills Preview */}
-        <div className="space-y-2">
+        {/* Sync Summary & Navigation */}
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
             <span>
               {t("agents.detail.syncedSkills", {
                 count: linked ? enabledSkills.length : 0,
               })}
             </span>
+            <Link
+              to="/installed"
+              onClick={() => onOpenChange(false)}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              {t("agents.detail.manageSkills")} →
+            </Link>
           </div>
-          {linked && enabledSkills.length > 0 ? (
-            <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-border/60 bg-muted/20 p-2.5">
-              {enabledSkills.map((skill) => (
-                <Badge
-                  key={skill.name}
-                  variant="secondary"
-                  className="gap-1 py-0.5 text-xs font-normal"
-                >
-                  <span>{skill.displayName ?? skill.name}</span>
-                </Badge>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center rounded-lg border border-dashed border-border py-4 text-xs text-muted-foreground">
-              {t("agents.detail.noSyncedSkills")}
-            </div>
-          )}
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground leading-relaxed">
+            {linked ? (
+              <p>
+                {t("agents.detail.syncedSummary", {
+                  count: enabledSkills.length,
+                })}
+              </p>
+            ) : (
+              <p>{t("agents.detail.notSyncedSummary")}</p>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

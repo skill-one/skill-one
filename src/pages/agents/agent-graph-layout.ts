@@ -70,8 +70,8 @@ export interface GraphLayout {
 }
 
 /** Tile size bounds: the constellation shrinks toward the floor to fit. */
-export const NODE_SIZE_MAX = 48;
-export const NODE_SIZE_MIN = 30;
+export const NODE_SIZE_MAX = 36;
+export const NODE_SIZE_MIN = 26;
 /** Gap between neighbouring tiles at the largest size; scales down slightly. */
 export const NODE_GAP_MAX = 6;
 export const NODE_GAP_MIN = 4;
@@ -89,10 +89,10 @@ export const HUB_TIP_GAP = 10;
  * low jar packs the same cards while disturbing the ring's vertical clearance
  * far less.
  */
-export const HUB_CARD_HALF = 200;
-export const HUB_CARD_HALF_COLUMNS = 190;
+export const HUB_CARD_HALF = 240;
+export const HUB_CARD_HALF_COLUMNS = 240;
 /** Approximate half-height of the hub jar card plus a safety margin. */
-export const HUB_CARD_HALF_H = 105;
+export const HUB_CARD_HALF_H = 150;
 const HUB_CARD_MARGIN = 12;
 
 /** Whether a constellation pill would slide under the opaque hub card. */
@@ -112,7 +112,7 @@ function pillHitsCard(
  * ellipsis. Fixed so the pure layout can reserve the width without measuring
  * the DOM.
  */
-export const NODE_LABEL_WIDTH = 88;
+export const NODE_LABEL_WIDTH = 96;
 /** Gap between the icon box and the label inside a pill. */
 export const NODE_LABEL_GAP = 8;
 /**
@@ -304,14 +304,14 @@ export function resolveGraphWidth(measuredWidth: number): number {
 }
 
 /** Column-mode geometry: one icon-plus-name pill per row. */
-const COL_TILE = NODE_SIZE_MAX;
-const COL_PILL = COL_TILE + NODE_LABEL_GAP + NODE_LABEL_WIDTH;
-const COL_GAP = 14;
-const COL_PITCH = COL_TILE + COL_GAP;
+export const COL_TILE = NODE_SIZE_MAX;
+export const COL_PILL = COL_TILE + NODE_LABEL_GAP + NODE_LABEL_WIDTH;
+export const COL_GAP = 10;
+export const COL_PITCH = COL_TILE + COL_GAP;
 /** Vertical pad and the clear central lane for the hub card. */
 const COL_PAD_TOP = 28;
 const COL_PAD_BOTTOM = 28;
-const COL_HUB_LANE = HUB_CARD_HALF_COLUMNS + HUB_TIP_GAP + 24;
+export const COL_HUB_LANE = HUB_CARD_HALF_COLUMNS + HUB_TIP_GAP + 20;
 
 /** The height of an icon column holding `count` tiles. */
 function columnHeight(count: number): number {

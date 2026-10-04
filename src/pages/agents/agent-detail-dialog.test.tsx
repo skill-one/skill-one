@@ -35,7 +35,7 @@ const mockSkills: InstalledSkill[] = [
 ];
 
 describe("AgentDetailDialog", () => {
-  it("renders agent title, link state and active skills", () => {
+  it("renders agent title, link state, path and sync summary", () => {
     renderWithRouter(
       <AgentDetailDialog
         agent={mockAgent}
@@ -50,8 +50,10 @@ describe("AgentDetailDialog", () => {
     expect(screen.getByText("Cursor")).toBeInTheDocument();
     expect(screen.getAllByText(/已连接/).length).toBeGreaterThan(0);
     expect(screen.getByText(/~\/\.cursor\/skills/)).toBeInTheDocument();
-    expect(screen.getByText("PDF Viewer")).toBeInTheDocument();
-    // docx is disabled, so not active
+    expect(screen.getByText(/已同步 1 个全局技能/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /前往管理技能/ })).toHaveAttribute("href", "/installed");
+    // Redundant individual skill badges are no longer rendered
+    expect(screen.queryByText("PDF Viewer")).toBeNull();
     expect(screen.queryByText("Docx Editor")).toBeNull();
   });
 

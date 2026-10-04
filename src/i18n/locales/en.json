@@ -191,6 +191,9 @@
       "internalOthers": "Other Local Files",
       "warningNotice": "Enabling sharing allows SkillOne to manage skills. Existing local skills will be merged, and non-skill files quarantined safely.",
       "syncedSkills": "Active Skills ({{count}})",
+      "syncedSummary": "Synchronized with {{count}} global skills. SkillOne centrally manages skills and automatically keeps all linked agents up to date.",
+      "notSyncedSummary": "Skill sharing is disabled. Enable it to automatically sync all active global skills to this client.",
+      "manageSkills": "Manage skills",
       "noSyncedSkills": "No active skills"
     }
   },

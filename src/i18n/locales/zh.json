@@ -191,6 +191,9 @@
       "internalOthers": "检测到本地其他文件",
       "warningNotice": "开启共享后将由 SkillOne 统一管理。本地已有技能将合并入库，非技能文件将移入安全隔离区备份。",
       "syncedSkills": "生效技能（{{count}}）",
+      "syncedSummary": "已同步 {{count}} 个全局技能。SkillOne 集中管理所有技能，各已连接 Agent 自动保持同步。",
+      "notSyncedSummary": "未启用技能共享。开启后，SkillOne 将把所有生效的全局技能自动分发至该客户端。",
+      "manageSkills": "前往管理技能",
       "noSyncedSkills": "暂无生效技能"
     }
   },

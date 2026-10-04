@@ -76,6 +76,6 @@ describe("HubDashboard", () => {
     });
     expect(viewAllLink).toBeInTheDocument();
     expect(viewAllLink).toHaveAttribute("href", "/installed");
-    expect(viewAllLink).toHaveTextContent("+85");
+    expect(viewAllLink).toHaveTextContent("+55");
   });
 });
