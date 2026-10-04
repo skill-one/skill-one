@@ -16,7 +16,7 @@ const mockSkills: InstalledSkill[] = [
 ];
 
 describe("HubDashboard", () => {
-  it("renders hub figure with title, brand logo, stats, and links", () => {
+  it("renders hub figure with title, brand logo, stats, and enabled skills", () => {
     renderWithRouter(
       <HubDashboard agents={mockAgents} skills={mockSkills} />,
     );
@@ -35,9 +35,9 @@ describe("HubDashboard", () => {
     expect(screen.getByText("/2")).toBeInTheDocument(); // of 2 total
     expect(screen.getByText(/1 个待处理/)).toBeInTheDocument();
 
-    // Links to explore and installed
-    expect(screen.getByRole("link", { name: /商店/ })).toHaveAttribute("href", "/explore");
-    expect(screen.getByRole("link", { name: /管理/ })).toHaveAttribute("href", "/installed");
+    // Redundant navigation buttons are removed from the hub card
+    expect(screen.queryByRole("link", { name: /商店/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /管理/ })).toBeNull();
 
     // Enabled skills rendered
     expect(screen.getByText("PDF")).toBeInTheDocument();

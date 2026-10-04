@@ -326,7 +326,7 @@ describe("AgentGraph", () => {
     expect(status.find((a) => a.name === "windsurf")?.linked).toBe(false);
   });
 
-  it("shows the central hub dashboard with active skills and quick links", async () => {
+  it("shows the central hub dashboard with active skills and coverage", async () => {
     renderWithRouter(<AgentGraph agents={agents} />);
     const skills = await fetchInstalledSkills();
 
@@ -335,12 +335,9 @@ describe("AgentGraph", () => {
     expect(disk).toHaveTextContent("1 个待处理");
     expect(disk).toHaveTextContent("安装一次，全 agents 直接使用");
 
-    // Quick links are directly visible and accessible
-    const storeLink = within(disk).getByRole("link", { name: /商店/ });
-    expect(storeLink).toHaveAttribute("href", "/explore");
-
-    const manageLink = within(disk).getByRole("link", { name: /管理/ });
-    expect(manageLink).toHaveAttribute("href", "/installed");
+    // Redundant navigation buttons are removed from the hub card
+    expect(within(disk).queryByRole("link", { name: /商店/ })).toBeNull();
+    expect(within(disk).queryByRole("link", { name: /管理/ })).toBeNull();
 
     // Enabled skills are listed
     for (const { name } of skills) {
