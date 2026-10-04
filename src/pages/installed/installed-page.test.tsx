@@ -1771,15 +1771,20 @@ describe("InstalledPage", () => {
     }
 
     /** The parked group: the section `CollapsibleSection` draws, reached by its
-     *  own name rather than by position, so a test states which group it means. */
+     *  own name rather than by position, so a test states which group it means.
+     *  It exists only while something is parked, and it starts folded. */
     function parkedSection(): HTMLElement {
       return screen.getByRole("region", { name: "已禁用" });
     }
 
-    /** The live group: its peer above, named the same way. It exists only while
-     *  something is parked — a whole answer is one bare list, not two sections. */
-    function liveSection(): HTMLElement {
-      return screen.getByRole("region", { name: "已启用" });
+    /** The live group: the bare list the page draws above that section. Nothing
+     *  wraps those rows — they are the list itself — so it is found as "the list
+     *  that is not inside a section" rather than by position, which would change
+     *  the moment the parked section is unfolded. */
+    function liveList(): HTMLElement {
+      const list = screen.getAllByRole("list").find((ul) => !ul.closest("section"));
+      if (!list) throw new Error("the live list is not on screen");
+      return list;
     }
 
     /** The section's disclosure trigger — the rows below it are cards that also
@@ -1787,6 +1792,31 @@ describe("InstalledPage", () => {
      *  button in there". */
     function parkedHeader(): HTMLElement {
       return within(parkedSection()).getByRole("button", { name: /已禁用/ });
+    }
+
+    /** The parked rows currently on screen — none while the section is folded,
+     *  since folding unmounts the panel rather than hiding it. */
+    function parkedRows(): HTMLElement[] {
+      return within(parkedSection()).queryAllByRole("button", {
+        name: /查看 .+ 详情/,
+      });
+    }
+
+    /**
+     * Unfolds the parked section, the way a reader reaches those rows. Idempotent
+     * by design: the section's fold is the reader's own state, so a case that
+     * sorts or unfolds first must not be flipped back by this helper.
+     */
+    async function revealParked(
+      user: ReturnType<typeof userEvent.setup>,
+    ): Promise<void> {
+      const header = parkedHeader();
+      if (header.getAttribute("aria-expanded") === "false") {
+        await user.click(header);
+      }
+      await waitFor(() =>
+        expect(parkedHeader()).toHaveAttribute("aria-expanded", "true"),
+      );
     }
 
     /** The ordinal each row prints, in the same document order as `rowNames`. */
@@ -1806,8 +1836,14 @@ describe("InstalledPage", () => {
      *  the parked ones the whole tail, and neither group borrows a row from the
      *  other. Written as a position claim rather than a full snapshot because
      *  that is the part every order shares — which rows lead is each order's own
-     *  business, and is what the sort's own cases are for. */
-    async function expectParkedBelowLive() {
+     *  business, and is what the sort's own cases are for.
+     *
+     *  The parked half has to be unfolded to be read at all, so the helper does
+     *  that first: the claim is about where the rows sit, not about the fold. */
+    async function expectParkedBelowLive(
+      user: ReturnType<typeof userEvent.setup>,
+    ) {
+      await revealParked(user);
       await waitFor(() => expect(rowNames()).toHaveLength(6));
       expect(rowNames().slice(0, LIVE.length)).toEqual(
         LIVE.map((name) => `查看 ${name} 详情`),
@@ -1833,13 +1869,14 @@ describe("InstalledPage", () => {
       // by the popularity fallback too — they are the two rows that would lead
       // the list. They read fourth and fifth instead.
       await screen.findByText("frontend-design");
+      await revealParked(user);
       expect(rowNames()).toEqual([
         ...LIVE.map((name) => `查看 ${name} 详情`),
         ...PARKED.map((name) => `查看 ${name} 详情`),
       ]);
 
       await pickSort(user, "安装时间");
-      await expectParkedBelowLive();
+      await expectParkedBelowLive(user);
     });
 
     it("parks them just the same under the popularity blend", async () => {
@@ -1850,7 +1887,7 @@ describe("InstalledPage", () => {
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
 
-      await expectParkedBelowLive();
+      await expectParkedBelowLive(user);
     });
 
     it("parks them just the same under the token order", async () => {
@@ -1864,7 +1901,7 @@ describe("InstalledPage", () => {
       await screen.findByText("frontend-design");
 
       await pickSort(user, "Token 占用");
-      await expectParkedBelowLive();
+      await expectParkedBelowLive(user);
     });
 
     it("holds each group to the order the reader picked", async () => {
@@ -1878,11 +1915,8 @@ describe("InstalledPage", () => {
       // among the other parked ones, which is the whole reason the split runs
       // after the sort rather than replacing it.
       await pickSort(user, "安装时间");
-      await waitFor(() =>
-        expect(
-          within(parkedSection()).getAllByRole("button", { name: /查看 .+ 详情/ }),
-        ).toHaveLength(2),
-      );
+      await revealParked(user);
+      await waitFor(() => expect(parkedRows()).toHaveLength(2));
       expect(rowNames()).toEqual([
         ...LIVE.map((name) => `查看 ${name} 详情`),
         ...PARKED.map((name) => `查看 ${name} 详情`),
@@ -1890,22 +1924,23 @@ describe("InstalledPage", () => {
     });
 
     it("numbers each group from one, so neither half carries the other's gaps", async () => {
-      // Each half is a named section, so each is numbered as the list it is. The
-      // flat order interleaves the two groups rather than laying them end to
-      // end, and under this sort the two parked installs are the two newest —
-      // the rows that would otherwise lead. Counting across the split would
-      // therefore leave the live section carrying 3…6 and hand the parked
-      // section the 1 and 2 it gave up: a live group starting at 3, followed by
-      // a parked group starting at 1, reads as one list with rows gone missing
-      // rather than as two lists.
+      // The parked half is a section of its own, so it is numbered as the list
+      // it is rather than continuing the live list above it. The flat order
+      // interleaves the two groups rather than laying them end to end, and under
+      // this sort the two parked installs are the two newest — the rows that
+      // would otherwise lead. Counting across the split would therefore leave
+      // the live list carrying 3…6 and hand the parked section the 1 and 2 it
+      // gave up: a run that jumps from 4 back to 1 reads as one list with rows
+      // gone missing rather than as a list and a section below it.
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
       await pickSort(user, "安装时间");
+      await revealParked(user);
 
       await waitFor(() =>
-        expect(rowOrdinalsIn(liveSection())).toEqual(["1", "2", "3", "4"]),
+        expect(rowOrdinalsIn(liveList())).toEqual(["1", "2", "3", "4"]),
       );
       expect(rowOrdinalsIn(parkedSection())).toEqual(["1", "2"]);
       // And in document order the run restarts at the section, so the claim does
@@ -1930,8 +1965,9 @@ describe("InstalledPage", () => {
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
+      await revealParked(user);
 
-      expect(rowOrdinalsIn(liveSection())).toEqual(["1", "2", "3", "4"]);
+      expect(rowOrdinalsIn(liveList())).toEqual(["1", "2", "3", "4"]);
       expect(rowOrdinalsIn(parkedSection())).toEqual(["1", "2"]);
     });
 
@@ -1948,13 +1984,14 @@ describe("InstalledPage", () => {
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
+      await revealParked(user);
 
       // Whatever is revealed is numbered as a plain run from 1 — no gaps, and no
       // dependence on rows that are not mounted yet.
-      for (const section of [liveSection(), parkedSection()]) {
-        expect(rowOrdinalsIn(section)).toEqual(
+      for (const group of [liveList(), parkedSection()]) {
+        expect(rowOrdinalsIn(group)).toEqual(
           Array.from(
-            { length: section.querySelectorAll("li").length },
+            { length: group.querySelectorAll("li").length },
             (_, i) => String(i + 1),
           ),
         );
@@ -1973,32 +2010,30 @@ describe("InstalledPage", () => {
       expect(parkedHeader()).toHaveTextContent("2 个 skill");
     });
 
-    it("names both halves, so each run of numbers reads as its own list", async () => {
-      // Each half numbers itself from 1 (the two cases above), which is only
-      // legible as two lists if both are announced. A bare list above a titled
-      // one, the second starting again at 1, reads instead as a single list that
-      // stops and restarts — which is what the live header exists to remove. Its
-      // appearance is therefore tied to the split, not to there being any live
-      // rows at all.
+    it("wraps only the parked half in a section, leaving the live rows a bare list", async () => {
+      // The live rows are the page's list, so nothing is named over them: a
+      // header reading 「已启用」 would label the answer with the very subject it
+      // answers, and a section around it would add a landmark and a fold to a
+      // list a reader never asked to put away. The parked half keeps its header
+      // because it is a group *below* the list, and the count on it is what says
+      // there is anything to see.
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
+      await revealParked(user);
 
-      // Two peers, each stating its own size: 4 live against 2 parked.
-      expect(liveSection()).toBeInTheDocument();
       expect(
-        within(liveSection()).getByRole("button", { name: /已启用/ }),
-      ).toHaveTextContent("4 个 skill");
+        screen.queryByRole("region", { name: "已启用" }),
+      ).not.toBeInTheDocument();
+      expect(liveList().closest("section")).toBeNull();
+      // The parked half is the one that is named, and it states its own size.
+      expect(parkedSection()).toBeInTheDocument();
       expect(parkedHeader()).toHaveTextContent("2 个 skill");
-      // The same shell for both, so the comparison a reader makes between the
-      // two headers is a comparison of like things.
-      expect(liveSection().tagName).toBe(parkedSection().tagName);
-      // The hairline separates the two halves; it does not lead the first.
+      // The hairline leads the section, which is the only group that has one.
       expect(parkedSection()).toHaveClass("border-t");
-      expect(liveSection()).not.toHaveClass("border-t");
-      // Each half holds its own rows, and the split still partitions rather
-      // than re-orders: live leads the document, parked follows it.
+      // Each half holds its own rows, and the split still partitions rather than
+      // re-orders: live leads the document, parked follows it.
       expect(rowNames().slice(0, LIVE.length)).toEqual(
         LIVE.map((name) => `查看 ${name} 详情`),
       );
@@ -2007,37 +2042,70 @@ describe("InstalledPage", () => {
       );
     });
 
-    it("folds the live half without touching the parked one", async () => {
-      // The live header brings the live fold with it, and the two folds are
-      // independent: a reader working through their enabled skills has a reason
-      // to put that half away without also hiding what they parked.
+    it("starts the parked section folded, so the page lands on the live list alone", async () => {
+      // The parked half is by definition what the reader set aside, so it opens
+      // folded: the page on arrival is the live list, and the header's badge is
+      // the whole of what says there is more below it.
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
-      const live = () =>
-        within(liveSection()).queryAllByRole("button", { name: /查看 .+ 详情/ });
-      const parked = () =>
-        within(parkedSection()).queryAllByRole("button", { name: /查看 .+ 详情/ });
 
-      expect(live()).toHaveLength(4);
-      await user.click(within(liveSection()).getByRole("button", { name: /已启用/ }));
-      expect(live()).toHaveLength(0);
-      expect(parked()).toHaveLength(2);
+      expect(parkedHeader()).toHaveAttribute("aria-expanded", "false");
+      expect(parkedRows()).toHaveLength(0);
+      expect(rowNames()).toEqual(LIVE.map((name) => `查看 ${name} 详情`));
+      expect(parkedHeader()).toHaveTextContent("2 个 skill");
+    });
 
-      // And back: a fold is the reader's own, so nothing is lost by it.
-      await user.click(within(liveSection()).getByRole("button", { name: /已启用/ }));
-      expect(live()).toHaveLength(4);
+    it("folds the parked rows away and back without losing them", async () => {
+      // The fold is the reader's, in both directions, and touches nothing else:
+      // the live list above is never hidden with it.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      expect(parkedRows()).toHaveLength(0);
+      await user.click(parkedHeader());
+      await waitFor(() => expect(parkedRows()).toHaveLength(2));
+      expect(rowNames()).toHaveLength(6);
+
+      await user.click(parkedHeader());
+      await waitFor(() => expect(parkedRows()).toHaveLength(0));
+      // The live list is untouched by the fold — only the parked half was ever
+      // hidden.
+      expect(rowNames()).toEqual(LIVE.map((name) => `查看 ${name} 详情`));
+    });
+
+    it("keeps the reader's fold across a change of order", async () => {
+      // The fold is not keyed by the answer: re-ordering or narrowing the list
+      // neither opens nor closes it, because a reader who put their parked
+      // skills away means it for the answer, not for one order of it.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+      await revealParked(user);
+
+      await pickSort(user, "安装时间");
+      await waitFor(() =>
+        expect(parkedHeader()).toHaveAttribute("aria-expanded", "true"),
+      );
+      expect(parkedRows()).toHaveLength(2);
+
+      await user.click(parkedHeader());
+      await pickSort(user, "Token 占用");
+      await waitFor(() =>
+        expect(parkedHeader()).toHaveAttribute("aria-expanded", "false"),
+      );
     });
 
     it("draws no section at all while nothing is parked", async () => {
       // An absent section reads quieter than a zero: with every install live the
       // list is exactly the list this page always drew. The two installs this
       // group parks are handed back, since a list with nothing parked is the
-      // only state in which the section must not appear. It is the state that
-      // also settles where the live header comes from: the header exists to
-      // describe a split, so with no split there is nothing for it to describe
-      // and the live rows must not end up wrapped in one of their own.
+      // only state in which the section must not appear — and with it the last
+      // trace of a group header over the live rows.
       setMockSkillEnabled("pdf", true);
       setMockSkillEnabled("docx", true);
       const user = userEvent.setup();
@@ -2051,8 +2119,8 @@ describe("InstalledPage", () => {
       expect(
         screen.queryByRole("region", { name: "已启用" }),
       ).not.toBeInTheDocument();
-      // One list, not two sections: all six rows sit in the same bare list, so
-      // nothing is wrapped around either half.
+      // One list, unwrapped: all six rows sit in the same bare list, so nothing
+      // is wrapped around them either way.
       expect(rowNames()).toHaveLength(6);
       const lists = new Set(
         screen
@@ -2060,39 +2128,23 @@ describe("InstalledPage", () => {
           .map((row) => row.closest("ul")),
       );
       expect(lists.size).toBe(1);
-    });
-
-    it("folds the parked rows away and back without losing them", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-      const parked = () =>
-        within(parkedSection()).queryAllByRole("button", { name: /查看 .+ 详情/ });
-
-      expect(parked()).toHaveLength(2);
-      await user.click(parkedHeader());
-      expect(parked()).toHaveLength(0);
-      // The live list is untouched by the fold — only the parked half was ever
-      // hidden.
-      expect(rowNames()).toHaveLength(4);
-
-      await user.click(parkedHeader());
-      expect(parked()).toHaveLength(2);
+      expect(liveList().closest("section")).toBeNull();
     });
 
     it("keeps a parked skill in the drawer's walk while its section is folded", async () => {
-      // Folding hides content visually only. The drawer walks the whole answer
-      // rather than the mounted prefix, so a folded skill is still reachable —
-      // which is what lets a reader turn one back on without unfolding the
-      // section first.
+      // Folding hides content visually only, and it is the state the page opens
+      // in, so the drawer has to work from the folded answer. It walks the whole
+      // answer rather than the mounted prefix, so a folded skill is still
+      // reachable — which is what lets a reader turn one back on without
+      // unfolding the section first.
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
       await pickSort(user, "安装时间");
       await waitFor(() => expect(parkedSection()).toBeInTheDocument());
-      await user.click(parkedHeader());
+      // Folded, and holding nothing: the state a reader actually meets.
+      expect(parkedRows()).toHaveLength(0);
 
       // Opened from the last live row, so the walk's next step is the question:
       // the first parked one, not a skill drawn far above this one. The drawer
