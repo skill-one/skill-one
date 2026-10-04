@@ -349,18 +349,12 @@ describe("AgentGraph", () => {
     }
   });
 
-  it("opens the agent detail dialog upon clicking the info button", async () => {
-    const user = userEvent.setup();
+  it("renders pure icon and name without switches or extra info buttons", () => {
     renderWithRouter(<AgentGraph agents={agents} />);
 
-    const infoButton = screen.getByRole("button", { name: "Cursor details" });
-    await user.click(infoButton);
-
-    // Dialog opens with details and warning explanation
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText("Cursor 详情")).toBeInTheDocument();
-    expect(screen.getByText(/~\/\.cursor\/skills/)).toBeInTheDocument();
-    expect(screen.getByText(/检测到本地原有技能/)).toBeInTheDocument();
+    // Only main interactive pill buttons exist for each agent
+    expect(screen.queryByRole("button", { name: "Cursor details" })).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
   });
 
   it("counts the enabled skills and displays active ones", async () => {

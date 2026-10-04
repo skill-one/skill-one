@@ -1,17 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { AlertCircle, Info, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import type { AgentStatus } from "../../lib/skills-manager";
 import { agentLinkState } from "../../lib/agent-link-state";
 import { useAgentLinkToggle } from "../../hooks/use-agent-link-toggle";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { AgentIcon } from "../../components/agent-icon";
-import { Switch } from "../../components/ui/switch";
 import { cn } from "../../lib/utils";
 import { useAgentEdgeColor } from "../../hooks/use-agent-edge-color";
 import { HubDashboard } from "./hub-dashboard";
-import { AgentDetailDialog } from "./agent-detail-dialog";
 import {
   layoutAgents,
   resolveGraphWidth,
@@ -53,7 +51,6 @@ export function AgentGraph({ agents }: { agents: AgentStatus[] }) {
   const [ref, size] = useElementSize();
   const [active, setActive] = useState<string | null>(null);
   const [pulse, setPulse] = useState<Pulse>("idle");
-  const [selectedAgent, setSelectedAgent] = useState<AgentStatus | null>(null);
 
   const { toggle, busyFor } = useAgentLinkToggle();
   const { data: skills, isLoading: skillsLoading } = useInstalledSkills();
@@ -119,7 +116,6 @@ export function AgentGraph({ agents }: { agents: AgentStatus[] }) {
               index={i}
               busy={busyFor(agent.name)}
               onHover={setActive}
-              onOpenDetail={(target) => setSelectedAgent(target)}
               onToggleLink={(link) => toggle.mutate({ name: agent.name, link })}
             />
           ))}
@@ -142,18 +138,6 @@ export function AgentGraph({ agents }: { agents: AgentStatus[] }) {
           </div>
         </div>
       </div>
-
-      {/* Agent Detail Dialog */}
-      <AgentDetailDialog
-        agent={selectedAgent}
-        open={selectedAgent !== null}
-        onOpenChange={(open) => {
-          if (!open) setSelectedAgent(null);
-        }}
-        onToggleLink={(name, link) => toggle.mutate({ name, link })}
-        busy={selectedAgent ? busyFor(selectedAgent.name) : false}
-        installedSkills={skills ?? []}
-      />
     </div>
   );
 }
@@ -331,8 +315,8 @@ function Ribbon({
 }
 
 /**
- * Agent node pill: displays brand icon, title, attention badges,
- * and a dedicated switch toggle to safely disconnect/connect.
+ * Agent node pill: displays brand icon and name.
+ * Clicking directly toggles link/unlink.
  */
 function AgentNode({
   agent,
@@ -340,7 +324,6 @@ function AgentNode({
   index,
   busy,
   onHover,
-  onOpenDetail,
   onToggleLink,
 }: {
   agent: AgentStatus;
@@ -348,7 +331,6 @@ function AgentNode({
   index: number;
   busy: boolean;
   onHover: (name: string | null) => void;
-  onOpenDetail: (agent: AgentStatus) => void;
   onToggleLink: (link: boolean) => void;
 }) {
   const reduceMotion = useReducedMotion();
@@ -389,74 +371,40 @@ function AgentNode({
         onFocus={() => onHover(agent.name)}
         onBlur={() => onHover(null)}
         className={cn(
-          "pointer-events-auto relative flex w-full cursor-pointer items-center gap-1.5 rounded-lg border bg-card pr-1.5 pl-1.5 outline-none transition-colors",
-          "hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-default",
+          "pointer-events-auto relative flex w-full cursor-pointer items-center gap-2 rounded-lg border px-2 outline-none transition-all shadow-2xs select-none",
+          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-default",
           state === "warning"
-            ? "border-amber-500/50 bg-amber-500/5 hover:border-amber-500/70"
+            ? "border-amber-500/50 bg-amber-500/10 hover:border-amber-500/70 hover:bg-amber-500/15"
             : state === "unlinked"
-              ? "border-dashed border-border hover:border-primary/40"
-              : "border-border hover:border-primary/40",
+              ? "border-dashed border-border/70 bg-card/30 opacity-60 hover:opacity-100 hover:border-primary/50 hover:bg-accent/40"
+              : "border-border/80 bg-card hover:border-primary/60 hover:bg-accent/50",
         )}
         style={{ height: node.height }}
       >
         <span
           className="shrink-0"
-          style={{ width: node.height - 10, height: node.height - 10 }}
+          style={{ width: node.height - 12, height: node.height - 12 }}
         >
           <AgentIcon
             agentName={agent.name}
             shape="squircle"
-            className={cn(!linked && "opacity-50 grayscale")}
+            className={cn(!linked && "opacity-45 grayscale")}
           />
         </span>
 
-        <span className="min-w-0 flex-1 truncate text-left text-[11.5px] font-medium">
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-left text-[12px] transition-colors",
+            linked
+              ? "font-medium text-foreground"
+              : "font-normal text-muted-foreground",
+          )}
+        >
           {agent.display}
         </span>
 
-        {/* Info button for details */}
-        <span
-          role="button"
-          tabIndex={0}
-          aria-label={`${agent.display} details`}
-          title={`${agent.display} details`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenDetail(agent);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.stopPropagation();
-              onOpenDetail(agent);
-            }
-          }}
-          className="flex shrink-0 items-center justify-center size-4.5 rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground cursor-pointer"
-        >
-          {state === "warning" ? (
-            <AlertCircle className="size-3 text-amber-500" />
-          ) : (
-            <Info className="size-3" />
-          )}
-        </span>
-
-        {/* Dedicated Switch Toggle */}
-        <span
-          className="shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          <Switch
-            size="sm"
-            checked={linked}
-            disabled={pinned || busy}
-            aria-label={`${agent.display} switch`}
-            onCheckedChange={(checked) => onToggleLink(checked)}
-          />
-        </span>
-
         {busy && (
-          <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-card/70">
+          <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-card/80">
             <Loader2
               className="size-4 animate-spin text-muted-foreground"
               aria-hidden="true"
