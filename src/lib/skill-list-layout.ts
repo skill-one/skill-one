@@ -51,6 +51,21 @@ export const SKILL_ROW_LIST_CLASS = "flex flex-col gap-4";
 export const SKILL_ROW_SKELETON_CLASS = "h-[58px] rounded-xl";
 
 /**
+ * The compact square grid: one minimal card per skill. Narrower columns than
+ * the store grid so more skills fit per screen; the tighter gap keeps the
+ * grid dense without extra density controls.
+ */
+export const SKILL_GRID_LIST_CLASS =
+  "grid grid-cols-[repeat(auto-fill,minmax(168px,1fr))] gap-3";
+
+/**
+ * Placeholder standing in for one square while the grid loads: roughly the
+ * height of a rendered square card, so the skeleton never changes size when
+ * the real cards arrive.
+ */
+export const SKILL_GRID_SKELETON_CLASS = "aspect-square rounded-xl";
+
+/**
  * The repository view: one full-width card per repository, stacked — every
  * card takes the whole row and splits its skills across two balanced columns
  * inside (see `RepoCard`), so one column is sized for a repository rather

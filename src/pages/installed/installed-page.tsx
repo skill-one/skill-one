@@ -21,6 +21,8 @@ import { domainFacets, domainsOf } from "../../lib/domain-filter";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
+  SKILL_GRID_LIST_CLASS,
+  SKILL_GRID_SKELETON_CLASS,
   SKILL_ROW_LIST_CLASS,
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
@@ -34,6 +36,7 @@ import type { SkillMatched } from "../../components/highlighted-text";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillRow } from "../explore/skill-row";
+import { SkillGridCard } from "../explore/skill-grid-card";
 import {
   compareByInstalledTime,
   newestInstallTime,
@@ -254,18 +257,17 @@ export function InstalledPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   // Anything that re-answers the list resets the detail panel: its skill may
-  // not be in the new answer at all.
-  //
-  // The controls are shared with the other list now, so this watches the answer
-  // instead of each control. The sort carries the unit (it is derived above),
-  // so one field here covers both switches' old answers.
-  const shownAnswer = useRef(`${query}\u0000${domain ?? "all"}\u0000${sort}`);
+  // not be in the new answer at all. The shape is its own answer now, so the
+  // unit joins the sort and the scope here.
+  const shownAnswer = useRef(
+    `${query}\u0000${domain ?? "all"}\u0000${sort}\u0000${unit}`,
+  );
   useEffect(() => {
-    const answer = `${query}\u0000${domain ?? "all"}\u0000${sort}`;
+    const answer = `${query}\u0000${domain ?? "all"}\u0000${sort}\u0000${unit}`;
     if (shownAnswer.current === answer) return;
     shownAnswer.current = answer;
     setSelectedKey(null);
-  }, [query, domain, sort]);
+  }, [query, domain, sort, unit]);
 
   // Deep link from the menu bar popover: `/installed?skill=<name>` asks the
   // list's own question, which ranks the targeted skill near the top of the
@@ -381,7 +383,7 @@ export function InstalledPage() {
   // too, and the better one while a question is live — the same order the
   // store keeps there.
   const activeRows = useMemo(() => {
-    if (unit !== "skill") return [];
+    if (unit === "repo") return [];
     if (isSearching) return rows;
     const scoped =
       domain === null
@@ -407,21 +409,21 @@ export function InstalledPage() {
   // The category facets of the unit on screen: how many *repositories* a domain
   // holds, or how many *skills*. A repository rides every domain its rows belong
   // to and a skill every domain it belongs to; either way one nothing classified
-  // holds the 未分类 item of its own, apart from the dataset's 其他. The two
-  // units file the same installs differently, which is exactly why the count
-  // follows the unit — an item that promised six skills must not scope the list
-  // to two cards.
+  // holds the 未分类 item of its own, apart from the dataset's 其他. Rows and
+  // grid squares file the same installs the same way, so both weigh skills —
+  // only the repository shape weighs repositories, which is exactly why the
+  // count follows the unit.
   const facets = useMemo(() => {
-    if (unit === "skill") {
-      return domainFacets(rows, (row) => domainsOf(row.skill));
+    if (unit === "repo") {
+      return domainFacets(cards, (card) => {
+        const keys = new Set<string>();
+        for (const row of card.items) {
+          for (const key of domainsOf(row.skill)) keys.add(key);
+        }
+        return Array.from(keys);
+      });
     }
-    return domainFacets(cards, (card) => {
-      const keys = new Set<string>();
-      for (const row of card.items) {
-        for (const key of domainsOf(row.skill)) keys.add(key);
-      }
-      return Array.from(keys);
-    });
+    return domainFacets(rows, (row) => domainsOf(row.skill));
   }, [unit, rows, cards]);
 
   // The repository shape's flat order — the sort's own answer over cards:
@@ -481,13 +483,13 @@ export function InstalledPage() {
     return map;
   }, [registryGroups, list]);
 
-  // What the answer on screen is made of: one row or one card per entry — the
-  // entry, not a bucket, is what the reveal counts, because an entry is what
-  // both units list.
-  const itemCount = unit === "skill" ? activeRows.length : activeCards.length;
+  // What the answer on screen is made of: one row or square per skill, or one
+  // card per repository — the entry, not a bucket, is what the reveal counts,
+  // because an entry is what every shape lists.
+  const itemCount = unit === "repo" ? activeCards.length : activeRows.length;
   // What the 全部 item counts, in the unit on screen: every repository, or every
   // skill.
-  const totalCount = unit === "skill" ? rows.length : cards.length;
+  const totalCount = unit === "repo" ? cards.length : rows.length;
 
   // Progressive rendering: only the first `renderedCount` items are mounted;
   // an IntersectionObserver on the sentinel below the list extends the count
@@ -501,8 +503,7 @@ export function InstalledPage() {
     total: itemCount,
     initial: INITIAL_CARDS,
     step: CARD_CHUNK,
-    // The sort carries the unit, so one field names the whole shape change.
-    resetKey: `${sort}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}`,
+    resetKey: `${unit}\u0000${sort}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}`,
   });
   const shownRows = activeRows.slice(0, renderedCount);
   const shownCards = activeCards.slice(0, renderedCount);
@@ -565,11 +566,11 @@ export function InstalledPage() {
   // pressing → on the last live row would jump to a skill drawn far above it.
   const detailSkills = useMemo(
     () =>
-      unit === "skill"
-        ? [...splitActive.enabled, ...splitActive.disabled].map(
+      unit === "repo"
+        ? activeCards.flatMap((card) => card.items.map((row) => row.skill))
+        : [...splitActive.enabled, ...splitActive.disabled].map(
             (row) => row.skill,
-          )
-        : activeCards.flatMap((card) => card.items.map((row) => row.skill)),
+          ),
     [unit, splitActive, activeCards],
   );
 
@@ -626,15 +627,45 @@ export function InstalledPage() {
   };
 
   /**
-   * One half of the skill unit, drawn as the bare list it is. The live rows wear
-   * no section at all: they are the page's list, and a header naming them would
-   * label the answer with the subject it already answers. The parked half wraps
-   * the same rows in a section of its own (see the render below), so a skill
-   * reads identically wherever it is drawn — only its surroundings differ.
+   * One square of the grid unit. Same facts as the row above, minus the
+   * ordinal: squares carry no ranking column, so there is no number to print.
    */
-  const skillRows = (group: Row[]) => (
-    <ul className={SKILL_ROW_LIST_CLASS}>{group.map(renderSkillRow)}</ul>
-  );
+  const renderSkillGrid = (row: Row) => {
+    const key = skillKey(row.skill);
+    return (
+      <SkillGridCard
+        key={key}
+        skill={row.skill}
+        fact={
+          sort === "installed"
+            ? "installedAt"
+            : sort === "tokens"
+              ? "tokens"
+              : "popularity"
+        }
+        selected={key === selected}
+        muted={!row.enabled}
+        extra={rowExtra(row, "label")}
+        action={<SkillEnableSwitch skill={row.skill} />}
+        onSelect={() => setSelectedKey(key)}
+      />
+    );
+  };
+
+  /**
+   * One half of the per-skill shapes, drawn as the bare list it is — rows or
+   * squares per the shape on screen. The live entries wear no section at all:
+   * they are the page's list, and a header naming them would label the answer
+   * with the subject it already answers. The parked half wraps the same
+   * entries in a section of its own (see the render below), so a skill reads
+   * identically wherever it is drawn — only its surroundings differ.
+   */
+  const skillEntries = (group: Row[]) =>
+    unit === "grid" ? (
+      <ul className={SKILL_GRID_LIST_CLASS}>{group.map(renderSkillGrid)}</ul>
+    ) : (
+      <ul className={SKILL_ROW_LIST_CLASS}>{group.map(renderSkillRow)}</ul>
+    );
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
@@ -654,8 +685,9 @@ export function InstalledPage() {
         searching={isSearching}
       />
 
-      {/* The list — repository cards or skill rows; the modal detail drawer
-          overlays either without reflowing it or moving its scroll position. */}
+      {/* The list — repository cards, skill rows or grid squares; the modal
+          detail drawer overlays any without reflowing it or moving its scroll
+          position. */}
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5">
           {isError ? (
@@ -670,14 +702,20 @@ export function InstalledPage() {
             // switching to this page lands on its final layout instead of an
             // empty spin.
             <SkeletonList
-              rows={unit === "skill" ? SKELETON_ROWS : SKELETON_CARDS}
+              rows={unit === "repo" ? SKELETON_CARDS : SKELETON_ROWS}
               listClassName={
-                unit === "skill" ? SKILL_ROW_LIST_CLASS : REPO_LIST_CLASS
+                unit === "repo"
+                  ? REPO_LIST_CLASS
+                  : unit === "grid"
+                    ? SKILL_GRID_LIST_CLASS
+                    : SKILL_ROW_LIST_CLASS
               }
               itemClassName={
-                unit === "skill"
-                  ? SKILL_ROW_SKELETON_CLASS
-                  : REPO_CARD_SKELETON_CLASS
+                unit === "repo"
+                  ? REPO_CARD_SKELETON_CLASS
+                  : unit === "grid"
+                    ? SKILL_GRID_SKELETON_CLASS
+                    : SKILL_ROW_SKELETON_CLASS
               }
             />
           ) : list.length === 0 ? (
@@ -703,48 +741,7 @@ export function InstalledPage() {
                 action: <SkillEnableSwitch skill={row.skill} />,
               }))}
             />
-          ) : itemCount === 0 ? (
-            <Placeholder
-              message={
-                unit === "skill"
-                  ? t("state.noMatchSkill")
-                  : t("state.noMatchRepo")
-              }
-            />
-          ) : unit === "skill" ? (
-            // The skill unit: one row per install, in the sort's own order —
-            // the live installs first as the bare list, then the parked ones
-            // below under the one header that names them. The same row a
-            // repository's own page lists, so a skill reads the same wherever
-            // it is found — and the figure each row states is the one this list
-            // answers in: the install's own clock under the 按安装时间 sort, the
-            // popularity blend otherwise.
-            //
-            // The parked section exists only once something is parked, and it
-            // starts folded: those skills were set aside, so on arrival the
-            // page is the live list alone and the header's count is what says
-            // there is more below. An absent section still reads quieter than a
-            // zero-count one.
-            <>
-              {splitRows.enabled.length > 0 && skillRows(splitRows.enabled)}
-              {split && (
-                <CollapsibleSection
-                  icon={PowerOff}
-                  title={t("list.disabled")}
-                  count={t("state.skillCount", {
-                    count: splitRows.disabled.length,
-                  })}
-                  // The fold is the reader's ("not working with these right
-                  // now"), so it is left to survive a change of sort or scope —
-                  // both of which only re-order or narrow rows.
-                  defaultOpen={false}
-                  className="border-t border-border/60 pt-6"
-                >
-                  {skillRows(splitRows.disabled)}
-                </CollapsibleSection>
-              )}
-            </>
-          ) : (
+          ) : unit === "repo" ? (
             // The repository unit: one card per repository, led by the
             // repository's own stars (the figure the card itself prints, so the
             // order and the numbers above it cannot disagree), ties broken by
@@ -782,6 +779,40 @@ export function InstalledPage() {
                 />
               ))}
             </ul>
+          ) : (
+            // The per-skill shapes: one row or one square per install, the live
+            // installs first as the bare list, then the parked ones below under
+            // the one header that names them. The same entries a repository's
+            // own page lists, so a skill reads the same wherever it is found —
+            // and the figure each entry states is the one this list answers in:
+            // the install's own clock under the 按安装时间 sort, the popularity
+            // blend otherwise.
+            //
+            // The parked section exists only once something is parked, and it
+            // starts folded: those skills were set aside, so on arrival the
+            // page is the live list alone and the header's count is what says
+            // there is more below. An absent section still reads quieter than a
+            // zero-count one.
+            <>
+              {splitRows.enabled.length > 0 &&
+                skillEntries(splitRows.enabled)}
+              {split && (
+                <CollapsibleSection
+                  icon={PowerOff}
+                  title={t("list.disabled")}
+                  count={t("state.skillCount", {
+                    count: splitRows.disabled.length,
+                  })}
+                  // The fold is the reader's ("not working with these right
+                  // now"), so it is left to survive a change of sort or scope —
+                  // both of which only re-order or narrow rows.
+                  defaultOpen={false}
+                  className="border-t border-border/60 pt-6"
+                >
+                  {skillEntries(splitRows.disabled)}
+                </CollapsibleSection>
+              )}
+            </>
           )}
           {/* The sentinel ends the rendered run: while it is on screen the
               observer above extends the run, so scrolling down keeps revealing

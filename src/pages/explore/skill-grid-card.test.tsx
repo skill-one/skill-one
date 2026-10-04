@@ -1,0 +1,103 @@
+import { describe, expect, it, vi } from "vitest";
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+import { SkillGridCard } from "./skill-grid-card";
+import { TooltipProvider } from "../../components/ui/tooltip";
+import { renderWithRouter } from "../../test/test-utils";
+import type { SkillView } from "../../lib/skill-view";
+
+const backed: SkillView = {
+  name: "pdf",
+  repo: "anthropics/skills",
+  description: "Read and write PDF files.",
+  stars: 169600,
+  downloads: 2991984,
+};
+
+function renderCard(skill: SkillView, props = {}) {
+  return renderWithRouter(
+    <TooltipProvider>
+      <ul>
+        <SkillGridCard skill={skill} onSelect={() => {}} {...props} />
+      </ul>
+    </TooltipProvider>,
+  );
+}
+
+describe("SkillGridCard", () => {
+  it("states the name and the description on one square", () => {
+    renderCard(backed);
+
+    expect(screen.getByRole("button", { name: /pdf/ })).toBeInTheDocument();
+    expect(screen.getByText("Read and write PDF files.")).toBeInTheDocument();
+  });
+
+  it("opens the detail panel from the square body", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    renderWithRouter(
+      <TooltipProvider>
+        <ul>
+          <SkillGridCard skill={backed} onSelect={onSelect} />
+        </ul>
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /pdf/ }));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks the open square and dims a disabled install", () => {
+    const { rerender } = renderCard(backed, { selected: true });
+
+    expect(screen.getByRole("button", { name: /pdf/ })).toHaveClass(
+      "border-primary",
+    );
+
+    rerender(
+      <TooltipProvider>
+        <ul>
+          <SkillGridCard skill={backed} muted onSelect={() => {}} />
+        </ul>
+      </TooltipProvider>,
+    );
+    expect(screen.getByRole("button", { name: /pdf/ })).toHaveClass(
+      "opacity-60",
+    );
+  });
+
+  it("keeps the store install button, and drops it for a discovery domain", () => {
+    const { container, unmount } = renderCard(backed);
+    expect(container.querySelector("button")).not.toBeNull();
+    unmount();
+
+    const domainLive: SkillView = {
+      name: "lark-skill-maker",
+      repo: "open.feishu.cn",
+      description: "",
+      stars: 0,
+      downloads: 0,
+      url: "https://www.skills.sh/open.feishu.cn/lark-skill-maker",
+      storeBacked: false,
+    };
+    const { container: liveContainer } = renderCard(domainLive);
+    expect(liveContainer.querySelector("button")).toBeNull();
+  });
+
+  it("states 本地安装 for a source-less skill instead of a borrowed face", () => {
+    const local: SkillView = {
+      name: "local-tool",
+      repo: "",
+      description: "On-disk only.",
+      stars: 0,
+      downloads: 0,
+      installedAt: null,
+      storeBacked: false,
+    };
+    renderCard(local);
+
+    expect(screen.getByText("本地安装")).toBeInTheDocument();
+  });
+});

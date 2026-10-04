@@ -39,7 +39,8 @@
   },
   "unit": {
     "list": "列表",
-    "cards": "卡片"
+    "grid": "网格",
+    "repos": "仓库"
   },
   "list": {
     "disabled": "已禁用"

@@ -39,7 +39,8 @@
   },
   "unit": {
     "list": "List",
-    "cards": "Cards"
+    "grid": "Grid",
+    "repos": "Repos"
   },
   "list": {
     "disabled": "Disabled"

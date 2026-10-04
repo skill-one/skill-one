@@ -138,12 +138,12 @@ function renderPage(route = "/installed") {
 
 /**
  * Picks the shape the installed list is read in: 列表 (one row per install) or
- * 卡片 (one card per source repository). The pair stands on the row itself, so
+ * 仓库 (one card per source repository). The shapes stand on the row itself, so
  * this is one press on a named toggle and no popup to open.
  */
 async function pickUnit(
   user: ReturnType<typeof userEvent.setup>,
-  shape: "列表" | "卡片",
+  shape: "列表" | "仓库",
 ) {
   await user.click(screen.getByRole("button", { name: shape }));
 }
@@ -1302,7 +1302,7 @@ describe("InstalledPage", () => {
       // is a repository led by its own stars, so the row orders — an install
       // clock, a token cost — are not on offer in this shape and the sort control
       // is gone rather than standing there promising a pick that changes nothing.
-      expect(screen.getByRole("button", { name: "卡片" })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: "仓库" })).toHaveAttribute(
         "aria-pressed",
         "true",
       );
@@ -1638,7 +1638,7 @@ describe("InstalledPage", () => {
       );
 
       // Back in the repository unit, 全部 counts cards again.
-      await pickUnit(user, "卡片");
+      await pickUnit(user, "仓库");
       await openDomainSelect(user);
       expect(screen.getByRole("menuitemradio", { name: /^全部/ })).toHaveTextContent(
         "2",
@@ -1743,7 +1743,7 @@ describe("InstalledPage", () => {
       await screen.findByText("frontend-design");
       const rowInk = podium(0);
 
-      await pickUnit(user, "卡片");
+      await pickUnit(user, "仓库");
       await waitFor(() =>
         expect(
           document.querySelector('[data-slot="card-header"]')!.firstElementChild!
