@@ -28,8 +28,7 @@ interface HubDashboardProps {
 
 /**
  * Modern dashboard card acting as the SkillOne core hub.
- * Replaces the heavy physics jar with a clean, highly scalable status center.
- * Adapts gracefully whether there are 3 skills or 100+ skills installed.
+ * Designed with seamless brand integration, clean borders and high scalability.
  */
 export function HubDashboard({
   agents,
@@ -63,7 +62,7 @@ export function HubDashboard({
     return domainEmoji(storeEntries[name]?.profile?.domain) ?? "⚡";
   };
 
-  // When skills are numerous (e.g. 16+ or 100+), group domain statistics for overview
+  // Group domain statistics for overview when skills are numerous
   const domainSummary = useMemo(() => {
     if (enabled.length <= 16) return [];
     const counts = new Map<string, number>();
@@ -79,10 +78,9 @@ export function HubDashboard({
         count,
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 4); // Top 4 domains
+      .slice(0, 4);
   }, [enabled, storeEntries]);
 
-  // Scalable chip rendering limit
   const maxVisibleChips = 20;
   const visibleSkills = enabled.slice(0, maxVisibleChips);
   const overflowCount = enabled.length - visibleSkills.length;
@@ -97,7 +95,7 @@ export function HubDashboard({
       data-slot="hub-dashboard"
       style={{ width }}
       className={cn(
-        "relative select-none border-border/80 bg-card/95 shadow-md backdrop-blur-sm",
+        "relative select-none border-border/60 bg-card/90 shadow-sm backdrop-blur-md",
         className,
       )}
     >
@@ -113,15 +111,13 @@ export function HubDashboard({
 
       <CardHeader className="p-3.5 pb-2">
         <div className="flex items-center justify-between gap-2">
-          {/* Brand Logo & Hub Title */}
+          {/* Brand Logo & Hub Title — seamless with background like the app header */}
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/60 p-1">
-              <img
-                src="/skill-one-transparent.png"
-                alt="Skill One"
-                className="size-5 shrink-0 object-contain"
-              />
-            </div>
+            <img
+              src="/skill-one-transparent.png"
+              alt="Skill One"
+              className="size-6 shrink-0 object-contain drop-shadow-xs"
+            />
             <div>
               <CardTitle className="text-sm font-semibold leading-none text-foreground">
                 {t("agents.hub.title")}
@@ -134,7 +130,10 @@ export function HubDashboard({
 
           {/* Stats Badges */}
           <div className="flex flex-col items-end gap-1">
-            <Badge variant="secondary" className="px-1.5 py-0 text-[11px] font-medium tabular-nums">
+            <Badge
+              variant="secondary"
+              className="border-border/40 bg-muted/60 px-1.5 py-0 text-[11px] font-medium tabular-nums"
+            >
               <span className="font-semibold text-foreground">{enabled.length}</span>
               <span className="text-muted-foreground">/{total}</span>
               <span className="ml-1 text-[10px] text-muted-foreground">
@@ -152,8 +151,8 @@ export function HubDashboard({
       </CardHeader>
 
       <CardContent className="p-3.5 pt-0 space-y-2.5">
-        {/* Active Skills List / Flow Container */}
-        <div className="rounded-lg border border-border/60 bg-muted/40 p-2">
+        {/* Active Skills List / Flow Container — light, blended background */}
+        <div className="rounded-lg border border-border/40 bg-muted/25 p-2">
           {loading ? (
             <div className="flex h-16 items-center justify-center">
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -164,9 +163,9 @@ export function HubDashboard({
             </div>
           ) : (
             <div className="space-y-1.5">
-              {/* Domain Summary Bar when 16+ or 100+ skills */}
+              {/* Domain Summary Bar when 16+ skills */}
               {domainSummary.length > 0 && (
-                <div className="flex items-center gap-2 border-b border-border/40 pb-1.5 text-[10px] text-muted-foreground">
+                <div className="flex items-center gap-2 border-b border-border/30 pb-1.5 text-[10px] text-muted-foreground">
                   <span className="shrink-0 font-medium text-foreground/80">
                     {t("agents.hub.activeSkills")}:
                   </span>
@@ -174,7 +173,7 @@ export function HubDashboard({
                     {domainSummary.map((d) => (
                       <span
                         key={d.key}
-                        className="inline-flex items-center gap-0.5 rounded bg-background/80 px-1 py-0.5 font-medium tabular-nums"
+                        className="inline-flex items-center gap-0.5 rounded border border-border/30 bg-background/80 px-1 py-0.5 font-medium tabular-nums"
                       >
                         <span>{d.emoji}</span>
                         <span>{d.count}</span>
@@ -194,7 +193,7 @@ export function HubDashboard({
                           type="button"
                           data-skill={skill.name}
                           onClick={() => navigate("/installed")}
-                          className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-card px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:border-primary/50 hover:bg-accent/50 cursor-pointer"
+                          className="inline-flex items-center gap-1 rounded-md border border-border/40 bg-background/70 px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:border-primary/50 hover:bg-accent/60 cursor-pointer shadow-2xs"
                         >
                           <span className="text-[12px] leading-none">
                             {getEmoji(skill.name)}
@@ -211,7 +210,7 @@ export function HubDashboard({
                   </Tooltip>
                 ))}
 
-                {/* Interactive Overflow Button: Clicking navigates to /installed */}
+                {/* Interactive Overflow Button */}
                 {overflowCount > 0 && (
                   <Tooltip>
                     <TooltipTrigger
