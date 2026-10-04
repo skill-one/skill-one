@@ -18,7 +18,12 @@ import {
   resetMockInstalledSkills,
   setMockSkillEnabled,
 } from "../../lib/mock-local";
-import { resetMockProvenance, seedMockProvenance } from "../../lib/provenance";
+import {
+  loadCustomTags,
+  resetMockProvenance,
+  seedMockCustomTags,
+  seedMockProvenance,
+} from "../../lib/provenance";
 import { resetLinkSuggestions } from "../../lib/link-suggestions";
 import { MEDAL_CLASSES } from "../../lib/ordinal";
 import {
@@ -33,16 +38,21 @@ configure({ asyncUtilTimeout: 5000 });
 // The provenance hook consults the registry for namesake candidates and the
 // page looks up the store entries behind recorded sources; both mocks answer
 // "nothing found" by default so the worker-less test env stays silent.
-const { namesakeSkills, lookupSkills, getGroups, registrySnapshot, searchSkillsSh } =
-  vi.hoisted(() => ({
-    namesakeSkills: vi.fn(),
-    lookupSkills: vi.fn(),
-    getGroups: vi.fn(),
-    // One stable object: the page reads it through useSyncExternalStore, which
-    // treats a fresh snapshot on every call as an infinite render loop.
-    registrySnapshot: { ready: true, epoch: 1 },
-    searchSkillsSh: vi.fn(),
-  }));
+const {
+  namesakeSkills,
+  lookupSkills,
+  getGroups,
+  registrySnapshot,
+  searchSkillsSh,
+} = vi.hoisted(() => ({
+  namesakeSkills: vi.fn(),
+  lookupSkills: vi.fn(),
+  getGroups: vi.fn(),
+  // One stable object: the page reads it through useSyncExternalStore, which
+  // treats a fresh snapshot on every call as an infinite render loop.
+  registrySnapshot: { ready: true, epoch: 1 },
+  searchSkillsSh: vi.fn(),
+}));
 vi.mock("../../lib/registry/client", () => ({
   namesakeSkills,
   lookupSkills,
@@ -80,7 +90,9 @@ beforeEach(() => {
 /** The persisted ledger's record for `name` (the store is JSONL). */
 function ledgerRecord(
   name: string,
-): { name: string; kind?: string; repo?: string; repos?: string[] } | undefined {
+):
+  | { name: string; kind?: string; repo?: string; repos?: string[] }
+  | undefined {
   return (localStorage.getItem("skill-one.provenance") ?? "")
     .split("\n")
     .filter((line) => line.trim())
@@ -258,7 +270,6 @@ describe("InstalledPage", () => {
       ]);
     });
 
-
     it("gives every source-less install a home in one repository-style card", async () => {
       const user = userEvent.setup();
       renderPage();
@@ -426,7 +437,6 @@ describe("InstalledPage", () => {
 
       expect(await screen.findByText("还没有安装任何技能")).toBeInTheDocument();
     });
-
   });
 
   describe("the per-card enable switch", () => {
@@ -581,7 +591,6 @@ describe("InstalledPage", () => {
         "opacity-60",
       );
     });
-
   });
 
   describe("the uninstalled pool", () => {
@@ -761,7 +770,6 @@ describe("InstalledPage", () => {
         }),
       ).not.toBeInTheDocument();
     });
-
   });
 
   describe("the detail drawer", () => {
@@ -899,6 +907,115 @@ describe("InstalledPage", () => {
       expect(await within(dialog).findByText("本地安装")).toBeInTheDocument();
     }, 20_000);
 
+    it("keeps the drawer open when the open skill is retagged", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(
+        await screen.findByRole("button", { name: "查看 pdf 详情" }),
+      );
+      const dialog = await screen.findByRole("dialog");
+
+      // The badge itself opens the tag menu — no separate affordance beside
+      // it — and the popover teleports outside the sheet element, so its
+      // contents are queried at the screen level like the link candidates.
+      await user.click(
+        within(dialog).getByRole("button", { name: "编辑 pdf 的标签" }),
+      );
+      await user.click(await screen.findByRole("button", { name: "开发编程" }));
+      await waitFor(async () =>
+        expect((await loadCustomTags()).skillTags).toEqual({
+          pdf: "development",
+        }),
+      );
+
+      // The choice was made inside the drawer, so unlike a scope or sort
+      // change it stays open — and the badge answers the choice live.
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(await within(dialog).findByText("开发编程")).toBeInTheDocument();
+    }, 20_000);
+
+    it("renames a custom tag from the drawer, moving assignments and the scope along", async () => {
+      const user = userEvent.setup();
+      seedMockCustomTags([{ key: "效率工具", label: "效率工具" }], {
+        pdf: "效率工具",
+      });
+      renderPage();
+      await pickDomain(user, /^效率工具/);
+
+      await user.click(
+        await screen.findByRole("button", { name: "查看 pdf 详情" }),
+      );
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("效率工具")).toBeInTheDocument();
+
+      // The pencil reuses the creation row as its editor, prefilled with the
+      // tag's own label; the popover teleports outside the sheet element, so
+      // both are queried at the screen level.
+      await user.click(
+        within(dialog).getByRole("button", { name: "编辑 pdf 的标签" }),
+      );
+      await user.click(
+        await screen.findByRole("button", { name: "重命名标签 效率工具" }),
+      );
+      const nameBox = await screen.findByRole("textbox", {
+        name: "新建标签…",
+      });
+      expect(nameBox).toHaveValue("效率工具");
+      await user.clear(nameBox);
+      await user.type(nameBox, "摸鱼神器");
+      await user.click(await screen.findByRole("button", { name: "保存" }));
+
+      // The assignment moved with the rename, the badge answers it, and the
+      // scope followed the new key — the answer never emptied out from under
+      // the reader, so the drawer stays open throughout.
+      await waitFor(async () =>
+        expect((await loadCustomTags()).skillTags).toEqual({
+          pdf: "摸鱼神器",
+        }),
+      );
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(await within(dialog).findByText("摸鱼神器")).toBeInTheDocument();
+      // The scope followed the rename: the 分类 trigger now names the new
+      // label. The drawer is open, so the toolbar behind it is inert and the
+      // trigger is read off the DOM rather than the a11y tree.
+      await waitFor(() =>
+        expect(
+          document.querySelector('button[aria-label="分类"]'),
+        ).toHaveTextContent("摸鱼神器"),
+      );
+    }, 20_000);
+
+    it("closes the drawer when clearing files the open skill out of the scoped answer", async () => {
+      const user = userEvent.setup();
+      seedMockCustomTags([], { pdf: "development" });
+      renderPage();
+      await pickDomain(user, /^开发编程/);
+
+      await user.click(
+        await screen.findByRole("button", { name: "查看 pdf 详情" }),
+      );
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("开发编程")).toBeInTheDocument();
+
+      // Clearing falls back to the store's classification — unclassified for
+      // this local install — which is outside the development scope, so the
+      // drawer closes instead of lingering on a skill the list no longer
+      // holds (leaving the stale key would pop it back open on 全部).
+      await user.click(
+        within(dialog).getByRole("button", { name: "编辑 pdf 的标签" }),
+      );
+      await user.click(
+        await screen.findByRole("button", { name: "恢复默认分类" }),
+      );
+      await waitFor(async () =>
+        expect((await loadCustomTags()).skillTags).toEqual({}),
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+    }, 20_000);
+
     it("does not open the drawer or the door from the bar's switch", async () => {
       const user = userEvent.setup();
       renderPage();
@@ -915,7 +1032,6 @@ describe("InstalledPage", () => {
         screen.queryByRole("button", { name: /展开 本地安装/ }),
       ).toBeNull();
     });
-
   });
 
   describe("what a row says about its source", () => {
@@ -953,15 +1069,17 @@ describe("InstalledPage", () => {
       // repository: the owner's face and the repo path. One skill, nothing to
       // reveal — so no figure rides the bar.
       await screen.findByText("anthropics/skills");
-      for (const bar of container.querySelectorAll('[data-slot="card-header"]')) {
+      for (const bar of container.querySelectorAll(
+        '[data-slot="card-header"]',
+      )) {
         expect(bar).not.toHaveTextContent(/个 skill/);
       }
       // The other five keep the pool card, whose bar names no repository.
       expect(screen.getAllByText("本地安装")).toHaveLength(1);
       // Only the sourced card can name an owner, so it carries the only face.
-      expect(container.querySelectorAll('ul [data-slot="avatar"]')).toHaveLength(
-        1,
-      );
+      expect(
+        container.querySelectorAll('ul [data-slot="avatar"]'),
+      ).toHaveLength(1);
     });
 
     it("links a sourced skill's detail drawer to its repo instead of 本地安装", async () => {
@@ -1012,7 +1130,9 @@ describe("InstalledPage", () => {
       expect(within(dialog).queryByText("安装量")).not.toBeInTheDocument();
 
       // The drawer's switch writes the same backend state the bar's does.
-      await user.click(within(dialog).getByRole("switch", { name: "关闭 pdf" }));
+      await user.click(
+        within(dialog).getByRole("switch", { name: "关闭 pdf" }),
+      );
       expect(
         await within(dialog).findByRole("switch", { name: "开启 pdf" }),
       ).toHaveAttribute("aria-checked", "false");
@@ -1069,7 +1189,6 @@ describe("InstalledPage", () => {
       expect(screen.queryByText("内容创作")).not.toBeInTheDocument();
       expect(screen.queryByTitle(/stars/)).toBeNull();
     });
-
   });
 
   describe("offering a store source", () => {
@@ -1151,7 +1270,6 @@ describe("InstalledPage", () => {
       // And pdf's card now names the source it was linked to on its own.
       await screen.findByText("anthropics/skills");
     });
-
   });
 
   describe("scoping and ordering", () => {
@@ -1565,9 +1683,9 @@ describe("InstalledPage", () => {
       await pickUnit(user, "列表");
       await pickSort(user, "热度");
       await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
-      expect(screen.getByRole("button", { name: "排序方式" })).toHaveTextContent(
-        "热度",
-      );
+      expect(
+        screen.getByRole("button", { name: "排序方式" }),
+      ).toHaveTextContent("热度");
 
       // Most-popular first, regardless of how fresh the install is; the
       // figure-less installs sink below every figure, and among themselves
@@ -1585,7 +1703,6 @@ describe("InstalledPage", () => {
         "查看 frontend-design 详情",
       ]);
     });
-
   });
 
   describe("counts in the skill unit", () => {
@@ -1624,13 +1741,15 @@ describe("InstalledPage", () => {
       expect(
         screen.getByRole("menuitemradio", { name: /^内容创作/ }),
       ).toHaveTextContent("2");
-      expect(screen.getByRole("menuitemradio", { name: /^全部/ })).toHaveTextContent(
-        "6",
-      );
+      expect(
+        screen.getByRole("menuitemradio", { name: /^全部/ }),
+      ).toHaveTextContent("6");
 
       // Scoping keeps the skills that belong to the domain, whoever they share a
       // source with: each keeps its own row.
-      await user.click(screen.getByRole("menuitemradio", { name: /^内容创作/ }));
+      await user.click(
+        screen.getByRole("menuitemradio", { name: /^内容创作/ }),
+      );
       await waitFor(() =>
         expect(
           screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
@@ -1640,9 +1759,9 @@ describe("InstalledPage", () => {
       // Back in the repository unit, 全部 counts cards again.
       await pickUnit(user, "仓库");
       await openDomainSelect(user);
-      expect(screen.getByRole("menuitemradio", { name: /^全部/ })).toHaveTextContent(
-        "2",
-      );
+      expect(
+        screen.getByRole("menuitemradio", { name: /^全部/ }),
+      ).toHaveTextContent("2");
     });
 
     it("walks the skill unit's newest-first time order in the detail drawer", async () => {
@@ -1665,7 +1784,6 @@ describe("InstalledPage", () => {
         await within(dialog).findByText("frontend-design"),
       ).toBeInTheDocument();
     });
-
   });
 
   /**
@@ -1746,8 +1864,8 @@ describe("InstalledPage", () => {
       await pickUnit(user, "仓库");
       await waitFor(() =>
         expect(
-          document.querySelector('[data-slot="card-header"]')!.firstElementChild!
-            .firstElementChild!.className,
+          document.querySelector('[data-slot="card-header"]')!
+            .firstElementChild!.firstElementChild!.className,
         ).toBe(rowInk),
       );
     });
@@ -1782,7 +1900,9 @@ describe("InstalledPage", () => {
      *  that is not inside a section" rather than by position, which would change
      *  the moment the parked section is unfolded. */
     function liveList(): HTMLElement {
-      const list = screen.getAllByRole("list").find((ul) => !ul.closest("section"));
+      const list = screen
+        .getAllByRole("list")
+        .find((ul) => !ul.closest("section"));
       if (!list) throw new Error("the live list is not on screen");
       return list;
     }
@@ -1990,9 +2110,8 @@ describe("InstalledPage", () => {
       // dependence on rows that are not mounted yet.
       for (const group of [liveList(), parkedSection()]) {
         expect(rowOrdinalsIn(group)).toEqual(
-          Array.from(
-            { length: group.querySelectorAll("li").length },
-            (_, i) => String(i + 1),
+          Array.from({ length: group.querySelectorAll("li").length }, (_, i) =>
+            String(i + 1),
           ),
         );
       }
@@ -2331,11 +2450,13 @@ describe("InstalledPage", () => {
       // browse list behind it still holds docx, and the answer has no section
       // of its own that could scope the assertion.)
       await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
-      expect(screen.getByText("pdf")).toBeInTheDocument();
+      // Both the installed answer and the store's highlight the hit, so the
+      // singular read is scoped to the region it names.
+      const own = await screen.findByRole("region", { name: "已安装" });
+      expect(within(own).getByText("pdf")).toBeInTheDocument();
       // The own group now carries the source's name and count, like every other
       // group: three sources answer one question, and the reader is told which
       // is which.
-      const own = await screen.findByRole("region", { name: "已安装" });
       expect(within(own).getByText("1 个仓库")).toBeInTheDocument();
       // The store's index is cheap and certain, so its answer is simply there
       // below the installed one — a titled group, open by default, counted.
@@ -2444,10 +2565,14 @@ describe("InstalledPage", () => {
       // The install the row carries is what this list manages, so the drawer it
       // opens wears the installed surface: no store install CTA — the skill is
       // already home, and the panel says so with the switch, not with a button.
-      await user.click(await screen.findByRole("button", { name: "查看 pdf 详情" }));
+      await user.click(
+        await screen.findByRole("button", { name: "查看 pdf 详情" }),
+      );
       expect(await screen.findByRole("dialog")).toBeInTheDocument();
       expect(
-        within(screen.getByRole("dialog")).queryByRole("button", { name: /安装/ }),
+        within(screen.getByRole("dialog")).queryByRole("button", {
+          name: /安装/,
+        }),
       ).not.toBeInTheDocument();
     });
 
@@ -2476,7 +2601,9 @@ describe("InstalledPage", () => {
       );
       // The store row wears the store's surface: the install CTA the installed
       // surface never offers.
-      await user.click(screen.getAllByRole("button", { name: "查看 pdf 详情" })[1]);
+      await user.click(
+        screen.getAllByRole("button", { name: "查看 pdf 详情" })[1],
+      );
       expect(
         await within(await screen.findByRole("dialog")).findByRole("button", {
           name: "已安装",
@@ -2540,9 +2667,7 @@ describe("InstalledPage", () => {
       // not leave the row: the field it stands beside would move under the
       // reader's cursor on every keystroke.
       await waitFor(() =>
-        expect(
-          screen.getByRole("button", { name: "排序方式" }),
-        ).toBeDisabled(),
+        expect(screen.getByRole("button", { name: "排序方式" })).toBeDisabled(),
       );
       await user.clear(screen.getByLabelText("搜索 Skill"));
       await waitFor(() =>
@@ -2583,4 +2708,4 @@ describe("InstalledPage", () => {
       expect(getListView().views.store).not.toHaveProperty("query");
     });
   });
-  });
+});

@@ -267,3 +267,47 @@ sources (`reconcileProvenance`), so what a row shows and what the ledger says
 cannot come from two different reads. Inside a running session the suggestion
 memo is cleared, so the next reconcile pass immediately re-runs the lookup and
 offers what remains.
+
+## Custom tags
+
+The store's domains are a fixed taxonomy, and a locally installed skill no
+store entry covers has no classification at all — it pools under 未分类 with
+every other unplaced install. Custom tags close that gap with two more ledger
+line kinds, read only by the installed list:
+
+```jsonc
+// A tag definition: the user taxonomy. The key is the trimmed label with
+// whitespace folded to `-`, so a Chinese label works verbatim — no slug to
+// invent. System domain keys are reserved and rejected at creation. `emoji`
+// is the tag's own mark, absent meaning the label's first character.
+{"kind":"tag-def","key":"效率工具","label":"效率工具","emoji":"🌟"}
+
+// One skill's chosen tag: a system domain key or a tag-def key. A single
+// override — last one wins — read ahead of the store's classification. An
+// empty `tag` clears the choice.
+{"kind":"skill-tag","name":"my-tool","tag":"效率工具"}
+```
+
+Key properties:
+
+- **Same file, separate maps.** Definitions are keyed by tag key and survive
+  skill prunes — an unused tag is still the user's taxonomy, not a stale
+  cache. Assignments are pruned with their skill, like source records.
+- **Single select, override semantics.** A chosen tag replaces the view's
+  `profile` at the installed page's one synthesis point, so filtering,
+  facets, badges, glyphs and the drawer all answer the choice through the
+  `domainsOf` they already read — no second code path. Clearing falls back
+  to the store's classification (or unclassified).
+- **Resolved like domains.** Definitions register into the domain resolvers
+  (`registerCustomTagMeta`), so a tag wears the 🏷️ mark wherever a system
+  domain wears its emoji, and the facet picker lists it with its count. The
+  store page never sees them: its rows answer the registry's taxonomy alone.
+- **Edited in the detail drawer.** The installed surface's classification
+  badge carries the tag picker: system domains, custom tags, a new-tag
+  field (a smile toggle plus the name — the toggle opens the full
+  `emoji-picker-react` panel, lazy-chunked with the Chinese dataset, and
+  wears the pick itself; leaving it blank files the tag under its first
+  character — creating files the skill at once), reset-to-default, and deletion of a tag no skill uses anymore (an
+  unused tag is the only deletable kind, so removing one can never orphan a
+  choice). Best-effort writes like every ledger update, refreshed through
+  `markSkillsChanged`.

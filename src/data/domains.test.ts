@@ -7,6 +7,7 @@ import {
   domainLabel,
   domainMeta,
   domainTooltip,
+  registerCustomTagMeta,
 } from "./domains";
 
 /**
@@ -91,5 +92,48 @@ describe("the domain taxonomy in English", () => {
       expect(domain.description.en.trim().length).toBeGreaterThan(0);
       expect(domain.description.zh.trim().length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("user tag registration", () => {
+  // Registration is additive and global: the key below is unique to this
+  // block so no other test can observe it, in either direction.
+  const KEY = "test-registration-tag-xyz";
+  const LABEL = "Test Registration Tag";
+
+  it("resolves a registered tag through every domain surface", () => {
+    expect(domainMeta(KEY)).toBeUndefined();
+    registerCustomTagMeta({
+      key: KEY,
+      name: { en: LABEL, zh: LABEL },
+      emoji: "🏷️",
+      description: { en: LABEL, zh: LABEL },
+    });    expect(domainMeta(KEY)?.name.zh).toBe(LABEL);
+    expect(domainLabel(KEY, "zh")).toBe(LABEL);
+    expect(domainEmoji([KEY])).toBe("🏷️");
+    expect(domainTooltip([KEY], "en")).toBe(LABEL);
+  });
+
+  it("never overwrites the static taxonomy, but lets a tag evolve", () => {
+    const before = domainMeta("development");
+    registerCustomTagMeta({
+      key: "development",
+      name: { en: "Hijack", zh: "Hijack" },
+      emoji: "🏷️",
+      description: { en: "Hijack", zh: "Hijack" },
+    });
+    expect(domainMeta("development")).toBe(before);
+    expect(domainLabel("development", "en")).toBe("Development");
+    // Re-registering our own key updates it — a label or mark the user
+    // changed — and drops the old spelling's lookup.
+    registerCustomTagMeta({
+      key: KEY,
+      name: { en: "Renamed Label", zh: "Renamed Label" },
+      emoji: "🌟",
+      description: { en: "Renamed Label", zh: "Renamed Label" },
+    });
+    expect(domainLabel(KEY, "en")).toBe("Renamed Label");
+    expect(domainEmoji([KEY])).toBe("🌟");
+    expect(domainMeta(LABEL)).toBeUndefined();
   });
 });

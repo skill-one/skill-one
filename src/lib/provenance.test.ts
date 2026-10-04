@@ -10,6 +10,11 @@ import {
   dismissSkillSource,
   loadPendingRecords,
   savePendingRecords,
+  loadCustomTags,
+  saveCustomTagDef,
+  renameCustomTagDef,
+  deleteCustomTagDef,
+  setSkillTag,
   ledgerLines,
   readLedgerRaw,
   resetMockProvenance,
@@ -453,6 +458,184 @@ describe("dismissSkillSource", () => {
     expect((await loadPendingRecords()).records["my-tool"]).toEqual({
       ...PENDING,
       repos: ["a/skills"],
+    });
+  });
+});
+
+// Custom tags ride the same ledger under their own maps: definitions keyed
+// by tag key (they survive skill prunes — an unused tag is still taxonomy),
+// assignments as skill name → tag key (pruned with their skill).
+
+describe("custom tag ledger lines", () => {
+  it("parses tag definitions and assignments beside skill records", () => {
+    const parsed = parseLedger(
+      [
+        JSON.stringify(SOURCE),
+        JSON.stringify({ kind: "tag-def", key: "效率工具", label: "效率工具" }),
+        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "效率工具" }),
+      ].join("\n"),
+    );
+    expect([...parsed.records.keys()]).toEqual(["pdf"]);
+    expect([...parsed.tagDefs.keys()]).toEqual(["效率工具"]);
+    expect(parsed.skillTags.get("pdf")).toBe("效率工具");
+  });
+
+  it("last one wins for both maps", () => {
+    const parsed = parseLedger(
+      [
+        JSON.stringify({ kind: "tag-def", key: "a", label: "First" }),
+        JSON.stringify({ kind: "tag-def", key: "a", label: "Second" }),
+        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "a" }),
+        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "testing" }),
+      ].join("\n"),
+    );
+    expect(parsed.tagDefs.get("a")).toEqual({ kind: "tag-def", key: "a", label: "Second" });
+    expect(parsed.skillTags.get("pdf")).toBe("testing");
+  });
+
+  it("reads an empty tag as the explicit clear", () => {
+    const parsed = parseLedger(
+      [
+        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "a" }),
+        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "" }),
+        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "  " }),
+      ].join("\n"),
+    );
+    expect(parsed.skillTags.has("pdf")).toBe(false);
+  });
+
+  it("skips tag lines without a usable key, label or name", () => {
+    const parsed = parseLedger(
+      [
+        JSON.stringify({ kind: "tag-def", key: "", label: "x" }),
+        JSON.stringify({ kind: "tag-def", key: "a" }),
+        JSON.stringify({ kind: "skill-tag", name: "", tag: "a" }),
+        JSON.stringify({ kind: "skill-tag", name: "pdf" }),
+        JSON.stringify({ kind: "tag-def", key: "kept", label: "Kept" }),
+      ].join("\n"),
+    );
+    expect([...parsed.tagDefs.keys()]).toEqual(["kept"]);
+    expect(parsed.skillTags.size).toBe(0);
+  });
+
+  it("serializes tags after the skill records, sorted for a stable diff", () => {
+    const text = serializeLedger(
+      '"e1"',
+      [SOURCE],
+      [
+        { kind: "tag-def", key: "b", label: "B" },
+        { kind: "tag-def", key: "a", label: "A" },
+      ],
+      [["pdf", "b"]],
+    );
+    const lines = text.split("\n").filter(Boolean);
+    expect(lines[0]).toBe(JSON.stringify(HEADER));
+    expect(lines[1]).toBe(JSON.stringify(SOURCE));
+    expect(lines[2]).toBe(JSON.stringify({ kind: "tag-def", key: "a", label: "A" }));
+    expect(lines[3]).toBe(JSON.stringify({ kind: "tag-def", key: "b", label: "B" }));
+    expect(lines[4]).toBe(JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "b" }));
+    // And the round trip keeps the maps apart: no tag line lands in records.
+    const parsed = parseLedger(text);
+    expect([...parsed.records.keys()]).toEqual(["pdf"]);
+    expect(parsed.skillTags.get("pdf")).toBe("b");
+  });
+});
+
+describe("custom tags browser store", () => {
+  beforeEach(() => resetMockProvenance());
+  afterEach(() => resetMockProvenance());
+
+  it("round-trips definitions and assignments through the persisted ledger", async () => {
+    await saveCustomTagDef("效率工具", "效率工具");
+    await setSkillTag("pdf", "效率工具");
+
+    expect(await loadCustomTags()).toEqual({
+      tagDefs: [{ key: "效率工具", label: "效率工具" }],
+      skillTags: { pdf: "效率工具" },
+    });
+  });
+
+  it("round-trips a tag's own mark", async () => {
+    await saveCustomTagDef("效率工具", "效率工具", "🌟");
+
+    expect(await loadCustomTags()).toEqual({
+      tagDefs: [{ key: "效率工具", label: "效率工具", emoji: "🌟" }],
+      skillTags: {},
+    });
+    // A re-save without a mark keeps the stored one honest: the ledger
+    // writes what well-formed lines carry, and the menu always passes the
+    // field through.
+    await saveCustomTagDef("效率工具", "效率工具");
+    expect((await loadCustomTags()).tagDefs).toEqual([
+      { key: "效率工具", label: "效率工具" },
+    ]);
+  });
+
+  it("replaces a skill's choice and clears it back to null", async () => {
+    await setSkillTag("pdf", "development");
+    await setSkillTag("pdf", "testing");
+    expect((await loadCustomTags()).skillTags).toEqual({ pdf: "testing" });
+
+    await setSkillTag("pdf", null);
+    expect((await loadCustomTags()).skillTags).toEqual({});
+  });
+
+  it("keeps tag lines when skill records are written around them", async () => {
+    await saveCustomTagDef("效率工具", "效率工具");
+    await recordSkillProvenance("anthropics/skills", "pdf");
+    await setSkillTag("pdf", "效率工具");
+
+    const { sources } = await reconcileProvenance(["pdf"]);
+    expect(sources.pdf?.repo).toBe("anthropics/skills");
+    expect(await loadCustomTags()).toEqual({
+      tagDefs: [{ key: "效率工具", label: "效率工具" }],
+      skillTags: { pdf: "效率工具" },
+    });
+  });
+
+  it("prunes a removed skill's choice but keeps its definition", async () => {
+    await saveCustomTagDef("效率工具", "效率工具");
+    await setSkillTag("pdf", "效率工具");
+    await reconcileProvenance(["other"]);
+
+    expect(await loadCustomTags()).toEqual({
+      tagDefs: [{ key: "效率工具", label: "效率工具" }],
+      skillTags: {},
+    });
+  });
+
+  it("deleting a definition drops the assignments pointing at it", async () => {
+    await saveCustomTagDef("效率工具", "效率工具");
+    await setSkillTag("pdf", "效率工具");
+    await setSkillTag("docx", "development");
+    await deleteCustomTagDef("效率工具");
+
+    expect(await loadCustomTags()).toEqual({
+      tagDefs: [],
+      skillTags: { docx: "development" },
+    });
+  });
+
+  it("renaming moves every assignment along in one pass", async () => {
+    await saveCustomTagDef("效率工具", "效率工具", "🌟");
+    await setSkillTag("pdf", "效率工具");
+    await setSkillTag("docx", "效率工具");
+    await setSkillTag("pptx", "development");
+    await renameCustomTagDef("效率工具", "摸鱼神器", "摸鱼神器", "🎣");
+
+    expect(await loadCustomTags()).toEqual({
+      tagDefs: [{ key: "摸鱼神器", label: "摸鱼神器", emoji: "🎣" }],
+      skillTags: { pdf: "摸鱼神器", docx: "摸鱼神器", pptx: "development" },
+    });
+  });
+
+  it("renaming a missing tag writes nothing", async () => {
+    await setSkillTag("pdf", "development");
+    await renameCustomTagDef("ghost", "spook", "Spook");
+
+    expect(await loadCustomTags()).toEqual({
+      tagDefs: [],
+      skillTags: { pdf: "development" },
     });
   });
 });

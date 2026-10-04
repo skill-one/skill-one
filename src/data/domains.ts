@@ -208,6 +208,44 @@ export function domainMeta(nameOrKey: string): DomainMeta | undefined {
   return BY_KEY.get(nameOrKey) ?? BY_NAME.get(nameOrKey);
 }
 
+/**
+ * Register user-defined tags so every domain surface resolves them: the list
+ * glyph (`domainEmoji`), the badge (`domainMeta`/`domainLabel`/`domainTooltip`)
+ * and the facet picker. Additive for new keys, updating for tags registered
+ * before (a label or mark the user changed) — and never for the static
+ * taxonomy, so no later write can corrupt a system domain. Callers must
+ * reject system keys before building the meta (see `lib/custom-tags`); the
+ * guard here stays as the second lock.
+ */
+const CUSTOM_TAG_KEYS = new Set<string>();
+
+export function registerCustomTagMeta(meta: DomainMeta): void {
+  if (!CUSTOM_TAG_KEYS.has(meta.key)) {
+    // A known key that is not ours is the static taxonomy: hands off.
+    if (BY_KEY.has(meta.key)) return;
+    CUSTOM_TAG_KEYS.add(meta.key);
+  } else {
+    // Re-registering our own key: drop the old name lookups first, so a
+    // renamed label leaves no stale spelling resolving to the old meta.
+    const prev = BY_KEY.get(meta.key);
+    if (prev) {
+      for (const [name, target] of BY_NAME) {
+        if (target === prev) BY_NAME.delete(name);
+      }
+    }
+  }
+  // Key resolution always wins: a tag whose label happens to read like a
+  // system display name still resolves by its own key, while name lookup
+  // keeps the system's priority.
+  BY_KEY.set(meta.key, meta);
+  if (!BY_NAME.has(meta.name.en)) BY_NAME.set(meta.name.en, meta);
+  // A tag carries one user-given name for both locales; index it once more
+  // under the zh slot only when it actually differs.
+  if (meta.name.zh !== meta.name.en && !BY_NAME.has(meta.name.zh)) {
+    BY_NAME.set(meta.name.zh, meta);
+  }
+}
+
 /** The display label for a domain key in a locale; the raw key when stale. */
 export function domainLabel(key: string, locale: AppLocale): string {
   return BY_KEY.get(key)?.name[locale] ?? key;
