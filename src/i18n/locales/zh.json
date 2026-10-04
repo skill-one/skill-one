@@ -159,12 +159,38 @@
       "enabledSuffix": "已启用",
       "tagline": "安装一次，全 agents 直接使用",
       "noneEnabled": "还没有启用的技能",
-      "overflowAria": "还有 {{count}} 个技能未在瓶中展示",
+      "overflowAria": "还有 {{count}} 个技能未在面板中展示",
       "browseStore": "商店",
-      "manage": "管理"
+      "manage": "管理",
+      "activeSkills": "已启用技能",
+      "coverage": "已连接 {{linked}}/{{total}} 个 Agent",
+      "openSkill": "在「我的技能」中查看"
     },
     "head": {
-      "linkedAgents": "已连接 {{count}} 个 agents"
+      "title": "Agents 网络",
+      "linkedAgents": "已连接 {{count}} 个 agents",
+      "refresh": "重新检测",
+      "refreshing": "检测中..."
+    },
+    "state": {
+      "linked": "已连接",
+      "unlinked": "未连接",
+      "warning": "待处理",
+      "canonical": "原生宿主"
+    },
+    "detail": {
+      "title": "{{name}} 详情",
+      "status": "链接状态",
+      "toggleLink": "启用技能共享",
+      "canonicalDesc": "此 Agent 为 SkillOne 宿主目录，所有技能在此集中管理与分发。",
+      "skillsDir": "配置目录",
+      "copyPath": "复制路径",
+      "pathCopied": "已复制路径",
+      "internalSkills": "检测到本地原有技能",
+      "internalOthers": "检测到本地其他文件",
+      "warningNotice": "开启共享后将由 SkillOne 统一管理。本地已有技能将合并入库，非技能文件将移入安全隔离区备份。",
+      "syncedSkills": "生效技能（{{count}}）",
+      "noSyncedSkills": "暂无生效技能"
     }
   },
   "agentLink": {

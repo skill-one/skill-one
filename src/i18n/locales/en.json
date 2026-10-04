@@ -159,12 +159,38 @@
       "enabledSuffix": "enabled",
       "tagline": "Install once, use in every agent",
       "noneEnabled": "No enabled skills yet",
-      "overflowAria": "{{count}} more skills not shown in the jar",
+      "overflowAria": "{{count}} more skills not shown",
       "browseStore": "Store",
-      "manage": "Manage"
+      "manage": "Manage",
+      "activeSkills": "Active Skills",
+      "coverage": "Connected {{linked}}/{{total}} Agents",
+      "openSkill": "View in My Skills"
     },
     "head": {
-      "linkedAgents": "{{count}} agents connected"
+      "title": "Agents Network",
+      "linkedAgents": "{{count}} agents connected",
+      "refresh": "Refresh",
+      "refreshing": "Checking..."
+    },
+    "state": {
+      "linked": "Linked",
+      "unlinked": "Unlinked",
+      "warning": "Attention",
+      "canonical": "Host"
+    },
+    "detail": {
+      "title": "{{name}} Details",
+      "status": "Link Status",
+      "toggleLink": "Enable skill sharing",
+      "canonicalDesc": "This agent hosts the central skill directory where all skills are managed.",
+      "skillsDir": "Configuration Directory",
+      "copyPath": "Copy path",
+      "pathCopied": "Path copied",
+      "internalSkills": "Existing Local Skills",
+      "internalOthers": "Other Local Files",
+      "warningNotice": "Enabling sharing allows SkillOne to manage skills. Existing local skills will be merged, and non-skill files quarantined safely.",
+      "syncedSkills": "Active Skills ({{count}})",
+      "noSyncedSkills": "No active skills"
     }
   },
   "agentLink": {

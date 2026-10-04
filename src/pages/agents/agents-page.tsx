@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Columns2, Loader2, Users, Waypoints } from "lucide-react";
+import { Columns2, Loader2, RefreshCw, Users, Waypoints } from "lucide-react";
 
 import { fetchAgentStatus } from "../../lib/local-skills";
 import { agentLinkState } from "../../lib/agent-link-state";
@@ -17,24 +17,22 @@ import { AgentGraph } from "./agent-graph";
 
 /**
  * The agents page — the app's home. Every agent this machine detects is drawn
- * into one hub-and-spoke graph (see `AgentGraph`): the picture is the product,
- * one SkillOne core with every agent's skills flowing into it — which is why the
- * window opens here and the brand in the header leads back. The head states the
- * one figure worth stating up front — how many agents are linked — and the hub
- * card at the picture's centre carries the skill totals; linking is done
- * straight from each agent's card and stays automatic everywhere else.
+ * into one hub-and-spoke graph (see `AgentGraph`). The central dashboard card
+ * displays skill totals, active status and quick actions; linking is controlled
+ * via explicit switches and inspection dialogs on each agent card.
  */
 export function AgentsPage() {
   const { t } = useTranslation();
-  // The presentation reads live so a change re-renders the graph without a
-  // remount. The toggle below flips it; the choice persists across launches.
   const layoutMode = useAgentsLayout();
   const toColumns = layoutMode === "constellation";
+
   const {
     data: agents,
     isLoading,
     isError,
     error,
+    refetch,
+    isFetching,
   } = useQuery({
     queryKey: ["agent-status"],
     queryFn: fetchAgentStatus,
@@ -42,62 +40,78 @@ export function AgentsPage() {
   });
 
   const list = agents ?? [];
-  // The count answers what the picture shows: the canonical agent reads as
-  // linked=false on the wire (it never needed a link — it hosts the shared
-  // dir), so the raw field undercounts by one against the graph's own
-  // ribbons. Every state on this page derives from `agentLinkState`.
   const linkedCount = list.filter(
     (agent) => agentLinkState(agent) === "linked",
   ).length;
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The home's head states the one figure worth stating up front — how
-          many agents are linked — and leaves the rest to the picture: the
-          skill totals live on the hub card at its centre, and linking is done
-          straight from each agent's card. No way back — this is where the
-          window opens (see the app's routes), so there is nowhere above it to
-          go. The single toggle flips the graph between the columns and the
-          constellation; its face names the way it goes, not where it is. */}
-      <div className="mb-4 flex min-w-0 items-center gap-3">
+      <div className="mb-4 flex min-w-0 items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-medium text-muted-foreground">
             {t("agents.head.linkedAgents", { count: linkedCount })}
           </h1>
         </div>
 
-        <div className="flex shrink-0 items-center rounded-lg border border-border bg-card p-0.5">
+        <div className="flex shrink-0 items-center gap-1.5">
+          {/* Refresh Agent Detection Button */}
           <Tooltip>
             <TooltipTrigger
               render={
                 <button
                   type="button"
                   aria-label={t(
-                    toColumns
-                      ? "agents.layout.switchToColumns"
-                      : "agents.layout.switchToConstellation",
+                    isFetching ? "agents.head.refreshing" : "agents.head.refresh",
                   )}
-                  onClick={() =>
-                    setAgentsLayout(toColumns ? "columns" : "constellation")
-                  }
-                  className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => void refetch()}
+                  disabled={isFetching}
+                  className="flex size-7 items-center justify-center rounded-md border border-border bg-card text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 >
-                  {toColumns ? (
-                    <Columns2 className="size-4" />
-                  ) : (
-                    <Waypoints className="size-4" />
-                  )}
+                  <RefreshCw
+                    className={`size-3.5 ${isFetching ? "animate-spin" : ""}`}
+                  />
                 </button>
               }
             />
             <TooltipContent side="bottom">
-              {t(
-                toColumns
-                  ? "agents.layout.switchToColumns"
-                  : "agents.layout.switchToConstellation",
-              )}
+              {t("agents.head.refresh")}
             </TooltipContent>
           </Tooltip>
+
+          {/* Layout Toggle Button */}
+          <div className="flex items-center rounded-lg border border-border bg-card p-0.5">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label={t(
+                      toColumns
+                        ? "agents.layout.switchToColumns"
+                        : "agents.layout.switchToConstellation",
+                    )}
+                    onClick={() =>
+                      setAgentsLayout(toColumns ? "columns" : "constellation")
+                    }
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {toColumns ? (
+                      <Columns2 className="size-4" />
+                    ) : (
+                      <Waypoints className="size-4" />
+                    )}
+                  </button>
+                }
+              />
+              <TooltipContent side="bottom">
+                {t(
+                  toColumns
+                    ? "agents.layout.switchToColumns"
+                    : "agents.layout.switchToConstellation",
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </div>
 

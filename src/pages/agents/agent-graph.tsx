@@ -1,32 +1,23 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Loader2 } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { Link } from "react-router";
+import { AlertCircle, Info, Loader2 } from "lucide-react";
 
-import type { AgentStatus, InstalledSkill } from "../../lib/skills-manager";
+import type { AgentStatus } from "../../lib/skills-manager";
 import { agentLinkState } from "../../lib/agent-link-state";
 import { useAgentLinkToggle } from "../../hooks/use-agent-link-toggle";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
-import { useSkillProvenance } from "../../hooks/use-skill-provenance";
-import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
-import { domainEmoji } from "../../data/domains";
 import { AgentIcon } from "../../components/agent-icon";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "../../components/ui/hover-card";
+import { Switch } from "../../components/ui/switch";
 import { cn } from "../../lib/utils";
 import { useAgentEdgeColor } from "../../hooks/use-agent-edge-color";
-import { JAR_CAPACITY, HubJar } from "./hub-jar";
+import { HubDashboard } from "./hub-dashboard";
+import { AgentDetailDialog } from "./agent-detail-dialog";
 import {
   layoutAgents,
   resolveGraphWidth,
   HUB_CARD_HALF,
   HUB_CARD_HALF_COLUMNS,
   type AgentsLayoutMode,
-  type GraphLayout,
   type NodeLayout,
 } from "./agent-graph-layout";
 
@@ -41,61 +32,26 @@ function enterStagger(col: number | undefined, index: number): number {
   return index * 0.05;
 }
 
-/**
- * The staged hover pulse. With no hover every ribbon is fully still. While
- * one agent is hovered its shimmer first runs inward into the hub (collect —
- * that agent "installs" its skill), and the hub then hands it back out to
- * everyone else (broadcast — their shimmers run outward); the two phases
- * alternate until the pointer leaves.
- *
- * Each hover pass is a single run a touch faster than an idle glance, and it
- * fades in and out, so the slider always completes and never starts a second
- * round it cannot finish.
- */
 export const HOVER_MS = 750;
 const HOVER_SECONDS = HOVER_MS / 1000;
-/** The dash's travel, in path-normalised units (see `pathLength`). */
 const SHIMMER_TRAVEL = 1;
-/**
- * One shimmer dash per ribbon. Its dash-plus-gap run (1.01) is a hair longer
- * than the path (normalised to 1 by `pathLength`), so a single slider never
- * splits into two at the seam as it wraps.
- */
 const SHIMMER_DASHARRAY = "0.08 0.93";
 
 type Pulse = "idle" | "collect" | "broadcast";
 
-/** How one ribbon's shimmer behaves in the current phase. */
 interface ShimmerFlow {
   visible: boolean;
   inward: boolean;
-  /** How many times the pass repeats — one for hover phases, never looping. */
   repeat: number;
-  /** How long one pass along the ribbon takes. */
   seconds: number;
-  /** Opacity target — a scalar, or keyframes when the pass fades in and out. */
   opacity: number | number[];
-  /** Keyframe timing, present only when `opacity` is a keyframe array. */
   times?: number[];
 }
 
 /**
- * The agents graph: every detected agent is one bare icon on a Vogel spiral
- * around the SkillOne hub — casually scattered to every side, evenly spaced
- * and never overlapping, shrinking to fit a long roster. A thin ribbon draws
- * from each icon into the hub with one shared swirl, and its look is the
- * agent's link state alone — a quiet static line: a hub-gray to icon-color
- * gradient for linked agents, amber dashes when the agent's own directory
- * already holds content a link would adopt, gray dots when unlinked. Nothing self-animates; only
- * hovering an agent wakes the pulse — its own shimmer first flows into the
- * hub (collect), then the hub hands the skill back out to every other linked
- * agent (broadcast), alternating until the pointer leaves. The pill says the
- * name outright beside its face; the face and edge alone carry the state,
- * and a click links or unlinks it outright.
- *
- * Geometry comes from the pure `layoutAgents` — one layout renders both the
- * SVG ribbons and the absolutely-positioned HTML above it — so this file is
- * presentation only.
+ * The agents graph: detected agents distributed around the SkillOne hub.
+ * Visual representation of the central skill sharing ecosystem with
+ * dedicated switch controls and inspection dialogs for safety.
  */
 export function AgentGraph({
   agents,
@@ -107,12 +63,12 @@ export function AgentGraph({
   const [ref, size] = useElementSize();
   const [active, setActive] = useState<string | null>(null);
   const [pulse, setPulse] = useState<Pulse>("idle");
+  const [selectedAgent, setSelectedAgent] = useState<AgentStatus | null>(null);
+
   const { toggle, busyFor } = useAgentLinkToggle();
   const { data: skills, isLoading: skillsLoading } = useInstalledSkills();
 
-  // While an agent is hovered, alternate collect (its shimmer into the hub)
-  // and broadcast (everyone else's shimmer back out) on a loop; on leave the
-  // whole graph settles to full stillness.
+  // Hover pulse alternation: collect -> broadcast
   useEffect(() => {
     if (active === null) {
       setPulse("idle");
@@ -132,19 +88,17 @@ export function AgentGraph({
     return () => window.clearTimeout(timer);
   }, [active]);
 
-  // The canvas is always exactly the measured box — it never grows, so there
-  // is no scroller. The window's minimum size keeps the roster on one screen.
   const graphWidth = resolveGraphWidth(size.width);
   const layout = useMemo(
     () => layoutAgents(agents, graphWidth, size.height, mode),
     [agents, graphWidth, size.height, mode],
   );
 
+  const hubWidth =
+    mode === "columns" ? HUB_CARD_HALF_COLUMNS * 2 : HUB_CARD_HALF * 2;
+
   return (
     <div ref={ref} className="h-full w-full overflow-hidden" data-pulse={pulse}>
-      {/* Keyed by presentation: flipping constellation/columns remounts the
-          whole picture so the entrance cascade replays instead of hard-cutting
-          every node to its new spot. */}
       <div key={mode} className="relative" style={{ width: layout.width }}>
         <svg
           width={layout.width}
@@ -167,8 +121,6 @@ export function AgentGraph({
           ))}
         </svg>
 
-        {/* The icons and hub float above the ribbons; the wrapper itself lets
-            pointer events through to anything not covered by a control. */}
         <div className="pointer-events-none absolute inset-0">
           {agents.map((agent, i) => (
             <AgentNode
@@ -178,35 +130,47 @@ export function AgentGraph({
               index={i}
               busy={busyFor(agent.name)}
               onHover={setActive}
+              onOpenDetail={(target) => setSelectedAgent(target)}
               onToggleLink={(link) => toggle.mutate({ name: agent.name, link })}
             />
           ))}
-          <HubDisk
-            hub={layout.hub}
-            agents={agents}
-            skills={skills ?? []}
-            loading={skillsLoading && !skills}
-            mode={mode}
-          />
+
+          {/* Central Hub Dashboard */}
+          <div
+            className="pointer-events-auto absolute"
+            style={{
+              left: layout.hub.x,
+              top: layout.hub.y,
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            <HubDashboard
+              agents={agents}
+              skills={skills ?? []}
+              loading={skillsLoading && !skills}
+              width={hubWidth}
+            />
+          </div>
         </div>
       </div>
+
+      {/* Agent Detail Dialog */}
+      <AgentDetailDialog
+        agent={selectedAgent}
+        open={selectedAgent !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedAgent(null);
+        }}
+        onToggleLink={(name, link) => toggle.mutate({ name, link })}
+        busy={selectedAgent ? busyFor(selectedAgent.name) : false}
+        installedSkills={skills ?? []}
+      />
     </div>
   );
 }
 
 /**
  * One agent-to-hub ribbon.
- *
- * Unlinked states are one plain static path, never animated and never lifted
- * — amber dashes for content a link would adopt, gray dots otherwise. A
- * linked ribbon is one thin gradient line that draws itself in on mount and
- * otherwise stays still: faint neutral at the hub, warming to the average
- * color of the agent's own icon at its tile (neutral all the way while the
- * icon is still loading or has no usable color). Only while an agent is
- * hovered does the staged pulse move a shimmer — into the hub from the
- * hovered agent (collect), then back out of the hub to every other linked
- * agent (broadcast). There is deliberately no glow layer: the picture stays
- * quiet, the icons own the attention.
  */
 function Ribbon({
   agent,
@@ -223,7 +187,6 @@ function Ribbon({
   from: { x: number; y: number };
   hub: { x: number; y: number };
   index: number;
-  /** Columns-mode column index: the ribbon draws with its column's cascade. */
   col?: number;
   pulse: Pulse;
   lifted: boolean;
@@ -234,8 +197,6 @@ function Ribbon({
   const gradientId = `edge-${agent.name.replace(/[^a-z0-9-]/gi, "-")}`;
 
   if (state !== "linked") {
-    // A link that is not there stays quiet always — hovering its icon neither
-    // brightens nor moves its line. Only linked ribbons answer a hover.
     return (
       <g data-agent={agent.name} data-state={state} data-lifted="false">
         <path
@@ -254,12 +215,6 @@ function Ribbon({
     );
   }
 
-  // This ribbon's shimmer for the current pulse phase. Idle: nothing flows at
-  // all. Collect: the hovered ribbon flows inward once, the rest are silent.
-  // Broadcast: the hovered ribbon goes quiet and every other linked ribbon
-  // flows outward once. A ribbon that is neither the collector nor part of
-  // the broadcast mounts no shimmer, so switching phase cancels the old run
-  // outright instead of leaving a second slider gliding on.
   const shimmer: ShimmerFlow =
     pulse === "idle"
       ? {
@@ -310,10 +265,6 @@ function Ribbon({
       data-lifted={lifted ? "true" : "false"}
       data-flow={lifted ? "in" : "out"}
     >
-      {/* The one quiet core line; it brightens and thickens on hover. When
-          the icon's average color has resolved the stroke is a hub-to-tile
-          gradient — faint neutral at the hub, its own color at the tile;
-          otherwise one flat neutral line. */}
       <defs>
         {edgeColor && (
           <linearGradient
@@ -357,9 +308,6 @@ function Ribbon({
               }
         }
       />
-      {/* One shimmer, keyed by its direction and mounted only while it has a
-          flow, so a phase switch cancels the old run outright. Negative
-          offset travels toward the hub (collect), positive away (broadcast). */}
       {!reduceMotion && shimmer.visible && (
         <motion.path
           key={shimmer.inward ? "in" : "out"}
@@ -394,221 +342,8 @@ function Ribbon({
 }
 
 /**
- * The hub: the container card pinned at the constellation's centre. The
- * geometry (hub.x/y) is unchanged so ribbons still converge underneath it —
- * the card is opaque and covers their tips.
- *
- * The hub is one abstract **jar** holding the enabled skills as tiny title
- * cards, resting in a loose seeded heap at the bottom of a fixed field. The
- * heap is real physics — a matter-js run with seeded spawns, gravity and three
- * compaction taps — but it is **solved, not poured**: the run goes to its end
- * in one pass and only where each card came to rest is kept, so the jar looks
- * exactly as the animation used to leave it while nothing ever moves (see
- * `HubJar`). The jar is sized to hold fifty cards — a full roster, not a
- * preview. The jar holds the enabled skills and only those: the number in its
- * border and the cards inside it are the same set, so the figure never promises
- * cards the jar does not have. With nothing enabled the jar is empty and says
- * so. There is no card chrome around it and no prose on it: the one figure it
- * states — how many enabled skills it holds — sits **in the border line itself**,
- * the way a fieldset's legend interrupts its own frame, and a roster past the
- * jar's capacity states the remainder as a quiet `+n` chip riding the rim. The
- * attention count rides the opposite corner when something needs it.
- */
-function HubDisk({
-  hub,
-  agents,
-  skills,
-  loading,
-  mode,
-}: {
-  hub: GraphLayout["hub"];
-  agents: AgentStatus[];
-  skills: InstalledSkill[];
-  loading: boolean;
-  mode: AgentsLayoutMode;
-}) {
-  const { t } = useTranslation();
-  const total = skills.length;
-  const enabled = useMemo(
-    () => skills.filter((skill) => skill.enabled),
-    [skills],
-  );
-  const attentionCount = agents.filter(
-    (agent) => agentLinkState(agent) === "warning",
-  ).length;
-  // The jar's contents: the enabled skills and nothing else, up to the jar's
-  // own capacity — the jar is sized to hold exactly this many. The border's
-  // figure counts the same set, so the number on the frame and the cards under
-  // it never disagree. Past the capacity the jar stays whole and the remainder
-  // is stated, never silently dropped.
-  const jarred = enabled.slice(0, JAR_CAPACITY);
-  const overflow = enabled.length - jarred.length;
-
-  // Every card's classification emoji. An on-disk record carries no
-  // classification, so each skill resolves through the provenance ledger to
-  // its registry entry's profile — the same join the installed list uses —
-  // and `domainEmoji` answers the ❓ of the unclassified for the rest.
-  // Empty until the ledger and the registry answer; the jar renders initials
-  // meanwhile and repaints when the marks land.
-  const { data: provenance } = useSkillProvenance();
-  const storeEntries = useInstalledStoreEntries(provenance?.linked);
-  const emojis = useMemo(() => {
-    const marks = new Map<string, string>();
-    for (const skill of skills) {
-      marks.set(
-        skill.name,
-        domainEmoji(storeEntries[skill.name]?.profile?.domain),
-      );
-    }
-    return marks;
-  }, [skills, storeEntries]);
-
-  // The columns presentation keeps a narrower central lane, so the card
-  // renders slimmer there; widths stay in sync with the layout clearance
-  // constants.
-  const width =
-    mode === "columns" ? HUB_CARD_HALF_COLUMNS * 2 : HUB_CARD_HALF * 2;
-
-  return (
-    <div
-      className="pointer-events-auto absolute"
-      style={{
-        left: hub.x,
-        top: hub.y,
-        width,
-        transform: "translate(-50%, -50%)",
-      }}
-    >
-      {/* `figure`, not a bare div: the jar is a self-contained figure with a
-          caption (the legend below), and the role is what makes its
-          `aria-label` reach assistive tech at all — `aria-label` on a generic
-          div is silently dropped, which is also why tests query it by role
-          rather than by a test id. */}
-      <div
-        role="figure"
-        aria-label={t("agents.hub.diskAria", {
-          enabled: enabled.length,
-          total,
-        })}
-        className="relative"
-      >
-        {/* The legend sits in the jar's own border line — a fieldset's
-            legend, not a caption above it: the one figure the jar states,
-            read as part of the frame rather than as prose on the page. It
-            rides the border's centre, the count set large with the word
-            beside it small. The count is the **enabled** roster, the same
-            set the jar holds. It is also a hover card: resting on it opens
-            the details — the enabled share of the installed total, the idea
-            in one line, and the two shortest paths out (store, manage).
-            The hover card keeps itself open while the pointer crosses to
-            its links, so a rest, not a click, is all the details ask. */}
-        <HoverCard>
-          <HoverCardTrigger
-            delay={120}
-            closeDelay={120}
-            render={
-              <button
-                type="button"
-                className="absolute top-0 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-baseline gap-1 rounded-full border border-border bg-background py-0.5 pr-2.5 pl-2.5 outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring data-open:bg-muted/60"
-              >
-                <span className="text-base leading-none font-semibold tabular-nums">
-                  {enabled.length}
-                </span>
-                <span className="text-[10px] leading-none font-medium text-muted-foreground">
-                  {t("agents.hub.skillsLabel")}
-                </span>
-              </button>
-            }
-          />
-          <HoverCardContent
-            side="top"
-            sideOffset={8}
-            className="w-60 gap-2 rounded-xl p-3.5"
-          >
-            <div
-              data-slot="hub-popover-stats"
-              className="flex items-baseline gap-1"
-            >
-              <span className="text-sm leading-none font-semibold tabular-nums">
-                {enabled.length}
-              </span>
-              <span className="text-sm leading-none text-muted-foreground">
-                /
-              </span>
-              <span className="text-sm leading-none tabular-nums">{total}</span>
-              <span className="text-xs leading-none text-muted-foreground">
-                {t("agents.hub.enabledSuffix")}
-              </span>
-            </div>
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              {t("agents.hub.tagline")}
-            </p>
-            <div className="-mx-3.5 h-px bg-border" />
-            <div className="flex gap-2">
-              <Link
-                to="/explore"
-                className="flex h-7 flex-1 items-center justify-center rounded-lg bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-              >
-                {t("agents.hub.browseStore")}
-              </Link>
-              <Link
-                to="/installed"
-                className="flex h-7 flex-1 items-center justify-center rounded-lg border border-border text-xs font-medium transition-colors hover:bg-muted/60"
-              >
-                {t("agents.hub.manage")}
-              </Link>
-            </div>
-          </HoverCardContent>
-        </HoverCard>
-
-        {/* The jar: the field the cards are laid out in. It clips at the rim,
-            so an over-capacity roster reads as a jar filled to the neck, with
-            the remainder stated by the `+n` chip on the opposite corner from
-            the attention chip. */}
-        {loading ? (
-          <div className="flex h-[190px] items-center justify-center rounded-xl border border-border/60 bg-muted/50">
-            <Loader2
-              className="size-5 animate-spin text-muted-foreground"
-              aria-hidden="true"
-            />
-          </div>
-        ) : (
-          <div className="relative h-[190px] overflow-hidden rounded-xl border border-border/60 bg-muted/50">
-            {jarred.length === 0 ? (
-              <p className="flex h-full items-center justify-center px-2 text-[11px] text-muted-foreground">
-                {t("agents.hub.noneEnabled")}
-              </p>
-            ) : (
-              <HubJar skills={jarred} emojis={emojis} className="h-full w-full" />
-            )}
-            {overflow > 0 && (
-              <p
-                title={t("agents.hub.overflowAria", { count: overflow })}
-                className="absolute left-2 top-2 rounded-full bg-background/80 px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground"
-              >
-                +{overflow}
-              </p>
-            )}
-            {attentionCount > 0 && (
-              <p className="absolute right-2 top-2 rounded-full bg-background/80 px-1.5 text-[10px] font-medium text-amber-600 tabular-nums dark:text-amber-500">
-                {t("agents.attention", { count: attentionCount })}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * One agent's node: a pill carrying its brand face and its name. The link
- * state is carried by the ribbon and echoed without words on the pill's edge
- * (dashed when unlinked, amber when its own directory holds content) and on
- * the face itself (greyed out when switched off). The pill is the switch:
- * clicking it links or unlinks outright (a canonical agent's native directory
- * cannot be switched off, so its pill is inert). Longer names truncate inside
- * the fixed label slot the layout reserves.
+ * Agent node pill: displays brand icon, title, attention badges,
+ * and a dedicated switch toggle to safely disconnect/connect.
  */
 function AgentNode({
   agent,
@@ -616,6 +351,7 @@ function AgentNode({
   index,
   busy,
   onHover,
+  onOpenDetail,
   onToggleLink,
 }: {
   agent: AgentStatus;
@@ -623,6 +359,7 @@ function AgentNode({
   index: number;
   busy: boolean;
   onHover: (name: string | null) => void;
+  onOpenDetail: (agent: AgentStatus) => void;
   onToggleLink: (link: boolean) => void;
 }) {
   const reduceMotion = useReducedMotion();
@@ -634,14 +371,8 @@ function AgentNode({
     <motion.div
       className="absolute"
       style={{ left: node.x, top: node.y, width: node.width }}
-      // Hover lives on the wrapper, not the button: a canonical icon is a
-      // disabled button, which some webviews (WKWebView) send no pointer
-      // events to — its ribbon must still lift on hover.
       onMouseEnter={() => onHover(agent.name)}
       onMouseLeave={() => onHover(null)}
-      // Entrance drift: outward along the spiral ray, or sideways in columns.
-      // Columns cascade a column at a time (see `enterStagger`); the
-      // constellation ripples agent by agent.
       initial={
         reduceMotion
           ? undefined
@@ -675,18 +406,16 @@ function AgentNode({
         onFocus={() => onHover(agent.name)}
         onBlur={() => onHover(null)}
         className={cn(
-          "pointer-events-auto relative flex w-full cursor-pointer items-center gap-2 rounded-lg border bg-card pr-3 pl-1.5 outline-none transition-colors",
+          "pointer-events-auto relative flex w-full cursor-pointer items-center gap-1.5 rounded-lg border bg-card pr-2 pl-1.5 outline-none transition-colors",
           "hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-default",
           state === "warning"
-            ? "border-amber-500/50 hover:border-amber-500/70"
+            ? "border-amber-500/50 bg-amber-500/5 hover:border-amber-500/70"
             : state === "unlinked"
               ? "border-dashed border-border hover:border-primary/40"
               : "border-border hover:border-primary/40",
         )}
         style={{ height: node.height }}
       >
-        {/* The macOS-app-style icon box; the glyph fills it (the brand SVGs
-            already carry their own small safe margin inside the viewBox). */}
         <span
           className="shrink-0"
           style={{ width: node.height - 12, height: node.height - 12 }}
@@ -697,9 +426,52 @@ function AgentNode({
             className={cn(!linked && "opacity-50 grayscale")}
           />
         </span>
-        <span className="min-w-0 flex-1 truncate text-left text-[13px] font-medium">
+
+        <span className="min-w-0 flex-1 truncate text-left text-[12px] font-medium">
           {agent.display}
         </span>
+
+        {/* Info button for details */}
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={`${agent.display} details`}
+          title={`${agent.display} details`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenDetail(agent);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.stopPropagation();
+              onOpenDetail(agent);
+            }
+          }}
+          className="flex shrink-0 items-center justify-center size-5 rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+        >
+          {state === "warning" ? (
+            <AlertCircle className="size-3.5 text-amber-500" />
+          ) : (
+            <Info className="size-3.5" />
+          )}
+        </span>
+
+        {/* Dedicated Switch Toggle */}
+        <span
+          className="shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          <Switch
+            size="sm"
+            checked={linked}
+            disabled={pinned || busy}
+            aria-label={`${agent.display} switch`}
+            onCheckedChange={(checked) => onToggleLink(checked)}
+          />
+        </span>
+
         {busy && (
           <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-card/70">
             <Loader2
@@ -713,7 +485,6 @@ function AgentNode({
   );
 }
 
-/** Observe an element's content-box size; 0 until the first measurement. */
 function useElementSize() {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -724,7 +495,6 @@ function useElementSize() {
     const update = () => {
       const width = el.clientWidth;
       const height = el.clientHeight;
-      // An unchanged size must not re-render, or the observer re-arms forever.
       setSize((prev) =>
         prev.width === width && prev.height === height
           ? prev
