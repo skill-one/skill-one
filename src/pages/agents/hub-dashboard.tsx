@@ -183,8 +183,8 @@ export function HubDashboard({
                 </div>
               )}
 
-              {/* Skill Chips Flow — grounded to the bottom */}
-              <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto pr-1 mt-auto">
+              {/* Skill Chips Flow — bottom-up stacking with dynamic width */}
+              <div className="flex max-h-52 flex-wrap-reverse content-end gap-1.5 overflow-y-auto pr-1 mt-auto">
                 {visibleSkills.map((skill) => (
                   <Tooltip key={skill.name}>
                     <TooltipTrigger
@@ -193,7 +193,7 @@ export function HubDashboard({
                           type="button"
                           data-skill={skill.name}
                           onClick={() => navigate("/installed")}
-                          className="inline-flex flex-1 min-w-[120px] max-w-[220px] items-center gap-1.5 rounded-md border border-border/40 bg-background/70 px-2 py-1 text-[11px] font-medium transition-colors hover:border-primary/50 hover:bg-accent/60 cursor-pointer shadow-2xs"
+                          className="inline-flex shrink-0 max-w-[150px] items-center gap-1.5 rounded-md border border-border/40 bg-background/70 px-2 py-0.5 text-[11px] font-medium transition-colors hover:border-primary/50 hover:bg-accent/60 cursor-pointer shadow-2xs"
                         >
                           <span className="text-[12px] leading-none shrink-0">
                             {getEmoji(skill.name)}
@@ -220,7 +220,7 @@ export function HubDashboard({
                           aria-label={t("agents.hub.viewAll", {
                             count: enabled.length,
                           })}
-                          className="inline-flex shrink-0 items-center justify-center gap-0.5 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                          className="inline-flex shrink-0 items-center justify-center gap-0.5 rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
                         >
                           <span>+{overflowCount}</span>
                           <span className="text-[9px]">全部 →</span>
