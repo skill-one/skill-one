@@ -344,10 +344,10 @@ describe("SkillDetailPanel", () => {
     expect(await screen.findByText("Local skill body.")).toBeInTheDocument();
     expect(mockFetchLocalSkillDetail).toHaveBeenCalledWith("my-tool");
     expect(mockFetchSkillDetail).not.toHaveBeenCalled();
-    // No repo → no links at all and a 本地安装 caption; the disk path sits
+    // No repo → no links at all and a 第三方安装 caption; the disk path sits
     // behind 本地文件, and no stats.
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.getByText("本地安装")).toBeInTheDocument();
+    expect(screen.getByText("第三方安装")).toBeInTheDocument();
     expect(
       screen.queryByRole("img", { name: "my-tool 封面图" }),
     ).not.toBeInTheDocument();
@@ -758,7 +758,7 @@ describe("SkillDetailPanel source linking", () => {
     expect(unlinkSkillSource).toHaveBeenCalledWith("pdf", "anthropics/skills");
     await waitFor(() =>
       expect(toastSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ title: "已解除关联，恢复为本地安装" }),
+        expect.objectContaining({ title: "已解除关联，恢复为第三方安装" }),
       ),
     );
   });
@@ -780,7 +780,7 @@ describe("SkillDetailPanel source linking", () => {
     renderDrawer({ skill: localSkill, surface: "installed" });
 
     await screen.findByText("Local skill body.");
-    expect(screen.getByText("本地安装")).toBeInTheDocument();
+    expect(screen.getByText("第三方安装")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "关联 my-tool 的商店来源" }),
     ).not.toBeInTheDocument();

@@ -22,6 +22,7 @@ import {
   type SkillMatched,
 } from "../../components/highlighted-text";
 import { OwnerAvatar } from "../../components/owner-avatar";
+import { ThirdPartyMark } from "../../components/third-party-mark";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { Card, CardContent, CardHeader } from "../../components/ui/card";
 
@@ -318,7 +319,7 @@ export function RepoCard({
   };
   // The bar's own name: the repository when there is one, and the label for the
   // installed list's pool of skills no source vouches for when there is not.
-  const name = repo || t("common.localInstall");
+  const name = repo || t("common.thirdPartyInstall");
   // The bar's identity: the card's own ordinal, the face, the name, the
   // repository's weight. Shared by the toggle and the plain label — where this
   // is in the list, who this is and how big it is are read the same whichever
@@ -341,11 +342,14 @@ export function RepoCard({
           14px name against the rows' 13px names and 13px glyphs. The bar
           sits under a hairline at the top of the card, so the step is
           what stops it from reading as one more row of the list. A pool
-          of source-less installs has no owner to draw, so its name leads
-          the bar alone. */}
+          of source-less installs has no owner to draw, so it wears the
+          third-party mark in the face's place — same box, same size, so
+          the name still starts at the offset every other card's does. */}
       {repo ? (
         <OwnerAvatar owner={owner} className="size-6 shrink-0 text-[11px]" />
-      ) : null}
+      ) : (
+        <ThirdPartyMark className="size-6" />
+      )}
       {/* No hover underline here: the name is not what a press acts on. The
           toggle's figure carries the hover feedback instead (see below), so
           the highlight lands on the control, never on a label. */}

@@ -24,7 +24,8 @@
     "openAria": "Open {{repo}}",
     "openOnGitHubAria": "Open {{repo}} on GitHub",
     "stars": "{{count}} stars",
-    "localInstall": "Installed locally"
+    "thirdPartyInstall": "Third-party install",
+    "thirdPartyInstallTip": "Third-party install — no source linked"
   },
   "nav": {
     "mainAria": "Main navigation",
@@ -222,7 +223,7 @@
     "currentSource": "Current source",
     "noOtherSources": "No other store entries share this skill's name.",
     "unlinkSource": "Unlink source",
-    "sourceUnlinked": "Source unlinked; back to a local install",
+    "sourceUnlinked": "Source unlinked; back to a third-party install",
     "installedAtLabel": "Installed ",
     "installedAtHint": "Creation time of the skill directory; skills adopted from an agent directory keep their original timestamp.",
     "tokensLabel": "{{count}} tokens",

@@ -253,9 +253,9 @@ describe("InstalledPage", () => {
       // No install has a recorded source, so every skill lives in one pool card:
       // six skills fit inside the folded cap, so the bar is a plain label and
       // every row is on screen.
-      expect(await screen.findByText("本地安装")).toBeInTheDocument();
+      expect(await screen.findByText("第三方安装")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /展开 本地安装/ }),
+        screen.queryByRole("button", { name: /展开 第三方安装/ }),
       ).toBeNull();
       expect(
         screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
@@ -273,7 +273,7 @@ describe("InstalledPage", () => {
       expect(screen.getByText("mcp-builder")).toBeInTheDocument();
       expect(screen.getByText("frontend-design")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /展开 本地安装/ }),
+        screen.queryByRole("button", { name: /展开 第三方安装/ }),
       ).toBeNull();
     });
 
@@ -412,7 +412,7 @@ describe("InstalledPage", () => {
       // fits the folded cap, and each carries its own hover-revealed switch
       // alongside it.
       const groupSwitch = await screen.findByRole("switch", {
-        name: "全部关闭（本地安装）",
+        name: "全部关闭（第三方安装）",
       });
       expect(groupSwitch).toHaveAttribute("aria-checked", "true");
       expect(screen.getAllByRole("switch")).toHaveLength(7);
@@ -423,14 +423,14 @@ describe("InstalledPage", () => {
       const { container } = renderPage();
 
       await user.click(
-        await screen.findByRole("switch", { name: "全部关闭（本地安装）" }),
+        await screen.findByRole("switch", { name: "全部关闭（第三方安装）" }),
       );
 
       // The whole pool is now off: the visible rows dim together and the bar's
       // own switch flips, including for the three skills past the preview cap that
       // the backend write still covers (the card re-reads the same records).
       const off = await screen.findByRole("switch", {
-        name: "全部开启（本地安装）",
+        name: "全部开启（第三方安装）",
       });
       expect(off).toHaveAttribute("aria-checked", "false");
       const rows = container.querySelectorAll("[data-skill]");
@@ -439,7 +439,7 @@ describe("InstalledPage", () => {
 
       await user.click(off);
       expect(
-        await screen.findByRole("switch", { name: "全部关闭（本地安装）" }),
+        await screen.findByRole("switch", { name: "全部关闭（第三方安装）" }),
       ).toHaveAttribute("aria-checked", "true");
       rows.forEach((row) => expect(row).not.toHaveClass("opacity-60"));
     });
@@ -452,7 +452,7 @@ describe("InstalledPage", () => {
       renderPage();
 
       const groupSwitch = await screen.findByRole("switch", {
-        name: "全部开启（本地安装）",
+        name: "全部开启（第三方安装）",
       });
       expect(groupSwitch).toHaveAttribute("aria-checked", "false");
       expect(groupSwitch).toHaveClass("data-unchecked:bg-primary/40!");
@@ -464,13 +464,13 @@ describe("InstalledPage", () => {
       const { container } = renderPage();
 
       await user.click(
-        await screen.findByRole("switch", { name: "全部开启（本地安装）" }),
+        await screen.findByRole("switch", { name: "全部开启（第三方安装）" }),
       );
 
       // Enable-all-first: the previously disabled skill joins the rest, its row
       // un-dims, and the group reaches the fully-on state in one press.
       expect(
-        await screen.findByRole("switch", { name: "全部关闭（本地安装）" }),
+        await screen.findByRole("switch", { name: "全部关闭（第三方安装）" }),
       ).toHaveAttribute("aria-checked", "true");
       const row = container.querySelector('[data-skill="pdf"]');
       expect(row).not.toHaveClass("opacity-60");
@@ -479,7 +479,7 @@ describe("InstalledPage", () => {
     it("carries a hover-revealed switch on each installed row", async () => {
       const { container } = renderPage();
 
-      await screen.findByRole("switch", { name: "全部关闭（本地安装）" });
+      await screen.findByRole("switch", { name: "全部关闭（第三方安装）" });
 
       // Every row now owns its enable switch in the card's floating hover slot
       // (the store's install button takes the same slot), while the bar's group
@@ -500,7 +500,7 @@ describe("InstalledPage", () => {
       setMockSkillEnabled("pdf", false);
       const { container } = renderPage();
 
-      await screen.findByRole("switch", { name: "全部开启（本地安装）" });
+      await screen.findByRole("switch", { name: "全部开启（第三方安装）" });
       const row = container.querySelector('[data-skill="pdf"]');
       const wrapper = row?.querySelector("span.absolute");
       expect(wrapper).toHaveClass("has-data-unchecked:opacity-100");
@@ -516,7 +516,7 @@ describe("InstalledPage", () => {
       setMockSkillEnabled("pdf", false);
       const { container } = renderPage();
 
-      await screen.findByRole("switch", { name: "全部开启（本地安装）" });
+      await screen.findByRole("switch", { name: "全部开启（第三方安装）" });
       const row = container.querySelector('[data-skill="pdf"]');
       expect(row).toHaveClass("opacity-60");
     });
@@ -524,7 +524,7 @@ describe("InstalledPage", () => {
     it("scopes each card's switch to that card's own skills", async () => {
       const user = userEvent.setup();
       // pdf carries a recorded source and moves into its own repository card;
-      // the other five stay pooled under 本地安装.
+      // the other five stay pooled under 第三方安装.
       seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
       const { container } = renderPage();
 
@@ -532,7 +532,7 @@ describe("InstalledPage", () => {
         name: "全部关闭（anthropics/skills）",
       });
       const poolSwitch = screen.getByRole("switch", {
-        name: "全部关闭（本地安装）",
+        name: "全部关闭（第三方安装）",
       });
       // Two bars, plus every row's own switch (5 pool rows, 1 repo row — all
       // six fixtures fit the folded cap).
@@ -756,9 +756,9 @@ describe("InstalledPage", () => {
       const dialog = await screen.findByRole("dialog");
       // The installed record carries no repo (agents-skills 0.13 records no
       // install source): the panel reads the SKILL.md from the (mock) skills
-      // directory and labels the skill 本地安装.
+      // directory and labels the skill 第三方安装.
       expect(within(dialog).getByText("pdf")).toBeInTheDocument();
-      expect(within(dialog).getByText("本地安装")).toBeInTheDocument();
+      expect(within(dialog).getByText("第三方安装")).toBeInTheDocument();
       expect(
         within(dialog).getByText("PDF 文档读取、生成、合并、拆分与标注。"),
       ).toBeInTheDocument();
@@ -788,7 +788,7 @@ describe("InstalledPage", () => {
       expect(within(dialog).getByText("docx")).toBeInTheDocument();
     });
 
-    it("labels a no-source skill's drawer as 本地安装 without repo links", async () => {
+    it("labels a no-source skill's drawer as 第三方安装 without repo links", async () => {
       const user = userEvent.setup();
       addMockLocalSkill("my-local");
       renderPage();
@@ -798,7 +798,7 @@ describe("InstalledPage", () => {
       );
 
       const dialog = await screen.findByRole("dialog");
-      expect(within(dialog).getByText("本地安装")).toBeInTheDocument();
+      expect(within(dialog).getByText("第三方安装")).toBeInTheDocument();
       expect(
         within(dialog).queryByText("anthropics/skills"),
       ).not.toBeInTheDocument();
@@ -851,7 +851,7 @@ describe("InstalledPage", () => {
       expect(
         await within(dialog).findByText("anthropics/skills"),
       ).toBeInTheDocument();
-      expect(within(dialog).queryByText("本地安装")).not.toBeInTheDocument();
+      expect(within(dialog).queryByText("第三方安装")).not.toBeInTheDocument();
 
       // Unlinking from the change-source menu flips the identity back and
       // still keeps the drawer on the skill.
@@ -868,7 +868,7 @@ describe("InstalledPage", () => {
         }),
       );
       expect(ledgerRecord("pdf")).not.toHaveProperty("repo");
-      expect(await within(dialog).findByText("本地安装")).toBeInTheDocument();
+      expect(await within(dialog).findByText("第三方安装")).toBeInTheDocument();
     }, 20_000);
 
     it("keeps the drawer open when the open skill is retagged", async () => {
@@ -973,14 +973,14 @@ describe("InstalledPage", () => {
       await screen.findByText("pdf");
 
       await user.click(
-        await screen.findByRole("switch", { name: "全部关闭（本地安装）" }),
+        await screen.findByRole("switch", { name: "全部关闭（第三方安装）" }),
       );
       // The switch is a sibling of the bar's toggle, not a child: the press
       // toggles the group without opening the drawer. Six skills fit the folded
       // cap, so the bar is a plain label here — there is no door to open.
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /展开 本地安装/ }),
+        screen.queryByRole("button", { name: /展开 第三方安装/ }),
       ).toBeNull();
     });
   });
@@ -994,7 +994,7 @@ describe("InstalledPage", () => {
       expect(screen.getByText("暂无描述")).toBeInTheDocument();
     });
 
-    it("names a source-less install as 本地安装 and draws no owner face", async () => {
+    it("names a source-less install as 第三方安装 and draws no owner face", async () => {
       const { container } = renderPage();
 
       await screen.findByText("pdf");
@@ -1002,7 +1002,7 @@ describe("InstalledPage", () => {
       // bar states that in place of a repository, and no owner face joins it.
       const bars = container.querySelectorAll('[data-slot="card-header"]');
       expect(bars).toHaveLength(1);
-      expect(bars[0]).toHaveTextContent("本地安装");
+      expect(bars[0]).toHaveTextContent("第三方安装");
       expect(
         container.querySelectorAll(
           '[data-slot="card-header"] [data-slot="avatar"]',
@@ -1026,14 +1026,14 @@ describe("InstalledPage", () => {
         expect(bar).not.toHaveTextContent(/个 skill/);
       }
       // The other five keep the pool card, whose bar names no repository.
-      expect(screen.getAllByText("本地安装")).toHaveLength(1);
+      expect(screen.getAllByText("第三方安装")).toHaveLength(1);
       // Only the sourced card can name an owner, so it carries the only face.
       expect(
         container.querySelectorAll('ul [data-slot="avatar"]'),
       ).toHaveLength(1);
     });
 
-    it("links a sourced skill's detail drawer to its repo instead of 本地安装", async () => {
+    it("links a sourced skill's detail drawer to its repo instead of 第三方安装", async () => {
       const user = userEvent.setup();
       seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
       renderPage();
@@ -1049,9 +1049,9 @@ describe("InstalledPage", () => {
 
       const dialog = await screen.findByRole("dialog");
       // The panel now knows the repo: the description is the source link, not
-      // the bare 本地安装 label.
+      // the bare 第三方安装 label.
       expect(within(dialog).getByText("anthropics/skills")).toBeInTheDocument();
-      expect(within(dialog).queryByText("本地安装")).not.toBeInTheDocument();
+      expect(within(dialog).queryByText("第三方安装")).not.toBeInTheDocument();
     });
 
     it("carries the enable switch, and no registry figures, into the drawer", async () => {
@@ -1229,7 +1229,7 @@ describe("InstalledPage", () => {
     function cardBarNames(scope: ParentNode): string[] {
       return Array.from(
         scope.querySelectorAll('[data-slot="card"][data-repo]'),
-      ).map((card) => card.getAttribute("data-repo") || "本地安装");
+      ).map((card) => card.getAttribute("data-repo") || "第三方安装");
     }
 
     it("orders the repository unit's cards by each card's newest install", async () => {
@@ -1251,7 +1251,7 @@ describe("InstalledPage", () => {
       // trails.
       expect(cardBarNames(baseElement)).toEqual([
         "zoo/new",
-        "本地安装",
+        "第三方安装",
         "acme/tools",
       ]);
     });
@@ -1269,7 +1269,7 @@ describe("InstalledPage", () => {
 
       await screen.findByText("acme/tools");
       // The pool (newest docx, 3 days) is the other, older card.
-      expect(cardBarNames(baseElement)).toEqual(["acme/tools", "本地安装"]);
+      expect(cardBarNames(baseElement)).toEqual(["acme/tools", "第三方安装"]);
 
       // Inside the card, newest first.
       const card = baseElement.querySelector('[data-repo="acme/tools"]');
@@ -1336,7 +1336,7 @@ describe("InstalledPage", () => {
         expect(cardBarNames(baseElement)).toEqual([
           "zoo/a",
           "zoo/b",
-          "本地安装",
+          "第三方安装",
         ]),
       );
     });
@@ -1444,7 +1444,7 @@ describe("InstalledPage", () => {
       ).toHaveLength(6);
       // No card, so no bar: nothing in this unit is a door to a repository.
       expect(screen.queryByRole("link", { name: /^查看仓库 / })).toBeNull();
-      expect(screen.queryByRole("link", { name: /^查看本地安装/ })).toBeNull();
+      expect(screen.queryByRole("link", { name: /^查看第三方安装/ })).toBeNull();
       // The enable switch rides the row, so both units manage the same skills.
       expect(screen.getAllByRole("switch")).toHaveLength(6);
     });
@@ -2233,7 +2233,7 @@ describe("InstalledPage", () => {
       // shape.
       renderPage();
 
-      await screen.findByText("本地安装");
+      await screen.findByText("第三方安装");
       expect(
         screen.queryByRole("region", { name: "已禁用" }),
       ).not.toBeInTheDocument();

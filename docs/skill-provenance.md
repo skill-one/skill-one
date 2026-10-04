@@ -144,18 +144,30 @@ came from X" needs to see the record the app is not acting on too.
   the owner's GitHub avatar (the author chip on the card's metadata rail, whose
   hover card names the repo the card itself no longer prints) and the drawer's
   repo line; the detail drawer links to the source repo instead of reading as
-  本地安装. The recorded source is also
+  第三方安装. The recorded source is also
   resolved back to its registry entry (`use-installed-store-entries.ts`, over
   the worker's `lookupSkills`), which is where the store's classification and
   install count come from — an on-disk record carries neither, so without
   the lookup the installed list could only ever render the store's card with
   those two slots empty. A source that resolves to nothing (tool installs, or
-  an entry the index no longer lists) keeps the local-install presentation and
+  an entry the index no longer lists) keeps the third-party-install
+  presentation and
   shows no figure rather than a fabricated zero; `SkillView.storeBacked` is
   what records that difference, and both the card and the detail drawer read
   it the same way. Its author chip is the one part that survives: the ledger
   vouches for the repo even when the registry does not. And a card's image slot
   falls back to the skill's own initial whenever no cover can be addressed.
+  What an unlinked install wears in that slot is `ThirdPartyMark`
+  (`components/third-party-mark.tsx`): the owner's own round box, hairline
+  border and muted fill, holding an amber folder glyph at 72% of the box. It is
+  the mark's shape rather than its hue that keeps the column aligned — a row, a
+  square and a repository card's bar all size that column off the same box — and
+  amber is what keeps it from reading as an avatar that failed to load, which is
+  the one thing it must never look like. The glyph is the statement: nothing
+  prints the source beside it, so it is `role="img"` with the label
+  `common.thirdPartyInstall`, and its tooltip spells out
+  `common.thirdPartyInstallTip`. The same box becomes a control when namesake
+  candidates exist — see `LinkSuggestionMark` below.
   A repository card's bar opens that repository as *this* list reads it
   (`/installed/repo/owner/repo`): the installs the ledger placed there, listed
   with the installed list's own chrome, and the rest of the store's catalogue
@@ -242,11 +254,20 @@ to matter, and a slug family that wide is not one this dataset has.
 
 The detail drawer's source line is the provenance surface: its hover tooltip
 states how the recorded source was established (store install via this app, a
-linked third-party copy, or an unlinked local install), and the line carries
-the re-selection affordances:
+linked third-party copy, or an unlinked third-party install), and the line
+carries the re-selection affordances:
 
-- **Unlinked, candidates exist** — the local-install label becomes the same
-  确认关联 trigger the list rows show, opening the ranked namesake candidates.
+- **Unlinked, candidates exist** — the mark itself is the trigger
+  (`LinkSuggestionMark`, `pages/installed/link-suggestion-mark.tsx`), opening
+  the ranked namesake candidates from wherever it is worn: a list row, a grid
+  square, a repository card's row, or the drawer's own source line. It is the
+  same round box the plain statement wears, so linking never changes the
+  layout — only the hover (the amber deepens) and the tooltip, which names what
+  a press does. The amber alert triangle that used to ride beside the mark is
+  gone: the folder glyph already says 「装了，但说不出是谁装的」, and the alert was
+  the only one of the two that did anything, which made it the half a reader
+  had to learn to aim at. With no candidate there is nothing to offer, so the
+  mark stays a plain statement and the drawer keeps the words beside it.
 - **Linked** — a quiet chevron beside the repo opens a change-source popover:
   the source currently on record (pinned and marked), the other same-name
   store entries (`findLinkCandidates`, ranked like the suggestions but

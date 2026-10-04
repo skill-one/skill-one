@@ -24,7 +24,8 @@
     "openAria": "打开 {{repo}}",
     "openOnGitHubAria": "在 GitHub 中打开 {{repo}}",
     "stars": "{{count}} Star",
-    "localInstall": "本地安装"
+    "thirdPartyInstall": "第三方安装",
+    "thirdPartyInstallTip": "第三方安装，未关联来源"
   },
   "nav": {
     "mainAria": "主导航",
@@ -222,7 +223,7 @@
     "currentSource": "当前来源",
     "noOtherSources": "没有其他同名的商店条目。",
     "unlinkSource": "解除关联",
-    "sourceUnlinked": "已解除关联，恢复为本地安装",
+    "sourceUnlinked": "已解除关联，恢复为第三方安装",
     "installedAtLabel": "安装于 ",
     "installedAtHint": "技能目录的创建时间；从 agent 目录收编的技能保留其原始时间。",
     "tokensLabel": "{{count}} tokens",

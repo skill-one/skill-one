@@ -18,6 +18,7 @@ import {
   type SkillMatched,
 } from "../../components/highlighted-text";
 import { OwnerAvatar } from "../../components/owner-avatar";
+import { ThirdPartyMark } from "../../components/third-party-mark";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillInstalledTime } from "../../components/skill-installed-time";
 import { SkillPopularity } from "../../components/skill-popularity";
@@ -119,7 +120,12 @@ export const SkillRow = memo(function SkillRow({
   action?: ReactNode;
   /** Dimmed presentation: an installed skill that is disabled. */
   muted?: boolean;
-  /** Trails the facts cluster: the migration badge on an unlinked install. */
+  /**
+   * Fills the source slot when this skill has no source: the third-party
+   * mark, made pressable when namesake candidates exist to link. It stands in
+   * for the owner face rather than trailing the facts cluster, so a surface
+   * hands over one thing — how to state this skill's origin — not two.
+   */
   extra?: ReactNode;
   /**
    * Whether the list is ranked or merely enumerated: a ranked list medals its
@@ -235,26 +241,32 @@ export const SkillRow = memo(function SkillRow({
             fixed, so the description keeps the width it needs. The face drops
             out on a repository's own page (see `showSource`): the head already
             names it, and 48 identical copies only crowd the names. A skill with
-            no source at all states it in words instead, there being no face to
-            stand for it. The classification lives on the leading glyph, so it is
-            not repeated here. The figure takes a fixed right-aligned slot,
+            no source at all wears the third-party mark in the same slot — it is
+            the same column, sized the same, so the figures stay aligned across a
+            list that mixes the two kinds. The classification lives on the
+            leading glyph, so it is not repeated here. The figure takes a fixed
+            right-aligned slot,
             sized to the format's longest rendering ("169.6K" for the blend,
             a relative age like "12个月前" for the stamp): the digits then end
             on one edge at the row's far right, where magnitudes are compared,
             and the face left of it sits in a column of its own instead of
             drifting with the digits' width. */}
         <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
-          {showSource && owner && (
-            <OwnerAvatar
-              owner={owner}
-              className="size-5 shrink-0 text-[9px]"
-            />
-          )}
-          {/* A source-less row: the extra owns the label (text + icon merged
-              into one trigger, or a plain statement with no candidates). */}
-          {showSource && !owner
-            ? extra ?? <span className="truncate">{t("common.localInstall")}</span>
-            : extra}
+          {/* The source's face, or the third-party mark in its place: the same
+              round box at the same size, with an amber folder glyph where a
+              sourced row has a person, so the two kinds of row read apart at a
+              glance. `extra` is that mark when this skill can be linked — it
+              fills the slot rather than trailing it, because the affordance and
+              the fact are one thing here. */}
+          {showSource &&
+            (owner ? (
+              <OwnerAvatar
+                owner={owner}
+                className="size-5 shrink-0 text-[9px]"
+              />
+            ) : (
+              (extra ?? <ThirdPartyMark className="size-5" />)
+            ))}
           {fact === "installedAt" ? (
             <SkillInstalledTime
               skill={skill}

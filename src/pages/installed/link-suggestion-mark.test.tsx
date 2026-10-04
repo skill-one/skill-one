@@ -3,7 +3,7 @@ import { screen, configure } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { renderWithRouter } from "../../test/test-utils";
-import { LinkSuggestionBadge } from "./link-suggestion-badge";
+import { LinkSuggestionMark } from "./link-suggestion-mark";
 import type { LinkCandidate } from "../../lib/link-suggestions";
 
 const { recordSkillProvenance, markSkillsChanged } = vi.hoisted(() => ({
@@ -38,14 +38,15 @@ const candidates: LinkCandidate[] = [
   },
 ];
 
-type BadgeProps = Parameters<typeof LinkSuggestionBadge>[0];
+type MarkProps = Parameters<typeof LinkSuggestionMark>[0];
 
-function renderBadge(props: Partial<BadgeProps> = {}) {
+function renderMark(props: Partial<MarkProps> = {}) {
   return renderWithRouter(
-    <LinkSuggestionBadge
+    <LinkSuggestionMark
       name="pdf"
       localDescription="PDF 文档读取与生成。"
       candidates={candidates}
+      className="size-4"
       {...props}
     />,
   );
@@ -57,36 +58,38 @@ beforeEach(() => {
   markSkillsChanged.mockResolvedValue(undefined);
 });
 
-describe("LinkSuggestionBadge — label variant (default)", () => {
-  it("merges the local-install text and icon into one trigger", () => {
-    renderBadge();
+describe("LinkSuggestionMark", () => {
+  it("is the mark itself that is pressed — no second icon beside it", () => {
+    renderMark();
 
-    const trigger = screen.getByRole("button", {
-      name: "关联 pdf 的商店来源",
-    });
-    expect(trigger).toBeInTheDocument();
-    expect(trigger).toHaveTextContent("本地安装");
-    // The label carries the underline-on-hover affordance.
-    const label = screen.getByText("本地安装");
-    expect(label).toHaveClass("group-hover:underline");
+    // The affordance is the mark: one control in the face's slot, wearing the
+    // same box the plain mark does. Nothing rides after it.
+    const trigger = screen.getByRole("button", { name: "关联 pdf 的商店来源" });
+    expect(trigger).toHaveClass("rounded-full", "border", "size-4");
+    expect(trigger).toHaveTextContent("");
+    // Pressable, and pressable in its own amber: a hover that greyed the ink
+    // would drop the mark back into the crowd it stands out of.
+    expect(trigger).toHaveClass("hover:bg-amber-500/20");
+    // The trigger is the mark, so it is a control where the plain mark is a
+    // graphic — never both at once, and never an icon riding beside it.
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
   });
 
-  it("renders a plain statement when no candidate exists", () => {
-    renderBadge({ candidates: [] });
+  it("falls back to the plain mark when there is no candidate to link", () => {
+    renderMark({ candidates: [] });
 
     expect(
       screen.queryByRole("button", { name: "关联 pdf 的商店来源" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("本地安装")).toBeInTheDocument();
+    const mark = screen.getByRole("img", { name: "第三方安装" });
+    expect(mark).toHaveClass("rounded-full", "border", "size-4");
   });
 
-  it("explains linking in a tooltip on hover", async () => {
+  it("explains linking in a tooltip on hover, not the plain statement", async () => {
     const user = userEvent.setup();
-    renderBadge();
+    renderMark();
 
-    await user.hover(
-      screen.getByRole("button", { name: "关联 pdf 的商店来源" }),
-    );
+    await user.hover(screen.getByRole("button", { name: "关联 pdf 的商店来源" }));
 
     const tooltip = await screen.findByRole("tooltip");
     expect(tooltip).toHaveTextContent("关联来源，不改动本地文件");
@@ -94,11 +97,9 @@ describe("LinkSuggestionBadge — label variant (default)", () => {
 
   it("opens a popover on click with local and candidate descriptions", async () => {
     const user = userEvent.setup();
-    renderBadge();
+    renderMark();
 
-    await user.click(
-      screen.getByRole("button", { name: "关联 pdf 的商店来源" }),
-    );
+    await user.click(screen.getByRole("button", { name: "关联 pdf 的商店来源" }));
 
     // Header identifies which skill is being linked.
     expect(screen.getByText("关联来源")).toBeInTheDocument();
@@ -126,11 +127,9 @@ describe("LinkSuggestionBadge — label variant (default)", () => {
 
   it("hides the local-description block when the skill has no description", async () => {
     const user = userEvent.setup();
-    renderBadge({ localDescription: "  " });
+    renderMark({ localDescription: "  " });
 
-    await user.click(
-      screen.getByRole("button", { name: "关联 pdf 的商店来源" }),
-    );
+    await user.click(screen.getByRole("button", { name: "关联 pdf 的商店来源" }));
 
     expect(screen.queryByText("本地描述")).not.toBeInTheDocument();
   });
@@ -140,11 +139,9 @@ describe("LinkSuggestionBadge — label variant (default)", () => {
     // A cut keeps its repo among the candidates — re-picking it is the user's
     // own act of re-identification — so the row says which ones they refused
     // instead of presenting them as if they were new.
-    renderBadge({ cutRepos: ["fork/pdf-skills"] });
+    renderMark({ cutRepos: ["fork/pdf-skills"] });
 
-    await user.click(
-      screen.getByRole("button", { name: "关联 pdf 的商店来源" }),
-    );
+    await user.click(screen.getByRole("button", { name: "关联 pdf 的商店来源" }));
 
     // Exactly one row is marked: the cut one, not the whole list.
     const marked = screen.getAllByTitle("已忽略");
@@ -163,11 +160,9 @@ describe("LinkSuggestionBadge — label variant (default)", () => {
 
   it("records the picked candidate as a confirmed link and closes the popover", async () => {
     const user = userEvent.setup();
-    renderBadge();
+    renderMark();
 
-    await user.click(
-      screen.getByRole("button", { name: "关联 pdf 的商店来源" }),
-    );
+    await user.click(screen.getByRole("button", { name: "关联 pdf 的商店来源" }));
     await user.click(screen.getByRole("button", { name: /anthropics\/skills/ }));
 
     expect(recordSkillProvenance).toHaveBeenCalledWith(
@@ -188,55 +183,17 @@ describe("LinkSuggestionBadge — label variant (default)", () => {
     const onCardClick = vi.fn();
     renderWithRouter(
       <div onClick={onCardClick}>
-        <LinkSuggestionBadge
+        <LinkSuggestionMark
           name="pdf"
           localDescription="PDF 文档读取与生成。"
           candidates={candidates}
+          className="size-4"
         />
       </div>,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "关联 pdf 的商店来源" }),
-    );
+    await user.click(screen.getByRole("button", { name: "关联 pdf 的商店来源" }));
 
     expect(onCardClick).not.toHaveBeenCalled();
-  });
-});
-
-describe("LinkSuggestionBadge — icon variant", () => {
-  it("renders only a muted icon trigger, no visible text", () => {
-    renderBadge({ variant: "icon" });
-
-    const trigger = screen.getByRole("button", {
-      name: "关联 pdf 的商店来源",
-    });
-    expect(trigger).toBeInTheDocument();
-    expect(trigger).toHaveTextContent("");
-    expect(screen.queryByText("本地安装")).not.toBeInTheDocument();
-  });
-
-  it("renders nothing when no candidate exists", () => {
-    const { container } = renderWithRouter(
-      <LinkSuggestionBadge
-        name="pdf"
-        localDescription="x"
-        candidates={[]}
-        variant="icon"
-      />,
-    );
-
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("opens the same popover on click", async () => {
-    const user = userEvent.setup();
-    renderBadge({ variant: "icon" });
-
-    await user.click(
-      screen.getByRole("button", { name: "关联 pdf 的商店来源" }),
-    );
-
-    expect(screen.getByText("为「pdf」选择来源仓库")).toBeInTheDocument();
   });
 });

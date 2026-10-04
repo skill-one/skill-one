@@ -86,7 +86,7 @@ describe("SkillGridCard", () => {
     expect(liveContainer.querySelector("button")).toBeNull();
   });
 
-  it("states 本地安装 for a source-less skill instead of a borrowed face", () => {
+  it("marks a source-less skill with the third-party glyph, not a borrowed face", () => {
     const local: SkillView = {
       name: "local-tool",
       repo: "",
@@ -96,8 +96,37 @@ describe("SkillGridCard", () => {
       installedAt: null,
       storeBacked: false,
     };
-    renderCard(local);
+    const { container, unmount } = renderCard(local);
 
-    expect(screen.getByText("本地安装")).toBeInTheDocument();
+    // The face's slot is filled by the mark, and it is labelled rather than
+    // hidden: no text sits beside it to name it, so the glyph is the statement.
+    expect(screen.getByRole("img", { name: "第三方安装" })).toBeInTheDocument();
+    expect(container.querySelector("[data-slot='avatar']")).toBeNull();
+    // The square no longer repeats the words beside the mark.
+    expect(screen.queryByText("第三方安装")).toBeNull();
+    unmount();
+
+    // A sourced square keeps the owner's face where the mark would be.
+    renderCard(backed);
+    expect(screen.queryByRole("img", { name: "第三方安装" })).toBeNull();
+    expect(document.querySelector("[data-slot='avatar']")).not.toBeNull();
+  });
+
+  it("lets the source slot take over the mark, so no icon trails it", () => {
+    const local: SkillView = {
+      name: "local-tool",
+      repo: "",
+      description: "On-disk only.",
+      stars: 0,
+      downloads: 0,
+      installedAt: null,
+      storeBacked: false,
+    };
+    renderCard(local, { extra: <span data-testid="extra">extra</span> });
+
+    // `extra` is the source statement itself when the skill can be linked, so
+    // it fills the face's slot rather than riding after it — one mark, not two.
+    expect(screen.getByTestId("extra")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "第三方安装" })).toBeNull();
   });
 });

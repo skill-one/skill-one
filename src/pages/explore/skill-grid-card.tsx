@@ -16,6 +16,7 @@ import {
   type SkillMatched,
 } from "../../components/highlighted-text";
 import { OwnerAvatar } from "../../components/owner-avatar";
+import { ThirdPartyMark } from "../../components/third-party-mark";
 import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillInstalledTime } from "../../components/skill-installed-time";
 import { SkillPopularity } from "../../components/skill-popularity";
@@ -63,7 +64,12 @@ export function SkillGridCard({
   action?: ReactNode;
   /** Dimmed presentation: an installed skill that is disabled. */
   muted?: boolean;
-  /** Trails the footer: the migration badge on an unlinked install. */
+  /**
+   * Fills the source slot when this skill has no source: the third-party
+   * mark, made pressable when namesake candidates exist to link. It stands in
+   * for the owner face rather than trailing the footer, so a surface hands over
+   * one thing — how to state this skill's origin — not two.
+   */
   extra?: ReactNode;
   /**
    * Which fact the footer states — the figure the list answers in, so the
@@ -140,17 +146,20 @@ export function SkillGridCard({
 
         {/* Footer: owner face, the figure the list answers in, corner action. */}
         <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-muted-foreground">
+          {/* A skill no source vouches for has no face to draw, so the column
+              wears the third-party mark instead — same box, same border, so
+              the footer below it starts at the same offset as a sourced
+              square's, and only the glyph tells the two apart. `extra` is that
+              mark when the skill can be linked: it fills the slot rather than
+              trailing it. */}
           {owner ? (
             <OwnerAvatar
               owner={owner}
               className="size-4 shrink-0 text-[8px]"
             />
           ) : (
-            (extra ?? (
-              <span className="truncate">{t("common.localInstall")}</span>
-            ))
+            (extra ?? <ThirdPartyMark className="size-4" />)
           )}
-          {!owner ? null : extra}
           <span className="ml-auto flex shrink-0 items-center">
             {fact === "installedAt" ? (
               <SkillInstalledTime skill={skill} align="end" />

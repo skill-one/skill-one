@@ -42,7 +42,7 @@ import {
 } from "../../lib/install-time";
 import { SkeletonList } from "../../components/skeleton-list";
 import { ListToolbar } from "../../components/list-toolbar";
-import { LinkSuggestionBadge } from "./link-suggestion-badge";
+import { LinkSuggestionMark } from "./link-suggestion-mark";
 import type { LinkCandidate } from "../../lib/link-suggestions";
 import { RepoCard } from "../explore/repo-card";
 import { SearchResults, type SearchRow } from "../explore/search-results";
@@ -598,19 +598,23 @@ export function InstalledPage() {
   // the open skill out of this answer — the list no longer narrows by
   // classification — so the drawer walks the answer as it is.
 
-  // The link affordance is only meaningful while the source is unknown: an
-  // install the ledger placed has a repository to point at. In the skill unit
-  // the label and icon are merged into one trigger ("label"); a repo-card row
-  // takes the icon alone, since the card's bar already names the source.
+  // What stands in for the owner face on a skill the ledger placed no
+  // repository for: the third-party mark, which is itself the way to give it
+  // one whenever the registry knows a namesake. An install the ledger did
+  // place has a repository to show, and no mark at all.
+  //
+  // The size is the caller's because the face's slot is sized by the surface
+  // that owns it — a square is a step below a row, and the mark has to fill
+  // whichever box it lands in exactly as the owner's face does.
   const rowExtra = useCallback(
-    (row: Row, variant: "label" | "icon") =>
+    (row: Row, className: string) =>
       !row.skill.repo ? (
-        <LinkSuggestionBadge
+        <LinkSuggestionMark
           name={row.skill.name}
           localDescription={row.skill.description}
           candidates={row.suggestion ?? []}
           cutRepos={row.skill.cutRepos}
-          variant={variant}
+          className={className}
         />
       ) : undefined,
     [],
@@ -628,7 +632,7 @@ export function InstalledPage() {
         skill: row.skill,
         matched: row.matched,
         muted: !row.enabled,
-        extra: rowExtra(row, "label"),
+        extra: rowExtra(row, "size-5"),
         action: <SkillEnableSwitch skill={row.skill} />,
       })),
     [rows, rowExtra],
@@ -659,7 +663,7 @@ export function InstalledPage() {
         fact={sort === "installed" ? "installedAt" : "popularity"}
         selected={key === selected}
         muted={!row.enabled}
-        extra={rowExtra(row, "label")}
+        extra={rowExtra(row, "size-5")}
         action={<SkillEnableSwitch skill={row.skill} />}
         onSelect={setSelectedKey}
       />
@@ -679,7 +683,7 @@ export function InstalledPage() {
         fact={sort === "installed" ? "installedAt" : "popularity"}
         selected={key === selected}
         muted={!row.enabled}
-        extra={rowExtra(row, "label")}
+        extra={rowExtra(row, "size-4")}
         action={<SkillEnableSwitch skill={row.skill} />}
         onSelect={() => setSelectedKey(key)}
       />
@@ -822,7 +826,7 @@ export function InstalledPage() {
                   skills={card.items.map((row) => ({
                     skill: row.skill,
                     muted: !row.enabled,
-                    extra: rowExtra(row, "icon"),
+                    extra: rowExtra(row, "size-5"),
                     // Each row's own enable switch, in the card's floating
                     // hover slot; the disabled rows stay dimmed so the group
                     // switch's state has its evidence.
@@ -836,7 +840,7 @@ export function InstalledPage() {
                   footerAction={
                     <RepoEnableSwitch
                       names={card.items.map((row) => row.skill.name)}
-                      label={card.repo || t("common.localInstall")}
+                      label={card.repo || t("common.thirdPartyInstall")}
                     />
                   }
                 />

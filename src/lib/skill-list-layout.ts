@@ -27,7 +27,7 @@ export const SKILL_LIST_CLASS =
  * two 12px gaps, a 36px two-line description and a 43px rail. The description
  * is clamped and the rail's height is the same whether or not a classification
  * rides it, so one figure covers every store card. A skill with no source is a
- * few pixels shorter — its rail carries the 本地安装 label instead of a chip —
+ * few pixels shorter — its rail carries the 第三方安装 label instead of a chip —
  * and the grid stretches its row to match its taller neighbours, which is the
  * case the skeleton is measuring.
  */

@@ -1,0 +1,63 @@
+import { describe, expect, it } from "vitest";
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+import { ThirdPartyMark } from "./third-party-mark";
+import { TooltipProvider } from "./ui/tooltip";
+import { renderWithRouter } from "../test/test-utils";
+
+function renderMark(props: { className?: string } = {}) {
+  return renderWithRouter(
+    <TooltipProvider>
+      <ThirdPartyMark {...props} />
+    </TooltipProvider>,
+  );
+}
+
+describe("ThirdPartyMark", () => {
+  it("is a labelled graphic, not a decoration: nothing prints its name beside it", () => {
+    renderMark();
+
+    const mark = screen.getByRole("img", { name: "第三方安装" });
+    expect(mark).toBeInTheDocument();
+    // Labelled rather than hidden, unlike the owner face it stands in for.
+    expect(mark).not.toHaveAttribute("aria-hidden");
+    // The glyph is decoration inside the mark and must not leak into the name.
+    expect(mark.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("wears the owner's shape, so it drops into the face's column unchanged", () => {
+    renderMark({ className: "size-5" });
+
+    const mark = screen.getByRole("img", { name: "第三方安装" });
+    // The same round box and the same hairline border `OwnerAvatar` wears — the
+    // face's geometry — so nothing in the layout moves when one replaces the
+    // other.
+    expect(mark).toHaveClass("rounded-full", "border", "size-5");
+    expect(mark).not.toHaveClass("size-8");
+  });
+
+  it("is inked amber and cut large, so it never reads as a placeholder", () => {
+    renderMark({ className: "size-4" });
+
+    const mark = screen.getByRole("img", { name: "第三方安装" });
+    // Amber, where the owner's face is the only true colour in that column: a
+    // muted grey glyph at 16px read as an avatar that failed to load, which is
+    // the one thing this mark must not look like.
+    expect(mark).toHaveClass("text-amber-500/80");
+    expect(mark).not.toHaveClass("text-muted-foreground");
+    // 72% of the box, not the 58% that left a three-pixel smudge in a square.
+    expect(mark.querySelector("svg")).toHaveClass("size-[72%]");
+  });
+
+  it("spells the fact out on hover, since the mark carries no text", async () => {
+    const user = userEvent.setup();
+    renderMark();
+
+    await user.hover(screen.getByRole("img", { name: "第三方安装" }));
+
+    expect(
+      await screen.findByRole("tooltip"),
+    ).toHaveTextContent("第三方安装，未关联来源");
+  });
+});

@@ -422,7 +422,7 @@ export function SearchResults({
           footerAction={
             <RepoEnableSwitch
               names={card.items.map((row) => row.skill.name)}
-              label={card.repo || t("common.localInstall")}
+              label={card.repo || t("common.thirdPartyInstall")}
             />
           }
         />

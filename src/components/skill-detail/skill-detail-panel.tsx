@@ -55,10 +55,11 @@ import { toast } from "../ui/toast";
 import { Toggle } from "../ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { OwnerAvatar } from "../owner-avatar";
+import { ThirdPartyMark } from "../third-party-mark";
 import { SkillEnableSwitch } from "../skill-enable-switch";
 import { SkillInstallButton } from "../skill-install-button";
 import { SkillRemoveButton } from "../skill-remove-button";
-import { LinkSuggestionBadge } from "../../pages/installed/link-suggestion-badge";
+import { LinkSuggestionMark } from "../../pages/installed/link-suggestion-mark";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { SourceLinkMenu } from "./source-link-menu";
 import { ExpandableDescription } from "./expandable-description";
@@ -713,20 +714,32 @@ export function SkillDetailPanel({
               </Tooltip>
             ) : hasSource ? (
               <SheetDescription render={repoLink} />
-            ) : !isStore && shown ? (
-              // An unlinked install: the same suggestion badge its list row
-              // shows — the link affordance when namesake candidates exist,
-              // the plain local-install label when they do not.
-              <SheetDescription render={<div className="min-w-0" />}>
-                <LinkSuggestionBadge
-                  name={shown.name}
-                  localDescription={shown.description}
-                  candidates={suggestion ?? []}
-                  cutRepos={shown.cutRepos}
-                />
-              </SheetDescription>
             ) : (
-              <SheetDescription>{t("common.localInstall")}</SheetDescription>
+              // No source to name: the third-party mark leads the line in the
+              // role the owner face plays above it, and the sentence follows —
+              // with the mark pressable whenever the registry knows a namesake,
+              // so the drawer's way to give this skill a source is the same one
+              // click its row offers.
+              <SheetDescription
+                render={
+                  <span className="inline-flex min-w-0 items-center gap-1.5" />
+                }
+              >
+                {shown && !isStore ? (
+                  <LinkSuggestionMark
+                    name={shown.name}
+                    localDescription={shown.description}
+                    candidates={suggestion ?? []}
+                    cutRepos={shown.cutRepos}
+                    className="size-4"
+                  />
+                ) : (
+                  <ThirdPartyMark className="size-4" />
+                )}
+                <span className="truncate">
+                  {t("common.thirdPartyInstall")}
+                </span>
+              </SheetDescription>
             )}
           </div>
           {/* The primary action lives in the header, like every store's
