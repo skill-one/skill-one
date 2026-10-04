@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   CalendarDays,
   ExternalLink,
+  FolderCode,
   FolderOpen,
   Languages,
   Loader2,
@@ -98,9 +99,8 @@ function MarkdownSkeleton() {
 
 /**
  * The header's single provenance affordance: a quiet "源" link for registry
- * skills (opens the mirror SKILL.md) or a "本地文件" label for local ones.
- * The exact file path is provenance detail, so one hover reveals it in the
- * tooltip instead of taking a permanent header row.
+ * skills (opens the mirror SKILL.md). The exact file path is provenance detail,
+ * so one hover reveals it in the tooltip instead of taking a permanent header row.
  */
 function ProvenanceTip({
   href,
@@ -111,6 +111,7 @@ function ProvenanceTip({
   path?: string;
 }) {
   const { t } = useTranslation();
+  if (!href) return null;
   const className =
     "flex items-center gap-1 whitespace-nowrap text-muted-foreground/70 transition-colors hover:text-foreground";
   const body = (
@@ -124,27 +125,18 @@ function ProvenanceTip({
     <Tooltip>
       <TooltipTrigger
         render={
-          href ? (
-            <a
-              href={href}
-              title={t("detail.provenanceTitle")}
-              onClick={(e) => {
-                e.preventDefault();
-                void openExternal(href);
-              }}
-              className={className}
-            >
-              {t("detail.source")}
-              <ExternalLink className="h-3 w-3 shrink-0" />
-            </a>
-          ) : (
-            <span
-              title={t("detail.provenanceTitleLocal")}
-              className={className}
-            >
-              {t("detail.localFile")}
-            </span>
-          )
+          <a
+            href={href}
+            title={t("detail.provenanceTitle")}
+            onClick={(e) => {
+              e.preventDefault();
+              void openExternal(href);
+            }}
+            className={className}
+          >
+            {t("detail.source")}
+            <ExternalLink className="h-3 w-3 shrink-0" />
+          </a>
         }
       />
       {body}
@@ -570,9 +562,6 @@ export function SkillDetailPanel({
     shown && !fromDisk && filePath ? (
       <ProvenanceTip key="provenance" href={skillBlobUrl} path={filePath} />
     ) : null,
-    fromDisk && detail ? (
-      <ProvenanceTip key="local-provenance" path={detail.path} />
-    ) : null,
     // The classification rides the meta line flattened to text (`ghost`), one
     // quiet fact among the others rather than a chip that out-weights them.
     // On the installed surface it is always present — the user's tag choice,
@@ -685,8 +674,15 @@ export function SkillDetailPanel({
               no known source has no owner to show, so its name stays flush
               left; the initials stand-in is the cover's job, and the cover
               is gone. */}
-          {hasSource && owner && (
-            <OwnerAvatar owner={owner} className="h-12 w-12 shrink-0 text-lg" />
+          {hasSource && owner ? (
+            <OwnerAvatar owner={owner} className="size-12 shrink-0 text-lg" />
+          ) : (
+            <div
+              aria-hidden="true"
+              className="flex size-12 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted text-muted-foreground"
+            >
+              <FolderCode className="size-6" />
+            </div>
           )}
           <div className="min-w-0 flex-1">
             <SheetTitle className="truncate text-lg font-bold tracking-tight">
@@ -857,7 +853,7 @@ export function SkillDetailPanel({
                 variant="ghost"
                 size="icon-sm"
                 aria-label={t("detail.openFolder")}
-                title={t("detail.openFolderHint")}
+                title={detail?.path || t("detail.openFolderHint")}
                 onClick={() => void handleOpenFolder()}
               >
                 <FolderOpen />

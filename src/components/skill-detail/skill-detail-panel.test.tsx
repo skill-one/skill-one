@@ -337,24 +337,20 @@ describe("SkillDetailPanel", () => {
   });
 
   it("reads pure local skills from disk without store-only header parts", async () => {
-    const user = userEvent.setup();
     mockFetchLocalSkillDetail.mockResolvedValue(localDetail);
     const { baseElement } = renderDrawer({ skill: localSkill });
 
     expect(await screen.findByText("Local skill body.")).toBeInTheDocument();
     expect(mockFetchLocalSkillDetail).toHaveBeenCalledWith("my-tool");
     expect(mockFetchSkillDetail).not.toHaveBeenCalled();
-    // No repo → no links at all and a 第三方安装 caption; the disk path sits
-    // behind 本地文件, and no stats.
+    // No repo → no links at all and a 第三方安装 caption; no redundant 本地文件 tag;
+    // and no stats.
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("第三方安装")).toBeInTheDocument();
     expect(
       screen.queryByRole("img", { name: "my-tool 封面图" }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByText(localDetail.path)).not.toBeInTheDocument();
-    await user.hover(screen.getByText("本地文件"));
-    const tip = await screen.findByRole("tooltip");
-    expect(within(tip).getByText(localDetail.path)).toBeInTheDocument();
+    expect(screen.queryByText("本地文件")).not.toBeInTheDocument();
     // No registry stats for a pure local skill: no install figure at all.
     expect(screen.queryByText("安装量")).not.toBeInTheDocument();
     expect(screen.queryByTitle(/次安装/)).not.toBeInTheDocument();
@@ -781,6 +777,9 @@ describe("SkillDetailPanel source linking", () => {
 
     await screen.findByText("Local skill body.");
     expect(screen.getByText("第三方安装")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "打开文件夹" }),
+    ).toHaveAttribute("title", localDetail.path);
     expect(
       screen.queryByRole("button", { name: "关联 my-tool 的商店来源" }),
     ).not.toBeInTheDocument();
