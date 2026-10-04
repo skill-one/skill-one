@@ -31,7 +31,7 @@
     "mainAria": "Main navigation",
     "home": "Home",
     "store": "Store",
-    "installed": "Installed"
+    "installed": "My Skills"
   },
   "sort": {
     "byPopularity": "Popularity",
@@ -116,7 +116,7 @@
   },
   "search": {
     "store": "Store",
-    "installed": "Installed",
+    "installed": "My Skills",
     "skillsSh": "skills.sh official search",
     "searching": "Searching…"
   },
