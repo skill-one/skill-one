@@ -1,4 +1,11 @@
-import { forwardRef, useLayoutEffect, useRef, type CSSProperties } from "react";
+import {
+  forwardRef,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import Matter from "matter-js";
 import { useReducedMotion } from "motion/react";
 
@@ -85,13 +92,13 @@ export function jarFaces(
 export const JAR_CAPACITY = 50;
 
 /**
- * One card-size bucket. A sparse jar pours labeled capsules — wide enough to
- * carry the skill's name beside its emoji, the only bucket that prints a
- * label, since a handful of cards has the floor to spare. A fuller roster
- * drops back to icon-only tiles: the jar reads as a box of app icons, and a
- * face's name floats above it in a tooltip on hover. The jar's own frame
- * never changes size, so the graph around it never re-flows as the roster
- * grows.
+ * One card-size bucket. The labeled bucket is a capsule wide enough to carry the
+ * skill's name beside its emoji, and the jar pours it for as long as the whole
+ * roster fits the floor — names are the point of a card, so they are the last
+ * thing to go. A roster the floor cannot hold drops to icon-only tiles: the jar
+ * reads as a box of app icons, and a face's name floats above it in a tooltip on
+ * hover. The jar's own frame never changes size, so the graph around it never
+ * re-flows as the roster grows.
  */
 export interface JarCardScale {
   /** The tile's edge — card and physics body share these exact numbers. */
@@ -109,9 +116,54 @@ const CARD_SCALES: Record<"lg" | "md" | "sm", JarCardScale> = {
   sm: { width: 22, height: 22, glyph: 11, labeled: false },
 };
 
-/** The card-size bucket for a roster of `count` — stable object per bucket. */
-export function jarCardScale(count: number): JarCardScale {
-  if (count <= 6) return CARD_SCALES.lg;
+/**
+ * The air one capsule needs beside itself to lie in a pile without touching —
+ * the same 6px the spawn stack leaves between cards, so the estimate counts the
+ * floor the pour actually lands on rather than a tidier grid that never forms.
+ */
+const SLOT_GAP = 6;
+
+/**
+ * How many labeled capsules a field of `width` × `height` holds: as many 66×26
+ * cards as fit across it and down it, each in its own slot. This is what decides
+ * whether a roster keeps its names — a wide window fits a full jar of them, a
+ * narrow one drops to icons far earlier, and neither is a count somebody picked.
+ */
+export function labeledCapacity(width: number, height: number): number {
+  const slotW = CARD_SCALES.lg.width + SLOT_GAP;
+  const slotH = CARD_SCALES.lg.height + SLOT_GAP;
+  const across = Math.floor(width / slotW);
+  const down = Math.floor(height / slotH);
+  return across > 0 && down > 0 ? across * down : 0;
+}
+
+/**
+ * The field the hub's jar has at the app's default window — the capacity every
+ * caller and every test means when it does not measure a field of its own. It
+ * is also what the first frame renders with, before the field has been measured
+ * (and what an environment with no layout at all resolves to), so the very first
+ * pour already knows whether the names fit.
+ */
+export const JAR_FIELD_FALLBACK = { width: 360, height: 190 } as const;
+
+/** `labeledCapacity` of the fallback field: the names a default window holds. */
+export const JAR_NOMINAL_CAPACITY = labeledCapacity(
+  JAR_FIELD_FALLBACK.width,
+  JAR_FIELD_FALLBACK.height,
+);
+
+/**
+ * The card-size bucket for a roster of `count` in a field holding `capacity`
+ * labeled capsules: the whole roster keeps its names while it fits, and past that
+ * the jar steps down to icon tiles — `md` while the pile still reads as a
+ * handful, `sm` once it is a box of them. `capacity` defaults to the fallback
+ * field's, which is the answer for any caller that has no field to measure.
+ */
+export function jarCardScale(
+  count: number,
+  capacity: number = JAR_NOMINAL_CAPACITY,
+): JarCardScale {
+  if (count <= capacity) return CARD_SCALES.lg;
   if (count <= 14) return CARD_SCALES.md;
   return CARD_SCALES.sm;
 }
@@ -217,9 +269,9 @@ export function tapVelocityX(name: string, tap: number): number {
  *
  * Every tile in a bucket is one fixed rectangle, so each physics body is cut
  * to exactly its DOM tile. A tile wears the skill's classification emoji (an
- * initial when nothing classified it), and the sparse lg bucket prints the
- * name in the tile itself; a hover floats the name above every other tile in
- * a portal tooltip.
+ * initial when nothing classified it), and the labeled bucket prints the name
+ * in the tile itself for as long as the whole roster fits the floor; a hover
+ * floats the name above every other tile in a portal tooltip.
  *
  * The bodies are simulated; the *tiles* are plain DOM (one absolutely
  * positioned span per body, transformed to its body's pose each frame), so
@@ -250,6 +302,30 @@ export function HubJar({
   const reduceMotion = useReducedMotion();
   const fieldRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  // The measured field, or the fallback until it is measured. The roster's
+  // names hang on this: a card keeps its name for as long as the whole roster
+  // fits the floor, which is a property of the jar's width, so the bucket is
+  // decided by measurement rather than by a count somebody picked. A
+  // ResizeObserver keeps it honest as the window resizes, and because the
+  // measurement only enters the pour through the integer capacity, ordinary
+  // resizing does not restart the run — only crossing a capacity step does.
+  const [fieldSize, setFieldSize] = useState<{ width: number; height: number }>(
+    JAR_FIELD_FALLBACK,
+  );
+  useLayoutEffect(() => {
+    const element = fieldRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setFieldSize((current) =>
+        current.width === width && current.height === height
+          ? current
+          : { width, height },
+      );
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   // The effect reads the roster through a ref and keys on its signature, so
   // a parent re-render (a hovered agent, a badge) never restarts the rain —
   // only a changed roster or jar does. Syncing the ref in an effect rather than
@@ -260,7 +336,18 @@ export function HubJar({
     skillsRef.current = skills;
   }, [skills]);
   const signature = skills.map((skill) => skill.name).join("\n");
-  const scale = jarCardScale(skills.length);
+  // How many names the floor holds, then the bucket that follows from it. Both
+  // are memos on their own terms: an integer capacity and a stable object per
+  // bucket, so the pour below is keyed to the shape of the answer rather than to
+  // every pixel a resize delivers.
+  const capacity = useMemo(
+    () => labeledCapacity(fieldSize.width, fieldSize.height),
+    [fieldSize.width, fieldSize.height],
+  );
+  const scale = useMemo(
+    () => jarCardScale(skills.length, capacity),
+    [skills.length, capacity],
+  );
   // Roster-aware faces so same-prefix siblings split across hues (a cheap
   // pass over at most JAR_CAPACITY names, recomputed each render).
   const faces = jarFaces(skills.map((s) => s.name));
@@ -464,11 +551,11 @@ export function HubJar({
  * One jar card: the skill's squircle face wearing its classification emoji —
  * a colored mark that scans faster than any initial — or, with no
  * classification, the display spelling's leading letter in the face's own
- * hue. The sparse lg bucket pours labeled capsules instead: the name printed
- * beside the emoji in one truncated line, the only bucket with the floor to
- * spare for it. Everywhere else the name floats above the tile in a portal
- * tooltip on hover (so it never clips on the jar's overflow). The tooltip
- * trigger IS the transformed tile the physics engine moves.
+ * hue. The labeled bucket pours capsules instead: the name printed beside the
+ * emoji in one truncated line, which is the shape every card wears for as long
+ * as the roster fits the floor. Everywhere else the name floats above the tile
+ * in a portal tooltip on hover (so it never clips on the jar's overflow). The
+ * tooltip trigger IS the transformed tile the physics engine moves.
  */
 const JarCard = forwardRef<
   HTMLSpanElement,
