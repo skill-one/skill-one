@@ -34,8 +34,8 @@
     "installed": "Installed"
   },
   "sort": {
-    "byPopularity": "By popularity",
-    "byInstalled": "By install time"
+    "byPopularity": "Popularity",
+    "byInstalled": "Install time"
   },
   "unit": {
     "list": "List",

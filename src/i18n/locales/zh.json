@@ -34,8 +34,8 @@
     "installed": "已安装"
   },
   "sort": {
-    "byPopularity": "按热度分组",
-    "byInstalled": "按安装时间分组"
+    "byPopularity": "热度",
+    "byInstalled": "安装时间"
   },
   "unit": {
     "list": "列表",

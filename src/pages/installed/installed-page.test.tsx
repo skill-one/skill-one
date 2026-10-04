@@ -162,8 +162,8 @@ async function pickUnit(
 }
 
 /**
- * Picks a grouping for the rows: 按热度分组 (the default, most-popular first)
- * or 按安装时间分组 (newest first). Each groups the rows ten at a time. The
+ * Picks a grouping for the rows: 热度 (the default, most-popular first)
+ * or 安装时间 (newest first). Each groups the rows ten at a time. The
  * control is there for the per-skill shapes only — the cards are led by their
  * repository's stars and say so themselves.
  */
@@ -1435,7 +1435,7 @@ describe("InstalledPage", () => {
       await screen.findByText("pdf");
 
       await pickUnit(user, "列表");
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
 
       // One row per install, uncapped: this is the whole list, so the unit that
       // reads it one skill at a time reads all of it.
@@ -1458,7 +1458,7 @@ describe("InstalledPage", () => {
       await screen.findByText("pdf");
 
       await pickUnit(user, "列表");
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
       await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
 
       // One flat list, newest first: pdf landed today, docx three days ago,
@@ -1490,7 +1490,7 @@ describe("InstalledPage", () => {
       await screen.findByText("pdf");
 
       await pickUnit(user, "列表");
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
 
       // The figure a row states is the one the list is ordered by: every
       // install carries its stamp (a local fact — no store entry needed), so
@@ -1522,7 +1522,7 @@ describe("InstalledPage", () => {
       renderPage();
 
       await pickUnit(user, "列表");
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
 
       // Every install keeps its own row, across the day groups...
       expect(
@@ -1548,11 +1548,11 @@ describe("InstalledPage", () => {
       // answers which way the rows read. 热度 is the default, so the select marks
       // it on arrival too.
       await pickUnit(user, "列表");
-      await pickSort(user, "按热度分组");
+      await pickSort(user, "热度");
       await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
       expect(
         screen.getByRole("button", { name: "分组方式" }),
-      ).toHaveTextContent("按热度分组");
+      ).toHaveTextContent("热度");
 
       // Most-popular first, regardless of how fresh the install is; the
       // figure-less installs sink below every figure, and among themselves
@@ -1577,7 +1577,7 @@ describe("InstalledPage", () => {
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
 
       // The walk follows the newest-first time order: after code-review (200
       // days) the next install is frontend-design (400) — one press lands there,
@@ -1697,7 +1697,7 @@ describe("InstalledPage", () => {
         within(menu)
           .getAllByRole("menuitemradio")
           .map((item) => item.textContent),
-      ).toEqual(["按热度分组", "按安装时间分组"]);
+      ).toEqual(["热度", "安装时间"]);
       await user.keyboard("{Escape}");
     });
   });
@@ -1713,7 +1713,7 @@ describe("InstalledPage", () => {
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
       await screen.findByText("frontend-design");
 
       // pdf is installed today, docx three days ago, pptx twelve, and the
@@ -1747,7 +1747,7 @@ describe("InstalledPage", () => {
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
       await screen.findByText("frontend-design");
 
       // No stamp reads last, so 今天 has nothing to draw and pdf lands at
@@ -1804,12 +1804,12 @@ describe("InstalledPage", () => {
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
 
-      // 按安装时间分组 reads as a timeline, so this is where a medal is most
+      // 安装时间 reads as a timeline, so this is where a medal is most
       // easily over-read as a weight. The list is content to call its own
       // order a ranking anyway: the reader picked the order, and the number
       // states a place in exactly that. Its own case, so relaxing one
       // comparator cannot quietly relax the claim for the others.
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
       await waitFor(() => expect(podium(0)).toContain(MEDAL_CLASSES[0]));
       expect(podium(1)).toContain(MEDAL_CLASSES[1]);
       expect(podium(2)).toContain(MEDAL_CLASSES[2]);
@@ -1953,7 +1953,7 @@ describe("InstalledPage", () => {
         ...PARKED.map((name) => `查看 ${name} 详情`),
       ]);
 
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
       await expectParkedBelowLive(user);
     });
 
@@ -1978,7 +1978,7 @@ describe("InstalledPage", () => {
       // clock as the live list — parking a skill does not cost it its place
       // among the other parked ones, which is the whole reason the split runs
       // after the sort rather than replacing it.
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
       await revealParked(user);
       await waitFor(() => expect(parkedRows()).toHaveLength(2));
       expect(rowNames()).toEqual([
@@ -2002,7 +2002,7 @@ describe("InstalledPage", () => {
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
       await revealParked(user);
 
       const recent = screen.getByRole("region", { name: "最近 30 天" });
@@ -2158,14 +2158,14 @@ describe("InstalledPage", () => {
       await screen.findByText("frontend-design");
       await revealParked(user);
 
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
       await waitFor(() =>
         expect(parkedHeader()).toHaveAttribute("aria-expanded", "true"),
       );
       expect(parkedRows()).toHaveLength(2);
 
       await user.click(parkedHeader());
-      await pickSort(user, "按热度分组");
+      await pickSort(user, "热度");
       await waitFor(() =>
         expect(parkedHeader()).toHaveAttribute("aria-expanded", "false"),
       );
@@ -2209,7 +2209,7 @@ describe("InstalledPage", () => {
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
       await waitFor(() => expect(parkedSection()).toBeInTheDocument());
       // Folded, and holding nothing: the state a reader actually meets.
       expect(parkedRows()).toHaveLength(0);
@@ -2566,7 +2566,7 @@ describe("InstalledPage", () => {
       seedStoreEntries({ docx: 50, pdf: 30, pptx: 20, "mcp-builder": 5 });
       renderPage();
       await pickUnit(user, "列表");
-      await pickSort(user, "按热度分组");
+      await pickSort(user, "热度");
       await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
 
       // A search re-answers the list by relevance — the better ranking while a
@@ -2585,7 +2585,7 @@ describe("InstalledPage", () => {
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
-      await pickSort(user, "按安装时间分组");
+      await pickSort(user, "安装时间");
 
       await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 

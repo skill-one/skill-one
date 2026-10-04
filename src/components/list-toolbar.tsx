@@ -41,13 +41,14 @@ const DEFAULT_UNIT: ListUnit = "skill";
  * re-ranks the whole list by relevance and ignores the taxonomy slice, so a
  * scope picked now and an order picked now would promise narrowing and ranking
  * the answer does not have. Locked rather than removed, so the row holds still
- * under the reader's cursor instead of jumping on the first keystroke. Docking
- * that pair to the trailing edge is also where the tools put the controls that
- * read the answer — MUI's density and columns, Ant Design Pro's 密度 and 列设置,
- * Airtable's sort and view options, GitHub's sort on the issue list — so the row
- * lands where those rows land instead of trailing 700px of slack. The field
- * keeps the standard `max-w-sm` box the component library caps its own fields
- * at, and the slack between the two groups is the row's, to be spent on nothing.
+ * under the reader's cursor instead of jumping on the first keystroke. The
+ * scope alone docks to the trailing edge — where the tools put the controls
+ * that read the answer: MUI's density and columns, Ant Design Pro's 密度 and
+ * 列设置, Airtable's sort and view options, GitHub's sort on the issue list —
+ * so the row lands where those rows land instead of trailing 700px of slack.
+ * The field keeps the standard `max-w-sm` box the component library caps its
+ * own fields at, and the slack between the two groups is the row's, to be
+ * spent on nothing.
  *
   * The shape is a **row of toggles** rather than a menu, because it is the one
   * answer here that is about the screen rather than about the data: every
@@ -149,6 +150,14 @@ export function ListToolbar({
         unit={unit}
         onChange={(next) => setUnit(destination, next)}
       />
+      {sortable && (
+        <ListSortSelect
+          sort={sort}
+          sorts={sorts}
+          disabled={searching}
+          onChange={(next) => setSort(destination, next)}
+        />
+      )}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {scopable && (
           <ListFacets
@@ -157,14 +166,6 @@ export function ListToolbar({
             selected={scope ?? null}
             disabled={searching}
             onSelect={(key) => setScope(destination, key)}
-          />
-        )}
-        {sortable && (
-          <ListSortSelect
-            sort={sort}
-            sorts={sorts}
-            disabled={searching}
-            onChange={(next) => setSort(destination, next)}
           />
         )}
       </div>

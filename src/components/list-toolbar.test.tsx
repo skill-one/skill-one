@@ -34,11 +34,11 @@ function renderRow(props: Partial<Parameters<typeof ListToolbar>[0]> = {}) {
   return renderWithRouter(row(props));
 }
 
-/** The trailing group, where the reading pair is docked: the scope and the
- *  order — the two a live search overrides, so the two that lock under one. Not
- *  the field, and not the shape. */
+/** The trailing group, where the scope is docked — the one control a live
+ *  search overrides that stays on the row's far edge. Not the field, the shape,
+ *  or the order beside it. */
 function docked(): HTMLElement {
-  const element = screen.getByRole("button", { name: "分组方式" }).parentElement;
+  const element = screen.getByRole("button", { name: "分类" }).parentElement;
   if (!element) throw new Error("no trailing group rendered");
   return element;
 }
@@ -61,33 +61,36 @@ beforeEach(() => {
 });
 
 describe("ListToolbar", () => {
-  it("leads with the field and the shape, and docks the reading pair to the far edge", () => {
+  it("leads with the field, the shape and the order, and docks the scope to the far edge", () => {
     renderRow();
 
     const field = screen.getByLabelText("搜索 Skill");
     const shape = screen.getByRole("button", { name: "列表" });
-    const picker = screen.getByRole("button", { name: "分类" });
     const sort = screen.getByRole("button", { name: "分组方式" });
+    const picker = screen.getByRole("button", { name: "分类" });
 
     // Left to right the row reads: the question, then the shape that says what
-    // the answer is made of, then the scope and the order that say how it is
-    // narrowed and which way it reads — the pair the tools dock to the trailing
-    // edge (MUI's density and columns, Airtable's sort and view options, GitHub's
-    // sort on issues).
+    // the answer is made of, then the order that says which way it reads — the
+    // order lives beside the shape because both are about the screen, not the
+    // data — and the scope alone is pushed to the trailing edge, where the
+    // tools dock the controls that read the answer (MUI's density and columns,
+    // Airtable's sort and view options, GitHub's sort on issues).
     expect(standsAfter(field, shape)).toBe(true);
-    expect(standsAfter(shape, picker)).toBe(true);
-    expect(standsAfter(picker, sort)).toBe(true);
+    expect(standsAfter(shape, sort)).toBe(true);
+    expect(standsAfter(sort, picker)).toBe(true);
   });
 
-  it("anchors the reading pair to the far edge, clear of the shape", () => {
+  it("anchors the scope to the far edge, clear of the shape and the order", () => {
     renderRow();
 
-    // The shape keeps its own width on the leading edge, and the scope and the
-    // order are pushed out by `ml-auto` — so the row lands where those toolbars
-    // land instead of trailing slack after one tight cluster.
+    // The shape keeps its own width on the leading edge with the order beside
+    // it, and the scope is pushed out by `ml-auto` — so the row lands where
+    // those toolbars land instead of trailing slack after one tight cluster.
+    const sort = screen.getByRole("button", { name: "分组方式" });
     expect(shapeSwitch().parentElement).toBe(docked().parentElement);
     expect(docked()).toHaveClass("ml-auto");
     expect(docked()).not.toContainElement(shapeSwitch());
+    expect(docked()).not.toContainElement(sort);
   });
 
   it("never lets the switches be squeezed", () => {
@@ -147,7 +150,7 @@ describe("ListToolbar", () => {
     await user.click(screen.getByRole("button", { name: "列表" }));
     await user.click(screen.getByRole("button", { name: "分组方式" }));
     await user.click(
-      await screen.findByRole("menuitemradio", { name: "按安装时间分组" }),
+      await screen.findByRole("menuitemradio", { name: "安装时间" }),
     );
     await user.click(screen.getByRole("button", { name: "仓库" }));
     await user.click(screen.getByRole("button", { name: "列表" }));

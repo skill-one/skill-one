@@ -35,7 +35,7 @@ describe("ListSortSelect", () => {
     // puts its chevron in, and the two now read as one family on the row rather
     // than as a labelled button beside a chevronned one.
     expect(first).toHaveProperty("nodeType", Node.TEXT_NODE);
-    expect(first?.textContent).toBe("按安装时间分组");
+    expect(first?.textContent).toBe("安装时间");
     expect(last?.nodeName).toBe("svg");
   });
 
