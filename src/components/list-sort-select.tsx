@@ -17,6 +17,7 @@ import {
 const SORT_LABELS: { sort: ListSort; labelKey: ParseKeys }[] = [
   { sort: "popularity", labelKey: "sort.byPopularity" },
   { sort: "installed", labelKey: "sort.byInstalled" },
+  { sort: "tag", labelKey: "sort.byTag" },
 ];
 
 /**

@@ -37,7 +37,9 @@ export type Destination = "store" | "installed";
  * How a list orders itself while no search is live. `popularity` is the
  * registry's blended installs-and-stars figure (`lib/popularity.ts`), the
  * figure every row displays; `installed` is the install's own clock (newest
- * first).
+ * first); `tag` files each install under its classification (the user's own
+ * tag when one was picked, else the store's domain) and reads the tags
+ * biggest first.
  *
  * Every one of these is an order and nothing else: which rows the list is made
  * of is the shape's own business (`ListUnit`), because "按仓库" never said which
@@ -47,9 +49,11 @@ export type Destination = "store" | "installed";
  * why the two are one value each again.
  *
  * On the installed list the order doubles as the grouping: the answer reads in
- * sections of ten rows each, in the chosen order (see the installed page).
+ * titled sections in the chosen reading — rank ranges of ten under
+ * `popularity`, the time buckets under `installed`, the tags under `tag` (see
+ * the installed page).
  */
-export type ListSort = "installed" | "popularity";
+export type ListSort = "installed" | "popularity" | "tag";
 
 /**
  * The orders each list answers in. The installed list carries the install's own
@@ -59,7 +63,7 @@ export type ListSort = "installed" | "popularity";
  */
 export const LIST_SORTS: Readonly<Record<Destination, readonly ListSort[]>> = {
   store: ["popularity"],
-  installed: ["popularity", "installed"],
+  installed: ["popularity", "installed", "tag"],
 };
 
 /**

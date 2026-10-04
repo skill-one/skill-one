@@ -35,7 +35,8 @@
   },
   "sort": {
     "byPopularity": "热度",
-    "byInstalled": "安装时间"
+    "byInstalled": "安装时间",
+    "byTag": "标签"
   },
   "unit": {
     "list": "列表",

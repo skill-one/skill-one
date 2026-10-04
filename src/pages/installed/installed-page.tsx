@@ -13,6 +13,9 @@ import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
 import { setQuery } from "../../lib/list-view";
 import { buildSearchIndex } from "../../lib/search-index";
+import { domainsOf, taxonomyRank } from "../../lib/domain-filter";
+import { domainLabel } from "../../data/domains";
+import { useAppLocale } from "../../i18n/use-language";
 import {
   installedSkillView,
   skillKey,
@@ -207,10 +210,18 @@ function compareByStars<T>(
  *   a row shows is always the one the list is ordered by. The sections are
  *   the time itself: 今天 / 昨天 / 最近 7 天 / 最近 30 天 / 更早, an
  *   install with no recorded stamp reading last under 更早.
+ * - **按标签分组**: one row per install, filed under its classification —
+ *   the user's own tag where one was picked (the single select in the detail
+ *   drawer), else the store's domain, else 未分类. The sections are the tags
+ *   themselves, biggest first (ties fall back to the taxonomy's own order,
+ *   then to the label), and each install files under its leading
+ *   classification only, so no skill reads twice. Within a section the rows
+ *   keep the popularity order, the same reading the default grouping gives.
  *
  * Each section's header names what it holds — the rank range it covers
  * ("1–10", "11–20", …) under the popularity grouping, the bucket's span of
- * time under the install clock — with the count it actually lists beside it;
+ * time under the install clock, the tag's own label under the tag grouping —
+ * with the count it actually lists beside it;
  * every section starts open, and a press on the header folds it. An empty
  * bucket draws no section at all. A search stands the sections down and
  * re-answers in relevance order. What the page adds to the store's surfaces
@@ -242,6 +253,9 @@ function compareByStars<T>(
 
 export function InstalledPage() {
   const { t } = useTranslation();
+  // The locale the tag sections name themselves in: a tag header is the
+  // classification's own label, resolved the same way the row badges are.
+  const locale = useAppLocale();
   const { data: skills, isLoading, isError, error } = useInstalledSkills();
 
   // Install sources recorded by this app (the provenance ledger), reconciled
@@ -434,7 +448,8 @@ export function InstalledPage() {
   }, [rows]);
 
   // The skill unit's flat order: the installs in the chosen grouping's order —
-  // the registry's popularity blend (the default) or newest-first by the
+  // the registry's popularity blend (the default; also the within-section
+  // reading the tag grouping hands its sections), or newest-first by the
   // recorded install time (see `lib/install-time`). Installs the platform
   // recorded no birth time for settle last in the time order. A search is left
   // exactly as the index answered it: relevance is a ranking too, and the
@@ -566,13 +581,122 @@ export function InstalledPage() {
   // group's order, so the revealed prefix is a prefix of the whole group and a
   // row's number never shifts under the reader as more is revealed.
   const split = splitRows.disabled.length > 0;
+
+  // The live answer, divided into titled sections in the chosen grouping's
+  // order — the shared shell the parked half draws through
+  // (`CollapsibleSection`). 按热度分组 slices the ordinal run into ranges of
+  // ten ("1–10", "11–20", … — computed from the *whole* live answer, so a
+  // header never shifts while the progressive reveal fills its section);
+  // 按安装时间分组 files each install into the time bucket its age falls in
+  // (今天 / 昨天 / 最近 7 天 / 最近 30 天 / 更早); 按标签分组 files each
+  // install under its leading classification — the user's tag where one was
+  // picked, else the store's domain, else 未分类 — and reads the tags
+  // biggest first, ties falling back to the taxonomy's own order and then to
+  // the label (the same ordering the store's facet chips answer in). Empty
+  // sections are not drawn — an absent bucket reads quieter than a zero. The
+  // count beside a header states what the section actually lists right now.
+  const sections = useMemo(() => {
+    const live = splitRows.enabled;
+    if (live.length === 0) return [];
+    if (sort === "tag") {
+      const byTag = new Map<string, Row[]>();
+      for (const row of live) {
+        // The leading key is the whole filing: the user's single select
+        // overrides the store's answer upstream of here, and a store entry
+        // naming several domains files under its first — a skill reads once.
+        const key = domainsOf(row.skill)[0];
+        const bucket = byTag.get(key);
+        if (bucket) bucket.push(row);
+        else byTag.set(key, [row]);
+      }
+      return Array.from(byTag, ([key, items]) => ({ key, items }))
+        .toSorted(
+          (a, b) =>
+            b.items.length -
+              a.items.length ||
+            taxonomyRank(a.key) - taxonomyRank(b.key) ||
+            domainLabel(a.key, locale).localeCompare(
+              domainLabel(b.key, locale),
+            ),
+        )
+        .map(({ key, items }) => ({
+          title: domainLabel(key, locale),
+          rows: items,
+        }));
+    }
+    if (sort === "installed") {
+      const buckets: Row[][] = TIME_BUCKETS.map(() => []);
+      for (const row of live) {
+        const stamp = row.skill.installedAt;
+        const ageDays =
+          stamp == null ? null : (Date.now() / 1000 - stamp) / DAY_SECONDS;
+        const index =
+          ageDays == null
+            ? TIME_BUCKETS.length - 1
+            : TIME_BUCKETS.findIndex(
+                (bucket) =>
+                  bucket.maxAgeDays !== null && ageDays < bucket.maxAgeDays,
+              );
+        buckets[index === -1 ? TIME_BUCKETS.length - 1 : index].push(row);
+      }
+      return TIME_BUCKETS.map((bucket, index) => ({
+        title: t(bucket.titleKey),
+        rows: buckets[index],
+      })).filter((section) => section.rows.length > 0);
+    }
+    const liveTotal = splitActive.enabled.length;
+    const groups: { title: string; rows: Row[] }[] = [];
+    for (let start = 0; start < live.length; start += GROUP_SIZE) {
+      const last = Math.min(start + GROUP_SIZE, liveTotal);
+      groups.push({
+        title: start + 1 === last ? `${start + 1}` : `${start + 1}–${last}`,
+        rows: live.slice(start, start + GROUP_SIZE),
+      });
+    }
+    return groups;
+  }, [splitRows, splitActive, sort, t, locale]);
+
+  // Whether the answer is cut in two, and — when it is — the number each row
+  // prints: where it stands *within its own group*, counted from 1 in each. The
+  // parked half is a section of its own, with a header that states how much it
+  // holds, so it numbers itself as the list it is rather than continuing the
+  // live list above it.
+  //
+  // Counting across the split instead would be the alternative, and it is wrong
+  // here for a reason worth stating: the flat order interleaves the halves, so
+  // the live list would carry the gaps where a parked row used to sit (2, 4,
+  // 5, 6) and the parked section would hold the very numbers the live one gave
+  // up (1, 3). A run that jumps 1, 2, 4 and then restarts at 1 reads as one list
+  // with rows gone missing — the opposite of what the section's own run is for.
+  // Each group also numbers the order its own sort gave it, which is the only
+  // order a reader looking at that group can see.
+  //
+  // The count survives the progressive reveal: `splitByEnabled` preserves each
+  // group's order, so the revealed prefix is a prefix of the whole group and a
+  // row's number never shifts under the reader as more is revealed.
+  //
+  // Under 按标签分组 the groups are the sections above, so the run restarts
+  // with each tag: a row numbers its place within its own tag, and the
+  // podium is that tag's three most-popular installs. The parked half numbers
+  // itself as it does under every grouping.
   const rowOrdinals = useMemo(() => {
     const ordinals = new Map<string, number>();
-    for (const group of [splitRows.enabled, splitRows.disabled]) {
-      group.forEach((row, index) => ordinals.set(skillKey(row.skill), index));
+    if (sort === "tag") {
+      for (const section of sections) {
+        section.rows.forEach((row, index) =>
+          ordinals.set(skillKey(row.skill), index),
+        );
+      }
+      splitRows.disabled.forEach((row, index) =>
+        ordinals.set(skillKey(row.skill), index),
+      );
+    } else {
+      for (const group of [splitRows.enabled, splitRows.disabled]) {
+        group.forEach((row, index) => ordinals.set(skillKey(row.skill), index));
+      }
     }
     return ordinals;
-  }, [splitRows]);
+  }, [sort, sections, splitRows]);
 
   // The drawer walks every skill of the answer on screen, in the order the unit
   // lists it: a card's preview cap and the progressive reveal are rendering
@@ -701,50 +825,6 @@ export function InstalledPage() {
       <ul className={SKILL_ROW_LIST_CLASS}>{group.map(renderSkillRow)}</ul>
     );
 
-  // The live answer, divided into titled sections in the chosen grouping's
-  // order — the shared shell the parked half draws through
-  // (`CollapsibleSection`). 按热度分组 slices the ordinal run into ranges of
-  // ten ("1–10", "11–20", … — computed from the *whole* live answer, so a
-  // header never shifts while the progressive reveal fills its section);
-  // 按安装时间分组 files each install into the time bucket its age falls in
-  // (今天 / 昨天 / 最近 7 天 / 最近 30 天 / 更早). Empty sections are not
-  // drawn — an absent bucket reads quieter than a zero. The count beside a
-  // header states what the section actually lists right now.
-  const sections = useMemo(() => {
-    const live = splitRows.enabled;
-    if (live.length === 0) return [];
-    if (sort === "installed") {
-      const buckets: Row[][] = TIME_BUCKETS.map(() => []);
-      for (const row of live) {
-        const stamp = row.skill.installedAt;
-        const ageDays =
-          stamp == null ? null : (Date.now() / 1000 - stamp) / DAY_SECONDS;
-        const index =
-          ageDays == null
-            ? TIME_BUCKETS.length - 1
-            : TIME_BUCKETS.findIndex(
-                (bucket) =>
-                  bucket.maxAgeDays !== null && ageDays < bucket.maxAgeDays,
-              );
-        buckets[index === -1 ? TIME_BUCKETS.length - 1 : index].push(row);
-      }
-      return TIME_BUCKETS.map((bucket, index) => ({
-        title: t(bucket.titleKey),
-        rows: buckets[index],
-      })).filter((section) => section.rows.length > 0);
-    }
-    const liveTotal = splitActive.enabled.length;
-    const groups: { title: string; rows: Row[] }[] = [];
-    for (let start = 0; start < live.length; start += GROUP_SIZE) {
-      const last = Math.min(start + GROUP_SIZE, liveTotal);
-      groups.push({
-        title: start + 1 === last ? `${start + 1}` : `${start + 1}–${last}`,
-        rows: live.slice(start, start + GROUP_SIZE),
-      });
-    }
-    return groups;
-  }, [splitRows, splitActive, sort, t]);
-
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
       {/* The list's own first row, and the only row above the answer: the
@@ -850,7 +930,8 @@ export function InstalledPage() {
             // The per-skill shapes: one row or one square per install, the
             // live installs divided into titled sections — rank ranges of ten
             // under the popularity grouping, time buckets (今天 / 昨天 /
-            // 最近 7 天 / 最近 30 天 / 更早) under the install clock — then
+            // 最近 7 天 / 最近 30 天 / 更早) under the install clock, the
+            // classifications themselves under the tag grouping — then
             // the parked ones below under the one header that names them.
             // The same entries a repository's own page lists, so a skill
             // reads the same wherever it is found — and the figure each

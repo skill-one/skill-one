@@ -138,7 +138,7 @@ came from X" needs to see the record the app is not acting on too.
   stays installable.
 - **Installed page** (`installed-page.tsx`): the page lists the same installs in
   either shape — the repository cards (卡片) and the skill rows (列表, read by
-  热度 or 按安装时间) — and every shape presents a skill identically, so a skill reads
+  热度, 按安装时间, or 按标签) — and every shape presents a skill identically, so a skill reads
   the same wherever it is listed. A row
   with a ledger entry carries
   the owner's GitHub avatar (the author chip on the card's metadata rail, whose
