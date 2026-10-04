@@ -38,7 +38,7 @@ function renderRow(props: Partial<Parameters<typeof ListToolbar>[0]> = {}) {
  *  order — the two a live search overrides, so the two that lock under one. Not
  *  the field, and not the shape. */
 function docked(): HTMLElement {
-  const element = screen.getByRole("button", { name: "排序方式" }).parentElement;
+  const element = screen.getByRole("button", { name: "分组方式" }).parentElement;
   if (!element) throw new Error("no trailing group rendered");
   return element;
 }
@@ -67,7 +67,7 @@ describe("ListToolbar", () => {
     const field = screen.getByLabelText("搜索 Skill");
     const shape = screen.getByRole("button", { name: "列表" });
     const picker = screen.getByRole("button", { name: "分类" });
-    const sort = screen.getByRole("button", { name: "排序方式" });
+    const sort = screen.getByRole("button", { name: "分组方式" });
 
     // Left to right the row reads: the question, then the shape that says what
     // the answer is made of, then the scope and the order that say how it is
@@ -95,7 +95,7 @@ describe("ListToolbar", () => {
 
     // Every switch is two or three short words, and a truncated "排序方…" is
     // worse than anything else on the row giving ground.
-    for (const name of ["列表", "分类", "排序方式"]) {
+    for (const name of ["列表", "分类", "分组方式"]) {
       expect(screen.getByRole("button", { name })).toHaveClass("shrink-0");
     }
     expect(shapeSwitch()).toHaveClass("shrink-0");
@@ -145,9 +145,9 @@ describe("ListToolbar", () => {
     renderRow();
 
     await user.click(screen.getByRole("button", { name: "列表" }));
-    await user.click(screen.getByRole("button", { name: "排序方式" }));
+    await user.click(screen.getByRole("button", { name: "分组方式" }));
     await user.click(
-      await screen.findByRole("menuitemradio", { name: "安装时间" }),
+      await screen.findByRole("menuitemradio", { name: "按安装时间分组" }),
     );
     await user.click(screen.getByRole("button", { name: "仓库" }));
     await user.click(screen.getByRole("button", { name: "列表" }));
@@ -163,7 +163,7 @@ describe("ListToolbar", () => {
     // The store's rows display the figure they are ordered by, so a menu of one
     // would be a control that costs a press to say what the rows already say.
     expect(
-      screen.queryByRole("button", { name: "排序方式" }),
+      screen.queryByRole("button", { name: "分组方式" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "仓库" })).toBeInTheDocument();
   });
@@ -178,12 +178,12 @@ describe("ListToolbar", () => {
     // cost are figures the rows carry and the card does not, so the control
     // leaves rather than promise a pick that changes nothing.
     expect(
-      screen.queryByRole("button", { name: "排序方式" }),
+      screen.queryByRole("button", { name: "分组方式" }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "列表" }));
 
-    expect(screen.getByRole("button", { name: "排序方式" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "分组方式" })).toBeInTheDocument();
   });
 
   it("keeps the order control in the grid shape, which reads per skill", async () => {
@@ -194,7 +194,7 @@ describe("ListToolbar", () => {
 
     // Squares carry the same per-skill figures the rows do, so the order still
     // applies — only the repository shape hides it.
-    expect(screen.getByRole("button", { name: "排序方式" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "分组方式" })).toBeInTheDocument();
   });
 
   it("keeps each list's own scope, shape and order to itself", async () => {
@@ -219,7 +219,7 @@ describe("ListToolbar", () => {
 
     // Nothing to narrow to, so there is no control that would narrow.
     expect(screen.queryByRole("button", { name: "分类" })).toBeNull();
-    expect(screen.getByRole("button", { name: "排序方式" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "分组方式" })).toBeInTheDocument();
   });
 
   it("keeps the picker on a scoped list, so the scope can be cleared", () => {
@@ -268,7 +268,7 @@ describe("ListToolbar", () => {
     // a pick now would promise narrowing and ranking the answer does not have.
     // Locked, not removed: the row holds still under the reader's cursor.
     expect(screen.getByRole("button", { name: "分类" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "排序方式" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "分组方式" })).toBeDisabled();
     // The shape is not one of the two a search overrides, so it stays open: a
     // search is read in either arrangement.
     expect(screen.getByRole("button", { name: "仓库" })).toBeEnabled();

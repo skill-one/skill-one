@@ -17,6 +17,7 @@ import {
   resetMockAgentStatus,
   resetMockInstalledSkills,
   setMockSkillEnabled,
+  setMockSkillInstalledAt,
 } from "../../lib/mock-local";
 import {
   loadCustomTags,
@@ -155,47 +156,23 @@ function renderPage(route = "/installed") {
  */
 async function pickUnit(
   user: ReturnType<typeof userEvent.setup>,
-  shape: "列表" | "仓库",
+  shape: "列表" | "网格" | "仓库",
 ) {
   await user.click(screen.getByRole("button", { name: shape }));
 }
 
 /**
- * Picks an order for the rows: 热度 (the default, most-popular first), 安装时间
- * (newest first) or Token 占用 (heaviest description first). The control is
- * there for the row shape only — the cards are led by their repository's stars
- * and say so themselves.
+ * Picks a grouping for the rows: 按热度分组 (the default, most-popular first)
+ * or 按安装时间分组 (newest first). Each groups the rows ten at a time. The
+ * control is there for the per-skill shapes only — the cards are led by their
+ * repository's stars and say so themselves.
  */
 async function pickSort(
   user: ReturnType<typeof userEvent.setup>,
   label: string,
 ) {
-  await user.click(screen.getByRole("button", { name: "排序方式" }));
+  await user.click(screen.getByRole("button", { name: "分组方式" }));
   await user.click(await screen.findByRole("menuitemradio", { name: label }));
-}
-
-/**
- * Picks a domain scope from the 分类 picker. `label` names the menu item —
- * 全部 or a domain's display label. The popup closes on the pick, so each
- * scope change reopens it.
- */
-async function pickDomain(
-  user: ReturnType<typeof userEvent.setup>,
-  label: string | RegExp,
-) {
-  // The list renders its bar only once rows exist, so the trigger is waited
-  // for rather than read off the first render.
-  await user.click(await screen.findByRole("button", { name: "分类" }));
-  await user.click(await screen.findByRole("menuitemradio", { name: label }));
-}
-
-/**
- * Opens the 分类 picker without picking, to read its menu of scopes; the
- * popup mounts asynchronously, so the caller's queries can be synchronous.
- */
-async function openDomainSelect(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole("button", { name: "分类" }));
-  await screen.findByRole("menuitemradio", { name: /^全部/ });
 }
 
 describe("InstalledPage", () => {
@@ -271,21 +248,8 @@ describe("InstalledPage", () => {
     });
 
     it("gives every source-less install a home in one repository-style card", async () => {
-      const user = userEvent.setup();
       renderPage();
 
-      // The browse bar leads with 全部: an install no store entry covers has no
-      // classification either, and that is not the dataset's 其他 — nobody has
-      // looked at it at all. The picker states the whole count, and its list
-      // carries 未分类 and nothing for 其他.
-      expect(
-        await screen.findByRole("button", { name: "分类" }),
-      ).toHaveTextContent("1");
-      await openDomainSelect(user);
-      expect(
-        screen.getByRole("menuitemradio", { name: /^未分类/ }),
-      ).toBeInTheDocument();
-      expect(screen.queryByRole("menuitemradio", { name: /^其他/ })).toBeNull();
       // No install has a recorded source, so every skill lives in one pool card:
       // six skills fit inside the folded cap, so the bar is a plain label and
       // every row is on screen.
@@ -929,19 +893,18 @@ describe("InstalledPage", () => {
         }),
       );
 
-      // The choice was made inside the drawer, so unlike a scope or sort
-      // change it stays open — and the badge answers the choice live.
+      // The choice was made inside the drawer, so unlike a sort change it
+      // stays open — and the badge answers the choice live.
       expect(screen.getByRole("dialog")).toBeInTheDocument();
       expect(await within(dialog).findByText("开发编程")).toBeInTheDocument();
     }, 20_000);
 
-    it("renames a custom tag from the drawer, moving assignments and the scope along", async () => {
+    it("renames a custom tag from the drawer, moving assignments along", async () => {
       const user = userEvent.setup();
       seedMockCustomTags([{ key: "效率工具", label: "效率工具" }], {
         pdf: "效率工具",
       });
       renderPage();
-      await pickDomain(user, /^效率工具/);
 
       await user.click(
         await screen.findByRole("button", { name: "查看 pdf 详情" }),
@@ -966,9 +929,8 @@ describe("InstalledPage", () => {
       await user.type(nameBox, "摸鱼神器");
       await user.click(await screen.findByRole("button", { name: "保存" }));
 
-      // The assignment moved with the rename, the badge answers it, and the
-      // scope followed the new key — the answer never emptied out from under
-      // the reader, so the drawer stays open throughout.
+      // The assignment moved with the rename and the badge answers it, so
+      // the drawer stays open throughout.
       await waitFor(async () =>
         expect((await loadCustomTags()).skillTags).toEqual({
           pdf: "摸鱼神器",
@@ -976,21 +938,12 @@ describe("InstalledPage", () => {
       );
       expect(screen.getByRole("dialog")).toBeInTheDocument();
       expect(await within(dialog).findByText("摸鱼神器")).toBeInTheDocument();
-      // The scope followed the rename: the 分类 trigger now names the new
-      // label. The drawer is open, so the toolbar behind it is inert and the
-      // trigger is read off the DOM rather than the a11y tree.
-      await waitFor(() =>
-        expect(
-          document.querySelector('button[aria-label="分类"]'),
-        ).toHaveTextContent("摸鱼神器"),
-      );
     }, 20_000);
 
-    it("closes the drawer when clearing files the open skill out of the scoped answer", async () => {
+    it("keeps the drawer open when clearing the open skill's tag", async () => {
       const user = userEvent.setup();
       seedMockCustomTags([], { pdf: "development" });
       renderPage();
-      await pickDomain(user, /^开发编程/);
 
       await user.click(
         await screen.findByRole("button", { name: "查看 pdf 详情" }),
@@ -999,9 +952,9 @@ describe("InstalledPage", () => {
       expect(within(dialog).getByText("开发编程")).toBeInTheDocument();
 
       // Clearing falls back to the store's classification — unclassified for
-      // this local install — which is outside the development scope, so the
-      // drawer closes instead of lingering on a skill the list no longer
-      // holds (leaving the stale key would pop it back open on 全部).
+      // this local install — but the list no longer narrows by
+      // classification, so the skill stays listed and the drawer stays open
+      // over it while the badge answers the fallback.
       await user.click(
         within(dialog).getByRole("button", { name: "编辑 pdf 的标签" }),
       );
@@ -1011,9 +964,7 @@ describe("InstalledPage", () => {
       await waitFor(async () =>
         expect((await loadCustomTags()).skillTags).toEqual({}),
       );
-      await waitFor(() =>
-        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-      );
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
     }, 20_000);
 
     it("does not open the drawer or the door from the bar's switch", async () => {
@@ -1158,15 +1109,10 @@ describe("InstalledPage", () => {
       });
       renderPage();
 
-      // The resolved entry is what classifies the install, so an item for its
-      // domain joins the picker's list — and the card's bar prints the
-      // repository's stars, the same figure the store's own cards carry.
-      await openDomainSelect(user);
-      expect(
-        screen.getByRole("menuitemradio", { name: /^内容创作/ }),
-      ).toBeInTheDocument();
-      await user.keyboard("{Escape}");
-      expect(screen.getByTitle("169600 stars")).toBeInTheDocument();
+      // The resolved entry is what classifies the install, and the card's bar
+      // prints the repository's stars, the same figure the store's own cards
+      // carry.
+      expect(await screen.findByTitle("169600 stars")).toBeInTheDocument();
 
       // The drawer states the classification and the store figure the compact
       // repository row has no room for.
@@ -1272,48 +1218,7 @@ describe("InstalledPage", () => {
     });
   });
 
-  describe("scoping and ordering", () => {
-    it("scopes the list to a classification from the picker", async () => {
-      const user = userEvent.setup();
-      seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-      // The registry still lists the source the ledger recorded, so pdf wears a
-      // store classification and a chip for it joins the filter bar.
-      lookupSkills.mockResolvedValue({
-        entries: [
-          {
-            name: "pdf",
-            repo: "anthropics/skills",
-            description: "PDF 文档读取、生成、合并、拆分与标注。",
-            stars: 169600,
-            downloads: 2991984,
-            path: "skills/anthropics/skills/pdf",
-            profile: { domain: ["content-creation"] },
-          },
-        ],
-      });
-      renderPage();
-
-      await pickDomain(user, /^内容创作/);
-
-      // The scope leaves only the classified skill on screen...
-      await waitFor(() =>
-        expect(
-          screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-        ).toHaveLength(1),
-      );
-      expect(
-        screen.getByRole("button", { name: "查看 pdf 详情" }),
-      ).toBeInTheDocument();
-
-      // ...and 全部 clears the scope again.
-      await pickDomain(user, /^全部/);
-      await waitFor(() =>
-        expect(
-          screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-        ).toHaveLength(6),
-      );
-    });
-
+  describe("ordering", () => {
     // The repository unit (the default): one card per source, the cards ordered
     // by each card's newest install.
 
@@ -1425,7 +1330,7 @@ describe("InstalledPage", () => {
         "true",
       );
       expect(
-        screen.queryByRole("button", { name: "排序方式" }),
+        screen.queryByRole("button", { name: "分组方式" }),
       ).not.toBeInTheDocument();
       await waitFor(() =>
         expect(cardBarNames(baseElement)).toEqual([
@@ -1530,7 +1435,7 @@ describe("InstalledPage", () => {
       await screen.findByText("pdf");
 
       await pickUnit(user, "列表");
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
 
       // One row per install, uncapped: this is the whole list, so the unit that
       // reads it one skill at a time reads all of it.
@@ -1553,7 +1458,7 @@ describe("InstalledPage", () => {
       await screen.findByText("pdf");
 
       await pickUnit(user, "列表");
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
       await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
 
       // One flat list, newest first: pdf landed today, docx three days ago,
@@ -1585,7 +1490,7 @@ describe("InstalledPage", () => {
       await screen.findByText("pdf");
 
       await pickUnit(user, "列表");
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
 
       // The figure a row states is the one the list is ordered by: every
       // install carries its stamp (a local fact — no store entry needed), so
@@ -1607,44 +1512,6 @@ describe("InstalledPage", () => {
       expect(screen.queryByLabelText(/^安装于 /)).toBeNull();
     });
 
-    it("orders the skill unit by token cost and states each row's estimate", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await screen.findByText("pdf");
-
-      await pickUnit(user, "列表");
-      await pickSort(user, "Token 占用");
-
-      // The estimate is a local fact — the description's own cost, no store
-      // entry needed — so every row with a description states one, as a bare
-      // figure under the coin icon. The short hint is matched exactly: jsdom
-      // never runs the sort select's closing animation, so its content stays
-      // mounted, and a substring of "Token" would match the select's own text
-      // through it.
-      await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
-      const estimates = screen
-        .getAllByLabelText("Skill 英文描述的预估 Token 数")
-        .map((node) => node.textContent ?? "");
-
-      // The order is the estimate's own: heaviest first, non-increasing down
-      // the list (pdf's long description leads the mock installs).
-      const figures = estimates.map(Number);
-      expect(figures.length).toBeGreaterThanOrEqual(5);
-      expect(figures[0]).toBeGreaterThan(figures[1]);
-      for (let i = 0; i < figures.length - 1; i += 1) {
-        expect(figures[i]).toBeGreaterThanOrEqual(figures[i + 1]);
-      }
-
-      // Picking 热度 re-answers the list and its slots together: the estimates
-      // leave with the ordering they belonged to. (No store entry resolves
-      // here, so the rows state no blend either.)
-      setSort("installed", "popularity");
-      await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
-      expect(
-        screen.queryByLabelText("Skill 英文描述的预估 Token 数"),
-      ).toBeNull();
-    });
-
     it("orders one source's several installs by time instead of folding them", async () => {
       const user = userEvent.setup();
       // Four installs share one source the registry still lists: where the old
@@ -1655,7 +1522,7 @@ describe("InstalledPage", () => {
       renderPage();
 
       await pickUnit(user, "列表");
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
 
       // Every install keeps its own row, across the day groups...
       expect(
@@ -1681,11 +1548,11 @@ describe("InstalledPage", () => {
       // answers which way the rows read. 热度 is the default, so the select marks
       // it on arrival too.
       await pickUnit(user, "列表");
-      await pickSort(user, "热度");
+      await pickSort(user, "按热度分组");
       await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
       expect(
-        screen.getByRole("button", { name: "排序方式" }),
-      ).toHaveTextContent("热度");
+        screen.getByRole("button", { name: "分组方式" }),
+      ).toHaveTextContent("按热度分组");
 
       // Most-popular first, regardless of how fresh the install is; the
       // figure-less installs sink below every figure, and among themselves
@@ -1705,70 +1572,12 @@ describe("InstalledPage", () => {
     });
   });
 
-  describe("counts in the skill unit", () => {
-    it("counts skills rather than repositories in the skill unit's chips", async () => {
-      const user = userEvent.setup();
-      seedMockProvenance({
-        pdf: { repo: "anthropics/skills" },
-        docx: { repo: "anthropics/skills" },
-      });
-      seedStoreEntries({ pdf: 2991984, docx: 1991984 }, "content-creation");
-      renderPage();
-
-      // The repository unit weighs a domain by repositories: one source holds
-      // both classified installs, so 内容创作 counts 1 beside 全部's 2 cards.
-      // The figures arrive with the store's lookup, so the trigger is waited
-      // out before the select is read.
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: "分类" })).toHaveTextContent(
-          "2",
-        ),
-      );
-      await openDomainSelect(user);
-      expect(
-        screen.getByRole("menuitemradio", { name: /^内容创作/ }),
-      ).toHaveTextContent("1");
-      expect(
-        screen.getByRole("menuitemradio", { name: /^全部/ }),
-      ).toHaveTextContent("2");
-      await user.keyboard("{Escape}");
-
-      await pickUnit(user, "列表");
-      await pickSort(user, "安装时间");
-
-      // The same domain now weighs skills, and 全部 every install.
-      await openDomainSelect(user);
-      expect(
-        screen.getByRole("menuitemradio", { name: /^内容创作/ }),
-      ).toHaveTextContent("2");
-      expect(
-        screen.getByRole("menuitemradio", { name: /^全部/ }),
-      ).toHaveTextContent("6");
-
-      // Scoping keeps the skills that belong to the domain, whoever they share a
-      // source with: each keeps its own row.
-      await user.click(
-        screen.getByRole("menuitemradio", { name: /^内容创作/ }),
-      );
-      await waitFor(() =>
-        expect(
-          screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-        ).toHaveLength(2),
-      );
-
-      // Back in the repository unit, 全部 counts cards again.
-      await pickUnit(user, "仓库");
-      await openDomainSelect(user);
-      expect(
-        screen.getByRole("menuitemradio", { name: /^全部/ }),
-      ).toHaveTextContent("2");
-    });
-
+  describe("the skill unit", () => {
     it("walks the skill unit's newest-first time order in the detail drawer", async () => {
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
 
       // The walk follows the newest-first time order: after code-review (200
       // days) the next install is frontend-design (400) — one press lands there,
@@ -1783,6 +1592,175 @@ describe("InstalledPage", () => {
       expect(
         await within(dialog).findByText("frontend-design"),
       ).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * The per-skill shapes read in titled sections of ten, in the chosen
+   * grouping's order. The header names the rank range it covers and the badge
+   * states what it actually lists; every section opens on arrival, and a
+   * press on the header folds it.
+   */
+  describe("the rank sections in the skill unit", () => {
+    /** Enough extra installs to spill past the first section of ten. */
+    function seedEighteenInstalls() {
+      for (let i = 0; i < 12; i += 1) {
+        addMockLocalSkill(`extra-${i}`);
+      }
+    }
+
+    /** Fires the reveal sentinel once: the run grows by its chunk per fire. */
+    function triggerReveal(): void {
+      (
+        globalThis.IntersectionObserver as unknown as {
+          instances: Array<{ trigger(intersecting?: boolean): void }>;
+        }
+      ).instances.at(-1)!.trigger(true);
+    }
+
+    it("keeps every section open on arrival, and folds one on a press", async () => {
+      seedEighteenInstalls();
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      const first = await screen.findByRole("region", { name: "1–10" });
+
+      // Reveal the whole answer the way scrolling would: two sentinel fires
+      // carry the run from its first chunk past both sections.
+      triggerReveal();
+      await waitFor(() =>
+        expect(within(first).getAllByRole("listitem")).toHaveLength(10),
+      );
+      triggerReveal();
+      const second = await screen.findByRole("region", { name: "11–18" });
+      await waitFor(() =>
+        expect(within(second).getAllByRole("listitem")).toHaveLength(8),
+      );
+      // Both sections open on arrival, each holding its own ten (and eight).
+      expect(
+        within(first).getByRole("button", { name: /^1–10/ }),
+      ).toHaveAttribute("aria-expanded", "true");
+      expect(
+        within(second).getByRole("button", { name: /^11–18/ }),
+      ).toHaveAttribute("aria-expanded", "true");
+      expect(within(first).getAllByRole("listitem")).toHaveLength(10);
+      expect(within(second).getAllByRole("listitem")).toHaveLength(8);
+      // The badges state what each section actually lists.
+      expect(
+        within(first).getByRole("button", { name: /^1–10/ }),
+      ).toHaveTextContent("10 个 skill");
+      expect(
+        within(second).getByRole("button", { name: /^11–18/ }),
+      ).toHaveTextContent("8 个 skill");
+
+      // A press folds the section, folding unmounts its panel, and a second
+      // press brings the rows back.
+      await user.click(within(second).getByRole("button", { name: /^11–18/ }));
+      await waitFor(() =>
+        expect(
+          within(second).getByRole("button", { name: /^11–18/ }),
+        ).toHaveAttribute("aria-expanded", "false"),
+      );
+      expect(within(second).queryAllByRole("listitem")).toHaveLength(0);
+      await user.click(within(second).getByRole("button", { name: /^11–18/ }));
+      await waitFor(() =>
+        expect(within(second).getAllByRole("listitem")).toHaveLength(8),
+      );
+    });
+
+    it("groups the grid squares the same way", async () => {
+      seedEighteenInstalls();
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "网格");
+      const first = await screen.findByRole("region", { name: "1–10" });
+      triggerReveal();
+      await waitFor(() =>
+        expect(within(first).getAllByRole("listitem")).toHaveLength(10),
+      );
+      triggerReveal();
+      const second = await screen.findByRole("region", { name: "11–18" });
+      await waitFor(() =>
+        expect(within(second).getAllByRole("listitem")).toHaveLength(8),
+      );
+    });
+
+    it("offers exactly the two groupings from the menu", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      await user.click(screen.getByRole("button", { name: "分组方式" }));
+      const menu = await screen.findByRole("menu");
+      expect(
+        within(menu)
+          .getAllByRole("menuitemradio")
+          .map((item) => item.textContent),
+      ).toEqual(["按热度分组", "按安装时间分组"]);
+      await user.keyboard("{Escape}");
+    });
+  });
+
+  /**
+   * Under the install-clock grouping the sections are the time itself: 今天 /
+   * 昨天 / 最近 7 天 / 最近 30 天 / 更早. The mock's install ages (0, 3, 12,
+   * 45, 200, 400 days) fall one per rolling window, which is what lets each
+   * bucket be asserted in isolation; empty buckets draw no section at all.
+   */
+  describe("the time buckets in the skill unit", () => {
+    it("files each install into the time bucket its age falls in", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "按安装时间分组");
+      await screen.findByText("frontend-design");
+
+      // pdf is installed today, docx three days ago, pptx twelve, and the
+      // rest older than a month — so 今天, 最近 7 天 and 最近 30 天 hold one
+      // row each, 更早 the other three, and no 昨天 bucket exists to draw.
+      expect(screen.getByRole("region", { name: "今天" })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("region", { name: "昨天" }),
+      ).not.toBeInTheDocument();
+      const last7 = screen.getByRole("region", { name: "最近 7 天" });
+      expect(
+        within(last7).getAllByRole("button", { name: /查看 .+ 详情/ }),
+      ).toHaveLength(1);
+      const earlier = screen.getByRole("region", { name: "更早" });
+      expect(
+        within(earlier)
+          .getAllByRole("button", { name: /查看 .+ 详情/ })
+          .map((node) => node.getAttribute("aria-label")),
+      ).toEqual([
+        "查看 mcp-builder 详情",
+        "查看 Code Review 详情",
+        "查看 frontend-design 详情",
+      ]);
+      expect(
+        within(earlier).getByRole("button", { name: /^更早/ }),
+      ).toHaveTextContent("3 个 skill");
+    });
+
+    it("files an install with no recorded stamp under 更早", async () => {
+      setMockSkillInstalledAt("pdf", null);
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "按安装时间分组");
+      await screen.findByText("frontend-design");
+
+      // No stamp reads last, so 今天 has nothing to draw and pdf lands at
+      // the end of 更早 — an unreadable clock is not a fresh one.
+      expect(
+        screen.queryByRole("region", { name: "今天" }),
+      ).not.toBeInTheDocument();
+      const earlier = screen.getByRole("region", { name: "更早" });
+      const names = within(earlier)
+        .getAllByRole("button", { name: /查看 .+ 详情/ })
+        .map((node) => node.getAttribute("aria-label"));
+      expect(names).toHaveLength(4);
+      expect(names.at(-1)).toBe("查看 pdf 详情");
     });
   });
 
@@ -1826,26 +1804,12 @@ describe("InstalledPage", () => {
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
 
-      // 按安装时间 reads as a timeline, so this is where a medal is most easily
-      // over-read as a weight. The list is content to call its own order a ranking
-      // anyway: the reader picked the order, and the number states a place in
-      // exactly that. Its own case, so relaxing one comparator cannot quietly
-      // relax the claim for the others.
-      await pickSort(user, "安装时间");
-      await waitFor(() => expect(podium(0)).toContain(MEDAL_CLASSES[0]));
-      expect(podium(1)).toContain(MEDAL_CLASSES[1]);
-      expect(podium(2)).toContain(MEDAL_CLASSES[2]);
-    });
-
-    it("still colours them under the token cost", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-
-      // And the third order, which weighs the description rather than the skill.
-      // Same claim, restated, for the same reason.
-      await pickSort(user, "Token 占用");
+      // 按安装时间分组 reads as a timeline, so this is where a medal is most
+      // easily over-read as a weight. The list is content to call its own
+      // order a ranking anyway: the reader picked the order, and the number
+      // states a place in exactly that. Its own case, so relaxing one
+      // comparator cannot quietly relax the claim for the others.
+      await pickSort(user, "按安装时间分组");
       await waitFor(() => expect(podium(0)).toContain(MEDAL_CLASSES[0]));
       expect(podium(1)).toContain(MEDAL_CLASSES[1]);
       expect(podium(2)).toContain(MEDAL_CLASSES[2]);
@@ -1874,10 +1838,10 @@ describe("InstalledPage", () => {
   /**
    * The one thing about the skill unit's order the reader does not get to pick:
    * a disabled install is parked below every live one, in a section of its own,
-   * under all three orders alike. Enablement is not a fourth order — it is a
-   * partition of whichever order was chosen — so the tests below hold the
+   * under both groupings alike. Enablement is not a third grouping — it is a
+   * partition of whichever grouping was chosen — so the tests below hold the
    * *relative* claim ("no parked row above a live row") rather than a snapshot of
-   * one order, and pin the concrete order only where it is knowable up front.
+   * one grouping, and pin the concrete grouping only where it is knowable up front.
    */
   describe("the parked section in the skill unit", () => {
     /** The skill rows on screen, in the order the document draws them — which is
@@ -1895,16 +1859,10 @@ describe("InstalledPage", () => {
       return screen.getByRole("region", { name: "已禁用" });
     }
 
-    /** The live group: the bare list the page draws above that section. Nothing
-     *  wraps those rows — they are the list itself — so it is found as "the list
-     *  that is not inside a section" rather than by position, which would change
-     *  the moment the parked section is unfolded. */
-    function liveList(): HTMLElement {
-      const list = screen
-        .getAllByRole("list")
-        .find((ul) => !ul.closest("section"));
-      if (!list) throw new Error("the live list is not on screen");
-      return list;
+    /** The first rank section: four live installs fit it, so it is the one the
+     *  live rows read through. */
+    function rankSection(): HTMLElement {
+      return screen.getByRole("region", { name: "1–4" });
     }
 
     /** The section's disclosure trigger — the rows below it are cards that also
@@ -1995,7 +1953,7 @@ describe("InstalledPage", () => {
         ...PARKED.map((name) => `查看 ${name} 详情`),
       ]);
 
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
       await expectParkedBelowLive(user);
     });
 
@@ -2010,20 +1968,6 @@ describe("InstalledPage", () => {
       await expectParkedBelowLive(user);
     });
 
-    it("parks them just the same under the token order", async () => {
-      // And under the third. The invariant is a property of the pipeline, so the
-      // assertion that matters is the relative one and it has to hold for an
-      // order nobody wrote a case for — which is why each order gets its own
-      // short case rather than one case looping over all three.
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-
-      await pickSort(user, "Token 占用");
-      await expectParkedBelowLive(user);
-    });
-
     it("holds each group to the order the reader picked", async () => {
       const user = userEvent.setup();
       renderPage();
@@ -2034,7 +1978,7 @@ describe("InstalledPage", () => {
       // clock as the live list — parking a skill does not cost it its place
       // among the other parked ones, which is the whole reason the split runs
       // after the sort rather than replacing it.
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
       await revealParked(user);
       await waitFor(() => expect(parkedRows()).toHaveLength(2));
       expect(rowNames()).toEqual([
@@ -2043,28 +1987,31 @@ describe("InstalledPage", () => {
       ]);
     });
 
-    it("numbers each group from one, so neither half carries the other's gaps", async () => {
+    it("keeps the live run continuous across its sections, the parked half from one", async () => {
       // The parked half is a section of its own, so it is numbered as the list
       // it is rather than continuing the live list above it. The flat order
       // interleaves the two groups rather than laying them end to end, and under
-      // this sort the two parked installs are the two newest — the rows that
+      // this grouping the two parked installs are the two newest — the rows that
       // would otherwise lead. Counting across the split would therefore leave
-      // the live list carrying 3…6 and hand the parked section the 1 and 2 it
-      // gave up: a run that jumps from 4 back to 1 reads as one list with rows
-      // gone missing rather than as a list and a section below it.
+      // the live sections carrying 3…6 and hand the parked section the 1 and 2
+      // it gave up: a run that jumps from 4 back to 1 reads as one list with
+      // rows gone missing rather than as a list and a section below it. The
+      // live half's own run runs *across* its buckets: 最近 30 天 holds pptx
+      // alone, 更早 the three oldest installs.
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
       await revealParked(user);
 
-      await waitFor(() =>
-        expect(rowOrdinalsIn(liveList())).toEqual(["1", "2", "3", "4"]),
-      );
+      const recent = screen.getByRole("region", { name: "最近 30 天" });
+      const earlier = screen.getByRole("region", { name: "更早" });
+      await waitFor(() => expect(rowOrdinalsIn(recent)).toEqual(["1"]));
+      expect(rowOrdinalsIn(earlier)).toEqual(["2", "3", "4"]);
       expect(rowOrdinalsIn(parkedSection())).toEqual(["1", "2"]);
-      // And in document order the run restarts at the section, so the claim does
-      // not rest on which section a row happened to be found in.
+      // And in document order the run restarts at the parked section, so the
+      // claim does not rest on which section a row happened to be found in.
       expect(rowOrdinalsIn(document.body)).toEqual([
         "1",
         "2",
@@ -2087,7 +2034,7 @@ describe("InstalledPage", () => {
       await screen.findByText("frontend-design");
       await revealParked(user);
 
-      expect(rowOrdinalsIn(liveList())).toEqual(["1", "2", "3", "4"]);
+      expect(rowOrdinalsIn(rankSection())).toEqual(["1", "2", "3", "4"]);
       expect(rowOrdinalsIn(parkedSection())).toEqual(["1", "2"]);
     });
 
@@ -2108,7 +2055,7 @@ describe("InstalledPage", () => {
 
       // Whatever is revealed is numbered as a plain run from 1 — no gaps, and no
       // dependence on rows that are not mounted yet.
-      for (const group of [liveList(), parkedSection()]) {
+      for (const group of [rankSection(), parkedSection()]) {
         expect(rowOrdinalsIn(group)).toEqual(
           Array.from({ length: group.querySelectorAll("li").length }, (_, i) =>
             String(i + 1),
@@ -2129,30 +2076,35 @@ describe("InstalledPage", () => {
       expect(parkedHeader()).toHaveTextContent("2 个 skill");
     });
 
-    it("wraps only the parked half in a section, leaving the live rows a bare list", async () => {
-      // The live rows are the page's list, so nothing is named over them: a
-      // header reading 「已启用」 would label the answer with the very subject it
-      // answers, and a section around it would add a landmark and a fold to a
-      // list a reader never asked to put away. The parked half keeps its header
-      // because it is a group *below* the list, and the count on it is what says
-      // there is anything to see.
+    it("wraps the live rows in one rank section while nothing spills past it", async () => {
+      // Four live installs fit the first section of ten, so the page draws one
+      // rank section for them — its header naming the range it covers and its
+      // badge stating what it actually lists. The parked half keeps its own
+      // section below, and the count on it is what says there is anything to
+      // see.
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
       await revealParked(user);
 
+      const firstRank = screen.getByRole("region", { name: "1–4" });
       expect(
-        screen.queryByRole("region", { name: "已启用" }),
-      ).not.toBeInTheDocument();
-      expect(liveList().closest("section")).toBeNull();
+        within(firstRank).getAllByRole("button", {
+          name: /查看 .+ 详情/,
+        }),
+      ).toHaveLength(LIVE.length);
+      expect(
+        within(firstRank).getByRole("button", { name: /1–4/ }),
+      ).toHaveTextContent("4 个 skill");
       // The parked half is the one that is named, and it states its own size.
       expect(parkedSection()).toBeInTheDocument();
       expect(parkedHeader()).toHaveTextContent("2 个 skill");
-      // The hairline leads the section, which is the only group that has one.
+      // The hairline leads the parked section, which is the only group that
+      // has one.
       expect(parkedSection()).toHaveClass("border-t");
-      // Each half holds its own rows, and the split still partitions rather than
-      // re-orders: live leads the document, parked follows it.
+      // Each half holds its own rows, and the split still partitions rather
+      // than re-orders: live leads the document, parked follows it.
       expect(rowNames().slice(0, LIVE.length)).toEqual(
         LIVE.map((name) => `查看 ${name} 详情`),
       );
@@ -2206,25 +2158,23 @@ describe("InstalledPage", () => {
       await screen.findByText("frontend-design");
       await revealParked(user);
 
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
       await waitFor(() =>
         expect(parkedHeader()).toHaveAttribute("aria-expanded", "true"),
       );
       expect(parkedRows()).toHaveLength(2);
 
       await user.click(parkedHeader());
-      await pickSort(user, "Token 占用");
+      await pickSort(user, "按热度分组");
       await waitFor(() =>
         expect(parkedHeader()).toHaveAttribute("aria-expanded", "false"),
       );
     });
 
-    it("draws no section at all while nothing is parked", async () => {
-      // An absent section reads quieter than a zero: with every install live the
-      // list is exactly the list this page always drew. The two installs this
-      // group parks are handed back, since a list with nothing parked is the
-      // only state in which the section must not appear — and with it the last
-      // trace of a group header over the live rows.
+    it("draws no parked section while nothing is parked", async () => {
+      // An absent section reads quieter than a zero: with every install live
+      // the parked section must not appear. The rank sections are the answer's
+      // own shape and stay; the six installs all fit the first one.
       setMockSkillEnabled("pdf", true);
       setMockSkillEnabled("docx", true);
       const user = userEvent.setup();
@@ -2238,16 +2188,15 @@ describe("InstalledPage", () => {
       expect(
         screen.queryByRole("region", { name: "已启用" }),
       ).not.toBeInTheDocument();
-      // One list, unwrapped: all six rows sit in the same bare list, so nothing
-      // is wrapped around them either way.
+      // All six rows sit in the first rank section, in one list.
       expect(rowNames()).toHaveLength(6);
+      const firstRank = screen.getByRole("region", { name: "1–6" });
       const lists = new Set(
-        screen
-          .getAllByRole("button", { name: /查看 .+ 详情/ })
-          .map((row) => row.closest("ul")),
+        Array.from(
+          firstRank.querySelectorAll('[data-slot="card"]'),
+        ).map((row) => row.closest("ul")),
       );
       expect(lists.size).toBe(1);
-      expect(liveList().closest("section")).toBeNull();
     });
 
     it("keeps a parked skill in the drawer's walk while its section is folded", async () => {
@@ -2260,7 +2209,7 @@ describe("InstalledPage", () => {
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
       await waitFor(() => expect(parkedSection()).toBeInTheDocument());
       // Folded, and holding nothing: the state a reader actually meets.
       expect(parkedRows()).toHaveLength(0);
@@ -2617,7 +2566,7 @@ describe("InstalledPage", () => {
       seedStoreEntries({ docx: 50, pdf: 30, pptx: 20, "mcp-builder": 5 });
       renderPage();
       await pickUnit(user, "列表");
-      await pickSort(user, "热度");
+      await pickSort(user, "按热度分组");
       await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
 
       // A search re-answers the list by relevance — the better ranking while a
@@ -2636,7 +2585,7 @@ describe("InstalledPage", () => {
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
-      await pickSort(user, "安装时间");
+      await pickSort(user, "按安装时间分组");
 
       await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
@@ -2652,13 +2601,13 @@ describe("InstalledPage", () => {
       ).toBeInTheDocument();
     });
 
-    it("locks the sort control while searching, like the picker", async () => {
+    it("locks the sort control while searching", async () => {
       const user = userEvent.setup();
       renderPage();
       await screen.findByText("pdf");
       // The rows are the shape that has an order to lock: the cards have none.
       await pickUnit(user, "列表");
-      expect(screen.getByRole("button", { name: "排序方式" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "分组方式" })).toBeEnabled();
 
       await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
@@ -2667,27 +2616,11 @@ describe("InstalledPage", () => {
       // not leave the row: the field it stands beside would move under the
       // reader's cursor on every keystroke.
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: "排序方式" })).toBeDisabled(),
+        expect(screen.getByRole("button", { name: "分组方式" })).toBeDisabled(),
       );
       await user.clear(screen.getByLabelText("搜索 Skill"));
       await waitFor(() =>
-        expect(screen.getByRole("button", { name: "排序方式" })).toBeEnabled(),
-      );
-    });
-
-    it("locks the category picker while searching", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await screen.findByText("pdf");
-      expect(screen.getByRole("button", { name: "分类" })).toBeEnabled();
-
-      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
-
-      // A search re-orders the list by relevance and ignores the scope, so the
-      // picker says so where it stands — exactly as it does in the store — and
-      // the row keeps its shape while the field is being typed into.
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: "分类" })).toBeDisabled(),
+        expect(screen.getByRole("button", { name: "分组方式" })).toBeEnabled(),
       );
     });
 

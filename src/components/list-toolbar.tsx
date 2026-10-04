@@ -90,9 +90,14 @@ export function ListToolbar({
 }: {
   /** The list this row belongs to; its own question, order, shape and scope. */
   destination: Destination;
-  facets: readonly Facet[];
-  /** What 全部 counts, in the unit on screen. */
-  total: number;
+  /**
+   * The category facets of the answer on screen, in the unit it answers in.
+   * Absent is a list with no category picker at all — the installed list, for
+   * one. Provided empty, the facets still drive the scoped-list case below.
+   */
+  facets?: readonly Facet[];
+  /** What 全部 counts, in the unit on screen. Only read with `facets`. */
+  total?: number;
   /**
    * The orders this list answers in, list order included. Absent is every
    * order — the installed list's own set; the store offers the subset its rows
@@ -113,9 +118,10 @@ export function ListToolbar({
   // `ready` on its own, so a climbing count never re-renders the row.
   const ready = useRegistrySnapshot((snapshot) => snapshot.ready);
   const waiting = destination === "store" && !ready;
-  // A list with nothing to scope has no picker — and a list already scoped
-  // keeps it, because that picker is also how the scope is cleared.
-  const scopable = facets.length > 0 || scope !== undefined;
+  // A list that hands over no facets has no picker at all. A list with
+  // nothing to scope has none either — and a list already scoped keeps it,
+  // because that picker is also how the scope is cleared.
+  const scopable = facets !== undefined && (facets.length > 0 || scope !== undefined);
   // Only the repository shape hides the order: a card is a repository led by
   // its own stars, while rows and grid squares both carry the per-skill
   // figures the order picks between.
@@ -147,7 +153,7 @@ export function ListToolbar({
         {scopable && (
           <ListFacets
             facets={facets}
-            total={total}
+            total={total ?? 0}
             selected={scope ?? null}
             disabled={searching}
             onSelect={(key) => setScope(destination, key)}

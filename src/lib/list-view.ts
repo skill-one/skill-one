@@ -37,8 +37,7 @@ export type Destination = "store" | "installed";
  * How a list orders itself while no search is live. `popularity` is the
  * registry's blended installs-and-stars figure (`lib/popularity.ts`), the
  * figure every row displays; `installed` is the install's own clock (newest
- * first); `tokens` is the skill's estimated context cost (`lib/token-estimate`,
- * heaviest first).
+ * first).
  *
  * Every one of these is an order and nothing else: which rows the list is made
  * of is the shape's own business (`ListUnit`), because "按仓库" never said which
@@ -46,19 +45,21 @@ export type Destination = "store" | "installed";
  * than for an order within one. A sort that also changed the shape could not be
  * persisted as one value without the two answers travelling together, which is
  * why the two are one value each again.
+ *
+ * On the installed list the order doubles as the grouping: the answer reads in
+ * sections of ten rows each, in the chosen order (see the installed page).
  */
-export type ListSort = "installed" | "popularity" | "tokens";
+export type ListSort = "installed" | "popularity";
 
 /**
  * The orders each list answers in. The installed list carries the install's own
- * clock and the token estimate among its options — both facts only an on-disk
- * record has. The store has neither install of its own to clock nor a locally
- * measured cost to weigh, so it answers in one order: the figure its rows
+ * clock among its options — a fact only an on-disk record has. The store has no
+ * install of its own to clock, so it answers in one order: the figure its rows
  * display, which needs no switch to name.
  */
 export const LIST_SORTS: Readonly<Record<Destination, readonly ListSort[]>> = {
   store: ["popularity"],
-  installed: ["popularity", "installed", "tokens"],
+  installed: ["popularity", "installed"],
 };
 
 /**
@@ -87,9 +88,8 @@ export interface DestinationView {
    */
   sort?: ListSort;
   /**
-   * The scope that list is narrowed to, by its own taxonomy's key: a domain for
-   * the store, a classification for the installed list. Absent is "every
-   * scope" — what the chips call 全部.
+   * The scope that list is narrowed to, by its own taxonomy's key: a domain
+   * for the store. Absent is "every scope" — what the chips call 全部.
    */
   scope?: string;
   /**
@@ -273,25 +273,13 @@ export function setUnit(destination: Destination, unit: ListUnit): void {
   });
 }
 
-/**
- * One-shot keeps: destinations whose next answer change must not reset the
- * selection. Set only by a caller that moves the answer *with* the open
- * skill — renaming the tag a list is scoped to follows the scope to the new
- * key, so the skill stays listed and closing its drawer would punish the
- * rename. Consumed (and cleared) by the next answer change, whatever it is,
- * so a stale keep can never outlive the change it was set for.
- */
-const keepSelectionOnce = new Set<Destination>();
-
 /** Narrow one list to a scope, or — with `null` — to every scope. */
 export function setScope(
   destination: Destination,
   scope: string | null,
-  opts?: { keepSelection?: boolean },
 ): void {
   const { query, sort, unit, scope: current } = state.views[destination];
   if ((scope ?? undefined) === current) return;
-  if (opts?.keepSelection) keepSelectionOnce.add(destination);
   publish({
     ...state,
     views: {
@@ -301,23 +289,11 @@ export function setScope(
   });
 }
 
-/**
- * Take a pending keep for the destination, if one was set by the scope
- * change now being answered. Called by the page owning the selection when
- * its answer changes; anything else leaves the token for that answer.
- */
-export function consumeKeepSelection(destination: Destination): boolean {
-  if (!keepSelectionOnce.has(destination)) return false;
-  keepSelectionOnce.delete(destination);
-  return true;
-}
-
 /** Test hook: forget both lists, so one case cannot inherit another's. */
 export function resetListView(): void {
   for (const destination of ["store", "installed"] as const) {
     storage.removeItem(UNIT_KEY_PREFIX + destination);
     storage.removeItem(SORT_KEY_PREFIX + destination);
   }
-  keepSelectionOnce.clear();
   publish({ views: initialViews() });
 }
