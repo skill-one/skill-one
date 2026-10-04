@@ -13,7 +13,9 @@ import { AppHeader } from "../../components/app-header";
 import { renderWithRouter } from "../../test/test-utils";
 import {
   addMockLocalSkill,
+  getMockInstalledSkills,
   installMockSkill,
+  removeMockSkill,
   resetMockAgentStatus,
   resetMockInstalledSkills,
   setMockSkillEnabled,
@@ -127,6 +129,15 @@ function seedStoreEntries(
       })),
     }),
   );
+}
+
+/** Fires the reveal sentinel once: the run grows by its chunk per fire. */
+function triggerReveal(): void {
+  (
+    globalThis.IntersectionObserver as unknown as {
+      instances: Array<{ trigger(intersecting?: boolean): void }>;
+    }
+  ).instances.at(-1)!.trigger(true);
 }
 
 // The page reads installed skills through local-skills, which falls back to
@@ -1610,15 +1621,6 @@ describe("InstalledPage", () => {
       }
     }
 
-    /** Fires the reveal sentinel once: the run grows by its chunk per fire. */
-    function triggerReveal(): void {
-      (
-        globalThis.IntersectionObserver as unknown as {
-          instances: Array<{ trigger(intersecting?: boolean): void }>;
-        }
-      ).instances.at(-1)!.trigger(true);
-    }
-
     it("keeps every section open on arrival, and folds one on a press", async () => {
       seedEighteenInstalls();
       const user = userEvent.setup();
@@ -1951,6 +1953,100 @@ describe("InstalledPage", () => {
       expect(
         solo.querySelectorAll("li span.w-6")[0].className,
       ).toContain(MEDAL_CLASSES[0]);
+    });
+
+    it("preserves stable tag section order and fills progressively when installs exceed initial chunk", async () => {
+      // 14 skills: 8 in development, 4 in data-analysis, 2 in office-productivity.
+      // Initial chunk is 6, so progressive reveal triggers across chunks.
+      const names = [
+        "dev-1", "dev-2", "dev-3", "dev-4", "dev-5", "dev-6", "dev-7", "dev-8",
+        "data-1", "data-2", "data-3", "data-4",
+        "office-1", "office-2",
+      ];
+      const existingNames = getMockInstalledSkills().map((skill) => skill.name);
+      for (const name of existingNames) {
+        removeMockSkill(name);
+      }
+      for (const name of names) {
+        addMockLocalSkill(name);
+      }
+      seedMockProvenance(
+        Object.fromEntries(names.map((name) => [name, { repo: "acme/repo" }])),
+      );
+      lookupSkills.mockImplementation(
+        async (refs: Array<{ repo: string; name: string }>) => ({
+          entries: refs.map((ref) => ({
+            name: ref.name,
+            repo: ref.repo,
+            description: `${ref.name} desc`,
+            stars: 1000,
+            downloads: 0,
+            path: `skills/${ref.repo}/${ref.name}`,
+            profile: {
+              domain: [
+                ref.name.startsWith("dev-")
+                  ? "development"
+                  : ref.name.startsWith("data-")
+                    ? "data-analysis"
+                    : "office-productivity",
+              ],
+            },
+          })),
+        }),
+      );
+
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "标签");
+
+      // Initial chunk (6): only the first 6 items of the leading tag (开发编程) are mounted
+      const devSection = await screen.findByRole("region", { name: "开发编程" });
+      expect(rowsOf(devSection)).toHaveLength(6);
+      expect(screen.queryByRole("region", { name: "数据分析" })).toBeNull();
+      expect(screen.queryByRole("region", { name: "办公效率" })).toBeNull();
+
+      // Scrolling sentinel into view reveals the rest of the answer
+      triggerReveal();
+      await waitFor(() => expect(rowsOf(devSection)).toHaveLength(8));
+      const dataSection = await screen.findByRole("region", { name: "数据分析" });
+      await waitFor(() => expect(rowsOf(dataSection)).toHaveLength(4));
+      const officeSection = await screen.findByRole("region", { name: "办公效率" });
+      await waitFor(() => expect(rowsOf(officeSection)).toHaveLength(2));
+
+      // Section order is strictly stable: 开发编程 -> 数据分析 -> 办公效率
+      expect(
+        screen.getAllByRole("region").map((region) => region.ariaLabel),
+      ).toEqual(["开发编程", "数据分析", "办公效率"]);
+    });
+
+    it("traverses detail drawer in screen order across tag sections with arrow keys", async () => {
+      seedClassifiedInstalls({ docx: 50, pdf: 30, pptx: 10 });
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "标签");
+      await screen.findByText("frontend-design");
+
+      // Open the last skill of 开发编程 (pptx)
+      const pptxButton = await screen.findByRole("button", {
+        name: "查看 pptx 详情",
+      });
+      await user.click(pptxButton);
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("pptx")).toBeInTheDocument();
+
+      // Press ArrowRight: moves to the first skill of the next tag section (数据分析 -> mcp-builder)
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      expect(within(dialog).getByText("mcp-builder")).toBeInTheDocument();
+
+      // Press ArrowRight: moves to 内容创作 -> Code Review
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      expect(within(dialog).getByText("Code Review")).toBeInTheDocument();
+
+      // Press ArrowRight: moves to 未分类 -> frontend-design
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      expect(within(dialog).getByText("frontend-design")).toBeInTheDocument();
     });
   });
 

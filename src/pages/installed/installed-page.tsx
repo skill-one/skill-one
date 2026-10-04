@@ -457,16 +457,49 @@ export function InstalledPage() {
   const activeRows = useMemo(() => {
     if (unit === "repo") return [];
     if (isSearching) return rows;
+    if (sort === "installed") {
+      return rows.toSorted(
+        compareByInstalledTime((row) => row.skill.installedAt),
+      );
+    }
+    if (sort === "tag") {
+      const tagCounts = new Map<string, number>();
+      for (const row of rows) {
+        if (row.enabled) {
+          const key = domainsOf(row.skill)[0];
+          tagCounts.set(key, (tagCounts.get(key) ?? 0) + 1);
+        }
+      }
+      return rows.toSorted((a, b) => {
+        const tagA = domainsOf(a.skill)[0];
+        const tagB = domainsOf(b.skill)[0];
+        if (tagA !== tagB) {
+          const countA = tagCounts.get(tagA) ?? 0;
+          const countB = tagCounts.get(tagB) ?? 0;
+          if (countA !== countB) return countB - countA;
+          const rankA = taxonomyRank(tagA);
+          const rankB = taxonomyRank(tagB);
+          if (rankA !== rankB) return rankA - rankB;
+          const labelDiff = domainLabel(tagA, locale).localeCompare(
+            domainLabel(tagB, locale),
+          );
+          if (labelDiff !== 0) return labelDiff;
+        }
+        return compareByPopularity(
+          (row: Row) => popularity(row.skill),
+          (row: Row) => row.skill.installedAt,
+          byName,
+        )(a, b);
+      });
+    }
     return rows.toSorted(
-      sort === "installed"
-        ? compareByInstalledTime((row) => row.skill.installedAt)
-        : compareByPopularity(
-            (row) => popularity(row.skill),
-            (row) => row.skill.installedAt,
-            byName,
-          ),
+      compareByPopularity(
+        (row) => popularity(row.skill),
+        (row) => row.skill.installedAt,
+        byName,
+      ),
     );
-  }, [unit, rows, isSearching, sort]);
+  }, [unit, rows, isSearching, sort, locale]);
 
   // The repository shape's flat order — the sort's own answer over cards:
   // by their repository's stars (the 按仓库 option; the figure-less pool and
@@ -599,30 +632,41 @@ export function InstalledPage() {
     const live = splitRows.enabled;
     if (live.length === 0) return [];
     if (sort === "tag") {
-      const byTag = new Map<string, Row[]>();
-      for (const row of live) {
-        // The leading key is the whole filing: the user's single select
-        // overrides the store's answer upstream of here, and a store entry
-        // naming several domains files under its first — a skill reads once.
+      const liveActive = splitActive.enabled;
+      const activeByTag = new Map<string, Row[]>();
+      for (const row of liveActive) {
         const key = domainsOf(row.skill)[0];
-        const bucket = byTag.get(key);
+        const bucket = activeByTag.get(key);
         if (bucket) bucket.push(row);
-        else byTag.set(key, [row]);
+        else activeByTag.set(key, [row]);
       }
-      return Array.from(byTag, ([key, items]) => ({ key, items }))
-        .toSorted(
-          (a, b) =>
-            b.items.length -
-              a.items.length ||
-            taxonomyRank(a.key) - taxonomyRank(b.key) ||
-            domainLabel(a.key, locale).localeCompare(
-              domainLabel(b.key, locale),
-            ),
-        )
-        .map(({ key, items }) => ({
-          title: domainLabel(key, locale),
-          rows: items,
-        }));
+
+      const orderedTags = Array.from(activeByTag.entries()).toSorted(
+        ([keyA, itemsA], [keyB, itemsB]) =>
+          itemsB.length - itemsA.length ||
+          taxonomyRank(keyA) - taxonomyRank(keyB) ||
+          domainLabel(keyA, locale).localeCompare(domainLabel(keyB, locale)),
+      );
+
+      const shownByTag = new Map<string, Row[]>();
+      for (const row of live) {
+        const key = domainsOf(row.skill)[0];
+        const bucket = shownByTag.get(key);
+        if (bucket) bucket.push(row);
+        else shownByTag.set(key, [row]);
+      }
+
+      const groups: { title: string; rows: Row[] }[] = [];
+      for (const [key] of orderedTags) {
+        const tagRows = shownByTag.get(key);
+        if (tagRows && tagRows.length > 0) {
+          groups.push({
+            title: domainLabel(key, locale),
+            rows: tagRows,
+          });
+        }
+      }
+      return groups;
     }
     if (sort === "installed") {
       const buckets: Row[][] = TIME_BUCKETS.map(() => []);
