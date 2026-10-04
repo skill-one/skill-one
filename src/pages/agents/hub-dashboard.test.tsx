@@ -78,4 +78,31 @@ describe("HubDashboard", () => {
     expect(viewAllLink).toHaveAttribute("href", "/installed");
     expect(viewAllLink).toHaveTextContent("+55");
   });
+
+  it("counts skills without a store profile as unclassified, not other", () => {
+    // A worker-less test environment has no store entries, so every enabled
+    // skill is unclassified — the summary bar must say ❓, never 📦.
+    const unclassifiedSkills: InstalledSkill[] = Array.from(
+      { length: 17 },
+      (_, i) => ({
+        name: `skill-${i}`,
+        displayName: `Skill ${i}`,
+        enabled: true,
+        description: `Description for skill ${i}`,
+      }),
+    );
+
+    renderWithRouter(
+      <HubDashboard agents={mockAgents} skills={unclassifiedSkills} />,
+    );
+
+    // The summary bar (the row led by the "已启用技能" label) must mark the
+    // unclassified group ❓; 📦 is the "other" domain, a different state.
+    const summaryBar = screen
+      .getByText("已启用技能:")
+      .closest("div.flex.items-center");
+    expect(summaryBar).toHaveTextContent("❓");
+    expect(summaryBar).toHaveTextContent("17");
+    expect(summaryBar).not.toHaveTextContent("📦");
+  });
 });

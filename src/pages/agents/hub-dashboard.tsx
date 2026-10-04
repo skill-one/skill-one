@@ -5,7 +5,7 @@ import { Compass, Layers, Loader2 } from "lucide-react";
 
 import type { AgentStatus, InstalledSkill } from "../../lib/skills-manager";
 import { agentLinkState } from "../../lib/agent-link-state";
-import { domainEmoji } from "../../data/domains";
+import { domainEmoji, UNCLASSIFIED_DOMAIN } from "../../data/domains";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -59,16 +59,19 @@ export function HubDashboard({
   const storeEntries = useInstalledStoreEntries(provenance?.linked);
 
   const getEmoji = (name: string) => {
-    return domainEmoji(storeEntries[name]?.profile?.domain) ?? "⚡";
+    return domainEmoji(storeEntries[name]?.profile?.domain);
   };
 
-  // Group domain statistics for overview when skills are numerous
+  // Group domain statistics for overview when skills are numerous. A skill the
+  // store has no profile for is unclassified (❓), not "other" (📦) — the two
+  // states stay apart, matching the per-skill chips' marks.
   const domainSummary = useMemo(() => {
     if (enabled.length <= 16) return [];
     const counts = new Map<string, number>();
     for (const skill of enabled) {
       const domainList = storeEntries[skill.name]?.profile?.domain;
-      const primaryKey = domainList && domainList.length > 0 ? domainList[0] : "other";
+      const primaryKey =
+        domainList && domainList.length > 0 ? domainList[0] : UNCLASSIFIED_DOMAIN;
       counts.set(primaryKey, (counts.get(primaryKey) ?? 0) + 1);
     }
     return Array.from(counts.entries())
