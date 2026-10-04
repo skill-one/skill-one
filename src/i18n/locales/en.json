@@ -164,7 +164,6 @@
       "manage": "Manage",
       "activeSkills": "Active Skills",
       "coverage": "Connected {{linked}}/{{total}} Agents",
-      "openSkill": "View in My Skills",
       "viewAll": "View all {{count}} skills"
     },
     "head": {

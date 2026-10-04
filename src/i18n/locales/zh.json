@@ -164,7 +164,6 @@
       "manage": "管理",
       "activeSkills": "已启用技能",
       "coverage": "已连接 {{linked}}/{{total}} 个 Agent",
-      "openSkill": "在「我的技能」中查看",
       "viewAll": "查看全部 {{count}} 个技能"
     },
     "head": {

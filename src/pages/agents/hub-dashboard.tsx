@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Compass, Layers, Loader2 } from "lucide-react";
 
@@ -38,7 +38,6 @@ export function HubDashboard({
   width = 480,
 }: HubDashboardProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
 
   const total = skills.length;
   const enabled = useMemo(
@@ -189,28 +188,18 @@ export function HubDashboard({
               {/* Skill Chips Flow — bottom-up stacking with dynamic width */}
               <div className="flex max-h-52 flex-wrap-reverse content-end gap-1.5 overflow-y-auto pr-1 mt-auto">
                 {visibleSkills.map((skill) => (
-                  <Tooltip key={skill.name}>
-                    <TooltipTrigger
-                      render={
-                        <button
-                          type="button"
-                          data-skill={skill.name}
-                          onClick={() => navigate("/installed")}
-                          className="inline-flex shrink-0 max-w-[150px] items-center gap-1.5 rounded-md border border-border/40 bg-background/70 px-2 py-0.5 text-[11px] font-medium transition-colors hover:border-primary/50 hover:bg-accent/60 cursor-pointer shadow-2xs"
-                        >
-                          <span className="text-[12px] leading-none shrink-0">
-                            {getEmoji(skill.name)}
-                          </span>
-                          <span className="truncate">
-                            {skill.displayName ?? skill.name}
-                          </span>
-                        </button>
-                      }
-                    />
-                    <TooltipContent side="top">
-                      {skill.displayName ?? skill.name} · {t("agents.hub.openSkill")}
-                    </TooltipContent>
-                  </Tooltip>
+                  <span
+                    key={skill.name}
+                    data-skill={skill.name}
+                    className="inline-flex shrink-0 max-w-[150px] items-center gap-1.5 rounded-md border border-border/40 bg-background/70 px-2 py-0.5 text-[11px] font-medium shadow-2xs"
+                  >
+                    <span className="text-[12px] leading-none shrink-0">
+                      {getEmoji(skill.name)}
+                    </span>
+                    <span className="truncate">
+                      {skill.displayName ?? skill.name}
+                    </span>
+                  </span>
                 ))}
 
                 {/* Interactive Overflow Button */}
