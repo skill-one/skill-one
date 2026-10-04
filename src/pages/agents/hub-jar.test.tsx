@@ -7,10 +7,12 @@ import {
   avatarFace,
   jarCardScale,
   jarFaces,
+  labeledCapacity,
   rightedAngularVelocity,
   spawnOf,
   tapVelocityX,
   JAR_CAPACITY,
+  JAR_NOMINAL_CAPACITY,
   TAP_COUNT,
   HubJar,
 } from "./hub-jar";
@@ -24,30 +26,77 @@ function skill(name: string): InstalledSkill {
   return { name, enabled: true, description: "" };
 }
 
+/** A roster of `count` throwaway names, longest-first so truncation shows. */
+function roster(count: number): string[] {
+  return Array.from({ length: count }, (_, i) => `skill-number-${i}`);
+}
+
+describe("labeledCapacity", () => {
+  it("counts the capsules the floor holds, across and down", () => {
+    // The jar at the app's default window (380×190): a 66×26 capsule in a 72×32
+    // slot, so five across and five down.
+    expect(labeledCapacity(380, 190)).toBe(25);
+    // A narrower window holds fewer across, and the rows do not change.
+    expect(labeledCapacity(200, 190)).toBe(10);
+  });
+
+  it("holds nothing when the field cannot take a single capsule", () => {
+    // Too narrow, too short, or not measured at all: no names anywhere, rather
+    // than a fractional card the pour would have to clip.
+    expect(labeledCapacity(40, 190)).toBe(0);
+    expect(labeledCapacity(380, 20)).toBe(0);
+    expect(labeledCapacity(0, 0)).toBe(0);
+  });
+
+  it("keeps the answer whole, so a resize only ever steps it", () => {
+    // The pour is keyed on this integer, so a resize that does not change it
+    // must not read as a different jar: two fields a few pixels apart, one
+    // capacity.
+    expect(labeledCapacity(381, 190)).toBe(labeledCapacity(380, 190));
+    // And one that crosses a step does change it.
+    expect(labeledCapacity(72 * 5 - 1, 190)).toBe(20);
+    expect(labeledCapacity(72 * 5, 190)).toBe(25);
+  });
+});
+
 describe("jarCardScale", () => {
-  it("steps card size down as the roster grows", () => {
-    const few = jarCardScale(3);
-    const some = jarCardScale(10);
-    const many = jarCardScale(30);
-    // A sparse jar gets big, weighty capsules; a full roster shrinks to
-    // compact icon tiles — edge and glyph step together.
-    expect(few.width).toBeGreaterThan(some.width);
+  it("keeps the whole roster named while the floor holds it", () => {
+    // Names are the point of a card, so they are the last thing to go: a roster
+    // of 20 still wears 20 capsules in a field that holds 25, and 21 tips the
+    // whole jar over to icons rather than naming half of it.
+    expect(jarCardScale(1).labeled).toBe(true);
+    expect(jarCardScale(20).labeled).toBe(true);
+    expect(jarCardScale(JAR_NOMINAL_CAPACITY).labeled).toBe(true);
+    expect(jarCardScale(JAR_NOMINAL_CAPACITY + 1).labeled).toBe(false);
+  });
+
+  it("answers for the field it is given, not a fixed count", () => {
+    // The same roster is named in a wide jar and icon-only in a narrow one —
+    // which is the whole reason the capacity is measured.
+    expect(jarCardScale(12, 25).labeled).toBe(true);
+    expect(jarCardScale(12, 6).labeled).toBe(false);
+  });
+
+  it("steps card size down as the roster outgrows the floor", () => {
+    const named = jarCardScale(20);
+    const some = jarCardScale(12, 6);
+    const many = jarCardScale(30, 6);
+    // Past capacity the jar drops to icon tiles, and shrinks again once the
+    // pile is a box of them — edge and glyph step together.
+    expect(named.width).toBeGreaterThan(some.width);
     expect(some.width).toBeGreaterThan(many.width);
-    expect(few.glyph).toBeGreaterThan(many.glyph);
-    for (const scale of [few, some, many]) {
-      expect(scale.glyph).toBeLessThan(scale.width);
-    }
+    expect(named.glyph).toBeLessThan(named.width);
+    expect(many.glyph).toBeLessThan(many.width);
   });
 
   it("keeps one size within each bucket, icon tiles square", () => {
     expect(jarCardScale(1)).toBe(jarCardScale(6));
-    expect(jarCardScale(7)).toBe(jarCardScale(14));
-    expect(jarCardScale(15)).toBe(jarCardScale(JAR_CAPACITY));
-    // Only the sparse lg bucket prints a label; the rest stay icon-only
-    // squares.
+    expect(jarCardScale(7, 6)).toBe(jarCardScale(14, 6));
+    expect(jarCardScale(15, 6)).toBe(jarCardScale(JAR_CAPACITY, 6));
+    // Only the named bucket prints a label; the rest stay icon-only squares.
     expect(jarCardScale(3).labeled).toBe(true);
     for (const count of [7, 15]) {
-      const scale = jarCardScale(count);
+      const scale = jarCardScale(count, 6);
       expect(scale.labeled).toBe(false);
       expect(scale.width).toBe(scale.height);
     }
@@ -207,25 +256,41 @@ describe("HubJar", () => {
   });
 
   it("falls back to the display initial when no classification is known", () => {
-    // 7 skills: the md bucket, where the face is icon-only — so the face's
-    // whole text is the glyph alone.
-    const names = ["pdf", "alpha", "beta", "gamma", "delta", "omega", "sigma"];
-    const { container } = render(<HubJar skills={names.map(skill)} />);
+    // Past the floor's capacity the jar is icon-only, and with no emoji to wear
+    // the face's whole text is the initial alone — the name waits in the tooltip.
+    const { container } = render(<HubJar skills={roster(30).map(skill)} />);
     const face = container
-      .querySelector('[data-skill="pdf"]')!
+      .querySelector('[data-skill="skill-number-0"]')!
       .querySelector('[data-slot="jar-face"]')!;
-    expect(face.textContent).toBe("p");
+    expect(face.textContent).toBe("s");
   });
 
-  it("pours icon-only squares past the sparse bucket, name out of the tile", () => {
-    // 7 skills: the md bucket — squares, emoji only, no printed label.
-    const names = Array.from({ length: 7 }, (_, i) => `skill-${i}`);
+  it("keeps a named roster named, however many the floor holds", () => {
+    // The whole point of measuring the field: a dozen cards is not a "full"
+    // roster any more, and every one of them still carries its name.
+    const names = roster(12);
+    const { container } = render(<HubJar skills={names.map(skill)} />);
+
+    expect(jarCardScale(12).labeled).toBe(true);
+    const faces = container.querySelectorAll('[data-slot="jar-face"]');
+    expect(faces).toHaveLength(12);
+    for (const [index, face] of Array.from(faces).entries()) {
+      expect(face.className).toContain("rounded-full");
+      expect(face.textContent).toContain(names[index]);
+    }
+  });
+
+  it("pours icon-only squares once the roster outgrows the floor, name out of the tile", () => {
+    // One card past the capacity tips the whole jar to icons: never a jar of
+    // half-named cards, which would read as an arbitrary line through the
+    // roster rather than as one answer about the jar being full.
+    const names = roster(JAR_NOMINAL_CAPACITY + 1);
     const emojis = new Map(names.map((name) => [name, "💻"]));
     const { container } = render(
       <HubJar skills={names.map(skill)} emojis={emojis} />,
     );
 
-    const scale = jarCardScale(7);
+    const scale = jarCardScale(names.length);
     expect(scale.labeled).toBe(false);
     for (const card of container.querySelectorAll<HTMLElement>(
       "[data-skill]",
