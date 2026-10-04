@@ -152,7 +152,7 @@ export function HubDashboard({
 
       <CardContent className="p-3.5 pt-0 space-y-2.5">
         {/* Active Skills List / Flow Container — light, blended background */}
-        <div className="rounded-lg border border-border/40 bg-muted/25 p-2.5 min-h-[140px] flex flex-col justify-center">
+        <div className="rounded-lg border border-border/40 bg-muted/25 p-2.5 min-h-[140px] flex flex-col justify-end">
           {loading ? (
             <div className="flex h-28 items-center justify-center">
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -162,7 +162,7 @@ export function HubDashboard({
               {t("agents.hub.noneEnabled")}
             </div>
           ) : (
-            <div className="space-y-2 my-auto">
+            <div className="flex h-full flex-col justify-between space-y-2">
               {/* Domain Summary Bar when 16+ skills */}
               {domainSummary.length > 0 && (
                 <div className="flex items-center gap-2 border-b border-border/30 pb-1.5 text-[10px] text-muted-foreground">
@@ -183,8 +183,8 @@ export function HubDashboard({
                 </div>
               )}
 
-              {/* Skill Chips Flow */}
-              <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto pr-1">
+              {/* Skill Chips Flow — grounded to the bottom */}
+              <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto pr-1 mt-auto">
                 {visibleSkills.map((skill) => (
                   <Tooltip key={skill.name}>
                     <TooltipTrigger
