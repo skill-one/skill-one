@@ -330,11 +330,12 @@ describe("AgentGraph", () => {
     renderWithRouter(<AgentGraph agents={agents} />);
     const skills = await fetchInstalledSkills();
 
-    // The jar states its one figure in its own border line — the legend —
-    // and nothing else; the attention count rides the corner only when
-    // something needs it. The browse/manage routes are deliberately absent.
+    // The jar states its one figure in its own border line — the legend,
+    // centred, the installed count set large — and nothing else; the
+    // attention count rides the corner only when something needs it. The
+    // browse/manage routes are deliberately absent.
     const disk = await screen.findByRole("figure", { name: HUB });
-    expect(disk).toHaveTextContent("6 个 skills");
+    expect(disk).toHaveTextContent("6个 skills");
     expect(disk).toHaveTextContent("1 个待处理");
     expect(screen.queryByRole("link", { name: "商店" })).toBeNull();
 
@@ -367,6 +368,8 @@ describe("AgentGraph", () => {
     for (const name of PARKED) {
       expect(disk.querySelector(`[data-skill="${name}"]`)).toBeNull();
     }
+    // The legend keeps stating the installed total, whichever skills pour.
+    expect(disk).toHaveTextContent("6个 skills");
   });
 
   it("jars every installed skill when none are enabled", async () => {

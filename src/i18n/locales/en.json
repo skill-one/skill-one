@@ -148,7 +148,7 @@
     "hub": {
       "diskAria": "Shared hub ({{total}} installed, {{enabled}} enabled)",
       "title": "SkillOne shared hub",
-      "installed": "{{total}} skills",
+      "skillsLabel": "skills",
       "enabled": "{{enabled}}/{{total}} enabled",
       "tagline": "Install once, use in every agent",
       "noneEnabled": "No enabled skills yet",

@@ -148,7 +148,7 @@
     "hub": {
       "diskAria": "共享中心（已安装 {{total}} 个，{{enabled}} 个已启用）",
       "title": "SkillOne 共享中心",
-      "installed": "{{total}} 个 skills",
+      "skillsLabel": "个 skills",
       "enabled": "{{enabled}}/{{total}} 已启用",
       "tagline": "安装一次，全 agents 直接使用",
       "noneEnabled": "还没有启用的技能",

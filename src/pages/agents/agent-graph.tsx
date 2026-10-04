@@ -7,6 +7,9 @@ import type { AgentStatus, InstalledSkill } from "../../lib/skills-manager";
 import { agentLinkState } from "../../lib/agent-link-state";
 import { useAgentLinkToggle } from "../../hooks/use-agent-link-toggle";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
+import { useSkillProvenance } from "../../hooks/use-skill-provenance";
+import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
+import { domainEmoji } from "../../data/domains";
 import { AgentIcon } from "../../components/agent-icon";
 import { cn } from "../../lib/utils";
 import { useAgentEdgeColor } from "../../hooks/use-agent-edge-color";
@@ -432,6 +435,26 @@ function HubDisk({
   const poured = enabled.length > 0 ? enabled : skills;
   const jarred = poured.slice(0, JAR_CAPACITY);
   const overflow = poured.length - jarred.length;
+
+  // Every card's classification emoji. An on-disk record carries no
+  // classification, so each skill resolves through the provenance ledger to
+  // its registry entry's profile — the same join the installed list uses —
+  // and `domainEmoji` answers the ❓ of the unclassified for the rest.
+  // Empty until the ledger and the registry answer; the jar renders initials
+  // meanwhile and repaints when the marks land.
+  const { data: provenance } = useSkillProvenance();
+  const storeEntries = useInstalledStoreEntries(provenance?.linked);
+  const emojis = useMemo(() => {
+    const marks = new Map<string, string>();
+    for (const skill of skills) {
+      marks.set(
+        skill.name,
+        domainEmoji(storeEntries[skill.name]?.profile?.domain),
+      );
+    }
+    return marks;
+  }, [skills, storeEntries]);
+
   // The columns presentation keeps a narrower central lane, so the card
   // renders slimmer there; widths stay in sync with the layout clearance
   // constants.
@@ -460,9 +483,17 @@ function HubDisk({
       >
         {/* The legend sits in the jar's own border line — a fieldset's
             legend, not a caption above it: the one figure the jar states,
-            read as part of the frame rather than as prose on the page. */}
-        <span className="absolute left-3 top-0 z-10 -translate-y-1/2 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
-          {t("agents.hub.installed", { total })}
+            read as part of the frame rather than as prose on the page. It
+            rides the border's centre, the count set large with the word
+            beside it small; the enabled split lives on in the figure's
+            accessible name. */}
+        <span className="absolute top-0 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-baseline gap-1 rounded-full border border-border bg-background py-0.5 pr-2.5 pl-2.5">
+          <span className="text-base leading-none font-semibold tabular-nums">
+            {total}
+          </span>
+          <span className="text-[10px] leading-none font-medium text-muted-foreground">
+            {t("agents.hub.skillsLabel")}
+          </span>
         </span>
 
         {/* The jar: a field the cards rain into and settle at the bottom of.
@@ -483,7 +514,7 @@ function HubDisk({
                 {t("agents.hub.noneEnabled")}
               </p>
             ) : (
-              <HubJar skills={jarred} className="h-full w-full" />
+              <HubJar skills={jarred} emojis={emojis} className="h-full w-full" />
             )}
             {overflow > 0 && (
               <p

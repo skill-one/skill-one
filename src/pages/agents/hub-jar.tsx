@@ -85,24 +85,28 @@ export function jarFaces(
 export const JAR_CAPACITY = 50;
 
 /**
- * One card-size bucket. A card is just the skill's squircle face — an icon
- * tile with no label: the jar reads as a box of app icons, and a face's
- * name floats above it in a tooltip on hover. A sparse jar pours big,
- * weighty tiles so a few skills still fill the floor; a full roster shrinks
- * to compact tiles that pack the capacity. The jar's own frame never
- * changes size, so the graph around it never re-flows as the roster grows.
+ * One card-size bucket. A sparse jar pours labeled capsules — wide enough to
+ * carry the skill's name beside its emoji, the only bucket that prints a
+ * label, since a handful of cards has the floor to spare. A fuller roster
+ * drops back to icon-only tiles: the jar reads as a box of app icons, and a
+ * face's name floats above it in a tooltip on hover. The jar's own frame
+ * never changes size, so the graph around it never re-flows as the roster
+ * grows.
  */
 export interface JarCardScale {
-  /** The square tile's edge — card width, height and physics body. */
-  size: number;
-  /** The initial glyph's size inside the face, in px. */
+  /** The tile's edge — card and physics body share these exact numbers. */
+  width: number;
+  height: number;
+  /** The emoji/initial glyph's size inside the face, in px. */
   glyph: number;
+  /** Whether the tile prints the skill's name (the labeled lg capsule). */
+  labeled: boolean;
 }
 
 const CARD_SCALES: Record<"lg" | "md" | "sm", JarCardScale> = {
-  lg: { size: 36, glyph: 18 },
-  md: { size: 28, glyph: 14 },
-  sm: { size: 22, glyph: 11 },
+  lg: { width: 66, height: 26, glyph: 13, labeled: true },
+  md: { width: 28, height: 28, glyph: 14, labeled: false },
+  sm: { width: 22, height: 22, glyph: 11, labeled: false },
 };
 
 /** The card-size bucket for a roster of `count` — stable object per bucket. */
@@ -211,9 +215,11 @@ export function tapVelocityX(name: string, tap: number): number {
  * shoved sideways so wedged cards slide into the gaps along the floor —
  * the final pile fills the bottom instead of holding mid-air voids.
  *
- * Every tile in a bucket is one fixed square, so each physics body is cut
- * to exactly its DOM tile. Tiles are icon-only — a squircle initial — and a
- * hover floats the skill's name above them in a portal tooltip.
+ * Every tile in a bucket is one fixed rectangle, so each physics body is cut
+ * to exactly its DOM tile. A tile wears the skill's classification emoji (an
+ * initial when nothing classified it), and the sparse lg bucket prints the
+ * name in the tile itself; a hover floats the name above every other tile in
+ * a portal tooltip.
  *
  * The bodies are simulated; the *tiles* are plain DOM (one absolutely
  * positioned span per body, transformed to its body's pose each frame), so
@@ -228,10 +234,16 @@ export function tapVelocityX(name: string, tap: number): number {
  */
 export function HubJar({
   skills,
+  emojis,
   className,
 }: {
   /** The cards to pour, in any order — each card's choreography is its own. */
   skills: InstalledSkill[];
+  /**
+   * Each skill's classification emoji, keyed by name. Absent or missing
+   * entries fall back to the display name's initial.
+   */
+  emojis?: ReadonlyMap<string, string>;
   /** Classes for the jar field itself (size, rim, backdrop). */
   className?: string;
 }) {
@@ -262,9 +274,10 @@ export function HubJar({
     const height = field.clientHeight;
     if (width === 0 || height === 0) return;
 
-    // Every tile in a bucket is one fixed square, so its physics body is
+    // Every tile in a bucket is one fixed rectangle, so its physics body is
     // cut to exactly the DOM tile — no measure pass, no disagreement.
-    const tile = scale.size;
+    const tileW = scale.width;
+    const tileH = scale.height;
 
     const engine = Matter.Engine.create({ enableSleeping: true });
     // The walls: a floor across the jar's mouth and two side walls tall
@@ -300,11 +313,11 @@ export function HubJar({
     ];
     const bodies = jarred.map((skill, index) => {
       const { unit, angle, drift } = spawnOf(skill.name);
-      const x = tile / 2 + unit * (width - tile);
+      const x = tileW / 2 + unit * (width - tileW);
       // Tiles spawn stacked above the rim, so they pour in one after
       // another rather than materialising in a single overlapping slab.
-      const y = -(index + 1) * (tile + 6) - 10;
-      const body = Matter.Bodies.rectangle(x, y, tile, tile, {
+      const y = -(index + 1) * (tileH + 6) - 10;
+      const body = Matter.Bodies.rectangle(x, y, tileW, tileH, {
         angle,
         restitution: 0.05,
         friction: REST_FRICTION,
@@ -355,9 +368,9 @@ export function HubJar({
         }
         const card = cardRefs.current[index];
         if (card) {
-          card.style.transform = `translate(${body.position.x - tile / 2}px, ${
-            body.position.y - tile / 2
-          }px) rotate(${body.angle}rad)`;
+          card.style.transform = `translate(${
+            body.position.x - tileW / 2
+          }px, ${body.position.y - tileH / 2}px) rotate(${body.angle}rad)`;
         }
         if (!body.isSleeping) asleep = false;
       });
@@ -407,6 +420,7 @@ export function HubJar({
               key={skill.name}
               skill={skill}
               scale={scale}
+              emoji={emojis?.get(skill.name)}
               face={faces.get(skill.name) ?? avatarFace(skill.name)}
               style={scatterStyle(scatterOf(skill.name))}
               className={cn(
@@ -430,12 +444,13 @@ export function HubJar({
           }}
           skill={skill}
           scale={scale}
+          emoji={emojis?.get(skill.name)}
           face={faces.get(skill.name) ?? avatarFace(skill.name)}
           // The spawn pose is the card's first paint; the engine's first
           // frame (laid out before paint) takes the transform over.
           style={{
             transform: `translate(0px, ${
-              -(index + 1) * (scale.size + 6) - 10
+              -(index + 1) * (scale.height + 6) - 10
             }px) rotate(${spawnOf(skill.name).angle}rad)`,
           }}
           className="absolute top-0 left-0 z-0 will-change-transform hover:z-10"
@@ -446,22 +461,29 @@ export function HubJar({
 }
 
 /**
- * One jar card: just the skill's squircle face, icon-only — the name is not
- * printed under it, it floats above the tile in a portal tooltip on hover
- * (so it never clips on the jar's overflow). The tooltip trigger IS the
- * transformed tile the physics engine moves.
+ * One jar card: the skill's squircle face wearing its classification emoji —
+ * a colored mark that scans faster than any initial — or, with no
+ * classification, the display spelling's leading letter in the face's own
+ * hue. The sparse lg bucket pours labeled capsules instead: the name printed
+ * beside the emoji in one truncated line, the only bucket with the floor to
+ * spare for it. Everywhere else the name floats above the tile in a portal
+ * tooltip on hover (so it never clips on the jar's overflow). The tooltip
+ * trigger IS the transformed tile the physics engine moves.
  */
 const JarCard = forwardRef<
   HTMLSpanElement,
   {
     skill: InstalledSkill;
     scale: JarCardScale;
+    /** The classification emoji, when the skill has one. */
+    emoji?: string;
     /** The roster-resolved tinted face (hue wash plus glyph colour). */
     face: { bg: string; fg: string };
     className?: string;
     style?: CSSProperties;
   }
->(function JarCard({ skill, scale, face, className, style }, ref) {
+>(function JarCard({ skill, scale, emoji, face, className, style }, ref) {
+  const name = skillDisplayName(skill);
   return (
     <Tooltip>
       <TooltipTrigger
@@ -469,33 +491,43 @@ const JarCard = forwardRef<
           <span
             ref={ref}
             data-skill={skill.name}
-            aria-label={skillDisplayName(skill)}
-            style={{ width: scale.size, height: scale.size, ...style }}
+            aria-label={name}
+            style={{ width: scale.width, height: scale.height, ...style }}
             className={cn("flex items-center justify-center", className)}
           />
         }
       >
-        {/* The macOS-app-style squircle: a soft hue wash with the initial
-            in the hue itself, edged by a hairline so the tint reads on the
-            jar's own ground. The initial comes from the display spelling —
-            what the skill is published as — while the hue and scatter stay
-            seeded by the slug, so renames upstream cannot reshuffle the jar. */}
+        {/* The macOS-app-style squircle: a soft hue wash edged by a hairline
+            so the tint reads on the jar's own ground. The emoji needs no
+            glyph colour (color emoji paint themselves); the initial comes
+            from the display spelling — what the skill is published as —
+            while the hue and scatter stay seeded by the slug, so renames
+            upstream cannot reshuffle the jar. */}
         <span
           aria-hidden="true"
           data-slot="jar-face"
           style={{
-            width: scale.size,
-            height: scale.size,
+            width: scale.width,
+            height: scale.height,
             backgroundColor: face.bg,
             color: face.fg,
             fontSize: scale.glyph,
           }}
-          className="flex items-center justify-center rounded-[22.5%] font-semibold uppercase ring-black/10 ring-1 ring-inset dark:ring-white/10"
+          className={cn(
+            "flex items-center gap-1 overflow-hidden px-2 ring-black/10 ring-1 ring-inset dark:ring-white/10",
+            scale.labeled ? "rounded-full" : "justify-center rounded-[22.5%]",
+            !scale.labeled && "font-semibold uppercase",
+          )}
         >
-          {skillDisplayName(skill).charAt(0)}
+          <span className="leading-none">{emoji ?? name.charAt(0)}</span>
+          {scale.labeled && (
+            <span className="min-w-0 truncate text-[9px] leading-tight font-medium">
+              {name}
+            </span>
+          )}
         </span>
       </TooltipTrigger>
-      <TooltipContent>{skillDisplayName(skill)}</TooltipContent>
+      <TooltipContent>{name}</TooltipContent>
     </Tooltip>
   );
 });

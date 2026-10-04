@@ -29,20 +29,28 @@ describe("jarCardScale", () => {
     const few = jarCardScale(3);
     const some = jarCardScale(10);
     const many = jarCardScale(30);
-    // A sparse jar gets big, weighty tiles; a full roster shrinks to
-    // compact ones — edge and glyph step together, and each tile is square.
-    expect(few.size).toBeGreaterThan(some.size);
-    expect(some.size).toBeGreaterThan(many.size);
+    // A sparse jar gets big, weighty capsules; a full roster shrinks to
+    // compact icon tiles — edge and glyph step together.
+    expect(few.width).toBeGreaterThan(some.width);
+    expect(some.width).toBeGreaterThan(many.width);
     expect(few.glyph).toBeGreaterThan(many.glyph);
     for (const scale of [few, some, many]) {
-      expect(scale.glyph).toBeLessThan(scale.size);
+      expect(scale.glyph).toBeLessThan(scale.width);
     }
   });
 
-  it("keeps one size within each bucket", () => {
+  it("keeps one size within each bucket, icon tiles square", () => {
     expect(jarCardScale(1)).toBe(jarCardScale(6));
     expect(jarCardScale(7)).toBe(jarCardScale(14));
     expect(jarCardScale(15)).toBe(jarCardScale(JAR_CAPACITY));
+    // Only the sparse lg bucket prints a label; the rest stay icon-only
+    // squares.
+    expect(jarCardScale(3).labeled).toBe(true);
+    for (const count of [7, 15]) {
+      const scale = jarCardScale(count);
+      expect(scale.labeled).toBe(false);
+      expect(scale.width).toBe(scale.height);
+    }
   });
 });
 
@@ -171,25 +179,66 @@ describe("tapVelocityX", () => {
 });
 
 describe("HubJar", () => {
-  it("pours icon-only tiles: the squircle initial, no printed name", () => {
+  it("pours labeled capsules in the sparse bucket: emoji, name, no tooltip need", () => {
     const names = ["mcp-builder", "code-review", "frontend-design"];
-    const { container } = render(<HubJar skills={names.map(skill)} />);
+    const emojis = new Map([
+      ["mcp-builder", "🔧"],
+      ["code-review", "🧪"],
+      ["frontend-design", "🎨"],
+    ]);
+    const { container } = render(
+      <HubJar skills={names.map(skill)} emojis={emojis} />,
+    );
 
     expect(container.querySelectorAll("[data-skill]")).toHaveLength(3);
     for (const name of names) {
       const card = container.querySelector<HTMLElement>(
         `[data-skill="${name}"]`,
       );
-      // The tile carries only the initial; the name lives in its accessible
-      // name and hover tooltip, not as a printed label.
-      expect(card?.textContent).toBe(name.charAt(0));
+      // The capsule wears the classification emoji and the printed name.
       expect(card).toHaveAttribute("aria-label", name);
-      expect(card?.querySelector(".line-clamp-2")).toBeNull();
       const face = card?.querySelector('[data-slot="jar-face"]');
-      expect(face).not.toBeNull();
-      expect(face?.textContent).toBe(name.charAt(0));
-      expect(face?.className).toContain("uppercase");
-      expect(face?.className).toContain("rounded-[22.5%]");
+      expect(face?.className).toContain("rounded-full");
+      expect(face?.textContent).toContain(emojis.get(name));
+      expect(face?.textContent).toContain(name);
+      // A labeled capsule never wears the initial-only styling.
+      expect(face?.className).not.toContain("uppercase");
+    }
+  });
+
+  it("falls back to the display initial when no classification is known", () => {
+    // 7 skills: the md bucket, where the face is icon-only — so the face's
+    // whole text is the glyph alone.
+    const names = ["pdf", "alpha", "beta", "gamma", "delta", "omega", "sigma"];
+    const { container } = render(<HubJar skills={names.map(skill)} />);
+    const face = container
+      .querySelector('[data-skill="pdf"]')!
+      .querySelector('[data-slot="jar-face"]')!;
+    expect(face.textContent).toBe("p");
+  });
+
+  it("pours icon-only squares past the sparse bucket, name out of the tile", () => {
+    // 7 skills: the md bucket — squares, emoji only, no printed label.
+    const names = Array.from({ length: 7 }, (_, i) => `skill-${i}`);
+    const emojis = new Map(names.map((name) => [name, "💻"]));
+    const { container } = render(
+      <HubJar skills={names.map(skill)} emojis={emojis} />,
+    );
+
+    const scale = jarCardScale(7);
+    expect(scale.labeled).toBe(false);
+    for (const card of container.querySelectorAll<HTMLElement>(
+      "[data-skill]",
+    )) {
+      const name = card.getAttribute("data-skill")!;
+      const face = card.querySelector('[data-slot="jar-face"]')!;
+      // The emoji rides the face; the name does not.
+      expect(face.textContent).toBe("💻");
+      expect(face.textContent).not.toContain(name);
+      expect(card).toHaveAttribute("aria-label", name);
+      // Square squircle, not a capsule.
+      expect(face.className).toContain("rounded-[22.5%]");
+      expect(face.className).not.toContain("rounded-full");
     }
   });
 
@@ -203,7 +252,7 @@ describe("HubJar", () => {
     expect(tip).toBeInTheDocument();
   });
 
-  it("pours fixed square tiles cut to the bucket size", () => {
+  it("pours fixed tiles cut to the bucket size", () => {
     const { container } = render(
       <HubJar skills={[skill("pdf"), skill("docx")]} />,
     );
@@ -211,18 +260,18 @@ describe("HubJar", () => {
     for (const card of container.querySelectorAll<HTMLElement>(
       "[data-skill]",
     )) {
-      // One fixed square per bucket — the physics body is cut to it.
-      expect(card.style.width).toBe(`${scale.size}px`);
-      expect(card.style.height).toBe(`${scale.size}px`);
+      // One fixed rectangle per bucket — the physics body is cut to it.
+      expect(card.style.width).toBe(`${scale.width}px`);
+      expect(card.style.height).toBe(`${scale.height}px`);
       // The face fills the tile edge to edge.
       const face = card.querySelector<HTMLElement>('[data-slot="jar-face"]');
-      expect(face?.style.width).toBe(`${scale.size}px`);
-      expect(face?.style.height).toBe(`${scale.size}px`);
+      expect(face?.style.width).toBe(`${scale.width}px`);
+      expect(face?.style.height).toBe(`${scale.height}px`);
       expect(face?.style.fontSize).toBe(`${scale.glyph}px`);
     }
   });
 
-  it("keeps the same icon tiles in the static, reduced-motion pile", () => {
+  it("keeps the same tiles in the static, reduced-motion pile", () => {
     reduceMotionMock.mockReturnValue(true);
     try {
       const { container } = render(
@@ -232,8 +281,8 @@ describe("HubJar", () => {
       for (const card of container.querySelectorAll<HTMLElement>(
         "[data-skill]",
       )) {
-        expect(card.style.width).toBe(`${scale.size}px`);
-        expect(card.style.height).toBe(`${scale.size}px`);
+        expect(card.style.width).toBe(`${scale.width}px`);
+        expect(card.style.height).toBe(`${scale.height}px`);
         expect(card.querySelector('[data-slot="jar-face"]')).not.toBeNull();
         // The seeded static pose, not the pour's spawn transform.
         expect(card.style.getPropertyValue("--scatter-rotate")).toBeTruthy();
