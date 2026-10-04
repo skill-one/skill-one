@@ -32,8 +32,9 @@ import { EmojiPickerPanel } from "./emoji-picker-panel";
 /**
  * The installed skill's tag picker in the detail drawer, opened by the
  * classification badge itself: one press on the badge shows the creation
- * row first, then the system domains and the user's own tags, plus the ways
- * out: clearing back to the store's classification, or deleting a tag no
+ * row first, then — when the reader has coined any — their own tags leading
+ * the list, with the system domains after, plus the ways out: clearing
+ * back to the store's classification, or deleting a tag no
  * skill uses anymore. A custom tag's pencil reuses the creation row as its
  * editor — prefilled, saving back over the tag (and moving every assignment
  * along when the name changes) — so there is one form, not two. Nothing is
@@ -351,31 +352,13 @@ export function SkillTagMenu({
           />
         )}
         <div className="max-h-64 overflow-y-auto">
-          <p className="px-2 pt-1 pb-0.5 text-[10px] text-muted-foreground/70">
-            {t("tag.systemGroup")}
-          </p>
-          {DOMAINS.map((domain) => (
-            <button
-              key={domain.key}
-              type="button"
-              disabled={busy}
-              onClick={() => void pick(domain.key)}
-              className={itemClass(effectiveKey === domain.key)}
-            >
-              <span aria-hidden="true" className="text-[13px] leading-none">
-                {domain.emoji}
-              </span>
-              <span className="min-w-0 flex-1 truncate">
-                {domainLabel(domain.key, locale)}
-              </span>
-              {effectiveKey === domain.key && (
-                <Check className="size-3 shrink-0" aria-hidden />
-              )}
-            </button>
-          ))}
+          {/* Custom tags lead, when any exist: they are the labels the reader
+              coined themselves, so the menu answers with them before the
+              system domains. With none defined the system list stands alone,
+              headers and all, exactly as before. */}
           {defs.length > 0 && (
             <>
-              <p className="px-2 pt-2 pb-0.5 text-[10px] text-muted-foreground/70">
+              <p className="px-2 pt-1 pb-0.5 text-[10px] text-muted-foreground/70">
                 {t("tag.customGroup")}
               </p>
               {defs.map((def) => (
@@ -439,6 +422,33 @@ export function SkillTagMenu({
               ))}
             </>
           )}
+          <p
+            className={cn(
+              "px-2 pb-0.5 text-[10px] text-muted-foreground/70",
+              defs.length > 0 ? "pt-2" : "pt-1",
+            )}
+          >
+            {t("tag.systemGroup")}
+          </p>
+          {DOMAINS.map((domain) => (
+            <button
+              key={domain.key}
+              type="button"
+              disabled={busy}
+              onClick={() => void pick(domain.key)}
+              className={itemClass(effectiveKey === domain.key)}
+            >
+              <span aria-hidden="true" className="text-[13px] leading-none">
+                {domain.emoji}
+              </span>
+              <span className="min-w-0 flex-1 truncate">
+                {domainLabel(domain.key, locale)}
+              </span>
+              {effectiveKey === domain.key && (
+                <Check className="size-3 shrink-0" aria-hidden />
+              )}
+            </button>
+          ))}
         </div>
         {assignedKey != null && (
           <Button
