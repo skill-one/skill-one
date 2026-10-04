@@ -102,6 +102,26 @@ describe("AppNav", () => {
     expect(idle).not.toHaveClass("shadow-sm");
   });
 
+  it("wears the pill the recipe asks for: capsule track, compact halves", () => {
+    renderNav("/installed");
+
+    // The recipe's radius is a capsule at every size (`rounded-full` on the track
+    // and on the halves), and its height is a 24px half in 12px type — compact
+    // enough that the header's row still reads as a row of places rather than of
+    // buttons. The mark's half is tighter still, since a glyph needs less air
+    // than a word.
+    const track = screen.getByRole("navigation", { name: "主导航" });
+    expect(track).toHaveClass("rounded-full");
+    expect(track).not.toHaveClass("rounded-lg");
+    for (const name of ["首页", "商店", "已安装"]) {
+      const half = screen.getByRole("link", { name });
+      expect(half).toHaveClass("rounded-full", "h-6", "text-xs");
+      expect(half).not.toHaveClass("rounded-md");
+    }
+    expect(screen.getByRole("link", { name: "首页" })).toHaveClass("px-1.5");
+    expect(screen.getByRole("link", { name: "商店" })).toHaveClass("px-2.5");
+  });
+
   it("raises exactly the one half the reader is in", () => {
     renderNav("/repo/anthropics/skills");
 

@@ -112,11 +112,13 @@ function NavSegment({ item }: { item: NavItem }) {
   // The look is the shared segmented recipe, and only the state is this nav's:
   // a link knows which pane it is while it renders, so the raised look is a class
   // on the element rather than a selector the library owns. Height, padding and
-  // text size stay here — the chrome's own density, not the recipe's.
+  // text size stay here — the chrome's own density, not the recipe's: a 24px half
+  // in 12px type, which is the compact pill the recipe asks for and small enough
+  // that the header's row still reads as a row of places rather than of buttons.
   const className = cn(
     segmentedItemVariants({ active: isActive ? "chosen" : "off" }),
-    "h-7 px-3 text-[13px]",
-    item.icon ? "px-2" : undefined,
+    "h-6 px-2.5 text-xs",
+    item.icon ? "px-1.5" : undefined,
   );
 
   if (item.icon) {
@@ -133,7 +135,7 @@ function NavSegment({ item }: { item: NavItem }) {
             />
           }
         >
-          <Icon className="h-4 w-4" aria-hidden />
+          <Icon className="size-3.5" aria-hidden />
         </TooltipTrigger>
         <TooltipContent side="bottom">{t(item.labelKey)}</TooltipContent>
       </Tooltip>

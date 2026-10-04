@@ -40,7 +40,10 @@ const UNITS: readonly { unit: ListUnit; labelKey: ParseKeys }[] = [
  * not tell the reader which segment was chosen. The raised segment — surface colour
  * under one quiet shadow, out of a muted bed — can, and it is the same signal the
  * header's marked destination gives. So the segments drop `variant="outline"`: a
- * border belongs to a button that stands alone, and these never do.
+ * border belongs to a button that stands alone, and these never do. The halves
+ * are square and compact — a 24px pill in a 28px control, one step under the
+ * field they stand beside — because a shape switch is the row's quietest control:
+ * it says which arrangement the list is in and nothing else.
  */
 export function ListUnitToggle({
   unit,
@@ -85,14 +88,22 @@ export function ListUnitToggle({
           // The raised look rides the state Base UI writes onto the element, so
           // the pressed half is the raised one without this component having to
           // know which half that is.
-          className={segmentedItemVariants({ active: "toggle" })}
+          //
+          // `size="sm"` is the library's closest fit and is then tightened one
+          // step further: a square half is the compact pill the recipe asks for,
+          // and `px-1` keeps the padding from setting the width — at `size="sm"`'s
+          // own `px-2.5` a 12px glyph would carry 20px of air and the three
+          // halves would stop reading as one control. The glyph states its own
+          // size so the library's `[&_svg:not([class*='size-'])]:size-3.5` steps
+          // aside, exactly as the nav's mark does.
+          className={cn(segmentedItemVariants({ active: "toggle" }), "h-6 min-w-6 px-1")}
         >
           {value === "skill" ? (
-            <Rows3 aria-hidden />
+            <Rows3 className="size-3" aria-hidden />
           ) : value === "grid" ? (
-            <LayoutGrid aria-hidden />
+            <LayoutGrid className="size-3" aria-hidden />
           ) : (
-            <Layers aria-hidden />
+            <Layers className="size-3" aria-hidden />
           )}
         </ToggleGroupItem>
       ))}

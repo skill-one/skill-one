@@ -17,22 +17,24 @@ import { cva } from "class-variance-authority";
  * accessibility of each control are its own primitive's, and a change here moves
  * the two together without either one's semantics moving with it.
  *
- * Two deliberate departures from the tabs recipe, both to hold these controls at
- * the height of the things they stand beside: `p-0.5` rather than the tabs'
- * `p-[3px]`, and `gap-0.5` rather than no gap at all. A 28px half in a
- * 3px-padded track is a 34px control, which would make a list's shape switch the
- * tallest thing on a row whose field is `h-8`; at 2px of padding the whole track
- * is 32px, the field's own height, which is also exactly the height the header's
- * nav has always been. The 2px gap is what keeps two 28px halves from fusing
- * into one button at that size — the same air a native segmented control leaves
- * between its segments.
+ * Three deliberate departures from the tabs recipe, all of them about how small a
+ * pill can be: `p-0.5` rather than the tabs' `p-[3px]`, `gap-0.5` rather than no
+ * gap at all, and a 24px half rather than the tabs' 28px one — a whole control 28px
+ * tall where the tabs' would be 34px, which is one step under the `h-8` field a
+ * list's shape switch stands beside and a row that can hold a shorter control than
+ * its field without anything looking wrong. The 2px gap is what keeps two halves
+ * that small from fusing into one button — the same air a native segmented control
+ * leaves between its segments.
  *
  * Height, padding and text size stay with the caller, because the window's chrome
- * and a list's content row are not the same density. The radius does not: a half
- * that is 8px round inside a 10px track is the whole look.
+ * and a list's content row are not the same density. The radius does not, and it is
+ * a capsule at every size: `rounded-full` on both the track and the halves, so the
+ * inner pill is round whatever height a caller asks for. A fixed radius cannot say
+ * that — 6px inside a 28px half is a rounded rectangle that only reads as a pill
+ * by accident, and the taller the control grows the less it reads as one.
  */
 export const segmentedTrackVariants = cva(
-  "flex w-fit items-center gap-0.5 rounded-lg bg-muted p-0.5",
+  "flex w-fit items-center gap-0.5 rounded-full bg-muted p-0.5",
 );
 
 /**
@@ -49,7 +51,7 @@ export const segmentedItemVariants = cva(
   // The library's own focus ring, kept as it is: two controls that look alike
   // must also focus alike. `hover:bg-transparent` is here to beat the toggle's
   // own `hover:bg-muted` rather than to draw anything.
-  "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium text-foreground/60 transition-all outline-none hover:bg-transparent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
+  "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium text-foreground/60 transition-all outline-none hover:bg-transparent hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
   {
     variants: {
       /**

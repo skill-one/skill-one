@@ -129,13 +129,28 @@ describe("ListUnitToggle", () => {
     }
   });
 
-  it("stands as tall as the field it sits beside", () => {
+  it("wears a capsule at this size, and a compact one", () => {
     renderToggle();
 
-    // A 28px half in a 3px-padded track would be 34px and make this switch the
-    // tallest thing on a row whose field is `h-8`; the shared track's 2px padding
-    // holds the whole control at the field's own 32px.
-    expect(screen.getByRole("group", { name: "列表布局" })).toHaveClass("p-0.5");
-    expect(screen.getByRole("button", { name: "列表" })).toHaveClass("h-7");
+    // A pill, not a rounded rectangle: `rounded-full` on both the track and the
+    // halves, so the look is the same whatever height a caller asks for. The
+    // library's own `size="sm"` radius would win on specificity alone, so the
+    // recipe has to replace it in the class list rather than sit beside it.
+    const track = screen.getByRole("group", { name: "列表布局" });
+    expect(track).toHaveClass("rounded-full");
+    for (const name of ["列表", "网格", "仓库"]) {
+      const half = screen.getByRole("button", { name });
+      expect(half).toHaveClass("rounded-full");
+      expect(half.className).not.toContain("radius-md");
+    }
+
+    // One step under the `h-8` field this switch stands beside: a 24px half in the
+    // shared track's 2px padding is a 28px control, compact enough that the row's
+    // quietest control is also its smallest.
+    expect(track).toHaveClass("p-0.5");
+    expect(screen.getByRole("button", { name: "列表" })).toHaveClass(
+      "h-6",
+      "min-w-6",
+    );
   });
 });
