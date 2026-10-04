@@ -156,7 +156,7 @@ export function SkillGridCard({
           </span>
         )}
         {/* Name row: classification glyph plus the name, both on one line. */}
-        <div className="flex min-w-0 items-center gap-1.5">
+        <div className={cn("flex min-w-0 items-center gap-1.5", checkable && "pr-6")}>
           {live ? (
             <span aria-hidden="true" className="size-6 shrink-0" />
           ) : (

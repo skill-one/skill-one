@@ -820,6 +820,7 @@ export function InstalledPage() {
 
   const queryClient = useQueryClient();
   const multiSelect = useMultiSelect<string>();
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const allVisibleKeys = useMemo(
     () => rows.map((r) => skillKey(r.skill)),
@@ -840,15 +841,20 @@ export function InstalledPage() {
     return [...customDefs, ...systemDefs];
   }, [customTags, locale]);
 
+  const { clear: clearSelection, count: selectedCount } = multiSelect;
   useEffect(() => {
-    if (unit === "repo") {
-      multiSelect.clear();
+    if (unit === "repo" && selectedCount > 0) {
+      clearSelection();
     }
-  }, [unit, multiSelect]);
+  }, [unit, selectedCount, clearSelection]);
+
+  const getSelectedNames = () =>
+    multiSelect.selectedList.map((k) => k.slice(k.lastIndexOf("/") + 1));
 
   const handleBulkEnable = async () => {
-    const selectedNames = multiSelect.selectedList;
+    const selectedNames = getSelectedNames();
     if (selectedNames.length === 0) return;
+    setBulkLoading(true);
     try {
       await setManySkillsEnabled(selectedNames, true);
       await markSkillsChanged(queryClient);
@@ -856,18 +862,21 @@ export function InstalledPage() {
         title: t("multiSelect.enableSuccess", { count: selectedNames.length }),
         type: "success",
       });
-      multiSelect.clear();
+      clearSelection();
     } catch (e) {
       toast.add({
         title: errorMessage(e, t("action.toggleFailed")),
         type: "error",
       });
+    } finally {
+      setBulkLoading(false);
     }
   };
 
   const handleBulkDisable = async () => {
-    const selectedNames = multiSelect.selectedList;
+    const selectedNames = getSelectedNames();
     if (selectedNames.length === 0) return;
+    setBulkLoading(true);
     try {
       await setManySkillsEnabled(selectedNames, false);
       await markSkillsChanged(queryClient);
@@ -875,18 +884,21 @@ export function InstalledPage() {
         title: t("multiSelect.disableSuccess", { count: selectedNames.length }),
         type: "success",
       });
-      multiSelect.clear();
+      clearSelection();
     } catch (e) {
       toast.add({
         title: errorMessage(e, t("action.toggleFailed")),
         type: "error",
       });
+    } finally {
+      setBulkLoading(false);
     }
   };
 
   const handleBulkTag = async (tagKey: string | null) => {
-    const selectedNames = multiSelect.selectedList;
+    const selectedNames = getSelectedNames();
     if (selectedNames.length === 0) return;
+    setBulkLoading(true);
     try {
       await setManySkillTags(selectedNames, tagKey);
       await markSkillsChanged(queryClient);
@@ -894,18 +906,21 @@ export function InstalledPage() {
         title: t("multiSelect.tagSuccess", { count: selectedNames.length }),
         type: "success",
       });
-      multiSelect.clear();
+      clearSelection();
     } catch (e) {
       toast.add({
         title: errorMessage(e, t("tag.failed")),
         type: "error",
       });
+    } finally {
+      setBulkLoading(false);
     }
   };
 
   const handleBulkDelete = async () => {
-    const selectedNames = multiSelect.selectedList;
+    const selectedNames = getSelectedNames();
     if (selectedNames.length === 0) return;
+    setBulkLoading(true);
     try {
       await removeInstalledSkills(selectedNames);
       await markSkillsChanged(queryClient);
@@ -913,12 +928,14 @@ export function InstalledPage() {
         title: t("multiSelect.uninstallSuccess", { count: selectedNames.length }),
         type: "success",
       });
-      multiSelect.clear();
+      clearSelection();
     } catch (e) {
       toast.add({
         title: errorMessage(e, t("action.retry")),
         type: "error",
       });
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -1166,12 +1183,13 @@ export function InstalledPage() {
           count={multiSelect.count}
           totalCount={allVisibleKeys.length}
           onSelectAll={() => multiSelect.selectAll(allVisibleKeys)}
-          onClear={multiSelect.clear}
+          onClear={clearSelection}
           onEnable={handleBulkEnable}
           onDisable={handleBulkDisable}
           onTag={handleBulkTag}
           availableTags={availableTags}
           onDelete={handleBulkDelete}
+          loading={bulkLoading}
         />
       )}
     </div>

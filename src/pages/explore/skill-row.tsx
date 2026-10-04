@@ -221,20 +221,20 @@ export const SkillRow = memo(function SkillRow({
       >
         {/* Leading position: Ordinal number and hoverable/selectable Checkbox in the exact same spot */}
         <div className="relative flex size-6 shrink-0 items-center justify-center">
-          <Ordinal
-            index={index}
-            ranked={ranked}
+          <div
             className={
               checkable
                 ? cn(
-                    "transition-opacity duration-150",
+                    "flex size-full items-center justify-center transition-opacity duration-150",
                     selectionMode || checked
                       ? "opacity-0 pointer-events-none"
                       : "opacity-100 group-hover/row:opacity-0 group-focus-within/row:opacity-0 pointer-events-auto",
                   )
                 : undefined
             }
-          />
+          >
+            <Ordinal index={index} ranked={ranked} />
+          </div>
           {checkable && (
             <span
               className={cn(

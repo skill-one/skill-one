@@ -85,4 +85,15 @@ describe("useMultiSelect", () => {
     expect(result.current.isSelectionMode).toBe(false);
     expect(result.current.count).toBe(0);
   });
+
+  it("does not change reference when clear is called on empty selection", () => {
+    const { result } = renderHook(() => useMultiSelect());
+    const initial = result.current;
+
+    act(() => {
+      result.current.clear();
+    });
+
+    expect(result.current).toBe(initial);
+  });
 });

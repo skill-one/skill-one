@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export interface UseMultiSelectOptions {
   /**
@@ -70,11 +70,16 @@ export function useMultiSelect<T extends string = string>(
   }, []);
 
   const selectAll = useCallback((keys: T[]) => {
-    setSelectedKeys(new Set(keys));
+    setSelectedKeys((prev) => {
+      if (prev.size === keys.length && keys.every((k) => prev.has(k))) {
+        return prev;
+      }
+      return new Set(keys);
+    });
   }, []);
 
   const clear = useCallback(() => {
-    setSelectedKeys(new Set());
+    setSelectedKeys((prev) => (prev.size === 0 ? prev : new Set()));
   }, []);
 
   useEffect(() => {
@@ -90,18 +95,32 @@ export function useMultiSelect<T extends string = string>(
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [escapeToClear, isSelectionMode, clear]);
 
-  const selectedList = Array.from(selectedKeys);
+  const selectedList = useMemo(() => Array.from(selectedKeys), [selectedKeys]);
 
-  return {
-    selectedKeys,
-    selectedList,
-    count,
-    isSelectionMode,
-    isSelected,
-    toggle,
-    select,
-    unselect,
-    selectAll,
-    clear,
-  };
+  return useMemo(
+    () => ({
+      selectedKeys,
+      selectedList,
+      count,
+      isSelectionMode,
+      isSelected,
+      toggle,
+      select,
+      unselect,
+      selectAll,
+      clear,
+    }),
+    [
+      selectedKeys,
+      selectedList,
+      count,
+      isSelectionMode,
+      isSelected,
+      toggle,
+      select,
+      unselect,
+      selectAll,
+      clear,
+    ],
+  );
 }
