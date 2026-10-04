@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/react";
 
@@ -9,6 +9,7 @@ import {
   jarFaces,
   labeledCapacity,
   rightedAngularVelocity,
+  settledPoses,
   spawnOf,
   tapVelocityX,
   JAR_CAPACITY,
@@ -16,11 +17,6 @@ import {
   TAP_COUNT,
   HubJar,
 } from "./hub-jar";
-
-// The pour is a motion concern; the tests drive both presentations through a
-// switchable mock instead of a media query.
-const reduceMotionMock = vi.hoisted(() => vi.fn(() => false));
-vi.mock("motion/react", () => ({ useReducedMotion: reduceMotionMock }));
 
 function skill(name: string): InstalledSkill {
   return { name, enabled: true, description: "" };
@@ -227,8 +223,66 @@ describe("tapVelocityX", () => {
   });
 });
 
+describe("settledPoses", () => {
+  const field = { width: 360, height: 190 };
+  const lg = jarCardScale(6);
+
+  it("rests a pile at the floor of the field, not at its rim", () => {
+    // The whole point of solving rather than pouring: every card comes to rest
+    // against the floor, so the jar reads as a jar of settled things.
+    const poses = settledPoses(roster(6), field, lg);
+    expect(poses).toHaveLength(6);
+    for (const pose of poses) {
+      expect(pose.y + lg.height).toBeLessThanOrEqual(field.height);
+      // And inside the side walls, within the chamfer's slack.
+      expect(pose.x).toBeGreaterThan(-lg.width);
+      expect(pose.x + lg.width).toBeLessThan(field.width + lg.width);
+    }
+  });
+
+  it("answers the same pile every run — a replay, not a reroll", () => {
+    // The pour was seeded precisely so the jar looks the same on every visit;
+    // solving it must not have cost that.
+    const names = roster(12);
+    expect(settledPoses(names, field, lg)).toEqual(
+      settledPoses(names, field, lg),
+    );
+  });
+
+  it("is a pile, not a grid: distinct cards do not share a slot", () => {
+    // The settled heap is loose and overlapping, so no two cards rest on the
+    // same spot — the arrangement the tap phase exists to produce.
+    const poses = settledPoses(roster(12), field, lg);
+    const spots = new Set(poses.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`));
+    expect(spots.size).toBe(12);
+  });
+
+  it("rights the pile: no card settles upside down", () => {
+    // The righting moment is what the settle has to survive, so the solved rest
+    // state is inside the tilt band for every card.
+    for (const pose of settledPoses(roster(20), field, lg)) {
+      const tilt = Math.abs(Math.atan2(Math.sin(pose.angle), Math.cos(pose.angle)));
+      expect(tilt).toBeLessThanOrEqual(0.4 + 1e-6);
+    }
+  });
+
+  it("parks a roster in a field too small to hold, rather than losing it", () => {
+    // No layout at all: a pose per card still comes back, so every skill keeps
+    // a tile and the frame never answers with fewer cards than it was given.
+    for (const [w, h] of [
+      [0, 0],
+      [40, 0],
+    ]) {
+      const poses = settledPoses(roster(6), { width: w, height: h }, lg);
+      expect(poses).toHaveLength(6);
+    }
+    // And an empty roster is an empty pile, not a throw.
+    expect(settledPoses([], field, lg)).toEqual([]);
+  });
+});
+
 describe("HubJar", () => {
-  it("pours labeled capsules in the sparse bucket: emoji, name, no tooltip need", () => {
+  it("pours labeled capsules: emoji, name, no tooltip need", () => {
     const names = ["mcp-builder", "code-review", "frontend-design"];
     const emojis = new Map([
       ["mcp-builder", "🔧"],
@@ -256,7 +310,7 @@ describe("HubJar", () => {
   });
 
   it("falls back to the display initial when no classification is known", () => {
-    // Past the floor's capacity the jar is icon-only, and with no emoji to wear
+    // Past the field's capacity the jar is icon-only, and with no emoji to wear
     // the face's whole text is the initial alone — the name waits in the tooltip.
     const { container } = render(<HubJar skills={roster(30).map(skill)} />);
     const face = container
@@ -265,7 +319,7 @@ describe("HubJar", () => {
     expect(face.textContent).toBe("s");
   });
 
-  it("keeps a named roster named, however many the floor holds", () => {
+  it("keeps a named roster named, however many the field holds", () => {
     // The whole point of measuring the field: a dozen cards is not a "full"
     // roster any more, and every one of them still carries its name.
     const names = roster(12);
@@ -280,7 +334,7 @@ describe("HubJar", () => {
     }
   });
 
-  it("pours icon-only squares once the roster outgrows the floor, name out of the tile", () => {
+  it("lays out icon-only squares once the roster outgrows the field, name out of the tile", () => {
     // One card past the capacity tips the whole jar to icons: never a jar of
     // half-named cards, which would read as an arbitrary line through the
     // roster rather than as one answer about the jar being full.
@@ -336,24 +390,29 @@ describe("HubJar", () => {
     }
   });
 
-  it("keeps the same tiles in the static, reduced-motion pile", () => {
-    reduceMotionMock.mockReturnValue(true);
-    try {
-      const { container } = render(
-        <HubJar skills={[skill("frontend-a"), skill("frontend-b")]} />,
+  it("rests every tile at its solved pose, and holds it still", () => {
+    // The jar states a roster, it does not perform one: each tile carries the
+    // resting pose the solve laid out for it, written in the layout pass so
+    // there is no frame in which a card is anywhere else. A re-render with the
+    // same roster does not move a card.
+    const names = ["frontend-a", "frontend-b"];
+    const { container, rerender } = render(
+      <HubJar skills={names.map(skill)} />,
+    );
+    const read = () =>
+      Array.from(container.querySelectorAll<HTMLElement>("[data-skill]")).map(
+        (card) => card.style.transform,
       );
-      const scale = jarCardScale(2);
-      for (const card of container.querySelectorAll<HTMLElement>(
-        "[data-skill]",
-      )) {
-        expect(card.style.width).toBe(`${scale.width}px`);
-        expect(card.style.height).toBe(`${scale.height}px`);
-        expect(card.querySelector('[data-slot="jar-face"]')).not.toBeNull();
-        // The seeded static pose, not the pour's spawn transform.
-        expect(card.style.getPropertyValue("--scatter-rotate")).toBeTruthy();
-      }
-    } finally {
-      reduceMotionMock.mockReturnValue(false);
+
+    const poses = read();
+    for (const pose of poses) {
+      expect(pose).toContain("translate(");
+      expect(pose).toContain("rotate(");
+      // A solved pose, not the spawn stack above the rim: every card has come
+      // down into the field.
+      expect(pose).not.toMatch(/translate\(0px, -\d/);
     }
+    rerender(<HubJar skills={names.map(skill)} />);
+    expect(read()).toEqual(poses);
   });
 });

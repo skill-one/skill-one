@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { toast } from "../../components/ui/toast";
 import { renderWithRouter } from "../../test/test-utils";
 import { getExcludedAgents } from "../../lib/agent-link-preferences";
+import { agentLinkState } from "../../lib/agent-link-state";
 import { setAgentsLayout } from "../../lib/agents-layout-preference";
 import { resetMockAgentStatus } from "../../lib/mock-local";
 import { AgentsPage } from "./agents-page";
@@ -23,12 +24,23 @@ afterEach(() => {
 });
 
 describe("AgentsPage", () => {
-  it("states the idea in the head and the figures on the hub", async () => {
+  it("states the linked count in the head and nothing else", async () => {
     renderPage();
+    const { fetchAgentStatus } = await import("../../lib/local-skills");
 
-    // The head is the value proposition, not a count; the hub card carries
-    // the skill figures.
-    expect(screen.getByText("安装一次，全 agents 直接使用")).toBeInTheDocument();
+    // The head is one figure — how many agents are linked — in the page's own
+    // type; the skill totals stay on the hub card at the picture's centre, and
+    // no state chrome floats above the graph.
+    const agents = await fetchAgentStatus();
+    // The head counts what the picture shows: the canonical agent is
+    // effectively linked without ever reporting linked=true, so the figure
+    // derives from `agentLinkState`, not the raw wire field.
+    const linked = agents.filter(
+      (a) => agentLinkState(a) === "linked",
+    ).length;
+    const heading = await screen.findByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent(`已连接 ${linked} 个 agents`);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
 
     // Every agent is one bare icon, reachable by its name.
     for (const name of [

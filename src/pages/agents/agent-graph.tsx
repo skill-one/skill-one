@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 
 import type { AgentStatus, InstalledSkill } from "../../lib/skills-manager";
 import { agentLinkState } from "../../lib/agent-link-state";
@@ -11,6 +12,11 @@ import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { domainEmoji } from "../../data/domains";
 import { AgentIcon } from "../../components/agent-icon";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "../../components/ui/hover-card";
 import { cn } from "../../lib/utils";
 import { useAgentEdgeColor } from "../../hooks/use-agent-edge-color";
 import { JAR_CAPACITY, HubJar } from "./hub-jar";
@@ -393,17 +399,20 @@ function Ribbon({
  * the card is opaque and covers their tips.
  *
  * The hub is one abstract **jar** holding the enabled skills as tiny title
- * cards, poured in by real physics (see `HubJar` — a matter-js run with
- * seeded spawns, settling against the jar's floor and walls, then holding
- * still). It is sized to hold fifty cards — a full roster, not a preview.
- * With nothing enabled the jar holds every installed skill instead, so it
- * never reads as broken on a fresh install; with nothing installed it says
- * so. There is no card chrome around it and no prose on it: the one figure
- * it states — how many skills it holds — sits **in the border line itself**,
- * the way a fieldset's legend interrupts its own frame, and a roster past
- * the jar's capacity states the remainder as a quiet `+n` chip riding the
- * rim. The attention count rides the opposite corner when something needs
- * it.
+ * cards, resting in a loose seeded heap at the bottom of a fixed field. The
+ * heap is real physics — a matter-js run with seeded spawns, gravity and three
+ * compaction taps — but it is **solved, not poured**: the run goes to its end
+ * in one pass and only where each card came to rest is kept, so the jar looks
+ * exactly as the animation used to leave it while nothing ever moves (see
+ * `HubJar`). The jar is sized to hold fifty cards — a full roster, not a
+ * preview. The jar holds the enabled skills and only those: the number in its
+ * border and the cards inside it are the same set, so the figure never promises
+ * cards the jar does not have. With nothing enabled the jar is empty and says
+ * so. There is no card chrome around it and no prose on it: the one figure it
+ * states — how many enabled skills it holds — sits **in the border line itself**,
+ * the way a fieldset's legend interrupts its own frame, and a roster past the
+ * jar's capacity states the remainder as a quiet `+n` chip riding the rim. The
+ * attention count rides the opposite corner when something needs it.
  */
 function HubDisk({
   hub,
@@ -427,14 +436,13 @@ function HubDisk({
   const attentionCount = agents.filter(
     (agent) => agentLinkState(agent) === "warning",
   ).length;
-  // The jar's contents: the enabled skills, falling back to every installed
-  // one when nothing is enabled (a fresh install is an empty report, not an
-  // empty jar), up to the jar's own capacity — the physics jar is sized to
-  // hold exactly this many. Past the capacity the jar stays whole and the
-  // remainder is stated, never silently dropped.
-  const poured = enabled.length > 0 ? enabled : skills;
-  const jarred = poured.slice(0, JAR_CAPACITY);
-  const overflow = poured.length - jarred.length;
+  // The jar's contents: the enabled skills and nothing else, up to the jar's
+  // own capacity — the jar is sized to hold exactly this many. The border's
+  // figure counts the same set, so the number on the frame and the cards under
+  // it never disagree. Past the capacity the jar stays whole and the remainder
+  // is stated, never silently dropped.
+  const jarred = enabled.slice(0, JAR_CAPACITY);
+  const overflow = enabled.length - jarred.length;
 
   // Every card's classification emoji. An on-disk record carries no
   // classification, so each skill resolves through the provenance ledger to
@@ -478,28 +486,85 @@ function HubDisk({
           rather than by a test id. */}
       <div
         role="figure"
-        aria-label={t("agents.hub.diskAria", { total, enabled: enabled.length })}
+        aria-label={t("agents.hub.diskAria", {
+          enabled: enabled.length,
+          total,
+        })}
         className="relative"
       >
         {/* The legend sits in the jar's own border line — a fieldset's
             legend, not a caption above it: the one figure the jar states,
             read as part of the frame rather than as prose on the page. It
             rides the border's centre, the count set large with the word
-            beside it small; the enabled split lives on in the figure's
-            accessible name. */}
-        <span className="absolute top-0 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-baseline gap-1 rounded-full border border-border bg-background py-0.5 pr-2.5 pl-2.5">
-          <span className="text-base leading-none font-semibold tabular-nums">
-            {total}
-          </span>
-          <span className="text-[10px] leading-none font-medium text-muted-foreground">
-            {t("agents.hub.skillsLabel")}
-          </span>
-        </span>
+            beside it small. The count is the **enabled** roster, the same
+            set the jar holds. It is also a hover card: resting on it opens
+            the details — the enabled share of the installed total, the idea
+            in one line, and the two shortest paths out (store, manage).
+            The hover card keeps itself open while the pointer crosses to
+            its links, so a rest, not a click, is all the details ask. */}
+        <HoverCard>
+          <HoverCardTrigger
+            delay={120}
+            closeDelay={120}
+            render={
+              <button
+                type="button"
+                className="absolute top-0 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-baseline gap-1 rounded-full border border-border bg-background py-0.5 pr-2.5 pl-2.5 outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring data-open:bg-muted/60"
+              >
+                <span className="text-base leading-none font-semibold tabular-nums">
+                  {enabled.length}
+                </span>
+                <span className="text-[10px] leading-none font-medium text-muted-foreground">
+                  {t("agents.hub.skillsLabel")}
+                </span>
+              </button>
+            }
+          />
+          <HoverCardContent
+            side="top"
+            sideOffset={8}
+            className="w-60 gap-2 rounded-xl p-3.5"
+          >
+            <div
+              data-slot="hub-popover-stats"
+              className="flex items-baseline gap-1"
+            >
+              <span className="text-sm leading-none font-semibold tabular-nums">
+                {enabled.length}
+              </span>
+              <span className="text-sm leading-none text-muted-foreground">
+                /
+              </span>
+              <span className="text-sm leading-none tabular-nums">{total}</span>
+              <span className="text-xs leading-none text-muted-foreground">
+                {t("agents.hub.enabledSuffix")}
+              </span>
+            </div>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              {t("agents.hub.tagline")}
+            </p>
+            <div className="-mx-3.5 h-px bg-border" />
+            <div className="flex gap-2">
+              <Link
+                to="/explore"
+                className="flex h-7 flex-1 items-center justify-center rounded-lg bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                {t("agents.hub.browseStore")}
+              </Link>
+              <Link
+                to="/installed"
+                className="flex h-7 flex-1 items-center justify-center rounded-lg border border-border text-xs font-medium transition-colors hover:bg-muted/60"
+              >
+                {t("agents.hub.manage")}
+              </Link>
+            </div>
+          </HoverCardContent>
+        </HoverCard>
 
-        {/* The jar: a field the cards rain into and settle at the bottom of.
-            It clips at the rim, so an over-capacity roster reads as a jar
-            filled to the neck, with the remainder stated by the `+n` chip on
-            the opposite corner from the attention chip. */}
+        {/* The jar: the field the cards are laid out in. It clips at the rim,
+            so an over-capacity roster reads as a jar filled to the neck, with
+            the remainder stated by the `+n` chip on the opposite corner from
+            the attention chip. */}
         {loading ? (
           <div className="flex h-[190px] items-center justify-center rounded-xl border border-border/60 bg-muted/50">
             <Loader2

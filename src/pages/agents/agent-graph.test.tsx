@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 
 import { renderWithRouter } from "../../test/test-utils";
 import type { AgentStatus } from "../../lib/skills-manager";
@@ -331,27 +331,94 @@ describe("AgentGraph", () => {
     const skills = await fetchInstalledSkills();
 
     // The jar states its one figure in its own border line — the legend,
-    // centred, the installed count set large — and nothing else; the
-    // attention count rides the corner only when something needs it. The
-    // browse/manage routes are deliberately absent.
+    // centred, the enabled count set large; the attention count rides the
+    // corner only when something needs it. The browse/manage entries live in
+    // the legend's popover, so before it opens the routes are still absent
+    // from the page. With every installed skill enabled the figure is the
+    // whole installed set.
     const disk = await screen.findByRole("figure", { name: HUB });
-    expect(disk).toHaveTextContent("6个 skills");
+    expect(disk).toHaveTextContent(`${skills.length}个 skills`);
     expect(disk).toHaveTextContent("1 个待处理");
     expect(screen.queryByRole("link", { name: "商店" })).toBeNull();
 
-    // The jar holds every enabled skill as a mini card. Physics runs on
-    // transforms, so each card carries its own inline transform rather than
-    // a static pose class.
+    // The jar holds every enabled skill as a mini card, each resting at the pose
+    // the solve laid out for it. The transform is written in the layout pass,
+    // so it is the settled pose rather than a spawn above the rim.
     for (const { name } of skills) {
       const card = disk.querySelector<HTMLElement>(`[data-skill="${name}"]`);
       expect(card).not.toBeNull();
       expect(card?.style.transform).toContain("translate(");
+      expect(card?.style.transform).not.toMatch(/translate\(0px, -\d/);
     }
   });
 
-  it("jars only the enabled skills", async () => {
+  it("opens the legend into the details on hover: share, idea, two paths", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<AgentGraph agents={agents} />);
+    const disk = await screen.findByRole("figure", { name: HUB });
+
+    // The legend is a hover card. Resting on it opens the details — the
+    // enabled share of the installed total, the idea in one line, and the
+    // two shortest paths out — without ever unstating the figure on the
+    // frame: the card repeats the enabled count the border shows.
+    const legend = await waitFor(() =>
+      within(disk).getByRole("button", {
+        name: `${INSTALLED.length}个 skills`,
+      }),
+    );
+    await user.hover(legend);
+    // A hover card carries no dialog role — its content is the landmark.
+    const pop = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>(
+        '[data-slot="hover-card-content"]',
+      );
+      expect(el).not.toBeNull();
+      expect(el).toHaveTextContent(
+        `${INSTALLED.length}/${INSTALLED.length}已启用`,
+      );
+      return el!;
+    });
+    expect(pop).toHaveTextContent("安装一次，全 agents 直接使用");
+    expect(within(pop).getByRole("link", { name: "商店" })).toHaveAttribute(
+      "href",
+      "/explore",
+    );
+    expect(within(pop).getByRole("link", { name: "管理" })).toHaveAttribute(
+      "href",
+      "/installed",
+    );
+    // And resting off closes it again.
+    await user.hover(disk);
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-slot="hover-card-content"]'),
+      ).toBeNull(),
+    );
+  });
+
+  it("repeats the enabled share in the details, in step with the border", async () => {
+    // One skill enabled: the border says 1, and the opened details say 1 of
+    // the installed 6 — the same ledger twice, never two answers.
+    for (const name of PARKED) setMockSkillEnabled(name, false);
+    const user = userEvent.setup();
+    renderWithRouter(<AgentGraph agents={agents} />);
+
+    const disk = await waitFor(() => {
+      const el = screen.getByRole("figure", { name: HUB });
+      expect(el).toHaveTextContent("1个 skills");
+      return el;
+    });
+    await user.hover(within(disk).getByRole("button", { name: "1个 skills" }));
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-slot="hover-card-content"]'),
+      ).toHaveTextContent(`1/${INSTALLED.length}已启用`),
+    );
+  });
+
+  it("counts the enabled skills in the border and jars only those", async () => {
     // One skill left enabled: it alone fills the jar, the parked ones stay
-    // out. The enabled-share badge keeps stating the facts.
+    // out, and the border's figure counts that same single card.
     for (const name of PARKED) setMockSkillEnabled(name, false);
     renderWithRouter(<AgentGraph agents={agents} />);
 
@@ -368,22 +435,27 @@ describe("AgentGraph", () => {
     for (const name of PARKED) {
       expect(disk.querySelector(`[data-skill="${name}"]`)).toBeNull();
     }
-    // The legend keeps stating the installed total, whichever skills pour.
-    expect(disk).toHaveTextContent("6个 skills");
+    // The legend counts the enabled roster, not the installed one: the number
+    // on the frame and the cards under it are the same set.
+    expect(disk).toHaveTextContent("1个 skills");
+    expect(disk).not.toHaveTextContent(`${INSTALLED.length}个 skills`);
   });
 
-  it("jars every installed skill when none are enabled", async () => {
-    // Nothing enabled at all: the jar holds every installed skill rather than
-    // reading as broken — a fresh install is a full jar too, so the empty
-    // enabled-set must not look like a failure.
+  it("empties the jar and says so when no skill is enabled", async () => {
+    // Nothing enabled at all: the jar holds nothing and reads as empty rather
+    // than filling itself with parked skills — the legend says 0, so cards
+    // the figure does not count would be a lie.
     for (const name of INSTALLED) setMockSkillEnabled(name, false);
     renderWithRouter(<AgentGraph agents={agents} />);
 
     const disk = await waitFor(() => {
       const el = screen.getByRole("figure", { name: HUB });
-      expect(el.querySelector('[data-skill="pdf"]')).not.toBeNull();
+      expect(el).toHaveTextContent("还没有启用的技能");
       return el;
     });
-    expect(disk.querySelector('[data-skill="docx"]')).not.toBeNull();
+    // The legend reads 0 — the frame states the same (empty) set the jar holds,
+    // rather than a figure the cards underneath would contradict.
+    expect(disk).toHaveTextContent("0个 skills");
+    expect(disk.querySelector("[data-skill]")).toBeNull();
   });
 });

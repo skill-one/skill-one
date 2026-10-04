@@ -78,9 +78,7 @@ describe("App routing", () => {
     expect(persisterWiring.calls).toBe(1);
 
     // The default route is the home, the agents graph; wait for it to settle.
-    await screen.findByRole("heading", {
-      name: "安装一次，全 agents 直接使用",
-    });
+    await screen.findByRole("heading", { name: /已连接 \d+ 个 agents/ });
   });
 
   it("opens the agents graph at the root route", async () => {
@@ -93,9 +91,7 @@ describe("App routing", () => {
     // The home is the agents page: its head states the idea before any data
     // lands.
     expect(
-      await screen.findByRole("heading", {
-        name: "安装一次，全 agents 直接使用",
-      }),
+      await screen.findByRole("heading", { name: /已连接 \d+ 个 agents/ }),
     ).toBeInTheDocument();
   });
 
@@ -128,9 +124,7 @@ describe("App routing", () => {
     );
 
     expect(
-      await screen.findByRole("heading", {
-        name: "安装一次，全 agents 直接使用",
-      }),
+      await screen.findByRole("heading", { name: /已连接 \d+ 个 agents/ }),
     ).toBeInTheDocument();
   });
 

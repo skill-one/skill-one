@@ -75,8 +75,9 @@ describe("header update chip", () => {
     expect(chip.parentElement).toBe(
       screen.getByRole("button", { name: "设置" }).parentElement,
     );
-    // The brand and the three destinations — and nothing else.
-    expect(screen.getAllByRole("link")).toHaveLength(4);
+    // The three destinations — and nothing else. The brand is a title, not a
+    // link (the home already leads the nav).
+    expect(screen.getAllByRole("link")).toHaveLength(3);
   });
 
   it("opens the confirmation dialog from wherever the user is", async () => {

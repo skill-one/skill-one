@@ -7,11 +7,10 @@ import {
   type CSSProperties,
 } from "react";
 import Matter from "matter-js";
-import { useReducedMotion } from "motion/react";
 
 import type { InstalledSkill } from "../../lib/skills-manager";
 import { cn } from "../../lib/utils";
-import { scatterOf, scatterStyle, unitOf } from "../../lib/scatter";
+import { unitOf } from "../../lib/scatter";
 import { skillDisplayName } from "../../lib/skill-view";
 import { RIBBON_COLORS, ribbonColorIndex } from "./agent-graph-layout";
 import {
@@ -88,7 +87,7 @@ export function jarFaces(
   return faces;
 }
 
-/** The most cards the jar simulates — its own capacity guarantee. */
+/** The most cards the jar pours — its own capacity guarantee. */
 export const JAR_CAPACITY = 50;
 
 /**
@@ -254,42 +253,185 @@ export function tapVelocityX(name: string, tap: number): number {
   );
 }
 
+/** Where one card ends up: its settled centre, and the lean it settled at. */
+export interface JarPose {
+  x: number;
+  y: number;
+  angle: number;
+}
+
+/** A field too small to measure, or not measured yet: nothing settles in it. */
+const NO_FIELD = { width: 0, height: 0 };
+
 /**
- * The hub's jar: the enabled skills as title cards poured into a fixed
- * field by real physics — `matter-js` drops every card from above with a
- * seeded spawn column, tilt and sideways drift, gravity settles the pile
- * against the jar's floor and walls, and the run stops animating once the
- * pile has slept. The same list always rains the same way: seeded spawns
- * and the fixed 60Hz step make the settle a replay, not a reroll.
+ * The step ceiling for one solve — the same hard stop the animated pour had, for
+ * the rare card wedged too tight to right or tap. The pile is left wherever it
+ * got to, which is a jar of cards rather than an empty one.
+ */
+const MAX_STEPS = 2400;
+/** Fixed steps a tap loosens the pile for before normal grip returns (~0.33s). */
+const TAP_LOOSE_STEPS = 20;
+
+/**
+ * The pile, solved. The same engine, the same seeded spawns, the same three
+ * compaction taps and the same fixed 60Hz step the animated pour ran — run to
+ * their end in one synchronous pass, and only the resting pose kept.
  *
- * After the pour first sleeps, the jar gets three alternating taps the way
- * a settled jar of loose things does: the pile is briefly loosened and
- * shoved sideways so wedged cards slide into the gaps along the floor —
- * the final pile fills the bottom instead of holding mid-air voids.
+ * The pour existed to arrive somewhere: cards in a loose seeded heap at the
+ * bottom of the jar, wedged and tipped the way loose things wedge. That
+ * arrangement is a property of the roster and the field alone, so it is
+ * computed rather than performed — nothing is ever drawn between the spawn and
+ * the rest, and a card has no intermediate position to be seen in.
  *
- * Every tile in a bucket is one fixed rectangle, so each physics body is cut
- * to exactly its DOM tile. A tile wears the skill's classification emoji (an
- * initial when nothing classified it), and the labeled bucket prints the name
- * in the tile itself for as long as the whole roster fits the floor; a hover
- * floats the name above every other tile in a portal tooltip.
+ * Deterministic like the pour it replaces: the same names in the same field
+ * answer the same pile, every run.
+ */
+export function settledPoses(
+  names: readonly string[],
+  field: { width: number; height: number },
+  scale: JarCardScale,
+): JarPose[] {
+  const { width, height } = field;
+  if (names.length === 0 || width === 0 || height === 0) {
+    return names.map(() => ({ x: 0, y: 0, angle: 0 }));
+  }
+  const tileW = scale.width;
+  const tileH = scale.height;
+
+  const engine = Matter.Engine.create({ enableSleeping: true });
+  // The walls: a floor across the jar's mouth and two side walls tall
+  // enough to catch every card from its spawn above the rim — the jar is
+  // open-topped, so an over-full pile would rise past the rim rather than
+  // clip through the field.
+  const wall = 60;
+  const wallTop = 600;
+  const walls = [
+    // The floor sits a few px above the rim, so the bottom row keeps a
+    // sliver of breathing room instead of kissing the clip edge.
+    Matter.Bodies.rectangle(
+      width / 2,
+      height + wall / 2 - 4,
+      width + wall * 2,
+      wall,
+      { isStatic: true },
+    ),
+    Matter.Bodies.rectangle(
+      -wall / 2 + 1,
+      (height - wallTop) / 2,
+      wall,
+      height + wallTop,
+      { isStatic: true },
+    ),
+    Matter.Bodies.rectangle(
+      width + wall / 2 - 1,
+      (height - wallTop) / 2,
+      wall,
+      height + wallTop,
+      { isStatic: true },
+    ),
+  ];
+  const bodies = names.map((name, index) => {
+    const { unit, angle, drift } = spawnOf(name);
+    const x = tileW / 2 + unit * (width - tileW);
+    // Tiles spawn stacked above the rim, so they pour in one after
+    // another rather than materialising in a single overlapping slab.
+    const y = -(index + 1) * (tileH + 6) - 10;
+    const body = Matter.Bodies.rectangle(x, y, tileW, tileH, {
+      angle,
+      restitution: 0.05,
+      friction: REST_FRICTION,
+      frictionStatic: 0.9,
+      frictionAir: 0.02,
+      chamfer: { radius: 4 },
+    });
+    // The seeded sideways entry drift — varied paths, not vertical rails.
+    Matter.Body.setVelocity(body, { x: drift, y: 0 });
+    return body;
+  });
+  Matter.Composite.add(engine.world, [...walls, ...bodies]);
+
+  let steps = 0;
+  let taps = 0;
+  let looseSteps = 0;
+  // The loop the pour ran each frame, run here to its end instead. The only
+  // difference is that no pose is written anywhere per step: the pile is read
+  // once, at the bottom, which is the whole cost of an animation removed.
+  for (;;) {
+    Matter.Engine.update(engine, 1000 / 60);
+    if (looseSteps > 0) {
+      looseSteps -= 1;
+      if (looseSteps === 0) {
+        for (const body of bodies) body.friction = REST_FRICTION;
+      }
+    }
+    let asleep = true;
+    bodies.forEach((body) => {
+      // Right the standing and the inverted: wake a sleeping card the
+      // pile parked past the tilt band, then hand it the spring-damper
+      // velocity. Cards inside the band keep the lean they settled in.
+      const righted = rightedAngularVelocity(body.angle, body.angularVelocity);
+      if (righted !== null) {
+        if (body.isSleeping) Matter.Sleeping.set(body, false);
+        Matter.Body.setAngularVelocity(body, righted);
+      }
+      if (!body.isSleeping) asleep = false;
+    });
+    // The first sleep is the poured pile; each further sleep is a tapped
+    // pile. Until the taps are spent, jolt the whole pile sideways with
+    // its friction briefly loosened — wedged cards slide into floor gaps
+    // and the pile re-packs from the bottom up, one tap per new sleep.
+    if (asleep && taps < TAP_COUNT) {
+      const tap = taps;
+      taps += 1;
+      asleep = false;
+      bodies.forEach((body, index) => {
+        body.friction = TAP_FRICTION;
+        Matter.Sleeping.set(body, false);
+        Matter.Body.setVelocity(body, {
+          x: tapVelocityX(names[index], tap),
+          y: body.velocity.y,
+        });
+      });
+      looseSteps = TAP_LOOSE_STEPS;
+    }
+    steps += 1;
+    if (!asleep && steps < MAX_STEPS) continue;
+    break;
+  }
+
+  const poses = bodies.map((body) => ({
+    x: body.position.x - tileW / 2,
+    y: body.position.y - tileH / 2,
+    angle: body.angle,
+  }));
+  Matter.Composite.clear(engine.world, false);
+  Matter.Engine.clear(engine);
+  return poses;
+}
+
+/**
+ * The hub's jar: the enabled skills as title cards resting in one fixed field.
+ * The pile is solved, not poured — `settledPoses` runs the pour's own engine to
+ * its end and hands back only where each card came to rest, so the jar looks
+ * exactly as it did once the animation had finished while nothing ever moves.
  *
- * The bodies are simulated; the *tiles* are plain DOM (one absolutely
- * positioned span per body, transformed to its body's pose each frame), so
- * the faces stay crisp rather than pixels on a canvas. The pour is the
- * jar's only animation: once settled, nothing moves — a hover raises a
- * buried tile above its neighbours (a z-order swap, not a motion), and
- * nothing transitions.
+ * Every tile in a bucket is one fixed rectangle, so a tile is cut to exactly the
+ * body that placed it. A tile wears the skill's classification emoji (an initial
+ * when nothing classified it), and the labeled bucket prints the name in the tile
+ * itself for as long as the whole roster fits the floor; a hover floats the name
+ * above every other tile in a portal tooltip.
  *
- * Readers who ask for reduced motion get no simulation: the same cards
- * render as a static bottom-aligned wrap, each pose seeded the way every
- * scattered card in the app sits (see `lib/scatter`).
+ * The poses are written straight to the tiles in the layout pass, before the
+ * first paint — a card is never drawn in flight, so there is no frame in which
+ * the jar is anything but settled. Readers who resize or change the roster get
+ * the same treatment: one more solve, still no in-between.
  */
 export function HubJar({
   skills,
   emojis,
   className,
 }: {
-  /** The cards to pour, in any order — each card's choreography is its own. */
+  /** The cards to lay out, in any order — each card's pile is its own. */
   skills: InstalledSkill[];
   /**
    * Each skill's classification emoji, keyed by name. Absent or missing
@@ -299,7 +441,6 @@ export function HubJar({
   /** Classes for the jar field itself (size, rim, backdrop). */
   className?: string;
 }) {
-  const reduceMotion = useReducedMotion();
   const fieldRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Array<HTMLSpanElement | null>>([]);
   // The measured field, or the fallback until it is measured. The roster's
@@ -326,11 +467,11 @@ export function HubJar({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  // The effect reads the roster through a ref and keys on its signature, so
-  // a parent re-render (a hovered agent, a badge) never restarts the rain —
-  // only a changed roster or jar does. Syncing the ref in an effect rather than
+  // The effect reads the roster through a ref and keys on its signature, so a
+  // parent re-render (a hovered agent, a badge) never re-solves the pile — only
+  // a changed roster or jar does. Syncing the ref in an effect rather than
   // during render keeps the ref out of the render phase; declared first, it has
-  // already written by the time the simulation effect below reads it.
+  // already written by the time the solve below reads it.
   const skillsRef = useRef(skills);
   useLayoutEffect(() => {
     skillsRef.current = skills;
@@ -353,173 +494,27 @@ export function HubJar({
   const faces = jarFaces(skills.map((s) => s.name));
 
   useLayoutEffect(() => {
-    if (reduceMotion) return;
     const field = fieldRef.current;
     const jarred = skillsRef.current;
-    if (!field || jarred.length === 0) return;
-    const width = field.clientWidth;
-    const height = field.clientHeight;
-    if (width === 0 || height === 0) return;
-
-    // Every tile in a bucket is one fixed rectangle, so its physics body is
-    // cut to exactly the DOM tile — no measure pass, no disagreement.
-    const tileW = scale.width;
-    const tileH = scale.height;
-
-    const engine = Matter.Engine.create({ enableSleeping: true });
-    // The walls: a floor across the jar's mouth and two side walls tall
-    // enough to catch every card from its spawn above the rim — the jar is
-    // open-topped, so an over-full pile would rise past the rim rather than
-    // clip through the field.
-    const wall = 60;
-    const wallTop = 600;
-    const walls = [
-      // The floor sits a few px above the rim, so the bottom row keeps a
-      // sliver of breathing room instead of kissing the clip edge.
-      Matter.Bodies.rectangle(
-        width / 2,
-        height + wall / 2 - 4,
-        width + wall * 2,
-        wall,
-        { isStatic: true },
-      ),
-      Matter.Bodies.rectangle(
-        -wall / 2 + 1,
-        (height - wallTop) / 2,
-        wall,
-        height + wallTop,
-        { isStatic: true },
-      ),
-      Matter.Bodies.rectangle(
-        width + wall / 2 - 1,
-        (height - wallTop) / 2,
-        wall,
-        height + wallTop,
-        { isStatic: true },
-      ),
-    ];
-    const bodies = jarred.map((skill, index) => {
-      const { unit, angle, drift } = spawnOf(skill.name);
-      const x = tileW / 2 + unit * (width - tileW);
-      // Tiles spawn stacked above the rim, so they pour in one after
-      // another rather than materialising in a single overlapping slab.
-      const y = -(index + 1) * (tileH + 6) - 10;
-      const body = Matter.Bodies.rectangle(x, y, tileW, tileH, {
-        angle,
-        restitution: 0.05,
-        friction: REST_FRICTION,
-        frictionStatic: 0.9,
-        frictionAir: 0.02,
-        chamfer: { radius: 4 },
-      });
-      // The seeded sideways entry drift — varied paths, not vertical rails.
-      Matter.Body.setVelocity(body, { x: drift, y: 0 });
-      return body;
-    });
-    Matter.Composite.add(engine.world, [...walls, ...bodies]);
-
-    let raf = 0;
-    // A hard stop for the rare chip wedged too tight to right or tap: the
-    // springs would otherwise keep it awake and the loop would never end.
-    let steps = 0;
-    const MAX_STEPS = 2400;
-    let taps = 0;
-    // Fixed steps a tap loosens the pile for before normal grip returns
-    // (~0.33s): long enough to slide into floor gaps, short enough that the
-    // pile re-settles before the next sleep can launch another tap.
-    const TAP_LOOSE_STEPS = 20;
-    let looseSteps = 0;
-    const settle = () => {
-      // One fixed 60Hz step: a replay, not a variable-rate roll.
-      Matter.Engine.update(engine, 1000 / 60);
-      if (looseSteps > 0) {
-        looseSteps -= 1;
-        if (looseSteps === 0) {
-          bodies.forEach((body) => {
-            body.friction = REST_FRICTION;
-          });
-        }
-      }
-      let asleep = true;
-      bodies.forEach((body, index) => {
-        // Right the standing and the inverted: wake a sleeping card the
-        // pile parked past the tilt band, then hand it the spring-damper
-        // velocity. Cards inside the band keep the lean they settled in.
-        const righted = rightedAngularVelocity(
-          body.angle,
-          body.angularVelocity,
-        );
-        if (righted !== null) {
-          if (body.isSleeping) Matter.Sleeping.set(body, false);
-          Matter.Body.setAngularVelocity(body, righted);
-        }
-        const card = cardRefs.current[index];
-        if (card) {
-          card.style.transform = `translate(${
-            body.position.x - tileW / 2
-          }px, ${body.position.y - tileH / 2}px) rotate(${body.angle}rad)`;
-        }
-        if (!body.isSleeping) asleep = false;
-      });
-      // The first sleep is the poured pile; each further sleep is a tapped
-      // pile. Until the taps are spent, jolt the whole pile sideways with
-      // its friction briefly loosened — wedged cards slide into floor gaps
-      // and the pile re-packs from the bottom up, one tap per new sleep.
-      if (asleep && taps < TAP_COUNT) {
-        const tap = taps;
-        taps += 1;
-        asleep = false;
-        bodies.forEach((body, index) => {
-          body.friction = TAP_FRICTION;
-          Matter.Sleeping.set(body, false);
-          Matter.Body.setVelocity(body, {
-            x: tapVelocityX(jarred[index].name, tap),
-            y: body.velocity.y,
-          });
-        });
-        looseSteps = TAP_LOOSE_STEPS;
-      }
-      steps += 1;
-      // A settled jar holds still — the loop ends once every card sleeps
-      // after the final tap (or the step cap trips), and only a roster
-      // change rebuilds the run.
-      if (!asleep && steps < MAX_STEPS) {
-        raf = requestAnimationFrame(settle);
-      }
-    };
-    raf = requestAnimationFrame(settle);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      Matter.Composite.clear(engine.world, false);
-      Matter.Engine.clear(engine);
-    };
-  }, [signature, reduceMotion, scale]);
-
-  if (reduceMotion) {
-    // No simulation: the same cards, bottom-aligned and seeded — the pile
-    // without the pour.
-    return (
-      <div className={cn("relative overflow-hidden", className)}>
-        <div className="flex h-full flex-wrap content-end justify-center gap-1 p-2">
-          {skills.map((skill) => (
-            <JarCard
-              key={skill.name}
-              skill={skill}
-              scale={scale}
-              emoji={emojis?.get(skill.name)}
-              face={faces.get(skill.name) ?? avatarFace(skill.name)}
-              style={scatterStyle(scatterOf(skill.name))}
-              className={cn(
-                "relative z-0 hover:z-10",
-                "[transform:rotate(var(--scatter-rotate))_translate(var(--scatter-x),var(--scatter-y))]",
-              )}
-            />
-          ))}
-        </div>
-      </div>
+    if (!field) return;
+    // The measured field, or none: a jar in an environment with no layout has
+    // nothing to settle into, and the cards stay parked above the rim.
+    const measured =
+      field.clientWidth === 0 && field.clientHeight === 0
+        ? NO_FIELD
+        : { width: field.clientWidth, height: field.clientHeight };
+    const poses = settledPoses(
+      jarred.map((skill) => skill.name),
+      measured,
+      scale,
     );
-  }
+    poses.forEach((pose, index) => {
+      const card = cardRefs.current[index];
+      if (card) {
+        card.style.transform = `translate(${pose.x}px, ${pose.y}px) rotate(${pose.angle}rad)`;
+      }
+    });
+  }, [signature, scale]);
 
   return (
     <div ref={fieldRef} className={cn("relative overflow-hidden", className)}>
@@ -533,14 +528,15 @@ export function HubJar({
           scale={scale}
           emoji={emojis?.get(skill.name)}
           face={faces.get(skill.name) ?? avatarFace(skill.name)}
-          // The spawn pose is the card's first paint; the engine's first
-          // frame (laid out before paint) takes the transform over.
+          // The spawn pose is the card's first paint; the solve above (laid out
+          // before paint) takes the transform over. It sits above the rim, so
+          // the one frame it is on screen is clipped away.
           style={{
             transform: `translate(0px, ${
               -(index + 1) * (scale.height + 6) - 10
             }px) rotate(${spawnOf(skill.name).angle}rad)`,
           }}
-          className="absolute top-0 left-0 z-0 will-change-transform hover:z-10"
+          className="absolute top-0 left-0 z-0 hover:z-10"
         />
       ))}
     </div>
@@ -555,7 +551,7 @@ export function HubJar({
  * emoji in one truncated line, which is the shape every card wears for as long
  * as the roster fits the floor. Everywhere else the name floats above the tile
  * in a portal tooltip on hover (so it never clips on the jar's overflow). The
- * tooltip trigger IS the transformed tile the physics engine moves.
+ * tooltip trigger IS the transformed tile the solve placed.
  */
 const JarCard = forwardRef<
   HTMLSpanElement,

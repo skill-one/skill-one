@@ -1,5 +1,3 @@
-import { Link } from "react-router";
-
 import { cn } from "../lib/utils";
 import { isTauri } from "../lib/tauri";
 import { AppNav } from "./app-nav";
@@ -46,10 +44,11 @@ import { SettingsMenu } from "./settings-menu";
  * itself does in a unified toolbar.
  *
  * The row is also the window's drag region, and it claims the whole subtree:
- * `"deep"` covers every descendant, so its empty stretches move the window.
- * Tauri walks up from whatever was clicked, and a clickable element without the
- * attribute — the brand, a link, the settings entry — stops the walk there, so
- * nothing inside loses its own click.
+ * `"deep"` covers every descendant, so its empty stretches move the window —
+ * the brand's stretch included, which is most of the middle of the row. Tauri
+ * walks up from whatever was clicked, and a clickable element without the
+ * attribute — a link, the settings entry — stops the walk there, so nothing
+ * inside loses its own click.
  */
 export function AppHeader() {
   return (
@@ -67,8 +66,10 @@ export function AppHeader() {
           `pointer-events-none` because this wrapper is `inset-0` — it spans the
           whole header, not just the mark — and it paints after the nav, so
           without this it swallows every click meant for the nav links. The mark
-          itself opts back in below, since it is a link home. jsdom has no
-          pointer-event hit testing, so only the end-to-end suite can see this. */}
+          stays under it: it is a title, not a link — the nav's home segment is
+          the way back, and a second door to the same place would only make the
+          reader ask which one is the real one. jsdom has no pointer-event hit
+          testing, so only the end-to-end suite can see this. */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <Brand />
       </div>
@@ -80,18 +81,15 @@ export function AppHeader() {
 }
 
 /**
- * The brand mark: the logo and the word, and the window's way home — the agents
- * graph at `/` (see the app's routes), which is what the mark stands for.
+ * The brand mark: the logo and the word. A title, the way a unified toolbar's
+ * is — not a link home. The home already leads the row (see `AppNav`), so a
+ * second, centred way back would be one destination with two doors, and the
+ * under-the-pointer stretch this frees up is the window's drag region — most
+ * of the middle of the row moves the window again.
  */
 function Brand() {
   return (
-    <Link
-      to="/"
-      // Opts back into the pointer events its wrapper opts out of, so the mark
-      // stays a link home while the rest of the header it overlays does not
-      // intercept anything.
-      className="pointer-events-auto flex shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-    >
+    <div className="flex shrink-0 items-center gap-2">
       <img
         src="/skill-one-transparent.png"
         alt=""
@@ -100,6 +98,6 @@ function Brand() {
       <span className="text-[13px] font-semibold text-foreground">
         Skill One
       </span>
-    </Link>
+    </div>
   );
 }

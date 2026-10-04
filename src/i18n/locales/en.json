@@ -146,15 +146,19 @@
       "switchToConstellation": "Switch to constellation"
     },
     "hub": {
-      "diskAria": "Shared hub ({{total}} installed, {{enabled}} enabled)",
+      "diskAria": "Shared hub ({{enabled}} enabled of {{total}} installed)",
       "title": "SkillOne shared hub",
       "skillsLabel": "skills",
       "enabled": "{{enabled}}/{{total}} enabled",
+      "enabledSuffix": "enabled",
       "tagline": "Install once, use in every agent",
       "noneEnabled": "No enabled skills yet",
       "overflowAria": "{{count}} more skills not shown in the jar",
       "browseStore": "Store",
       "manage": "Manage"
+    },
+    "head": {
+      "linkedAgents": "{{count}} agents connected"
     }
   },
   "agentLink": {

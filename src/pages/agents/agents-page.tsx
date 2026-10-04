@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Columns2, Loader2, Users, Waypoints } from "lucide-react";
 
 import { fetchAgentStatus } from "../../lib/local-skills";
+import { agentLinkState } from "../../lib/agent-link-state";
 import { setAgentsLayout } from "../../lib/agents-layout-preference";
 import { useAgentsLayout } from "../../hooks/use-agents-layout";
 import { errorMessage } from "../../lib/utils";
@@ -19,8 +20,9 @@ import { AgentGraph } from "./agent-graph";
  * into one hub-and-spoke graph (see `AgentGraph`): the picture is the product,
  * one SkillOne core with every agent's skills flowing into it — which is why the
  * window opens here and the brand in the header leads back. The head states the
- * figures behind the picture; linking is done straight from each agent's card
- * and stays automatic everywhere else.
+ * one figure worth stating up front — how many agents are linked — and the hub
+ * card at the picture's centre carries the skill totals; linking is done
+ * straight from each agent's card and stays automatic everywhere else.
  */
 export function AgentsPage() {
   const { t } = useTranslation();
@@ -40,20 +42,27 @@ export function AgentsPage() {
   });
 
   const list = agents ?? [];
+  // The count answers what the picture shows: the canonical agent reads as
+  // linked=false on the wire (it never needed a link — it hosts the shared
+  // dir), so the raw field undercounts by one against the graph's own
+  // ribbons. Every state on this page derives from `agentLinkState`.
+  const linkedCount = list.filter(
+    (agent) => agentLinkState(agent) === "linked",
+  ).length;
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">
-      {/* The home's head is the idea itself: one line saying what the app
-          does — install once, every agent uses it. The figures live on the
-          hub card at the picture's centre, so nothing here competes with
-          them. No way back — this is where the window opens (see the app's
-          routes), so there is nowhere above it to go. The single toggle flips
-          the graph between the columns and the constellation; its face names
-          the way it goes, not where it is. */}
+      {/* The home's head states the one figure worth stating up front — how
+          many agents are linked — and leaves the rest to the picture: the
+          skill totals live on the hub card at its centre, and linking is done
+          straight from each agent's card. No way back — this is where the
+          window opens (see the app's routes), so there is nowhere above it to
+          go. The single toggle flips the graph between the columns and the
+          constellation; its face names the way it goes, not where it is. */}
       <div className="mb-4 flex min-w-0 items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-semibold tracking-tight">
-            {t("agents.hub.tagline")}
+          <h1 className="truncate text-sm font-medium text-muted-foreground">
+            {t("agents.head.linkedAgents", { count: linkedCount })}
           </h1>
         </div>
 

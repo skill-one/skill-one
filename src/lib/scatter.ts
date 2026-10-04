@@ -62,9 +62,8 @@ export function scatterOf(seed: string): Scatter {
 
 /**
  * A seeded figure in [0, 1) — the same seed always answers the same value.
- * Layouts that need more spread than a `Scatter` carries (a physics jar's
- * spawn columns, say) scale it themselves instead of each growing a private
- * hash.
+ * Layouts that need more spread than a `Scatter` carries (the jar's spawn
+ * columns, say) scale it themselves instead of each growing a private hash.
  */
 export function unitOf(seed: string): number {
   return hash32(seed, "unit") / 0x1_0000_0000;

@@ -60,8 +60,8 @@ describe("AppHeader", () => {
     // The mark is a title, not a leading item: it is centred over the header's
     // own box instead of sharing a flex line whose leading padding (`pl-24`,
     // for the traffic lights) is twice its trailing one.
-    const brand = screen.getByRole("link", { name: "Skill One" });
-    const overlay = brand.parentElement;
+    const brand = screen.getByText("Skill One");
+    const overlay = brand.parentElement?.parentElement;
     expect(overlay?.className).toContain("absolute");
     expect(overlay?.className).toContain("inset-0");
     expect(overlay?.className).toContain("justify-center");
@@ -70,9 +70,9 @@ describe("AppHeader", () => {
     // overlay paints after the nav — so without this it sat on top of every
     // nav link and swallowed its clicks. The app was unusable while every test
     // in this file stayed green, because jsdom does no hit testing. The mark
-    // opts back in, since it is a link home.
+    // stays under it: a title, not a link — the drag region it frees up is
+    // most of the row's middle.
     expect(overlay).toHaveClass("pointer-events-none");
-    expect(brand).toHaveClass("pointer-events-auto");
 
     // The row still leads with the destinations, and closes with the actions.
     expect(header().firstElementChild?.tagName).toBe("NAV");
@@ -81,14 +81,17 @@ describe("AppHeader", () => {
     );
   });
 
-  it("points the brand at the home, the agents graph", () => {
+  it("leaves the way home to the nav's own segment", () => {
     renderHeader("/explore");
 
-    // The mark names the window and is the window's way home.
-    expect(screen.getByRole("link", { name: "Skill One" })).toHaveAttribute(
+    // One destination, one door: the home already leads the segmented nav
+    // (and reads as active when it is on screen), so the centred brand is a
+    // title rather than a second link to the same place.
+    expect(screen.getByRole("link", { name: "首页" })).toHaveAttribute(
       "href",
       "/",
     );
+    expect(screen.queryByRole("link", { name: "Skill One" })).toBeNull();
   });
 
   it("closes the row with the settings entry", () => {
