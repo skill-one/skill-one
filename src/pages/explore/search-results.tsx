@@ -1,8 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Boxes, Globe, Loader2, Store } from "lucide-react";
 
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
+import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { openExternal } from "../../lib/open-external";
 import { skillKey, type SkillView } from "../../lib/skill-view";
@@ -107,6 +108,16 @@ export interface SearchRow {
 /** React-key identity of the pool card. */
 const LOCAL_POOL_KEY = "local";
 
+/**
+ * How much of the registry's answer mounts with the question, and how much more
+ * each scroll to the end of it brings. A chunk is a screenful rather than a
+ * token number: the answer should be readable before the reader has scrolled at
+ * all, which is the whole difference between a search that feels instant and one
+ * that feels like it is still working.
+ */
+const INITIAL_HITS = 12;
+const HIT_CHUNK = 12;
+
 export function SearchResults({
   unit,
   query,
@@ -161,6 +172,29 @@ export function SearchResults({
     [storeHits],
   );
 
+  // **The registry is the one source here with no ceiling of its own.** The two
+  // others are bounded by what they are: this machine's installs by what the
+  // reader has, skills.sh by the limit the answer is asked with. A broad word
+  // over a multi-thousand-entry registry, on the other hand, matches thousands
+  // of skills — and mounting every one of them at once is a stall the reader
+  // would read as the app having hung, which is the last thing a search that
+  // already cost them a keystroke's worth of waiting should add. So this answer
+  // is revealed a chunk at a time, by the same mechanism the browse lists use
+  // (see `useProgressiveReveal`): nothing is withheld, it simply starts arriving
+  // at once instead of all at once.
+  const {
+    count: storeShown,
+    sentinelRef: storeSentinel,
+    done: storeRevealed,
+  } = useProgressiveReveal({
+    // The repository unit lists repositories; the two skill shapes (rows and
+    // the compact grid) list skills, one entry each either way.
+    total: unit === "repo" ? storeGroups.length : storeHits.length,
+    initial: INITIAL_HITS,
+    step: HIT_CHUNK,
+    resetKey: `${unit}\u0000${query}`,
+  });
+
   // The live answer: what the store's does not already cover. Identity is the
   // whole comparison — the same `repo/name` pair both sides key a skill by —
   // so a skill upstream also carries never lists twice in one answer.
@@ -173,8 +207,13 @@ export function SearchResults({
     [liveSkills],
   );
   // The endpoint answers no matched terms, so the query's own words stand in
-  // for the live rows' highlight.
-  const liveTerms = useMemo(() => query.split(/\s+/).filter(Boolean), [query]);
+  // for the live rows' highlight. Held as the row's own `{ name }` shape once
+  // rather than rebuilt per row, so a settled answer re-renders no row that did
+  // not change (see `SkillRow`).
+  const liveMatched = useMemo(
+    () => ({ name: query.split(/\s+/).filter(Boolean) }),
+    [query],
+  );
 
   // The open skill, addressed by the answer it was opened in plus its identity:
   // the installed list puts the store's own rows under its own rows (see the
@@ -236,12 +275,31 @@ export function SearchResults({
   // belong to, plus their own key — so neither has to restate the other's.
   const isOpen = (answer: Answer, key: string) =>
     opened?.answer === answer && opened.key === key;
-  const openRow = (answer: Answer, key: string) => () =>
-    setOpened({ answer, key });
-  const openCard =
-    (answer: Answer) =>
+  // One handler per answer, held across renders: the rows are memoized, so a
+  // handler rebuilt on the way down would hand every row of a long answer a new
+  // prop and re-render all of them to no end (see `SkillRow`).
+  const openOwn = useCallback(
+    (key: string) => setOpened({ answer: "own", key }),
+    [],
+  );
+  const openStore = useCallback(
+    (key: string) => setOpened({ answer: "store", key }),
+    [],
+  );
+  const openRowOf = (answer: Answer) =>
+    answer === "own" ? openOwn : openStore;
+  const openCard = (answer: Answer) =>
     (key: string | null) =>
       setOpened(key == null ? null : { answer, key });
+  // A live row opens skills.sh rather than anything this app can fill, so its
+  // handler addresses the same key the other rows do and finds the URL itself.
+  const openLive = useCallback(
+    (key: string) => {
+      const live = liveSkills.find((s) => skillKey(s) === key);
+      if (live?.url) void openExternal(live.url);
+    },
+    [liveSkills],
+  );
 
   // The count a group states, in the unit on screen: repositories weigh
   // repositories, skills weigh skills, and a source still answering says so
@@ -277,56 +335,60 @@ export function SearchResults({
 
   // The store's grouped answer in the unit's own shape — the store list's own
   // group, and the installed list's second group, read from the same place.
-  const storeAnswer = (answer: Answer) =>
-    unit === "repo" ? (
-      <ul className={REPO_LIST_CLASS}>
-        {storeGroups.map((group) => (
-          <RepoCard
-            key={group.key}
-            repo={group.title}
-            stars={group.stars}
-            skills={group.skills.map((hit) => ({
-              skill: hit.skill,
-              matched: hit.matched,
-            }))}
-            hasQuery
-            selected={opened?.answer === answer ? opened.key : null}
-            onOpenSkill={openCard(answer)}
-          />
-        ))}
-      </ul>
-    ) : unit === "grid" ? (
-      <ul className={SKILL_GRID_LIST_CLASS}>
-        {storeHits.map((hit) => {
-          const key = skillKey(hit.skill);
-          return (
-            <SkillGridCard
-              key={key}
-              skill={hit.skill}
-              matched={hit.matched}
-              selected={isOpen(answer, key)}
-              onSelect={openRow(answer, key)}
+  // Both are revealed in chunks (see `useProgressiveReveal` above), so the run's
+  // sentinel closes the list and the observer extends it as the reader reaches
+  // the end.
+  const storeAnswer = (answer: Answer) => (
+    <>
+      {unit === "repo" ? (
+        <ul className={REPO_LIST_CLASS}>
+          {storeGroups.slice(0, storeShown).map((group) => (
+            <RepoCard
+              key={group.key}
+              repo={group.title}
+              stars={group.stars}
+              skills={group.skills.map((hit) => ({
+                skill: hit.skill,
+                matched: hit.matched,
+              }))}
+              hasQuery
+              selected={opened?.answer === answer ? opened.key : null}
+              onOpenSkill={openCard(answer)}
             />
-          );
-        })}
-      </ul>
-    ) : (
-      <ul className={SKILL_ROW_LIST_CLASS}>
-        {storeHits.map((hit, index) => {
-          const key = skillKey(hit.skill);
-          return (
+          ))}
+        </ul>
+      ) : unit === "grid" ? (
+        <ul className={SKILL_GRID_LIST_CLASS}>
+          {storeHits.slice(0, storeShown).map((hit) => {
+            const key = skillKey(hit.skill);
+            return (
+              <SkillGridCard
+                key={key}
+                skill={hit.skill}
+                matched={hit.matched}
+                selected={isOpen(answer, key)}
+                onSelect={() => openRowOf(answer)(key)}
+              />
+            );
+          })}
+        </ul>
+      ) : (
+        <ul className={SKILL_ROW_LIST_CLASS}>
+          {storeHits.slice(0, storeShown).map((hit, index) => (
             <SkillRow
-              key={key}
+              key={skillKey(hit.skill)}
               skill={hit.skill}
               matched={hit.matched}
               index={index}
-              selected={isOpen(answer, key)}
-              onSelect={openRow(answer, key)}
+              selected={isOpen(answer, skillKey(hit.skill))}
+              onSelect={openRowOf(answer)}
             />
-          );
-        })}
-      </ul>
-    );
+          ))}
+        </ul>
+      )}
+      {!storeRevealed && <div ref={storeSentinel} aria-hidden="true" />}
+    </>
+  );
 
   // The asking list's own answer, in the unit's own shape.
   const ownAnswer = remote ? (
@@ -379,35 +441,32 @@ export function SearchResults({
             muted={row.muted}
             extra={row.extra}
             action={row.action}
-            onSelect={openRow("own", key)}
+            onSelect={() => openRowOf("own")(key)}
           />
         );
       })}
     </ul>
   ) : (
     <ul className={SKILL_ROW_LIST_CLASS}>
-      {installed.map((row, index) => {
-        const key = skillKey(row.skill);
-        return (
-          <SkillRow
-            key={key}
-            skill={row.skill}
-            matched={row.matched}
-            index={index}
-            // The same rows, and the same marks, as the installed list's own
-            // answer: a row numbers its position in the order the reader picked
-            // and the first three of that order wear the podium. A search narrows
-            // the list, it does not re-rank it — the order here is the installed
-            // list's order restricted to the matches, so the numbering and the
-            // podium are the ones the list itself would print.
-            selected={isOpen("own", key)}
-            muted={row.muted}
-            extra={row.extra}
-            action={row.action}
-            onSelect={openRow("own", key)}
-          />
-        );
-      })}
+      {installed.map((row, index) => (
+        <SkillRow
+          key={skillKey(row.skill)}
+          skill={row.skill}
+          matched={row.matched}
+          index={index}
+          // The same rows, and the same marks, as the installed list's own
+          // answer: a row numbers its position in the order the reader picked
+          // and the first three of that order wear the podium. A search narrows
+          // the list, it does not re-rank it — the order here is the installed
+          // list's order restricted to the matches, so the numbering and the
+          // podium are the ones the list itself would print.
+          selected={isOpen("own", skillKey(row.skill))}
+          muted={row.muted}
+          extra={row.extra}
+          action={row.action}
+          onSelect={openOwn}
+        />
+      ))}
     </ul>
   );
 
@@ -444,7 +503,7 @@ export function SearchResults({
         <SkillGridCard
           key={skillKey(skill)}
           skill={skill}
-          matched={{ name: liveTerms }}
+          matched={liveMatched}
           onSelect={() => {
             if (skill.url) void openExternal(skill.url);
           }}
@@ -461,10 +520,8 @@ export function SearchResults({
           // An enumeration, not a ranking: the endpoint's
           // relevance order is no contest to medal.
           ranked={false}
-          matched={{ name: liveTerms }}
-          onSelect={() => {
-            if (skill.url) void openExternal(skill.url);
-          }}
+          matched={liveMatched}
+          onSelect={openLive}
         />
       ))}
     </ul>

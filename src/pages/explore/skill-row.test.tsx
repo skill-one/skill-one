@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 
 import { SkillRow } from "./skill-row";
@@ -8,6 +8,24 @@ import { renderWithRouter } from "../../test/test-utils";
 import { estimateTokens } from "../../lib/token-estimate";
 import { MEDAL_CLASSES } from "../../lib/ordinal";
 import type { SkillView } from "../../lib/skill-view";
+
+/**
+ * How many times the rows actually rendered. The row is where a list's size
+ * becomes a page's cost, so "did this row re-render" needs to be answerable
+ * without a profiler in the room: a memoized row skips its *whole subtree*, so
+ * a component every row draws is an exact witness. HighlightedText is that
+ * component here — it is the one thing on the row that has no reason to exist
+ * outside a search, which makes it a natural place to hang the count.
+ */
+const rowRenders = vi.fn();
+
+vi.mock("../../components/highlighted-text", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../components/highlighted-text")>()),
+  HighlightedText: ({ text }: { text: string }) => {
+    rowRenders(text);
+    return text;
+  },
+}));
 
 /**
  * A live skills.sh hit sourced from a GitHub repository: no store entry, but
@@ -66,6 +84,97 @@ describe("SkillRow live-hit install button", () => {
     // page instead of a button that can only fail.
     const { container } = renderRow(domainLive);
     expect(container.querySelector("button")).toBeNull();
+  });
+});
+
+describe("the row's own re-rendering", () => {
+  /**
+   * The handler both rows are given, held across renders. A caller that wrote
+   * `onSelect={() => open(key)}` inline would hand every row a new prop on every
+   * render and re-render the lot — which is the whole reason the row takes a
+   * key and every caller passes a handler it already had.
+   */
+  const noop = () => {};
+
+  // Two rows of a list, and the one fact a reader changes: which row is open.
+  // Everything else about them — the skills, their positions, the handler — is
+  // held still, because that is the situation a list is in most of the time.
+  const rows = (open: string | null) => (
+    <ul>
+      <SkillRow
+        skill={repoLive}
+        index={0}
+        selected={open === "repo"}
+        onSelect={noop}
+      />
+      <SkillRow
+        skill={domainLive}
+        index={1}
+        selected={open === "domain"}
+        onSelect={noop}
+      />
+    </ul>
+  );
+
+  it("leaves every row untouched when nothing about the list changed", () => {
+    const { rerender } = renderWithRouter(
+      <TooltipProvider>{rows(null)}</TooltipProvider>,
+    );
+    rowRenders.mockClear();
+
+    rerender(<TooltipProvider>{rows(null)}</TooltipProvider>);
+
+    // A page of skills is the one surface where re-rendering the page and
+    // re-rendering every row in it are the same cost. So a row that was handed
+    // the same skill, the same position and a handler it already had does not
+    // re-render at all.
+    expect(rowRenders).not.toHaveBeenCalled();
+  });
+
+  it("re-renders the row that changed, so the list is never a stale one", () => {
+    const { rerender } = renderWithRouter(
+      <TooltipProvider>{rows(null)}</TooltipProvider>,
+    );
+    rowRenders.mockClear();
+
+    rerender(<TooltipProvider>{rows("repo")}</TooltipProvider>);
+
+    // The opened row is the one thing that genuinely differs, and it is the one
+    // row that redraws: skipping it would trade a page's cost for a wrong page.
+    expect(rowRenders).toHaveBeenCalledTimes(1);
+    expect(rowRenders).toHaveBeenCalledWith("find-skills");
+  });
+
+  it("cannot be memoized away by a caller that rebuilds its handler", () => {
+    // The failure mode this API shape exists to prevent, pinned so the shape
+    // cannot be "simplified" back into it: a fresh closure per row is a new
+    // prop on every row, and the list pays for it in full every time anything
+    // above it moves.
+    const { rerender } = renderWithRouter(
+      <TooltipProvider>{rows(null)}</TooltipProvider>,
+    );
+    rowRenders.mockClear();
+
+    rerender(
+      <TooltipProvider>
+        <ul>
+          <SkillRow
+            skill={repoLive}
+            index={0}
+            selected={false}
+            onSelect={() => {}}
+          />
+          <SkillRow
+            skill={domainLive}
+            index={1}
+            selected={false}
+            onSelect={() => {}}
+          />
+        </ul>
+      </TooltipProvider>,
+    );
+
+    expect(rowRenders).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useRepoSections } from "../../hooks/use-repo-sections";
 import { useViewMemory } from "../../hooks/use-view-memory";
 import { skillKey } from "../../lib/skill-view";
@@ -97,7 +96,13 @@ export function ExplorePage() {
   // are read from the shared view rather than held here. The shape and the order
   // are two answers again — the store's list is one of skill rows or of
   // repository cards, read in the one order a list of skills can be read in.
-  const search = useListQuery("store");
+  //
+  // The field answers as it is typed, the list on the settled word: the question
+  // the reader reads while typing is their own, not a half-word they have
+  // already committed to. The field is what settles it (see `SearchInput`), so
+  // this page is woken by a question and never by a keystroke — a list of
+  // hundreds of rows must not re-render per character.
+  const query = useListQuery("store").trim();
   const {
     scope,
     sort = "popularity",
@@ -107,11 +112,6 @@ export function ExplorePage() {
   // relevance and ignores the scope (and the filter bar locks while it is
   // live), so the scope is not part of the answer's definition.
   const selectedDomain = scope ?? null;
-
-  // The field is answered as it is typed, the list on the settled word: the
-  // question the reader reads while typing is their own, not a half-word they
-  // have already committed to.
-  const query = useDebouncedValue(search).trim();
   const isSearching = query.length > 0;
 
   // The answer this page is showing, named by the controls that produced it.
@@ -439,19 +439,16 @@ export function ExplorePage() {
                   // same row a repository's own page lists, so a skill reads
                   // the same wherever it is found.
                   <ul className={SKILL_ROW_LIST_CLASS}>
-                    {activeSkills.slice(0, renderedCount).map((hit, index) => {
-                      const key = skillKey(hit.skill);
-                      return (
-                        <SkillRow
-                          key={key}
-                          skill={hit.skill}
-                          matched={hit.matched}
-                          index={index}
-                          selected={key === selected}
-                          onSelect={() => setSelected(key)}
-                        />
-                      );
-                    })}
+                    {activeSkills.slice(0, renderedCount).map((hit, index) => (
+                      <SkillRow
+                        key={skillKey(hit.skill)}
+                        skill={hit.skill}
+                        matched={hit.matched}
+                        index={index}
+                        selected={skillKey(hit.skill) === selected}
+                        onSelect={setSelected}
+                      />
+                    ))}
                   </ul>
                 )}
                 {/* The sentinel ends the rendered run: while it is on screen

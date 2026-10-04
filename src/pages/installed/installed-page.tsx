@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Boxes, PowerOff, Users } from "lucide-react";
 
-import { useDebouncedValue } from "../../hooks/use-debounced-value";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
@@ -46,7 +45,7 @@ import { ListToolbar } from "../../components/list-toolbar";
 import { LinkSuggestionBadge } from "./link-suggestion-badge";
 import type { LinkCandidate } from "../../lib/link-suggestions";
 import { RepoCard } from "../explore/repo-card";
-import { SearchResults } from "../explore/search-results";
+import { SearchResults, type SearchRow } from "../explore/search-results";
 import { CollapsibleSection } from "../../components/collapsible-section";
 import { splitByEnabled } from "../../lib/enabled-split";
 
@@ -238,16 +237,17 @@ export function InstalledPage() {
   // one of skill rows or of repository cards, and each reads in its own orders.
   // The full installed list is already in memory, so everything below filters on
   // the main thread.
-  const search = useListQuery("installed");
+  //
+  // The field answers as it is typed, the list on the settled word: the question
+  // the reader reads while typing is their own, not a half-word they have
+  // already committed to. The field is what settles it (see `SearchInput`), so
+  // this page is woken by a question and never by a keystroke. A live question
+  // re-answers the list by relevance, which is why the scope and the order lock
+  // beside the field (see `ListToolbar`).
+  const query = useListQuery("installed").trim();
   const { scope, sort = "popularity", unit = "skill" } =
     useDestinationView("installed");
   const domain = scope ?? null;
-  // The field is answered as it is typed, the list on the settled word: the
-  // question the reader reads while typing is their own, not a half-word they
-  // have already committed to. A live question re-answers the list by relevance,
-  // which is why the scope and the order lock beside the field (see
-  // `ListToolbar`).
-  const query = useDebouncedValue(search).trim();
   const isSearching = query.length > 0;
   // Open skill in the shared detail drawer, tracked by identity rather than by
   // index: the provenance and store-entry queries land asynchronously and
@@ -578,16 +578,37 @@ export function InstalledPage() {
   // install the ledger placed has a repository to point at. In the skill unit
   // the label and icon are merged into one trigger ("label"); a repo-card row
   // takes the icon alone, since the card's bar already names the source.
-  const rowExtra = (row: Row, variant: "label" | "icon") =>
-    !row.skill.repo ? (
-      <LinkSuggestionBadge
-        name={row.skill.name}
-        localDescription={row.skill.description}
-        candidates={row.suggestion ?? []}
-        cutRepos={row.skill.cutRepos}
-        variant={variant}
-      />
-    ) : undefined;
+  const rowExtra = useCallback(
+    (row: Row, variant: "label" | "icon") =>
+      !row.skill.repo ? (
+        <LinkSuggestionBadge
+          name={row.skill.name}
+          localDescription={row.skill.description}
+          candidates={row.suggestion ?? []}
+          cutRepos={row.skill.cutRepos}
+          variant={variant}
+        />
+      ) : undefined,
+    [],
+  );
+
+  // This list's own answer as the shared search view reads it, built once per
+  // answer rather than on every render. Handed over inline it would be a fresh
+  // array of fresh rows each time, so the view would re-file the answer by
+  // repository and re-order the groups for a page that had not changed — and
+  // every row would be handed a new corner action, re-rendering the lot (see
+  // `SkillRow`).
+  const searchRows = useMemo<SearchRow[]>(
+    () =>
+      rows.map((row) => ({
+        skill: row.skill,
+        matched: row.matched,
+        muted: !row.enabled,
+        extra: rowExtra(row, "label"),
+        action: <SkillEnableSwitch skill={row.skill} />,
+      })),
+    [rows, rowExtra],
+  );
 
   /**
    * One row of the skill unit. Shared by the live section and the parked one so
@@ -621,7 +642,7 @@ export function InstalledPage() {
         muted={!row.enabled}
         extra={rowExtra(row, "label")}
         action={<SkillEnableSwitch skill={row.skill} />}
-        onSelect={() => setSelectedKey(key)}
+        onSelect={setSelectedKey}
       />
     );
   };
@@ -733,13 +754,7 @@ export function InstalledPage() {
               unit={unit}
               query={query}
               destination="installed"
-              installed={rows.map((row) => ({
-                skill: row.skill,
-                matched: row.matched,
-                muted: !row.enabled,
-                extra: rowExtra(row, "label"),
-                action: <SkillEnableSwitch skill={row.skill} />,
-              }))}
+              installed={searchRows}
             />
           ) : unit === "repo" ? (
             // The repository unit: one card per repository, led by the

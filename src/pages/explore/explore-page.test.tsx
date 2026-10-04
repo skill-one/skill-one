@@ -1244,10 +1244,10 @@ describe("ExplorePage search", () => {
     });
   });
 
-  it("renders a search's whole answer at once, leaving the reveal to the browse list", async () => {
+  it("gives a search its own reveal, independent of how deep the browse list was read", async () => {
     const user = userEvent.setup();
     // Twelve one-skill "gadget" repositories: every one of them matches the
-    // search, so the search answer alone is bigger than one render chunk.
+    // search, so the search answer alone is a whole chunk of its own.
     harness.init();
     harness.pushAll(
       Array.from({ length: 12 }, (_, i) => ({
@@ -1273,13 +1273,55 @@ describe("ExplorePage search", () => {
     lastObserver().trigger(true);
     await waitFor(() => expect(cardsOf("acme/gadget-")).toHaveLength(12));
 
-    // A search answers whole: the unified search view mounts its sections
-    // entire, no reveal to pace it and no observer to wait for.
+    // A search is revealed by its own hand, not by the browse list's: the depth
+    // this list had been read to describes the browse answer and says nothing
+    // about a question asked after it. Twelve cards is one whole chunk, so the
+    // answer below is whole — and it got there by its own reveal, not by the
+    // browse list happening to have been read to exactly twelve as well.
     await user.type(await searchField(), "gadget");
     await waitFor(() => {
       expect(cardsOf("acme/gadget-")).toHaveLength(12);
       expect(document.querySelector("mark")).toBeInTheDocument();
     });
+  });
+
+  it("reveals a search answer past its first chunk as the reader reaches its end", async () => {
+    const user = userEvent.setup();
+    // Twenty one-skill "widget" repositories. A broad word over the real
+    // registry — thousands of entries, indexed for prefixes — matches far more
+    // than any screen holds, and mounting all of it at once is a stall the
+    // reader reads as the app having hung. So the answer starts arriving
+    // immediately and finishes as it is read: nothing is withheld, it simply
+    // does not all arrive at once.
+    harness.init();
+    harness.pushAll(
+      Array.from({ length: 20 }, (_, i) => ({
+        name: `widget-${String(i).padStart(2, "0")}`,
+        repo: `acme/widget-${String(i).padStart(2, "0")}`,
+        description: "A widget.",
+        stars: 10,
+        downloads: 10,
+      })),
+    );
+    harness.complete();
+    renderExplorePage();
+    await screen.findByText("widget-00");
+
+    await user.type(await searchField(), "widget");
+    // One chunk is on screen and the rest has not arrived.
+    await waitFor(() => expect(cardsOf("acme/widget-")).toHaveLength(12));
+    expect(cardsOf("acme/widget-")).toHaveLength(12);
+
+    // Reaching the end of what is mounted brings the next chunk — and then all
+    // of it, since this answer is twenty cards and a chunk is twelve.
+    const lastObserver = () =>
+      (
+        globalThis.IntersectionObserver as unknown as {
+          instances: Array<{ trigger(intersecting?: boolean): void }>;
+        }
+      ).instances.at(-1)!;
+    lastObserver().trigger(true);
+    await waitFor(() => expect(cardsOf("acme/widget-")).toHaveLength(20));
   });
 
   it("restores the full registry when the search is cleared", async () => {
@@ -1844,7 +1886,10 @@ describe("ExplorePage search", () => {
     await screen.findByText("gadget-master");
 
     await user.type(await searchField(), "gadget");
-    expect(getListView().views.store.query).toBe("gadget");
+    // The field settles the word before the list is asked about it (see
+    // `SearchInput`), so the question lands a beat after the last keystroke —
+    // and lands whole, rather than once per character.
+    await waitFor(() => expect(getListView().views.store.query).toBe("gadget"));
 
     // The question is this list's own state, and it outlives the page: a reader
     // who comes back to the store finds the question they left standing.

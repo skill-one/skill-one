@@ -5,6 +5,7 @@ import {
   subscribeRegistry,
 } from "../lib/registry/client";
 import {
+  installedSignature,
   PROVENANCE_QUERY_KEY,
   useInstalledSkills,
 } from "./use-installed-skills";
@@ -105,12 +106,10 @@ export function useSkillProvenance() {
     () => getRegistrySnapshot().epoch,
   );
   const { data: installed } = useInstalledSkills();
-  const signature = installed
-    ? installed
-        .map((s) => s.name)
-        .toSorted()
-        .join("\u0000")
-    : undefined;
+  // The list's own signature, derived once per list rather than once per reader
+  // of it (see `factsOf`): a page of rows mounting this hook must not sort the
+  // installed list once per row.
+  const signature = installedSignature(installed);
   return useQuery({
     queryKey: [...PROVENANCE_QUERY_KEY, epoch, signature],
     queryFn: () => fetchProvenanceState(installed ?? []),
