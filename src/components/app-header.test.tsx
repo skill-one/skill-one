@@ -51,7 +51,7 @@ describe("AppHeader", () => {
     expect(screen.getByText("Skill One")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "首页" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "商店" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "已安装" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "我的技能" })).toBeInTheDocument();
   });
 
   it("rides the brand over the row, so the lights' padding cannot push it off centre", () => {
@@ -136,7 +136,7 @@ describe("AppHeader", () => {
     const user = userEvent.setup();
     renderHeader("/explore");
 
-    await user.click(screen.getByRole("link", { name: "已安装" }));
+    await user.click(screen.getByRole("link", { name: "我的技能" }));
 
     expect(currentPath).toBe("/installed");
   });

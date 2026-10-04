@@ -69,7 +69,7 @@ function belongsTo(roots: readonly string[], pathname: string): boolean {
  *
  * Every top-level place is here, the home included: a reader must be able to
  * see which one is on screen and reach any other, so the home cannot be left to
- * the brand alone. Two entries are named by their word (商店 · 已安装); the home
+ * the brand alone. Two entries are named by their word (商店 · 我的技能); the home
  * is a mark, because its word would name a role rather than a place and a
  * compact mark keeps the row short — the word rides its accessible name and
  * hover tip instead, a mark carrying its name rather than a word naming a role.

@@ -59,8 +59,8 @@ import { RepoCard } from "./repo-card";
  *
  * **Except the asking list's own source, which leaves one quiet line.** Three
  * groups where one of them belongs to *this* list is not the same as three
- * equal sources: a reader who searched 「已安装」 and finds rows under no
- * 「已安装」 header reads them as installs until they happen to look up and
+ * equal sources: a reader who searched 「我的技能」 and finds rows under no
+ * 「我的技能」 header reads them as installs until they happen to look up and
  * find a different source's name. The scope change has to be stated, so an
  * empty own source says so in a single muted line in the slot its group would
  * have held — which is cheap, and a far cry from the full-height empty state
@@ -540,7 +540,7 @@ export function SearchResults({
   // A source that answered empty but was not the *only* one to be asked leaves
   // one quiet line where its group would have been. A group that vanishes
   // silently is a scope change the reader has to notice on their own: on the
-  // installed list, rows under no 「已安装」 header read as installs until the
+  // installed list, rows under no 「我的技能」 header read as installs until the
   // reader happens to look up and find a different source's name. The line
   // costs one row of text and states the scope the answer is not.
   //

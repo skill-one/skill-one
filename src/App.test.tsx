@@ -109,8 +109,8 @@ describe("App routing", () => {
     expect(await screen.findByText("主题")).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
-    // Navigate back to the installed list, the header's 已安装 segment.
-    await user.click(screen.getByRole("link", { name: /^已安装$/ }));
+    // Navigate back to the installed list, the header's 我的技能 segment.
+    await user.click(screen.getByRole("link", { name: /^我的技能$/ }));
 
     expect(await screen.findByText("pdf")).toBeInTheDocument();
   });
@@ -140,7 +140,7 @@ describe("App routing", () => {
     // whose list is one route away, so it belongs to the list itself.
     expect(screen.queryByLabelText("搜索 Skill")).toBeNull();
 
-    await user.click(screen.getByRole("link", { name: /^已安装$/ }));
+    await user.click(screen.getByRole("link", { name: /^我的技能$/ }));
     const field = await screen.findByLabelText("搜索 Skill");
     await user.type(field, "pdf");
 

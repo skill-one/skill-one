@@ -2401,7 +2401,7 @@ describe("InstalledPage", () => {
       await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
       // Both the installed answer and the store's highlight the hit, so the
       // singular read is scoped to the region it names.
-      const own = await screen.findByRole("region", { name: "已安装" });
+      const own = await screen.findByRole("region", { name: "我的技能" });
       expect(within(own).getByText("pdf")).toBeInTheDocument();
       // The own group now carries the source's name and count, like every other
       // group: three sources answer one question, and the reader is told which
@@ -2455,7 +2455,7 @@ describe("InstalledPage", () => {
       // The empty groups are absent; the live one is the whole answer, and it
       // says which source it is.
       expect(
-        screen.queryByRole("region", { name: "已安装" }),
+        screen.queryByRole("region", { name: "我的技能" }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("region", { name: "应用商店" }),
@@ -2464,7 +2464,7 @@ describe("InstalledPage", () => {
         name: "skills.sh 官方搜索",
       });
       // **The scope change is stated, not left to be noticed.** The reader
-      // searched 「已安装」; rows under no 「已安装」 header would read as
+      // searched 「我的技能」; rows under no 「我的技能」 header would read as
       // installs until they looked up and found another source's name. So the
       // own source leaves one quiet line in the slot its group would have held,
       // and the line is not a header over an empty panel — it is a sentence.

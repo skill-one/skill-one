@@ -25,7 +25,7 @@ describe("AppNav", () => {
 
     expect(screen.getByRole("link", { name: "首页" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "商店" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "已安装" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "我的技能" })).toBeInTheDocument();
   });
 
   it("is the app's whole navigation: every place and nothing else", () => {
@@ -55,7 +55,7 @@ describe("AppNav", () => {
   it("marks the active destination", () => {
     renderNav("/installed");
 
-    expect(screen.getByRole("link", { name: "已安装" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "我的技能" })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -66,7 +66,7 @@ describe("AppNav", () => {
 
     // The agents graph is a sub-page of the installed list, so the destination
     // it opened from stays lit.
-    expect(screen.getByRole("link", { name: "已安装" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "我的技能" })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -85,7 +85,7 @@ describe("AppNav", () => {
     renderNav("/installed");
 
     const track = screen.getByRole("navigation", { name: "主导航" });
-    const marked = screen.getByRole("link", { name: "已安装" });
+    const marked = screen.getByRole("link", { name: "我的技能" });
     const idle = screen.getByRole("link", { name: "商店" });
 
     // The shared recipe (see `segmented`), which is the header's own look
@@ -113,7 +113,7 @@ describe("AppNav", () => {
     const track = screen.getByRole("navigation", { name: "主导航" });
     expect(track).toHaveClass("rounded-full");
     expect(track).not.toHaveClass("rounded-lg");
-    for (const name of ["首页", "商店", "已安装"]) {
+    for (const name of ["首页", "商店", "我的技能"]) {
       const half = screen.getByRole("link", { name });
       expect(half).toHaveClass("rounded-full", "h-6", "text-xs");
       expect(half).not.toHaveClass("rounded-md");
@@ -133,7 +133,7 @@ describe("AppNav", () => {
     expect(screen.getByRole("link", { name: "首页" })).not.toHaveClass(
       "bg-background",
     );
-    expect(screen.getByRole("link", { name: "已安装" })).not.toHaveClass(
+    expect(screen.getByRole("link", { name: "我的技能" })).not.toHaveClass(
       "bg-background",
     );
   });

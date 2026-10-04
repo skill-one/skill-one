@@ -31,7 +31,7 @@
     "mainAria": "主导航",
     "home": "首页",
     "store": "商店",
-    "installed": "已安装"
+    "installed": "我的技能"
   },
   "sort": {
     "byPopularity": "按热度分组",
@@ -116,7 +116,7 @@
   },
   "search": {
     "store": "应用商店",
-    "installed": "已安装",
+    "installed": "我的技能",
     "skillsSh": "skills.sh 官方搜索",
     "searching": "搜索中…"
   },
