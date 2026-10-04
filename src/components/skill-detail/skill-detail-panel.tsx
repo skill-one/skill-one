@@ -12,7 +12,10 @@ import {
 
 import { useAppLocale } from "../../i18n/use-language";
 
-import { fetchSkillDetail, fetchSkillZhDetail } from "../../lib/skill-detail-api";
+import {
+  fetchSkillDetail,
+  fetchSkillZhDetail,
+} from "../../lib/skill-detail-api";
 import { MIRROR } from "../../lib/mirror";
 import {
   fetchLocalSkillDetail,
@@ -23,7 +26,11 @@ import {
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
-import { skillDisplayName, skillKey, type SkillView } from "../../lib/skill-view";
+import {
+  skillDisplayName,
+  skillKey,
+  type SkillView,
+} from "../../lib/skill-view";
 import { estimateTokens } from "../../lib/token-estimate";
 import {
   errorMessage,
@@ -31,6 +38,10 @@ import {
   formatUnixDate,
 } from "../../lib/utils";
 import { DomainBadge } from "../domain-badge";
+import { UNCLASSIFIED_DOMAIN } from "../../data/domains";
+import { effectiveDomains } from "../../lib/custom-tags";
+import { useCustomTags } from "../../hooks/use-custom-tags";
+import { SkillTagMenu } from "./skill-tag-menu";
 import { SkillPopularity } from "../skill-popularity";
 import { Button } from "../ui/button";
 import {
@@ -42,11 +53,7 @@ import {
 import { Skeleton } from "../ui/skeleton";
 import { toast } from "../ui/toast";
 import { Toggle } from "../ui/toggle";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "../ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { OwnerAvatar } from "../owner-avatar";
 import { SkillEnableSwitch } from "../skill-enable-switch";
 import { SkillInstallButton } from "../skill-install-button";
@@ -113,31 +120,34 @@ function ProvenanceTip({
     </TooltipContent>
   );
   return (
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            href ? (
-              <a
-                href={href}
-                title={t("detail.provenanceTitle")}
-                onClick={(e) => {
-                  e.preventDefault();
-                  void openExternal(href);
-                }}
-                className={className}
-              >
-                {t("detail.source")}
-                <ExternalLink className="h-3 w-3 shrink-0" />
-              </a>
-            ) : (
-              <span title={t("detail.provenanceTitleLocal")} className={className}>
-                {t("detail.localFile")}
-              </span>
-            )
-          }
-        />
-        {body}
-      </Tooltip>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          href ? (
+            <a
+              href={href}
+              title={t("detail.provenanceTitle")}
+              onClick={(e) => {
+                e.preventDefault();
+                void openExternal(href);
+              }}
+              className={className}
+            >
+              {t("detail.source")}
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </a>
+          ) : (
+            <span
+              title={t("detail.provenanceTitleLocal")}
+              className={className}
+            >
+              {t("detail.localFile")}
+            </span>
+          )
+        }
+      />
+      {body}
+    </Tooltip>
   );
 }
 
@@ -177,12 +187,12 @@ function InstalledAt({ installedAt }: { installedAt?: number | null }) {
       <TooltipContent className="max-w-[260px] text-left normal-case">
         <div className="flex flex-col gap-1">
           <p>
-            <span className="text-background/55">{t("detail.installedAtLabel")}</span>
+            <span className="text-background/55">
+              {t("detail.installedAtLabel")}
+            </span>
             {installedExact}
           </p>
-          <p className="text-background/55">
-            {t("detail.installedAtHint")}
-          </p>
+          <p className="text-background/55">{t("detail.installedAtHint")}</p>
         </div>
       </TooltipContent>
     </Tooltip>
@@ -274,7 +284,22 @@ export function SkillDetailPanel({
   // skill's source was established. A shared cache entry; the store surface
   // already pays for it through the install button.
   const { data: provenanceState } = useSkillProvenance();
-  const suggestion = shown ? provenanceState?.suggestions?.[shown.name] : undefined;
+  const suggestion = shown
+    ? provenanceState?.suggestions?.[shown.name]
+    : undefined;
+
+  // The tag choice behind the installed surface's badge: the user's explicit
+  // pick, when there is one. The view's own `profile` already carries the
+  // effective classification (the installed page synthesizes the override
+  // into it), so the effective key is the choice, else the profile's leading
+  // domain, else the explicit unclassified state.
+  const { data: customTags } = useCustomTags();
+  const assignedTagKey = shown
+    ? (customTags?.skillTags[shown.name] ?? null)
+    : null;
+  const effectiveTagKey =
+    effectiveDomains({ profile: shown?.profile }, assignedTagKey)[0] ??
+    UNCLASSIFIED_DOMAIN;
 
   // Leaving the current skill (or closing the drawer) drops any edit session, so
   // the next skill never opens on a stale draft. The drawer language resets with
@@ -361,8 +386,7 @@ export function SkillDetailPanel({
       }
     };
     window.addEventListener("keydown", onKeyDownCapture, true);
-    return () =>
-      window.removeEventListener("keydown", onKeyDownCapture, true);
+    return () => window.removeEventListener("keydown", onKeyDownCapture, true);
   }, [editing]);
 
   // Editing is offered only where a writable file exists: an installed skill.
@@ -393,13 +417,21 @@ export function SkillDetailPanel({
       await saveLocalSkillMd(shown.name, draft);
       // The file changed on disk: refresh the raw cache, the displayed detail
       // and the installed list (whose description is read from the file).
-      void queryClient.invalidateQueries({ queryKey: ["skill-md-raw", shown.name] });
+      void queryClient.invalidateQueries({
+        queryKey: ["skill-md-raw", shown.name],
+      });
       void queryClient.invalidateQueries({ queryKey: ["skill-detail"] });
       await markSkillsChanged(queryClient);
       setEditing(false);
-      toast.add({ title: t("detail.saved", { name: shown.name }), type: "success" });
+      toast.add({
+        title: t("detail.saved", { name: shown.name }),
+        type: "success",
+      });
     } catch (err) {
-      toast.add({ title: errorMessage(err, t("detail.saveFailed")), type: "error" });
+      toast.add({
+        title: errorMessage(err, t("detail.saveFailed")),
+        type: "error",
+      });
     }
   };
 
@@ -449,9 +481,7 @@ export function SkillDetailPanel({
   const originalDescription = detail?.description || shown?.description || "";
   const showingTranslation =
     locale === "zh" && translated !== "" && !showOriginal;
-  const description = showingTranslation
-    ? translated
-    : originalDescription;
+  const description = showingTranslation ? translated : originalDescription;
   // The mirror-relative SKILL.md path, reused for the mirror's GitHub file
   // link and to resolve relative URLs inside the markdown body. The index
   // row carries the skill's snapshot directory, so the file's path is known
@@ -531,20 +561,39 @@ export function SkillDetailPanel({
     // The same blended popularity figure the list rows show; hover/focus
     // breaks it into installs and stars. Shown for exactly the skills whose
     // card shows it — the registry-backed ones.
-    showStats && shown ? <SkillPopularity key="installs" skill={shown} /> : null,
+    showStats && shown ? (
+      <SkillPopularity key="installs" skill={shown} />
+    ) : null,
     // Provenance reads the index row, not the fetched file, so the 源 tip
     // renders before — and without — the English SKILL.md's fetch.
     shown && !fromDisk && filePath ? (
-      <ProvenanceTip
-        key="provenance"
-        href={skillBlobUrl}
-        path={filePath}
-      />
+      <ProvenanceTip key="provenance" href={skillBlobUrl} path={filePath} />
     ) : null,
-    fromDisk && detail ? <ProvenanceTip key="local-provenance" path={detail.path} /> : null,
-    // The domain rides the meta line flattened to text (`ghost`), one quiet
-    // fact among the others rather than a chip that out-weights them.
-    shown?.profile ? (
+    fromDisk && detail ? (
+      <ProvenanceTip key="local-provenance" path={detail.path} />
+    ) : null,
+    // The classification rides the meta line flattened to text (`ghost`), one
+    // quiet fact among the others rather than a chip that out-weights them.
+    // On the installed surface it is always present — the user's tag choice,
+    // the store's classification, or the explicit unclassified state — and a
+    // press on it opens the tag picker, so there is no second affordance
+    // beside it. The store surface keeps the badge alone, and a store row
+    // nothing classified keeps showing nothing, as before.
+    !isStore && shown ? (
+      <SkillTagMenu
+        key="tag"
+        skillName={shown.name}
+        assignedKey={assignedTagKey}
+        effectiveKey={effectiveTagKey}
+        trigger={
+          <DomainBadge
+            domain={shown.profile?.domain ?? [UNCLASSIFIED_DOMAIN]}
+            variant="ghost"
+            className="px-0 py-0"
+          />
+        }
+      />
+    ) : shown?.profile ? (
       <DomainBadge
         key="domain"
         domain={shown.profile.domain}
@@ -555,7 +604,8 @@ export function SkillDetailPanel({
     // Installed skills only — the on-disk fact the registry cannot report.
     // The same guard the component applies, so an unformattable timestamp
     // leaves no separator behind.
-    shown?.installedAt != null && formatRelativeTime(shown.installedAt, locale) ? (
+    shown?.installedAt != null &&
+    formatRelativeTime(shown.installedAt, locale) ? (
       <InstalledAt key="installed-at" installedAt={shown.installedAt} />
     ) : null,
     // Token cost of the English frontmatter description — the text an agent
@@ -571,7 +621,10 @@ export function SkillDetailPanel({
               className="whitespace-nowrap"
               aria-label={t("detail.tokensHint")}
             >
-              ≈ {t("detail.tokensLabel", { count: estimateTokens(originalDescription) })}
+              ≈{" "}
+              {t("detail.tokensLabel", {
+                count: estimateTokens(originalDescription),
+              })}
             </span>
           }
         />
@@ -713,9 +766,7 @@ export function SkillDetailPanel({
               />
             </Tooltip>
           )}
-          {isStore && (
-            <SkillInstallButton skill={shown!} labeled />
-          )}
+          {isStore && <SkillInstallButton skill={shown!} labeled />}
           {!isStore && shown && <SkillEnableSwitch skill={shown} />}
           {/* Uninstalling shares that slot, and hides itself unless the skill
               is on disk — so the same drawer serves the store, a repo's list
@@ -841,7 +892,9 @@ export function SkillDetailPanel({
             ) : detailIsError ? (
               <div className="flex flex-col items-center gap-3 py-16 text-center">
                 <p className="text-[13px] leading-relaxed text-muted-foreground">
-                  {t("detail.loadFailed", { message: errorMessage(detailError) })}
+                  {t("detail.loadFailed", {
+                    message: errorMessage(detailError),
+                  })}
                   <br />
                   {t("detail.loadFailedHint")}
                 </p>

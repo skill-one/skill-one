@@ -6,10 +6,11 @@ import { Boxes, PowerOff, Users } from "lucide-react";
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
+import { useCustomTags } from "../../hooks/use-custom-tags";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
-import { setQuery } from "../../lib/list-view";
+import { consumeKeepSelection, setQuery } from "../../lib/list-view";
 import { buildSearchIndex } from "../../lib/search-index";
 import {
   installedSkillView,
@@ -65,6 +66,14 @@ const SKELETON_ROWS = 12;
 
 /** React-key identity of the pool card: skills no recorded source vouches for. */
 const LOCAL_POOL_KEY = "local";
+
+/**
+ * The tag assignments before the ledger answers: no choices yet. Module-level
+ * so the rows memo below keeps a stable identity while the query is pending —
+ * a literal `{}` inline would be a new object every render and the memo would
+ * never hit.
+ */
+const EMPTY_SKILL_TAGS: Record<string, string> = {};
 
 /** One installed skill, precomputed where the list is built. */
 interface Row {
@@ -222,6 +231,25 @@ export function InstalledPage() {
   const suggestions = provenanceState?.suggestions;
   const cut = provenanceState?.cut;
 
+  // The user taxonomy plus one tag choice per installed skill, read off the
+  // same ledger as the sources above (and refreshed by the same
+  // `markSkillsChanged`). A choice overrides the store's classification for
+  // that skill — the single select — so a hand-placed local install files
+  // where the user filed it instead of pooling under 未分类.
+  const { data: customTags, isFetching: tagsFetching } = useCustomTags();
+  const assignments = customTags?.skillTags ?? EMPTY_SKILL_TAGS;
+  // The tag state folded into one string, so any choice, new tag or removal
+  // re-answers the list and resets the reveal exactly like a scope change.
+  const tagSig = useMemo(() => {
+    const defs = (customTags?.tagDefs ?? [])
+      .map((def) => def.key)
+      .join("\u0001");
+    const picks = Object.entries(assignments)
+      .map(([name, tag]) => `${name}=${tag}`)
+      .toSorted()
+      .join("\u0001");
+    return `${defs}\u0000${picks}`;
+  }, [customTags, assignments]);
   // The registry entries behind those recorded sources, keyed by skill name:
   // the store facts an on-disk record never carries (classification, the
   // install count), so the installed list can show the store's card for
@@ -245,8 +273,11 @@ export function InstalledPage() {
   // re-answers the list by relevance, which is why the scope and the order lock
   // beside the field (see `ListToolbar`).
   const query = useListQuery("installed").trim();
-  const { scope, sort = "popularity", unit = "skill" } =
-    useDestinationView("installed");
+  const {
+    scope,
+    sort = "popularity",
+    unit = "skill",
+  } = useDestinationView("installed");
   const domain = scope ?? null;
   const isSearching = query.length > 0;
   // Open skill in the shared detail drawer, tracked by identity rather than by
@@ -258,7 +289,12 @@ export function InstalledPage() {
 
   // Anything that re-answers the list resets the detail panel: its skill may
   // not be in the new answer at all. The shape is its own answer now, so the
-  // unit joins the sort and the scope here.
+  // unit joins the sort and the scope here. Tag choices stay out of it on
+  // purpose: they are made inside the drawer, so resetting on them would
+  // close the panel over the very pick it was opened for (see below). The
+  // one caller that moves the answer with the open skill — renaming the tag
+  // the list is scoped to — says so through `keepSelection`, and that one
+  // change keeps the drawer on the skill it still lists.
   const shownAnswer = useRef(
     `${query}\u0000${domain ?? "all"}\u0000${sort}\u0000${unit}`,
   );
@@ -266,6 +302,7 @@ export function InstalledPage() {
     const answer = `${query}\u0000${domain ?? "all"}\u0000${sort}\u0000${unit}`;
     if (shownAnswer.current === answer) return;
     shownAnswer.current = answer;
+    if (consumeKeepSelection("installed")) return;
     setSelectedKey(null);
   }, [query, domain, sort, unit]);
 
@@ -300,31 +337,45 @@ export function InstalledPage() {
   // the store's facts are present exactly when the registry holds an entry.
   // While a question is live the list *is* its hits — same view, same surface,
   // relevance order and highlights instead of the whole install list.
+  //
+  // The user's tag choice is applied here, once, as the view's classification:
+  // a skill filed under a tag carries that tag as its `profile`, so the
+  // filter, the facets, the badges and the glyphs below all answer the choice
+  // through the same `domainsOf` they already read — no second code path.
   const rows = useMemo<Row[]>(() => {
+    const withTag = (skill: SkillView): SkillView => {
+      const tag = assignments[skill.name];
+      if (!tag) return skill;
+      return { ...skill, profile: { domain: [tag] } };
+    };
     if (!hits) {
       return list.map((skill) => ({
-        skill: installedSkillView(
-          skill,
-          linked,
-          storeEntries[skill.name],
-          cut?.[skill.name],
+        skill: withTag(
+          installedSkillView(
+            skill,
+            linked,
+            storeEntries[skill.name],
+            cut?.[skill.name],
+          ),
         ),
         enabled: skill.enabled,
         suggestion: suggestions?.[skill.name],
       }));
     }
     return hits.map((hit) => ({
-      skill: installedSkillView(
-        hit.doc,
-        linked,
-        storeEntries[hit.doc.name],
-        cut?.[hit.doc.name],
+      skill: withTag(
+        installedSkillView(
+          hit.doc,
+          linked,
+          storeEntries[hit.doc.name],
+          cut?.[hit.doc.name],
+        ),
       ),
       enabled: hit.doc.enabled,
       suggestion: suggestions?.[hit.doc.name],
       matched: hit.matched,
     }));
-  }, [cut, hits, list, linked, storeEntries, suggestions]);
+  }, [cut, hits, list, linked, storeEntries, suggestions, assignments]);
 
   // Linking or unlinking a source inside the detail drawer changes the
   // skill's identity (the unlinked `/name` key becomes `repo/name` and
@@ -334,7 +385,9 @@ export function InstalledPage() {
   // and the row carrying that name supplies the key's new shape. The state
   // is synced right after.
   const selectedName =
-    selectedKey == null ? null : selectedKey.slice(selectedKey.lastIndexOf("/") + 1);
+    selectedKey == null
+      ? null
+      : selectedKey.slice(selectedKey.lastIndexOf("/") + 1);
   const selectedRow = selectedName
     ? rows.find((r) => r.skill.name === selectedName)
     : undefined;
@@ -363,10 +416,7 @@ export function InstalledPage() {
     return Array.from(byRepo, ([repo, items]) => ({
       repo,
       items: items.toSorted(
-        compareByInstalledTime(
-          (row) => row.skill.installedAt,
-          byName,
-        ),
+        compareByInstalledTime((row) => row.skill.installedAt, byName),
       ),
     })).toSorted((a, b) => a.repo.localeCompare(b.repo));
   }, [rows]);
@@ -503,7 +553,7 @@ export function InstalledPage() {
     total: itemCount,
     initial: INITIAL_CARDS,
     step: CARD_CHUNK,
-    resetKey: `${unit}\u0000${sort}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}`,
+    resetKey: `${unit}\u0000${sort}\u0000${query}\u0000${domain ?? "all"}\u0000${list.length}\u0000${tagSig}`,
   });
   const shownRows = activeRows.slice(0, renderedCount);
   const shownCards = activeCards.slice(0, renderedCount);
@@ -521,9 +571,10 @@ export function InstalledPage() {
   // grows as the reader scrolls, and its badge counts what it actually holds.
   // The drawer's runs over the whole answer, because the drawer walks every skill
   // the list holds, not the prefix that happens to be on screen.
-  const splitRows = useMemo(() => splitByEnabled(shownRows, isRowEnabled), [
-    shownRows,
-  ]);
+  const splitRows = useMemo(
+    () => splitByEnabled(shownRows, isRowEnabled),
+    [shownRows],
+  );
   const splitActive = useMemo(
     () => splitByEnabled(activeRows, isRowEnabled),
     [activeRows],
@@ -573,6 +624,41 @@ export function InstalledPage() {
           ),
     [unit, splitActive, activeCards],
   );
+
+  // A tag write lands in two renders — the ledger change, then the refetched
+  // assignments — and pairing the new scope with the not-yet-reloaded choices
+  // transiently files the open skill outside the answer (a rename moves the
+  // scope first, the assignments follow). Closing the drawer over that render
+  // would unmount and remount it for a change the next render undoes, so the
+  // verdict waits: while the tags reload, the selected skill is pinned into
+  // the walk from the unscoped rows. Once the answer settles the drawer is
+  // either legitimately listed (a rename — it stays open, badge answered) or
+  // gone for good (a clear — the effect below closes it).
+  const drawerSkills = useMemo(() => {
+    if (!tagsFetching || selectedName == null) return detailSkills;
+    if (detailSkills.some((skill) => skill.name === selectedName)) {
+      return detailSkills;
+    }
+    const pinned = rows.find((row) => row.skill.name === selectedName)?.skill;
+    return pinned ? [...detailSkills, pinned] : detailSkills;
+  }, [detailSkills, rows, selectedName, tagsFetching]);
+
+  // A retag lands while the drawer is open on the skill being filed, so it
+  // must not reset the selection like a scope or sort change does: the
+  // drawer stays and its badge answers the new choice live. The one case
+  // that closes it is filing the open skill out of the answer on screen —
+  // leaving the stale key would pop the drawer back open the next time the
+  // answer contains the skill again (e.g. clearing the scope). While the
+  // tags reload the verdict waits: the render pairing a just-moved scope
+  // with not-yet-reloaded assignments is a transition, not an exit.
+  useEffect(() => {
+    if (tagsFetching) return;
+    if (selectedName == null) return;
+    const stillListed = detailSkills.some(
+      (skill) => skill.name === selectedName,
+    );
+    if (!stillListed) setSelectedKey(null);
+  }, [tagSig, detailSkills, selectedName, tagsFetching]);
 
   // The link affordance is only meaningful while the source is unknown: an
   // install the ledger placed has a repository to point at. In the skill unit
@@ -809,8 +895,7 @@ export function InstalledPage() {
             // there is more below. An absent section still reads quieter than a
             // zero-count one.
             <>
-              {splitRows.enabled.length > 0 &&
-                skillEntries(splitRows.enabled)}
+              {splitRows.enabled.length > 0 && skillEntries(splitRows.enabled)}
               {split && (
                 <CollapsibleSection
                   icon={PowerOff}
@@ -843,7 +928,7 @@ export function InstalledPage() {
           the skill. (Selection by identity is what makes that swap impossible
           in the first place — see `SkillDetailDrawer`.) */}
       <SkillDetailDrawer
-        skills={detailSkills}
+        skills={drawerSkills}
         selected={selected}
         onSelect={setSelectedKey}
         onRemoved={() => setSelectedKey(null)}

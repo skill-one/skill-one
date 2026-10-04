@@ -208,7 +208,12 @@ export function setQuery(destination: Destination, query: string): void {
     views: {
       ...state.views,
       // Absent for no question at all, exactly as the default order is absent.
-      [destination]: buildView(query === "" ? undefined : query, sort, scope, unit),
+      [destination]: buildView(
+        query === "" ? undefined : query,
+        sort,
+        scope,
+        unit,
+      ),
     },
   });
 }
@@ -268,10 +273,25 @@ export function setUnit(destination: Destination, unit: ListUnit): void {
   });
 }
 
+/**
+ * One-shot keeps: destinations whose next answer change must not reset the
+ * selection. Set only by a caller that moves the answer *with* the open
+ * skill — renaming the tag a list is scoped to follows the scope to the new
+ * key, so the skill stays listed and closing its drawer would punish the
+ * rename. Consumed (and cleared) by the next answer change, whatever it is,
+ * so a stale keep can never outlive the change it was set for.
+ */
+const keepSelectionOnce = new Set<Destination>();
+
 /** Narrow one list to a scope, or — with `null` — to every scope. */
-export function setScope(destination: Destination, scope: string | null): void {
+export function setScope(
+  destination: Destination,
+  scope: string | null,
+  opts?: { keepSelection?: boolean },
+): void {
   const { query, sort, unit, scope: current } = state.views[destination];
   if ((scope ?? undefined) === current) return;
+  if (opts?.keepSelection) keepSelectionOnce.add(destination);
   publish({
     ...state,
     views: {
@@ -281,11 +301,23 @@ export function setScope(destination: Destination, scope: string | null): void {
   });
 }
 
+/**
+ * Take a pending keep for the destination, if one was set by the scope
+ * change now being answered. Called by the page owning the selection when
+ * its answer changes; anything else leaves the token for that answer.
+ */
+export function consumeKeepSelection(destination: Destination): boolean {
+  if (!keepSelectionOnce.has(destination)) return false;
+  keepSelectionOnce.delete(destination);
+  return true;
+}
+
 /** Test hook: forget both lists, so one case cannot inherit another's. */
 export function resetListView(): void {
   for (const destination of ["store", "installed"] as const) {
     storage.removeItem(UNIT_KEY_PREFIX + destination);
     storage.removeItem(SORT_KEY_PREFIX + destination);
   }
+  keepSelectionOnce.clear();
   publish({ views: initialViews() });
 }

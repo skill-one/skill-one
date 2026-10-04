@@ -15,6 +15,13 @@
  *   and the guards that let an unchanged ranking be reused without redoing the
  *   similarity math. Persisting these keeps an app restart from re-ranking
  *   every unlinked skill.
+ * - **tag-def** — one user-defined tag: `key` plus its display `label`. The
+ *   system domains are code, not ledger lines; these are the only taxonomy
+ *   the user can extend.
+ * - **skill-tag** — one installed skill's chosen tag: skill `name` plus the
+ *   tag `key` (a system domain key or a `tag-def` key). A single override —
+ *   last one wins — that the installed list reads ahead of the store's
+ *   classification. An empty `tag` clears the choice.
  *
  * `meta.index` is the identity of the registry snapshot those pending records
  * were computed against, which makes "is this cache still good?" one
@@ -123,7 +130,40 @@ export interface PendingRecord {
 }
 
 /** One ledger line below the header: a skill is either linked or pending. */
-export type LedgerRecord = SourceRecord | PendingRecord;
+export type LedgerRecord =
+  | SourceRecord
+  | PendingRecord
+  | TagDefRecord
+  | SkillTagRecord;
+
+/**
+ * One user-defined tag: the taxonomy extension the system domains do not
+ * cover. Keyed by `key` rather than by skill name — it belongs to no skill
+ * until a `skill-tag` line points at it — and surviving skill prunes: an
+ * unused tag is still the user's taxonomy, not a stale cache.
+ */
+export interface TagDefRecord {
+  kind: "tag-def";
+  /** The tag's key: the user's trimmed label, whitespace folded to `-`. */
+  key: string;
+  /** The display name, one spelling for both locales. */
+  label: string;
+  /** The tag's mark; absent means the label's first character. */
+  emoji?: string;
+}
+
+/**
+ * One installed skill's chosen tag: the single-select override the installed
+ * list reads ahead of the store's classification. The `tag` is a system
+ * domain key or a `tag-def` key; an empty one clears the choice.
+ */
+export interface SkillTagRecord {
+  kind: "skill-tag";
+  /** The skill's name — the directory name, unique in the global directory. */
+  name: string;
+  /** The chosen tag's key. */
+  tag: string;
+}
 
 /**
  * A parsed file: the snapshot identity its caches belong to, plus one record
@@ -133,10 +173,17 @@ export type LedgerRecord = SourceRecord | PendingRecord;
  * (`IndexInfo.etag`: equal etag, equal index bytes). Absent, it costs every
  * `pending` record its validity and nothing else: a snapshot that cannot name
  * itself cannot vouch for a ranking computed against it.
+ *
+ * Tag lines ride the same file under their own maps: `tagDefs` keyed by tag
+ * key, `skillTags` as skill name → tag key. They are taxonomy, not snapshot
+ * cache, so `index` never invalidates them.
  */
 export interface ParsedLedger {
   index?: string;
-  records: Map<string, LedgerRecord>;
+  /** Source/pending records keyed by skill name; tag lines live below. */
+  records: Map<string, SourceRecord | PendingRecord>;
+  tagDefs: Map<string, TagDefRecord>;
+  skillTags: Map<string, string>;
 }
 
 /**
@@ -161,6 +208,10 @@ const SOURCE_LINK_REASONS: ReadonlySet<string> = new Set([
 function parseRecord(value: unknown): LedgerRecord | null {
   if (typeof value !== "object" || value === null) return null;
   const entry = value as Record<string, unknown>;
+  // Tag definitions belong to no skill, so they carry a `key` instead of a
+  // `name` and are checked before the name gate below.
+  if (entry.kind === "tag-def") return parseTagDef(entry);
+  if (entry.kind === "skill-tag") return parseSkillTag(entry);
   if (typeof entry.name !== "string" || entry.name.length === 0) return null;
   if (entry.kind === "source") return parseSourceRecord(entry.name, entry);
   if (entry.kind === "pending") return parsePendingRecord(entry.name, entry);
@@ -243,6 +294,32 @@ function parseCandidate(value: unknown): PersistedCandidate | null {
   return candidate;
 }
 
+/** Parse a user-defined tag; null when its key or label is unusable. */
+function parseTagDef(entry: Record<string, unknown>): TagDefRecord | null {
+  if (typeof entry.key !== "string" || typeof entry.label !== "string") {
+    return null;
+  }
+  const key = entry.key.trim();
+  const label = entry.label.trim();
+  if (key.length === 0 || label.length === 0) return null;
+  const record: TagDefRecord = { kind: "tag-def", key, label };
+  if (typeof entry.emoji === "string" && entry.emoji.trim().length > 0) {
+    record.emoji = entry.emoji.trim();
+  }
+  return record;
+}
+
+/**
+ * Parse one skill's chosen tag. An empty `tag` is the explicit clear: it
+ * parses (so the line counts as seen) and the ledger drops the assignment
+ * rather than keeping one.
+ */
+function parseSkillTag(entry: Record<string, unknown>): SkillTagRecord | null {
+  if (typeof entry.name !== "string" || entry.name.length === 0) return null;
+  if (typeof entry.tag !== "string") return null;
+  return { kind: "skill-tag", name: entry.name, tag: entry.tag.trim() };
+}
+
 /**
  * Parse raw ledger content into records keyed by name, tolerating everything a
  * missing or hand-edited file can throw at it: a line that is not JSON is
@@ -251,7 +328,11 @@ function parseCandidate(value: unknown): PersistedCandidate | null {
  * which is the pre-ledger behavior — never a broken UI.
  */
 export function parseLedger(raw: string | null | undefined): ParsedLedger {
-  const ledger: ParsedLedger = { records: new Map() };
+  const ledger: ParsedLedger = {
+    records: new Map(),
+    tagDefs: new Map(),
+    skillTags: new Map(),
+  };
   if (!raw) return ledger;
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
@@ -274,19 +355,42 @@ export function parseLedger(raw: string | null | undefined): ParsedLedger {
       continue;
     }
     const record = parseRecord(entry);
-    if (record) ledger.records.set(record.name, record);
+    if (!record) continue;
+    // Tag lines keep their own maps — and survive skill prunes — while
+    // source/pending lines stay keyed by skill name, last one winning.
+    if (record.kind === "tag-def") {
+      ledger.tagDefs.set(record.key, record);
+    } else if (record.kind === "skill-tag") {
+      if (record.tag) ledger.skillTags.set(record.name, record.tag);
+      else ledger.skillTags.delete(record.name);
+    } else {
+      ledger.records.set(record.name, record);
+    }
   }
   return ledger;
 }
 
-/** Serialize back to JSONL: the header line, then one line per record. */
+/**
+ * Serialize back to JSONL: the header line, then one line per record. Tag
+ * definitions and assignments ride the same file after the skill records,
+ * sorted for a stable diff — the parse is order-insensitive, so this order
+ * is a readability choice, not a contract.
+ */
 export function serializeLedger(
   index: string | undefined,
   records: Iterable<LedgerRecord>,
+  tagDefs?: Iterable<TagDefRecord>,
+  skillTags?: Iterable<readonly [string, string]>,
 ): string {
   const header = index ? { kind: "meta", index } : { kind: "meta" };
   let text = `${JSON.stringify(header)}\n`;
   for (const record of records) text += `${JSON.stringify(record)}\n`;
+  const defs = tagDefs ? [...tagDefs].toSorted((a, b) => a.key.localeCompare(b.key)) : [];
+  for (const def of defs) text += `${JSON.stringify(def)}\n`;
+  const tags = skillTags ? [...skillTags].toSorted(([a], [b]) => a.localeCompare(b)) : [];
+  for (const [name, tag] of tags) {
+    text += `${JSON.stringify({ kind: "skill-tag", name, tag })}\n`;
+  }
   return text;
 }
 
@@ -301,7 +405,12 @@ async function loadLedger(): Promise<ParsedLedger> {
 }
 
 async function saveLedger(ledger: ParsedLedger): Promise<void> {
-  const text = serializeLedger(ledger.index, ledger.records.values());
+  const text = serializeLedger(
+    ledger.index,
+    ledger.records.values(),
+    ledger.tagDefs.values(),
+    ledger.skillTags.entries(),
+  );
   if (isTauri()) {
     await writeProvenanceRaw(text);
     return;
@@ -478,6 +587,14 @@ export async function reconcileProvenance(
       changed = true;
     }
   }
+  // A removed skill takes its tag choice with it; the definitions stay — an
+  // unused tag is still the user's taxonomy, not a stale cache.
+  for (const name of ledger.skillTags.keys()) {
+    if (!installed.has(name)) {
+      ledger.skillTags.delete(name);
+      changed = true;
+    }
+  }
   if (changed) await saveLedger(ledger);
   const sources: Record<string, SkillProvenance> = {};
   const cut: Record<string, string[]> = {};
@@ -545,6 +662,146 @@ export async function savePendingRecords(
   }
   ledger.index = index;
   await saveLedger(ledger);
+}
+
+// ------------------------------------------------------------- custom tags
+
+/**
+ * One user-defined tag as the UI consumes it: the ledger's `tag-def` line
+ * without the `kind` discriminator.
+ */
+export interface CustomTagDef {
+  key: string;
+  label: string;
+  /** The tag's mark; absent means the label's first character. */
+  emoji?: string;
+}
+
+/**
+ * The user taxonomy plus every installed skill's choice: definitions keyed
+ * by tag key (in key order, so menus read stably) and assignments as
+ * skill name → tag key.
+ */
+export interface CustomTags {
+  tagDefs: CustomTagDef[];
+  skillTags: Record<string, string>;
+}
+
+/**
+ * Load the user taxonomy and the installed skills' tag choices. Cheap
+ * single-file read; unknown lines never fail it (see `parseLedger`).
+ */
+export async function loadCustomTags(): Promise<CustomTags> {
+  const ledger = await loadLedger();
+  const tagDefs = [...ledger.tagDefs.values()]
+    .toSorted((a, b) => a.key.localeCompare(b.key))
+    .map(({ key, label, emoji }) => ({
+      key,
+      label,
+      ...(emoji !== undefined ? { emoji } : {}),
+    }));
+  const skillTags: Record<string, string> = {};
+  for (const [name, tag] of ledger.skillTags) skillTags[name] = tag;
+  return { tagDefs, skillTags };
+}
+
+/**
+ * Define a tag (or rename the label / change the mark of the key it
+ * normalizes to). Best-effort like every ledger write. Validation
+ * (emptiness, reserved system keys, duplicates) is the caller's
+ * (`lib/custom-tags`); the ledger stores what well-formed lines carry.
+ */
+export async function saveCustomTagDef(
+  key: string,
+  label: string,
+  emoji?: string,
+): Promise<void> {
+  try {
+    const ledger = await loadLedger();
+    ledger.tagDefs.set(key, {
+      kind: "tag-def",
+      key,
+      label,
+      ...(emoji !== undefined ? { emoji } : {}),
+    });
+    await saveLedger(ledger);
+  } catch (e) {
+    console.warn("provenance: failed to save custom tag", e);
+  }
+}
+
+/**
+ * Remove a tag definition. Assignments pointing at it are dropped with it,
+ * so no skill keeps pointing at a tag that no longer exists; the skills
+ * fall back to the store's classification (or unclassified).
+ * Best-effort like every ledger write.
+ */
+export async function deleteCustomTagDef(key: string): Promise<void> {
+  try {
+    const ledger = await loadLedger();
+    let changed = ledger.tagDefs.delete(key);
+    for (const [name, tag] of ledger.skillTags) {
+      if (tag === key) {
+        ledger.skillTags.delete(name);
+        changed = true;
+      }
+    }
+    if (changed) await saveLedger(ledger);
+  } catch (e) {
+    console.warn("provenance: failed to delete custom tag", e);
+  }
+}
+
+/**
+ * Rename a tag definition, moving every assignment pointing at the old key
+ * along in the same read-modify-write pass — a rename must never orphan a
+ * choice, and split writes could leave the file between the two. The skills
+ * keep filing where the user filed them, under the new key; the list scope
+ * naming the old key is the caller's to follow (see the tag menu).
+ * Best-effort like every ledger write. A missing old key writes nothing.
+ */
+export async function renameCustomTagDef(
+  oldKey: string,
+  newKey: string,
+  label: string,
+  emoji?: string,
+): Promise<void> {
+  try {
+    const ledger = await loadLedger();
+    if (!ledger.tagDefs.has(oldKey)) return;
+    ledger.tagDefs.delete(oldKey);
+    ledger.tagDefs.set(newKey, {
+      kind: "tag-def",
+      key: newKey,
+      label,
+      ...(emoji !== undefined ? { emoji } : {}),
+    });
+    for (const [name, tag] of ledger.skillTags) {
+      if (tag === oldKey) ledger.skillTags.set(name, newKey);
+    }
+    await saveLedger(ledger);
+  } catch (e) {
+    console.warn("provenance: failed to rename custom tag", e);
+  }
+}
+
+/**
+ * Choose one installed skill's tag — a system domain key or a `tag-def`
+ * key — or clear it back to the store's classification with `null`.
+ * Best-effort like every ledger write.
+ */
+export async function setSkillTag(
+  name: string,
+  tag: string | null,
+): Promise<void> {
+  try {
+    const ledger = await loadLedger();
+    if (tag == null || tag === "") ledger.skillTags.delete(name);
+    else ledger.skillTags.set(name, tag);
+    await saveLedger(ledger);
+  } catch (e) {
+    console.warn("provenance: failed to set skill tag", e);
+  }
 }
 
 // ------------------------------------------------------- developer inspector
@@ -623,6 +880,44 @@ export function seedMockProvenance(
 export function resetMockProvenance(): void {
   if (isTauri()) return;
   storage.removeItem(BROWSER_STORAGE_KEY);
+}
+
+/**
+ * Seed the browser ledger with custom tags directly (dev server demos,
+ * tests). No-op inside Tauri, where the real file is the only source of
+ * truth.
+ */
+export function seedMockCustomTags(
+  defs: readonly { key: string; label: string; emoji?: string }[] = [],
+  assignments: Record<string, string> = {},
+): void {
+  if (isTauri()) return;
+  const records: LedgerRecord[] = [];
+  for (const { key, label, emoji } of defs) {
+    records.push({
+      kind: "tag-def",
+      key,
+      label,
+      ...(emoji !== undefined ? { emoji } : {}),
+    });
+  }
+  for (const [name, tag] of Object.entries(assignments)) {
+    records.push({ kind: "skill-tag", name, tag });
+  }
+  const existing = storage.getItem(BROWSER_STORAGE_KEY);
+  const parsed = parseLedger(existing);
+  const text = serializeLedger(
+    parsed.index,
+    parsed.records.values(),
+    [...parsed.tagDefs.values(), ...records.filter((r): r is TagDefRecord => r.kind === "tag-def")],
+    [
+      ...parsed.skillTags.entries(),
+      ...records.filter((r): r is SkillTagRecord => r.kind === "skill-tag").map(
+        (r): readonly [string, string] => [r.name, r.tag] as const,
+      ),
+    ],
+  );
+  storage.setItem(BROWSER_STORAGE_KEY, text);
 }
 
 /**

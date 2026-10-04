@@ -361,5 +361,32 @@
       "auto": "Automatic",
       "scan": "Scan"
     }
+  },
+  "tag": {
+    "title": "Choose a tag",
+    "edit": "Edit tag",
+    "editAria": "Edit tag for {{name}}",
+    "systemGroup": "System",
+    "customGroup": "Custom",
+    "newPlaceholder": "New tag…",
+    "create": "Create",
+    "clear": "Reset to default",
+    "cleared": "Tag cleared",
+    "failed": "Failed to save tag",
+    "errorEmpty": "Tag name cannot be empty",
+    "errorTooLong": "Tag name is too long (max 32 characters)",
+    "errorReserved": "Name is reserved by a system category",
+    "errorDuplicate": "Tag already exists",
+    "delete": "Delete tag",
+    "deleteAria": "Delete tag {{label}}",
+    "deleted": "Tag deleted",
+    "errorEmojiLong": "Emoji is too long (one is enough)",
+    "pickEmoji": "Pick emoji",
+    "emojiSearch": "Search emoji…",
+    "clearEmoji": "Clear emoji",
+    "rename": "Rename",
+    "renameAria": "Rename tag {{label}}",
+    "save": "Save",
+    "cancel": "Cancel"
   }
 }
