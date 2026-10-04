@@ -49,12 +49,12 @@ const DEFAULT_UNIT: ListUnit = "skill";
  * keeps the standard `max-w-sm` box the component library caps its own fields
  * at, and the slack between the two groups is the row's, to be spent on nothing.
  *
- * The shape is a **pair of toggles** rather than a menu, because it is the one
- * answer here that has exactly two values and is about the screen rather than
- * about the data: both arrangements stand on the row at once, so the reader never
- * opens anything to find out which shape they are looking at, and switching costs
- * one press. It stays open under a live search too — relevance is a ranking of
- * the same entries, not another list — so a search is read in either shape.
+  * The shape is a **row of toggles** rather than a menu, because it is the one
+  * answer here that is about the screen rather than about the data: every
+  * arrangement stands on the row at once, so the reader never
+  * opens anything to find out which shape they are looking at, and switching costs
+  * one press. It stays open under a live search too — relevance is a ranking of
+  * the same entries, not another list — so a search is read in any shape.
  * Sorting keeps its menu because an order names itself in a word and will grow a
  * fifth option; the scope keeps its own because it is a taxonomy, not a shape.
  * The shape used to be the sort's "按仓库" option, which put the arrangement
@@ -116,7 +116,10 @@ export function ListToolbar({
   // A list with nothing to scope has no picker — and a list already scoped
   // keeps it, because that picker is also how the scope is cleared.
   const scopable = facets.length > 0 || scope !== undefined;
-  const isCard = unit === "repo";
+  // Only the repository shape hides the order: a card is a repository led by
+  // its own stars, while rows and grid squares both carry the per-skill
+  // figures the order picks between.
+  const isRepo = unit === "repo";
   // One order needs no switch: the rows already display the order they read in,
   // so a menu of one would cost a press to say what the list is already saying.
   // And the cards have no order to pick: a card is a repository, led by the
@@ -124,7 +127,7 @@ export function ListToolbar({
   // cost — are figures the rows carry and the card does not. The control leaves
   // with the shape, and the order the reader picked is still there when the rows
   // come back.
-  const sortable = (sorts ?? LIST_SORTS[destination]).length > 1 && !isCard;
+  const sortable = (sorts ?? LIST_SORTS[destination]).length > 1 && !isRepo;
 
   return (
     <div className="mb-3 flex min-w-0 items-center gap-3">

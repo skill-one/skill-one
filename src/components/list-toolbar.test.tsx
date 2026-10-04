@@ -110,7 +110,7 @@ describe("ListToolbar", () => {
     await user.click(
       await screen.findByRole("menuitemradio", { name: /^开发编程/ }),
     );
-    await user.click(screen.getByRole("button", { name: "卡片" }));
+    await user.click(screen.getByRole("button", { name: "仓库" }));
 
     // A list the reader left and came back to is still scoped and shaped as they
     // left it, because the state outlives the page that set it.
@@ -120,20 +120,20 @@ describe("ListToolbar", () => {
     });
   });
 
-  it("shows both arrangements on the row, and never in a menu", () => {
+  it("shows every arrangement on the row, and never in a menu", () => {
     renderRow();
 
-    // The shape is the one answer with two values and nothing to name, so both
-    // of them stand there: no press to discover which one is on, and no popup
+    // The shape is the one answer with nothing to name, so every shape stands
+    // there: no press to discover which one is on, and no popup
     // between the reader and the arrangement they want.
-    for (const name of ["列表", "卡片"]) {
+    for (const name of ["列表", "网格", "仓库"]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
     expect(screen.getByRole("button", { name: "列表" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: "卡片" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "仓库" })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
@@ -149,7 +149,7 @@ describe("ListToolbar", () => {
     await user.click(
       await screen.findByRole("menuitemradio", { name: "安装时间" }),
     );
-    await user.click(screen.getByRole("button", { name: "卡片" }));
+    await user.click(screen.getByRole("button", { name: "仓库" }));
     await user.click(screen.getByRole("button", { name: "列表" }));
 
     // Two answers, two values: the shape is where the reader left it and so is
@@ -165,14 +165,14 @@ describe("ListToolbar", () => {
     expect(
       screen.queryByRole("button", { name: "排序方式" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "卡片" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "仓库" })).toBeInTheDocument();
   });
 
   it("takes the order control away in the card shape, and gives it back", async () => {
     const user = userEvent.setup();
     renderRow();
 
-    await user.click(screen.getByRole("button", { name: "卡片" }));
+    await user.click(screen.getByRole("button", { name: "仓库" }));
 
     // A card is a repository led by its own stars; an install clock and a token
     // cost are figures the rows carry and the card does not, so the control
@@ -186,11 +186,22 @@ describe("ListToolbar", () => {
     expect(screen.getByRole("button", { name: "排序方式" })).toBeInTheDocument();
   });
 
+  it("keeps the order control in the grid shape, which reads per skill", async () => {
+    const user = userEvent.setup();
+    renderRow();
+
+    await user.click(screen.getByRole("button", { name: "网格" }));
+
+    // Squares carry the same per-skill figures the rows do, so the order still
+    // applies — only the repository shape hides it.
+    expect(screen.getByRole("button", { name: "排序方式" })).toBeInTheDocument();
+  });
+
   it("keeps each list's own scope, shape and order to itself", async () => {
     const user = userEvent.setup();
     const { unmount } = renderRow();
 
-    await user.click(screen.getByRole("button", { name: "卡片" }));
+    await user.click(screen.getByRole("button", { name: "仓库" }));
     unmount();
     renderRow({ destination: "store", sorts: ["popularity"] });
 
@@ -260,7 +271,7 @@ describe("ListToolbar", () => {
     expect(screen.getByRole("button", { name: "排序方式" })).toBeDisabled();
     // The shape is not one of the two a search overrides, so it stays open: a
     // search is read in either arrangement.
-    expect(screen.getByRole("button", { name: "卡片" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "仓库" })).toBeEnabled();
   });
 
   it("locks the store's field until its index exists, and says why", () => {

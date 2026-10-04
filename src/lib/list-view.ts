@@ -62,13 +62,13 @@ export const LIST_SORTS: Readonly<Record<Destination, readonly ListSort[]>> = {
 };
 
 /**
- * The two shapes a list is read in — one repository card each, or one skill row
- * each. A stored choice of its own, because it is a choice about the screen and
- * not about the reading: the same rows in the same order are a different list
- * when they are cards rather than rows, and the reader is deciding which one
- * they want to look at.
+ * The three shapes a list is read in — one repository card each, one skill row
+ * each, or one compact square per skill. A stored choice of its own, because
+ * it is a choice about the screen and not about the reading: the same rows in
+ * the same order are a different list when they are cards rather than rows,
+ * and the reader is deciding which one they want to look at.
  */
-export type ListUnit = "repo" | "skill";
+export type ListUnit = "repo" | "skill" | "grid";
 
 /** One list's own reading: what it answers, in what order, in what shape, narrowed to what. */
 export interface DestinationView {
@@ -128,9 +128,9 @@ function readStoredSort(destination: Destination): ListSort | undefined {
 }
 
 function readStoredUnit(destination: Destination): ListUnit | undefined {
-  return storage.getItem(UNIT_KEY_PREFIX + destination) === "repo"
-    ? "repo"
-    : undefined;
+  const raw = storage.getItem(UNIT_KEY_PREFIX + destination);
+  // Only non-default shapes persist; unknown values read as the default.
+  return raw === "repo" || raw === "grid" ? raw : undefined;
 }
 
 function storedView(destination: Destination): DestinationView {

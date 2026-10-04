@@ -16,16 +16,20 @@ function renderToggle(
 }
 
 describe("ListUnitToggle", () => {
-  it("draws both arrangements and presses the one on screen", () => {
+  it("draws every arrangement and presses the one on screen", () => {
     renderToggle();
 
-    // The pair is the whole control: nothing to open, and the pressed half
-    // says which arrangement the list is in.
+    // Every shape stands on the row at once: nothing to open, and the pressed
+    // one says which arrangement the list is in.
     expect(screen.getByRole("button", { name: "列表" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: "卡片" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "网格" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByRole("button", { name: "仓库" })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
@@ -41,17 +45,26 @@ describe("ListUnitToggle", () => {
     const user = userEvent.setup();
     const { onChange } = renderToggle({ unit: "skill" });
 
-    await user.click(screen.getByRole("button", { name: "卡片" }));
+    await user.click(screen.getByRole("button", { name: "仓库" }));
 
     expect(onChange).toHaveBeenCalledWith("repo");
+  });
+
+  it("switches to the grid in one press", async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderToggle({ unit: "skill" });
+
+    await user.click(screen.getByRole("button", { name: "网格" }));
+
+    expect(onChange).toHaveBeenCalledWith("grid");
   });
 
   it("never leaves the list with neither arrangement", async () => {
     const user = userEvent.setup();
     const { onChange } = renderToggle({ unit: "skill" });
 
-    // A shape is chosen, not toggled off: pressing the pressed half is a no-op,
-    // so the pair can never end up with nothing pressed.
+    // A shape is chosen, not toggled off: pressing the pressed one is a no-op,
+    // so the row can never end up with nothing pressed.
     await user.click(screen.getByRole("button", { name: "列表" }));
 
     expect(onChange).not.toHaveBeenCalled();
@@ -61,7 +74,7 @@ describe("ListUnitToggle", () => {
     const user = userEvent.setup();
     const { onChange } = renderToggle({ disabled: true });
 
-    await user.click(screen.getByRole("button", { name: "卡片" }));
+    await user.click(screen.getByRole("button", { name: "仓库" }));
 
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -71,7 +84,7 @@ describe("ListUnitToggle", () => {
 
     const track = screen.getByRole("group", { name: "列表布局" });
     const pressed = screen.getByRole("button", { name: "列表" });
-    const idle = screen.getByRole("button", { name: "卡片" });
+    const idle = screen.getByRole("button", { name: "仓库" });
 
     // The same recipe the header's destinations wear (see `segmented`), and the
     // reason the two controls read as one family. The track is the muted bed and
@@ -105,10 +118,10 @@ describe("ListUnitToggle", () => {
     renderToggle();
 
     // `variant="outline"` drew a border round every half, borders included, on a
-    // pair that stands inside a track — so the unpressed halves were the
+    // run that stands inside a track — so the unpressed halves were the
     // outlined things on screen and the pressed one was a grey smudge between
     // them. The track says "one control"; the halves only fill it.
-    for (const name of ["列表", "卡片"]) {
+    for (const name of ["列表", "网格", "仓库"]) {
       expect(screen.getByRole("button", { name })).not.toHaveClass("border");
       expect(screen.getByRole("button", { name })).not.toHaveClass(
         "border-input",

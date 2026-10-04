@@ -262,13 +262,13 @@ const repoCards = (scope: ParentNode = document.body) =>
   scope.querySelectorAll('[data-slot="card"][data-repo]');
 
 /**
- * Picks the shape the store list is read in: 列表 (one row per skill) or 卡片
- * (one card per repository). The pair stands on the row itself, so this is one
+ * Picks the shape the store list is read in: 列表 (one row per skill) or 仓库
+ * (one card per repository). The shapes stand on the row itself, so this is one
  * press on a named toggle and no popup to open.
  */
 async function pickUnit(
   user: ReturnType<typeof userEvent.setup>,
-  shape: "列表" | "卡片",
+  shape: "列表" | "仓库",
 ) {
   await user.click(screen.getByRole("button", { name: shape }));
 }
@@ -427,9 +427,9 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("few");
 
-    await pickUnit(user, "卡片");
+    await pickUnit(user, "仓库");
 
-    // 卡片 is one card per repository, led by the most-starred one — however
+    // 仓库 is one card per repository, led by the most-starred one — however
     // few installs its skills claim, which is the opposite of the row order.
     await waitFor(() => expect(cardOrder()).toEqual(["star", "few"]));
     expect(repoCards()).toHaveLength(2);
@@ -441,7 +441,7 @@ describe("ExplorePage", () => {
     renderExplorePage();
     await screen.findByText("few");
 
-    await pickUnit(user, "卡片");
+    await pickUnit(user, "仓库");
 
     // The cards take the whole row each, so the figure column the row shape's
     // ordinals make is available here too — and it counts the order the reader is

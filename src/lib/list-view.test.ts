@@ -170,6 +170,28 @@ describe("list view", () => {
     expect(stored().views.installed).not.toHaveProperty("sort");
   });
 
+  it("persists the grid shape like the repository one, default excluded", async () => {
+    setUnit("store", "grid");
+    expect(getListView().views.store.unit).toBe("grid");
+    expect(window.localStorage.getItem("skill-one.listUnit.store")).toBe(
+      "grid",
+    );
+
+    setUnit("store", "skill");
+    expect(getListView().views.store).not.toHaveProperty("unit");
+    expect(window.localStorage.getItem("skill-one.listUnit.store")).toBeNull();
+
+    window.localStorage.setItem("skill-one.listUnit.store", "grid");
+    const { getListView: stored } = await freshListView();
+    expect(stored().views.store.unit).toBe("grid");
+  });
+
+  it("reads an unknown stored shape as the default", async () => {
+    window.localStorage.setItem("skill-one.listUnit.store", "masonry");
+    const { getListView: stored } = await freshListView();
+    expect(stored().views.store).not.toHaveProperty("unit");
+  });
+
   it("keeps the sort through a scope change, then forgets it on reset", () => {
     setSort("installed", "installed");
     setScope("installed", "development");

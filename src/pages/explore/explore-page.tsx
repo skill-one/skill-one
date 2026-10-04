@@ -13,6 +13,8 @@ import { byRepoRank } from "../../lib/registry/repo-rank";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
+  SKILL_GRID_LIST_CLASS,
+  SKILL_GRID_SKELETON_CLASS,
   SKILL_ROW_LIST_CLASS,
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
@@ -23,6 +25,7 @@ import { SkeletonList } from "../../components/skeleton-list";
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
 import { SearchResults } from "./search-results";
+import { SkillGridCard } from "./skill-grid-card";
 import { SkillRow } from "./skill-row";
 import { RepoCard } from "./repo-card";
 
@@ -170,11 +173,12 @@ export function ExplorePage() {
     [sectionsData],
   );
 
-  // The skill unit's browse list: the browse answer by install count, scoped
-  // to the chosen domain by membership. A search re-answers this list in
-  // relevance order inside the shared search view instead.
+  // The per-skill browse list (rows and grid squares share it): the browse
+  // answer by install count, scoped to the chosen domain by membership.
+  // A search re-answers this list in relevance order inside the shared
+  // search view instead.
   const activeSkills = useMemo(() => {
-    if (unit !== "skill") return [];
+    if (unit === "repo") return [];
     const list = selectedDomain
       ? allSkills.filter((hit) => domainsOf(hit.skill).includes(selectedDomain))
       : allSkills;
@@ -184,24 +188,24 @@ export function ExplorePage() {
   // Consecutive skills from one repository stay listed where the ranking puts
   // them: one row per skill, whatever its source.
   // The filter's facets for the current unit — repositories per domain, or
-  // skills per domain: the two units file the same data differently. Both lead
+  // skills per domain: the two readings file the same data differently. Both lead
   // with the biggest domain, ties broken by the taxonomy's own order. A skill
   // rides every domain it belongs to, and one nothing classified holds the
   // 未分类 item — as the repository unit files such a repository, and never
   // under 其他, which is the dataset's own answer.
   const facets = useMemo(() => {
-    if (unit === "skill") {
-      return domainFacets(allSkills, (hit) => domainsOf(hit.skill));
+    if (unit === "repo") {
+      return (sectionsData?.sections ?? []).map((section) => ({
+        key: section.title,
+        count: section.repos.length,
+      }));
     }
-    return (sectionsData?.sections ?? []).map((section) => ({
-      key: section.title,
-      count: section.repos.length,
-    }));
+    return domainFacets(allSkills, (hit) => domainsOf(hit.skill));
   }, [unit, allSkills, sectionsData]);
 
   // What the 全部 item counts: every repository, or every skill.
   const totalCount =
-    unit === "skill" ? allSkills.length : (sectionsData?.total ?? 0);
+    unit === "repo" ? (sectionsData?.total ?? 0) : allSkills.length;
 
   // A download failure only owns the screen while there is nothing to show;
   // with data on screen (cache / previous source) the error surfaces in the
@@ -214,9 +218,9 @@ export function ExplorePage() {
       : null;
 
   // How many entries the browse answer lists, and how many are revealed: one
-  // skill, or one repository card.
+  // skill per row or square, or one repository card.
   const itemCount =
-    unit === "skill" ? activeSkills.length : browseRepos.length;
+    unit === "repo" ? browseRepos.length : activeSkills.length;
   const renderedCount = Math.min(visibleCount, itemCount);
   const allRendered = renderedCount >= itemCount;
 
@@ -258,13 +262,16 @@ export function ExplorePage() {
   // so switching skills never replays the slide-in animation.
   const [selected, setSelected] = useState<string | null>(null);
   // The panel walks the flat skill list of the browse answer, unwrapped: the
-  // listed skills in the skill unit, and every skill of the listed repositories
-  // in the repository unit. One repository per group means no skill appears
-  // twice. A search walks inside the shared search view instead, which owns
-  // its own selection and drawer.
+  // listed skills in the per-skill shapes, and every skill of the listed
+  // repositories in the repository unit. One repository per group means no
+  // skill appears twice. A search walks inside the shared search view instead,
+  // which owns its own selection and drawer.
   const flatSkills = useMemo(() => {
-    if (unit === "skill") return activeSkills.map((hit) => hit.skill);
-    return browseRepos.flatMap((group) => group.skills.map((hit) => hit.skill));
+    if (unit === "repo")
+      return browseRepos.flatMap((group) =>
+        group.skills.map((hit) => hit.skill),
+      );
+    return activeSkills.map((hit) => hit.skill);
   }, [unit, activeSkills, browseRepos]);
   // Anything that re-answers the list resets what only described the old one:
   // the revealed depth (it belongs to the list it was revealed for) and the
@@ -354,20 +361,26 @@ export function ExplorePage() {
                 destination="store"
               />
             ) : loading ? (
-              // A viewport's worth of card- or row-shaped skeletons, per the
-              // unit: switching to this page paints its final layout instantly
-              // and real rows replace the placeholders as the index streams in
-              // (instead of an empty spin that reads as "the page never
+              // A viewport's worth of skeletons in the unit's own shape:
+              // switching to this page paints its final layout instantly
+              // and real entries replace the placeholders as the index streams
+              // in (instead of an empty spin that reads as "the page never
               // switched").
               <SkeletonList
                 rows={12}
                 listClassName={
-                  unit === "skill" ? SKILL_ROW_LIST_CLASS : REPO_LIST_CLASS
+                  unit === "repo"
+                    ? REPO_LIST_CLASS
+                    : unit === "grid"
+                      ? SKILL_GRID_LIST_CLASS
+                      : SKILL_ROW_LIST_CLASS
                 }
                 itemClassName={
-                  unit === "skill"
-                    ? SKILL_ROW_SKELETON_CLASS
-                    : REPO_CARD_SKELETON_CLASS
+                  unit === "repo"
+                    ? REPO_CARD_SKELETON_CLASS
+                    : unit === "grid"
+                      ? SKILL_GRID_SKELETON_CLASS
+                      : SKILL_ROW_SKELETON_CLASS
                 }
               />
             ) : itemCount === 0 ? (
@@ -385,26 +398,7 @@ export function ExplorePage() {
                     Streaming invalidations share the definition, so they
                     update the list in place without resetting how far it was
                     revealed. */}
-                {unit === "skill" ? (
-                  // The skill unit: one row per skill, in install order — the
-                  // same row a repository's own page lists, so a skill reads
-                  // the same wherever it is found.
-                  <ul className={SKILL_ROW_LIST_CLASS}>
-                    {activeSkills.slice(0, renderedCount).map((hit, index) => {
-                      const key = skillKey(hit.skill);
-                      return (
-                        <SkillRow
-                          key={key}
-                          skill={hit.skill}
-                          matched={hit.matched}
-                          index={index}
-                          selected={key === selected}
-                          onSelect={() => setSelected(key)}
-                        />
-                      );
-                    })}
-                  </ul>
-                ) : (
+                {unit === "repo" ? (
                   // The repository unit: one flat grid, the browse answer
                   // scoped by the domain filter, in the ranking `byRepoRank`
                   // defines — the most-starred repository first, which is the
@@ -422,6 +416,42 @@ export function ExplorePage() {
                         onOpenSkill={setSelected}
                       />
                     ))}
+                  </ul>
+                ) : unit === "grid" ? (
+                  // The grid unit: one compact square per skill, same order
+                  // as the rows so a skill reads the same in both shapes.
+                  <ul className={SKILL_GRID_LIST_CLASS}>
+                    {activeSkills.slice(0, renderedCount).map((hit) => {
+                      const key = skillKey(hit.skill);
+                      return (
+                        <SkillGridCard
+                          key={key}
+                          skill={hit.skill}
+                          matched={hit.matched}
+                          selected={key === selected}
+                          onSelect={() => setSelected(key)}
+                        />
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  // The skill unit: one row per skill, in install order — the
+                  // same row a repository's own page lists, so a skill reads
+                  // the same wherever it is found.
+                  <ul className={SKILL_ROW_LIST_CLASS}>
+                    {activeSkills.slice(0, renderedCount).map((hit, index) => {
+                      const key = skillKey(hit.skill);
+                      return (
+                        <SkillRow
+                          key={key}
+                          skill={hit.skill}
+                          matched={hit.matched}
+                          index={index}
+                          selected={key === selected}
+                          onSelect={() => setSelected(key)}
+                        />
+                      );
+                    })}
                   </ul>
                 )}
                 {/* The sentinel ends the rendered run: while it is on screen

@@ -10,6 +10,8 @@ import type { Destination, ListUnit } from "../../lib/list-view";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
+  SKILL_GRID_LIST_CLASS,
+  SKILL_GRID_SKELETON_CLASS,
   SKILL_ROW_LIST_CLASS,
   SKILL_ROW_SKELETON_CLASS,
 } from "../../lib/skill-list-layout";
@@ -20,6 +22,7 @@ import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-dr
 import { Placeholder } from "../../components/placeholder";
 import { SkeletonList } from "../../components/skeleton-list";
 import { buildLiveRepoGroups } from "./live-groups";
+import { SkillGridCard } from "./skill-grid-card";
 import { SkillRow } from "./skill-row";
 import { RepoCard } from "./repo-card";
 
@@ -251,15 +254,23 @@ export function SearchResults({
         : t("state.skillCount", { count: amount });
 
   // A skeleton of the unit's own shape, so a group that has not answered yet
-  // holds the space its rows will land in.
+  // holds the space its entries will land in.
   const skeleton = (
     <SkeletonList
       rows={3}
       listClassName={
-        unit === "skill" ? SKILL_ROW_LIST_CLASS : REPO_LIST_CLASS
+        unit === "repo"
+          ? REPO_LIST_CLASS
+          : unit === "grid"
+            ? SKILL_GRID_LIST_CLASS
+            : SKILL_ROW_LIST_CLASS
       }
       itemClassName={
-        unit === "skill" ? SKILL_ROW_SKELETON_CLASS : REPO_CARD_SKELETON_CLASS
+        unit === "repo"
+          ? REPO_CARD_SKELETON_CLASS
+          : unit === "grid"
+            ? SKILL_GRID_SKELETON_CLASS
+            : SKILL_ROW_SKELETON_CLASS
       }
     />
   );
@@ -267,23 +278,7 @@ export function SearchResults({
   // The store's grouped answer in the unit's own shape — the store list's own
   // group, and the installed list's second group, read from the same place.
   const storeAnswer = (answer: Answer) =>
-    unit === "skill" ? (
-      <ul className={SKILL_ROW_LIST_CLASS}>
-        {storeHits.map((hit, index) => {
-          const key = skillKey(hit.skill);
-          return (
-            <SkillRow
-              key={key}
-              skill={hit.skill}
-              matched={hit.matched}
-              index={index}
-              selected={isOpen(answer, key)}
-              onSelect={openRow(answer, key)}
-            />
-          );
-        })}
-      </ul>
-    ) : (
+    unit === "repo" ? (
       <ul className={REPO_LIST_CLASS}>
         {storeGroups.map((group) => (
           <RepoCard
@@ -300,6 +295,37 @@ export function SearchResults({
           />
         ))}
       </ul>
+    ) : unit === "grid" ? (
+      <ul className={SKILL_GRID_LIST_CLASS}>
+        {storeHits.map((hit) => {
+          const key = skillKey(hit.skill);
+          return (
+            <SkillGridCard
+              key={key}
+              skill={hit.skill}
+              matched={hit.matched}
+              selected={isOpen(answer, key)}
+              onSelect={openRow(answer, key)}
+            />
+          );
+        })}
+      </ul>
+    ) : (
+      <ul className={SKILL_ROW_LIST_CLASS}>
+        {storeHits.map((hit, index) => {
+          const key = skillKey(hit.skill);
+          return (
+            <SkillRow
+              key={key}
+              skill={hit.skill}
+              matched={hit.matched}
+              index={index}
+              selected={isOpen(answer, key)}
+              onSelect={openRow(answer, key)}
+            />
+          );
+        })}
+      </ul>
     );
 
   // The asking list's own answer, in the unit's own shape.
@@ -309,32 +335,7 @@ export function SearchResults({
     ) : (
       storeAnswer("own")
     )
-  ) : unit === "skill" ? (
-    <ul className={SKILL_ROW_LIST_CLASS}>
-      {installed.map((row, index) => {
-        const key = skillKey(row.skill);
-        return (
-          <SkillRow
-            key={key}
-            skill={row.skill}
-            matched={row.matched}
-            index={index}
-            // The same rows, and the same marks, as the installed list's own
-            // answer: a row numbers its position in the order the reader picked
-            // and the first three of that order wear the podium. A search narrows
-            // the list, it does not re-rank it — the order here is the installed
-            // list's order restricted to the matches, so the numbering and the
-            // podium are the ones the list itself would print.
-            selected={isOpen("own", key)}
-            muted={row.muted}
-            extra={row.extra}
-            action={row.action}
-            onSelect={openRow("own", key)}
-          />
-        );
-      })}
-    </ul>
-  ) : (
+  ) : unit === "repo" ? (
     <ul className={REPO_LIST_CLASS}>
       {installedCards.map((card) => (
         <RepoCard
@@ -365,31 +366,57 @@ export function SearchResults({
         />
       ))}
     </ul>
-  );
-
-  // The live answer, in the same shape per unit. Its rows claim nothing their
-  // source does not carry, and each opens skills.sh rather than a detail panel
-  // this app cannot fill.
-  const liveAnswer = liveSearching ? (
-    skeleton
-  ) : unit === "skill" ? (
-    <ul className={SKILL_ROW_LIST_CLASS}>
-      {liveSkills.map((skill, index) => (
-        <SkillRow
-          key={skillKey(skill)}
-          skill={skill}
-          index={index}
-          // An enumeration, not a ranking: the endpoint's
-          // relevance order is no contest to medal.
-          ranked={false}
-          matched={{ name: liveTerms }}
-          onSelect={() => {
-            if (skill.url) void openExternal(skill.url);
-          }}
-        />
-      ))}
+  ) : unit === "grid" ? (
+    <ul className={SKILL_GRID_LIST_CLASS}>
+      {installed.map((row) => {
+        const key = skillKey(row.skill);
+        return (
+          <SkillGridCard
+            key={key}
+            skill={row.skill}
+            matched={row.matched}
+            selected={isOpen("own", key)}
+            muted={row.muted}
+            extra={row.extra}
+            action={row.action}
+            onSelect={openRow("own", key)}
+          />
+        );
+      })}
     </ul>
   ) : (
+    <ul className={SKILL_ROW_LIST_CLASS}>
+      {installed.map((row, index) => {
+        const key = skillKey(row.skill);
+        return (
+          <SkillRow
+            key={key}
+            skill={row.skill}
+            matched={row.matched}
+            index={index}
+            // The same rows, and the same marks, as the installed list's own
+            // answer: a row numbers its position in the order the reader picked
+            // and the first three of that order wear the podium. A search narrows
+            // the list, it does not re-rank it — the order here is the installed
+            // list's order restricted to the matches, so the numbering and the
+            // podium are the ones the list itself would print.
+            selected={isOpen("own", key)}
+            muted={row.muted}
+            extra={row.extra}
+            action={row.action}
+            onSelect={openRow("own", key)}
+          />
+        );
+      })}
+    </ul>
+  );
+
+  // The live answer, in the same shape per unit. Its squares claim nothing
+  // their source does not carry, and each opens skills.sh rather than a
+  // detail panel this app cannot fill.
+  const liveAnswer = liveSearching ? (
+    skeleton
+  ) : unit === "repo" ? (
     <ul className={REPO_LIST_CLASS}>
       {liveRepoGroups.map((group) => (
         <RepoCard
@@ -407,6 +434,36 @@ export function SearchResults({
           onOpenSkill={(key) => {
             const live = liveSkills.find((s) => skillKey(s) === key);
             if (live?.url) void openExternal(live.url);
+          }}
+        />
+      ))}
+    </ul>
+  ) : unit === "grid" ? (
+    <ul className={SKILL_GRID_LIST_CLASS}>
+      {liveSkills.map((skill) => (
+        <SkillGridCard
+          key={skillKey(skill)}
+          skill={skill}
+          matched={{ name: liveTerms }}
+          onSelect={() => {
+            if (skill.url) void openExternal(skill.url);
+          }}
+        />
+      ))}
+    </ul>
+  ) : (
+    <ul className={SKILL_ROW_LIST_CLASS}>
+      {liveSkills.map((skill, index) => (
+        <SkillRow
+          key={skillKey(skill)}
+          skill={skill}
+          index={index}
+          // An enumeration, not a ranking: the endpoint's
+          // relevance order is no contest to medal.
+          ranked={false}
+          matched={{ name: liveTerms }}
+          onSelect={() => {
+            if (skill.url) void openExternal(skill.url);
           }}
         />
       ))}
