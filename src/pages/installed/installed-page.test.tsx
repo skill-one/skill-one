@@ -2574,8 +2574,12 @@ describe("InstalledPage", () => {
       await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
 
       // The two lists answer the same word from two different sources, so one
-      // list's question never becomes the other's (see `lib/list-view`).
-      expect(getListView().views.installed.query).toBe("pdf");
+      // list's question never becomes the other's (see `lib/list-view`). The
+      // field settles the word before asking (see `SearchInput`), so the
+      // question is a moment behind the last keystroke.
+      await waitFor(() =>
+        expect(getListView().views.installed.query).toBe("pdf"),
+      );
       expect(getListView().views.store).not.toHaveProperty("query");
     });
   });

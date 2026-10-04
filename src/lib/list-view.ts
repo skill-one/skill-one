@@ -73,10 +73,11 @@ export type ListUnit = "repo" | "skill";
 /** One list's own reading: what it answers, in what order, in what shape, narrowed to what. */
 export interface DestinationView {
   /**
-   * What the reader is looking for, raw as typed — the field is controlled by
-   * it, so the word under the cursor never lags a keystroke behind. Absent is
-   * no question: the list browses. A page debounces this into the settled query
-   * it actually answers (see `useDebouncedValue`).
+   * What the reader is looking for, as the word that has settled. The field
+   * holds the word still being written and writes it here only once the
+   * keystrokes stop (see `SearchInput`), so this is a question and never a
+   * half-word — and nothing downstream pays for a keystroke. Absent is no
+   * question: the list browses.
    */
   query?: string;
   /**
@@ -195,8 +196,9 @@ function buildView(
  * What one list is being asked for. Session-only, and per list: the store's
  * question is answered by the registry and the installed list's by this
  * machine's own records, so neither can answer the other's — which is also why
- * a question set on one list must not empty the other's field. The raw value is
- * kept as typed; the page debounces it into the query it answers with.
+ * a question set on one list must not empty the other's field. The value is the
+ * word as it settled; the field keeps the word being written to itself (see
+ * `SearchInput`).
  */
 export function setQuery(destination: Destination, query: string): void {
   const { query: current, sort, scope, unit } = state.views[destination];

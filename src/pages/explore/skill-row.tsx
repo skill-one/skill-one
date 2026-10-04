@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useAppLocale } from "../../i18n/use-language";
@@ -8,6 +8,7 @@ import {
   isInstallableSkill,
   isLiveSkill,
   skillDisplayName,
+  skillKey,
   type SkillView,
 } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
@@ -72,8 +73,18 @@ const INTERACTIVE_CLASS =
  * an installed row the same way; a skill whose entry is unknown (`storeBacked`)
  * states its source as 本地安装 and drops the figure rather than fabricating a
  * zero, exactly as the card does.
+ *
+ * **The row is memoized, and it is handed a handler rather than a closure.** A
+ * list of skills is the one surface where "re-render the page" and "re-render
+ * every row in it" are the same cost, so a row that re-renders whenever its
+ * parent does makes the list cost its own size times over — for a settled
+ * search word, a streamed index, a revealed page, a selected row. `onSelect`
+ * therefore takes the row's own key and every caller passes a handler it
+ * already had (a state setter, a shared callback) instead of building a fresh
+ * `() => open(key)` per row, which would hand every row a new prop on every
+ * render and make the memoization worth nothing.
  */
-export function SkillRow({
+export const SkillRow = memo(function SkillRow({
   skill,
   matched,
   index,
@@ -100,8 +111,11 @@ export function SkillRow({
    * skills from many repositories keeps it.
    */
   showSource?: boolean;
-  /** Opens the skill detail panel; without it the row is not a button. */
-  onSelect?: () => void;
+  /**
+   * Opens the skill detail panel, addressed by the row's own key. Without it the
+   * row is not a button.
+   */
+  onSelect?: (key: string) => void;
   /** The row's corner control; absent means the store's install button. */
   action?: ReactNode;
   /** Dimmed presentation: an installed skill that is disabled. */
@@ -129,6 +143,14 @@ export function SkillRow({
    */
   fact?: "popularity" | "installedAt" | "tokens";
 }) {
+  // The row's own identity, and the one handler it needs to answer a click with
+  // it — built here so a caller can pass a handler it already had.
+  const key = skillKey(skill);
+  const select = useMemo(
+    () => (onSelect ? () => onSelect(key) : undefined),
+    [onSelect, key],
+  );
+
   // Absent means backed: every row a collection page lists comes from the
   // registry, and the flag only ever unsets a caller with no store entry.
   const storeBacked = skill.storeBacked !== false;
@@ -149,19 +171,19 @@ export function SkillRow({
     <li className="flex flex-col">
       <Card
         size="sm"
-        role={onSelect ? "button" : undefined}
-        tabIndex={onSelect ? 0 : undefined}
-        aria-label={onSelect ? t("common.viewDetailAria", { name: skillDisplayName(skill) }) : undefined}
-        onClick={onSelect}
+        role={select ? "button" : undefined}
+        tabIndex={select ? 0 : undefined}
+        aria-label={select ? t("common.viewDetailAria", { name: skillDisplayName(skill) }) : undefined}
+        onClick={select}
         onKeyDown={(e) => {
-          if (onSelect && (e.key === "Enter" || e.key === " ")) {
+          if (select && (e.key === "Enter" || e.key === " ")) {
             e.preventDefault();
-            onSelect();
+            select();
           }
         }}
         className={cn(
           "flex-row items-center px-3",
-          onSelect && INTERACTIVE_CLASS,
+          select && INTERACTIVE_CLASS,
           selected && "border-primary ring-1 ring-primary",
           muted && "opacity-60",
         )}
@@ -270,4 +292,4 @@ export function SkillRow({
       </Card>
     </li>
   );
-}
+});

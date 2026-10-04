@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { SearchInput } from "./search-input";
@@ -15,7 +15,7 @@ function renderSearchField(
 }
 
 describe("SearchInput", () => {
-  it("hands every field value up as it stands — debouncing is the caller's", async () => {
+  it("shows every keystroke at once, and asks the list once the word settles", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     // The field is controlled by its caller, so the honest test drives it the
@@ -34,14 +34,61 @@ describe("SearchInput", () => {
       );
     }
     renderWithRouter(<Controlled />);
+    const field = screen.getByLabelText("搜索 Skill");
 
-    await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
+    await user.type(field, "pdf");
 
-    // One call per keystroke, each carrying the field as it stands — not the
-    // typed character, and not a debounced query the caller has to wait for.
-    expect(onChange).toHaveBeenCalledTimes(3);
-    expect(onChange).toHaveBeenLastCalledWith("pdf");
+    // The word under the cursor belongs to the reader and is on screen
+    // keystroke by keystroke: what the list does with it may never lag behind
+    // their own fingers.
+    expect(field).toHaveValue("pdf");
+    // The list, on the other hand, is asked about the *word* — three keystrokes
+    // are one question, and re-answering a list of hundreds of rows per
+    // character is the one cost a search field must not add.
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+    expect(onChange).toHaveBeenCalledWith("pdf");
+  });
+
+  it("asks about the word as it settled, not as it was left mid-word", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderSearchField({ onChange });
+
+    // The last word of a run is the question; the half-words before it were
+    // never answers to anything, and re-asking for each would put three round
+    // trips where one belongs.
+    await user.type(screen.getByLabelText("搜索 Skill"), "pd");
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+    expect(onChange).toHaveBeenCalledWith("pd");
+  });
+
+  it("follows a question asked from elsewhere", () => {
+    const { rerender } = renderSearchField({ value: "pdf" });
     expect(screen.getByLabelText("搜索 Skill")).toHaveValue("pdf");
+
+    // A deep link from the popover writes the shared view, and the field shows
+    // the word the list is answering: it holds the word being written, not a
+    // private draft of its own.
+    rerender(
+      <SearchInput value="excel" onChange={() => {}} label="搜索 Skill" />,
+    );
+    expect(screen.getByLabelText("搜索 Skill")).toHaveValue("excel");
+  });
+
+  it("hands the word over even if the field goes away mid-word", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { unmount } = renderSearchField({ onChange });
+
+    await user.type(screen.getByLabelText("搜索 Skill"), "pd");
+    unmount();
+
+    // The shared view outlives the page that wrote it (see `lib/list-view`), so
+    // a reader who leaves inside the settle window must not lose the question
+    // they just asked — dropping it would be the cheaper bug to fix and the
+    // more annoying one to hit.
+    expect(onChange).toHaveBeenCalledWith("pd");
   });
 
   it("shows what it searches as the hint, and lets a caller override it", () => {
@@ -59,7 +106,8 @@ describe("SearchInput", () => {
     const field = screen.getByLabelText("搜索 Skill");
     expect(field).toBeDisabled();
     fireEvent.change(field, { target: { value: "pdf" } });
-    // A locked field says nothing, so the query never leaves it.
+    // A locked field says nothing, and holds nothing either: there is nothing
+    // to search yet, so there is no word to write down.
     expect(field).toHaveValue("");
   });
 

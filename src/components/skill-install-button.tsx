@@ -10,7 +10,7 @@ import {
 } from "../lib/local-skills";
 import {
   markSkillsChanged,
-  useInstalledSkills,
+  useInstalledSkillNames,
 } from "../hooks/use-installed-skills";
 import { useSkillProvenance } from "../hooks/use-skill-provenance";
 import { cn, errorMessage } from "../lib/utils";
@@ -99,7 +99,11 @@ export function SkillInstallButton({
   // 已安装 (disabled) before any click. Sharing the "my skills" query keeps
   // store rows in sync with installs/removals done elsewhere; React Query
   // dedupes the shared key so a page of rows issues a single fetch.
-  const { data: installedSkills } = useInstalledSkills();
+  //
+  // The names come as one set for the whole list (see `useInstalledSkillNames`),
+  // so asking whether *this* row is installed is a lookup — the answer to a
+  // question a page of rows asks at once, not a scan each of them repeats.
+  const installedNames = useInstalledSkillNames();
   // The app's own install-source ledger (see lib/provenance.ts). Undefined
   // while loading and for skills installed by other tools — both degrade to
   // the name-only match below.
@@ -114,10 +118,8 @@ export function SkillInstallButton({
   const provenance = provenanceState?.linked[skill.name];
   const isInstalled =
     installState === "installed" ||
-    !!installedSkills?.some(
-      (s) =>
-        s.name === skill.name && (!provenance || provenance.repo === skill.repo),
-    );
+    (installedNames.has(skill.name) &&
+      (!provenance || provenance.repo === skill.repo));
   // Installing outranks "already on disk" (the click is in flight), and the
   // on-disk state outranks a stale local one.
   const state: InstallState = installing

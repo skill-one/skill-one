@@ -11,6 +11,39 @@ function escapeForRegExp(value: string): string {
 }
 
 /**
+ * The splitter each set of terms implies, compiled once per *term set* rather
+ * than once per row. Every row in one answer is highlighted from the same terms
+ * — the index reports the same matched words for all of them — so a page of
+ * several hundred rows was compiling the very same pattern hundreds of times
+ * over, on every render. Keyed by the pattern it compiles, so a term set that
+ * comes back (a revisited search, a re-render) costs a lookup.
+ */
+const splitters = new Map<string, RegExp>();
+
+/**
+ * How many term sets to keep. A reader's session asks a bounded number of
+ * searches, so this is generous rather than tight; it exists so that a long
+ * session cannot grow the table without end, and it resets wholesale rather
+ * than tracking ages — the terms a running app needs are the recent ones, and
+ * the next lookup rebuilds in microseconds.
+ */
+const MAX_CACHED_SPLITTERS = 64;
+
+function splitterFor(terms: readonly string[]): RegExp {
+  // Longest first: an overlapping longer term wins over a shorter one.
+  const pattern = [...new Set(terms)]
+    .toSorted((a, b) => b.length - a.length)
+    .map(escapeForRegExp)
+    .join("|");
+  const cached = splitters.get(pattern);
+  if (cached) return cached;
+  if (splitters.size >= MAX_CACHED_SPLITTERS) splitters.clear();
+  const splitter = new RegExp(`(${pattern})`, "iu");
+  splitters.set(pattern, splitter);
+  return splitter;
+}
+
+/**
  * Text with search-match highlighting: matched terms are wrapped in `<mark>`.
  * Without terms the text renders as a single node, keeping the non-search DOM
  * identical to an unhighlighted one.
@@ -29,15 +62,9 @@ export function HighlightedText({
   terms?: readonly string[];
 }) {
   if (!terms?.length) return text;
-  // Longest first: an overlapping longer term wins over a shorter one.
-  const pattern = [...new Set(terms)]
-    .toSorted((a, b) => b.length - a.length)
-    .map(escapeForRegExp)
-    .join("|");
-  const splitter = new RegExp(`(${pattern})`, "iu");
   return (
     <>
-      {text.split(splitter).map((part, i) =>
+      {text.split(splitterFor(terms)).map((part, i) =>
         i % 2 === 1 ? (
           <mark
             key={i}
