@@ -398,5 +398,21 @@
     "renameAria": "重命名标签 {{label}}",
     "save": "保存",
     "cancel": "取消"
+  },
+  "multiSelect": {
+    "selectedCount": "已选 {{count}} 项",
+    "selectAll": "全选",
+    "clearSelection": "取消",
+    "enable": "启用",
+    "disable": "停用",
+    "tag": "加标签",
+    "uninstall": "卸载",
+    "uninstallConfirmTitle": "卸载技能",
+    "uninstallConfirmDescription": "确定要卸载选中的 {{count}} 个技能吗？此操作无法撤销。",
+    "enableSuccess": "已启用 {{count}} 个技能",
+    "disableSuccess": "已停用 {{count}} 个技能",
+    "tagSuccess": "已为 {{count}} 个技能更新标签",
+    "uninstallSuccess": "已卸载 {{count}} 个技能",
+    "selectSkillAria": "选择 {{name}}"
   }
 }

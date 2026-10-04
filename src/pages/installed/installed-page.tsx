@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 import type { ParseKeys } from "i18next";
 import { Boxes, PowerOff, Users } from "lucide-react";
 
-import { useInstalledSkills } from "../../hooks/use-installed-skills";
+import { useInstalledSkills, markSkillsChanged } from "../../hooks/use-installed-skills";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useCustomTags } from "../../hooks/use-custom-tags";
@@ -14,8 +15,19 @@ import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
 import { setQuery } from "../../lib/list-view";
 import { buildSearchIndex } from "../../lib/search-index";
 import { domainsOf, taxonomyRank } from "../../lib/domain-filter";
-import { domainLabel } from "../../data/domains";
+import { DOMAINS, domainEmoji, domainLabel } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
+import { useMultiSelect } from "../../hooks/use-multi-select";
+import {
+  SelectionActionBar,
+  type SelectionTagOption,
+} from "../../components/selection-action-bar";
+import { toast } from "../../components/ui/toast";
+import {
+  removeInstalledSkills,
+  setManySkillsEnabled,
+} from "../../lib/local-skills";
+import { setManySkillTags } from "../../lib/provenance";
 import {
   installedSkillView,
   skillKey,
@@ -806,6 +818,110 @@ export function InstalledPage() {
     [rows, rowExtra],
   );
 
+  const queryClient = useQueryClient();
+  const multiSelect = useMultiSelect<string>();
+
+  const allVisibleKeys = useMemo(
+    () => rows.map((r) => skillKey(r.skill)),
+    [rows],
+  );
+
+  const availableTags = useMemo<SelectionTagOption[]>(() => {
+    const customDefs = (customTags?.tagDefs ?? []).map((def) => ({
+      key: def.key,
+      label: def.label,
+      emoji: def.emoji,
+    }));
+    const systemDefs = DOMAINS.map((dom) => ({
+      key: dom.key,
+      label: domainLabel(dom.key, locale),
+      emoji: domainEmoji([dom.key]),
+    }));
+    return [...customDefs, ...systemDefs];
+  }, [customTags, locale]);
+
+  useEffect(() => {
+    if (unit === "repo") {
+      multiSelect.clear();
+    }
+  }, [unit, multiSelect]);
+
+  const handleBulkEnable = async () => {
+    const selectedNames = multiSelect.selectedList;
+    if (selectedNames.length === 0) return;
+    try {
+      await setManySkillsEnabled(selectedNames, true);
+      await markSkillsChanged(queryClient);
+      toast.add({
+        title: t("multiSelect.enableSuccess", { count: selectedNames.length }),
+        type: "success",
+      });
+      multiSelect.clear();
+    } catch (e) {
+      toast.add({
+        title: errorMessage(e, t("action.toggleFailed")),
+        type: "error",
+      });
+    }
+  };
+
+  const handleBulkDisable = async () => {
+    const selectedNames = multiSelect.selectedList;
+    if (selectedNames.length === 0) return;
+    try {
+      await setManySkillsEnabled(selectedNames, false);
+      await markSkillsChanged(queryClient);
+      toast.add({
+        title: t("multiSelect.disableSuccess", { count: selectedNames.length }),
+        type: "success",
+      });
+      multiSelect.clear();
+    } catch (e) {
+      toast.add({
+        title: errorMessage(e, t("action.toggleFailed")),
+        type: "error",
+      });
+    }
+  };
+
+  const handleBulkTag = async (tagKey: string | null) => {
+    const selectedNames = multiSelect.selectedList;
+    if (selectedNames.length === 0) return;
+    try {
+      await setManySkillTags(selectedNames, tagKey);
+      await markSkillsChanged(queryClient);
+      toast.add({
+        title: t("multiSelect.tagSuccess", { count: selectedNames.length }),
+        type: "success",
+      });
+      multiSelect.clear();
+    } catch (e) {
+      toast.add({
+        title: errorMessage(e, t("tag.failed")),
+        type: "error",
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const selectedNames = multiSelect.selectedList;
+    if (selectedNames.length === 0) return;
+    try {
+      await removeInstalledSkills(selectedNames);
+      await markSkillsChanged(queryClient);
+      toast.add({
+        title: t("multiSelect.uninstallSuccess", { count: selectedNames.length }),
+        type: "success",
+      });
+      multiSelect.clear();
+    } catch (e) {
+      toast.add({
+        title: errorMessage(e, t("action.retry")),
+        type: "error",
+      });
+    }
+  };
+
   /**
    * One row of the skill unit. Shared by every rank section and the parked one
    * so a skill reads the same in all of them — the only thing that says which
@@ -834,6 +950,10 @@ export function InstalledPage() {
         extra={rowExtra(row, "size-5")}
         action={<SkillEnableSwitch skill={row.skill} />}
         onSelect={setSelectedKey}
+        checkable={true}
+        checked={multiSelect.isSelected(key)}
+        onCheckChange={() => multiSelect.toggle(key)}
+        selectionMode={multiSelect.isSelectionMode}
       />
     );
   };
@@ -854,6 +974,10 @@ export function InstalledPage() {
         extra={rowExtra(row, "size-4")}
         action={<SkillEnableSwitch skill={row.skill} />}
         onSelect={() => setSelectedKey(key)}
+        checkable={true}
+        checked={multiSelect.isSelected(key)}
+        onCheckChange={() => multiSelect.toggle(key)}
+        selectionMode={multiSelect.isSelectionMode}
       />
     );
   };
@@ -1036,6 +1160,20 @@ export function InstalledPage() {
         onRemoved={() => setSelectedKey(null)}
         surface="installed"
       />
+
+      {unit !== "repo" && (
+        <SelectionActionBar
+          count={multiSelect.count}
+          totalCount={allVisibleKeys.length}
+          onSelectAll={() => multiSelect.selectAll(allVisibleKeys)}
+          onClear={multiSelect.clear}
+          onEnable={handleBulkEnable}
+          onDisable={handleBulkDisable}
+          onTag={handleBulkTag}
+          availableTags={availableTags}
+          onDelete={handleBulkDelete}
+        />
+      )}
     </div>
   );
 }

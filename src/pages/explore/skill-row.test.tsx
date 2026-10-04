@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { SkillRow } from "./skill-row";
 import { RepoCard } from "./repo-card";
@@ -227,6 +228,57 @@ describe("SkillRow figure slot", () => {
     expect(screen.queryByLabelText(/^热度 /)).toBeNull();
   });
 
+  it("handles multi-selection check and row click toggling", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const onCheckChange = vi.fn();
+
+    const { rerender } = renderWithRouter(
+      <TooltipProvider>
+        <ul>
+          <SkillRow
+            skill={installed}
+            index={0}
+            checkable={true}
+            checked={false}
+            onSelect={onSelect}
+            onCheckChange={onCheckChange}
+            selectionMode={false}
+          />
+        </ul>
+      </TooltipProvider>,
+    );
+
+    const checkbox = screen.getByRole("checkbox");
+    expect(checkbox).toBeInTheDocument();
+    expect(checkbox).not.toBeChecked();
+
+    // Clicking checkbox toggles check without opening detail
+    await user.click(checkbox);
+    expect(onCheckChange).toHaveBeenCalledWith(true);
+    expect(onSelect).not.toHaveBeenCalled();
+
+    // When selectionMode is active, clicking row body toggles check
+    rerender(
+      <TooltipProvider>
+        <ul>
+          <SkillRow
+            skill={installed}
+            index={0}
+            checkable={true}
+            checked={true}
+            onSelect={onSelect}
+            onCheckChange={onCheckChange}
+            selectionMode={true}
+          />
+        </ul>
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /pdf/i }));
+    expect(onCheckChange).toHaveBeenCalledWith(false);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });
 
 describe("the ordinal mark, shared with the repository card", () => {

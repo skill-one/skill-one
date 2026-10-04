@@ -398,5 +398,21 @@
     "renameAria": "Rename tag {{label}}",
     "save": "Save",
     "cancel": "Cancel"
+  },
+  "multiSelect": {
+    "selectedCount": "{{count}} selected",
+    "selectAll": "Select all",
+    "clearSelection": "Cancel",
+    "enable": "Enable",
+    "disable": "Disable",
+    "tag": "Tag",
+    "uninstall": "Uninstall",
+    "uninstallConfirmTitle": "Uninstall Skills",
+    "uninstallConfirmDescription": "Are you sure you want to uninstall {{count}} selected skills? This action cannot be undone.",
+    "enableSuccess": "Enabled {{count}} skills",
+    "disableSuccess": "Disabled {{count}} skills",
+    "tagSuccess": "Tag updated for {{count}} skills",
+    "uninstallSuccess": "Uninstalled {{count}} skills",
+    "selectSkillAria": "Select {{name}}"
   }
 }

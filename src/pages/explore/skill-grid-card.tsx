@@ -27,6 +27,8 @@ import {
   TooltipTrigger,
 } from "../../components/ui/tooltip";
 
+import { Checkbox } from "../../components/ui/checkbox";
+
 /**
  * The lift and ring an interactive card gets on hover and focus. Same recipe
  * as `SkillRow` so a grid square and a list row animate as one family.
@@ -51,6 +53,10 @@ export function SkillGridCard({
   muted = false,
   extra,
   fact = "popularity",
+  checkable = false,
+  checked = false,
+  onCheckChange,
+  selectionMode = false,
 }: {
   /** The skill to render, from the registry or from the installed list. */
   skill: SkillView;
@@ -77,6 +83,14 @@ export function SkillGridCard({
    * by. Same contract as `SkillRow`'s `fact`.
    */
   fact?: "popularity" | "installedAt";
+  /** Whether this square can be selected in a multi-selection flow. */
+  checkable?: boolean;
+  /** Whether this square is checked in multi-selection. */
+  checked?: boolean;
+  /** Callback fired when multi-selection check state toggles. */
+  onCheckChange?: (checked: boolean) => void;
+  /** Whether multi-selection mode is active across the list/grid. */
+  selectionMode?: boolean;
 }) {
   const storeBacked = skill.storeBacked !== false;
   const [owner] = skill.repo.split("/");
@@ -85,31 +99,62 @@ export function SkillGridCard({
   const locale = useAppLocale();
   const { t } = useTranslation();
 
+  const handleCardClick = () => {
+    if (checkable && selectionMode) {
+      onCheckChange?.(!checked);
+    } else {
+      onSelect?.();
+    }
+  };
+
   return (
     <li className="flex min-w-0 flex-col">
       <Card
         size="sm"
-        role={onSelect ? "button" : undefined}
-        tabIndex={onSelect ? 0 : undefined}
+        role={onSelect || (checkable && selectionMode) ? "button" : undefined}
+        tabIndex={onSelect || (checkable && selectionMode) ? 0 : undefined}
         aria-label={
           onSelect
             ? t("common.viewDetailAria", { name: skillDisplayName(skill) })
             : undefined
         }
-        onClick={onSelect}
+        onClick={handleCardClick}
         onKeyDown={(e) => {
-          if (onSelect && (e.key === "Enter" || e.key === " ")) {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            onSelect();
+            handleCardClick();
           }
         }}
         className={cn(
-          "aspect-square p-3",
-          onSelect && INTERACTIVE_CLASS,
+          "relative group/card aspect-square p-3",
+          (onSelect || (checkable && selectionMode)) && INTERACTIVE_CLASS,
           selected && "border-primary ring-1 ring-primary",
+          checked && "border-primary ring-1 ring-primary bg-primary/5",
           muted && "opacity-60",
         )}
       >
+        {/* Floating selection checkbox: visible on card hover or when selection mode is active */}
+        {checkable && (
+          <span
+            className={cn(
+              "absolute top-2.5 right-2.5 z-10 rounded bg-background/90 p-0.5 shadow-xs transition-opacity backdrop-blur-xs",
+              selectionMode || checked
+                ? "opacity-100 pointer-events-auto"
+                : "opacity-0 pointer-events-none group-hover/card:opacity-100 group-hover/card:pointer-events-auto group-focus-within/card:opacity-100 group-focus-within/card:pointer-events-auto",
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <Checkbox
+              checked={checked}
+              onCheckedChange={(c) => onCheckChange?.(Boolean(c))}
+              aria-label={t("multiSelect.selectSkillAria", {
+                name: skillDisplayName(skill),
+              })}
+            />
+          </span>
+        )}
         {/* Name row: classification glyph plus the name, both on one line. */}
         <div className="flex min-w-0 items-center gap-1.5">
           {live ? (

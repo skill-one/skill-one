@@ -29,6 +29,8 @@ import {
   TooltipTrigger,
 } from "../../components/ui/tooltip";
 
+import { Checkbox } from "../../components/ui/checkbox";
+
 export type { SkillMatched };
 
 /**
@@ -96,6 +98,10 @@ export const SkillRow = memo(function SkillRow({
   extra,
   ranked = true,
   fact = "popularity",
+  checkable = false,
+  checked = false,
+  onCheckChange,
+  selectionMode = false,
 }: {
   /** The skill to render, from the registry or from the installed list. */
   skill: SkillView;
@@ -146,6 +152,14 @@ export const SkillRow = memo(function SkillRow({
    * zero).
    */
   fact?: "popularity" | "installedAt";
+  /** Whether this row can be selected in a multi-selection flow. */
+  checkable?: boolean;
+  /** Whether this row is checked in multi-selection. */
+  checked?: boolean;
+  /** Callback fired when multi-selection check state toggles. */
+  onCheckChange?: (checked: boolean) => void;
+  /** Whether multi-selection mode is active across the list/grid. */
+  selectionMode?: boolean;
 }) {
   // The row's own identity, and the one handler it needs to answer a click with
   // it — built here so a caller can pass a handler it already had.
@@ -171,27 +185,62 @@ export const SkillRow = memo(function SkillRow({
   const locale = useAppLocale();
   const { t } = useTranslation();
 
+  const handleCardClick = () => {
+    if (checkable && selectionMode) {
+      onCheckChange?.(!checked);
+    } else {
+      select?.();
+    }
+  };
+
   return (
     <li className="flex flex-col">
       <Card
         size="sm"
-        role={select ? "button" : undefined}
-        tabIndex={select ? 0 : undefined}
-        aria-label={select ? t("common.viewDetailAria", { name: skillDisplayName(skill) }) : undefined}
-        onClick={select}
+        role={select || (checkable && selectionMode) ? "button" : undefined}
+        tabIndex={select || (checkable && selectionMode) ? 0 : undefined}
+        aria-label={
+          select
+            ? t("common.viewDetailAria", { name: skillDisplayName(skill) })
+            : undefined
+        }
+        onClick={handleCardClick}
         onKeyDown={(e) => {
-          if (select && (e.key === "Enter" || e.key === " ")) {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            select();
+            handleCardClick();
           }
         }}
         className={cn(
-          "flex-row items-center px-3",
-          select && INTERACTIVE_CLASS,
+          "group/row flex-row items-center px-3",
+          (select || (checkable && selectionMode)) && INTERACTIVE_CLASS,
           selected && "border-primary ring-1 ring-primary",
+          checked && "border-primary ring-1 ring-primary bg-primary/5",
           muted && "opacity-60",
         )}
       >
+        {/* Floating selection checkbox: visible on row hover or when selection mode is active */}
+        {checkable && (
+          <span
+            className={cn(
+              "mr-2 -ml-0.5 flex shrink-0 items-center transition-opacity",
+              selectionMode || checked
+                ? "opacity-100 pointer-events-auto"
+                : "opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto group-focus-within/row:opacity-100 group-focus-within/row:pointer-events-auto",
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <Checkbox
+              checked={checked}
+              onCheckedChange={(c) => onCheckChange?.(Boolean(c))}
+              aria-label={t("multiSelect.selectSkillAria", {
+                name: skillDisplayName(skill),
+              })}
+            />
+          </span>
+        )}
         {/* The list's one addition: where this skill stands in the collection,
             top three medalled when the list is ranked. The box is `Ordinal`'s,
             shared with the repository card's bar so the two shapes of one list

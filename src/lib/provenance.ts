@@ -804,6 +804,26 @@ export async function setSkillTag(
   }
 }
 
+/**
+ * Assign a custom tag to multiple skills in one ledger read-write cycle.
+ */
+export async function setManySkillTags(
+  names: readonly string[],
+  tag: string | null,
+): Promise<void> {
+  try {
+    const ledger = await loadLedger();
+    for (const name of names) {
+      if (tag == null || tag === "") ledger.skillTags.delete(name);
+      else ledger.skillTags.set(name, tag);
+    }
+    await saveLedger(ledger);
+  } catch (e) {
+    console.warn("provenance: failed to set many skill tags", e);
+  }
+}
+
+
 // ------------------------------------------------------- developer inspector
 
 /**

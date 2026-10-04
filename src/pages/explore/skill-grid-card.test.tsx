@@ -129,4 +129,47 @@ describe("SkillGridCard", () => {
     expect(screen.getByTestId("extra")).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "第三方安装" })).toBeNull();
   });
+
+  it("handles multi-selection check and card click toggling", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const onCheckChange = vi.fn();
+
+    const { rerender } = renderCard(backed, {
+      checkable: true,
+      checked: false,
+      onSelect,
+      onCheckChange,
+      selectionMode: false,
+    });
+
+    const checkbox = screen.getByRole("checkbox");
+    expect(checkbox).toBeInTheDocument();
+    expect(checkbox).not.toBeChecked();
+
+    // Clicking checkbox toggles check without opening detail
+    await user.click(checkbox);
+    expect(onCheckChange).toHaveBeenCalledWith(true);
+    expect(onSelect).not.toHaveBeenCalled();
+
+    // When selectionMode is active, clicking card body toggles check
+    rerender(
+      <TooltipProvider>
+        <ul>
+          <SkillGridCard
+            skill={backed}
+            checkable={true}
+            checked={true}
+            onSelect={onSelect}
+            onCheckChange={onCheckChange}
+            selectionMode={true}
+          />
+        </ul>
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /pdf/ }));
+    expect(onCheckChange).toHaveBeenCalledWith(false);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });
