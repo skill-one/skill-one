@@ -1776,6 +1776,12 @@ describe("InstalledPage", () => {
       return screen.getByRole("region", { name: "已禁用" });
     }
 
+    /** The live group: its peer above, named the same way. It exists only while
+     *  something is parked — a whole answer is one bare list, not two sections. */
+    function liveSection(): HTMLElement {
+      return screen.getByRole("region", { name: "已启用" });
+    }
+
     /** The section's disclosure trigger — the rows below it are cards that also
      *  answer to the button role, so the trigger is named rather than "the
      *  button in there". */
@@ -1883,11 +1889,15 @@ describe("InstalledPage", () => {
       ]);
     });
 
-    it("numbers the rows straight through both groups", async () => {
-      // The ordinal is a position in the flat answer, not a position within its
-      // own group: the two parked rows keep 1 and 2 rather than restarting at 1
-      // under the section, so the number a row states is the one the sort gave
-      // it and the two halves cannot renumber each other.
+    it("numbers each group from one, so neither half carries the other's gaps", async () => {
+      // Each half is a named section, so each is numbered as the list it is. The
+      // flat order interleaves the two groups rather than laying them end to
+      // end, and under this sort the two parked installs are the two newest —
+      // the rows that would otherwise lead. Counting across the split would
+      // therefore leave the live section carrying 3…6 and hand the parked
+      // section the 1 and 2 it gave up: a live group starting at 3, followed by
+      // a parked group starting at 1, reads as one list with rows gone missing
+      // rather than as two lists.
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
@@ -1895,15 +1905,60 @@ describe("InstalledPage", () => {
       await pickSort(user, "安装时间");
 
       await waitFor(() =>
-        expect(rowOrdinalsIn(document.body)).toEqual([
-          "3",
-          "4",
-          "5",
-          "6",
-          "1",
-          "2",
-        ]),
+        expect(rowOrdinalsIn(liveSection())).toEqual(["1", "2", "3", "4"]),
       );
+      expect(rowOrdinalsIn(parkedSection())).toEqual(["1", "2"]);
+      // And in document order the run restarts at the section, so the claim does
+      // not rest on which section a row happened to be found in.
+      expect(rowOrdinalsIn(document.body)).toEqual([
+        "1",
+        "2",
+        "3",
+        "4",
+        "1",
+        "2",
+      ]);
+    });
+
+    it("leaves the live group's own run gapless under the default order too", async () => {
+      // The same claim under the order the list opens in, restated so a change to
+      // one order's comparator cannot quietly reintroduce the gaps. Here the two
+      // parked installs are not the two that lead the flat order, so counting
+      // across the split would have handed the parked group the 1 and the 3 and
+      // left holes in the live group's numbers — the exact shape this forbids.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      expect(rowOrdinalsIn(liveSection())).toEqual(["1", "2", "3", "4"]);
+      expect(rowOrdinalsIn(parkedSection())).toEqual(["1", "2"]);
+    });
+
+    it("keeps a row's number still as the reveal grows", async () => {
+      // The count runs over the *revealed* rows, so it must be a count a growing
+      // prefix cannot renumber under the reader. The split is what guarantees it:
+      // each half keeps the order it arrived in (`splitByEnabled`, pinned by
+      // "keeps each half in the order it arrived in"), so the revealed rows are
+      // a prefix of the whole group and a row numbered 2 while three rows are
+      // revealed is still numbered 2 when the fourth arrives. The mock's six
+      // installs all mount in the first chunk, so the property is asserted where
+      // it is decided rather than staged through the observer here.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      // Whatever is revealed is numbered as a plain run from 1 — no gaps, and no
+      // dependence on rows that are not mounted yet.
+      for (const section of [liveSection(), parkedSection()]) {
+        expect(rowOrdinalsIn(section)).toEqual(
+          Array.from(
+            { length: section.querySelectorAll("li").length },
+            (_, i) => String(i + 1),
+          ),
+        );
+      }
     });
 
     it("states the parked count on the section's own header", async () => {
@@ -1918,11 +1973,71 @@ describe("InstalledPage", () => {
       expect(parkedHeader()).toHaveTextContent("2 个 skill");
     });
 
+    it("names both halves, so each run of numbers reads as its own list", async () => {
+      // Each half numbers itself from 1 (the two cases above), which is only
+      // legible as two lists if both are announced. A bare list above a titled
+      // one, the second starting again at 1, reads instead as a single list that
+      // stops and restarts — which is what the live header exists to remove. Its
+      // appearance is therefore tied to the split, not to there being any live
+      // rows at all.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      // Two peers, each stating its own size: 4 live against 2 parked.
+      expect(liveSection()).toBeInTheDocument();
+      expect(
+        within(liveSection()).getByRole("button", { name: /已启用/ }),
+      ).toHaveTextContent("4 个 skill");
+      expect(parkedHeader()).toHaveTextContent("2 个 skill");
+      // The same shell for both, so the comparison a reader makes between the
+      // two headers is a comparison of like things.
+      expect(liveSection().tagName).toBe(parkedSection().tagName);
+      // The hairline separates the two halves; it does not lead the first.
+      expect(parkedSection()).toHaveClass("border-t");
+      expect(liveSection()).not.toHaveClass("border-t");
+      // Each half holds its own rows, and the split still partitions rather
+      // than re-orders: live leads the document, parked follows it.
+      expect(rowNames().slice(0, LIVE.length)).toEqual(
+        LIVE.map((name) => `查看 ${name} 详情`),
+      );
+      expect(rowNames().slice(LIVE.length)).toEqual(
+        PARKED.map((name) => `查看 ${name} 详情`),
+      );
+    });
+
+    it("folds the live half without touching the parked one", async () => {
+      // The live header brings the live fold with it, and the two folds are
+      // independent: a reader working through their enabled skills has a reason
+      // to put that half away without also hiding what they parked.
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+      const live = () =>
+        within(liveSection()).queryAllByRole("button", { name: /查看 .+ 详情/ });
+      const parked = () =>
+        within(parkedSection()).queryAllByRole("button", { name: /查看 .+ 详情/ });
+
+      expect(live()).toHaveLength(4);
+      await user.click(within(liveSection()).getByRole("button", { name: /已启用/ }));
+      expect(live()).toHaveLength(0);
+      expect(parked()).toHaveLength(2);
+
+      // And back: a fold is the reader's own, so nothing is lost by it.
+      await user.click(within(liveSection()).getByRole("button", { name: /已启用/ }));
+      expect(live()).toHaveLength(4);
+    });
+
     it("draws no section at all while nothing is parked", async () => {
       // An absent section reads quieter than a zero: with every install live the
       // list is exactly the list this page always drew. The two installs this
       // group parks are handed back, since a list with nothing parked is the
-      // only state in which the section must not appear.
+      // only state in which the section must not appear. It is the state that
+      // also settles where the live header comes from: the header exists to
+      // describe a split, so with no split there is nothing for it to describe
+      // and the live rows must not end up wrapped in one of their own.
       setMockSkillEnabled("pdf", true);
       setMockSkillEnabled("docx", true);
       const user = userEvent.setup();
@@ -1933,9 +2048,18 @@ describe("InstalledPage", () => {
       expect(
         screen.queryByRole("region", { name: "已禁用" }),
       ).not.toBeInTheDocument();
-      // One list, not two: the live rows are not wrapped in a section of their
-      // own just because the other half exists.
+      expect(
+        screen.queryByRole("region", { name: "已启用" }),
+      ).not.toBeInTheDocument();
+      // One list, not two sections: all six rows sit in the same bare list, so
+      // nothing is wrapped around either half.
       expect(rowNames()).toHaveLength(6);
+      const lists = new Set(
+        screen
+          .getAllByRole("button", { name: /查看 .+ 详情/ })
+          .map((row) => row.closest("ul")),
+      );
+      expect(lists.size).toBe(1);
     });
 
     it("folds the parked rows away and back without losing them", async () => {
