@@ -35,8 +35,8 @@ import type { LinkCandidate } from "../../lib/link-suggestions";
  * With no candidate there is nothing to offer, so the mark is a statement
  * again — the plain `ThirdPartyMark`, tooltip and all.
  *
- * It replaces what used to be two marks: the folder glyph and, beside it, an
- * amber alert triangle. The glyph already says 「装了，但说不出是谁装的」, and a
+ * It replaces what used to be two marks: the broken-chain glyph and, beside it,
+ * an amber alert triangle. The glyph already says 「装了，但说不出是谁装的」, and a
  * second icon saying so again was one mark too many in a row's facts cluster —
  * and worse, the alert was the only one of the two that did anything, which is
  * the half of it a reader would have to learn to aim at.

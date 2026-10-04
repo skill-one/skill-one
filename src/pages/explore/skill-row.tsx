@@ -253,8 +253,8 @@ export const SkillRow = memo(function SkillRow({
             drifting with the digits' width. */}
         <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
           {/* The source's face, or the third-party mark in its place: the same
-              round box at the same size, with an amber folder glyph where a
-              sourced row has a person, so the two kinds of row read apart at a
+              round box at the same size, with an amber broken-chain glyph where
+              a sourced row has a person, so the two kinds of row read apart at a
               glance. `extra` is that mark when this skill can be linked — it
               fills the slot rather than trailing it, because the affordance and
               the fact are one thing here. */}
