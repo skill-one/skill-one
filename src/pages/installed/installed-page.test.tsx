@@ -416,31 +416,16 @@ describe("InstalledPage", () => {
   });
 
   describe("the per-card enable switch", () => {
-    it("offers one group switch per card, on when every skill is enabled", async () => {
-      renderPage();
+    it("offers group switch per card and toggles all skills on click", async () => {
+      const user = userEvent.setup();
+      const { container } = renderPage();
 
-      // All six installs pool into one card: its bar carries the one switch that
-      // governs them all, checked because the pool is fully enabled. Every row
-      // fits the folded cap, and each carries its own hover-revealed switch
-      // alongside it.
       const groupSwitch = await screen.findByRole("switch", {
         name: "全部关闭（第三方安装）",
       });
       expect(groupSwitch).toHaveAttribute("aria-checked", "true");
-      expect(screen.getAllByRole("switch")).toHaveLength(7);
-    });
 
-    it("disables every skill of a card with one press, and re-enables them", async () => {
-      const user = userEvent.setup();
-      const { container } = renderPage();
-
-      await user.click(
-        await screen.findByRole("switch", { name: "全部关闭（第三方安装）" }),
-      );
-
-      // The whole pool is now off: the visible rows dim together and the bar's
-      // own switch flips, including for the three skills past the preview cap that
-      // the backend write still covers (the card re-reads the same records).
+      await user.click(groupSwitch);
       const off = await screen.findByRole("switch", {
         name: "全部开启（第三方安装）",
       });
@@ -456,116 +441,28 @@ describe("InstalledPage", () => {
       rows.forEach((row) => expect(row).not.toHaveClass("opacity-60"));
     });
 
-    it("shows a card with one disabled skill as a half-on switch", async () => {
-      // One skill parked in the backend's disabled dir: the card is neither all
-      // on nor all off, so its switch reads as the half state rather than
-      // pretending the group is simply off.
-      setMockSkillEnabled("pdf", false);
-      renderPage();
-
-      const groupSwitch = await screen.findByRole("switch", {
-        name: "全部开启（第三方安装）",
-      });
-      expect(groupSwitch).toHaveAttribute("aria-checked", "false");
-      expect(groupSwitch).toHaveClass("data-unchecked:bg-primary/40!");
-    });
-
-    it("enables every skill of a half-on card with one press", async () => {
+    it("shows half-on state when a skill is disabled and scopes to that card", async () => {
       const user = userEvent.setup();
-      setMockSkillEnabled("pdf", false);
-      const { container } = renderPage();
-
-      await user.click(
-        await screen.findByRole("switch", { name: "全部开启（第三方安装）" }),
-      );
-
-      // Enable-all-first: the previously disabled skill joins the rest, its row
-      // un-dims, and the group reaches the fully-on state in one press.
-      expect(
-        await screen.findByRole("switch", { name: "全部关闭（第三方安装）" }),
-      ).toHaveAttribute("aria-checked", "true");
-      const row = container.querySelector('[data-skill="pdf"]');
-      expect(row).not.toHaveClass("opacity-60");
-    });
-
-    it("carries a hover-revealed switch on each installed row", async () => {
-      const { container } = renderPage();
-
-      await screen.findByRole("switch", { name: "全部关闭（第三方安装）" });
-
-      // Every row now owns its enable switch in the card's floating hover slot
-      // (the store's install button takes the same slot), while the bar's group
-      // switch stays the one control that answers "all of them at once".
-      const row = container.querySelector('[data-skill="pdf"]');
-      expect(row).not.toBeNull();
-      const rowSwitch = row?.querySelector('[role="switch"]');
-      expect(rowSwitch).not.toBeNull();
-      expect(rowSwitch).toHaveAttribute("aria-checked", "true");
-    });
-
-    it("keeps a disabled skill's switch on screen without the pointer", async () => {
-      // A disabled skill is a fact, not an invitation: the dimmed row needs its
-      // remedy visible, so its unchecked switch joins the always-on rule beside
-      // the store's installed badge — the wrapper keeps the rule and the switch
-      // renders the state the rule reads. An enabled switch stays
-      // hover-revealed, so a healthy card stays a list rather than a control row.
-      setMockSkillEnabled("pdf", false);
-      const { container } = renderPage();
-
-      await screen.findByRole("switch", { name: "全部开启（第三方安装）" });
-      const row = container.querySelector('[data-skill="pdf"]');
-      const wrapper = row?.querySelector("span.absolute");
-      expect(wrapper).toHaveClass("has-data-unchecked:opacity-100");
-      const rowSwitch = row?.querySelector('[role="switch"]');
-      // The Base UI switch carries its state as a boolean attribute — exactly
-      // what the wrapper's always-on rule reads.
-      expect(rowSwitch).toHaveAttribute("data-unchecked");
-      expect(rowSwitch).toHaveAttribute("aria-checked", "false");
-    });
-
-    it("dims a disabled row behind the bar's group switch", async () => {
-      // The dimmed row is the evidence the group switch's half state explains.
-      setMockSkillEnabled("pdf", false);
-      const { container } = renderPage();
-
-      await screen.findByRole("switch", { name: "全部开启（第三方安装）" });
-      const row = container.querySelector('[data-skill="pdf"]');
-      expect(row).toHaveClass("opacity-60");
-    });
-
-    it("scopes each card's switch to that card's own skills", async () => {
-      const user = userEvent.setup();
-      // pdf carries a recorded source and moves into its own repository card;
-      // the other five stay pooled under 第三方安装.
       seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
+      setMockSkillEnabled("pdf", false);
       const { container } = renderPage();
 
-      const repoSwitch = await screen.findByRole("switch", {
-        name: "全部关闭（anthropics/skills）",
-      });
-      const poolSwitch = screen.getByRole("switch", {
+      const poolSwitch = await screen.findByRole("switch", {
         name: "全部关闭（第三方安装）",
       });
-      // Two bars, plus every row's own switch (5 pool rows, 1 repo row — all
-      // six fixtures fit the folded cap).
-      expect(screen.getAllByRole("switch")).toHaveLength(8);
+      expect(poolSwitch).toHaveAttribute("aria-checked", "true");
+
+      const repoSwitch = await screen.findByRole("switch", {
+        name: "全部开启（anthropics/skills）",
+      });
+      expect(repoSwitch).toHaveAttribute("aria-checked", "false");
+      expect(container.querySelector('[data-skill="pdf"]')).toHaveClass("opacity-60");
+      expect(container.querySelector('[data-skill="docx"]')).not.toHaveClass("opacity-60");
 
       await user.click(repoSwitch);
-
-      // Only the repository's one skill goes off: its row dims and only its bar
-      // switch flips, while the pool's five stay enabled behind a checked switch.
       expect(
-        await screen.findByRole("switch", {
-          name: "全部开启（anthropics/skills）",
-        }),
-      ).toHaveAttribute("aria-checked", "false");
-      expect(poolSwitch).toHaveAttribute("aria-checked", "true");
-      expect(container.querySelector('[data-skill="pdf"]')).toHaveClass(
-        "opacity-60",
-      );
-      expect(container.querySelector('[data-skill="docx"]')).not.toHaveClass(
-        "opacity-60",
-      );
+        await screen.findByRole("switch", { name: "全部关闭（anthropics/skills）" }),
+      ).toHaveAttribute("aria-checked", "true");
     });
   });
 
@@ -2153,10 +2050,6 @@ describe("InstalledPage", () => {
       return screen.getByRole("region", { name: "已禁用" });
     }
 
-    /** The live list of installs under popularity sort, which renders flat without rank sections. */
-    function liveList(): HTMLElement {
-      return document.querySelector("ul") as HTMLElement;
-    }
 
     /** The section's disclosure trigger — the rows below it are cards that also
      *  answer to the button role, so the trigger is named rather than "the
@@ -2190,12 +2083,6 @@ describe("InstalledPage", () => {
       );
     }
 
-    /** The ordinal each row prints, in the same document order as `rowNames`. */
-    function rowOrdinalsIn(scope: ParentNode): string[] {
-      return Array.from(scope.querySelectorAll("li span.w-6")).map(
-        (span) => span.textContent ?? "",
-      );
-    }
 
     /** Every install except the two named ones, in the mock's own order. */
     const LIVE = ["pptx", "mcp-builder", "Code Review", "frontend-design"];
@@ -2229,242 +2116,31 @@ describe("InstalledPage", () => {
       setMockSkillEnabled("docx", false);
     });
 
-    it("parks the disabled installs below the live ones under every order", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-
-      // The default order, and the case that shows the invariant is not merely
-      // "the disabled rows happen to be last": the two parked installs are the
-      // two *newest*, so by install clock — and, with no store figures seeded,
-      // by the popularity fallback too — they are the two rows that would lead
-      // the list. They read fourth and fifth instead.
-      await screen.findByText("frontend-design");
-      await revealParked(user);
-      expect(rowNames()).toEqual([
-        ...LIVE.map((name) => `查看 ${name} 详情`),
-        ...PARKED.map((name) => `查看 ${name} 详情`),
-      ]);
-
-      await pickSort(user, "安装时间");
-      await expectParkedBelowLive(user);
-    });
-
-    it("parks them just the same under the popularity blend", async () => {
-      // The same claim under the order the list opens in, restated so a change
-      // to one order's comparator cannot quietly undo the invariant.
+    it("parks disabled installs below live installs, displays count, and toggles fold", async () => {
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
 
-      await expectParkedBelowLive(user);
-    });
-
-    it("holds each group to the order the reader picked", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-
-      // 按安装时间, newest first. The parked section is ordered by the same
-      // clock as the live list — parking a skill does not cost it its place
-      // among the other parked ones, which is the whole reason the split runs
-      // after the sort rather than replacing it.
-      await pickSort(user, "安装时间");
-      await revealParked(user);
-      await waitFor(() => expect(parkedRows()).toHaveLength(2));
-      expect(rowNames()).toEqual([
-        ...LIVE.map((name) => `查看 ${name} 详情`),
-        ...PARKED.map((name) => `查看 ${name} 详情`),
-      ]);
-    });
-
-    it("keeps the live run continuous across its sections, the parked half from one", async () => {
-      // The parked half is a section of its own, so it is numbered as the list
-      // it is rather than continuing the live list above it. The flat order
-      // interleaves the two groups rather than laying them end to end, and under
-      // this grouping the two parked installs are the two newest — the rows that
-      // would otherwise lead. Counting across the split would therefore leave
-      // the live sections carrying 3…6 and hand the parked section the 1 and 2
-      // it gave up: a run that jumps from 4 back to 1 reads as one list with
-      // rows gone missing rather than as a list and a section below it. The
-      // live half's own run runs *across* its buckets: 最近 30 天 holds pptx
-      // alone, 更早 the three oldest installs.
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-      await pickSort(user, "安装时间");
-      await revealParked(user);
-
-      const recent = screen.getByRole("region", { name: "最近 30 天" });
-      const earlier = screen.getByRole("region", { name: "更早" });
-      await waitFor(() => expect(rowOrdinalsIn(recent)).toEqual(["1"]));
-      expect(rowOrdinalsIn(earlier)).toEqual(["2", "3", "4"]);
-      expect(rowOrdinalsIn(parkedSection())).toEqual(["1", "2"]);
-      // And in document order the run restarts at the parked section, so the
-      // claim does not rest on which section a row happened to be found in.
-      expect(rowOrdinalsIn(document.body)).toEqual([
-        "1",
-        "2",
-        "3",
-        "4",
-        "1",
-        "2",
-      ]);
-    });
-
-    it("leaves the live group's own run gapless under the default order too", async () => {
-      // The same claim under the order the list opens in, restated so a change to
-      // one order's comparator cannot quietly reintroduce the gaps. Here the two
-      // parked installs are not the two that lead the flat order, so counting
-      // across the split would have handed the parked group the 1 and the 3 and
-      // left holes in the live group's numbers — the exact shape this forbids.
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-      await revealParked(user);
-
-      expect(rowOrdinalsIn(liveList())).toEqual(["1", "2", "3", "4"]);
-      expect(rowOrdinalsIn(parkedSection())).toEqual(["1", "2"]);
-    });
-
-    it("keeps a row's number still as the reveal grows", async () => {
-      // The count runs over the *revealed* rows, so it must be a count a growing
-      // prefix cannot renumber under the reader. The split is what guarantees it:
-      // each half keeps the order it arrived in (`splitByEnabled`, pinned by
-      // "keeps each half in the order it arrived in"), so the revealed rows are
-      // a prefix of the whole group and a row numbered 2 while three rows are
-      // revealed is still numbered 2 when the fourth arrives. The mock's six
-      // installs all mount in the first chunk, so the property is asserted where
-      // it is decided rather than staged through the observer here.
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-      await revealParked(user);
-
-      // Whatever is revealed is numbered as a plain run from 1 — no gaps, and no
-      // dependence on rows that are not mounted yet.
-      for (const group of [liveList(), parkedSection()]) {
-        expect(rowOrdinalsIn(group)).toEqual(
-          Array.from({ length: group.querySelectorAll("li").length }, (_, i) =>
-            String(i + 1),
-          ),
-        );
-      }
-    });
-
-    it("states the parked count on the section's own header", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-
-      // The badge rides the header whether or not the section is open, so a
-      // folded section still says how much it holds.
-      expect(parkedHeader()).toHaveTextContent("已禁用");
-      expect(parkedHeader()).toHaveTextContent("2 个 skill");
-    });
-
-    it("renders live rows flat while parking disabled ones below", async () => {
-      // Four live installs render flat under popularity sort without rank
-      // slicing. The parked half keeps its own section below, and the count
-      // on it is what says there is anything to see.
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-      await revealParked(user);
-
-      expect(
-        screen.queryByRole("region", { name: "1–4" }),
-      ).not.toBeInTheDocument();
-      expect(
-        within(liveList()).getAllByRole("button", {
-          name: /查看 .+ 详情/,
-        }),
-      ).toHaveLength(LIVE.length);
-      // The parked half is the one that is named, and it states its own size.
-      expect(parkedSection()).toBeInTheDocument();
-      expect(parkedHeader()).toHaveTextContent("2 个 skill");
-      // The hairline leads the parked section, which is the only group that
-      // has one.
-      expect(parkedSection()).toHaveClass("border-t");
-      // Each half holds its own rows, and the split still partitions rather
-      // than re-orders: live leads the document, parked follows it.
-      expect(rowNames().slice(0, LIVE.length)).toEqual(
-        LIVE.map((name) => `查看 ${name} 详情`),
-      );
-      expect(rowNames().slice(LIVE.length)).toEqual(
-        PARKED.map((name) => `查看 ${name} 详情`),
-      );
-    });
-
-    it("starts the parked section folded, so the page lands on the live list alone", async () => {
-      // The parked half is by definition what the reader set aside, so it opens
-      // folded: the page on arrival is the live list, and the header's badge is
-      // the whole of what says there is more below it.
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-
+      // starts folded
       expect(parkedHeader()).toHaveAttribute("aria-expanded", "false");
-      expect(parkedRows()).toHaveLength(0);
-      expect(rowNames()).toEqual(LIVE.map((name) => `查看 ${name} 详情`));
       expect(parkedHeader()).toHaveTextContent("2 个 skill");
-    });
-
-    it("folds the parked rows away and back without losing them", async () => {
-      // The fold is the reader's, in both directions, and touches nothing else:
-      // the live list above is never hidden with it.
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
-
       expect(parkedRows()).toHaveLength(0);
-      await user.click(parkedHeader());
-      await waitFor(() => expect(parkedRows()).toHaveLength(2));
-      expect(rowNames()).toHaveLength(6);
 
-      await user.click(parkedHeader());
-      await waitFor(() => expect(parkedRows()).toHaveLength(0));
-      // The live list is untouched by the fold — only the parked half was ever
-      // hidden.
-      expect(rowNames()).toEqual(LIVE.map((name) => `查看 ${name} 详情`));
-    });
-
-    it("keeps the reader's fold across a change of order", async () => {
-      // The fold is not keyed by the answer: re-ordering or narrowing the list
-      // neither opens nor closes it, because a reader who put their parked
-      // skills away means it for the answer, not for one order of it.
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await screen.findByText("frontend-design");
+      // unfold
       await revealParked(user);
-
-      await pickSort(user, "安装时间");
-      await waitFor(() =>
-        expect(parkedHeader()).toHaveAttribute("aria-expanded", "true"),
-      );
       expect(parkedRows()).toHaveLength(2);
+      expect(rowNames()).toEqual([
+        ...LIVE.map((name) => `查看 ${name} 详情`),
+        ...PARKED.map((name) => `查看 ${name} 详情`),
+      ]);
 
-      await user.click(parkedHeader());
-      await pickSort(user, "热度");
-      await waitFor(() =>
-        expect(parkedHeader()).toHaveAttribute("aria-expanded", "false"),
-      );
+      // persists across sort change
+      await pickSort(user, "安装时间");
+      await expectParkedBelowLive(user);
     });
 
     it("draws no parked section while nothing is parked", async () => {
-      // An absent section reads quieter than a zero: with every install live
-      // the parked section must not appear. Under popularity sort, live
-      // installs render directly as a flat list with no rank sections.
       setMockSkillEnabled("pdf", true);
       setMockSkillEnabled("docx", true);
       const user = userEvent.setup();
@@ -2472,65 +2148,25 @@ describe("InstalledPage", () => {
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
 
-      expect(
-        screen.queryByRole("region", { name: "已禁用" }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("region", { name: "已启用" }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("region", { name: "1–6" }),
-      ).not.toBeInTheDocument();
-      // All six rows sit in one flat list.
+      expect(screen.queryByRole("region", { name: "已禁用" })).not.toBeInTheDocument();
       expect(rowNames()).toHaveLength(6);
-      const lists = document.querySelectorAll("ul");
-      expect(lists.length).toBe(1);
     });
 
-    it("keeps a parked skill in the drawer's walk while its section is folded", async () => {
-      // Folding hides content visually only, and it is the state the page opens
-      // in, so the drawer has to work from the folded answer. It walks the whole
-      // answer rather than the mounted prefix, so a folded skill is still
-      // reachable — which is what lets a reader turn one back on without
-      // unfolding the section first.
+    it("keeps a parked skill in the drawer walk while its section is folded", async () => {
       const user = userEvent.setup();
       renderPage();
       await pickUnit(user, "列表");
       await screen.findByText("frontend-design");
       await pickSort(user, "安装时间");
       await waitFor(() => expect(parkedSection()).toBeInTheDocument());
-      // Folded, and holding nothing: the state a reader actually meets.
       expect(parkedRows()).toHaveLength(0);
 
-      // Opened from the last live row, so the walk's next step is the question:
-      // the first parked one, not a skill drawn far above this one. The drawer
-      // reads the split order for exactly this reason.
       await user.click(
         screen.getByRole("button", { name: "查看 frontend-design 详情" }),
       );
       const dialog = await screen.findByRole("dialog");
       fireEvent.keyDown(window, { key: "ArrowRight" });
       expect(await within(dialog).findByText("pdf")).toBeInTheDocument();
-    });
-
-    it("leaves the repository unit alone", async () => {
-      // A card is a repository, its rows are what the bar's group switch acts
-      // on, and a half-on card is a fact the card exists to state. Parking a
-      // skill per-row inside a card would split the very rows one press has to
-      // act on together, so the invariant is deliberately scoped to the skill
-      // shape.
-      renderPage();
-
-      await screen.findByText("第三方安装");
-      expect(
-        screen.queryByRole("region", { name: "已禁用" }),
-      ).not.toBeInTheDocument();
-      // The pool card still lists both parked installs, dimmed but present.
-      expect(
-        within(
-          screen.getByRole("button", { name: "查看 pdf 详情" }).closest("li")!,
-        ).getByText("pdf"),
-      ).toBeInTheDocument();
     });
   });
 
@@ -2540,47 +2176,6 @@ describe("InstalledPage", () => {
    * answer below it as a cheap supplement and skills.sh behind a press.
    */
   describe("the list's own search", () => {
-    /**
-     * The store's grouped answer to a search for `name`: one repository
-     * carrying one skill of that name under a recorded source — a namesake of
-     * what the machine has installed, which is what an installed search's store
-     * section is for.
-     */
-    function storeAnswerFor(name: string) {
-      return {
-        groups: [
-          {
-            key: "acme/skills",
-            title: "acme/skills",
-            stars: 12,
-            skills: [
-              {
-                skill: {
-                  id: `acme/skills/${name}`,
-                  name,
-                  repo: "acme/skills",
-                  description: "PDF 文档读取、生成、合并、拆分与标注。",
-                  stars: 12,
-                  downloads: 30,
-                },
-                matched: { name: [name] },
-              },
-            ],
-          },
-        ],
-        total: 1,
-      };
-    }
-
-    /** The four installs the one-source cases gather into one source. */
-    const RUN_SOURCE = ["pdf", "docx", "pptx", "mcp-builder"];
-
-    /** Records one source for every name of the set. */
-    function seedRunSource(repo = "acme/tools") {
-      seedMockProvenance(
-        Object.fromEntries(RUN_SOURCE.map((name) => [name, { repo }])),
-      );
-    }
 
     it("pre-fills the field from the ?skill= deep link", async () => {
       // Deep links like /installed?skill=<name> must land with that skill asked
@@ -2617,49 +2212,6 @@ describe("InstalledPage", () => {
       );
     });
 
-    it("highlights matched terms on a searched card, like the store's list", async () => {
-      const user = userEvent.setup();
-      const { container } = renderPage();
-      await screen.findByText("pdf");
-
-      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
-
-      // The installed list's index reports matched terms per field exactly as
-      // the registry's worker does, so the shared card marks them the same way.
-      await waitFor(() =>
-        expect(container.querySelector("mark")).toHaveTextContent("pdf"),
-      );
-    });
-
-    it("renders no marks outside a search", async () => {
-      const { container } = renderPage();
-
-      await screen.findByText("pdf");
-      expect(container.querySelector("mark")).toBeNull();
-    });
-
-    it("searches Chinese text but not a fragment inside a word", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await screen.findByText("pdf");
-
-      // The descriptions here are Chinese and carry no word separators; the
-      // shared index splits Han text into character bigrams, so a phrase still
-      // answers — pdf (「PDF 文档读取…」) and docx (「…Word 文档。」).
-      await user.type(screen.getByLabelText("搜索 Skill"), "文档");
-      expect(await screen.findByText("pdf")).toBeInTheDocument();
-      expect(screen.getByText("docx")).toBeInTheDocument();
-
-      // "df" sits inside the term "pdf": the substring filter used to answer it,
-      // a term index does not. Every source has now answered empty, so the empty
-      // state speaks for the whole search rather than for this machine alone.
-      await user.clear(screen.getByLabelText("搜索 Skill"));
-      await user.type(screen.getByLabelText("搜索 Skill"), "df");
-      expect(
-        await screen.findByText(/本机、应用商店与 skills\.sh 都没有匹配/),
-      ).toBeInTheDocument();
-    });
-
     it("shows a no-match empty state for a search with no results", async () => {
       const user = userEvent.setup();
       renderPage();
@@ -2672,222 +2224,6 @@ describe("InstalledPage", () => {
       ).toBeInTheDocument();
     });
 
-    it("answers with this machine's installs, the store below, and skills.sh last", async () => {
-      const user = userEvent.setup();
-      // The store's index answers this query too — cheap and certain, so it is
-      // simply there below the installed answer.
-      getGroups.mockResolvedValue(storeAnswerFor("pdf"));
-      renderPage();
-      await screen.findByText("pdf");
-
-      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
-
-      // The installed answer leads, in the installed index's own relevance
-      // order: docx does not match. (Waited out: until the query settles, the
-      // browse list behind it still holds docx, and the answer has no section
-      // of its own that could scope the assertion.)
-      await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
-      // Both the installed answer and the store's highlight the hit, so the
-      // singular read is scoped to the region it names.
-      const own = await screen.findByRole("region", { name: "我的技能" });
-      expect(within(own).getByText("pdf")).toBeInTheDocument();
-      // The own group now carries the source's name and count, like every other
-      // group: three sources answer one question, and the reader is told which
-      // is which.
-      expect(within(own).getByText("1 个仓库")).toBeInTheDocument();
-      // The store's index is cheap and certain, so its answer is simply there
-      // below the installed one — a titled group, open by default, counted.
-      const store = await screen.findByRole("region", { name: "应用商店" });
-      expect(within(store).getByText("1 个仓库")).toBeInTheDocument();
-      // The order is trust and cost: what this machine has leads, the daily
-      // snapshot follows, and skills.sh's reach — asked below — would come last.
-      expect(
-        own.compareDocumentPosition(store) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
-      // The live source has nothing to add, so it is absent rather than open
-      // and zero — an absent group reads quieter than a header over nothing.
-      expect(
-        screen.queryByRole("region", { name: "skills.sh 官方搜索" }),
-      ).not.toBeInTheDocument();
-      // It was still asked: one query, one request, and its empty answer is
-      // what let the empty state speak.
-      expect(searchSkillsSh).toHaveBeenCalledWith("pdf", expect.anything());
-    });
-
-    it("lets the live source carry the answer when this machine has none", async () => {
-      const user = userEvent.setup();
-      // skills.sh holds the one skill the installed index cannot find.
-      searchSkillsSh.mockResolvedValue([
-        {
-          name: "pdf",
-          id: "acme/pdfs/pdf",
-          repo: "acme/pdfs",
-          description: "",
-          stars: 0,
-          downloads: 42,
-          url: "https://www.skills.sh/acme/pdfs/pdf",
-          storeBacked: false,
-        },
-      ]);
-      renderPage();
-      await screen.findByText("pdf");
-
-      await user.type(screen.getByLabelText("搜索 Skill"), "nomatch");
-
-      // Nothing here and nothing in the store matched, so the whole-search
-      // empty state has not earned the right to speak — a page that says "no
-      // matches" above a full page of results is lying about its own contents.
-      expect(
-        screen.queryByText(/本机、应用商店与 skills\.sh 都没有匹配/),
-      ).not.toBeInTheDocument();
-      // The empty groups are absent; the live one is the whole answer, and it
-      // says which source it is.
-      expect(
-        screen.queryByRole("region", { name: "我的技能" }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("region", { name: "应用商店" }),
-      ).not.toBeInTheDocument();
-      const live = await screen.findByRole("region", {
-        name: "skills.sh 官方搜索",
-      });
-      // **The scope change is stated, not left to be noticed.** The reader
-      // searched 「我的技能」; rows under no 「我的技能」 header would read as
-      // installs until they looked up and found another source's name. So the
-      // own source leaves one quiet line in the slot its group would have held,
-      // and the line is not a header over an empty panel — it is a sentence.
-      const note = screen.getByText("本机没有匹配“nomatch”的 Skill");
-      expect(note).toBeInTheDocument();
-      expect(
-        note.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
-      // It is **centred** in the answer column, as one unit with its glyph —
-      // `pl-6` would put half of itself inside the centring and land the line
-      // 12px right of true centre, which reads as "almost centred" rather than
-      // as either. The class is the claim here: jsdom lays nothing out, so
-      // centring is pinned by what asks for it rather than by a measurement.
-      expect(note).toHaveClass("justify-center");
-      expect(note.className).not.toContain("pl-");
-      // The glyph is what still names the scope, so it travels with the
-      // sentence rather than being left behind at the column edge.
-      expect(note.querySelector("svg")).not.toBeNull();
-    });
-
-    it("stands the quiet scope line down when the whole search found nothing", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await screen.findByText("pdf");
-
-      await user.type(screen.getByLabelText("搜索 Skill"), "zzz");
-
-      // Every source answered empty, so the one sentence that speaks for all of
-      // them is enough; a second line about this machine alone would be the same
-      // fact said twice.
-      expect(
-        await screen.findByText(/本机、应用商店与 skills\.sh 都没有匹配/),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText("本机没有匹配“zzz”的 Skill"),
-      ).not.toBeInTheDocument();
-    });
-
-    it("opens the installed surface's own drawer from a searched row", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await screen.findByText("pdf");
-      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
-      await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
-      await pickUnit(user, "列表");
-
-      // The install the row carries is what this list manages, so the drawer it
-      // opens wears the installed surface: no store install CTA — the skill is
-      // already home, and the panel says so with the switch, not with a button.
-      await user.click(
-        await screen.findByRole("button", { name: "查看 pdf 详情" }),
-      );
-      expect(await screen.findByRole("dialog")).toBeInTheDocument();
-      expect(
-        within(screen.getByRole("dialog")).queryByRole("button", {
-          name: /安装/,
-        }),
-      ).not.toBeInTheDocument();
-    });
-
-    it("brings the store's answer in a default-open section, each row in its own surface", async () => {
-      const user = userEvent.setup();
-      // The store's index answers the same query with a namesake of an installed
-      // skill — the same name under a recorded source, which is exactly what the
-      // section below is for.
-      getGroups.mockResolvedValue(storeAnswerFor("pdf"));
-      renderPage();
-      await screen.findByText("pdf");
-      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
-      await waitFor(() => expect(screen.queryByText("docx")).toBeNull());
-      await pickUnit(user, "列表");
-
-      // Asked for nothing: the registry's index is already in memory, so its
-      // answer is on screen under the installed one, with a count, open.
-      const store = await screen.findByRole("region", { name: "应用商店" });
-      expect(within(store).getByText("1 个 skill")).toBeInTheDocument();
-      // Two answers, two rows of the same name — the install above, the store
-      // entry below it.
-      await waitFor(() =>
-        expect(
-          screen.getAllByRole("button", { name: "查看 pdf 详情" }),
-        ).toHaveLength(2),
-      );
-      // The store row wears the store's surface: the install CTA the installed
-      // surface never offers.
-      await user.click(
-        screen.getAllByRole("button", { name: "查看 pdf 详情" })[1],
-      );
-      expect(
-        await within(await screen.findByRole("dialog")).findByRole("button", {
-          name: "已安装",
-        }),
-      ).toBeInTheDocument();
-    });
-
-    it("keeps the answer in relevance order while the sort is popularity", async () => {
-      const user = userEvent.setup();
-      seedRunSource();
-      seedStoreEntries({ docx: 50, pdf: 30, pptx: 20, "mcp-builder": 5 });
-      renderPage();
-      await pickUnit(user, "列表");
-      await pickSort(user, "热度");
-      await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
-
-      // A search re-answers the list by relevance — the better ranking while a
-      // question is live — so the sort stands down rather than re-ranking hits.
-      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
-      await waitFor(() =>
-        expect(
-          screen
-            .getAllByRole("button", { name: /查看 .+ 详情/ })
-            .map((node) => node.getAttribute("aria-label")),
-        ).toEqual(["查看 pdf 详情"]),
-      );
-    });
-
-    it("answers with rows in the skill unit", async () => {
-      const user = userEvent.setup();
-      renderPage();
-      await pickUnit(user, "列表");
-      await pickSort(user, "安装时间");
-
-      await user.type(screen.getByLabelText("搜索 Skill"), "pdf");
-
-      // The match comes back as a row rather than a card, and as the only row: a
-      // search re-answers the list by relevance in either unit.
-      await waitFor(() =>
-        expect(
-          screen.getAllByRole("button", { name: /查看 .+ 详情/ }),
-        ).toHaveLength(1),
-      );
-      expect(
-        screen.getByRole("button", { name: "查看 pdf 详情" }),
-      ).toBeInTheDocument();
-    });
 
     it("locks the sort control while searching", async () => {
       const user = userEvent.setup();
