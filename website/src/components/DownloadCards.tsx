@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { translations } from '../i18n/translations';
 import { Download, Apple, Monitor, Terminal, Clock, Check, X, Sparkles } from 'lucide-react';
-import { DMG_URL as MAC_ARM_DMG_URL, DMG_FILENAME } from '../lib/version';
+import {
+  MAC_ARM_DMG_URL,
+  DMG_FILENAME,
+  MAC_X64_DMG_URL,
+  MAC_X64_DMG_FILENAME,
+  WIN_EXE_URL,
+  WIN_EXE_FILENAME,
+  WIN_MSI_URL,
+  WIN_MSI_FILENAME,
+  LINUX_APPIMAGE_URL,
+  LINUX_APPIMAGE_FILENAME,
+  LINUX_DEB_URL,
+  LINUX_DEB_FILENAME,
+} from '../lib/version';
 
 interface DownloadCardsProps {
   lang?: 'en' | 'zh';
@@ -12,11 +25,7 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
   const isZh = lang === 'zh';
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [downloadTriggered, setDownloadTriggered] = useState(false);
-
-  const showToast = (message: string) => {
-    setToastMessage(message);
-  };
+  const [downloadTriggered, setDownloadTriggered] = useState<string | null>(null);
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -37,14 +46,14 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
     return () => window.removeEventListener('show-platform-toast', handlePlatformToast);
   }, []);
 
-  const handleAppleSiliconDownload = () => {
-    setDownloadTriggered(true);
-    setTimeout(() => setDownloadTriggered(false), 3000);
+  const triggerDownloadFeedback = (key: string) => {
+    setDownloadTriggered(key);
+    setTimeout(() => setDownloadTriggered(null), 3000);
   };
 
   return (
     <div className="relative">
-      {/* Toast Notification for Unsupported Platforms / Actions */}
+      {/* Toast Notification */}
       {toastMessage && (
         <div
           role="status"
@@ -66,7 +75,7 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
 
       {/* Download Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        {/* macOS Card (Supported ARM64 direct download + Intel coming soon) */}
+        {/* macOS Card */}
         <div className="rounded-2xl border-2 border-blue-400/80 dark:border-blue-500/40 bg-white dark:bg-slate-900/90 p-6 backdrop-blur-md flex flex-col justify-between relative shadow-lg ring-1 ring-blue-500/10">
           <div className="absolute -top-3 right-4 px-3 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
             <Sparkles className="size-3" />
@@ -85,11 +94,11 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
               <a
                 href={MAC_ARM_DMG_URL}
                 download={DMG_FILENAME}
-                onClick={handleAppleSiliconDownload}
+                onClick={() => triggerDownloadFeedback('mac-arm')}
                 className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold transition-all shadow-sm hover:shadow group"
               >
                 <div className="flex items-center gap-2.5">
-                  {downloadTriggered ? (
+                  {downloadTriggered === 'mac-arm' ? (
                     <Check className="size-4 text-emerald-300" />
                   ) : (
                     <Download className="size-4 group-hover:translate-y-0.5 transition-transform" />
@@ -101,20 +110,25 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
                 </span>
               </a>
 
-              {/* Intel Mac - Coming Soon button with toast */}
-              <button
-                type="button"
-                onClick={() => showToast(t.toastIntel)}
-                className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 text-xs font-medium transition-colors cursor-pointer group"
+              {/* Intel Mac direct download */}
+              <a
+                href={MAC_X64_DMG_URL}
+                download={MAC_X64_DMG_FILENAME}
+                onClick={() => triggerDownloadFeedback('mac-intel')}
+                className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 text-xs font-medium transition-colors group"
               >
                 <div className="flex items-center gap-2">
-                  <Clock className="size-3.5 text-slate-400 group-hover:text-amber-500 transition-colors" />
+                  {downloadTriggered === 'mac-intel' ? (
+                    <Check className="size-3.5 text-emerald-500" />
+                  ) : (
+                    <Download className="size-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                  )}
                   <span>{t.macIntel}</span>
                 </div>
-                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono font-normal">
-                  {t.comingSoon}
+                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-mono font-normal">
+                  .dmg
                 </span>
-              </button>
+              </a>
             </div>
           </div>
 
@@ -123,34 +137,60 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
           </div>
         </div>
 
-        {/* Windows Card - Coming soon */}
-        <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-slate-900/60 p-6 backdrop-blur-md flex flex-col justify-between shadow-xs">
+        {/* Windows Card */}
+        <div className="rounded-2xl border-2 border-slate-200/90 dark:border-white/10 bg-white dark:bg-slate-900/90 p-6 backdrop-blur-md flex flex-col justify-between shadow-lg">
           <div>
-            <div className="size-11 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-800 dark:text-white mb-4">
+            <div className="size-11 rounded-xl bg-sky-50 dark:bg-sky-500/15 border border-sky-200 dark:border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-400 mb-4">
               <Monitor className="size-6" />
             </div>
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Windows</h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 font-mono">
-                {t.comingSoonBadge}
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-mono font-medium">
+                {isZh ? '正式支持' : 'Supported'}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">{t.winReq}</p>
 
             <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => showToast(t.toastWindows)}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 text-xs font-medium transition-colors cursor-pointer group"
+              {/* Windows NSIS Setup Exe */}
+              <a
+                href={WIN_EXE_URL}
+                download={WIN_EXE_FILENAME}
+                onClick={() => triggerDownloadFeedback('win-exe')}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-xs font-semibold transition-all shadow-sm hover:shadow group"
               >
-                <div className="flex items-center gap-2">
-                  <Clock className="size-3.5 text-slate-400 group-hover:text-amber-500 transition-colors" />
+                <div className="flex items-center gap-2.5">
+                  {downloadTriggered === 'win-exe' ? (
+                    <Check className="size-4 text-emerald-300" />
+                  ) : (
+                    <Download className="size-4 group-hover:translate-y-0.5 transition-transform" />
+                  )}
                   <span>{t.windows}</span>
                 </div>
-                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
-                  {t.comingSoon}
+                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-sky-700/60 font-mono font-normal">
+                  {isZh ? '安装包 (.exe)' : 'Setup (.exe)'}
                 </span>
-              </button>
+              </a>
+
+              {/* Windows MSI */}
+              <a
+                href={WIN_MSI_URL}
+                download={WIN_MSI_FILENAME}
+                onClick={() => triggerDownloadFeedback('win-msi')}
+                className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 text-xs font-medium transition-colors group"
+              >
+                <div className="flex items-center gap-2">
+                  {downloadTriggered === 'win-msi' ? (
+                    <Check className="size-3.5 text-emerald-500" />
+                  ) : (
+                    <Download className="size-3.5 text-slate-400 group-hover:text-sky-500 transition-colors" />
+                  )}
+                  <span>Windows Installer (.msi)</span>
+                </div>
+                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-mono font-normal">
+                  .msi
+                </span>
+              </a>
             </div>
           </div>
 
@@ -159,34 +199,60 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
           </div>
         </div>
 
-        {/* Linux Card - Coming soon */}
-        <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-slate-900/60 p-6 backdrop-blur-md flex flex-col justify-between shadow-xs">
+        {/* Linux Card */}
+        <div className="rounded-2xl border-2 border-slate-200/90 dark:border-white/10 bg-white dark:bg-slate-900/90 p-6 backdrop-blur-md flex flex-col justify-between shadow-lg">
           <div>
-            <div className="size-11 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-800 dark:text-white mb-4">
+            <div className="size-11 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4">
               <Terminal className="size-6" />
             </div>
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Linux</h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 font-mono">
-                {t.comingSoonBadge}
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-mono font-medium">
+                {isZh ? '正式支持' : 'Supported'}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">Ubuntu, Debian, Fedora, Arch</p>
 
             <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => showToast(t.toastLinux)}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 text-xs font-medium transition-colors cursor-pointer group"
+              {/* Linux AppImage */}
+              <a
+                href={LINUX_APPIMAGE_URL}
+                download={LINUX_APPIMAGE_FILENAME}
+                onClick={() => triggerDownloadFeedback('linux-appimage')}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-all shadow-sm hover:shadow group"
+              >
+                <div className="flex items-center gap-2.5">
+                  {downloadTriggered === 'linux-appimage' ? (
+                    <Check className="size-4 text-emerald-300" />
+                  ) : (
+                    <Download className="size-4 group-hover:translate-y-0.5 transition-transform" />
+                  )}
+                  <span>AppImage</span>
+                </div>
+                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-emerald-700/60 font-mono font-normal">
+                  {isZh ? '免安装' : 'Standalone'}
+                </span>
+              </a>
+
+              {/* Linux DEB */}
+              <a
+                href={LINUX_DEB_URL}
+                download={LINUX_DEB_FILENAME}
+                onClick={() => triggerDownloadFeedback('linux-deb')}
+                className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 text-xs font-medium transition-colors group"
               >
                 <div className="flex items-center gap-2">
-                  <Clock className="size-3.5 text-slate-400 group-hover:text-amber-500 transition-colors" />
-                  <span>{t.linux}</span>
+                  {downloadTriggered === 'linux-deb' ? (
+                    <Check className="size-3.5 text-emerald-500" />
+                  ) : (
+                    <Download className="size-3.5 text-slate-400 group-hover:text-emerald-500 transition-colors" />
+                  )}
+                  <span>Debian / Ubuntu</span>
                 </div>
-                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
-                  {t.comingSoon}
+                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-mono font-normal">
+                  .deb
                 </span>
-              </button>
+              </a>
             </div>
           </div>
 
@@ -198,3 +264,4 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
     </div>
   );
 };
+
