@@ -96,7 +96,7 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
                   )}
                   <span>{t.macArm}</span>
                 </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-700/60 font-mono font-normal">
+                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-blue-700/60 font-mono font-normal">
                   {isZh ? '直接下载' : 'Direct DMG'}
                 </span>
               </a>
@@ -111,7 +111,7 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
                   <Clock className="size-3.5 text-slate-400 group-hover:text-amber-500 transition-colors" />
                   <span>{t.macIntel}</span>
                 </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono font-normal">
+                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono font-normal">
                   {t.comingSoon}
                 </span>
               </button>
@@ -147,7 +147,7 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
                   <Clock className="size-3.5 text-slate-400 group-hover:text-amber-500 transition-colors" />
                   <span>{t.windows}</span>
                 </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
+                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
                   {t.comingSoon}
                 </span>
               </button>
@@ -183,7 +183,7 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
                   <Clock className="size-3.5 text-slate-400 group-hover:text-amber-500 transition-colors" />
                   <span>{t.linux}</span>
                 </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
+                <span className="shrink-0 whitespace-nowrap text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
                   {t.comingSoon}
                 </span>
               </button>
