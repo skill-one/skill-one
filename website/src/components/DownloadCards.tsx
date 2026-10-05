@@ -78,7 +78,7 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
               <Apple className="size-6" />
             </div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">macOS</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">macOS 12.0 (Monterey) or later</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">{t.macReq}</p>
 
             <div className="space-y-3">
               {/* Apple Silicon direct download */}
@@ -135,7 +135,7 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
                 {t.comingSoonBadge}
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">Windows 10 / 11 (64-bit)</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">{t.winReq}</p>
 
             <div className="space-y-3">
               <button

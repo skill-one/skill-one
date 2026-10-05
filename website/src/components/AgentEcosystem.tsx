@@ -198,7 +198,7 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
                           </h4>
                           {agent.isTop && (
                             <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
-                              <Sparkles className="size-2.5" /> Popular
+                              <Sparkles className="size-2.5" /> {t.filterTop}
                             </span>
                           )}
                         </div>

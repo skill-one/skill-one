@@ -165,10 +165,10 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                   <div className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-emerald-500" />
                     <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                      Skill One Store · Verified Catalog
+                      {t.marketTab.storeHeader}
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-400">GUI 1-Click</span>
+                  <span className="text-[11px] font-mono text-slate-400">{t.marketTab.guiBadge}</span>
                 </div>
 
                 <div className="p-4 sm:p-5 rounded-xl border border-blue-200/80 dark:border-blue-500/20 bg-blue-50/30 dark:bg-blue-950/20">
@@ -187,7 +187,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          by Antigravity Team · MIT Licensed
+                          {t.marketTab.skillAuthor}
                         </p>
                       </div>
                     </div>
@@ -210,7 +210,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                           {t.marketTab.installedBtn}
                         </span>
                       ) : isInstalling ? (
-                        'Installing...'
+                        t.marketTab.installingBtn
                       ) : (
                         <span className="flex items-center gap-1.5">
                           <Sparkles className="size-3.5" />
@@ -225,9 +225,9 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                   </p>
 
                   <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono pt-3 border-t border-slate-200/60 dark:border-white/5">
-                    <span>Target: ~/.agents/skills/shadcn-ui-mastery</span>
+                    <span>{t.marketTab.targetPath}</span>
                     <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                      {isInstalled ? 'Synced Everywhere (0ms)' : 'Ready to Install'}
+                      {isInstalled ? t.marketTab.syncedEverywhere : t.marketTab.readyToInstall}
                     </span>
                   </div>
                 </div>
@@ -282,22 +282,22 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                   {cliRunning ? (
                     <div className="text-slate-400 animate-pulse py-2 flex items-center gap-2">
                       <span className="size-2 rounded-full bg-blue-400 animate-ping" />
-                      <span>Resolving package and extracting directly to ~/.agents/skills...</span>
+                      <span>{t.cliTab.resolving}</span>
                     </div>
                   ) : cliFinished ? (
                     <div className="space-y-1 text-slate-300 pt-1">
                       <div className="flex items-center gap-2 text-emerald-400">
                         <Check className="size-3.5" />
-                        <span>Fetched skill '@antigravity/shadcn-ui'</span>
+                        <span>{t.cliTab.fetched}</span>
                       </div>
                       <div className="text-slate-400 pl-5">
-                        ↳ Stored in canonical: <span className="text-blue-300">~/.agents/skills/shadcn-ui</span>
+                        {t.cliTab.storedLabel} <span className="text-blue-300">~/.agents/skills/shadcn-ui</span>
                       </div>
                       <div className="text-slate-400 pl-5">
-                        ↳ Symlinks verified: <span className="text-emerald-300">Cursor, Claude, Windsurf, +78 agents</span>
+                        {t.cliTab.verifiedLabel} <span className="text-emerald-300">{t.cliTab.verifiedAgents}</span>
                       </div>
                       <div className="text-emerald-400 pt-1 font-semibold">
-                        ✔ Done! Immediately ready across your entire workspace (0ms).
+                        {t.cliTab.done}
                       </div>
                     </div>
                   ) : null}
@@ -357,7 +357,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                         <p className="mb-2">{t.chatTab.agentMessage}</p>
                         <div className="p-2 rounded-lg bg-white dark:bg-black/30 border border-slate-200/80 dark:border-white/5 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                           <Check className="size-3" />
-                          <span>~/.agents/skills/shadcn-ui (Active in all 80+ agents)</span>
+                          <span>{t.chatTab.activeEverywhere}</span>
                         </div>
                       </div>
                     </div>
@@ -380,11 +380,11 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                     <FolderGit2 className="size-4 text-purple-600 dark:text-purple-400" />
                     <span className="text-xs text-slate-800 dark:text-slate-200 font-semibold">{t.gitTab.termTitle}</span>
                   </div>
-                  <span className="text-[11px] text-slate-400 font-mono">100% Open & Native</span>
+                  <span className="text-[11px] text-slate-400 font-mono">{t.gitTab.openBadge}</span>
                 </div>
 
                 <div className="p-4 rounded-xl bg-slate-950 text-slate-200 text-xs sm:text-[13px] leading-relaxed space-y-2 select-text shadow-inner">
-                  <div className="text-slate-500"># Navigate to Skill One central skills repository</div>
+                  <div className="text-slate-500">{t.gitTab.comment}</div>
                   <div className="flex items-center gap-2">
                     <span className="text-emerald-400">~</span>
                     <span className="text-blue-400">$</span>
@@ -396,7 +396,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                     <span className="text-white font-semibold">git clone https://github.com/my-org/custom-ai-skills</span>
                   </div>
                   <div className="text-emerald-400 pt-1">
-                    ✔ Cloned into 'custom-ai-skills'. Immediately active in all 80+ agents.
+                    {t.gitTab.done}
                   </div>
                 </div>
 
@@ -441,7 +441,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                   <span>{t.centralRepoLabel}</span>
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-mono font-semibold">
-                  Physical Source
+                  {t.physicalSourceBadge}
                 </span>
               </div>
 
@@ -480,7 +480,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                     <span>{t.symlinkedToAgents}</span>
                   </span>
                   <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
-                    {isSynced ? '0ms 同步延迟' : '等待写入'}
+                    {isSynced ? t.symlinkStatusSynced : t.symlinkStatusWaiting}
                   </span>
                 </div>
 

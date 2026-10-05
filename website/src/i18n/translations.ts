@@ -112,6 +112,13 @@ export interface TranslationStrings {
       installBtn: string;
       installedBtn: string;
       installedFeedback: string;
+      storeHeader: string;
+      guiBadge: string;
+      skillAuthor: string;
+      installingBtn: string;
+      targetPath: string;
+      readyToInstall: string;
+      syncedEverywhere: string;
     };
     cliTab: {
       termTitle: string;
@@ -119,6 +126,12 @@ export interface TranslationStrings {
       runningBtn: string;
       copyBtn: string;
       copiedBtn: string;
+      resolving: string;
+      fetched: string;
+      storedLabel: string;
+      verifiedLabel: string;
+      verifiedAgents: string;
+      done: string;
     };
     chatTab: {
       chatTitle: string;
@@ -126,11 +139,18 @@ export interface TranslationStrings {
       userMessage: string;
       agentMessage: string;
       askAnotherBtn: string;
+      activeEverywhere: string;
     };
     gitTab: {
       termTitle: string;
       explain: string;
+      openBadge: string;
+      comment: string;
+      done: string;
     };
+    physicalSourceBadge: string;
+    symlinkStatusSynced: string;
+    symlinkStatusWaiting: string;
   };
   agentsExplorer: {
     eyebrow: string;
@@ -152,6 +172,8 @@ export interface TranslationStrings {
     subtitle: string;
     macArm: string;
     macIntel: string;
+    macReq: string;
+    winReq: string;
     windows: string;
     linux: string;
     releaseNotes: string;
@@ -311,6 +333,9 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       centralRepoPath: "~/.agents/skills",
       physicalSingleNotice: "Single physical directory on disk · Zero duplication",
       symlinkedToAgents: "Transparently shared with all 80+ AI Agents via OS symlinks",
+      physicalSourceBadge: "Physical Source",
+      symlinkStatusSynced: "0ms sync latency",
+      symlinkStatusWaiting: "Awaiting write",
       marketTab: {
         searchPlaceholder: "Search 2,000+ community skills...",
         skillName: "shadcn-ui-mastery",
@@ -318,6 +343,13 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
         installBtn: "Install to Hub",
         installedBtn: "Installed to Hub",
         installedFeedback: "Skill stored at ~/.agents/skills/shadcn-ui-mastery. All 80+ agents instantly linked!",
+        storeHeader: "Skill One Store · Verified Catalog",
+        guiBadge: "GUI 1-Click",
+        skillAuthor: "by Antigravity Team · MIT Licensed",
+        installingBtn: "Installing...",
+        targetPath: "Target: ~/.agents/skills/shadcn-ui-mastery",
+        readyToInstall: "Ready to Install",
+        syncedEverywhere: "Synced Everywhere (0ms)",
       },
       cliTab: {
         termTitle: "Terminal — zsh",
@@ -325,17 +357,27 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
         runningBtn: "Executing...",
         copyBtn: "Copy Command",
         copiedBtn: "Copied!",
+        resolving: "Resolving package and extracting directly to ~/.agents/skills...",
+        fetched: "Fetched skill '@antigravity/shadcn-ui'",
+        storedLabel: "↳ Stored in canonical:",
+        verifiedLabel: "↳ Symlinks verified:",
+        verifiedAgents: "Cursor, Claude, Windsurf, +78 agents",
+        done: "✔ Done! Immediately ready across your entire workspace (0ms).",
       },
       chatTab: {
         chatTitle: "Cursor / Claude Composer",
         promptInput: "Ask agent to install a skill...",
         userMessage: "Hey, please install the official 'shadcn-ui' and 'git-workflow' skills for my project.",
         agentMessage: "Done! I've fetched the skill into ~/.agents/skills/. Because Skill One maintains central OS symlinks, this skill is immediately accessible in Cursor, Windsurf, Claude Code, and all your other agents without restart.",
+        activeEverywhere: "~/.agents/skills/shadcn-ui (Active in all 80+ agents)",
         askAnotherBtn: "Try Chat Example",
       },
       gitTab: {
         termTitle: "Local Filesystem / Git Clone",
         explain: "Prefer crafting your own skills or cloning private enterprise repositories? Simply clone or drag any skill folder directly into ~/.agents/skills/. Every agent recognizes it instantly.",
+        openBadge: "100% Open & Native",
+        comment: "# Navigate to Skill One central skills repository",
+        done: "✔ Cloned into 'custom-ai-skills'. Immediately active in all 80+ agents.",
       },
     },
     agentsExplorer: {
@@ -361,6 +403,8 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       windows: "Windows (.exe / .msi)",
       linux: "Linux (.deb / AppImage)",
       releaseNotes: "View Release Notes",
+        macReq: "macOS 12.0 (Monterey) or later",
+        winReq: "Windows 10 / 11 (64-bit)",
       systemReq: "macOS 12+, Windows 10+, or modern Linux distribution",
       openSourceBadge: "MIT Licensed · 100% Free & Open Source",
       directDownload: "Direct Download (.dmg)",
@@ -541,6 +585,9 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       centralRepoPath: "~/.agents/skills",
       physicalSingleNotice: "磁盘上真实存在的物理目录 · 绝无重复文件",
       symlinkedToAgents: "通过内核级系统软链接，实时穿透至 80+ 款 AI 智能体",
+      physicalSourceBadge: "物理源",
+      symlinkStatusSynced: "0ms 同步延迟",
+      symlinkStatusWaiting: "等待写入",
       marketTab: {
         searchPlaceholder: "快速搜索 2,000+ 社区精选技能...",
         skillName: "shadcn-ui-mastery",
@@ -548,6 +595,13 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
         installBtn: "一键安装到中枢",
         installedBtn: "已安装至中央仓库",
         installedFeedback: "技能已存入 ~/.agents/skills/shadcn-ui-mastery，所有 80+ 款智能体秒级直接可用！",
+        storeHeader: "Skill One 集市 · 官方认证目录",
+        guiBadge: "图形界面 · 一键安装",
+        skillAuthor: "由 Antigravity Team 开发 · MIT 许可",
+        installingBtn: "安装中...",
+        targetPath: "目标位置 ~/.agents/skills/shadcn-ui-mastery",
+        readyToInstall: "待安装",
+        syncedEverywhere: "全端已同步 (0ms)",
       },
       cliTab: {
         termTitle: "终端 — zsh",
@@ -555,17 +609,27 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
         runningBtn: "正在执行...",
         copyBtn: "复制命令",
         copiedBtn: "已复制！",
+        resolving: "正在解析依赖包，并直接解压到 ~/.agents/skills...",
+        fetched: "已获取技能 '@antigravity/shadcn-ui'",
+        storedLabel: "↳ 已写入规范仓库:",
+        verifiedLabel: "↳ 软链验证通过:",
+        verifiedAgents: "Cursor、Claude、Windsurf 等 +78 款智能体",
+        done: "✔ 完成！整个工作区即刻就绪 (0ms)。",
       },
       chatTab: {
         chatTitle: "Cursor / Claude 对话窗口",
         promptInput: "在对话框直接对智能体下达安装指令...",
         userMessage: "请帮我安装 shadcn-ui 和 git-workflow 技能，并在本项目中启用。",
         agentMessage: "已为您将技能直接保存至中央仓库 ~/.agents/skills/。得益于 Skill One 的原生软链架构，不仅我可以直接读取，您的 Cursor、Windsurf、Claude Code 及其他 80+ 款智能体也已同步就绪！",
+        activeEverywhere: "~/.agents/skills/shadcn-ui（全部 80+ 款智能体已激活）",
         askAnotherBtn: "模拟对话安装",
       },
       gitTab: {
         termTitle: "本地文件系统 / Git Clone",
         explain: "喜欢自研私有技能或从 GitHub 团队仓库同步？只需将任意技能文件夹放入 ~/.agents/skills/，全生态工具立即自动感知，无需任何复杂的注册配置。",
+        openBadge: "100% 开放原生",
+        comment: "# 进入 Skill One 中央技能仓库",
+        done: "✔ 已克隆到 'custom-ai-skills'，全部智能体立即可用。",
       },
     },
     agentsExplorer: {
@@ -591,6 +655,8 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       windows: "Windows 版 (.exe / .msi)",
       linux: "Linux 版 (.deb / AppImage)",
       releaseNotes: "查看最新发行说明",
+        macReq: "macOS 12.0 (Monterey) 或更高版本",
+        winReq: "Windows 10 / 11（64 位）",
       systemReq: "支持 macOS 12+、Windows 10+ 及主流 Linux 发行版",
       openSourceBadge: "MIT 开源协议 · 永久免费使用",
       directDownload: "直接下载 (.dmg)",
