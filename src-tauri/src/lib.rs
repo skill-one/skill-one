@@ -1,15 +1,11 @@
 // Skill One — minimal Tauri entry. All network reads (skills index, SKILL.md)
 // happen in the frontend via CORS-enabled CDN mirrors (JSDMirror / jsDelivr);
-// the Rust side only exposes local skills install / agent management, plus the
-// menu bar tray and its popover window (see `tray.rs`).
-
-use tauri::Listener;
+// the Rust side only exposes local skills install / agent management.
 
 mod activity;
 mod dir_fingerprint;
 mod provenance;
 mod skills;
-mod tray;
 mod update_channel;
 
 pub fn run() {
@@ -23,10 +19,6 @@ pub fn run() {
         // GitHub Releases; `process` lets the frontend relaunch after install.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        // Native panel material for the menu bar popover (Liquid Glass on
-        // macOS 26+, NSVisualEffectView fallback on older macOS, no-op else).
-        .plugin(tauri_plugin_liquid_glass::init())
-        .manage(tray::PopoverState::default())
         .invoke_handler(tauri::generate_handler![
             skills::install_skill,
             skills::list_installed_skills,
@@ -47,30 +39,6 @@ pub fn run() {
             activity::open_activity_dir,
             update_channel::is_homebrew_install,
         ])
-        .setup(|app| {
-            tray::create_tray(app.handle())?;
-            // The popover window is NOT declared in `tauri.conf.json`; it is
-            // built on the first tray click (`tray::ensure_popover`), which
-            // also applies its native material (rounded to the CSS corner
-            // radius, see `POPOVER_MATERIAL_RADIUS` in `tray.rs`).
-            // A popover navigation request shows + focuses the main window;
-            // the main window's own listener performs the actual routing.
-            let handle = app.handle().clone();
-            app.listen_any(tray::NAVIGATE_EVENT, move |_| tray::show_main(&handle));
-            Ok(())
-        })
-        .on_window_event(tray::handle_window_event)
-        .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            // Clicking the dock icon while running must bring the main window
-            // back (it hides on close instead of quitting). `Reopen` is
-            // macOS-only. We don't trust `has_visible_windows`: the tray
-            // popover is itself a visible window, so the flag can be true
-            // while the main window is hidden.
-            #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen { .. } = event {
-                tray::show_main(app_handle);
-            }
-        });
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

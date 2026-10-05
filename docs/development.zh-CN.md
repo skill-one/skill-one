@@ -104,9 +104,9 @@ shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 
 
 - `src/components/theme-provider.tsx` —— 唯一的共享配置（`attribute="class"`、`defaultTheme="system"`、`enableColorScheme`、`storageKey="skill-one-theme"`），并负责把主题同步到原生窗口。
 - `src/components/theme-mode-toggle.tsx` —— 设置浮窗里的三选 `ToggleGroup` 分段控件。
-- `src/hooks/use-native-theme.ts` —— 在 Tauri 环境中调用 `getCurrentWindow().setTheme()`，让系统绘制的部分（标题栏、滚动条、表单控件、菜单栏 popover 的玻璃材质）一并跟随；`system` 映射为 `null`，交由操作系统自行决定。macOS 上 `set_theme` 是全应用生效的，主窗口这一次调用会覆盖所有窗口。
+- `src/hooks/use-native-theme.ts` —— 在 Tauri 环境中调用 `getCurrentWindow().setTheme()`，让系统绘制的部分（标题栏、滚动条、表单控件）一并跟随；`system` 映射为 `null`，交由操作系统自行决定。macOS 上 `set_theme` 是全应用生效的，主窗口这一次调用会覆盖所有窗口。
 
-只有主窗口入口 `src/main.tsx` 需要挂载 Provider。菜单栏 popover（`src/popover/popover-main.tsx`）刻意不挂主题 Provider：`src/popover/popover.css` 只为该文档把 shadcn token 重新定义为一套半透明的系统色值（label / secondary label / 半透明填充 / hairline 分隔线），并由 `prefers-color-scheme` 驱动切换——它与透明窗口背后原生玻璃材质读取的是同一个外观源，因此内容与毛玻璃背景永远不会一深一浅。
+只有主窗口入口 `src/main.tsx` 需要挂载 Provider。
 
 新增 UI 样式时的约定：
 

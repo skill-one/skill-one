@@ -1,8 +1,7 @@
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy } from "react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { listen } from "@tauri-apps/api/event";
-import { HashRouter, Routes, Route, Navigate, useNavigate } from "react-router";
+import { HashRouter, Routes, Route, Navigate } from "react-router";
 
 import { AppHeader } from "./components/app-header";
 import { UpdateDialog } from "./components/update-dialog";
@@ -16,7 +15,6 @@ import { checkForUpdate } from "./lib/update-store";
 import { isTauri } from "./lib/tauri";
 import { storage } from "./lib/storage";
 import { InstalledPage } from "./pages/installed/installed-page";
-import { POPOVER_NAVIGATE_EVENT } from "./popover/popover-events";
 
 /**
  * Route-level code splitting: every page but the landing one ships as its own
@@ -72,7 +70,6 @@ export default function App() {
           breaks hover-open for every tooltip but the group's own. */}
       <TooltipProvider delay={300}>
         <HashRouter>
-          <PopoverNavigation />
           <AppUpdateWatcher />
           <RegistryAutoRefresh />
           <AgentAutoLink />
@@ -105,25 +102,6 @@ export default function App() {
       </TooltipProvider>
     </PersistQueryClientProvider>
   );
-}
-
-/**
- * Menu bar popover → main window routing. The popover asks Rust to show +
- * focus this window (native side) and emits the target path; this listener
- * performs the actual navigation.
- */
-function PopoverNavigation() {
-  const navigate = useNavigate();
-  useEffect(() => {
-    if (!isTauri()) return;
-    const unlisten = listen<{ path: string }>(POPOVER_NAVIGATE_EVENT, (event) =>
-      navigate(event.payload.path),
-    );
-    return () => {
-      void unlisten.then((dispose) => dispose());
-    };
-  }, [navigate]);
-  return null;
 }
 
 /**

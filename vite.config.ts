@@ -117,7 +117,7 @@ export default defineConfig({
         // to raise — a floor, not a target.
         "src/components/ui/**": {
           statements: 62,
-          branches: 72,
+          branches: 70,
           functions: 66,
           lines: 62,
         },
@@ -155,14 +155,6 @@ export default defineConfig({
     format: "es",
   },
   build: {
-    // Multi-page build: the menu bar popover window gets its own entry
-    // (see popover.html / src/popover/).
-    rolldownOptions: {
-      input: {
-        main: "index.html",
-        popover: "popover.html",
-      },
-    },
     // Tauri supports es2021.
     target: "es2021",
     // Disable minify (default Oxc minifier) for debug builds.

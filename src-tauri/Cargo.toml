@@ -21,9 +21,7 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# tray-icon: menu bar tray; image-png: load the template tray icon from bytes;
-# macos-private-api: required by the transparent popover window (macOSPrivateApi).
-tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri = { version = "2", features = [] }
 # Opens external links (skill sources) in the system browser.
 tauri-plugin-opener = "2"
 # Fetches the skills.sh live search from the Rust side: the endpoint sends no
@@ -61,15 +59,6 @@ serde_json = "1"
 # Home directory resolution for the provenance ledger path
 # (`<home>/.agents/skills/.skill-one.jsonl`).
 dirs = "7"
-# Menu bar popover material: real Liquid Glass (NSGlassEffectView) on macOS
-# 26+, automatic NSVisualEffectView fallback on older macOS, no-op elsewhere.
-tauri-plugin-liquid-glass = "0.1"
 
 [dev-dependencies]
 tempfile = "3"
-
-# Activate the app when the tray popover opens: without real activation the
-# previous frontmost app reclaims key focus and the popover blur-dismisses.
-[target.'cfg(target_os = "macos")'.dependencies]
-objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSApplication"] }

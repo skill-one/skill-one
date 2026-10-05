@@ -2,11 +2,6 @@ import { ThemeProvider as NextThemeProvider, useTheme } from "next-themes";
 
 import { useNativeTheme } from "../hooks/use-native-theme";
 
-/**
- * Shared across both window entries (the main window and the tray popover are
- * separate HTML documents, so each root needs its own provider). They share a
- * localStorage origin and therefore the same key, keeping the two in sync.
- */
 const STORAGE_KEY = "skill-one-theme";
 
 /**

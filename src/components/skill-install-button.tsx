@@ -144,9 +144,8 @@ export function SkillInstallButton({
         name: skill.name,
       });
       // The "my skills" list is cached for 10 minutes (staleTime) and never
-      // GCs, so refresh this window and broadcast the change: invalidate here
-      // makes the new skill show up on the next visit, and the broadcast lets
-      // the menu bar popover (its own webview + cache) update live.
+      // GCs, so refresh the list: invalidating here makes the new skill show
+      // up immediately and updates the badge counts.
       await markSkillsChanged(queryClient);
       setInstallState("installed");
     } catch (err) {

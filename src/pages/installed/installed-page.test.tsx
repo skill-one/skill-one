@@ -2544,8 +2544,8 @@ describe("InstalledPage", () => {
     }
 
     it("pre-fills the field from the ?skill= deep link", async () => {
-      // The menu bar popover deep links to /installed?skill=<name>; the page
-      // must land with that skill asked for and consume the param.
+      // Deep links like /installed?skill=<name> must land with that skill asked
+      // for and consume the param.
       renderPage("/installed?skill=pdf");
 
       expect(await screen.findByLabelText("搜索 Skill")).toHaveValue("pdf");
