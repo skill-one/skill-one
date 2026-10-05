@@ -103,12 +103,21 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
     }));
   };
 
-  // Canvas Geometry
+  // Canvas Geometry & Exact Node Alignment
   const GRAPH_WIDTH = 880;
   const GRAPH_HEIGHT = 440;
   const HUB_CENTER = { x: 440, y: 220 };
   const HUB_HALF_W = 210;
   const HUB_HALF_H = 145;
+
+  const CARD_WIDTH = 190;
+  const CARD_HEIGHT = 50;
+  const CARD_GAP = 22;
+  const START_Y = 87; // Mathematically centered with Hub card
+
+  const getNodeY = (row: number) => START_Y + row * (CARD_HEIGHT + CARD_GAP);
+  const getNodeCenterY = (row: number) => getNodeY(row) + CARD_HEIGHT / 2;
+  const getHubAnchorY = (row: number) => 112 + row * 72;
 
   return (
     <div className="w-full max-w-5xl mx-auto select-none">
@@ -162,17 +171,19 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
               {agents.map((agent) => {
                 const gradientId = `ribbon-grad-${agent.id}`;
                 const isLeft = agent.side === 'left';
-                const fromX = isLeft ? 190 : 690;
+                const fromX = isLeft ? CARD_WIDTH : GRAPH_WIDTH - CARD_WIDTH;
+                const fromY = getNodeCenterY(agent.row);
                 const toX = isLeft ? HUB_CENTER.x - HUB_HALF_W : HUB_CENTER.x + HUB_HALF_W;
+                const toY = getHubAnchorY(agent.row);
                 return (
                   <linearGradient
                     key={gradientId}
                     id={gradientId}
                     gradientUnits="userSpaceOnUse"
                     x1={toX}
-                    y1={HUB_CENTER.y}
+                    y1={toY}
                     x2={fromX}
-                    y2={35 + agent.row * 94 + 22}
+                    y2={fromY}
                   >
                     <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.2" />
                     <stop offset="60%" stopColor={agent.color} stopOpacity="0.5" />
@@ -185,10 +196,10 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
             {agents.map((agent) => {
               const isLinked = linkedAgentIds[agent.id];
               const isLeft = agent.side === 'left';
-              const fromX = isLeft ? 190 : 690;
-              const fromY = 35 + agent.row * 94 + 22;
+              const fromX = isLeft ? CARD_WIDTH : GRAPH_WIDTH - CARD_WIDTH;
+              const fromY = getNodeCenterY(agent.row);
               const toX = isLeft ? HUB_CENTER.x - HUB_HALF_W : HUB_CENTER.x + HUB_HALF_W;
-              const toY = HUB_CENTER.y - 75 + agent.row * 48;
+              const toY = getHubAnchorY(agent.row);
 
               // S-curve cubic bezier
               const dx = toX - fromX;
@@ -207,13 +218,13 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
                     d={pathD}
                     fill="none"
                     stroke={isLinked ? `url(#ribbon-grad-${agent.id})` : '#cbd5e1'}
-                    strokeWidth={isHighlighted ? 2.75 : isLinked ? 2 : 1.25}
+                    strokeWidth={isHighlighted ? 3 : isLinked ? 2.25 : 1.25}
                     strokeDasharray={isLinked ? undefined : '4 6'}
                     className="transition-all duration-300"
-                    opacity={isLinked ? (isHighlighted ? 1 : 0.8) : 0.4}
+                    opacity={isLinked ? (isHighlighted ? 1 : 0.85) : 0.35}
                   />
 
-                  {/* Flowing Shimmer Particle Light */}
+                  {/* Flowing Shimmer Particle Light along curve */}
                   {isLinked && (
                     <path
                       d={pathD}
@@ -234,53 +245,57 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
             })}
           </svg>
 
-          {/* Left Column Agents (Cursor, Claude, Windsurf, Cline) */}
-          <div className="absolute left-0 top-0 w-[190px] space-y-4 pt-4">
-            {agents.filter(a => a.side === 'left').map(agent => {
-              const isLinked = linkedAgentIds[agent.id];
-              const isHovered = hoveredAgent === agent.id;
-              return (
-                <div
-                  key={agent.id}
-                  onMouseEnter={() => setHoveredAgent(agent.id)}
-                  onMouseLeave={() => setHoveredAgent(null)}
-                  className={`group relative flex items-center justify-between p-2.5 rounded-xl border transition-all duration-200 cursor-pointer select-none ${
-                    isLinked
-                      ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/15 hover:border-slate-300 dark:hover:border-white/30 shadow-2xs hover:shadow-sm'
-                      : 'bg-slate-100/60 dark:bg-slate-950/40 border-slate-200/50 dark:border-white/5 opacity-55 hover:opacity-85'
-                  }`}
-                  style={{
-                    borderColor: isHovered && isLinked ? agent.color : undefined,
-                    boxShadow: isHovered && isLinked ? `0 0 16px ${agent.color}30` : undefined,
-                  }}
-                  onClick={() => handleToggleAgent(agent.id)}
-                  title={`${agent.name} (${isLinked ? 'Click to Unlink' : 'Click to Link'})`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={agent.icon}
-                      alt={agent.name}
-                      className={`size-6 object-contain rounded-md transition-transform group-hover:scale-105 ${!isLinked ? 'grayscale opacity-60' : ''}`}
-                    />
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight truncate">
-                        {agent.name}
-                      </h4>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[90px]">
-                        {agent.skillsDir}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`size-2 rounded-full shrink-0 transition-colors ${
-                      isLinked ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-slate-400 dark:bg-slate-600'
-                    }`}
+          {/* Left Column Agents (Cursor, Claude, Windsurf, Cline) — Absolutely Positioned */}
+          {agents.filter(a => a.side === 'left').map(agent => {
+            const isLinked = linkedAgentIds[agent.id];
+            const isHovered = hoveredAgent === agent.id;
+            const topY = getNodeY(agent.row);
+            return (
+              <div
+                key={agent.id}
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: topY,
+                  width: CARD_WIDTH,
+                  height: CARD_HEIGHT,
+                  borderColor: isHovered && isLinked ? agent.color : undefined,
+                  boxShadow: isHovered && isLinked ? `0 0 16px ${agent.color}30` : undefined,
+                }}
+                onMouseEnter={() => setHoveredAgent(agent.id)}
+                onMouseLeave={() => setHoveredAgent(null)}
+                className={`group flex items-center justify-between px-3 rounded-xl border transition-all duration-200 cursor-pointer select-none ${
+                  isLinked
+                    ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/15 hover:border-slate-300 dark:hover:border-white/30 shadow-2xs hover:shadow-sm'
+                    : 'bg-slate-100/60 dark:bg-slate-950/40 border-slate-200/50 dark:border-white/5 opacity-55 hover:opacity-85'
+                }`}
+                onClick={() => handleToggleAgent(agent.id)}
+                title={`${agent.name} (${isLinked ? 'Click to Unlink' : 'Click to Link'})`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <img
+                    src={agent.icon}
+                    alt={agent.name}
+                    className={`size-6 object-contain rounded-md transition-transform group-hover:scale-105 ${!isLinked ? 'grayscale opacity-60' : ''}`}
                   />
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight truncate">
+                      {agent.name}
+                    </h4>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[95px]">
+                      {agent.skillsDir}
+                    </p>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+
+                <span
+                  className={`size-2 rounded-full shrink-0 transition-colors ${
+                    isLinked ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-slate-400 dark:bg-slate-600'
+                  }`}
+                />
+              </div>
+            );
+          })}
 
           {/* Central Hub Dashboard Card — faithful to software's HubDashboard */}
           <div
@@ -384,53 +399,57 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
             </div>
           </div>
 
-          {/* Right Column Agents (Antigravity, Roo Code, Codex, Goose) */}
-          <div className="absolute right-0 top-0 w-[190px] space-y-4 pt-4">
-            {agents.filter(a => a.side === 'right').map(agent => {
-              const isLinked = linkedAgentIds[agent.id];
-              const isHovered = hoveredAgent === agent.id;
-              return (
-                <div
-                  key={agent.id}
-                  onMouseEnter={() => setHoveredAgent(agent.id)}
-                  onMouseLeave={() => setHoveredAgent(null)}
-                  className={`group relative flex items-center justify-between p-2.5 rounded-xl border transition-all duration-200 cursor-pointer select-none ${
-                    isLinked
-                      ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/15 hover:border-slate-300 dark:hover:border-white/30 shadow-2xs hover:shadow-sm'
-                      : 'bg-slate-100/60 dark:bg-slate-950/40 border-slate-200/50 dark:border-white/5 opacity-55 hover:opacity-85'
-                  }`}
-                  style={{
-                    borderColor: isHovered && isLinked ? agent.color : undefined,
-                    boxShadow: isHovered && isLinked ? `0 0 16px ${agent.color}30` : undefined,
-                  }}
-                  onClick={() => handleToggleAgent(agent.id)}
-                  title={`${agent.name} (${isLinked ? 'Click to Unlink' : 'Click to Link'})`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={agent.icon}
-                      alt={agent.name}
-                      className={`size-6 object-contain rounded-md transition-transform group-hover:scale-105 ${!isLinked ? 'grayscale opacity-60' : ''}`}
-                    />
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight truncate">
-                        {agent.name}
-                      </h4>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[90px]">
-                        {agent.skillsDir}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`size-2 rounded-full shrink-0 transition-colors ${
-                      isLinked ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-slate-400 dark:bg-slate-600'
-                    }`}
+          {/* Right Column Agents (Antigravity, Roo Code, Codex, Goose) — Absolutely Positioned */}
+          {agents.filter(a => a.side === 'right').map(agent => {
+            const isLinked = linkedAgentIds[agent.id];
+            const isHovered = hoveredAgent === agent.id;
+            const topY = getNodeY(agent.row);
+            return (
+              <div
+                key={agent.id}
+                style={{
+                  position: 'absolute',
+                  left: GRAPH_WIDTH - CARD_WIDTH,
+                  top: topY,
+                  width: CARD_WIDTH,
+                  height: CARD_HEIGHT,
+                  borderColor: isHovered && isLinked ? agent.color : undefined,
+                  boxShadow: isHovered && isLinked ? `0 0 16px ${agent.color}30` : undefined,
+                }}
+                onMouseEnter={() => setHoveredAgent(agent.id)}
+                onMouseLeave={() => setHoveredAgent(null)}
+                className={`group flex items-center justify-between px-3 rounded-xl border transition-all duration-200 cursor-pointer select-none ${
+                  isLinked
+                    ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/15 hover:border-slate-300 dark:hover:border-white/30 shadow-2xs hover:shadow-sm'
+                    : 'bg-slate-100/60 dark:bg-slate-950/40 border-slate-200/50 dark:border-white/5 opacity-55 hover:opacity-85'
+                }`}
+                onClick={() => handleToggleAgent(agent.id)}
+                title={`${agent.name} (${isLinked ? 'Click to Unlink' : 'Click to Link'})`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <img
+                    src={agent.icon}
+                    alt={agent.name}
+                    className={`size-6 object-contain rounded-md transition-transform group-hover:scale-105 ${!isLinked ? 'grayscale opacity-60' : ''}`}
                   />
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight truncate">
+                      {agent.name}
+                    </h4>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[95px]">
+                      {agent.skillsDir}
+                    </p>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+
+                <span
+                  className={`size-2 rounded-full shrink-0 transition-colors ${
+                    isLinked ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-slate-400 dark:bg-slate-600'
+                  }`}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {/* ========================================================================= */}

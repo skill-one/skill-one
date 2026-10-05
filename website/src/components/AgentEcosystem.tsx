@@ -23,6 +23,7 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
 
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'top' | 'ide' | 'cli' | 'desktop'>('all');
+  const [showAll, setShowAll] = useState(false);
 
   const agents = agentsData as AgentItem[];
 
@@ -143,67 +144,85 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
             {t.emptyResult}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredAgents.map((agent) => (
-              <div
-                key={agent.name}
-                className="group relative p-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/70 hover:border-blue-400 dark:hover:border-blue-500/40 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between backdrop-blur-sm"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <img
-                        src={agent.icon}
-                        alt={agent.display}
-                        className="size-7 object-contain rounded-md transition-transform group-hover:scale-105"
-                      />
-                      <div className="min-w-0">
-                        <h4 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white leading-tight truncate">
-                          {agent.display}
-                        </h4>
-                        {agent.isTop && (
-                          <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
-                            <Sparkles className="size-2.5" /> Popular
-                          </span>
-                        )}
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {(showAll || query || activeTab !== 'all' ? filteredAgents : filteredAgents.slice(0, 16)).map((agent) => (
+                <div
+                  key={agent.name}
+                  className="group relative p-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/70 hover:border-blue-400 dark:hover:border-blue-500/40 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between backdrop-blur-sm"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={agent.icon}
+                          alt={agent.display}
+                          className="size-7 object-contain rounded-md transition-transform group-hover:scale-105"
+                        />
+                        <div className="min-w-0">
+                          <h4 className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white leading-tight truncate">
+                            {agent.display}
+                          </h4>
+                          {agent.isTop && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
+                              <Sparkles className="size-2.5" /> Popular
+                            </span>
+                          )}
+                        </div>
                       </div>
+
+                      {agent.website && (
+                        <a
+                          href={agent.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1"
+                          title={t.openWebsite}
+                        >
+                          <ExternalLink className="size-3.5" />
+                        </a>
+                      )}
                     </div>
 
-                    {agent.website && (
-                      <a
-                        href={agent.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1"
-                        title={t.openWebsite}
-                      >
-                        <ExternalLink className="size-3.5" />
-                      </a>
+                    <div className="text-[10px] text-slate-600 dark:text-slate-400 font-mono bg-slate-50 dark:bg-black/30 px-2 py-1 rounded truncate border border-slate-200/60 dark:border-white/5">
+                      {agent.skillsDir}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                    <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                      <CheckCircle className="size-3" />
+                      <span>{isZh ? '自动发现就绪' : 'Auto-detected'}</span>
+                    </span>
+                    {agent.stars > 0 && (
+                      <span className="flex items-center gap-1 font-mono text-slate-500 dark:text-slate-400">
+                        <Star className="size-3 text-amber-500 fill-amber-500" />
+                        {agent.stars >= 1000 ? `${(agent.stars / 1000).toFixed(1)}k` : agent.stars}
+                      </span>
                     )}
                   </div>
-
-                  <div className="text-[10px] text-slate-600 dark:text-slate-400 font-mono bg-slate-50 dark:bg-black/30 px-2 py-1 rounded truncate border border-slate-200/60 dark:border-white/5">
-                    {agent.skillsDir}
-                  </div>
                 </div>
+              ))}
+            </div>
 
-                <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
-                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                    <CheckCircle className="size-3" />
-                    <span>{isZh ? '自动发现就绪' : 'Auto-detected'}</span>
-                  </span>
-                  {agent.stars > 0 && (
-                    <span className="flex items-center gap-1 font-mono text-slate-500 dark:text-slate-400">
-                      <Star className="size-3 text-amber-500 fill-amber-500" />
-                      {agent.stars >= 1000 ? `${(agent.stars / 1000).toFixed(1)}k` : agent.stars}
-                    </span>
-                  )}
-                </div>
+            {/* Expand / Collapse Button when more than 16 agents */}
+            {!query && activeTab === 'all' && filteredAgents.length > 16 && (
+              <div className="mt-8 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowAll(!showAll)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-2xs transition-all"
+                >
+                  {showAll
+                    ? (isZh ? '收起列表 ↑' : 'Show Fewer Agents ↑')
+                    : (isZh ? `展开查看全部 ${filteredAgents.length} 款 AI 智能体 ↓` : `Show All ${filteredAgents.length} Supported Agents ↓`)}
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </section>
   );
 }
+
