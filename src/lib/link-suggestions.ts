@@ -153,10 +153,20 @@ export function rankNamesakes(
       skill,
       similarity: bestSimilarity(localDescription, skill),
     }))
-    .toSorted(
-      (a, b) =>
-        b.similarity - a.similarity || popularity(b.skill) - popularity(a.skill),
-    )
+    .toSorted((a, b) => {
+      // Composite score: text similarity + popularity boost (logarithmic stars/installs)
+      // When similarity is equal or very close, high-reputation official repos win.
+      // But a genuinely high text match (e.g. 0.85 vs 0.10) is preserved.
+      const popA = popularity(a.skill);
+      const popB = popularity(b.skill);
+      const boostA = popA > 0 ? Math.min(0.25, Math.log10(popA + 1) * 0.045) : 0;
+      const boostB = popB > 0 ? Math.min(0.25, Math.log10(popB + 1) * 0.045) : 0;
+      const scoreDiff = b.similarity + boostB - (a.similarity + boostA);
+      if (Math.abs(scoreDiff) > 1e-4) {
+        return scoreDiff;
+      }
+      return popB - popA;
+    })
     .slice(0, MAX_CANDIDATES);
 }
 

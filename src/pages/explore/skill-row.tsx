@@ -6,6 +6,7 @@ import { skillDescription } from "../../lib/i18n-content";
 import { Ordinal } from "../../components/ordinal";
 import {
   isInstallableSkill,
+  isLinkedLocalSkill,
   isLiveSkill,
   skillDisplayName,
   skillKey,
@@ -23,6 +24,7 @@ import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillInstalledTime } from "../../components/skill-installed-time";
 import { SkillPopularity } from "../../components/skill-popularity";
 import { Card } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -285,9 +287,26 @@ export const SkillRow = memo(function SkillRow({
             no description — its source publishes none, so the line claims
             nothing rather than a placeholder. */}
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-[14px] font-medium leading-tight">
-            <HighlightedText text={skillDisplayName(skill)} terms={matched?.name} />
-          </h3>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className="truncate text-[14px] font-medium leading-tight">
+              <HighlightedText text={skillDisplayName(skill)} terms={matched?.name} />
+            </h3>
+            {isLinkedLocalSkill(skill) && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Badge
+                      variant="secondary"
+                      className="h-4 px-1 text-[10px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
+                    >
+                      {t("common.localBadge")}
+                    </Badge>
+                  }
+                />
+                <TooltipContent>{t("common.localLinkedTooltip")}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
           {!live && (
             <p className="truncate text-[12px] leading-snug text-muted-foreground">
               {skillDescription(skill, locale) || t("common.noDescription")}

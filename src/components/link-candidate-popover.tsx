@@ -57,24 +57,21 @@ export function LinkCandidatePopover({
   const { t } = useTranslation();
   return (
     <>
-      <div className="flex flex-col gap-0.5">
-        <p className="text-xs font-medium">{t("sourceLink.title")}</p>
-        <p className="text-[11px] text-muted-foreground">
-          {t("sourceLink.subtitle", { name })}
-        </p>
-      </div>
-
-      {/* The local description is the fact candidates compare against. */}
-      {localDescription?.trim() ? (
-        <div className="rounded-md bg-muted/60 px-2 py-1.5">
-          <p className="pb-0.5 text-[10px] font-medium text-muted-foreground">
-            {t("sourceLink.localLabel")}
-          </p>
-          <p className="line-clamp-2 text-[11px] leading-snug text-foreground/90">
-            {localDescription}
-          </p>
+      <div className="flex flex-col gap-1 border-b border-border/40 pb-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-xs font-semibold text-foreground">{t("sourceLink.title")}</span>
+          <span className="text-[11px] text-muted-foreground truncate">{t("sourceLink.subtitle", { name })}</span>
         </div>
-      ) : null}
+        {localDescription?.trim() ? (
+          <div className="flex items-baseline gap-1 rounded bg-muted/50 px-2 py-1 text-[11px] text-muted-foreground">
+            <span className="shrink-0 font-medium text-foreground/80">{t("sourceLink.localLabel")}</span>
+            <span className="text-muted-foreground/60">:</span>
+            <span className="line-clamp-1 truncate text-foreground/80" title={localDescription}>
+              {localDescription}
+            </span>
+          </div>
+        ) : null}
+      </div>
 
       {beforeList}
 
@@ -95,7 +92,7 @@ export function LinkCandidatePopover({
         <p className="px-2 text-[11px] text-muted-foreground">{emptyLabel}</p>
       )}
 
-      <p className="text-[10px] text-muted-foreground">{t("sourceLink.footnote")}</p>
+      <p className="text-[10px] text-muted-foreground/75 text-center pt-0.5">{t("sourceLink.footnote")}</p>
 
       {afterList}
     </>

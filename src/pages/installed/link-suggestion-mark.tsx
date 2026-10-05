@@ -119,11 +119,8 @@ export function LinkSuggestionMark({
       onClick={(e) => e.stopPropagation()}
       className={cn(
         THIRD_PARTY_MARK_CLASS,
-        // Pressable, so it answers a pointer the way every control in the app
-        // does — but in its own amber, deepening rather than changing hue: a
-        // hover that greyed the ink would drop the mark back into the crowd it
-        // stands out of.
-        "cursor-pointer transition-colors hover:bg-amber-500/20 hover:text-amber-500",
+        // Pressable, so it answers a pointer the way every control in the app does
+        "cursor-pointer transition-colors hover:bg-accent hover:border-border hover:text-foreground",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         className,
       )}
@@ -132,7 +129,7 @@ export function LinkSuggestionMark({
         <ThirdPartyMarkGlyph />
       ) : (
         <>
-          <span className="font-semibold uppercase select-none leading-none text-inherit">
+          <span className="font-semibold uppercase select-none leading-none text-foreground">
             {skillInitial(name)}
           </span>
           <span
@@ -154,7 +151,7 @@ export function LinkSuggestionMark({
           align="start"
           sideOffset={6}
           onClick={(e) => e.stopPropagation()}
-          className="w-80 gap-2 p-3"
+          className="w-[340px] gap-2.5 p-3"
         >
           <LinkCandidatePopover
             name={name}

@@ -37,15 +37,13 @@ describe("ThirdPartyMark", () => {
     expect(mark).not.toHaveClass("size-8");
   });
 
-  it("is inked amber and cut large, so it never reads as a placeholder", () => {
+  it("wears a clean neutral fill matching the owner-face fallback", () => {
     renderMark({ className: "size-4" });
 
     const mark = screen.getByRole("img", { name: "第三方安装" });
-    // Amber, where the owner's face is the only true colour in that column: a
-    // muted grey glyph at 16px read as an avatar that failed to load, which is
-    // the one thing this mark must not look like.
-    expect(mark).toHaveClass("text-amber-500/80");
-    expect(mark).not.toHaveClass("text-muted-foreground");
+    expect(mark).toHaveClass("border-border/60", "bg-muted", "text-muted-foreground");
+    expect(mark).not.toHaveClass("bg-amber-500/10");
+    expect(mark).not.toHaveClass("text-amber-500/80");
     // 72% of the box, not the 58% that left a three-pixel smudge in a square.
     expect(mark.querySelector("svg")).toHaveClass("size-[72%]");
   });

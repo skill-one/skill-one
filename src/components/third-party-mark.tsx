@@ -10,13 +10,13 @@ import { cn } from "../lib/utils";
 
 /**
  * Geometric shell matching `OwnerAvatar`'s round box and hairline border.
+ * Defaults to a clean neutral tone matching shadcn/ui.
  */
 export const THIRD_PARTY_MARK_CLASS =
-  "relative flex shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500/80";
-
-/** The same box in the closed tone: a source-less skill with no candidate to link. */
-export const THIRD_PARTY_MARK_MUTED_CLASS =
   "relative flex shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted text-muted-foreground";
+
+/** The same box in the closed tone: identical neutral fill. */
+export const THIRD_PARTY_MARK_MUTED_CLASS = THIRD_PARTY_MARK_CLASS;
 
 /**
  * Extracts the first meaningful grapheme (letter, Chinese character, or emoji)
@@ -51,9 +51,9 @@ export function isMicroSize(className?: string): boolean {
 }
 
 /**
- * Dual-layer avatar for third-party / local skills (Monogram + Folder badge):
+ * Avatar for third-party / local skills:
  * - Center: Monogram letter extracted from the skill's name (or Folder glyph if no name).
- * - Bottom-Right Badge: Folder badge (or amber Link2 badge when linkable).
+ * - Bottom-Right Badge: Amber Link2 badge when namesake candidates exist to link.
  */
 export function ThirdPartyMark({
   name,
@@ -66,7 +66,7 @@ export function ThirdPartyMark({
   /** The skill's name (e.g. "git-commit"), used to derive the monogram. */
   name?: string;
   className?: string;
-  /** The closed tone: nothing to link, so the mark files under neutral. */
+  /** The closed tone: dim presentation for disabled skills. */
   muted?: boolean;
   /** Whether namesake candidates exist to link (shows amber link indicator). */
   candidate?: boolean;
@@ -84,13 +84,14 @@ export function ThirdPartyMark({
       role="img"
       aria-label={t("common.thirdPartyInstall")}
       className={cn(
-        candidate || !muted ? THIRD_PARTY_MARK_CLASS : THIRD_PARTY_MARK_MUTED_CLASS,
+        THIRD_PARTY_MARK_CLASS,
+        muted && "opacity-60",
         className,
       )}
     >
       {initial && !compact ? (
         <>
-          <span className="font-semibold uppercase select-none leading-none text-inherit">
+          <span className="font-semibold uppercase select-none leading-none text-foreground">
             {initial}
           </span>
           {showBadge && candidate && (

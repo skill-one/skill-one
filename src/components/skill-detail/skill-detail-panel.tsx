@@ -27,6 +27,7 @@ import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
 import {
+  isLinkedLocalSkill,
   skillDisplayName,
   skillKey,
   type SkillView,
@@ -43,6 +44,7 @@ import { effectiveDomains } from "../../lib/custom-tags";
 import { useCustomTags } from "../../hooks/use-custom-tags";
 import { SkillTagMenu } from "./skill-tag-menu";
 import { SkillPopularity } from "../skill-popularity";
+import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
   SheetContent,
@@ -683,27 +685,37 @@ export function SkillDetailPanel({
             />
           )}
           <div className="min-w-0 flex-1">
-            <SheetTitle className="truncate text-lg font-bold tracking-tight">
-              {shown ? skillDisplayName(shown) : null}
-            </SheetTitle>
+            <div className="flex items-center gap-2 min-w-0">
+              <SheetTitle className="truncate text-lg font-bold tracking-tight">
+                {shown ? skillDisplayName(shown) : null}
+              </SheetTitle>
+              {isLinkedLocalSkill(shown) && (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Badge
+                        variant="secondary"
+                        className="h-5 px-1.5 text-xs font-normal text-muted-foreground shrink-0 select-none cursor-default"
+                      >
+                        {t("common.localBadge")}
+                      </Badge>
+                    }
+                  />
+                  <TooltipContent>{t("common.localLinkedTooltip")}</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
             {hasSource && !isStore && shown && shown.origin === "local" ? (
-              <Tooltip>
-                <TooltipTrigger
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <SheetDescription
                   render={
-                    <SheetDescription
-                      render={
-                        <span className="inline-flex min-w-0 items-center gap-1">
-                          {repoLink}
-                          <SourceLinkMenu skill={shown} />
-                        </span>
-                      }
-                    />
+                    <span className="inline-flex min-w-0 items-center gap-1">
+                      {repoLink}
+                    </span>
                   }
                 />
-                <TooltipContent className="max-w-[260px] text-left normal-case">
-                  {t("detail.sourceViaLink")}
-                </TooltipContent>
-              </Tooltip>
+                <SourceLinkMenu skill={shown} />
+              </div>
             ) : hasSource ? (
               <SheetDescription render={repoLink} />
             ) : (

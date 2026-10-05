@@ -67,9 +67,8 @@ describe("LinkSuggestionMark", () => {
     const trigger = screen.getByRole("button", { name: "关联 pdf 的商店来源" });
     expect(trigger).toHaveClass("rounded-full", "border", "size-4");
     expect(trigger).toHaveTextContent("");
-    // Pressable, and pressable in its own amber: a hover that greyed the ink
-    // would drop the mark back into the crowd it stands out of.
-    expect(trigger).toHaveClass("hover:bg-amber-500/20");
+    // Pressable, so it answers a pointer the way every control in the app does
+    expect(trigger).toHaveClass("hover:bg-accent");
     // The trigger is the mark, so it is a control where the plain mark is a
     // graphic — never both at once, and never an icon riding beside it.
     expect(screen.queryAllByRole("img")).toHaveLength(0);
@@ -83,7 +82,7 @@ describe("LinkSuggestionMark", () => {
     ).not.toBeInTheDocument();
     const mark = screen.getByRole("img", { name: "第三方安装" });
     expect(mark).toHaveClass("rounded-full", "border", "size-4");
-    expect(mark).toHaveClass("bg-amber-500/10", "text-amber-500/80");
+    expect(mark).toHaveClass("border-border/60", "bg-muted", "text-muted-foreground");
   });
 
   it("renders a dual-layer avatar with initial and link badge when size is non-micro", () => {
@@ -109,7 +108,7 @@ describe("LinkSuggestionMark", () => {
     await user.hover(screen.getByRole("button", { name: "关联 pdf 的商店来源" }));
 
     const tooltip = await screen.findByRole("tooltip");
-    expect(tooltip).toHaveTextContent("关联来源，不改动本地文件");
+    expect(tooltip).toHaveTextContent("发现商店同名技能，点击关联来源以获取完整信息与自动更新");
   });
 
   it("opens a popover on click with local and candidate descriptions", async () => {
@@ -230,6 +229,6 @@ describe("LinkSuggestionMark", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText("第三方安装")).toBeInTheDocument();
     const mark = screen.getByRole("img", { name: "第三方安装" });
-    expect(mark).toHaveClass("bg-amber-500/10", "text-amber-500/80");
+    expect(mark).toHaveClass("border-border/60", "bg-muted", "text-muted-foreground");
   });
 });

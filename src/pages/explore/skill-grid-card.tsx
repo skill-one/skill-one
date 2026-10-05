@@ -5,6 +5,7 @@ import { useAppLocale } from "../../i18n/use-language";
 import { skillDescription } from "../../lib/i18n-content";
 import {
   isInstallableSkill,
+  isLinkedLocalSkill,
   isLiveSkill,
   skillDisplayName,
   type SkillView,
@@ -21,6 +22,7 @@ import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillInstalledTime } from "../../components/skill-installed-time";
 import { SkillPopularity } from "../../components/skill-popularity";
 import { Card } from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -170,12 +172,29 @@ export function SkillGridCard({
               />
             ))
           )}
-          <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-tight">
-            <HighlightedText
-              text={skillDisplayName(skill)}
-              terms={matched?.name}
-            />
-          </h3>
+          <div className="min-w-0 flex-1 flex items-center gap-1.5">
+            <h3 className="min-w-0 truncate text-[13px] font-medium leading-tight">
+              <HighlightedText
+                text={skillDisplayName(skill)}
+                terms={matched?.name}
+              />
+            </h3>
+            {isLinkedLocalSkill(skill) && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Badge
+                      variant="secondary"
+                      className="h-3.5 px-1 text-[9px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
+                    >
+                      {t("common.localBadge")}
+                    </Badge>
+                  }
+                />
+                <TooltipContent>{t("common.localLinkedTooltip")}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
 
         {/* What it does, at most two lines so every square stays a square. */}

@@ -25,7 +25,9 @@
     "openOnGitHubAria": "Open {{repo}} on GitHub",
     "stars": "{{count}} stars",
     "thirdPartyInstall": "Third-party install",
-    "thirdPartyInstallTip": "Third-party install — no source linked"
+    "thirdPartyInstallTip": "Third-party install — no source linked",
+    "localBadge": "Local",
+    "localLinkedTooltip": "Locally installed skill, linked to store metadata"
   },
   "nav": {
     "mainAria": "Main navigation",
@@ -205,8 +207,9 @@
     "linkSuggestionAction": "Link to store available",
     "title": "Link source",
     "subtitle": "Choose the source repository for {{name}}",
-    "tooltip": "Link source — local files unchanged",
+    "tooltip": "Matching skill found in store. Click to link source for full details and auto-updates",
     "cutBadge": "Ignored",
+    "recommendedBadge": "Recommended",
     "localLabel": "Local description",
     "starsTitle": "Repository stars",
     "similarity": "{{percent}}% similar description",
@@ -243,9 +246,11 @@
     "sourceViaLink": "Installed by another tool, linked to this store entry",
     "changeSource": "Change linked source",
     "changeSourceAria": "Change the source linked to {{name}}",
+    "changeSourceShort": "Change",
     "currentSource": "Current source",
     "noOtherSources": "No other store entries share this skill's name.",
     "unlinkSource": "Unlink source",
+    "unlinkSourceAria": "Unlink the source for {{name}}",
     "sourceUnlinked": "Source unlinked; back to a third-party install",
     "installedAtLabel": "Installed ",
     "installedAtHint": "Creation time of the skill directory; skills adopted from an agent directory keep their original timestamp.",

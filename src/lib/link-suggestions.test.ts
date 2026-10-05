@@ -189,6 +189,26 @@ describe("rankNamesakes", () => {
     expect(ranked.map((c) => c.similarity)).toEqual([1, 1]);
   });
 
+  it("prioritizes highly reputable repository over minor-similarity fork", () => {
+    const ranked = rankNamesakes(
+      [
+        namesake("fork/skills", {
+          description: "PDF files tool.",
+          stars: 50,
+          downloads: 10,
+        }),
+        namesake("anthropics/skills", {
+          description: "Read, generate, and manipulate PDF documents.",
+          stars: 150000,
+          downloads: 500000,
+        }),
+      ],
+      "PDF tools",
+    );
+
+    expect(ranked[0].skill.repo).toBe("anthropics/skills");
+  });
+
   it("caps the candidate list", () => {
     const ranked = rankNamesakes(
       Array.from({ length: 10 }, (_, i) =>
