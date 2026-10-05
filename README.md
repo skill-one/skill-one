@@ -11,12 +11,10 @@ A desktop app for finding, installing, and managing agent skills. Built on Tauri
 - **Store / Explore**: Browse the skills registry, view each skill's description (`SKILL.md`), and install with one click.
 - **My Skills**: View, update, and uninstall installed skills.
 - **Agent Linking**: Link the skill directories of various agents (Claude Code, Cursor, Gemini CLI, etc.) to a unified directory, with support for migrating existing skills.
-- **Auto-Update**: The app checks for new releases at startup, on refocus, and hourly, then installs signed updates in one click — no re-downloading, and no Apple Developer account involved (updates are verified with a minisign key). Homebrew installs are handed back to `brew upgrade` instead.
+- **Auto-Update**: The app checks for new releases at startup, on refocus, and hourly, then installs signed updates in one click — no re-downloading, and no Apple Developer account involved (updates are verified with a minisign key).
 - **Settings**: Configure the download source for registry files (direct GitHub or a CDN mirror).
 
 ## Installation
-
-### Download from Releases (recommended)
 
 Grab the latest `.dmg` from the [Releases](https://github.com/skill-one/skill-one/releases) page (currently macOS on Apple Silicon), then:
 
@@ -25,19 +23,9 @@ Grab the latest `.dmg` from the [Releases](https://github.com/skill-one/skill-on
 
 From v0.2.0 onwards you never need to download again: new versions arrive through the built-in updater. (Installs of earlier versions have no updater, so they need this one manual reinstall.)
 
-### Homebrew (one command)
-
-```bash
-brew install --cask skill-one/tap/skill-one
-```
-
-Brew users can keep updating with `brew upgrade --cask skill-one`; brew downloads carry no quarantine attribute, so Gatekeeper never prompts.
-
 ## Staying up to date
 
 The app checks for updates at startup, whenever it regains focus, and hourly as a fallback. When a newer version exists it offers **Update now** — download, install, relaunch. You can also check manually: **Settings popover → Software Update**. Update packages are signature-verified before installation; a package with an invalid signature is never installed.
-
-A Homebrew install is excluded from in-app updates: the app detects the cask and points you at `brew upgrade --cask skill-one` instead, so Homebrew never loses track of which version is installed.
 
 ## macOS first launch
 
@@ -47,7 +35,7 @@ The app is ad-hoc signed, so a manually downloaded `.dmg` may be blocked by Gate
 - **System Settings → Privacy & Security** → **Open Anyway** next to the blocked-app notice;
 - Run `xattr -d com.apple.quarantine "/Applications/Skill One.app"` in Terminal.
 
-After that the app opens normally, and later in-app updates never prompt again. Homebrew installs skip this entirely.
+After that the app opens normally, and later in-app updates never prompt again.
 
 ## Usage
 

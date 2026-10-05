@@ -6,7 +6,6 @@ mod activity;
 mod dir_fingerprint;
 mod provenance;
 mod skills;
-mod update_channel;
 
 pub fn run() {
     tauri::Builder::default()
@@ -37,7 +36,6 @@ pub fn run() {
             activity::read_activity,
             activity::clear_activity,
             activity::open_activity_dir,
-            update_channel::is_homebrew_install,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

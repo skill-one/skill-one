@@ -103,7 +103,6 @@
     "newVersion": "Update available",
     "checking": "Checking…",
     "upToDate": "Up to date",
-    "managed": "Managed by Homebrew",
     "failed": "Check failed",
     "dialogTitle": "Update to v{{version}}",
     "readyHint": "The new version is ready. The app will restart briefly during installation.",

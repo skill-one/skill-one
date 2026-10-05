@@ -22,24 +22,18 @@
 // throttle stamp is kept and the retry window doubles per consecutive failure,
 // so an offline or otherwise hopeless install settles into a slow poll instead
 // of firing one doomed request per focus hop.
-//
-// A Homebrew-managed bundle is refused outright: `brew upgrade` owns it, and
-// replacing it in place would desync the cask (see update-channel.ts).
 
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
 import { errorMessage } from "./utils";
 import { isTauri } from "./tauri";
-import { getUpdateChannel } from "./update-channel";
 
 export type UpdatePhase =
   | "idle"
   | "checking"
   | "upToDate"
   | "available"
-  /** Homebrew owns this install; the in-app updater stands down. */
-  | "managed"
   | "error";
 
 export interface UpdateStatus {
@@ -154,12 +148,6 @@ export async function checkForUpdate(
   inFlight = true;
   emit({ ...INITIAL, phase: "checking" });
   try {
-    // Homebrew installs are upgraded by brew: self-updating one would leave
-    // the cask pointing at a version it does not have.
-    if ((await getUpdateChannel()) === "homebrew") {
-      emit({ ...INITIAL, phase: "managed" });
-      return;
-    }
     const update = await check({ timeout: CHECK_TIMEOUT_MS });
     lastCheckedAt = Date.now();
     failureCount = 0;

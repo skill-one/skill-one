@@ -19,7 +19,7 @@ Skill One 通过 Tauri v2 官方 **updater 插件**自更新。可信性由 **mi
   GitHub 的 `releases/latest` 指针，该指针有边缘缓存：新 Release 可能要一分钟后才对客户端可见。
 - **发现新版本时** —— 不再弹模态打断。窗口顶栏的「设置」入口旁会出现一枚绿色「有新版本」徽章；
   **点它就能从任意页面直接唤起确认弹窗**，不需要知道更新入口藏在设置里。
-  设置浮窗的「软件更新」行就地呈现其余状态（已是最新、检查失败、Homebrew 接管），发现新版本时则
+  设置浮窗的「软件更新」行就地呈现其余状态（已是最新、检查失败），发现新版本时则
   交棒给确认弹窗。徽章挂在已有图标上而不是新增一行，与 VS Code（设置齿轮上的徽章）、Chrome（⋮
   菜单上的徽章）、Slack（工作区徽章）一致，避免同一件事在两处重复提示。
 - **安装** —— 你确认后，应用下载更新包、按 `tauri.conf.json` 里的 `plugins.updater.pubkey` 验签、
@@ -28,19 +28,10 @@ Skill One 通过 Tauri v2 官方 **updater 插件**自更新。可信性由 **mi
   进度按服务端给出的包大小换算成百分比；若服务端没有返回 `Content-Length`，弹窗会如实说明，而不是
   把进度条钉在 0%。
 
-## Homebrew 安装
-
-由 cask 管理的 bundle 永不自更新。首次检测会先向 Rust 询问安装渠道
-（`is_homebrew_install` → `src-tauri/src/update_channel.rs`，探测 `/opt/homebrew/Caskroom` 或
-`/usr/local/Caskroom` 下的 cask 目录），命中则整体让位：设置浮窗会说明情况并指向
-`brew upgrade --cask skill-one`。对 cask 安装做自更新会让 Homebrew 记录的版本与实际不符，两个更新器
-也会互相打架。从 Caskroom 拷出来的副本会回到自更新；探测失败同样退回自更新，而不是把用户困在旧版本。
-
 ## 怎么发版
 
 推一个附注 tag 就等于发布一次更新，其余全部由 CI（`.github/workflows/release.yml`、`macos-14`）
-完成——只构建一次、创建 Release 并生成更新说明、把说明写进 `latest.json`、上传三个文件、随后更新
-Homebrew cask。每次发版都不用改配置：应用永远跟随最新一次 Release。
+完成——只构建一次、创建 Release 并生成更新说明、把说明写进 `latest.json`、上传三个文件。每次发版都不用改配置：应用永远跟随最新一次 Release。
 
 ```bash
 # 1) 四处版本号一起改成 X.Y.Z —— 必须完全一致
@@ -56,7 +47,7 @@ git push origin vX.Y.Z
 
 | 文件 | 谁在用 |
 | --- | --- |
-| `Skill One_X.Y.Z_aarch64.dmg` | 新用户、Homebrew |
+| `Skill One_X.Y.Z_aarch64.dmg` | 新用户 |
 | `Skill One.app.tar.gz` | 已安装用户——更新包本体 |
 | `latest.json` | 应用内更新器（版本号 + 签名 + 更新说明） |
 

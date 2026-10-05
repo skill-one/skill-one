@@ -1,26 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the native plugins + Tauri detection so the store's state machine can
-// be exercised in plain jsdom. `invoke` stands in for the Rust
-// `is_homebrew_install` probe: `managed` is its answer, `probeFails` a broken
-// bridge. It is a plain async function rather than a `vi.fn()` so that a stray
-// `restoreAllMocks` can never turn it back into a non-thenable.
+// be exercised in plain jsdom.
 const mocks = vi.hoisted(() => ({
   isTauri: false,
-  managed: false,
-  probeFails: false,
   check: vi.fn(),
   relaunch: vi.fn(),
   downloadAndInstall: vi.fn(),
 }));
 
 vi.mock("./tauri", () => ({ isTauri: () => mocks.isTauri }));
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: async () => {
-    if (mocks.probeFails) throw new Error("no such command");
-    return mocks.managed;
-  },
-}));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: mocks.check }));
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch: mocks.relaunch }));
 
@@ -36,7 +25,6 @@ import {
   resetUpdateState,
   subscribeUpdate,
 } from "./update-store";
-import { resetUpdateChannel } from "./update-channel";
 
 /** A fake `Update` object shaped like the plugin's return value. */
 function fakeUpdate(version = "9.9.9") {
@@ -65,14 +53,11 @@ function advance(ms: number) {
 beforeEach(() => {
   clock = CLOCK_BASE;
   mocks.isTauri = true;
-  mocks.managed = false;
-  mocks.probeFails = false;
   mocks.check.mockReset();
   mocks.relaunch.mockReset();
   mocks.downloadAndInstall.mockReset();
   vi.spyOn(Date, "now").mockImplementation(() => clock);
   resetUpdateState();
-  resetUpdateChannel();
 });
 
 afterEach(() => {
@@ -322,33 +307,6 @@ describe("update-store throttle", () => {
     advance(MIN_CHECK_INTERVAL_MS);
     await checkForUpdate();
     expect(mocks.check).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("update-store homebrew installs", () => {
-  it("stands down and tells the user to use brew", async () => {
-    mocks.managed = true;
-    await checkForUpdate();
-    // Self-updating a cask-managed bundle would desync the cask.
-    expect(mocks.check).not.toHaveBeenCalled();
-    expect(getUpdateStatus().phase).toBe("managed");
-  });
-
-  it("stands down on a manual check too", async () => {
-    mocks.managed = true;
-    await checkForUpdate({ force: true });
-    expect(mocks.check).not.toHaveBeenCalled();
-    expect(getUpdateStatus().phase).toBe("managed");
-  });
-
-  it("falls back to self-update when the probe fails", async () => {
-    mocks.probeFails = true;
-    mocks.check.mockResolvedValue(null);
-
-    // A broken probe must never strand the user on an old version.
-    await checkForUpdate();
-    expect(mocks.check).toHaveBeenCalledTimes(1);
-    expect(getUpdateStatus().phase).toBe("upToDate");
   });
 });
 

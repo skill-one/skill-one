@@ -11,31 +11,19 @@
 - **商店 / 探索**：浏览 skills 注册表，查看每个 skill 的说明（`SKILL.md`）并一键安装。
 - **我的 Skills**：查看、更新与卸载已安装的技能。
 - **Agent 链接**：将各类 agent（Claude Code、Cursor、Gemini CLI 等）的技能目录链接到统一目录，支持迁移已有技能。
-- **应用内自更新**：启动时、切回前台及每小时兜底检查新版本，一键下载安装签名更新包——无需重新手动下载，也无需 Apple 开发者账号（更新包以 minisign 密钥验签）；Homebrew 安装自动交由 `brew upgrade` 处理。
+- **应用内自更新**：启动时、切回前台及每小时兜底检查新版本，一键下载安装签名更新包——无需重新手动下载，也无需 Apple 开发者账号（更新包以 minisign 密钥验签）。
 - **设置**：可配置注册表文件的下载源（直连 GitHub 或 CDN 镜像）。
 
 ## 安装
-
-### 从 Releases 下载（推荐）
 
 到 [Releases](https://github.com/skill-one/skill-one/releases) 页面下载最新的 `.dmg`（目前提供 macOS Apple Silicon 版），然后：
 
 1. 打开 `.dmg`，把 **Skill One** 拖入「应用程序」文件夹。
 2. 启动应用——首次启动只需按 [macOS 首次安装须知](#macos-首次安装须知) 放行一次 Gatekeeper。
 
-### Homebrew（一条命令）
-
-```bash
-brew install --cask skill-one/tap/skill-one
-```
-
-Homebrew 用户可继续用 `brew upgrade --cask skill-one` 升级；brew 下载不带 quarantine 属性，因此不会触发 Gatekeeper 提示。
-
 ## 保持最新
 
 启动时、切回前台时以及每小时兜底自动检查更新；发现新版会提示，点「立即更新」即下载安装并自动重启；也可手动检查：**设置浮窗 → 软件更新**。更新包安装前会做签名校验，签名不符不会安装。
-
-Homebrew 安装会被排除在应用内更新之外：应用识别到 cask 后会在设置浮窗提示改用 `brew upgrade --cask skill-one` 升级，这样 Homebrew 记录到的版本永远与实际一致。
 
 ## macOS 首次安装须知
 
@@ -45,7 +33,7 @@ Homebrew 安装会被排除在应用内更新之外：应用识别到 cask 后�
 - **系统设置 → 隐私与安全性** → 点被拦截提示处的**仍要打开**；
 - 终端执行 `xattr -d com.apple.quarantine "/Applications/Skill One.app"`。
 
-放行后永久正常打开，后续应用内更新不会再提示；Homebrew 安装无此步骤。
+放行后永久正常打开，后续应用内更新不会再提示。
 
 ## 使用
 

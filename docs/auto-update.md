@@ -24,7 +24,7 @@ anywhere in the pipeline.
 - **When an update is found** — no modal interrupts you. A green **有新版本** chip appears beside the
   header's **设置** entry, and **clicking it opens the confirmation dialog from wherever the user is**
   — nobody has to know the update is filed under settings. The 软件更新 row in the settings popover reports the other phases in place (up to date,
-  check failed, Homebrew-managed) and, when a version is waiting, hands off to the confirmation
+  check failed) and, when a version is waiting, hands off to the confirmation
   dialog. One badge on an icon the user already knows, as in VS Code's gear, Chrome's ⋮ menu and
   Slack's workspace — one signal per fact instead of two.
 - **Installing** — on your go-ahead the app downloads the package, verifies its signature against
@@ -35,21 +35,11 @@ anywhere in the pipeline.
   the reported package size; when the server sends no `Content-Length` the dialog says so instead of
   pinning a bar at 0%.
 
-## Homebrew installs
-
-A cask-managed bundle is never self-updated. The first check asks Rust for the install channel
-(`is_homebrew_install` → `src-tauri/src/update_channel.rs`, which looks for the cask directory under
-`/opt/homebrew/Caskroom` or `/usr/local/Caskroom`) and, if it finds one, stands down: the settings
-popover says so and points at `brew upgrade --cask skill-one`. Self-updating a cask install would leave
-Homebrew recording a version it does not have, and the two updaters would fight over the bundle. A
-bundle copied out of the Caskroom goes back to self-update, and a failed probe degrades to
-self-update rather than stranding the user on an old version.
-
 ## Cutting a release
 
 Pushing one annotated tag publishes the update; CI (`.github/workflows/release.yml`, `macos-14`)
 does everything else — builds once, creates the GitHub Release with generated notes, bakes those
-notes into `latest.json`, uploads the three files, then bumps the Homebrew cask. No per-release
+notes into `latest.json`, and uploads the three files. No per-release
 config: the app always follows the newest release.
 
 ```bash
@@ -66,7 +56,7 @@ git push origin vX.Y.Z
 
 | File | Consumed by |
 | --- | --- |
-| `Skill One_X.Y.Z_aarch64.dmg` | new users, Homebrew |
+| `Skill One_X.Y.Z_aarch64.dmg` | new users |
 | `Skill One.app.tar.gz` | existing installs — the updater payload |
 | `latest.json` | the in-app updater (version + signature + release notes) |
 

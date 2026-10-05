@@ -103,7 +103,6 @@
     "newVersion": "有新版本",
     "checking": "检查中…",
     "upToDate": "已是最新",
-    "managed": "Homebrew 管理",
     "failed": "检查失败",
     "dialogTitle": "更新到 v{{version}}",
     "readyHint": "新版本已准备就绪，安装过程中应用会短暂重启。",

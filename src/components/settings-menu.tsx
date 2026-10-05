@@ -101,12 +101,6 @@ function UpdateRowStatus({
       );
     case "available":
       return <Badge variant="success">{t("update.newVersion")}</Badge>;
-    case "managed":
-      return (
-        <span className="text-xs text-muted-foreground">
-          {t("update.managed")}
-        </span>
-      );
     case "error":
       return (
         <span className="text-xs text-destructive">{t("update.failed")}</span>
@@ -263,7 +257,7 @@ export function SettingsMenu() {
           {/* closeOnClick=false: the row reports the check's outcome in
               place, so the menu must stay open while it does. */}
           <DropdownMenuItem
-            disabled={phase === "checking" || phase === "managed"}
+            disabled={phase === "checking"}
             closeOnClick={false}
             onClick={handleUpdateClick}
           >
@@ -283,16 +277,8 @@ export function SettingsMenu() {
               )}
             </span>
           </DropdownMenuItem>
-          {/* The two phases worth a second line: the brew command to run
-              instead of the in-app updater, and why a check failed. Rendered
-              as inert rows so they stay inside the menu's flow. */}
-          {phase === "managed" && (
-            <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-              <code className="rounded bg-muted px-1 py-0.5">
-                brew upgrade --cask skill-one
-              </code>
-            </DropdownMenuItem>
-          )}
+          {/* The phase worth a second line: why a check failed. Rendered
+              as an inert row so it stays inside the menu's flow. */}
           {phase === "error" && (
             <DropdownMenuItem
               disabled

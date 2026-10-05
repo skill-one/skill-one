@@ -8,24 +8,19 @@ import { I18nProvider } from "../i18n/language-provider";
 import { SettingsMenu } from "./settings-menu";
 import { TooltipProvider } from "./ui/tooltip";
 import { getUpdateStatus, resetUpdateState } from "../lib/update-store";
-import { resetUpdateChannel } from "../lib/update-channel";
 
 /**
  * The 软件更新 row runs against the real update store, so the desktop toggle
- * (off by default, matching jsdom) and the install channel are driven from here.
+ * (off by default, matching jsdom) is driven from here.
  */
 const updateEnv = vi.hoisted(() => ({
   isTauri: false,
-  managed: false,
   release: null as { version: string; body?: string } | null,
 }));
 
 vi.mock("../lib/tauri", () => ({ isTauri: () => updateEnv.isTauri }));
 vi.mock("@tauri-apps/plugin-updater", () => ({
   check: async () => updateEnv.release,
-}));
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: async () => updateEnv.managed,
 }));
 // Desktop mode also reaches the native window API (theme sync); jsdom is not
 // Tauri, so the bridge is stubbed rather than exercised.
@@ -101,11 +96,9 @@ describe("SettingsMenu", () => {
     document.documentElement.style.colorScheme = "";
     stats.current = null;
     updateEnv.isTauri = false;
-    updateEnv.managed = false;
     updateEnv.release = null;
-    // Store state (and the memoised channel) outlives a render.
+    // Store state outlives a render.
     resetUpdateState();
-    resetUpdateChannel();
   });
 
   afterEach(() => {
@@ -185,29 +178,6 @@ describe("SettingsMenu", () => {
     await user.click(screen.getByRole("menuitem", { name: /软件更新/ }));
 
     expect(await screen.findByText("已是最新")).toBeInTheDocument();
-  });
-
-  it("hands a Homebrew-managed install back to brew", async () => {
-    const user = userEvent.setup();
-    updateEnv.isTauri = true;
-    updateEnv.managed = true;
-    renderSettings();
-    await openMenu(user);
-
-    // The check is what discovers the managed install; the row is enabled
-    // while the phase is still idle.
-    await user.click(screen.getByRole("menuitem", { name: /软件更新/ }));
-
-    // The status settles before the row's command text is worth asserting.
-    expect(await screen.findByText("Homebrew 管理")).toBeInTheDocument();
-    expect(screen.getByText(/brew upgrade --cask skill-one/)).toBeInTheDocument();
-    // The row stops pretending a check could help. Base UI marks a disabled
-    // menu item with aria-disabled rather than the disabled property, which
-    // is what `toBeDisabled` reads.
-    expect(screen.getByRole("menuitem", { name: /软件更新/ })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
   });
 
   it("announces a new version on the row and hands off to the confirmation dialog", async () => {
