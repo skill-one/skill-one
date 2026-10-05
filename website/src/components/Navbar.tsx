@@ -54,7 +54,7 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
         </a>
 
         {/* Desktop Nav Links */}
-        <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-600 dark:text-slate-300">
+        <nav className="hidden lg:flex items-center gap-7 text-sm font-medium text-slate-600 dark:text-slate-300">
           <a href="#features" className="hover:text-slate-900 dark:hover:text-white transition-colors">
             {t.features}
           </a>
@@ -70,7 +70,7 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
         </nav>
 
         {/* Right CTA / Theme / Language / GitHub */}
-        <div className="hidden sm:flex items-center gap-2.5">
+        <div className="hidden lg:flex items-center gap-2.5">
           {/* Theme Toggle Button */}
           <button
             type="button"
@@ -114,7 +114,7 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
         </div>
 
         {/* Mobile Hamburger & Theme Toggle */}
-        <div className="flex sm:hidden items-center gap-1.5">
+        <div className="flex lg:hidden items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={toggleTheme}
@@ -125,14 +125,21 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
           </button>
           <a
             href={t.switchLangUrl}
-            className="px-2 py-1 rounded-lg text-slate-700 dark:text-slate-300 text-xs border border-slate-200 dark:border-white/10"
+            className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-slate-700 dark:text-slate-300 text-xs border border-slate-200 dark:border-white/10"
           >
             {t.switchLang}
+          </a>
+          <a
+            href="#download"
+            className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition-all shadow-xs"
+          >
+            <Download className="size-3.5" />
+            <span>{t.download}</span>
           </a>
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+            className="p-1.5 sm:p-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
             aria-label="Toggle Navigation Menu"
           >
             {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -142,7 +149,7 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="sm:hidden px-4 pt-3 pb-6 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#090d16] space-y-3">
+        <div className="lg:hidden px-4 pt-3 pb-6 border-b border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#090d16]/95 backdrop-blur-2xl space-y-3 shadow-lg">
           <a
             href="#features"
             onClick={() => setMobileMenuOpen(false)}

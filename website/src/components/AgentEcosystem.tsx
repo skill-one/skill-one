@@ -27,9 +27,9 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
 
   const agents = agentsData as AgentItem[];
 
-  // Categorize
+  // Categorize and prioritize flagship agents
   const filteredAgents = useMemo(() => {
-    return agents.filter((agent) => {
+    const list = agents.filter((agent) => {
       const q = query.toLowerCase().trim();
       const matchQuery = !q ||
         agent.name.toLowerCase().includes(q) ||
@@ -44,12 +44,19 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
         return ['cursor', 'windsurf', 'cline', 'roocode', 'githubcopilot', 'continue', 'augment', 'trae'].includes(agent.name);
       }
       if (activeTab === 'cli') {
-        return ['antigravity-cli', 'claudecode', 'geminicli', 'opencode', 'codex', 'goose', 'iflow-cli', 'tabnine-cli'].includes(agent.name);
+        return ['antigravity-cli', 'claude-code', 'geminicli', 'opencode', 'codex', 'goose', 'iflow-cli', 'tabnine-cli'].includes(agent.name);
       }
       if (activeTab === 'desktop') {
         return ['aider-desk', 'antigravity', 'astrbot', 'codestudio', 'cortex', 'lmstudio', 'pochi'].includes(agent.name);
       }
       return true;
+    });
+
+    // Prioritize flagship tools (Cursor, Claude, Windsurf, Cline, etc.) before others
+    return [...list].sort((a, b) => {
+      if (a.isTop && !b.isTop) return -1;
+      if (!a.isTop && b.isTop) return 1;
+      return a.display.localeCompare(b.display);
     });
   }, [agents, query, activeTab]);
 

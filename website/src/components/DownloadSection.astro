@@ -33,7 +33,7 @@ const RELEASE_URL = 'https://github.com/skill-one/skill-one/releases/latest';
       <!-- macOS Card (Featured) -->
       <div class="rounded-2xl border border-blue-300 dark:border-blue-500/30 bg-white dark:bg-slate-900/80 p-6 backdrop-blur-md flex flex-col justify-between relative shadow-md">
         <div class="absolute -top-3 right-4 px-2.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider shadow-xs">
-          Recommended
+          {isZh ? '官方推荐' : 'Recommended'}
         </div>
 
         <div>
@@ -73,7 +73,7 @@ const RELEASE_URL = 'https://github.com/skill-one/skill-one/releases/latest';
         </div>
 
         <div class="mt-6 pt-4 border-t border-slate-100 dark:border-white/5 text-[10px] text-slate-500 dark:text-slate-400 font-mono text-center">
-          Universal Binary Available
+          {isZh ? '通用架构原生适配 (M系列与Intel芯片)' : 'Universal Binary Available'}
         </div>
       </div>
 
@@ -103,7 +103,7 @@ const RELEASE_URL = 'https://github.com/skill-one/skill-one/releases/latest';
         </div>
 
         <div class="mt-6 pt-4 border-t border-slate-100 dark:border-white/5 text-[10px] text-slate-500 dark:text-slate-400 font-mono text-center">
-          Native Windows Symlink Support
+          {isZh ? '原生支持 Windows 目录软链穿透' : 'Native Windows Symlink Support'}
         </div>
       </div>
 
@@ -133,7 +133,7 @@ const RELEASE_URL = 'https://github.com/skill-one/skill-one/releases/latest';
         </div>
 
         <div class="mt-6 pt-4 border-t border-slate-100 dark:border-white/5 text-[10px] text-slate-500 dark:text-slate-400 font-mono text-center">
-          Standard Posix Symlink Architecture
+          {isZh ? '标准 POSIX 文件系统软链架构' : 'Standard Posix Symlink Architecture'}
         </div>
       </div>
     </div>

@@ -78,7 +78,7 @@
     "icon": "/agents/icons/claudecode-color.svg",
     "stars": 0,
     "skillsDir": "~/.agents/skills",
-    "isTop": false
+    "isTop": true
   },
   {
     "name": "openclaw",

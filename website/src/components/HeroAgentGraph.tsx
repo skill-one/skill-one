@@ -122,13 +122,13 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
   return (
     <div className="w-full max-w-5xl mx-auto select-none">
       {/* Broadcast Live Status Notification */}
-      <div className="mb-4 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 shadow-xs backdrop-blur-md text-xs transition-colors">
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-2.5 w-2.5">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 shadow-xs backdrop-blur-md text-xs transition-colors">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="relative flex h-2.5 w-2.5 shrink-0">
             <span className={`absolute inline-flex h-full w-full rounded-full ${broadcastingSkill ? 'bg-amber-400 animate-ping' : 'bg-emerald-500 animate-pulse'}`}></span>
             <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${broadcastingSkill ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
           </span>
-          <span className="text-slate-700 dark:text-slate-300 font-medium">
+          <span className="text-slate-700 dark:text-slate-300 font-medium truncate">
             {broadcastingSkill ? (
               <span className="text-amber-600 dark:text-amber-400 font-mono font-semibold">
                 {isZh ? `⚡ 正在广播 '${broadcastingSkill}' 至所有智能体 (底层软链 0ms 秒级生效)...` : `⚡ Broadcasting '${broadcastingSkill}' to all agents (atomic symlinks active)...`}
@@ -141,7 +141,7 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
           </span>
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+        <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0">
           <span className="hidden sm:inline">
             {isZh ? '点击中枢技能体验即时广播' : 'Click any skill to trigger live sync'}
           </span>
@@ -154,7 +154,7 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
       {/* Main Graphical Canvas Container */}
       <div className="relative w-full rounded-2xl border border-slate-200/90 dark:border-white/10 bg-slate-50/70 dark:bg-[#0b101d]/90 p-4 sm:p-6 backdrop-blur-xl shadow-lg transition-colors overflow-hidden">
         {/* Subtle Ambient Radial Backlight */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[300px] bg-gradient-to-r from-blue-400/10 via-purple-400/8 to-teal-400/10 blur-3xl pointer-events-none rounded-full" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[520px] h-[300px] bg-gradient-to-r from-blue-400/10 via-purple-400/8 to-teal-400/10 blur-3xl pointer-events-none rounded-full" />
 
         {/* ========================================================================= */}
         {/* DESKTOP VIEW: High-Fidelity S-Curve Graph */}
@@ -399,7 +399,7 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
             </div>
           </div>
 
-          {/* Right Column Agents (Antigravity, Roo Code, Codex, Goose) — Absolutely Positioned */}
+          {/* Right Column Agents (Antigravity, Roo Code, Codex, Goose) — Absolutely Positioned & Mirrored */}
           {agents.filter(a => a.side === 'right').map(agent => {
             const isLinked = linkedAgentIds[agent.id];
             const isHovered = hoveredAgent === agent.id;
@@ -426,13 +426,15 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
                 onClick={() => handleToggleAgent(agent.id)}
                 title={`${agent.name} (${isLinked ? 'Click to Unlink' : 'Click to Link'})`}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <img
-                    src={agent.icon}
-                    alt={agent.name}
-                    className={`size-6 object-contain rounded-md transition-transform group-hover:scale-105 ${!isLinked ? 'grayscale opacity-60' : ''}`}
-                  />
-                  <div className="min-w-0">
+                {/* Port dot on the left, facing Hub and ribbon connection */}
+                <span
+                  className={`size-2 rounded-full shrink-0 transition-colors ${
+                    isLinked ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-slate-400 dark:bg-slate-600'
+                  }`}
+                />
+
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 justify-end">
+                  <div className="min-w-0 text-right">
                     <h4 className="text-xs font-semibold text-slate-900 dark:text-white leading-tight truncate">
                       {agent.name}
                     </h4>
@@ -440,13 +442,12 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
                       {agent.skillsDir}
                     </p>
                   </div>
+                  <img
+                    src={agent.icon}
+                    alt={agent.name}
+                    className={`size-6 object-contain rounded-md transition-transform group-hover:scale-105 shrink-0 ${!isLinked ? 'grayscale opacity-60' : ''}`}
+                  />
                 </div>
-
-                <span
-                  className={`size-2 rounded-full shrink-0 transition-colors ${
-                    isLinked ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-slate-400 dark:bg-slate-600'
-                  }`}
-                />
               </div>
             );
           })}
@@ -504,21 +505,21 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
         </div>
 
         {/* Footer Metrics Row */}
-        <div className="mt-4 pt-3.5 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600 dark:text-slate-400">
+        <div className="mt-4 pt-3.5 border-t border-slate-200 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-400">
           <div className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-blue-500" />
+            <span className="size-2 rounded-full bg-blue-500 shrink-0" />
             <span className="text-slate-900 dark:text-white font-semibold">80+</span>
             <span>{isZh ? '款 AI 智能体零配置自动发现' : 'AI Agents Auto-Detected'}</span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-emerald-500" />
+            <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
             <span className="text-slate-900 dark:text-white font-semibold">1</span>
             <span>{isZh ? '次点击安装，所有智能体秒级热共享' : 'Click Install, Instant Multi-Agent Ready'}</span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-purple-500" />
+            <span className="size-2 rounded-full bg-purple-500 shrink-0" />
             <span className="text-slate-900 dark:text-white font-semibold">0 MB</span>
             <span>{isZh ? '零重复磁盘占用 · 原生软链穿透' : 'Zero Disk Overhead · Pure Symlinks'}</span>
           </div>

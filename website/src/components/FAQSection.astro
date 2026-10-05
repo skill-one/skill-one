@@ -29,9 +29,9 @@ const t = translations[lang].faq;
     <div class="space-y-4">
       {t.items.map((item, idx) => (
         <details class="group rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-slate-900/60 p-5 backdrop-blur-md transition-all duration-200 open:border-blue-400 dark:open:border-blue-500/30 open:bg-slate-50/50 dark:open:bg-slate-900/90 shadow-2xs">
-          <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-sm sm:text-base text-slate-900 dark:text-white focus:outline-none">
-            <span class="flex items-center gap-3">
-              <span class="size-6 rounded-md bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-mono flex items-center justify-center shrink-0">
+          <summary class="flex items-start justify-between cursor-pointer list-none font-semibold text-sm sm:text-base text-slate-900 dark:text-white focus:outline-none">
+            <span class="flex items-start gap-3">
+              <span class="size-6 rounded-md bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs font-mono flex items-center justify-center shrink-0 mt-0.5">
                 0{idx + 1}
               </span>
               <span>{item.q}</span>

@@ -80,9 +80,9 @@ const structuredData = {
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   </head>
-  <body class="bg-background text-foreground min-h-screen flex flex-col antialiased selection:bg-blue-500/20 selection:text-blue-600 transition-colors duration-200">
+  <body class="bg-background text-foreground min-h-screen flex flex-col antialiased selection:bg-blue-500/20 selection:text-blue-600 transition-colors duration-200 overflow-x-hidden w-full">
     <Navbar client:load lang={lang} />
-    <main class="flex-1">
+    <main class="flex-1 w-full overflow-x-hidden">
       <slot />
     </main>
     <Footer lang={lang} />
