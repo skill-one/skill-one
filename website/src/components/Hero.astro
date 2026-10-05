@@ -64,39 +64,6 @@ const isZh = lang === 'zh';
       </a>
     </div>
 
-    <!-- Platform Availability & Coming Soon Bar -->
-    <div class="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-6">
-      <span class="font-medium text-slate-700 dark:text-slate-300">{isZh ? '平台支持状态：' : 'Platform Support:'}</span>
-      <span class="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20 text-[11px]">
-        <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        macOS Apple Silicon ({isZh ? '直接下载 DMG' : 'Direct DMG'})
-      </span>
-      <span class="text-slate-300 dark:text-slate-700 hidden sm:inline">·</span>
-      <button
-        type="button"
-        class="hover:text-blue-600 dark:hover:text-blue-400 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer underline decoration-dotted text-[11px]"
-        data-toast-msg={translations[lang].download.toastIntel}
-      >
-        macOS Intel ({translations[lang].download.comingSoon})
-      </button>
-      <span class="text-slate-300 dark:text-slate-700 hidden sm:inline">·</span>
-      <button
-        type="button"
-        class="hover:text-blue-600 dark:hover:text-blue-400 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer underline decoration-dotted text-[11px]"
-        data-toast-msg={translations[lang].download.toastWindows}
-      >
-        Windows ({translations[lang].download.comingSoon})
-      </button>
-      <span class="text-slate-300 dark:text-slate-700 hidden sm:inline">·</span>
-      <button
-        type="button"
-        class="hover:text-blue-600 dark:hover:text-blue-400 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer underline decoration-dotted text-[11px]"
-        data-toast-msg={translations[lang].download.toastLinux}
-      >
-        Linux ({translations[lang].download.comingSoon})
-      </button>
-    </div>
-
     <!-- Trust Seals Bar -->
     <div class="flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs text-slate-600 dark:text-slate-400 mb-14 font-medium">
       <div class="flex items-center gap-2">
@@ -122,15 +89,3 @@ const isZh = lang === 'zh';
     </div>
   </div>
 </section>
-
-<script is:inline>
-  // Handle coming-soon platform toast dispatch
-  document.querySelectorAll('[data-toast-msg]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const msg = btn.getAttribute('data-toast-msg');
-      if (msg) {
-        window.dispatchEvent(new CustomEvent('show-platform-toast', { detail: { message: msg } }));
-      }
-    });
-  });
-</script>

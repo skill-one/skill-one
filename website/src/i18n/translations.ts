@@ -1,7 +1,6 @@
 export interface TranslationStrings {
   nav: {
     features: string;
-    howItWorks: string;
     agents: string;
     faq: string;
     download: string;
@@ -133,16 +132,6 @@ export interface TranslationStrings {
       explain: string;
     };
   };
-  howItWorks: {
-    eyebrow: string;
-    title: string;
-    subtitle: string;
-    steps: {
-      step1: { num: string; title: string; desc: string };
-      step2: { num: string; title: string; desc: string };
-      step3: { num: string; title: string; desc: string };
-    };
-  };
   agentsExplorer: {
     eyebrow: string;
     title: string;
@@ -196,12 +185,10 @@ export interface TranslationStrings {
     };
   };
 }
-
 export const translations: Record<'en' | 'zh', TranslationStrings> = {
   en: {
     nav: {
       features: "Features",
-      howItWorks: "How It Works",
       agents: "Ecosystem (80+)",
       faq: "FAQ",
       download: "Download",
@@ -214,7 +201,7 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       badge: "Built for the Agentic Coding Era",
       titleStart: "Install Once.",
       titleHighlight: "Ready for Every AI Agent.",
-      subtitle: "The single source of truth for Agent Skills. Skill One symlinks all your AI coding assistants into the exact same central skills repository (~/.agents/skills). Whether installed via the built-in market, 'npx skills', direct agent dialogues, or git clone, every tool has immediate access with zero duplication.",
+      subtitle: "The single source of truth for Agent Skills — all your AI coding assistants symlink to the same central repository (~/.agents/skills), so every skill is instantly available everywhere with zero duplication.",
       downloadMac: "Download for macOS (Direct DMG)",
       downloadSub: "Apple Silicon (M1-M4) · Direct DMG Download",
       viewGithub: "View on GitHub",
@@ -351,28 +338,6 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
         explain: "Prefer crafting your own skills or cloning private enterprise repositories? Simply clone or drag any skill folder directly into ~/.agents/skills/. Every agent recognizes it instantly.",
       },
     },
-    howItWorks: {
-      eyebrow: "Seamless Workflow",
-      title: "How Skill One Works in 3 Steps",
-      subtitle: "From download to multi-agent productivity in less than 60 seconds.",
-      steps: {
-        step1: {
-          num: "01",
-          title: "Auto-Detect Your Ecosystem",
-          desc: "Launch Skill One. It automatically scans your machine and connects to your installed IDEs, CLI agents, and desktop AI clients.",
-        },
-        step2: {
-          num: "02",
-          title: "Install or Craft Skills",
-          desc: "Browse curated community skills from the market or drop your custom prompt rules and MCP configs into the hub.",
-        },
-        step3: {
-          num: "03",
-          title: "Immediately Code Everywhere",
-          desc: "Open Cursor, Claude, Windsurf, or Cline. Every skill is instantly available and ready to assist.",
-        },
-      },
-    },
     agentsExplorer: {
       eyebrow: "Broad Compatibility",
       title: "Supported AI Coding Agents",
@@ -454,7 +419,6 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
   zh: {
     nav: {
       features: "核心特性",
-      howItWorks: "工作原理",
       agents: "生态支持 (80+)",
       faq: "常见问题",
       download: "立即下载",
@@ -467,7 +431,7 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       badge: "专为智能体编程时代打造",
       titleStart: "一次安装，",
       titleHighlight: "所有 Agents 直接使用。",
-      subtitle: "智能体技能的单一物理源。Skill One 的核心原理是让所有 AI 编程助手通过底层软链接指向同一个中央技能仓库 (~/.agents/skills)。无论是在内置集市安装、使用 'npx skills' 命令行安装，还是在对话中直接让 Agent 安装或手动 git clone，所有智能体均可直接使用，本就是同一个物理仓库，零冗余秒级穿透。",
+      subtitle: "智能体技能的单一物理源——所有 AI 编程助手通过软链接共享同一个中央技能仓库 (~/.agents/skills)，技能一次安装、全端立即可用，零冗余。",
       downloadMac: "直接下载 macOS 安装包",
       downloadSub: "Apple Silicon (M1-M4) · 直接下载 DMG 安装包",
       viewGithub: "前往 GitHub 仓库",
@@ -602,28 +566,6 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       gitTab: {
         termTitle: "本地文件系统 / Git Clone",
         explain: "喜欢自研私有技能或从 GitHub 团队仓库同步？只需将任意技能文件夹放入 ~/.agents/skills/，全生态工具立即自动感知，无需任何复杂的注册配置。",
-      },
-    },
-    howItWorks: {
-      eyebrow: "极简流转",
-      title: "三步开启全智能体协同",
-      subtitle: "从下载安装到全生态技能就绪，全程不超过 60 秒。",
-      steps: {
-        step1: {
-          num: "01",
-          title: "自动发现本地生态",
-          desc: "打开 Skill One，底层引擎瞬时扫描并识别已安装的 IDE、桌面智能体与命令行工具。",
-        },
-        step2: {
-          num: "02",
-          title: "任意方式安装技能",
-          desc: "在集市中挑选技能，或通过 `npx skills`、在 Agent 对话中直接安装，所有方式均落入统一仓库。",
-        },
-        step3: {
-          num: "03",
-          title: "全工具即刻共享",
-          desc: "回到 Cursor、Claude 或 Windsurf，所有技能已无缝注入，即刻享受极致生产力飞跃。",
-        },
       },
     },
     agentsExplorer: {

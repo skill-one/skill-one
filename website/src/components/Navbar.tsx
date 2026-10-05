@@ -60,9 +60,6 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
           <a href="#features" className="hover:text-slate-900 dark:hover:text-white transition-colors">
             {t.features}
           </a>
-          <a href="#how-it-works" className="hover:text-slate-900 dark:hover:text-white transition-colors">
-            {t.howItWorks}
-          </a>
           <a href="#ecosystem" className="hover:text-slate-900 dark:hover:text-white transition-colors">
             {t.agents}
           </a>
@@ -158,13 +155,6 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
             className="block py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600"
           >
             {t.features}
-          </a>
-          <a
-            href="#how-it-works"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600"
-          >
-            {t.howItWorks}
           </a>
           <a
             href="#ecosystem"
