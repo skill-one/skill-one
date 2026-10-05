@@ -37,15 +37,13 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-          cache-dependency-path: website/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        working-directory: website
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter website...
 
       - name: Build
-        working-directory: website
-        run: pnpm build
+        run: pnpm --filter website build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
