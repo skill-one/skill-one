@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { translations } from '../i18n/translations';const base = import.meta.env.BASE_URL.replace(//$/, '');
+import { translations } from '../i18n/translations';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 import {
   Store,
   Terminal,
