@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import agentsData from '../data/agents.json';
 import { translations } from '../i18n/translations';
-import { Search, ExternalLink, Star, CheckCircle, Sparkles } from 'lucide-react';
+import { Search, ExternalLink, Star, CheckCircle, Sparkles, Copy, Check } from 'lucide-react';
 
 interface AgentEcosystemProps {
   lang?: 'en' | 'zh';
@@ -24,8 +24,28 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'top' | 'ide' | 'cli' | 'desktop'>('all');
   const [showAll, setShowAll] = useState(false);
+  const [copiedAgent, setCopiedAgent] = useState<string | null>(null);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   const agents = agentsData as AgentItem[];
+
+  // Keyboard shortcut '/' to focus search input
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === '/' && document.activeElement !== searchInputRef.current && !['INPUT', 'TEXTAREA'].includes((document.activeElement as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleCopyPath = (agentName: string, path: string) => {
+    navigator.clipboard.writeText(path);
+    setCopiedAgent(agentName);
+    setTimeout(() => setCopiedAgent(null), 2000);
+  };
 
   // Categorize and prioritize flagship agents
   const filteredAgents = useMemo(() => {
@@ -82,19 +102,23 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
           <div className="relative w-full sm:w-96">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             <input
+              ref={searchInputRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t.searchPlaceholder}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-blue-500 shadow-2xs transition-colors backdrop-blur-md"
+              className="w-full pl-10 pr-12 py-2.5 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-blue-500 shadow-2xs transition-colors backdrop-blur-md"
             />
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center justify-center px-1.5 py-0.5 rounded border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800 text-[10px] font-mono text-slate-400">
+              /
+            </kbd>
           </div>
 
           {/* Filter Tabs */}
           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-200/60 dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 text-xs font-medium overflow-x-auto max-w-full">
             <button
               onClick={() => setActiveTab('all')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'all'
                   ? 'bg-white dark:bg-blue-600 text-slate-900 dark:text-white shadow-xs font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -104,43 +128,43 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
             </button>
             <button
               onClick={() => setActiveTab('top')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'top'
                   ? 'bg-white dark:bg-blue-600 text-slate-900 dark:text-white shadow-xs font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              {t.filterTop}
+              {t.filterTop} (14)
             </button>
             <button
               onClick={() => setActiveTab('ide')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'ide'
                   ? 'bg-white dark:bg-blue-600 text-slate-900 dark:text-white shadow-xs font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              {t.filterIde}
+              {t.filterIde} (8)
             </button>
             <button
               onClick={() => setActiveTab('cli')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'cli'
                   ? 'bg-white dark:bg-blue-600 text-slate-900 dark:text-white shadow-xs font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              {t.filterCli}
+              {t.filterCli} (8)
             </button>
             <button
               onClick={() => setActiveTab('desktop')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === 'desktop'
                   ? 'bg-white dark:bg-blue-600 text-slate-900 dark:text-white shadow-xs font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              {t.filterDesktop}
+              {t.filterDesktop} (7)
             </button>
           </div>
         </div>
@@ -191,9 +215,22 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
                       )}
                     </div>
 
-                    <div className="text-[10px] text-slate-600 dark:text-slate-400 font-mono bg-slate-50 dark:bg-black/30 px-2 py-1 rounded truncate border border-slate-200/60 dark:border-white/5">
-                      {agent.skillsDir}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPath(agent.name, agent.skillsDir)}
+                      className="w-full text-left group/path flex items-center justify-between text-[10px] text-slate-600 dark:text-slate-400 font-mono bg-slate-50 dark:bg-black/30 hover:bg-slate-100 dark:hover:bg-white/5 px-2 py-1 rounded truncate border border-slate-200/60 dark:border-white/5 transition-colors cursor-pointer"
+                      title={isZh ? `点击复制路径: ${agent.skillsDir}` : `Click to copy path: ${agent.skillsDir}`}
+                    >
+                      <span className="truncate">{agent.skillsDir}</span>
+                      {copiedAgent === agent.name ? (
+                        <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-sans text-[9px] shrink-0 ml-1">
+                          <Check className="size-2.5" />
+                          <span>{isZh ? '已复制' : 'Copied'}</span>
+                        </span>
+                      ) : (
+                        <Copy className="size-3 text-slate-400 opacity-0 group-hover/path:opacity-100 shrink-0 ml-1 transition-opacity" />
+                      )}
+                    </button>
                   </div>
 
                   <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">

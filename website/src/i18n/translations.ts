@@ -92,6 +92,47 @@ export interface TranslationStrings {
       };
     };
   };
+  universalInstall: {
+    eyebrow: string;
+    title: string;
+    subtitle: string;
+    tabs: {
+      market: string;
+      cli: string;
+      chat: string;
+      git: string;
+    };
+    centralRepoLabel: string;
+    centralRepoPath: string;
+    physicalSingleNotice: string;
+    symlinkedToAgents: string;
+    marketTab: {
+      searchPlaceholder: string;
+      skillName: string;
+      skillDesc: string;
+      installBtn: string;
+      installedBtn: string;
+      installedFeedback: string;
+    };
+    cliTab: {
+      termTitle: string;
+      runBtn: string;
+      runningBtn: string;
+      copyBtn: string;
+      copiedBtn: string;
+    };
+    chatTab: {
+      chatTitle: string;
+      promptInput: string;
+      userMessage: string;
+      agentMessage: string;
+      askAnotherBtn: string;
+    };
+    gitTab: {
+      termTitle: string;
+      explain: string;
+    };
+  };
   howItWorks: {
     eyebrow: string;
     title: string;
@@ -267,6 +308,47 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
           stat: "< 15 ms",
           statLabel: "Native launch time",
         },
+      },
+    },
+    universalInstall: {
+      eyebrow: "Multi-Channel Architecture",
+      title: "One Single Repository. Any Installation Workflow.",
+      subtitle: "Because Skill One unites all agents around a single physical folder (~/.agents/skills) via OS symlinks, you can install skills however you want. No proprietary lock-in, zero manual file copying.",
+      tabs: {
+        market: "Skill Store (GUI)",
+        cli: "npx skills add (CLI)",
+        chat: "In-Agent Chat Prompt",
+        git: "Git Clone & Manual Drop",
+      },
+      centralRepoLabel: "Single Physical Repository",
+      centralRepoPath: "~/.agents/skills",
+      physicalSingleNotice: "Single physical directory on disk · Zero duplication",
+      symlinkedToAgents: "Transparently shared with all 80+ AI Agents via OS symlinks",
+      marketTab: {
+        searchPlaceholder: "Search 2,000+ community skills...",
+        skillName: "shadcn-ui-mastery",
+        skillDesc: "Tailored UI design guidelines and Shadcn component templates for Cursor, Claude, and Windsurf.",
+        installBtn: "Install to Hub",
+        installedBtn: "Installed to Hub",
+        installedFeedback: "Skill stored at ~/.agents/skills/shadcn-ui-mastery. All 80+ agents instantly linked!",
+      },
+      cliTab: {
+        termTitle: "Terminal — zsh",
+        runBtn: "Run in Terminal",
+        runningBtn: "Executing...",
+        copyBtn: "Copy Command",
+        copiedBtn: "Copied!",
+      },
+      chatTab: {
+        chatTitle: "Cursor / Claude Composer",
+        promptInput: "Ask agent to install a skill...",
+        userMessage: "Hey, please install the official 'shadcn-ui' and 'git-workflow' skills for my project.",
+        agentMessage: "Done! I've fetched the skill into ~/.agents/skills/. Because Skill One maintains central OS symlinks, this skill is immediately accessible in Cursor, Windsurf, Claude Code, and all your other agents without restart.",
+        askAnotherBtn: "Try Chat Example",
+      },
+      gitTab: {
+        termTitle: "Local Filesystem / Git Clone",
+        explain: "Prefer crafting your own skills or cloning private enterprise repositories? Simply clone or drag any skill folder directly into ~/.agents/skills/. Every agent recognizes it instantly.",
       },
     },
     howItWorks: {
@@ -479,6 +561,47 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
           stat: "< 15 ms",
           statLabel: "原生极速冷启动",
         },
+      },
+    },
+    universalInstall: {
+      eyebrow: "全渠道同源架构",
+      title: "同一个技能仓库，支持任意安装方式",
+      subtitle: "Skill One 的底层核心是让所有智能体通过系统软连接共享同一个物理仓库 (~/.agents/skills)。因此不仅支持在软件集市中一键安装，更完美兼容第三方命令行、直接在 Agent 对话中安装或 git clone，零门槛零迁移成本。",
+      tabs: {
+        market: "Skill One 集市 (GUI)",
+        cli: "npx skills add (命令行)",
+        chat: "Agent 对话直接安装",
+        git: "Git Clone / 本地拖拽",
+      },
+      centralRepoLabel: "中央物理技能仓库",
+      centralRepoPath: "~/.agents/skills",
+      physicalSingleNotice: "磁盘上真实存在的物理目录 · 绝无重复文件",
+      symlinkedToAgents: "通过内核级系统软链接，实时穿透至 80+ 款 AI 智能体",
+      marketTab: {
+        searchPlaceholder: "快速搜索 2,000+ 社区精选技能...",
+        skillName: "shadcn-ui-mastery",
+        skillDesc: "专为 Cursor、Claude、Windsurf 深度定制的 Shadcn/UI 与现代化设计组件最佳实践技能包。",
+        installBtn: "一键安装到中枢",
+        installedBtn: "已安装至中央仓库",
+        installedFeedback: "技能已存入 ~/.agents/skills/shadcn-ui-mastery，所有 80+ 款智能体秒级直接可用！",
+      },
+      cliTab: {
+        termTitle: "终端 — zsh",
+        runBtn: "模拟运行命令",
+        runningBtn: "正在执行...",
+        copyBtn: "复制命令",
+        copiedBtn: "已复制！",
+      },
+      chatTab: {
+        chatTitle: "Cursor / Claude 对话窗口",
+        promptInput: "在对话框直接对智能体下达安装指令...",
+        userMessage: "请帮我安装 shadcn-ui 和 git-workflow 技能，并在本项目中启用。",
+        agentMessage: "已为您将技能直接保存至中央仓库 ~/.agents/skills/。得益于 Skill One 的原生软链架构，不仅我可以直接读取，您的 Cursor、Windsurf、Claude Code 及其他 80+ 款智能体也已同步就绪！",
+        askAnotherBtn: "模拟对话安装",
+      },
+      gitTab: {
+        termTitle: "本地文件系统 / Git Clone",
+        explain: "喜欢自研私有技能或从 GitHub 团队仓库同步？只需将任意技能文件夹放入 ~/.agents/skills/，全生态工具立即自动感知，无需任何复杂的注册配置。",
       },
     },
     howItWorks: {

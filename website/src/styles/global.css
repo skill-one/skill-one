@@ -107,18 +107,29 @@ body {
   background: radial-gradient(circle 800px at 50% -80px, rgba(59, 130, 246, 0.16), rgba(147, 51, 234, 0.1), transparent 70%);
 }
 
-/* Shimmer pulse animation for graph ribbons */
+/* Subtle Engineering Mesh Pattern */
+.bg-mesh-grid {
+  background-image: radial-gradient(rgba(148, 163, 184, 0.22) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dark .bg-mesh-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Continuous Shimmer Flow Along S-Curve Ribbons */
 @keyframes shimmerPulse {
   0% {
-    stroke-dashoffset: 0;
+    stroke-dashoffset: 200;
   }
   100% {
-    stroke-dashoffset: -1;
+    stroke-dashoffset: 0;
   }
 }
 
 .animate-shimmer-flow {
-  animation: shimmerPulse 1.8s linear infinite;
+  animation: shimmerPulse 2.4s linear infinite;
 }
 
 /* Custom scrollbar */

@@ -27,6 +27,17 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
     return () => clearTimeout(timer);
   }, [toastMessage]);
 
+  useEffect(() => {
+    const handlePlatformToast = (e: Event) => {
+      const customEvent = e as CustomEvent<{ message: string }>;
+      if (customEvent.detail?.message) {
+        setToastMessage(customEvent.detail.message);
+      }
+    };
+    window.addEventListener('show-platform-toast', handlePlatformToast);
+    return () => window.removeEventListener('show-platform-toast', handlePlatformToast);
+  }, []);
+
   const handleAppleSiliconDownload = () => {
     setDownloadTriggered(true);
     setTimeout(() => setDownloadTriggered(false), 3000);

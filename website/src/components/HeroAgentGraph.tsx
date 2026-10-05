@@ -134,6 +134,16 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
               <span className="text-amber-600 dark:text-amber-400 font-mono font-semibold">
                 {isZh ? `⚡ 动效演示 '${broadcastingSkill}' 即刻就绪 (所有智能体共享同一仓库，无需拷贝)...` : `⚡ Visualizing '${broadcastingSkill}' propagation (all agents share the same physical repo)...`}
               </span>
+            ) : hoveredAgent ? (
+              <span className="font-mono text-slate-800 dark:text-slate-200">
+                {(() => {
+                  const agent = agents.find(a => a.id === hoveredAgent);
+                  const isLinked = agent ? linkedAgentIds[agent.id] : false;
+                  return isZh
+                    ? `[${agent?.name}] 软链接: ${agent?.skillsDir} ➔ ~/.agents/skills (${isLinked ? '状态: 已穿透直连 · 点击可安全解绑' : '状态: 已断开 · 点击可恢复'})`
+                    : `[${agent?.name}] Symlink: ${agent?.skillsDir} ➔ ~/.agents/skills (${isLinked ? 'Active · Click to Unlink' : 'Disconnected · Click to Reconnect'})`;
+                })()}
+              </span>
             ) : (
               <span>
                 {isZh ? '所有智能体共享同一技能仓库 (~/.agents/skills) · 支持商店 / npx / 对话安装' : 'All agents share the same skills repo (~/.agents/skills) · Works with Store, npx & Agent-install'}
@@ -233,14 +243,26 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
                       stroke={agent.color}
                       strokeWidth={isHighlighted ? 3.5 : 2.5}
                       strokeLinecap="round"
-                      strokeDasharray="14 180"
+                      strokeDasharray="16 160"
                       className="animate-shimmer-flow"
                       style={{
-                        animationDuration: isHighlighted ? '0.9s' : '2.2s',
+                        animationDuration: isHighlighted ? '1.2s' : '2.4s',
                         filter: isHighlighted ? `drop-shadow(0 0 6px ${agent.color})` : 'none',
                       }}
                     />
                   )}
+
+                  {/* Hub Edge Connection Socket Dot */}
+                  <circle
+                    cx={toX}
+                    cy={toY}
+                    r={isHighlighted ? 3.5 : isLinked ? 2.5 : 1.5}
+                    fill={isLinked ? agent.color : '#cbd5e1'}
+                    className="transition-all duration-300"
+                    style={{
+                      filter: isHighlighted && isLinked ? `drop-shadow(0 0 8px ${agent.color})` : undefined,
+                    }}
+                  />
                 </g>
               );
             })}
@@ -361,7 +383,7 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
 
               <span className="text-[9px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-mono">
                 <Zap className="size-2.5" />
-                {broadcastingSkill ? (isZh ? '广播中...' : 'Syncing...') : (isZh ? '全生态已就绪' : 'In Sync')}
+                {broadcastingSkill ? (isZh ? '秒级穿透共享...' : 'Instantly Shared...') : (isZh ? '全生态已就绪' : 'In Sync')}
               </span>
             </div>
 

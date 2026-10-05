@@ -26,14 +26,19 @@
      - 手动 git clone 或本地拖拽
    - 因为本就是同一个物理仓库，所有工具读取的都是同一份文件，无需后台文件分发广播；官网界面中的广播动画仅作为帮助用户直观理解“所有智能体已即刻就绪”的视觉隐喻。
 
-4. **平台下载与即将推出策略**：
+4. **全渠道安装方式交互演练场（`UniversalInstallShowcase.tsx`）**：
+   - 提供 4 标签可交互演练工作流（集市 GUI、`npx skills` 终端模拟运行与复制、Agent 对话直接下达指令、Git clone 终端）。
+   - 联动右侧单一物理源收敛架构图（`~/.agents/skills` 唯一物理实体），动态展现向 Cursor、Claude、Windsurf、Cline 的 0 延时软链穿透，支持一键重置演练。
+
+5. **平台下载与即将推出策略**：
    - **已支持平台（macOS Apple 芯片 ARM64）**：点击下载直接触发 DMG 文件下载（`Skill.One_0.22.0_aarch64.dmg`），无需跳转至 GitHub 源仓库或 Releases 页面。
    - **暂未支持平台（macOS Intel x64、Windows、Linux）**：展示“即将推出”状态，点击后弹出轻量 Toast 提示框告知开发适配进度，提供真实的开发中反馈。
+   - **首屏快速平台选择器**：在主 CTA 按钮下方直接展现各系统支持状态与即将推出快速弹窗。
 
-5. **强烈反差故事线（痛点与方案对比）**：
+6. **强烈反差故事线（痛点与方案对比）**：
    - 左右对比“传统多工具孤岛模式”与“Skill One 单一事实源方案”，突出零磁盘冗余与版本零割裂。
 
-6. **便当盒（Bento Grid）特性阵列**：
+7. **便当盒（Bento Grid）特性阵列**：
    - 提炼 5 大核心架构技术支柱：
      - 原生软链穿透引擎（零重复文件）
      - 80+ 款智能体全自动扫描识别
@@ -41,10 +46,10 @@
      - 单 Agent 细粒度独立启闭开关
      - 100% 本地优先与 Rust 极致性能
 
-7. **全生态智能体搜索矩阵**：
-   - 提供 81 款主流 AI 编程助手交互式检索与分类筛选器（全部、热门、IDE 插件、CLI 命令行、桌面端），带官方图标与技能目录提示。
+8. **全生态智能体搜索矩阵**：
+   - 提供 81 款主流 AI 编程助手交互式检索与分类筛选器（全部、热门、IDE 插件、CLI 命令行、桌面端），带官方图标、`/` 快捷键聚焦，以及点击一键复制技能目录路径与反馈。
 
-8. **技术与 SEO 极致优化**：
+9. **技术与 SEO 极致优化**：
    - 基于 Astro 5 静态站点生成（SSG），实现极致的首屏加载性能。
    - 采用 React 独立岛（Island Architecture），兼顾强交互性与极小客户端运行时。
    - 原生支持英文（`/`）与简体中文（`/zh/`）无缝切换。
@@ -67,10 +72,12 @@ website/
     │   ├── Navbar.tsx       # 响应式导航栏（含语言切换）
     │   ├── Hero.astro       # 首屏区域（含下载入口与信任背书）
     │   ├── HeroAgentGraph.tsx # 高保真交互式 S 曲线拓扑图岛
+    │   ├── UniversalInstallShowcase.tsx # 全渠道安装交互演练场
     │   ├── ProblemSolution.astro # 痛点与收益对比
     │   ├── BentoFeatures.astro   # 五大架构能力便当盒
     │   ├── AgentEcosystem.tsx    # 81 款智能体检索展示矩阵
     │   ├── HowItWorks.astro      # 三步使用流程
+    │   ├── DownloadCards.tsx     # 平台直接下载卡片与即将推出 Toast
     │   ├── DownloadSection.astro # macOS、Windows、Linux 下载模块
     │   ├── FAQSection.astro      # 开发者常见问题折叠列表
     │   └── Footer.astro          # 页脚链接与版权信息
