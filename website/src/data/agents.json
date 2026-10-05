@@ -1,0 +1,731 @@
+[
+  {
+    "name": "aider-desk",
+    "display": "AiderDesk",
+    "website": "https://github.com/hotovo/aider-desk",
+    "icon": "/agents/icons/aider-desk.png",
+    "stars": 1400,
+    "skillsDir": "~/.aider-desk/skills",
+    "isTop": false
+  },
+  {
+    "name": "amp",
+    "display": "Amp",
+    "website": "https://ampcode.com",
+    "icon": "/agents/icons/amp-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.config/agents/skills",
+    "isTop": false
+  },
+  {
+    "name": "antigravity",
+    "display": "Antigravity",
+    "website": "https://antigravity.google",
+    "icon": "/agents/icons/antigravity-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.gemini/config/skills",
+    "isTop": true
+  },
+  {
+    "name": "antigravity-cli",
+    "display": "Antigravity CLI",
+    "website": "https://antigravity.google",
+    "icon": "/agents/icons/antigravity-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.gemini/antigravity-cli/skills",
+    "isTop": false
+  },
+  {
+    "name": "astrbot",
+    "display": "AstrBot",
+    "website": "https://astrbot.app",
+    "icon": "/agents/icons/astrbot.png",
+    "stars": 41000,
+    "skillsDir": "~/.astrbot/data/skills",
+    "isTop": false
+  },
+  {
+    "name": "autohand-code",
+    "display": "Autohand Code CLI",
+    "website": "https://autohand.ai",
+    "icon": "/agents/icons/autohand-code.png",
+    "stars": 199,
+    "skillsDir": "~/.agents/skills",
+    "isTop": false
+  },
+  {
+    "name": "augment",
+    "display": "Augment",
+    "website": "https://www.augmentcode.com",
+    "icon": "/agents/icons/augment.png",
+    "stars": 0,
+    "skillsDir": "~/.augment/skills",
+    "isTop": false
+  },
+  {
+    "name": "bob",
+    "display": "IBM Bob",
+    "website": "https://www.ibm.com/products/watsonx-code-assistant",
+    "icon": "/agents/icons/bob.png",
+    "stars": 0,
+    "skillsDir": "~/.bob/skills",
+    "isTop": false
+  },
+  {
+    "name": "claude-code",
+    "display": "Claude Code",
+    "website": "https://claude.com/product/claude-code",
+    "icon": "/agents/icons/claudecode-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.agents/skills",
+    "isTop": true
+  },
+  {
+    "name": "openclaw",
+    "display": "OpenClaw",
+    "website": "https://openclaw.ai",
+    "icon": "/agents/icons/openclaw-color.svg",
+    "stars": 391000,
+    "skillsDir": "~/.openclaw/skills",
+    "isTop": false
+  },
+  {
+    "name": "cline",
+    "display": "Cline",
+    "website": "https://cline.bot",
+    "icon": "/agents/icons/cline.svg",
+    "stars": 69000,
+    "skillsDir": "~/.agents/skills",
+    "isTop": true
+  },
+  {
+    "name": "codearts-agent",
+    "display": "CodeArts Agent",
+    "website": "https://codearts.huaweicloud.com",
+    "icon": "/agents/icons/huawei-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.codeartsdoer/skills",
+    "isTop": false
+  },
+  {
+    "name": "codebuddy",
+    "display": "CodeBuddy",
+    "website": "https://www.codebuddy.ai",
+    "icon": "/agents/icons/codebuddy-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.codebuddy/skills",
+    "isTop": false
+  },
+  {
+    "name": "codemaker",
+    "display": "Codemaker",
+    "website": "https://codemaker.ai",
+    "icon": "/agents/icons/codemaker.png",
+    "stars": 0,
+    "skillsDir": "~/.codemaker/skills",
+    "isTop": false
+  },
+  {
+    "name": "codestudio",
+    "display": "Code Studio",
+    "website": "https://www.syncfusion.com/code-studio/",
+    "icon": "/agents/icons/codestudio.png",
+    "stars": 0,
+    "skillsDir": "~/.codestudio/skills",
+    "isTop": false
+  },
+  {
+    "name": "codex",
+    "display": "Codex",
+    "website": "https://openai.com/codex",
+    "icon": "/agents/icons/codex-color.svg",
+    "stars": 126881,
+    "skillsDir": "~/.agents/skills",
+    "isTop": true
+  },
+  {
+    "name": "command-code",
+    "display": "Command Code",
+    "website": "https://commandcode.ai",
+    "icon": "/agents/icons/commandcode.svg",
+    "stars": 4100,
+    "skillsDir": "~/.commandcode/skills",
+    "isTop": false
+  },
+  {
+    "name": "continue",
+    "display": "Continue",
+    "website": "https://continue.dev",
+    "icon": "/agents/icons/continue.png",
+    "stars": 36000,
+    "skillsDir": "~/.continue/skills",
+    "isTop": false
+  },
+  {
+    "name": "cortex",
+    "display": "Cortex Code",
+    "website": "https://docs.snowflake.com/en/user-guide/cortex-code",
+    "icon": "/agents/icons/cortex.png",
+    "stars": 0,
+    "skillsDir": "~/.snowflake/cortex/skills",
+    "isTop": false
+  },
+  {
+    "name": "crush",
+    "display": "Crush",
+    "website": "https://github.com/charmbracelet/crush",
+    "icon": "/agents/icons/crush.png",
+    "stars": 28000,
+    "skillsDir": "~/.config/crush/skills",
+    "isTop": false
+  },
+  {
+    "name": "cursor",
+    "display": "Cursor",
+    "website": "https://cursor.com",
+    "icon": "/agents/icons/cursor-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.cursor/skills",
+    "isTop": true
+  },
+  {
+    "name": "deepagents",
+    "display": "Deep Agents",
+    "website": "https://github.com/langchain-ai/deepagents",
+    "icon": "/agents/icons/deepagents.png",
+    "stars": 30000,
+    "skillsDir": "~/.deepagents/agent/skills",
+    "isTop": false
+  },
+  {
+    "name": "devin",
+    "display": "Devin for Terminal",
+    "website": "https://devin.ai",
+    "icon": "/agents/icons/devin-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.config/devin/skills",
+    "isTop": false
+  },
+  {
+    "name": "dexto",
+    "display": "Dexto",
+    "website": "https://www.dexto.ai",
+    "icon": "/agents/icons/dexto.png",
+    "stars": 651,
+    "skillsDir": "~/.agents/skills",
+    "isTop": false
+  },
+  {
+    "name": "droid",
+    "display": "Droid",
+    "website": "https://factory.ai",
+    "icon": "/agents/icons/droid.png",
+    "stars": 0,
+    "skillsDir": "~/.factory/skills",
+    "isTop": false
+  },
+  {
+    "name": "firebender",
+    "display": "Firebender",
+    "website": "https://firebender.com",
+    "icon": "/agents/icons/firebender.png",
+    "stars": 0,
+    "skillsDir": "~/.firebender/skills",
+    "isTop": false
+  },
+  {
+    "name": "forgecode",
+    "display": "ForgeCode",
+    "website": "https://forgecode.dev",
+    "icon": "/agents/icons/forgecode.png",
+    "stars": 7600,
+    "skillsDir": "~/.forge/skills",
+    "isTop": false
+  },
+  {
+    "name": "gemini-cli",
+    "display": "Gemini CLI",
+    "website": "https://github.com/google-gemini/gemini-cli",
+    "icon": "/agents/icons/geminicli-color.svg",
+    "stars": 107000,
+    "skillsDir": "~/.gemini/skills",
+    "isTop": false
+  },
+  {
+    "name": "github-copilot",
+    "display": "GitHub Copilot",
+    "website": "https://github.com/features/copilot",
+    "icon": "/agents/icons/githubcopilot.svg",
+    "stars": 0,
+    "skillsDir": "~/.copilot/skills",
+    "isTop": false
+  },
+  {
+    "name": "goose",
+    "display": "Goose",
+    "website": "https://block.github.io/goose",
+    "icon": "/agents/icons/goose.svg",
+    "stars": 55000,
+    "skillsDir": "~/.config/goose/skills",
+    "isTop": true
+  },
+  {
+    "name": "grok",
+    "display": "Grok Build",
+    "website": "https://github.com/xai-org/grok-build",
+    "icon": "/agents/icons/grok.svg",
+    "stars": 27000,
+    "skillsDir": "~/.agents/skills",
+    "isTop": false
+  },
+  {
+    "name": "hermes-agent",
+    "display": "Hermes Agent",
+    "website": "https://github.com/NousResearch/hermes-agent",
+    "icon": "/agents/icons/hermesagent.svg",
+    "stars": 250000,
+    "skillsDir": "~/.agents/skills",
+    "isTop": false
+  },
+  {
+    "name": "inference-sh",
+    "display": "inference.sh",
+    "website": "https://inference.sh",
+    "icon": "/agents/icons/inference.svg",
+    "stars": 0,
+    "skillsDir": "~/.inferencesh/skills",
+    "isTop": false
+  },
+  {
+    "name": "iflow-cli",
+    "display": "iFlow CLI",
+    "website": "https://iflow.cn",
+    "icon": "/agents/icons/iflow-cli.png",
+    "stars": 0,
+    "skillsDir": "~/.iflow/skills",
+    "isTop": false
+  },
+  {
+    "name": "junie",
+    "display": "Junie",
+    "website": "https://www.jetbrains.com/junie/",
+    "icon": "/agents/icons/junie-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.junie/skills",
+    "isTop": false
+  },
+  {
+    "name": "kilo",
+    "display": "Kilo Code",
+    "website": "https://kilocode.ai",
+    "icon": "/agents/icons/kilocode.svg",
+    "stars": 27000,
+    "skillsDir": "~/.kilocode/skills",
+    "isTop": false
+  },
+  {
+    "name": "kimchi",
+    "display": "Kimchi",
+    "website": "https://kimchi.dev",
+    "icon": "/agents/icons/kimchi.png",
+    "stars": 2200,
+    "skillsDir": "~/.config/kimchi/harness/skills",
+    "isTop": false
+  },
+  {
+    "name": "kimi-code-cli",
+    "display": "Kimi Code CLI",
+    "website": "https://code.kimi.com",
+    "icon": "/agents/icons/kimi-color.svg",
+    "stars": 11000,
+    "skillsDir": "~/.agents/skills",
+    "isTop": false
+  },
+  {
+    "name": "kiro-cli",
+    "display": "Kiro CLI",
+    "website": "https://kiro.dev",
+    "icon": "/agents/icons/kiro-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.kiro/skills",
+    "isTop": false
+  },
+  {
+    "name": "kode",
+    "display": "Kode",
+    "website": "https://github.com/shareAI-lab/Kode-cli",
+    "icon": "/agents/icons/kode.png",
+    "stars": 5200,
+    "skillsDir": "~/.kode/skills",
+    "isTop": false
+  },
+  {
+    "name": "lingma",
+    "display": "Lingma",
+    "website": "https://lingma.aliyun.com",
+    "icon": "/agents/icons/qwen-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.lingma/skills",
+    "isTop": false
+  },
+  {
+    "name": "mcpjam",
+    "display": "MCPJam",
+    "website": "https://www.mcpjam.com",
+    "icon": "/agents/icons/mcpjam.png",
+    "stars": 2200,
+    "skillsDir": "~/.mcpjam/skills",
+    "isTop": false
+  },
+  {
+    "name": "minimax-code",
+    "display": "MiniMax Code",
+    "website": "https://agent.minimaxi.com",
+    "icon": "/agents/icons/minimax-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.minimax/skills",
+    "isTop": false
+  },
+  {
+    "name": "mistral-vibe",
+    "display": "Mistral Vibe",
+    "website": "https://mistral.ai/products/vibe/",
+    "icon": "/agents/icons/mistral-color.svg",
+    "stars": 5000,
+    "skillsDir": "~/.agents/skills",
+    "isTop": false
+  },
+  {
+    "name": "moxby",
+    "display": "Moxby",
+    "website": "https://moxby.com",
+    "icon": "/agents/icons/moxby.png",
+    "stars": 0,
+    "skillsDir": "~/.moxby/skills",
+    "isTop": false
+  },
+  {
+    "name": "mux",
+    "display": "Mux",
+    "website": "https://usemux.ai",
+    "icon": "/agents/icons/mux.png",
+    "stars": 0,
+    "skillsDir": "~/.mux/skills",
+    "isTop": false
+  },
+  {
+    "name": "neovate",
+    "display": "Neovate",
+    "website": "https://neovateai.dev",
+    "icon": "/agents/icons/neovate.png",
+    "stars": 1600,
+    "skillsDir": "~/.neovate/skills",
+    "isTop": false
+  },
+  {
+    "name": "opencode",
+    "display": "OpenCode",
+    "website": "https://opencode.ai",
+    "icon": "/agents/icons/opencode.svg",
+    "stars": 211000,
+    "skillsDir": "~/.config/opencode/skills",
+    "isTop": true
+  },
+  {
+    "name": "openhands",
+    "display": "OpenHands",
+    "website": "https://github.com/All-Hands-AI/OpenHands",
+    "icon": "/agents/icons/openhands-color.svg",
+    "stars": 89000,
+    "skillsDir": "~/.openhands/skills",
+    "isTop": false
+  },
+  {
+    "name": "ona",
+    "display": "Ona",
+    "website": "https://ona.com",
+    "icon": "/agents/icons/ona.png",
+    "stars": 0,
+    "skillsDir": "~/.ona/skills",
+    "isTop": false
+  },
+  {
+    "name": "pi",
+    "display": "Pi",
+    "website": "https://pi.dev",
+    "icon": "/agents/icons/pi.svg",
+    "stars": 110000,
+    "skillsDir": "~/.pi/agent/skills",
+    "isTop": false
+  },
+  {
+    "name": "qoder",
+    "display": "Qoder",
+    "website": "https://qoder.com",
+    "icon": "/agents/icons/qoder-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.qoder/skills",
+    "isTop": false
+  },
+  {
+    "name": "qoder-cn",
+    "display": "Qoder CN",
+    "website": "https://www.aliyun.com/product/qoder",
+    "icon": "/agents/icons/qoder-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.qoder-cn/skills",
+    "isTop": false
+  },
+  {
+    "name": "qwen-code",
+    "display": "Qwen Code",
+    "website": "https://github.com/QwenLM/qwen-code",
+    "icon": "/agents/icons/qwen-color.svg",
+    "stars": 28000,
+    "skillsDir": "~/.qwen/skills",
+    "isTop": false
+  },
+  {
+    "name": "replit",
+    "display": "Replit",
+    "website": "https://replit.com",
+    "icon": "/agents/icons/replit-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.config/agents/skills",
+    "isTop": false
+  },
+  {
+    "name": "reasonix",
+    "display": "Reasonix",
+    "website": "https://reasonix.io",
+    "icon": "/agents/icons/reasonix.png",
+    "stars": 36000,
+    "skillsDir": "~/.reasonix/skills",
+    "isTop": false
+  },
+  {
+    "name": "roo",
+    "display": "Roo Code",
+    "website": "https://roocode.com",
+    "icon": "/agents/icons/roocode.svg",
+    "stars": 24000,
+    "skillsDir": "~/.roo/skills",
+    "isTop": false
+  },
+  {
+    "name": "rovodev",
+    "display": "Rovo Dev",
+    "website": "https://www.atlassian.com/rovo",
+    "icon": "/agents/icons/rovodev.png",
+    "stars": 0,
+    "skillsDir": "~/.rovodev/skills",
+    "isTop": false
+  },
+  {
+    "name": "tabnine-cli",
+    "display": "Tabnine CLI",
+    "website": "https://tabnine.com",
+    "icon": "/agents/icons/tabnine-cli.png",
+    "stars": 0,
+    "skillsDir": "~/.tabnine/agent/skills",
+    "isTop": false
+  },
+  {
+    "name": "terramind",
+    "display": "Terramind",
+    "website": "https://terramind.com",
+    "icon": "/agents/icons/terramind.png",
+    "stars": 0,
+    "skillsDir": "~/.terramind/skills",
+    "isTop": false
+  },
+  {
+    "name": "tinycloud",
+    "display": "Tinycloud",
+    "website": "https://www.tinycloud.sh",
+    "icon": "/agents/icons/tinycloud.png",
+    "stars": 0,
+    "skillsDir": "~/.tinycloud/skills",
+    "isTop": false
+  },
+  {
+    "name": "trae",
+    "display": "Trae",
+    "website": "https://trae.ai",
+    "icon": "/agents/icons/trae-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.trae/skills",
+    "isTop": false
+  },
+  {
+    "name": "trae-cn",
+    "display": "Trae CN",
+    "website": "https://trae.com.cn",
+    "icon": "/agents/icons/trae-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.trae-cn/skills",
+    "isTop": false
+  },
+  {
+    "name": "warp",
+    "display": "Warp",
+    "website": "https://www.warp.dev",
+    "icon": "/agents/icons/warp.png",
+    "stars": 0,
+    "skillsDir": "~/.agents/skills",
+    "isTop": false
+  },
+  {
+    "name": "windsurf",
+    "display": "Windsurf",
+    "website": "https://windsurf.com",
+    "icon": "/agents/icons/windsurf.svg",
+    "stars": 0,
+    "skillsDir": "~/.codeium/windsurf/skills",
+    "isTop": true
+  },
+  {
+    "name": "workbuddy",
+    "display": "WorkBuddy",
+    "website": "https://workbuddy.cn",
+    "icon": "/agents/icons/workbuddy-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.workbuddy/skills",
+    "isTop": false
+  },
+  {
+    "name": "workbuddy-ai",
+    "display": "WorkBuddy AI",
+    "website": "https://www.workbuddy.ai",
+    "icon": "/agents/icons/workbuddy-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.workbuddy-ai/skills",
+    "isTop": false
+  },
+  {
+    "name": "zed",
+    "display": "Zed",
+    "website": "https://zed.dev",
+    "icon": "/agents/icons/zed.png",
+    "stars": 91000,
+    "skillsDir": "~/.agents/skills",
+    "isTop": true
+  },
+  {
+    "name": "zcode",
+    "display": "ZCode",
+    "website": "https://zcode.z.ai",
+    "icon": "/agents/icons/zcode.png",
+    "stars": 0,
+    "skillsDir": "~/.zcode/skills",
+    "isTop": false
+  },
+  {
+    "name": "zencoder",
+    "display": "Zencoder",
+    "website": "https://zencoder.ai",
+    "icon": "/agents/icons/zencoder-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.zencoder/skills",
+    "isTop": false
+  },
+  {
+    "name": "zenflow",
+    "display": "Zenflow",
+    "website": "https://zencoder.ai/zenflow",
+    "icon": "/agents/icons/zencoder-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.zencoder/skills",
+    "isTop": false
+  },
+  {
+    "name": "pochi",
+    "display": "Pochi",
+    "website": "https://app.getpochi.com",
+    "icon": "/agents/icons/pochi.png",
+    "stars": 0,
+    "skillsDir": "~/.pochi/skills",
+    "isTop": false
+  },
+  {
+    "name": "adal",
+    "display": "AdaL",
+    "website": "https://adalagent.ai",
+    "icon": "/agents/icons/adal.png",
+    "stars": 0,
+    "skillsDir": "~/.adal/skills",
+    "isTop": false
+  },
+  {
+    "name": "eve",
+    "display": "Eve",
+    "website": "https://vercel.com/eve",
+    "icon": "/agents/icons/eve.png",
+    "stars": 5400,
+    "skillsDir": "~/.agents/skills",
+    "isTop": false
+  },
+  {
+    "name": "posit-assistant",
+    "display": "Posit Assistant",
+    "website": "https://posit.co",
+    "icon": "/agents/icons/posit-assistant.png",
+    "stars": 0,
+    "skillsDir": "~/.posit/assistant/skills",
+    "isTop": false
+  },
+  {
+    "name": "comate",
+    "display": "Comate",
+    "website": "https://comate.baidu.com",
+    "icon": "/agents/icons/comate.png",
+    "stars": 0,
+    "skillsDir": "~/.comate/skills",
+    "isTop": false
+  },
+  {
+    "name": "qwenwork",
+    "display": "QwenWork",
+    "website": "https://qwenwork.ai",
+    "icon": "/agents/icons/qwen-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.qwenwork/skills",
+    "isTop": false
+  },
+  {
+    "name": "qwenworkcn",
+    "display": "QwenWork CN",
+    "website": "https://qwenwork.cn",
+    "icon": "/agents/icons/qwen-color.svg",
+    "stars": 0,
+    "skillsDir": "~/.qwenworkcn/skills",
+    "isTop": false
+  },
+  {
+    "name": "joycode",
+    "display": "JoyCode",
+    "website": "https://joycode.jd.com",
+    "icon": "/agents/icons/joycode.png",
+    "stars": 0,
+    "skillsDir": "~/.joycode/skills",
+    "isTop": false
+  },
+  {
+    "name": "lmstudio",
+    "display": "LM Studio",
+    "website": "https://lmstudio.ai",
+    "icon": "/agents/icons/lmstudio.svg",
+    "stars": 0,
+    "skillsDir": "~/.lmstudio/skills",
+    "isTop": false
+  },
+  {
+    "name": "universal",
+    "display": "Universal",
+    "website": "",
+    "icon": "/agents/null",
+    "stars": 0,
+    "skillsDir": "~/.config/agents/skills",
+    "isTop": false
+  }
+]

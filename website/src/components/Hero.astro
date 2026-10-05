@@ -1,0 +1,164 @@
+---
+import { translations } from '../i18n/translations';
+import { HeroAgentGraph } from './HeroAgentGraph';
+import { Download, ShieldCheck, Cpu, Layers, Sparkles } from 'lucide-react';
+import { GithubIcon } from './GithubIcon';
+
+interface Props {
+  lang?: 'en' | 'zh';
+}
+
+const { lang = 'en' } = Astro.props;
+const t = translations[lang].hero;
+const isZh = lang === 'zh';
+---
+
+<section class="relative pt-32 pb-20 overflow-hidden">
+  <!-- Ambient Radial Glow -->
+  <div class="hero-glow-bg absolute top-0 left-1/2 -translate-x-1/2 w-full h-[600px] pointer-events-none"></div>
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center relative z-10">
+    <!-- Top Pill Badge -->
+    <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-700 dark:text-blue-300 mb-8 backdrop-blur-md shadow-2xs">
+      <Sparkles class="size-3.5 text-blue-600 dark:text-blue-400" />
+      <span>{t.badge}</span>
+      <span class="text-blue-300 dark:text-blue-500/40">|</span>
+      <span class="text-slate-600 dark:text-slate-300 font-mono">v0.22.0 Released</span>
+    </div>
+
+    <!-- Main Value Prop Headline -->
+    <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-[1.2] mb-6 text-balance">
+      <span>{t.titleStart}</span>{lang === 'en' ? ' ' : ''}<span class="bg-gradient-to-r from-blue-600 via-teal-500 to-indigo-600 dark:from-blue-400 dark:via-teal-300 dark:to-indigo-400 bg-clip-text text-transparent">{t.titleHighlight}</span>
+    </h1>
+
+    <!-- Subtitle explaining Single Source of Truth & Zero Redundancy -->
+    <p class="max-w-3xl mx-auto text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-10 leading-relaxed font-normal">
+      {t.subtitle}
+    </p>
+
+    <!-- Call to Actions -->
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+      <!-- Direct Download DMG -->
+      <a
+        href="https://github.com/skill-one/skill-one/releases/latest/download/Skill.One_0.22.0_aarch64.dmg"
+        download="Skill.One_0.22.0_aarch64.dmg"
+        class="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 text-sm"
+      >
+        <Download class="size-4" />
+        <div class="text-left">
+          <div class="leading-tight">{t.downloadMac}</div>
+          <div class="text-[10px] text-blue-100 font-normal">{t.downloadSub}</div>
+        </div>
+      </a>
+
+      <!-- GitHub Link -->
+      <a
+        href="https://github.com/skill-one/skill-one"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900/80 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-white/15 transition-all duration-200 hover:-translate-y-0.5 text-sm shadow-2xs backdrop-blur-md"
+      >
+        <GithubIcon className="size-4" />
+        <span>{t.viewGithub}</span>
+      </a>
+    </div>
+
+    <!-- Platform Availability & Coming Soon Bar -->
+    <div class="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-6">
+      <span class="font-medium text-slate-700 dark:text-slate-300">{isZh ? '平台支持状态：' : 'Platform Support:'}</span>
+      <span class="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/20 text-[11px]">
+        <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        macOS Apple Silicon ({isZh ? '直接下载 DMG' : 'Direct DMG'})
+      </span>
+      <span class="text-slate-300 dark:text-slate-700 hidden sm:inline">·</span>
+      <button
+        type="button"
+        class="hover:text-blue-600 dark:hover:text-blue-400 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer underline decoration-dotted text-[11px]"
+        data-toast-msg={translations[lang].download.toastIntel}
+      >
+        macOS Intel ({translations[lang].download.comingSoon})
+      </button>
+      <span class="text-slate-300 dark:text-slate-700 hidden sm:inline">·</span>
+      <button
+        type="button"
+        class="hover:text-blue-600 dark:hover:text-blue-400 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer underline decoration-dotted text-[11px]"
+        data-toast-msg={translations[lang].download.toastWindows}
+      >
+        Windows ({translations[lang].download.comingSoon})
+      </button>
+      <span class="text-slate-300 dark:text-slate-700 hidden sm:inline">·</span>
+      <button
+        type="button"
+        class="hover:text-blue-600 dark:hover:text-blue-400 text-slate-500 dark:text-slate-400 transition-colors cursor-pointer underline decoration-dotted text-[11px]"
+        data-toast-msg={translations[lang].download.toastLinux}
+      >
+        Linux ({translations[lang].download.comingSoon})
+      </button>
+    </div>
+
+    <!-- Quick CLI & Central Repository Pill -->
+    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 text-xs font-mono text-slate-700 dark:text-slate-300 mb-10 backdrop-blur-md shadow-2xs group hover:border-blue-400/60 dark:hover:border-blue-500/40 transition-all">
+      <span class="text-blue-600 dark:text-blue-400 font-bold">$</span>
+      <span>npx skills add &lt;skill&gt;</span>
+      <span class="text-slate-300 dark:text-slate-700">|</span>
+      <span class="text-slate-500 dark:text-slate-400">~/.agents/skills</span>
+      <button
+        type="button"
+        id="copy-hero-cli"
+        class="ml-1 px-2.5 py-0.5 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-white/10 text-[11px] font-sans font-medium transition-all cursor-pointer shadow-2xs"
+        aria-label="Copy npx command"
+      >
+        <span id="copy-hero-cli-text">{isZh ? '复制' : 'Copy'}</span>
+      </button>
+    </div>
+
+    <!-- Trust Seals Bar -->
+    <div class="flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs text-slate-600 dark:text-slate-400 mb-14 font-medium">
+      <div class="flex items-center gap-2">
+        <ShieldCheck class="size-4 text-emerald-600 dark:text-emerald-400" />
+        <span>{t.trustLocal}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <Layers class="size-4 text-blue-600 dark:text-blue-400" />
+        <span>{t.trustZeroDisk}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <Cpu class="size-4 text-purple-600 dark:text-purple-400" />
+        <span>{t.trustAgents}</span>
+      </div>
+    </div>
+
+    <!-- Interactive Graph Island Showcase -->
+    <div class="text-left">
+      <div class="text-center mb-3 text-xs text-slate-500 dark:text-slate-400">
+        <span>{t.interactivePrompt}</span>
+      </div>
+      <HeroAgentGraph client:load lang={lang} />
+    </div>
+  </div>
+</section>
+
+<script is:inline>
+  const copyBtn = document.getElementById('copy-hero-cli');
+  const copyText = document.getElementById('copy-hero-cli-text');
+  if (copyBtn && copyText) {
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText('npx skills add @antigravity/shadcn-ui');
+      const original = copyText.innerText;
+      copyText.innerText = '✓';
+      setTimeout(() => {
+        copyText.innerText = original;
+      }, 2000);
+    });
+  }
+
+  // Handle coming-soon platform toast dispatch
+  document.querySelectorAll('[data-toast-msg]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const msg = btn.getAttribute('data-toast-msg');
+      if (msg) {
+        window.dispatchEvent(new CustomEvent('show-platform-toast', { detail: { message: msg } }));
+      }
+    });
+  });
+</script>

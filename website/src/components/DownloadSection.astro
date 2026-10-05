@@ -1,0 +1,53 @@
+---
+import { translations } from '../i18n/translations';
+import { DownloadCards } from './DownloadCards';
+import { Shield, ExternalLink } from 'lucide-react';
+
+interface Props {
+  lang?: 'en' | 'zh';
+}
+
+const { lang = 'en' } = Astro.props;
+const t = translations[lang].download;
+const isZh = lang === 'zh';
+
+const RELEASE_URL = 'https://github.com/skill-one/skill-one/releases/latest';
+---
+
+<section id="download" class="py-24 relative border-t border-slate-200/80 dark:border-white/[0.08] bg-slate-50/40 dark:bg-[#070b14]/70 transition-colors">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6">
+    <!-- Header -->
+    <div class="text-center max-w-3xl mx-auto mb-16">
+      <span class="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 font-mono">
+        {t.eyebrow}
+      </span>
+      <h2 class="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white tracking-tight mt-2 mb-4">
+        {t.title}
+      </h2>
+      <p class="text-slate-600 dark:text-slate-300 text-sm sm:text-base leading-relaxed">
+        {t.subtitle}
+      </p>
+    </div>
+
+    <!-- Interactive Platform Download Cards -->
+    <DownloadCards client:load lang={lang} />
+
+    <!-- Release Info & Guarantee -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 text-xs text-slate-600 dark:text-slate-400 shadow-2xs">
+      <div class="flex items-center gap-2">
+        <Shield class="size-4 text-emerald-600 dark:text-emerald-400" />
+        <span>{t.openSourceBadge}</span>
+      </div>
+
+      <a
+        href={RELEASE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline font-medium transition-colors"
+      >
+        <span>{t.releaseNotes}</span>
+        <ExternalLink class="size-3" />
+      </a>
+    </div>
+  </div>
+</section>
