@@ -4,7 +4,8 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://skill-one.com',
+  site: 'https://skill-one.github.io',
+  base: '/skill-one',
   integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
