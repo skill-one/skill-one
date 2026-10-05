@@ -98,6 +98,7 @@ export function isInstallableSkill(skill: SkillView): boolean {
  */
 export function isThirdPartySkill(
   skill?: {
+    name?: string;
     origin?: "store" | "local";
     storeBacked?: boolean;
     repo?: string;
