@@ -258,27 +258,29 @@ export const SkillRow = memo(function SkillRow({
           )}
         </div>
 
-        {/* The classification leads the row. The tip names the domain, its scope
-            and any other domains the skill belongs to — and answers for a skill
-            nothing classified, which wears the question mark here. A live row
-            draws nothing in the slot, which stays fixed so the names still line
-            up: nothing classified it, but nothing looked either. */}
-        {live ? (
+        {/* The owner avatar leads the row. A skill with no source wears the third-party mark
+            (or the suggestion badge `extra` when linkable). When `!showSource`,
+            a fixed placeholder preserves column alignment without repeating the source. */}
+        {!showSource ? (
           <span
             aria-hidden="true"
-            className="size-7 shrink-0 text-base leading-none"
+            className="size-7 shrink-0"
           />
-        ) : (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <span className="flex size-7 shrink-0 items-center justify-center text-base leading-none">
-                  {domainEmoji(domain)}
-                </span>
-              }
+        ) : owner ? (
+          <div className="relative inline-flex shrink-0 items-center">
+            <OwnerAvatar
+              owner={owner}
+              className="size-7 shrink-0 text-xs"
             />
-            <TooltipContent>{domainTooltip(domain ?? [], locale)}</TooltipContent>
-          </Tooltip>
+            {skill.origin === "local" && (
+              <span
+                title={t("detail.sourceViaLink")}
+                className="absolute -bottom-0.5 -right-0.5 flex size-2.5 items-center justify-center rounded-full bg-amber-500 ring-1 ring-background"
+              />
+            )}
+          </div>
+        ) : (
+          (extra ?? <ThirdPartyMark className="size-7" />)
         )}
 
         {/* What is it, and what does it do: the two lines every row leads with,
@@ -312,21 +314,18 @@ export const SkillRow = memo(function SkillRow({
             and the face left of it sits in a column of its own instead of
             drifting with the digits' width. */}
         <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
-          {/* The source's face, or the third-party mark in its place: the same
-              round box at the same size, with an amber broken-chain glyph where
-              a sourced row has a person, so the two kinds of row read apart at a
-              glance. `extra` is that mark when this skill can be linked — it
-              fills the slot rather than trailing it, because the affordance and
-              the fact are one thing here. */}
-          {showSource &&
-            (owner ? (
-              <OwnerAvatar
-                owner={owner}
-                className="size-5 shrink-0 text-[9px]"
+          {!live && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="flex size-5 shrink-0 items-center justify-center text-sm leading-none">
+                    {domainEmoji(domain)}
+                  </span>
+                }
               />
-            ) : (
-              (extra ?? <ThirdPartyMark className="size-5" />)
-            ))}
+              <TooltipContent>{domainTooltip(domain ?? [], locale)}</TooltipContent>
+            </Tooltip>
+          )}
           {fact === "installedAt" ? (
             <SkillInstalledTime
               skill={skill}

@@ -279,6 +279,18 @@ describe("SkillRow figure slot", () => {
     expect(onCheckChange).toHaveBeenCalledWith(false);
     expect(onSelect).not.toHaveBeenCalled();
   });
+
+  it("renders owner avatar as leading avatar for sourced skills", () => {
+    const { container } = renderRow(repoLive);
+    expect(container.querySelector("[data-slot='avatar']")).not.toBeNull();
+  });
+
+  it("renders third-party mark when skill has no owner", () => {
+    const sourceless: SkillView = { ...repoLive, repo: "", storeBacked: false };
+    const { container } = renderRow(sourceless);
+    expect(screen.getByRole("img", { name: "第三方安装" })).toBeInTheDocument();
+    expect(container.querySelector("[data-slot='avatar']")).toBeNull();
+  });
 });
 
 describe("the ordinal mark, shared with the repository card", () => {

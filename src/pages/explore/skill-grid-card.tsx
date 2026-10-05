@@ -155,23 +155,23 @@ export function SkillGridCard({
             />
           </span>
         )}
-        {/* Name row: classification glyph plus the name, both on one line. */}
-        <div className={cn("flex min-w-0 items-center gap-1.5", checkable && "pr-6")}>
-          {live ? (
-            <span aria-hidden="true" className="size-6 shrink-0" />
-          ) : (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span className="flex size-6 shrink-0 items-center justify-center text-base leading-none">
-                    {domainEmoji(domain)}
-                  </span>
-                }
+        {/* Name row: owner avatar plus the name, both on one line. */}
+        <div className={cn("flex min-w-0 items-center gap-2", checkable && "pr-6")}>
+          {owner ? (
+            <div className="relative inline-flex shrink-0 items-center">
+              <OwnerAvatar
+                owner={owner}
+                className="size-6 shrink-0 text-[10px]"
               />
-              <TooltipContent>
-                {domainTooltip(domain ?? [], locale)}
-              </TooltipContent>
-            </Tooltip>
+              {skill.origin === "local" && (
+                <span
+                  title={t("detail.sourceViaLink")}
+                  className="absolute -bottom-0.5 -right-0.5 flex size-2 items-center justify-center rounded-full bg-amber-500 ring-1 ring-background"
+                />
+              )}
+            </div>
+          ) : (
+            (extra ?? <ThirdPartyMark className="size-6" />)
           )}
           <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-tight">
             <HighlightedText
@@ -189,21 +189,21 @@ export function SkillGridCard({
         )}
         {live && <div className="min-h-0 flex-1" />}
 
-        {/* Footer: owner face, the figure the list answers in, corner action. */}
+        {/* Footer: category glyph, the figure the list answers in, corner action. */}
         <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-muted-foreground">
-          {/* A skill no source vouches for has no face to draw, so the column
-              wears the third-party mark instead — same box, same border, so
-              the footer below it starts at the same offset as a sourced
-              square's, and only the glyph tells the two apart. `extra` is that
-              mark when the skill can be linked: it fills the slot rather than
-              trailing it. */}
-          {owner ? (
-            <OwnerAvatar
-              owner={owner}
-              className="size-4 shrink-0 text-[8px]"
-            />
-          ) : (
-            (extra ?? <ThirdPartyMark className="size-4" />)
+          {!live && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="flex size-4 shrink-0 items-center justify-center text-xs leading-none">
+                    {domainEmoji(domain)}
+                  </span>
+                }
+              />
+              <TooltipContent>
+                {domainTooltip(domain ?? [], locale)}
+              </TooltipContent>
+            </Tooltip>
           )}
           <span className="ml-auto flex shrink-0 items-center">
             {fact === "installedAt" ? (
