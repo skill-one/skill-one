@@ -1,7 +1,8 @@
 name: Deploy Website
 
 # Deploys the Astro landing page (website/) to GitHub Pages.
-# Runs on every push to main (or feat/astro-landing during active development).
+# Runs on every push to main (or feat/astro-landing during active development),
+# and after each Release so download links built from the app version stay current.
 on:
   push:
     branches:
@@ -10,6 +11,10 @@ on:
     paths:
       - 'website/**'
       - '.github/workflows/deploy-website.yml'
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 # Required permissions for the GITHUB_TOKEN to deploy pages.

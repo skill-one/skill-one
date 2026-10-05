@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { translations } from '../i18n/translations';
 import { Download, Menu, X, Globe, Sun, Moon } from 'lucide-react';
 import { GithubIcon } from './GithubIcon';
+import { APP_VERSION } from '../lib/version';
 
 interface NavbarProps {
   lang?: 'en' | 'zh';
@@ -48,7 +49,7 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
             <span className="font-bold text-base tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
               Skill One
               <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                v0.22.0
+                v{APP_VERSION}
               </span>
             </span>
           </div>

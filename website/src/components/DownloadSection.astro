@@ -1,5 +1,6 @@
 ---
 import { translations } from '../i18n/translations';
+import { APP_VERSION } from '../lib/version';
 import { DownloadCards } from './DownloadCards';
 import { Shield, ExternalLink } from 'lucide-react';
 
@@ -45,7 +46,7 @@ const RELEASE_URL = 'https://github.com/skill-one/skill-one/releases/latest';
         rel="noopener noreferrer"
         class="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline font-medium transition-colors"
       >
-        <span>{t.releaseNotes}</span>
+        <span>{t.releaseNotes} (v{APP_VERSION})</span>
         <ExternalLink class="size-3" />
       </a>
     </div>

@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { translations } from '../i18n/translations';
 import { Download, Apple, Monitor, Terminal, Clock, Check, X, Sparkles } from 'lucide-react';
+import { DMG_URL as MAC_ARM_DMG_URL, DMG_FILENAME } from '../lib/version';
 
 interface DownloadCardsProps {
   lang?: 'en' | 'zh';
 }
-
-const MAC_ARM_DMG_URL = 'https://github.com/skill-one/skill-one/releases/latest/download/Skill.One_0.22.0_aarch64.dmg';
 
 export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => {
   const t = translations[lang].download;
@@ -85,7 +84,7 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
               {/* Apple Silicon direct download */}
               <a
                 href={MAC_ARM_DMG_URL}
-                download="Skill.One_0.22.0_aarch64.dmg"
+                download={DMG_FILENAME}
                 onClick={handleAppleSiliconDownload}
                 className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold transition-all shadow-sm hover:shadow group"
               >
