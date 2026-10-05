@@ -93,8 +93,8 @@ export function SelectionActionBar({
   const visible = count > 0;
   const isAllSelected = count > 0 && count === totalCount;
 
-  const customTags = availableTags.filter((t) => t.isCustom !== false);
-  const systemTags = availableTags.filter((t) => t.isCustom === false);
+  const customTags = availableTags.filter((tag) => tag.isCustom !== false);
+  const systemTags = availableTags.filter((tag) => tag.isCustom === false);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
