@@ -169,9 +169,9 @@ export function rankNamesakes(
  */
 export async function unlinkSkillSource(
   name: string,
-  repo: string,
+  repo?: string,
 ): Promise<void> {
-  await dismissSkillSource(name, repo);
+  await dismissSkillSource(name, repo ?? "");
   resolved.delete(name);
 }
 
@@ -280,40 +280,21 @@ export async function resolveAssociations(
   const served = getRegistrySnapshot().index?.etag;
   const stored = await loadPendingRecords();
   const verifiedIndex = served !== undefined && stored.index === served ? served : null;
-  const linked: string[] = [];
-  const matched: Array<{
-    repo: string;
-    name: string;
-    reason: SourceLinkReason;
-    defaultTags?: readonly string[];
-  }> = [];
   const upserts = new Map<string, PendingRecord>();
   const drops = new Set<string>();
 
   // Pass 1 — a skill whose stored ranking still describes it is answered from
-  // the ledger, without asking the registry anything. Two passes over the list
-  // rather than one, because "does this skill still need a lookup" is only
-  // known once its directory has been stat-ed, and the point of the fast path
-  // is precisely not to pay for that on the skills the ledger already answers.
+  // the ledger, without asking the registry anything.
   const outstanding = (
     await Promise.all(
       unlinked.map(async (skill) => {
         if (resolved.has(skill.name)) return null; // dead end or cached candidates
         const cached = stored.records[skill.name];
-        // A repo the user cut (via the detail drawer) must never ride the
-        // cache: the lookup re-runs so the suppression applies to the fresh
-        // ranking, and the cut is carried into whatever outcome is stored.
-        const cut = new Set(cached?.repos ?? []);
         if (
           cached &&
           verifiedIndex !== null &&
-          cut.size === 0 &&
           cached.candidates?.length
         ) {
-          // Verified against the snapshot now being served. The ranking itself
-          // is content-dependent (it reads the local description), so its reuse
-          // revalidates the directory. The browser mock has no real files, so
-          // there the stored ranking stands in as-is.
           if (!isTauri()) {
             resolved.set(skill.name, reviveCandidates(skill.name, cached.candidates));
             return null;
@@ -324,78 +305,37 @@ export async function resolveAssociations(
             return null;
           }
         }
-        return { skill, cached, cut };
+        return { skill, cached };
       }),
     )
   ).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
-  // Pass 2 — one query for every name the ledger did not answer, in registry
-  // order per name.
+  // Pass 2 — query namesakes for skills the ledger did not answer
   const byName = await findNamesakes(outstanding.map((entry) => entry.skill.name));
 
   await Promise.all(
-    outstanding.map(async ({ skill, cached, cut }) => {
-      // Step 1 — the cheap filter: without same-slug entries there is no
-      // association to make and no reason to look at the skill's directory.
+    outstanding.map(async ({ skill, cached }) => {
       const namesakes = byName.get(skill.name) ?? [];
       if (namesakes.length === 0) {
-        // A dead end is one in-memory query that cannot go stale between
-        // runs, so it earns no line: it is recomputed next time. The user's
-        // own cuts do earn one — a future snapshot that re-introduces a cut
-        // repo must not auto-link it behind their back — and a cache this
-        // run did not reproduce is dropped rather than left to rot.
         resolved.set(skill.name, []);
-        if (cut.size > 0) {
-          upserts.set(skill.name, { kind: "pending", name: skill.name, repos: [...cut] });
-        } else if (cached) {
+        if (cached) {
           drops.add(skill.name);
         }
         return;
       }
 
-      // Step 2 — the directory's current state, stat-only. A stored ranking is
-      // only reusable while this fingerprint still matches disk, and a
-      // fingerprint is exactly what a fresh record needs to be reusable later,
-      // so one stat call answers both. No file bytes are read: the registry
-      // publishes no per-skill hash for a content hash to match, so walking
-      // the directory would buy nothing. Outside Tauri there are no real
-      // files to stat, and the record simply carries no fingerprint.
       const fingerprint = isTauri() ? await skillFingerprint(skill.name) : null;
       const unchanged =
         fingerprint !== null &&
         cached?.fingerprint !== undefined &&
         sameFingerprint(fingerprint, cached.fingerprint);
 
-      // Step 3 — ranked candidates. A near-identical description (≥ threshold)
-      // is treated as the same skill and linked without asking; only below the
-      // threshold is the decision left to the user. Re-ranking is skipped when
-      // the ranking input is unchanged (same namesakes over unchanged content)
-      // — the stored ranking is revived instead.
       const key = rankingKey(namesakes);
       const ranked =
         unchanged && cached?.key === key && cached.candidates?.length
           ? reviveCandidates(skill.name, cached.candidates)
           : rankNamesakes(namesakes, skill.description ?? "");
-      // Auto-linking takes the one candidate that clears the threshold on its
-      // own. Two of them clearing it means the wording cannot tell them apart —
-      // forks copy frontmatter verbatim — so the decision goes to the user
-      // rather than to a tie-break that would only guess (see `rankNamesakes`).
-      // A cut top stays in `ranked` as a manual candidate.
-      const cleared = ranked.filter(
-        (c) => !cut.has(c.skill.repo) && c.similarity >= SIMILARITY_AUTO_LINK_THRESHOLD,
-      );
-      if (cleared.length === 1) {
-        matched.push({
-          repo: cleared[0].skill.repo,
-          name: skill.name,
-          reason: "description",
-          defaultTags: cleared[0].skill.profile?.domain,
-        });
-        linked.push(skill.name);
-        resolved.set(skill.name, []);
-        drops.add(skill.name);
-        return;
-      }
+
       resolved.set(skill.name, ranked);
       upserts.set(skill.name, {
         kind: "pending",
@@ -403,16 +343,13 @@ export async function resolveAssociations(
         key,
         ...(fingerprint ? { fingerprint } : {}),
         candidates: ranked.map(toPersisted),
-        ...(cut.size > 0 ? { repos: [...cut] } : {}),
       });
     }),
   );
 
-  if (matched.length > 0) await recordSkillProvenanceBatch(matched);
   await savePendingRecords([...upserts.values()], [...drops], served);
 
-  // Assemble suggestions from the memoized candidates (linked names were
-  // parked with an empty list, so they never appear here).
+  // Assemble suggestions from the memoized candidates
   const suggestions: LinkSuggestions = {};
   for (const skill of unlinked) {
     const candidates = resolved.get(skill.name);
@@ -420,7 +357,7 @@ export async function resolveAssociations(
       suggestions[skill.name] = candidates;
     }
   }
-  return { linked, suggestions };
+  return { linked: [], suggestions };
 }
 
 /**

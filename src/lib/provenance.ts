@@ -630,7 +630,7 @@ export async function savePendingRecords(
   _drops: readonly string[],
   _index: string | undefined,
 ): Promise<void> {
-  // In the new architecture, suggestions are derived in-memory and not stored as bloated cache.
+  // Suggestions are derived in-memory and not stored as bloated cache.
 }
 
 // ------------------------------------------------------------- custom tags
@@ -839,7 +839,10 @@ export async function revealProvenanceDir(): Promise<void> {
 // ------------------------------------------------- browser mock hooks (tests)
 
 export function seedMockProvenance(
-  entries: Record<string, { repo: string; origin?: "store" | "local"; tags?: string[] }>,
+  entries: Record<
+    string,
+    { repo?: string; origin?: "store" | "local"; tags?: string[] }
+  >,
 ): void {
   if (isTauri()) return;
   const config: SkillOneConfig = {
@@ -850,7 +853,7 @@ export function seedMockProvenance(
   for (const [name, e] of Object.entries(entries)) {
     config.skills[name] = {
       origin: e.origin ?? "store",
-      repo: e.repo,
+      ...(e.repo ? { repo: e.repo } : {}),
       tags: e.tags,
     };
   }

@@ -667,7 +667,7 @@ describe("SkillDetailPanel source linking", () => {
   it("offers the change-source menu beside the repo line on the installed surface", async () => {
     mockFetchLocalSkillDetail.mockResolvedValue(detail);
     renderDrawer({
-      skill: { ...skill, path: undefined, via: "install" },
+      skill: { ...skill, path: undefined, via: "confirm", origin: "local" },
       surface: "installed",
     });
 
@@ -686,12 +686,24 @@ describe("SkillDetailPanel source linking", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("offers no change-source menu for store-installed skills", async () => {
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({
+      skill: { ...skill, path: undefined, origin: "store" },
+      surface: "installed",
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "更改 pdf 关联的来源" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("lists the current source, the other namesakes and the unlink action", async () => {
     const user = userEvent.setup();
     vi.mocked(findLinkCandidates).mockResolvedValue([forkCandidate]);
     mockFetchLocalSkillDetail.mockResolvedValue(detail);
     renderDrawer({
-      skill: { ...skill, path: undefined },
+      skill: { ...skill, path: undefined, origin: "local" },
       surface: "installed",
     });
 
@@ -716,7 +728,7 @@ describe("SkillDetailPanel source linking", () => {
     vi.mocked(findLinkCandidates).mockResolvedValue([forkCandidate]);
     mockFetchLocalSkillDetail.mockResolvedValue(detail);
     renderDrawer({
-      skill: { ...skill, path: undefined },
+      skill: { ...skill, path: undefined, origin: "local" },
       surface: "installed",
     });
 
@@ -740,7 +752,7 @@ describe("SkillDetailPanel source linking", () => {
     const toastSpy = vi.spyOn(toast, "add");
     mockFetchLocalSkillDetail.mockResolvedValue(detail);
     renderDrawer({
-      skill: { ...skill, path: undefined },
+      skill: { ...skill, path: undefined, origin: "local" },
       surface: "installed",
     });
 

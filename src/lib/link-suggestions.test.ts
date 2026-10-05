@@ -203,23 +203,19 @@ describe("rankNamesakes", () => {
 });
 
 describe("resolveAssociations", () => {
-  it("auto-links a near-identical description at/above the threshold", async () => {
-    // The wording matches the namesake 100% — close enough to be the same
-    // skill, so it links without a prompt.
+  it("surfaces matching namesakes as suggestions for user confirmation without auto-linking", async () => {
     mockReady([namesake("anthropics/skills")]);
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and manipulate PDF files." },
     ]);
 
-    expect(linked).toEqual(["pdf"]);
-    expect(suggestions).toEqual({});
-    expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
-      { repo: "anthropics/skills", name: "pdf", reason: "description" },
-    ]);
+    expect(linked).toEqual([]);
+    expect(suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
+    expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
   });
 
-  it("auto-links by description outside Tauri too (no files to stat)", async () => {
+  it("surfaces suggestions outside Tauri too (no files to stat)", async () => {
     isTauri.mockReturnValue(false);
     mockReady([namesake("anthropics/skills")]);
 
@@ -228,17 +224,11 @@ describe("resolveAssociations", () => {
     ]);
 
     expect(skillFingerprint).not.toHaveBeenCalled();
-    expect(linked).toEqual(["pdf"]);
-    expect(suggestions).toEqual({});
+    expect(linked).toEqual([]);
+    expect(suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
   });
 
-  it("does not auto-link a below-threshold description, still suggests", async () => {
-    // "convert" vs "manipulate" drops similarity below the 0.9 threshold, so
-    // the decision is left to the user.
-    expect(
-      descriptionSimilarity("Read and convert PDF files.", namesake("a").description),
-    ).toBeLessThan(SIMILARITY_AUTO_LINK_THRESHOLD);
-
+  it("surfaces ranked candidates when descriptions differ", async () => {
     mockReady([namesake("anthropics/skills")]);
 
     const { linked, suggestions } = await resolveAssociations([
@@ -249,10 +239,7 @@ describe("resolveAssociations", () => {
     expect(suggestions.pdf[0].skill.repo).toBe("anthropics/skills");
   });
 
-  it("links a matching description regardless of any content hash", async () => {
-    // The registry carries no per-skill hash, so a description match is the
-    // only auto-link there is. The second namesake is worded differently, so
-    // exactly one candidate clears the threshold.
+  it("surfaces candidates without auto-linking regardless of content", async () => {
     mockReady([
       namesake("anthropics/skills"),
       namesake("fork/skills", { description: "entirely different wording" }),
@@ -262,11 +249,9 @@ describe("resolveAssociations", () => {
       { name: "pdf", description: "Read and manipulate PDF files." },
     ]);
 
-    expect(linked).toEqual(["pdf"]);
-    expect(suggestions).toEqual({});
-    expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
-      { repo: "anthropics/skills", name: "pdf", reason: "description" },
-    ]);
+    expect(linked).toEqual([]);
+    expect(suggestions.pdf).toHaveLength(2);
+    expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
   });
 
   it("auto-links nothing when two namesakes match equally well", async () => {
@@ -518,53 +503,19 @@ describe("resolveAssociations", () => {
     expect(savePendingRecords).toHaveBeenCalledWith([], [], undefined);
   });
 
-  it("never auto-links a repo the user cut, but keeps it as a candidate", async () => {
+  it("surfaces candidates without auto-linking and persists pending ranking", async () => {
     mockReady([namesake("anthropics/skills")]);
-    mockLedger({ records: { pdf: pending({ repos: ["anthropics/skills"] }) } });
     skillFingerprint.mockResolvedValue({ mtimeMs: 1, size: 2 });
 
     const { linked, suggestions } = await resolveAssociations([
       { name: "pdf", description: "Read and manipulate PDF files." },
     ]);
 
-    // The perfect description match is cut — no auto-link; the choice stays
-    // with the user, and the cut repo remains among the candidates it can still
-    // be picked from manually.
     expect(linked).toEqual([]);
     expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
     expect(suggestions.pdf.map((c) => c.skill.repo)).toEqual(["anthropics/skills"]);
-    // The cut is carried into the persisted outcome.
     expect(savePendingRecords).toHaveBeenCalledWith(
-      [expect.objectContaining({ name: "pdf", repos: ["anthropics/skills"] })],
-      [],
-      ETAG,
-    );
-  });
-
-  it("auto-links the best namesake that was not cut", async () => {
-    mockReady([namesake("anthropics/skills"), namesake("fork/skills")]);
-    mockLedger({ records: { pdf: pending({ repos: ["anthropics/skills"] }) } });
-    skillFingerprint.mockResolvedValue({ mtimeMs: 1, size: 2 });
-
-    const { linked } = await resolveAssociations([
-      { name: "pdf", description: "Read and manipulate PDF files." },
-    ]);
-
-    expect(linked).toEqual(["pdf"]);
-    expect(recordSkillProvenanceBatch).toHaveBeenCalledWith([
-      { repo: "fork/skills", name: "pdf", reason: "description" },
-    ]);
-  });
-
-  it("keeps the cut when the skill has no namesakes", async () => {
-    mockReady([]);
-    mockLedger({ records: { pdf: pending({ name: "pdf", candidates: undefined, repos: ["a/skills"] }) } });
-
-    await resolveAssociations([{ name: "pdf" }]);
-
-    // A cut outlives any cache: the record stays, stripped to the decision.
-    expect(savePendingRecords).toHaveBeenCalledWith(
-      [{ kind: "pending", name: "pdf", repos: ["a/skills"] }],
+      [expect.objectContaining({ name: "pdf" })],
       [],
       ETAG,
     );

@@ -87,17 +87,13 @@ beforeEach(() => {
 });
 
 describe("fetchProvenanceState", () => {
-  it("auto-links a tool-installed skill whose description matches a namesake", async () => {
+  it("surfaces candidates as suggestions for a tool-installed skill whose description matches a namesake", async () => {
     mockRegistry();
 
     const state = await runQueryFn([installed("pdf", "Read PDF files.")]);
 
-    expect(state.linked.pdf?.repo).toBe("anthropics/skills");
-    // Ledger entries written by the auto-link survive a reload.
-    const rerun = await runQueryFn([installed("pdf", "Read PDF files.")]);
-    expect(rerun.linked.pdf?.repo).toBe("anthropics/skills");
-    // The second run reads the ledger and does no association work at all.
-    expect(namesakeSkills).toHaveBeenCalledTimes(1);
+    expect(state.linked.pdf).toBeUndefined();
+    expect(state.suggestions.pdf?.[0]?.skill.repo).toBe("anthropics/skills");
   });
 
   it("offers ranked suggestions when the description does not match", async () => {

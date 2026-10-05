@@ -61,6 +61,7 @@ export function ThirdPartyMark({
   muted = false,
   candidate = false,
   showBadge = true,
+  showTooltip = true,
 }: {
   /** The skill's name (e.g. "git-commit"), used to derive the monogram. */
   name?: string;
@@ -71,52 +72,49 @@ export function ThirdPartyMark({
   candidate?: boolean;
   /** Whether to render the bottom-right badge when size permits. */
   showBadge?: boolean;
+  /** Whether to wrap the mark in a Tooltip. Defaults to true. */
+  showTooltip?: boolean;
 }) {
   const { t } = useTranslation();
   const compact = isMicroSize(className);
   const initial = name ? skillInitial(name) : null;
 
+  const content = (
+    <span
+      role="img"
+      aria-label={t("common.thirdPartyInstall")}
+      className={cn(
+        candidate || !muted ? THIRD_PARTY_MARK_CLASS : THIRD_PARTY_MARK_MUTED_CLASS,
+        className,
+      )}
+    >
+      {initial && !compact ? (
+        <>
+          <span className="font-semibold uppercase select-none leading-none text-inherit">
+            {initial}
+          </span>
+          {showBadge && candidate && (
+            <span
+              aria-hidden="true"
+              className="absolute -bottom-0.5 -right-0.5 flex size-[48%] min-w-3 min-h-3 items-center justify-center rounded-full ring-1.5 ring-background shadow-xs bg-amber-500 text-amber-950 dark:text-amber-100"
+            >
+              <Link2 className="size-[75%] stroke-[2.2]" />
+            </span>
+          )}
+        </>
+      ) : (
+        <ThirdPartyMarkGlyph />
+      )}
+    </span>
+  );
+
+  if (!showTooltip) {
+    return content;
+  }
+
   return (
     <Tooltip>
-      <TooltipTrigger
-        render={
-          <span
-            role="img"
-            aria-label={t("common.thirdPartyInstall")}
-            className={cn(
-              candidate || !muted ? THIRD_PARTY_MARK_CLASS : THIRD_PARTY_MARK_MUTED_CLASS,
-              className,
-            )}
-          >
-            {initial && !compact ? (
-              <>
-                <span className="font-semibold uppercase select-none leading-none text-inherit">
-                  {initial}
-                </span>
-                {showBadge && (
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "absolute -bottom-0.5 -right-0.5 flex size-[48%] min-w-3 min-h-3 items-center justify-center rounded-full ring-1.5 ring-background shadow-xs",
-                      candidate
-                        ? "bg-amber-500 text-amber-950 dark:text-amber-100"
-                        : "bg-background border border-border/90 text-foreground/80 dark:text-foreground/90",
-                    )}
-                  >
-                    {candidate ? (
-                      <Link2 className="size-[75%] stroke-[2.2]" />
-                    ) : (
-                      <Folder className="size-[75%] stroke-[2.2]" />
-                    )}
-                  </span>
-                )}
-              </>
-            ) : (
-              <ThirdPartyMarkGlyph />
-            )}
-          </span>
-        }
-      />
+      <TooltipTrigger render={content} />
       <TooltipContent>
         {candidate
           ? t("sourceLink.tooltip")

@@ -274,7 +274,7 @@ export const SkillRow = memo(function SkillRow({
         ) : (
           (extra ?? (
             <ThirdPartyMark
-              name={skill.name}
+              name={skillDisplayName(skill)}
               className="size-7 shrink-0 text-xs"
             />
           ))

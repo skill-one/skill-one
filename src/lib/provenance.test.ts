@@ -8,6 +8,7 @@ import {
   reconcileProvenance,
   removeSkillProvenance,
   unlinkSkillSource,
+  loadPendingRecords,
   loadCustomTags,
   saveCustomTagDef,
   renameCustomTagDef,

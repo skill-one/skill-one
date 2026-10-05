@@ -165,7 +165,7 @@ export function SkillGridCard({
           ) : (
             (extra ?? (
               <ThirdPartyMark
-                name={skill.name}
+                name={skillDisplayName(skill)}
                 className="size-6 shrink-0 text-[10px]"
               />
             ))

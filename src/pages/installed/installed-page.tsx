@@ -35,6 +35,7 @@ import {
 } from "../../lib/custom-tags";
 import {
   installedSkillView,
+  skillDisplayName,
   skillKey,
   type SkillView,
 } from "../../lib/skill-view";
@@ -869,7 +870,7 @@ export function InstalledPage() {
     (row: Row, className: string) =>
       !row.skill.repo ? (
         <LinkSuggestionMark
-          name={row.skill.name}
+          name={skillDisplayName(row.skill)}
           localDescription={row.skill.description}
           candidates={row.suggestion ?? []}
           cutRepos={row.skill.cutRepos}
@@ -891,7 +892,13 @@ export function InstalledPage() {
         skill: row.skill,
         matched: row.matched,
         muted: !row.enabled,
-        extra: unit !== "repo" ? rowExtra(row, "size-5") : undefined,
+        extra:
+          unit !== "repo"
+            ? rowExtra(
+                row,
+                unit === "grid" ? "size-6 text-[10px]" : "size-7 text-xs",
+              )
+            : undefined,
         action: <SkillEnableSwitch skill={row.skill} />,
       })),
     [rows, rowExtra, unit],
@@ -1083,7 +1090,7 @@ export function InstalledPage() {
         fact={sort === "installed" ? "installedAt" : "popularity"}
         selected={key === selected}
         muted={!row.enabled}
-        extra={rowExtra(row, "size-5")}
+        extra={rowExtra(row, "size-7 text-xs")}
         action={<SkillEnableSwitch skill={row.skill} />}
         onSelect={setSelectedKey}
         checkable={true}
@@ -1107,7 +1114,7 @@ export function InstalledPage() {
         fact={sort === "installed" ? "installedAt" : "popularity"}
         selected={key === selected}
         muted={!row.enabled}
-        extra={rowExtra(row, "size-4")}
+        extra={rowExtra(row, "size-6 text-[10px]")}
         action={<SkillEnableSwitch skill={row.skill} />}
         onSelect={() => setSelectedKey(key)}
         checkable={true}

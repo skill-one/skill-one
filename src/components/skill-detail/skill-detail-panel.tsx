@@ -678,6 +678,7 @@ export function SkillDetailPanel({
           ) : (
             <ThirdPartyMark
               name={shown ? skillDisplayName(shown) : undefined}
+              candidate={Boolean(suggestion && suggestion.length > 0)}
               className="size-12 shrink-0 text-lg"
             />
           )}
@@ -685,7 +686,7 @@ export function SkillDetailPanel({
             <SheetTitle className="truncate text-lg font-bold tracking-tight">
               {shown ? skillDisplayName(shown) : null}
             </SheetTitle>
-            {hasSource && !isStore && shown ? (
+            {hasSource && !isStore && shown && shown.origin === "local" ? (
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -700,9 +701,7 @@ export function SkillDetailPanel({
                   }
                 />
                 <TooltipContent className="max-w-[260px] text-left normal-case">
-                  {shown.origin === "store" || shown.via === "install"
-                    ? t("detail.sourceViaInstall")
-                    : t("detail.sourceViaLink")}
+                  {t("detail.sourceViaLink")}
                 </TooltipContent>
               </Tooltip>
             ) : hasSource ? (

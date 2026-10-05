@@ -1118,9 +1118,7 @@ describe("InstalledPage", () => {
       expect(ledgerRecord("pdf")?.repo).toBe("anthropics/skills");
     });
 
-    it("auto-links a tool-installed skill whose description matches a namesake", async () => {
-      // Identical wording (≥ 90% similarity) is treated as the same skill and
-      // linked automatically — no 关联来源 badge or confirm dialog ever appears.
+    it("surfaces link suggestion instead of auto-linking a tool-installed skill whose description matches a namesake", async () => {
       namesakeSkills.mockResolvedValue({
         entries: [
           [
@@ -1137,18 +1135,10 @@ describe("InstalledPage", () => {
       });
       renderPage();
 
-      // No link-source affordance — it linked on its own.
-      await waitFor(() =>
-        expect(
-          screen.queryByRole("button", { name: "关联 pdf 的商店来源" }),
-        ).not.toBeInTheDocument(),
-      );
-      // The persisted ledger already carries the source the auto-link wrote.
-      await waitFor(() =>
-        expect(ledgerRecord("pdf")?.repo).toBe("anthropics/skills"),
-      );
-      // And pdf's card now names the source it was linked to on its own.
-      await screen.findByText("anthropics/skills");
+      expect(
+        await screen.findByRole("button", { name: "关联 pdf 的商店来源" }),
+      ).toBeInTheDocument();
+      expect(ledgerRecord("pdf")?.repo).toBeUndefined();
     });
   });
 

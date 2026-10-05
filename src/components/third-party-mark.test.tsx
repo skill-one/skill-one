@@ -75,7 +75,7 @@ describe("ThirdPartyMark", () => {
     ).toHaveTextContent("第三方安装，未关联来源");
   });
 
-  it("renders a dual-layer avatar with monogram and local terminal badge when name is provided", () => {
+  it("renders a clean monogram avatar when name is provided without candidates", () => {
     renderWithRouter(
       <TooltipProvider>
         <ThirdPartyMark name="git-commit" className="size-7" />
@@ -84,8 +84,8 @@ describe("ThirdPartyMark", () => {
 
     const mark = screen.getByRole("img", { name: "第三方安装" });
     expect(mark).toHaveTextContent("G");
-    // Contains folder micro-badge in corner
-    expect(mark.querySelector("svg")).not.toBeNull();
+    // Clean monogram: no badge in corner when candidate is false
+    expect(mark.querySelector("svg")).toBeNull();
   });
 
   it("renders an amber link badge when candidate is true", () => {

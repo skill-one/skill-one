@@ -83,10 +83,23 @@ describe("LinkSuggestionMark", () => {
     ).not.toBeInTheDocument();
     const mark = screen.getByRole("img", { name: "第三方安装" });
     expect(mark).toHaveClass("rounded-full", "border", "size-4");
-    // Nothing to link, so nothing to press: the closed case wears the muted
-    // tone, not the amber that asks for a press.
-    expect(mark).toHaveClass("bg-muted", "text-muted-foreground");
-    expect(mark).not.toHaveClass("bg-amber-500/10");
+    expect(mark).toHaveClass("bg-amber-500/10", "text-amber-500/80");
+  });
+
+  it("renders a dual-layer avatar with initial and link badge when size is non-micro", () => {
+    renderMark({ className: "size-7" });
+
+    const trigger = screen.getByRole("button", { name: "关联 pdf 的商店来源" });
+    expect(trigger).toHaveTextContent("P");
+    expect(trigger.querySelector(".bg-amber-500")).not.toBeNull();
+  });
+
+  it("renders a clean monogram avatar when empty candidates and non-micro", () => {
+    renderMark({ candidates: [], className: "size-6" });
+
+    const mark = screen.getByRole("img", { name: "第三方安装" });
+    expect(mark).toHaveTextContent("P");
+    expect(mark.querySelector("svg")).toBeNull();
   });
 
   it("explains linking in a tooltip on hover, not the plain statement", async () => {
@@ -216,9 +229,7 @@ describe("LinkSuggestionMark", () => {
       screen.queryByRole("button", { name: "关联 pdf 的商店来源" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("第三方安装")).toBeInTheDocument();
-    // The labeled statement keeps the closed tone too: neutral, not amber.
     const mark = screen.getByRole("img", { name: "第三方安装" });
-    expect(mark).toHaveClass("bg-muted", "text-muted-foreground");
-    expect(mark).not.toHaveClass("bg-amber-500/10");
+    expect(mark).toHaveClass("bg-amber-500/10", "text-amber-500/80");
   });
 });
