@@ -9,12 +9,11 @@ interface Props {
 const { lang = 'en' } = Astro.props;
 const t = translations[lang].footer;
 const nav = translations[lang].nav;
-const isZh = lang === 'zh';
 ---
 
-<footer class="border-t border-white/[0.08] bg-[#050810] py-16 text-xs text-slate-400">
+<footer class="border-t border-slate-200/80 dark:border-white/[0.08] bg-slate-50 dark:bg-[#050810] py-16 text-xs text-slate-500 dark:text-slate-400 transition-colors">
   <div class="max-w-6xl mx-auto px-4 sm:px-6">
-    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-12 border-b border-white/5">
+    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-12 border-b border-slate-200/60 dark:border-white/5">
       <!-- Brand & Tagline -->
       <div class="space-y-3">
         <div class="flex items-center gap-2.5">
@@ -23,9 +22,9 @@ const isZh = lang === 'zh';
             alt="Skill One"
             class="size-7 object-contain"
           />
-          <span class="font-bold text-base text-white">Skill One</span>
+          <span class="font-bold text-base text-slate-900 dark:text-white">Skill One</span>
         </div>
-        <p class="text-xs text-slate-400 max-w-sm leading-relaxed">
+        <p class="text-xs text-slate-500 dark:text-slate-400 max-w-sm leading-relaxed">
           {t.tagline}
         </p>
       </div>
@@ -36,7 +35,7 @@ const isZh = lang === 'zh';
           href="https://github.com/skill-one/skill-one"
           target="_blank"
           rel="noopener noreferrer"
-          class="hover:text-white transition-colors"
+          class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
         >
           {t.links.github}
         </a>
@@ -44,7 +43,7 @@ const isZh = lang === 'zh';
           href="https://github.com/skill-one/skill-one/releases"
           target="_blank"
           rel="noopener noreferrer"
-          class="hover:text-white transition-colors"
+          class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
         >
           {t.links.releases}
         </a>
@@ -52,7 +51,7 @@ const isZh = lang === 'zh';
           href="https://github.com/skill-one/skill-one/blob/main/README.md"
           target="_blank"
           rel="noopener noreferrer"
-          class="hover:text-white transition-colors"
+          class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
         >
           {t.links.docs}
         </a>
@@ -60,7 +59,7 @@ const isZh = lang === 'zh';
           href="https://github.com/skill-one/skill-one/blob/main/LICENSE"
           target="_blank"
           rel="noopener noreferrer"
-          class="hover:text-white transition-colors"
+          class="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
         >
           {t.links.license}
         </a>
@@ -68,14 +67,14 @@ const isZh = lang === 'zh';
     </div>
 
     <!-- Bottom Bar -->
-    <div class="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-400">
+    <div class="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-500 dark:text-slate-400">
       <p>{t.rights}</p>
 
       <div class="flex items-center gap-4">
         <!-- Language Switcher in Footer -->
         <a
           href={nav.switchLangUrl}
-          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors border border-white/5 text-[11px]"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors border border-slate-200 dark:border-white/5 text-[11px] shadow-2xs"
         >
           <Globe class="size-3" />
           <span>{nav.switchLang}</span>

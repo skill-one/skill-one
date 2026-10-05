@@ -3,6 +3,35 @@
 @layer base {
   :root {
     --radius: 0.75rem;
+    --background: #fbfcfd;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --primary: #2563eb;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #1e293b;
+    --muted: #f8fafc;
+    --muted-foreground: #64748b;
+    --accent: #f1f5f9;
+    --accent-foreground: #0f172a;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --border-hover: #cbd5e1;
+    --ring: #3b82f6;
+
+    /* Skill One 5 Signature Ribbon Hues */
+    --brand-blue: #2E7FD9;
+    --brand-teal: #2FCB9F;
+    --brand-purple: #9535D4;
+    --brand-pink: #ED4B8E;
+    --brand-orange: #F49B1F;
+  }
+
+  .dark {
     --background: #090d16;
     --foreground: #f1f5f9;
     --card: #0f1626;
@@ -19,14 +48,9 @@
     --accent-foreground: #f8fafc;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-hover: rgba(255, 255, 255, 0.18);
+    --border: rgba(255, 255, 255, 0.1);
+    --border-hover: rgba(255, 255, 255, 0.2);
     --ring: #3b82f6;
-    --brand-blue: #2E7FD9;
-    --brand-teal: #2FCB9F;
-    --brand-purple: #9535D4;
-    --brand-pink: #ED4B8E;
-    --brand-orange: #F49B1F;
   }
 }
 
@@ -56,7 +80,7 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
   scroll-behavior: smooth;
   background-color: var(--background);
   color: var(--foreground);
@@ -65,21 +89,25 @@ html {
   -webkit-font-smoothing: antialiased;
 }
 
+html.dark {
+  color-scheme: dark;
+}
+
 body {
   overflow-x: hidden;
   min-height: 100vh;
 }
 
-/* Custom glow utility */
-.radial-gradient-hero {
-  background: radial-gradient(circle 800px at 50% -100px, rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.08), transparent 70%);
+/* Light / Dark Adaptive Hero Ambient Glow */
+.hero-glow-bg {
+  background: radial-gradient(circle 800px at 50% -80px, rgba(59, 130, 246, 0.08), rgba(47, 203, 159, 0.05), transparent 70%);
 }
 
-.mesh-glow {
-  background: radial-gradient(circle 500px at 50% 50%, rgba(46, 127, 217, 0.12), rgba(47, 203, 159, 0.06), transparent 70%);
+.dark .hero-glow-bg {
+  background: radial-gradient(circle 800px at 50% -80px, rgba(59, 130, 246, 0.16), rgba(147, 51, 234, 0.1), transparent 70%);
 }
 
-/* Shimmer animation keyframes for graph ribbons */
+/* Shimmer pulse animation for graph ribbons */
 @keyframes shimmerPulse {
   0% {
     stroke-dashoffset: 0;
@@ -93,21 +121,6 @@ body {
   animation: shimmerPulse 1.8s linear infinite;
 }
 
-@keyframes pulseGlow {
-  0%, 100% {
-    opacity: 0.4;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.03);
-  }
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 3s ease-in-out infinite;
-}
-
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -117,9 +130,9 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(148, 163, 184, 0.3);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(148, 163, 184, 0.5);
 }

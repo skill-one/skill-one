@@ -39,7 +39,7 @@ const structuredData = {
 ---
 
 <!doctype html>
-<html lang={isZh ? 'zh-CN' : 'en'} class="dark">
+<html lang={isZh ? 'zh-CN' : 'en'}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -51,7 +51,7 @@ const structuredData = {
     <title>{title}</title>
     <meta name="title" content={title} />
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#090d16" />
+    <meta name="theme-color" content="#fbfcfd" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -67,10 +67,20 @@ const structuredData = {
     <meta property="twitter:description" content={description} />
     <meta property="twitter:image" content="/skill-one-transparent.png" />
 
+    <!-- Theme Initialization Script (Default to Light) -->
+    <script is:inline>
+      const savedTheme = localStorage.getItem('skill-one-theme');
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    </script>
+
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   </head>
-  <body class="bg-[#090d16] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-blue-500/30 selection:text-blue-200">
+  <body class="bg-background text-foreground min-h-screen flex flex-col antialiased selection:bg-blue-500/20 selection:text-blue-600 transition-colors duration-200">
     <Navbar client:load lang={lang} />
     <main class="flex-1">
       <slot />
