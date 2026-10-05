@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Skill One",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "identifier": "com.skill-one.app",
   "build": {
     "frontendDist": "../dist",
@@ -16,7 +16,10 @@
         "title": "Skill One",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 20, "y": 26 },
+        "trafficLightPosition": {
+          "x": 20,
+          "y": 26
+        },
         "width": 1280,
         "height": 800,
         "minWidth": 1150,
@@ -39,7 +42,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
