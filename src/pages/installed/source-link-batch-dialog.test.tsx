@@ -173,4 +173,40 @@ describe("SourceLinkBatchDialog", () => {
     ]);
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("allows selecting 'keep unlinked' and submits empty repo", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+
+    renderWithRouter(
+      <SourceLinkBatchDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        skills={mockSkills}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    // Open dropdown for pdf
+    const changeRepoBtns = screen.getAllByTitle("更换来源仓库");
+    await user.click(changeRepoBtns[1]);
+
+    const keepUnlinkedItem = await screen.findByText("保持未关联（设为空，不再提醒）");
+    await user.click(keepUnlinkedItem);
+
+    await user.click(screen.getByRole("button", { name: "确认关联 (2)" }));
+
+    expect(onConfirm).toHaveBeenCalledWith([
+      {
+        name: "docx",
+        repo: "nexu-io/open-design",
+        defaultTags: ["document"],
+      },
+      {
+        name: "pdf",
+        repo: "",
+        defaultTags: undefined,
+      },
+    ]);
+  });
 });

@@ -121,6 +121,7 @@ export interface CustomTags {
 export interface ReconciledProvenance {
   sources: Record<string, SkillProvenance>;
   cut: Record<string, string[]>;
+  emptyRepos: Set<string>;
 }
 
 export interface StoredPending {
@@ -470,7 +471,9 @@ export async function recordSkillProvenance(
     ledger.records.set(name, { kind: "source", name, repo, via: reason });
 
     await saveLedger(ledger);
-    await logSkillSourceLink(repo, name, reason);
+    if (repo) {
+      await logSkillSourceLink(repo, name, reason);
+    }
   } catch (e) {
     console.warn("provenance: failed to record install source", e);
   }
@@ -480,14 +483,15 @@ export async function recordSkillProvenanceBatch(
   entries: readonly {
     repo: string;
     name: string;
-    reason: SourceLinkReason;
+    reason?: SourceLinkReason;
     defaultTags?: readonly string[];
   }[],
 ): Promise<void> {
   try {
     const ledger = await loadLedger();
     for (const entry of entries) {
-      const origin: "store" | "local" = entry.reason === "install" ? "store" : "local";
+      const reason = entry.reason ?? "confirm";
+      const origin: "store" | "local" = reason === "install" ? "store" : "local";
       const existing = ledger.config.skills[entry.name];
       const existingTags = existing?.tags ?? [];
       const newTags = entry.defaultTags ?? [];
@@ -502,16 +506,27 @@ export async function recordSkillProvenanceBatch(
         kind: "source",
         name: entry.name,
         repo: entry.repo,
-        via: entry.reason,
+        via: reason,
       });
     }
     await saveLedger(ledger);
     for (const entry of entries) {
-      await logSkillSourceLink(entry.repo, entry.name, entry.reason);
+      if (entry.repo) {
+        await logSkillSourceLink(entry.repo, entry.name, entry.reason ?? "confirm");
+      }
     }
   } catch (e) {
     console.warn("provenance: failed to record install sources", e);
   }
+}
+
+/**
+ * Explicitly mark a skill as having an empty source repository (`repo: ""`).
+ * This records the skill as an intentionally unlinked local skill, preventing
+ * future suggestion passes from offering recommendations in the banner.
+ */
+export async function markSkillUnlinked(name: string): Promise<void> {
+  await recordSkillProvenance("", name, "confirm");
 }
 
 export async function removeSkillProvenance(name: string): Promise<void> {
@@ -598,6 +613,7 @@ export async function reconcileProvenance(
   if (changed) await saveLedger(ledger);
 
   const sources: Record<string, SkillProvenance> = {};
+  const emptyRepos = new Set<string>();
   for (const [name, entry] of Object.entries(ledger.config.skills)) {
     if (entry.repo) {
       sources[name] = {
@@ -606,10 +622,12 @@ export async function reconcileProvenance(
         tags: entry.tags,
         via: entry.origin === "store" ? "install" : "confirm",
       };
+    } else if (entry.repo === "") {
+      emptyRepos.add(name);
     }
   }
 
-  return { sources, cut: {} };
+  return { sources, cut: {}, emptyRepos };
 }
 
 // ---------------------------------------------------- pending records & suggestions

@@ -1,6 +1,6 @@
 import { useState, useId, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, ChevronDown, Download, Loader2, Star } from "lucide-react";
+import { ArrowRight, ChevronDown, Download, Loader2, Star, Unlink } from "lucide-react";
 
 import {
   Dialog,
@@ -14,6 +14,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import { Checkbox } from "../../components/ui/checkbox";
@@ -158,7 +159,6 @@ export function SourceLinkBatchDialog({
               chosenCandidates[item.name] ?? item.recommendedCandidate;
             const isRecommended =
               currentCandidate.skill.repo === item.recommendedCandidate.skill.repo;
-            const hasMultiple = item.candidates.length > 1;
 
             return (
               <div
@@ -189,105 +189,105 @@ export function SourceLinkBatchDialog({
 
                 {/* Right: Target candidate repo */}
                 <div className="shrink-0">
-                  {hasMultiple ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <button
-                            type="button"
-                            title={t("sourceLink.dialogChangeCandidate")}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                          />
-                        }
-                      >
-                        <OwnerAvatar
-                          owner={currentCandidate.skill.repo.split("/")[0]}
-                          className="size-3.5 text-[8px]"
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <button
+                          type="button"
+                          title={t("sourceLink.dialogChangeCandidate")}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
                         />
-                        <span className="font-medium text-foreground max-w-[130px] truncate text-[11px]">
-                          {currentCandidate.skill.repo}
-                        </span>
-                        {isRecommended && (
-                          <span className="rounded bg-primary/10 px-1 py-0.2 text-[9px] text-primary border border-primary/20">
-                            {t("sourceLink.recommendedBadge")}
+                      }
+                    >
+                      {currentCandidate.skill.repo ? (
+                        <>
+                          <OwnerAvatar
+                            owner={currentCandidate.skill.repo.split("/")[0]}
+                            className="size-3.5 text-[8px]"
+                          />
+                          <span className="font-medium text-foreground max-w-[130px] truncate text-[11px]">
+                            {currentCandidate.skill.repo}
                           </span>
-                        )}
-                        {currentCandidate.skill.stars > 0 ? (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground">
-                            <Star className="size-2 text-amber-500 fill-amber-500/30" />
-                            {formatCount(currentCandidate.skill.stars)}
-                          </span>
-                        ) : currentCandidate.skill.downloads > 0 ? (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground">
-                            <Download className="size-2 text-muted-foreground" />
-                            {formatCount(currentCandidate.skill.downloads)}
-                          </span>
-                        ) : null}
-                        <ChevronDown className="size-3 text-muted-foreground/70" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-[300px]">
-                        {item.candidates.map((c) => {
-                          const isTop = c.skill.repo === item.recommendedCandidate.skill.repo;
-                          return (
-                            <DropdownMenuItem
-                              key={c.skill.repo}
-                              onClick={() => handlePickCandidate(item.name, c)}
-                              className="flex items-center justify-between gap-2 text-xs cursor-pointer py-1.5"
-                            >
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <OwnerAvatar
-                                  owner={c.skill.repo.split("/")[0]}
-                                  className="size-3.5 text-[8px]"
-                                />
-                                <span className="truncate font-medium text-[11px]">
-                                  {c.skill.repo}
-                                </span>
-                                {isTop && (
-                                  <span className="rounded bg-primary/10 px-1 py-0.2 text-[8px] text-primary">
-                                    {t("sourceLink.recommendedBadge")}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1.5 shrink-0 text-[10px] text-muted-foreground tabular-nums">
-                                {c.skill.stars > 0 ? (
-                                  <span>★ {formatCount(c.skill.stars)}</span>
-                                ) : c.skill.downloads > 0 ? (
-                                  <span>↓ {formatCount(c.skill.downloads)}</span>
-                                ) : null}
-                                <span>{c.similarity > 0 ? `${Math.round(c.similarity * 100)}%` : "skills.sh"}</span>
-                              </div>
-                            </DropdownMenuItem>
-                          );
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <div className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-muted/20 px-2 py-1 text-xs">
-                      <OwnerAvatar
-                        owner={currentCandidate.skill.repo.split("/")[0]}
-                        className="size-3.5 text-[8px]"
-                      />
-                      <span className="font-medium text-foreground max-w-[140px] truncate text-[11px]">
-                        {currentCandidate.skill.repo}
-                      </span>
-                      {isRecommended && (
-                        <span className="rounded bg-primary/10 px-1 py-0.2 text-[9px] text-primary border border-primary/20">
-                          {t("sourceLink.recommendedBadge")}
-                        </span>
+                          {isRecommended && (
+                            <span className="rounded bg-primary/10 px-1 py-0.2 text-[9px] text-primary border border-primary/20">
+                              {t("sourceLink.recommendedBadge")}
+                            </span>
+                          )}
+                          {currentCandidate.skill.stars > 0 ? (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground">
+                              <Star className="size-2 text-amber-500 fill-amber-500/30" />
+                              {formatCount(currentCandidate.skill.stars)}
+                            </span>
+                          ) : currentCandidate.skill.downloads > 0 ? (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground">
+                              <Download className="size-2 text-muted-foreground" />
+                              {formatCount(currentCandidate.skill.downloads)}
+                            </span>
+                          ) : null}
+                        </>
+                      ) : (
+                        <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Unlink className="size-3 text-muted-foreground/80" />
+                          <span>{t("sourceLink.dialogKeepUnlinkedShort")}</span>
+                        </div>
                       )}
-                      {currentCandidate.skill.stars > 0 ? (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground">
-                          <Star className="size-2 text-amber-500 fill-amber-500/30" />
-                          {formatCount(currentCandidate.skill.stars)}
-                        </span>
-                      ) : currentCandidate.skill.downloads > 0 ? (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground">
-                          <Download className="size-2 text-muted-foreground" />
-                          {formatCount(currentCandidate.skill.downloads)}
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
+                      <ChevronDown className="size-3 text-muted-foreground/70" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[300px]">
+                      {item.candidates.map((c) => {
+                        const isTop = c.skill.repo === item.recommendedCandidate.skill.repo;
+                        return (
+                          <DropdownMenuItem
+                            key={c.skill.repo}
+                            onClick={() => handlePickCandidate(item.name, c)}
+                            className="flex items-center justify-between gap-2 text-xs cursor-pointer py-1.5"
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <OwnerAvatar
+                                owner={c.skill.repo.split("/")[0]}
+                                className="size-3.5 text-[8px]"
+                              />
+                              <span className="truncate font-medium text-[11px]">
+                                {c.skill.repo}
+                              </span>
+                              {isTop && (
+                                <span className="rounded bg-primary/10 px-1 py-0.2 text-[8px] text-primary">
+                                  {t("sourceLink.recommendedBadge")}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 text-[10px] text-muted-foreground tabular-nums">
+                              {c.skill.stars > 0 ? (
+                                <span>★ {formatCount(c.skill.stars)}</span>
+                              ) : c.skill.downloads > 0 ? (
+                                <span>↓ {formatCount(c.skill.downloads)}</span>
+                              ) : null}
+                              <span>{c.similarity > 0 ? `${Math.round(c.similarity * 100)}%` : "skills.sh"}</span>
+                            </div>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handlePickCandidate(item.name, {
+                            similarity: 0,
+                            skill: {
+                              name: item.name,
+                              repo: "",
+                              description: "",
+                              stars: 0,
+                              downloads: 0,
+                            },
+                          })
+                        }
+                        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer py-1.5"
+                      >
+                        <Unlink className="size-3.5 text-muted-foreground" />
+                        <span className="text-[11px]">{t("sourceLink.dialogKeepUnlinked")}</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             );

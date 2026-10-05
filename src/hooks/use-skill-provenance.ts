@@ -57,9 +57,12 @@ export async function fetchProvenanceState(
   installed: InstalledSkill[],
 ): Promise<ProvenanceState> {
   const names = installed.map((s) => s.name);
-  let { sources: linked, cut } = await reconcileProvenance(names);
+  let { sources: linked, cut, emptyRepos } = await reconcileProvenance(names);
 
-  const unlinked = installed.filter((s) => !linked[s.name]);
+  // Exclude skills that are already linked or explicitly marked with repo === ""
+  const unlinked = installed.filter(
+    (s) => !linked[s.name] && !emptyRepos?.has(s.name),
+  );
   let suggestions: LinkSuggestions = {};
   // The association tiers need the registry (namesakes by slug), so a
   // snapshot that is still streaming skips them wholesale — the next run
@@ -72,7 +75,7 @@ export async function fetchProvenanceState(
     // the new entries up.
     const resolved = await resolveAssociations(unlinked);
     if (resolved.linked.length > 0) {
-      ({ sources: linked, cut } = await reconcileProvenance(names));
+      ({ sources: linked, cut, emptyRepos } = await reconcileProvenance(names));
     }
     suggestions = resolved.suggestions;
   }

@@ -65,7 +65,7 @@ This document defines the schema, location, and architecture of `.skill-one.json
 | Field | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `origin` | `"store" \| "local"` | Yes | **Installation origin**. `"store"` = installed via Skill One store; `"local"` = external / manual copy. |
-| `repo` | `string` | Optional | Associated GitHub repository (`owner/repo`). Required for `store`, optional for `local`. |
+| `repo` | `string` | Optional | Associated GitHub repository (`owner/repo`). Required for `store`, optional for `local`. An empty string `""` explicitly marks the skill as unlinked, suppressing source recommendations. |
 | `tags` | `string[]` | Optional | Array of tags assigned to this skill. Automatically populated from upstream on store install / source link. Users can freely add or remove tags. |
 
 #### `CustomTagDef`

@@ -36,7 +36,7 @@ vi.mock("../lib/skills-manager", () => ({
   appendActivityRaw: vi.fn(),
 }));
 
-import { resetMockProvenance } from "../lib/provenance";
+import { resetMockProvenance, recordSkillProvenance } from "../lib/provenance";
 import { resetLinkSuggestions } from "../lib/link-suggestions";
 import { fetchProvenanceState } from "./use-skill-provenance";
 import type { InstalledSkill } from "../lib/skills-manager";
@@ -128,5 +128,15 @@ describe("fetchProvenanceState", () => {
     expect(state.suggestions).toEqual({});
     expect(skillFingerprint).not.toHaveBeenCalled();
     expect(namesakeSkills).not.toHaveBeenCalled();
+  });
+
+  it("does not offer suggestions for a skill explicitly marked with repo empty string", async () => {
+    mockRegistry();
+    await recordSkillProvenance("", "pdf", "confirm");
+
+    const state = await runQueryFn([installed("pdf", "Read PDF files.")]);
+
+    expect(state.linked.pdf).toBeUndefined();
+    expect(state.suggestions.pdf).toBeUndefined();
   });
 });

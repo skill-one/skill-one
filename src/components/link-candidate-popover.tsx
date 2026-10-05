@@ -92,7 +92,16 @@ export function LinkCandidatePopover({
         <p className="px-2 text-[11px] text-muted-foreground">{emptyLabel}</p>
       )}
 
-      <p className="text-[10px] text-muted-foreground/75 text-center pt-0.5">{t("sourceLink.footnote")}</p>
+      <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[10px]">
+        <span className="text-muted-foreground/75">{t("sourceLink.footnote")}</span>
+        <button
+          type="button"
+          onClick={() => onPick("", undefined)}
+          className="text-muted-foreground hover:text-foreground underline underline-offset-2 cursor-pointer transition-colors"
+        >
+          {t("sourceLink.keepUnlinked")}
+        </button>
+      </div>
 
       {afterList}
     </>

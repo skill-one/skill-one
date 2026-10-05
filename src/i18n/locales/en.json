@@ -230,7 +230,12 @@
     "dialogSelectAll": "Select all",
     "dialogConfirmAction": "Confirm linking ({{count}})",
     "dialogNoSelection": "No skills selected",
-    "dialogChangeCandidate": "Change source repository"
+    "dialogChangeCandidate": "Change source repository",
+    "keepUnlinked": "Keep unlinked (do not recommend)",
+    "markedUnlinked": "Marked as unlinked source",
+    "dialogKeepUnlinked": "Keep unlinked (set empty, no reminders)",
+    "dialogKeepUnlinkedShort": "Keep unlinked",
+    "unlinkedBadge": "Unlinked"
   },
   "refresh": {
     "dataUpdated": "Skill data updated to the latest snapshot"

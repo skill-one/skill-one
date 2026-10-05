@@ -8,6 +8,7 @@ import {
   reconcileProvenance,
   removeSkillProvenance,
   unlinkSkillSource,
+  markSkillUnlinked,
   loadPendingRecords,
   loadCustomTags,
   saveCustomTagDef,
@@ -255,6 +256,22 @@ describe("provenance browser store", () => {
     const raw = JSON.parse((await readLedgerRaw())!);
     expect(raw.skills.tool).toEqual({
       origin: "local",
+      tags: ["开发"],
+    });
+  });
+
+  it("marks a skill as explicitly unlinked with repo empty string", async () => {
+    await recordSkillProvenance("fork/skills", "tool", "confirm", ["开发"]);
+    await markSkillUnlinked("tool");
+
+    const { sources, emptyRepos } = await reconcileProvenance(["tool"]);
+    expect(sources.tool).toBeUndefined();
+    expect(emptyRepos.has("tool")).toBe(true);
+
+    const raw = JSON.parse((await readLedgerRaw())!);
+    expect(raw.skills.tool).toEqual({
+      origin: "local",
+      repo: "",
       tags: ["开发"],
     });
   });

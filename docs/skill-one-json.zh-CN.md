@@ -65,7 +65,7 @@ English version: [skill-one-json.md](./skill-one-json.md)
 | 字段 | 类型 | 是否必填 | 说明 |
 | :--- | :--- | :--- | :--- |
 | `origin` | `"store" \| "local"` | 是 | **安装来源（出生证明）**。`"store"` 为商店安装，`"local"` 为第三方导入或手动拷贝。 |
-| `repo` | `string` | 条件必填 | 关联的 GitHub 仓库（`owner/repo`）。`store` 时必选，`local` 关联时可选。 |
+| `repo` | `string` | 条件必填 | 关联的 GitHub 仓库（`owner/repo`）。`store` 时必选，`local` 关联时可选。设为空字符串 `""` 时表示明确保持未关联，抑制横幅与气泡的来源推荐。 |
 | `tags` | `string[]` | 否 | 该技能分配的标签数组。商店安装或关联来源时自动填入商店官方分类，用户可自由增删自定义标签。 |
 
 #### `CustomTagDef`（自定义标签定义）

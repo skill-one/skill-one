@@ -231,4 +231,15 @@ describe("LinkSuggestionMark", () => {
     const mark = screen.getByRole("img", { name: "第三方安装" });
     expect(mark).toHaveClass("border-border/60", "bg-muted", "text-muted-foreground");
   });
+
+  it("allows setting repo empty when clicking keep unlinked in popover", async () => {
+    const user = userEvent.setup();
+    renderMark();
+
+    await user.click(screen.getByRole("button", { name: "关联 pdf 的商店来源" }));
+    await user.click(screen.getByRole("button", { name: "保持未关联（不再提醒）" }));
+
+    expect(recordSkillProvenance).toHaveBeenCalledWith("", "pdf", "confirm");
+    expect(markSkillsChanged).toHaveBeenCalledTimes(1);
+  });
 });

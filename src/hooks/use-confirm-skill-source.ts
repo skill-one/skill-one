@@ -31,6 +31,12 @@ export function useConfirmSkillSource(name: string) {
     async (repo: string, defaultTags?: readonly string[]): Promise<boolean> => {
       setPendingRepo(repo);
       try {
+        if (repo === "") {
+          await recordSkillProvenance("", name, "confirm");
+          await markSkillsChanged(queryClient);
+          toast.add({ title: t("sourceLink.markedUnlinked"), type: "success" });
+          return true;
+        }
         let tags = defaultTags;
         if (!tags || tags.length === 0) {
           try {

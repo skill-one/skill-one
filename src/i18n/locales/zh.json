@@ -230,7 +230,12 @@
     "dialogSelectAll": "全选",
     "dialogConfirmAction": "确认关联 ({{count}})",
     "dialogNoSelection": "未选择技能",
-    "dialogChangeCandidate": "更换来源仓库"
+    "dialogChangeCandidate": "更换来源仓库",
+    "keepUnlinked": "保持未关联（不再提醒）",
+    "markedUnlinked": "已标记为未关联来源",
+    "dialogKeepUnlinked": "保持未关联（设为空，不再提醒）",
+    "dialogKeepUnlinkedShort": "保持未关联",
+    "unlinkedBadge": "未关联"
   },
   "refresh": {
     "dataUpdated": "技能数据已更新到最新快照"
