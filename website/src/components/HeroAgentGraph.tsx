@@ -103,21 +103,22 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
     }));
   };
 
-  // Canvas Geometry & Exact Node Alignment
-  const GRAPH_WIDTH = 880;
+  // Canvas Geometry & Exact Node Alignment matching software's AgentGraph
+  const GRAPH_WIDTH = 920;
   const GRAPH_HEIGHT = 440;
-  const HUB_CENTER = { x: 440, y: 220 };
-  const HUB_HALF_W = 210;
+  const HUB_CENTER = { x: 460, y: 220 };
+  const HUB_HALF_W = 205;
   const HUB_HALF_H = 145;
 
-  const CARD_WIDTH = 190;
-  const CARD_HEIGHT = 50;
-  const CARD_GAP = 22;
-  const START_Y = 87; // Mathematically centered with Hub card
+  const CARD_WIDTH = 180;
+  const CARD_HEIGHT = 48;
+  const CARD_GAP = 42;
+  const START_Y = 38;
 
   const getNodeY = (row: number) => START_Y + row * (CARD_HEIGHT + CARD_GAP);
   const getNodeCenterY = (row: number) => getNodeY(row) + CARD_HEIGHT / 2;
-  const getHubAnchorY = (row: number) => 112 + row * 72;
+  // Converge gracefully into central band of Hub card, producing iconic S-curves
+  const getHubAnchorY = (row: number) => 152 + row * 34;
 
   return (
     <div className="w-full max-w-5xl mx-auto select-none">
