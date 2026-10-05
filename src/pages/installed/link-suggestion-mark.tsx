@@ -77,11 +77,11 @@ export function LinkSuggestionMark({
   if (candidates.length === 0) {
     return labeled ? (
       <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <ThirdPartyMark muted name={name} className={className} />
+        <ThirdPartyMark name={name} className={className} />
         <span className="truncate">{t("common.thirdPartyInstall")}</span>
       </span>
     ) : (
-      <ThirdPartyMark muted name={name} className={className} />
+      <ThirdPartyMark name={name} className={className} />
     );
   }
 
