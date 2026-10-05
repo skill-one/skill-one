@@ -16,7 +16,12 @@ const updateMocks = vi.hoisted(() => ({
   relaunch: vi.fn(),
 }));
 
-vi.mock("../lib/tauri", () => ({ isTauri: () => updateMocks.isTauri }));
+vi.mock("../lib/tauri", () => ({
+  isTauri: () => updateMocks.isTauri,
+  isMacOS: () => true,
+  isWindows: () => false,
+  isLinux: () => false,
+}));
 // The store probes the install channel before every check.
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => false) }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: updateMocks.check }));

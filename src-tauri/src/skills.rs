@@ -169,10 +169,20 @@ fn write_skill_md_file(skill_dir: &std::path::Path, content: &str) -> Result<(),
     let file = skill_dir.join("SKILL.md");
     let tmp = skill_dir.join("SKILL.md.tmp");
     std::fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", tmp.display()))?;
-    if let Err(e) = std::fs::rename(&tmp, &file) {
-        // Never leave the temp file behind when the swap fails.
-        let _ = std::fs::remove_file(&tmp);
-        return Err(format!("write {}: {e}", file.display()));
+    let mut attempts = 0;
+    loop {
+        match std::fs::rename(&tmp, &file) {
+            Ok(()) => break,
+            Err(e) => {
+                attempts += 1;
+                if attempts >= 3 {
+                    // Never leave the temp file behind when the swap fails.
+                    let _ = std::fs::remove_file(&tmp);
+                    return Err(format!("write {}: {e}", file.display()));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
     }
     Ok(())
 }

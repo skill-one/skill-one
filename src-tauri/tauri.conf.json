@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Skill One",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "identifier": "com.skill-one.app",
   "build": {
     "frontendDist": "../dist",
@@ -42,10 +42,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "app",
-      "dmg"
-    ],
+    "targets": "all",
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",

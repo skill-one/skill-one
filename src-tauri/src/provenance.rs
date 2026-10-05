@@ -45,7 +45,21 @@ fn read_ledger_at(ledger: &Path) -> Result<Option<String>, String> {
 fn write_ledger_at(ledger: &Path, content: &str) -> Result<(), String> {
     let tmp = ledger.with_extension("tmp");
     std::fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, ledger).map_err(|e| format!("rename {}: {e}", tmp.display()))
+    let mut attempts = 0;
+    loop {
+        match std::fs::rename(&tmp, ledger) {
+            Ok(()) => break,
+            Err(e) => {
+                attempts += 1;
+                if attempts >= 3 {
+                    let _ = std::fs::remove_file(&tmp);
+                    return Err(format!("rename {}: {e}", tmp.display()));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Read the raw provenance ledger; `null` when it does not exist yet.

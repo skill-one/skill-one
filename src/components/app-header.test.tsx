@@ -148,4 +148,37 @@ describe("AppHeader", () => {
     // window, while a link or a button still takes its own click.
     expect(header()).toHaveAttribute("data-tauri-drag-region", "deep");
   });
+
+  it("applies pl-24 only in Tauri on macOS for traffic lights avoidance", () => {
+    // macOS in Tauri: needs pl-24
+    // @ts-expect-error test injection
+    window.__TAURI_INTERNALS__ = {};
+    const originalNavigator = window.navigator;
+    Object.defineProperty(window, "navigator", {
+      value: { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" },
+      configurable: true,
+    });
+
+    const { unmount } = renderHeader("/explore");
+    expect(header()).toHaveClass("pl-24");
+    unmount();
+
+    // Windows in Tauri: should use standard pl-8 (no traffic lights)
+    Object.defineProperty(window, "navigator", {
+      value: { userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+      configurable: true,
+    });
+    renderHeader("/explore");
+    expect(header()).toHaveClass("pl-8");
+    expect(header()).not.toHaveClass("pl-24");
+
+    // Clean up
+    // @ts-expect-error test cleanup
+    delete window.__TAURI_INTERNALS__;
+    Object.defineProperty(window, "navigator", {
+      value: originalNavigator,
+      configurable: true,
+    });
+  });
 });
+

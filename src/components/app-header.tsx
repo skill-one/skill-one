@@ -1,5 +1,5 @@
 import { cn } from "../lib/utils";
-import { isTauri } from "../lib/tauri";
+import { isTauri, isMacOS } from "../lib/tauri";
 import { AppNav } from "./app-nav";
 import { SettingsMenu } from "./settings-menu";
 
@@ -56,7 +56,7 @@ export function AppHeader() {
       data-tauri-drag-region="deep"
       className={cn(
         "relative flex h-header shrink-0 items-center gap-3 border-b border-border bg-background pr-8",
-        isTauri() ? "pl-24" : "pl-8",
+        isTauri() && isMacOS() ? "pl-24" : "pl-8",
       )}
     >
       <AppNav />
