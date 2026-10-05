@@ -537,7 +537,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                       : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-white/10'
                   }`}>
                     <div className="flex items-center gap-2">
-                      <img src={`${base}/agents/icons/cline-color.svg`} alt="Cline" className="size-4 rounded" />
+                      <img src={`${base}/agents/icons/cline.svg`} alt="Cline" className="size-4 rounded" />
                       <span className="text-slate-800 dark:text-slate-200 font-medium">.cline/skills</span>
                     </div>
                     <span className="text-emerald-600 dark:text-emerald-400 text-[10px] flex items-center gap-1">

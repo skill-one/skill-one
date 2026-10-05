@@ -36,15 +36,15 @@ const BRAND_COLORS = [
 
 const INITIAL_AGENTS: DemoAgent[] = [
   // Left Column
-  { id: 'cursor', name: 'Cursor', icon: '/agents/icons/cursor-color.svg', skillsDir: '.cursor/skills', side: 'left', row: 0, color: BRAND_COLORS[0] },
-  { id: 'claude', name: 'Claude Desktop', icon: '/agents/icons/claudecode-color.svg', skillsDir: '~/.claude/skills', side: 'left', row: 1, color: BRAND_COLORS[1] },
-  { id: 'windsurf', name: 'Windsurf', icon: '/agents/icons/windsurf.svg', skillsDir: '~/.codeium/windsurf/skills', side: 'left', row: 2, color: BRAND_COLORS[2] },
-  { id: 'cline', name: 'Cline', icon: '/agents/icons/cline.svg', skillsDir: '~/.cline/skills', side: 'left', row: 3, color: BRAND_COLORS[3] },
+  { id: 'cursor', name: 'Cursor', icon: `${base}/agents/icons/cursor-color.svg`, skillsDir: '.cursor/skills', side: 'left', row: 0, color: BRAND_COLORS[0] },
+  { id: 'claude', name: 'Claude Desktop', icon: `${base}/agents/icons/claudecode-color.svg`, skillsDir: '~/.claude/skills', side: 'left', row: 1, color: BRAND_COLORS[1] },
+  { id: 'windsurf', name: 'Windsurf', icon: `${base}/agents/icons/windsurf.svg`, skillsDir: '~/.codeium/windsurf/skills', side: 'left', row: 2, color: BRAND_COLORS[2] },
+  { id: 'cline', name: 'Cline', icon: `${base}/agents/icons/cline.svg`, skillsDir: '~/.cline/skills', side: 'left', row: 3, color: BRAND_COLORS[3] },
   // Right Column
-  { id: 'antigravity', name: 'Antigravity', icon: '/agents/icons/antigravity-color.svg', skillsDir: '~/.gemini/config/skills', side: 'right', row: 0, color: BRAND_COLORS[4] },
-  { id: 'roocode', name: 'Roo Code', icon: '/agents/icons/roocode.svg', skillsDir: '~/.roocode/skills', side: 'right', row: 1, color: BRAND_COLORS[0] },
-  { id: 'codex', name: 'Codex / Copilot', icon: '/agents/icons/githubcopilot.svg', skillsDir: '~/.copilot/skills', side: 'right', row: 2, color: BRAND_COLORS[1] },
-  { id: 'goose', name: 'Goose', icon: '/agents/icons/goose.svg', skillsDir: '~/.config/goose/skills', side: 'right', row: 3, color: BRAND_COLORS[2] },
+  { id: 'antigravity', name: 'Antigravity', icon: `${base}/agents/icons/antigravity-color.svg`, skillsDir: '~/.gemini/config/skills', side: 'right', row: 0, color: BRAND_COLORS[4] },
+  { id: 'roocode', name: 'Roo Code', icon: `${base}/agents/icons/roocode.svg`, skillsDir: '~/.roocode/skills', side: 'right', row: 1, color: BRAND_COLORS[0] },
+  { id: 'codex', name: 'Codex / Copilot', icon: `${base}/agents/icons/githubcopilot.svg`, skillsDir: '~/.copilot/skills', side: 'right', row: 2, color: BRAND_COLORS[1] },
+  { id: 'goose', name: 'Goose', icon: `${base}/agents/icons/goose.svg`, skillsDir: '~/.config/goose/skills', side: 'right', row: 3, color: BRAND_COLORS[2] },
 ];
 
 const INITIAL_SKILLS: DemoSkill[] = [

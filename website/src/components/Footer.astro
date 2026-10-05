@@ -7,6 +7,7 @@ interface Props {
 }
 
 const { lang = 'en' } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const t = translations[lang].footer;
 const nav = translations[lang].nav;
 ---
@@ -18,7 +19,7 @@ const nav = translations[lang].nav;
       <div class="space-y-3">
         <div class="flex items-center gap-2.5">
           <img
-            src={`${Astro.base}/skill-one-transparent.png`}
+            src={`${base}/skill-one-transparent.png`}
             alt="Skill One"
             class="size-7 object-contain"
           />
@@ -73,7 +74,7 @@ const nav = translations[lang].nav;
       <div class="flex items-center gap-4">
         <!-- Language Switcher in Footer -->
         <a
-          href={`${Astro.base}${nav.switchLangUrl}`}
+          href={`${base}${nav.switchLangUrl}`}
           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors border border-slate-200 dark:border-white/5 text-[11px] shadow-2xs"
         >
           <Globe class="size-3" />
