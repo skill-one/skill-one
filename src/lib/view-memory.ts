@@ -1,18 +1,26 @@
 /**
- * What a list page's view is, remembered per history entry.
+ * What a list page's view is, remembered per page.
  *
- * A page that owns its own scroll container loses everything when the reader
- * drills into something and comes back: the router unmounts it, the browser
+ * A page that owns its own scroll container loses everything whenever the
+ * reader switches away and comes back: the router unmounts it, the browser
  * restores nothing (its own scroll restoration only ever covers the document,
- * and the document here never scrolls), and every control and every reveal on
- * the page resets with the component. So a page hands its view here on the way
- * past and takes it back when it returns.
+ * and the document here never scrolls), and every control, every fold and
+ * every reveal on the page resets with the component. So a page hands its view
+ * here on the way past and takes it back when it returns.
  *
- * The key is the *history entry's* key — react-router's own, written into
- * `history.state` with every entry and stable across back and forward — rather
- * than the page's path. Two entries of the same path are two different views:
- * coming back to the list is a return, and a fresh visit from the sidebar is a
- * fresh visit, and a memory keyed by path would confuse the two.
+ * The key is the page's own name, not a history entry's: the reader who moves
+ * from the store to the installed list and back is returning to the same page,
+ * and expects the page they left — the folds they had made and the place they
+ * had scrolled to — not a fresh one. This memory was once keyed per history
+ * entry, which made every sidebar visit a fresh visit; the reader's own answer
+ * is that switching pages is returning, so the memory follows the page.
+ *
+ * What keeps a return honest is the memory's `signature`: the answer the page
+ * was showing when the view was written. The controls are shared module state
+ * that can re-answer a page without it ever being unmounted, and a depth or a
+ * fold remembered under one answer is not a place the reader was ever at under
+ * another — so a return to a differently-shaped answer is dropped back to the
+ * fresh view rather than restored into a stale one.
  *
  * In memory, for the life of the window, on purpose: a scroll position is
  * orientation, not a preference, and an app that has just launched has nowhere
