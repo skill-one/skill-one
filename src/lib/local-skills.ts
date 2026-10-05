@@ -172,7 +172,12 @@ export class SkillAlreadyInstalledError extends Error {
  * (agents-skills keeps no install metadata).
  */
 export async function installSkillFromSource(
-  skill: { id: string; repo: string; name: string },
+  skill: {
+    id: string;
+    repo: string;
+    name: string;
+    profile?: { domain?: string[] };
+  },
 ): Promise<void> {
   const { id, repo, name } = skill;
   if (isTauri()) {
@@ -195,7 +200,11 @@ export async function installSkillFromSource(
     names: [name],
     detail: { repo, skipped: false },
   });
-  await recordSkillProvenance(repo, name);
+  if (skill.profile?.domain && skill.profile.domain.length > 0) {
+    await recordSkillProvenance(repo, name, "install", skill.profile.domain);
+  } else {
+    await recordSkillProvenance(repo, name, "install");
+  }
 }
 
 /** Remove an installed skill from the global skills directory. */

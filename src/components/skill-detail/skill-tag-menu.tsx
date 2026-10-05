@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Check, Pencil, RotateCcw, Smile, X } from "lucide-react";
+import { Check, Pencil, RotateCcw, X } from "lucide-react";
 import { DOMAINS, domainLabel } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useCustomTags } from "../../hooks/use-custom-tags";
@@ -9,7 +9,6 @@ import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import {
   collectTakenTagKeys,
   defaultTagMark,
-  normalizeTagEmoji,
   validateNewTag,
   type TagValidationError,
 } from "../../lib/custom-tags";
@@ -32,7 +31,6 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { toast } from "../ui/toast";
 import { errorMessage, cn } from "../../lib/utils";
-import { EmojiPickerPanel } from "./emoji-picker-panel";
 
 /**
  * The installed skill's tag picker in the detail drawer, opened by the
@@ -63,14 +61,9 @@ export function SkillTagMenu({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
-  // The mark for the tag being created: "" means the label's first character.
-  // Set from the picker panel below; the toggle itself shows it, so no
-  // separate box is needed to display or clear the choice.
-  const [markDraft, setMarkDraft] = useState("");
   // The custom tag being renamed, if any: the creation row below turns into
-  // its editor, prefilled with the tag's own label and mark.
+  // its editor, prefilled with the tag's own label.
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{
     key: string;
@@ -155,18 +148,11 @@ export function SkillTagMenu({
       toast.add({ title: errorText(checked.error), type: "error" });
       return;
     }
-    // The mark always comes from the picker (one visible character by
-    // construction); the check stays as the second lock, never the path.
-    const mark = normalizeTagEmoji(markDraft);
-    if (!mark.ok) {
-      toast.add({ title: errorText(mark.error), type: "error" });
-      return;
-    }
     setBusy(true);
     try {
       const label = draft.trim();
       if (editingKey == null) {
-        await saveCustomTagDef(checked.key, label, mark.emoji);
+        await saveCustomTagDef(checked.key, label);
         // The new tag files this skill at once: creating it was the act of
         // choosing it, and an unused tag would only linger in the menu.
         await setSkillTag(skillName, checked.key);
@@ -174,12 +160,12 @@ export function SkillTagMenu({
         checked.key.toLowerCase() === editingKey.toLowerCase()
       ) {
         // A case-only touch-up keeps its key: no assignment moves, only the
-        // spelling and the mark change.
-        await saveCustomTagDef(editingKey, label, mark.emoji);
+        // spelling changes.
+        await saveCustomTagDef(editingKey, label);
       } else {
         // A real rename moves every assignment along in the same ledger
         // pass, so no skill is ever left pointing at the old key.
-        await renameCustomTagDef(editingKey, checked.key, label, mark.emoji);
+        await renameCustomTagDef(editingKey, checked.key, label);
       }
       await markSkillsChanged(queryClient);
       cancelEdit();
@@ -191,11 +177,9 @@ export function SkillTagMenu({
     }
   };
 
-  const startEdit = (key: string, label: string, emoji?: string) => {
+  const startEdit = (key: string, label: string) => {
     setEditingKey(key);
     setDraft(label);
-    setMarkDraft(emoji ?? "");
-    setPickerOpen(false);
     setTimeout(() => {
       inputRef.current?.focus();
     }, 0);
@@ -204,8 +188,6 @@ export function SkillTagMenu({
   const cancelEdit = () => {
     setEditingKey(null);
     setDraft("");
-    setMarkDraft("");
-    setPickerOpen(false);
   };
 
   const remove = async (key: string) => {
@@ -285,66 +267,6 @@ export function SkillTagMenu({
               void create();
             }}
           >
-            {/* The mark toggle wears the choice itself — a picked emoji, else
-                the smile that opens the picker. A set mark grows a clear
-                beside it, back to the label's first character; two inputs
-                remain, not three. */}
-            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-              <PopoverTrigger
-                render={
-                  <button
-                    type="button"
-                    disabled={busy}
-                    aria-label={t("tag.pickEmoji")}
-                    title={t("tag.pickEmoji")}
-                    aria-pressed={pickerOpen}
-                    className={cn(
-                      "inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md",
-                      "text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                      pickerOpen && "bg-muted text-foreground",
-                    )}
-                  >
-                    {markDraft ? (
-                      <span aria-hidden="true" className="text-[15px] leading-none">
-                        {markDraft}
-                      </span>
-                    ) : (
-                      <Smile className="size-3.5" aria-hidden />
-                    )}
-                  </button>
-                }
-              />
-              <PopoverContent
-                side="bottom"
-                align="start"
-                sideOffset={4}
-                className="w-auto p-1 border shadow-lg bg-popover"
-              >
-                <EmojiPickerPanel
-                  onPick={(emoji) => {
-                    setMarkDraft(emoji);
-                    setPickerOpen(false);
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
-            {markDraft && (
-              <button
-                type="button"
-                disabled={busy}
-                aria-label={t("tag.clearEmoji")}
-                title={t("tag.clearEmoji")}
-                onClick={() => setMarkDraft("")}
-                className={cn(
-                  "-ml-1 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded",
-                  "text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
-                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                )}
-              >
-                <X className="size-3" aria-hidden />
-              </button>
-            )}
             <Input
               ref={inputRef}
               value={draft}
@@ -433,7 +355,7 @@ export function SkillTagMenu({
                         onClick={() =>
                           editingKey === def.key
                             ? cancelEdit()
-                            : startEdit(def.key, def.label, def.emoji)
+                            : startEdit(def.key, def.label)
                         }
                         className={cn(
                           "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded",

@@ -48,7 +48,7 @@ export function LinkCandidatePopover({
   emptyLabel: string;
   /** The repo whose write is in flight — that row shows a spinner. */
   pendingRepo: string | null;
-  onPick: (repo: string) => void;
+  onPick: (repo: string, defaultTags?: readonly string[]) => void;
   /** Rendered between the header and the list (the current source). */
   beforeList?: ReactNode;
   /** Rendered after the footnote (the way out of the association). */
@@ -87,7 +87,9 @@ export function LinkCandidatePopover({
           candidates={candidates}
           cutRepos={cutRepos}
           pendingRepo={pendingRepo}
-          onPick={(candidate) => onPick(candidate.skill.repo)}
+          onPick={(candidate) =>
+            onPick(candidate.skill.repo, candidate.skill.profile?.domain)
+          }
         />
       ) : (
         <p className="px-2 text-[11px] text-muted-foreground">{emptyLabel}</p>

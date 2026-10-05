@@ -7,234 +7,156 @@ import {
   recordSkillProvenanceBatch,
   reconcileProvenance,
   removeSkillProvenance,
-  dismissSkillSource,
-  loadPendingRecords,
-  savePendingRecords,
+  unlinkSkillSource,
   loadCustomTags,
   saveCustomTagDef,
   renameCustomTagDef,
   deleteCustomTagDef,
-  setSkillTag,
+  setSkillTags,
   ledgerLines,
   readLedgerRaw,
   resetMockProvenance,
   seedMockLedgerRaw,
   seedMockProvenance,
+  type SkillOneConfig,
 } from "./provenance";
-import type { LedgerRecord, PendingRecord, SourceRecord } from "./provenance";
 
-// The ledger degrades to fewer records on any malformed input; these tests
-// pin that contract — a broken file must never break the UI, only lose the
-// association (which falls back to name-only matching).
-
-const SOURCE: SourceRecord = {
-  kind: "source",
-  name: "pdf",
-  repo: "anthropics/skills",
-  via: "install",
-};
-const PENDING: PendingRecord = {
-  kind: "pending",
-  name: "my-tool",
-  key: "1a2b3c4d5e6f7081",
-  fingerprint: { mtimeMs: 1738022.4, size: 48213 },
-  candidates: [
-    {
-      repo: "a/skills",
-      similarity: 0.4,
-      stars: 12,
-      downloads: 340,
-      description: "Read PDF files.",
+const SAMPLE_CONFIG: SkillOneConfig = {
+  version: 1,
+  skills: {
+    pdf: {
+      origin: "store",
+      repo: "anthropics/skills",
+      tags: ["文档处理", "办公"],
     },
+    "my-tool": {
+      origin: "local",
+      tags: ["自定义"],
+    },
+    "find-skills": {
+      origin: "local",
+      repo: "vercel-labs/skills",
+      tags: ["开发工具"],
+    },
+  },
+  customTags: [
+    { key: "custom", label: "自定义" },
+    { key: "frontend", label: "💻 前端开发" },
   ],
 };
-/** The header every file opens with. */
-const HEADER = { kind: "meta", index: '"e1"' };
-
-/** The records of a parsed file, keyed by name. */
-function records(raw: string | null): Map<string, LedgerRecord> {
-  return parseLedger(raw).records;
-}
 
 describe("parseLedger", () => {
-  it("parses JSONL records, one per skill, last one winning", () => {
-    const ledger = records(
-      [
-        JSON.stringify(HEADER),
-        JSON.stringify(SOURCE),
-        JSON.stringify(PENDING),
-        JSON.stringify({ kind: "source", name: "pdf", repo: "other/repo" }),
-      ].join("\n"),
-    );
-    expect(ledger.size).toBe(2);
-    expect(ledger.get("pdf")).toMatchObject({ repo: "other/repo" });
-    expect(ledger.get("my-tool")).toMatchObject({ key: "1a2b3c4d5e6f7081" });
+  it("parses new .skill-one.json format", () => {
+    const raw = JSON.stringify(SAMPLE_CONFIG, null, 2);
+    const parsed = parseLedger(raw);
+
+    expect(parsed.config.version).toBe(1);
+    expect(parsed.config.skills.pdf).toEqual({
+      origin: "store",
+      repo: "anthropics/skills",
+      tags: ["文档处理", "办公"],
+    });
+    expect(parsed.config.skills["my-tool"]).toEqual({
+      origin: "local",
+      tags: ["自定义"],
+    });
+    expect(parsed.config.skills["find-skills"]).toEqual({
+      origin: "local",
+      repo: "vercel-labs/skills",
+      tags: ["开发工具"],
+    });
+    expect(parsed.config.customTags).toHaveLength(2);
+
+    // Backward-compatible maps
+    expect(parsed.records.get("pdf")).toMatchObject({
+      repo: "anthropics/skills",
+      via: "install",
+    });
+    expect(parsed.records.get("find-skills")).toMatchObject({
+      repo: "vercel-labs/skills",
+      via: "confirm",
+    });
+    expect(parsed.tagDefs.get("frontend")?.label).toBe("💻 前端开发");
   });
 
-  it("reads the header, and keeps it out of the records", () => {
-    const parsed = parseLedger([JSON.stringify(HEADER), JSON.stringify(SOURCE)].join("\n"));
-    expect(parsed.index).toBe('"e1"');
-    expect([...parsed.records.keys()]).toEqual(["pdf"]);
+  it("transparently migrates legacy JSONL format", () => {
+    const legacy = [
+      JSON.stringify({ kind: "meta", index: '"e1"' }),
+      JSON.stringify({ kind: "source", name: "pdf", repo: "anthropics/skills", via: "install" }),
+      JSON.stringify({ kind: "source", name: "find-skills", repo: "vercel-labs/skills", via: "confirm" }),
+      JSON.stringify({ kind: "pending", name: "local-tool" }),
+      JSON.stringify({ kind: "tag-def", key: "frontend", label: "前端开发" }),
+      JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "frontend" }),
+    ].join("\n");
+
+    const parsed = parseLedger(legacy);
+    expect(parsed.config.skills.pdf).toEqual({
+      origin: "store",
+      repo: "anthropics/skills",
+      tags: ["frontend"],
+    });
+    expect(parsed.config.skills["find-skills"]).toEqual({
+      origin: "local",
+      repo: "vercel-labs/skills",
+    });
+    expect(parsed.config.skills["local-tool"]).toEqual({
+      origin: "local",
+    });
+    expect(parsed.config.customTags).toEqual([{ key: "frontend", label: "前端开发" }]);
   });
 
-  it("skips broken lines and keeps the rest", () => {
-    const ledger = records(
-      [JSON.stringify(SOURCE), "{broken", "not json", JSON.stringify(PENDING)].join("\n"),
-    );
-    expect([...ledger.keys()]).toEqual(["pdf", "my-tool"]);
-  });
-
-  // Table-driven so a failure names the input that broke rather than only
-  // reporting that a size was not zero — the three used to be three bare
-  // expects in one `it`, all of which reported identically.
   it.each([
     ["null", null],
     ["an empty string", ""],
     ["truncated JSON", "not json {"],
   ] as const)("returns an empty ledger for %s", (_label, raw) => {
     expect(parseLedger(raw).records.size).toBe(0);
+    expect(parseLedger(raw).config.skills).toEqual({});
   });
 
-  it("rejects records without a usable name or of an unknown kind", () => {
-    const ledger = records(
-      [
-        JSON.stringify({ kind: "source", repo: "a/b" }), // no name
-        JSON.stringify({ kind: "source", name: "x" }), // no repo
-        JSON.stringify({ kind: "source", name: "y", repo: "" }), // empty repo
-        JSON.stringify({ kind: "pending", name: "z" }), // nothing worth keeping
-        JSON.stringify({ kind: "someday", name: "w", repo: "a/b" }), // unknown kind
-        JSON.stringify({ kind: "source", name: "good", repo: "a/b" }),
-      ].join("\n"),
-    );
-    expect([...ledger.keys()]).toEqual(["good"]);
-  });
+  it("skips broken lines during legacy migration and keeps valid ones", () => {
+    const raw = [
+      JSON.stringify({ kind: "source", name: "pdf", repo: "anthropics/skills", via: "install" }),
+      "{broken json",
+      "random garbage",
+      JSON.stringify({ kind: "tag-def", key: "custom", label: "Custom" }),
+    ].join("\n");
 
-  it("skips a line it cannot read, whatever the reason", () => {
-    // A `kind` this build does not know, a line from before the tag existed,
-    // and a whole-document JSON object all land in the same place: skipped.
-    // What is left is what answers.
-    const ledger = records(
-      [
-        JSON.stringify({ kind: "someday", name: "a", repo: "o/r" }),
-        JSON.stringify({ name: "b", repo: "o/r", installedAt: "2026-09-13T00:00:00.000Z" }),
-        JSON.stringify({ version: 1, skills: { c: { repo: "o/r" } } }),
-        JSON.stringify(SOURCE),
-      ].join("\n"),
-    );
-    expect([...ledger.keys()]).toEqual(["pdf"]);
-  });
-
-  it("parses a single JSONL line stored without a trailing newline", () => {
-    expect(records(JSON.stringify(SOURCE)).get("pdf")).toEqual(SOURCE);
-    expect(parseLedger(JSON.stringify(HEADER)).index).toBe('"e1"');
-  });
-
-  it("parses `via` on source records and rejects unknown values", () => {
-    const ledger = records(
-      [
-        JSON.stringify({ kind: "source", name: "a", repo: "o/r", via: "install" }),
-        JSON.stringify({ kind: "source", name: "b", repo: "o/r", via: "confirm" }),
-        JSON.stringify({ kind: "source", name: "c", repo: "o/r", via: "bogus" }),
-        JSON.stringify({ kind: "source", name: "d", repo: "o/r" }),
-      ].join("\n"),
-    );
-    expect(ledger.get("a")).toMatchObject({ via: "install" });
-    expect(ledger.get("b")).toMatchObject({ via: "confirm" });
-    expect(ledger.get("c")).not.toHaveProperty("via");
-    expect(ledger.get("d")).not.toHaveProperty("via");
-  });
-
-  it("parses `repos` on pending records, dropping unusable entries", () => {
-    const ledger = records(
-      [
-        JSON.stringify({ kind: "pending", name: "a", repos: ["x/y", "", 3] }),
-        JSON.stringify({ kind: "pending", name: "b", repos: [] }),
-        JSON.stringify({
-          kind: "pending",
-          name: "c",
-          candidates: [{ repo: "a/b", similarity: 1, stars: 1, downloads: 1, description: "d" }],
-        }),
-      ].join("\n"),
-    );
-    expect(ledger.get("a")).toMatchObject({ repos: ["x/y"] });
-    // An empty list leaves nothing worth a line, exactly like no list at all.
-    expect(ledger.has("b")).toBe(false);
-    expect(ledger.get("c")).not.toHaveProperty("repos");
-  });
-
-  it("drops candidates that cannot be rendered", () => {
-    const ledger = records(
-      JSON.stringify({
-        kind: "pending",
-        name: "a",
-        candidates: [
-          { repo: "a/b", similarity: "high", stars: 1, downloads: 1, description: "d" },
-          { repo: "c/d", similarity: 0.5, stars: 1, downloads: 1, description: "d" },
-        ],
-      }),
-    );
-    expect(ledger.get("a")).toMatchObject({
-      candidates: [{ repo: "c/d", similarity: 0.5 }],
-    });
+    const parsed = parseLedger(raw);
+    expect(parsed.config.skills.pdf?.repo).toBe("anthropics/skills");
+    expect(parsed.config.customTags).toEqual([{ key: "custom", label: "Custom" }]);
   });
 });
 
 describe("serializeLedger", () => {
-  it("opens with the header, then one line per record", () => {
-    const text = serializeLedger('"e1"', [SOURCE, PENDING]);
-    expect(text.split("\n").filter(Boolean)).toEqual([
-      JSON.stringify(HEADER),
-      JSON.stringify(SOURCE),
-      JSON.stringify(PENDING),
-    ]);
+  it("serializes SkillOneConfig as indented JSON", () => {
+    const json = serializeLedger(SAMPLE_CONFIG);
+    expect(json).toContain('"version": 1');
+    expect(json).toContain('"anthropics/skills"');
+    expect(JSON.parse(json)).toEqual(SAMPLE_CONFIG);
   });
 
-  it("writes a bare header when no snapshot is known", () => {
-    expect(serializeLedger(undefined, [SOURCE]).split("\n")[0]).toBe('{"kind":"meta"}');
-  });
-
-  it("round-trips records through one line per skill", () => {
-    const parsed = parseLedger(serializeLedger('"e1"', [SOURCE, PENDING]));
-    expect(parsed.index).toBe('"e1"');
-    expect(parsed.records).toEqual(
-      new Map<string, LedgerRecord>([
-        ["pdf", SOURCE],
-        ["my-tool", PENDING],
-      ]),
-    );
+  it("round-trips through parseLedger and serializeLedger", () => {
+    const json = serializeLedger(SAMPLE_CONFIG);
+    const parsed = parseLedger(json);
+    expect(parsed.config).toEqual(SAMPLE_CONFIG);
   });
 });
 
-// The developer viewer's per-line split: unlike parseLedger it keeps the
-// file's own order, duplicates and broken lines — the file as it is.
-
 describe("ledgerLines", () => {
-  it("splits JSONL into numbered lines, keeping order and duplicates", () => {
-    const lines = ledgerLines(
-      [JSON.stringify(SOURCE), JSON.stringify(PENDING), JSON.stringify(SOURCE)].join("\n"),
-    );
-    expect(lines.map((l) => l.line)).toEqual([1, 2, 3]);
-    expect(lines[0]?.record).toEqual(SOURCE);
-    expect(lines[1]?.record).toEqual(PENDING);
-    expect(lines[2]?.record).toEqual(SOURCE);
-  });
+  it("splits JSON config into structured items for developer dialog", () => {
+    const raw = serializeLedger(SAMPLE_CONFIG);
+    const lines = ledgerLines(raw);
 
-  it("flags broken lines with their raw text instead of skipping them", () => {
-    const lines = ledgerLines([JSON.stringify(SOURCE), "{broken"].join("\n"));
-    expect(lines[0]?.record).toEqual(SOURCE);
-    expect(lines[1]?.text).toBe("{broken");
-    expect(lines[1]?.record).toBeUndefined();
-  });
-
-  it("skips blank lines but keeps later line numbers intact", () => {
-    const lines = ledgerLines(
-      ["", JSON.stringify(SOURCE), "", JSON.stringify(PENDING)].join("\n"),
-    );
-    expect(lines.map((l) => l.line)).toEqual([2, 4]);
-  });
-
-  it("renders a single line without a trailing newline as one line", () => {
-    expect(ledgerLines(JSON.stringify(SOURCE))).toEqual([{ line: 1, record: SOURCE }]);
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines[0]?.record).toMatchObject({ kind: "meta", version: 1 });
+    const pdfLine = lines.find((l) => l.record?.name === "pdf");
+    expect(pdfLine?.record).toMatchObject({
+      name: "pdf",
+      origin: "store",
+      repo: "anthropics/skills",
+      tags: ["文档处理", "办公"],
+    });
   });
 
   it.each([
@@ -246,15 +168,14 @@ describe("ledgerLines", () => {
   });
 });
 
-// Raw read path backing the developer viewer (browser stand-in here).
-
 describe("readLedgerRaw", () => {
   beforeEach(() => resetMockProvenance());
   afterEach(() => resetMockProvenance());
 
   it("returns the stored ledger verbatim", async () => {
-    seedMockLedgerRaw(JSON.stringify(SOURCE));
-    expect(await readLedgerRaw()).toBe(JSON.stringify(SOURCE));
+    const raw = serializeLedger(SAMPLE_CONFIG);
+    seedMockLedgerRaw(raw);
+    expect(await readLedgerRaw()).toBe(raw);
   });
 
   it("returns null when nothing is stored yet", async () => {
@@ -262,380 +183,133 @@ describe("readLedgerRaw", () => {
   });
 });
 
-// Browser persistence (the localStorage stand-in for .skill-one.jsonl).
-
 describe("provenance browser store", () => {
   beforeEach(() => resetMockProvenance());
   afterEach(() => resetMockProvenance());
 
   it("round-trips a recorded install through the persisted ledger", async () => {
-    await recordSkillProvenance("anthropics/skills", "pdf");
-
-    const { sources: map } = await reconcileProvenance(["pdf"]);
-    expect(map.pdf).toEqual({ repo: "anthropics/skills", via: "install" });
-  });
-
-  it("opens a fresh ledger with a header, snapshot unknown", async () => {
-    await recordSkillProvenance("anthropics/skills", "pdf");
-
-    // An install says nothing about the dataset, so the header names no
-    // snapshot — which is exactly what invalidates any stored ranking.
-    const parsed = parseLedger(await readLedgerRaw());
-    expect(parsed.index).toBeUndefined();
-    expect(await readLedgerRaw()).toContain('{"kind":"meta"}');
-  });
-
-  it("a recorded entry for a name that is not installed gets pruned", async () => {
-    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-
-    const { sources: map } = await reconcileProvenance(["docx"]);
-    expect(map).toEqual({});
-  });
-
-  it("reconciliation persists the prune", async () => {
-    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-    await reconcileProvenance(["docx"]);
-
-    // A later reconcile against the same disk state stays pruned.
-    const { sources: map } = await reconcileProvenance(["docx"]);
-    expect(map).toEqual({});
-  });
-
-  it("forgets the entry on removal", async () => {
-    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-    await removeSkillProvenance("pdf");
-
-    const { sources: map } = await reconcileProvenance(["pdf"]);
-    expect(map).toEqual({});
-  });
-
-  it("reinstalls overwrite the recorded source", async () => {
-    seedMockProvenance({ pdf: { repo: "old/repo" } });
-    await recordSkillProvenance("new/repo", "pdf");
-
-    const { sources: map } = await reconcileProvenance(["pdf"]);
-    expect(map.pdf?.repo).toBe("new/repo");
-  });
-
-  it("auto-links overwrite a pending record with a source record", async () => {
-    await savePendingRecords([{ kind: "pending", name: "pdf", repos: ["fork/skills"] }], [], '"e1"');
-    await recordSkillProvenanceBatch([{ repo: "fork/skills", name: "pdf", reason: "description" }]);
-
-    const { sources: map } = await reconcileProvenance(["pdf"]);
-    expect(map.pdf).toEqual({ repo: "fork/skills", via: "description" });
-    expect((await loadPendingRecords()).records).toEqual({});
-  });
-
-  it("records how the source was established via `via`", async () => {
-    await recordSkillProvenance("anthropics/skills", "pdf");
-    expect((await reconcileProvenance(["pdf"])).sources.pdf?.via).toBe("install");
-
-    await recordSkillProvenance("fork/skills", "pdf", "confirm");
-    expect((await reconcileProvenance(["pdf"])).sources.pdf?.via).toBe("confirm");
-
-    await recordSkillProvenanceBatch([{ repo: "o/r", name: "pdf", reason: "description" }]);
-    expect((await reconcileProvenance(["pdf"])).sources.pdf?.via).toBe("description");
-  });
-
-  it("keeps no timestamp: when a link happened is the activity log's fact", async () => {
-    await recordSkillProvenance("anthropics/skills", "pdf");
-
-    const line = (await readLedgerRaw())?.split("\n")[1] ?? "";
-    expect(JSON.parse(line)).not.toHaveProperty("installedAt");
-  });
-});
-
-describe("pending records", () => {
-  beforeEach(() => resetMockProvenance());
-  afterEach(() => resetMockProvenance());
-
-  it("round-trips upserts through the persisted ledger, stamped with the snapshot", async () => {
-    await savePendingRecords([PENDING], [], '"e1"');
-
-    expect(await loadPendingRecords()).toEqual({ index: '"e1"', records: { "my-tool": PENDING } });
-  });
-
-  it("re-stamps the header with the snapshot it was given", async () => {
-    await savePendingRecords([PENDING], [], '"e1"');
-    await savePendingRecords([], [], '"e2"');
-
-    // Nothing to write, so nothing changed — the header still names e1.
-    expect((await loadPendingRecords()).index).toBe('"e1"');
-  });
-
-  it("leaves the header alone when a source is recorded", async () => {
-    await savePendingRecords([PENDING], [], '"e1"');
-    await recordSkillProvenance("anthropics/skills", "pdf");
-
-    // An install says nothing about the snapshot the pending records were
-    // verified against, so it must not invalidate them.
-    expect((await loadPendingRecords()).index).toBe('"e1"');
-  });
-
-  it("drops only pending records — a source record for the same name survives", async () => {
-    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-    await savePendingRecords(
-      [{ kind: "pending", name: "pdf", repos: ["fork/skills"] }],
-      ["pdf"],
-      '"e1"',
-    );
-
-    expect((await loadPendingRecords()).records).toEqual({});
-    const { sources: map } = await reconcileProvenance(["pdf"]);
-    expect(map.pdf?.repo).toBe("anthropics/skills");
-  });
-
-  it("pending records are pruned with their skill", async () => {
-    await savePendingRecords([PENDING], [], '"e1"');
-    await reconcileProvenance(["other"]);
-
-    expect((await loadPendingRecords()).records).toEqual({});
-  });
-
-  it("reports no snapshot identity when the file names none", async () => {
-    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-    expect((await loadPendingRecords()).index).toBeUndefined();
-  });
-});
-
-describe("dismissSkillSource", () => {
-  beforeEach(() => resetMockProvenance());
-  afterEach(() => resetMockProvenance());
-
-  it("replaces the source record with the cut", async () => {
-    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-    await dismissSkillSource("pdf", "anthropics/skills");
-
-    // The source is gone from the reconcile answer…
-    expect((await reconcileProvenance(["pdf"])).sources).toEqual({});
-    // …and the cut is persisted as a pending record.
-    expect((await loadPendingRecords()).records).toEqual({
-      pdf: { kind: "pending", name: "pdf", repos: ["anthropics/skills"] },
-    });
-  });
-
-  it("accumulates repos, and runs before any source record", async () => {
-    await dismissSkillSource("pdf", "a/skills");
-    await recordSkillProvenance("b/skills", "pdf", "confirm");
-    await dismissSkillSource("pdf", "b/skills");
-    await dismissSkillSource("pdf", "a/skills");
-    await dismissSkillSource("pdf", "c/skills");
-
-    expect((await loadPendingRecords()).records.pdf).toEqual({
-      kind: "pending",
-      name: "pdf",
-      repos: ["b/skills", "a/skills", "c/skills"],
-    });
-    expect((await reconcileProvenance(["pdf"])).sources).toEqual({});
-  });
-
-  it("hands the cut to the surfaces that offer the namesake list", async () => {
-    seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
-    await dismissSkillSource("pdf", "anthropics/skills");
-
-    // The repo stays on the candidate list — re-picking it is the user's own
-    // act of re-identification — so what the surfaces need is the fact that it
-    // was already refused, not its absence.
-    const { sources, cut } = await reconcileProvenance(["pdf"]);
-    expect(sources).toEqual({});
-    expect(cut).toEqual({ pdf: ["anthropics/skills"] });
-  });
-
-  it("reports no cut for a skill that only has a ranking pending", async () => {
-    // A pending record without `repos` is a suggestion, not a refusal — it must
-    // not show up as an empty cut for every unlinked skill.
-    await savePendingRecords([PENDING], [], '"e1"');
-
-    expect((await reconcileProvenance(["pdf"])).cut).toEqual({});
-  });
-
-  it("keeps the ranking the cut was made against", async () => {
-    // The user's cut does not invalidate work already done: dropping the
-    // candidates would make every cut re-rank from scratch.
-    await savePendingRecords([PENDING], [], '"e1"');
-    await dismissSkillSource("my-tool", "a/skills");
-
-    expect((await loadPendingRecords()).records["my-tool"]).toEqual({
-      ...PENDING,
-      repos: ["a/skills"],
-    });
-  });
-});
-
-// Custom tags ride the same ledger under their own maps: definitions keyed
-// by tag key (they survive skill prunes — an unused tag is still taxonomy),
-// assignments as skill name → tag key (pruned with their skill).
-
-describe("custom tag ledger lines", () => {
-  it("parses tag definitions and assignments beside skill records", () => {
-    const parsed = parseLedger(
-      [
-        JSON.stringify(SOURCE),
-        JSON.stringify({ kind: "tag-def", key: "效率工具", label: "效率工具" }),
-        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "效率工具" }),
-      ].join("\n"),
-    );
-    expect([...parsed.records.keys()]).toEqual(["pdf"]);
-    expect([...parsed.tagDefs.keys()]).toEqual(["效率工具"]);
-    expect(parsed.skillTags.get("pdf")).toBe("效率工具");
-  });
-
-  it("last one wins for both maps", () => {
-    const parsed = parseLedger(
-      [
-        JSON.stringify({ kind: "tag-def", key: "a", label: "First" }),
-        JSON.stringify({ kind: "tag-def", key: "a", label: "Second" }),
-        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "a" }),
-        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "testing" }),
-      ].join("\n"),
-    );
-    expect(parsed.tagDefs.get("a")).toEqual({ kind: "tag-def", key: "a", label: "Second" });
-    expect(parsed.skillTags.get("pdf")).toBe("testing");
-  });
-
-  it("reads an empty tag as the explicit clear", () => {
-    const parsed = parseLedger(
-      [
-        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "a" }),
-        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "" }),
-        JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "  " }),
-      ].join("\n"),
-    );
-    expect(parsed.skillTags.has("pdf")).toBe(false);
-  });
-
-  it("skips tag lines without a usable key, label or name", () => {
-    const parsed = parseLedger(
-      [
-        JSON.stringify({ kind: "tag-def", key: "", label: "x" }),
-        JSON.stringify({ kind: "tag-def", key: "a" }),
-        JSON.stringify({ kind: "skill-tag", name: "", tag: "a" }),
-        JSON.stringify({ kind: "skill-tag", name: "pdf" }),
-        JSON.stringify({ kind: "tag-def", key: "kept", label: "Kept" }),
-      ].join("\n"),
-    );
-    expect([...parsed.tagDefs.keys()]).toEqual(["kept"]);
-    expect(parsed.skillTags.size).toBe(0);
-  });
-
-  it("serializes tags after the skill records, sorted for a stable diff", () => {
-    const text = serializeLedger(
-      '"e1"',
-      [SOURCE],
-      [
-        { kind: "tag-def", key: "b", label: "B" },
-        { kind: "tag-def", key: "a", label: "A" },
-      ],
-      [["pdf", "b"]],
-    );
-    const lines = text.split("\n").filter(Boolean);
-    expect(lines[0]).toBe(JSON.stringify(HEADER));
-    expect(lines[1]).toBe(JSON.stringify(SOURCE));
-    expect(lines[2]).toBe(JSON.stringify({ kind: "tag-def", key: "a", label: "A" }));
-    expect(lines[3]).toBe(JSON.stringify({ kind: "tag-def", key: "b", label: "B" }));
-    expect(lines[4]).toBe(JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "b" }));
-    // And the round trip keeps the maps apart: no tag line lands in records.
-    const parsed = parseLedger(text);
-    expect([...parsed.records.keys()]).toEqual(["pdf"]);
-    expect(parsed.skillTags.get("pdf")).toBe("b");
-  });
-});
-
-describe("custom tags browser store", () => {
-  beforeEach(() => resetMockProvenance());
-  afterEach(() => resetMockProvenance());
-
-  it("round-trips definitions and assignments through the persisted ledger", async () => {
-    await saveCustomTagDef("效率工具", "效率工具");
-    await setSkillTag("pdf", "效率工具");
-
-    expect(await loadCustomTags()).toEqual({
-      tagDefs: [{ key: "效率工具", label: "效率工具" }],
-      skillTags: { pdf: "效率工具" },
-    });
-  });
-
-  it("round-trips a tag's own mark", async () => {
-    await saveCustomTagDef("效率工具", "效率工具", "🌟");
-
-    expect(await loadCustomTags()).toEqual({
-      tagDefs: [{ key: "效率工具", label: "效率工具", emoji: "🌟" }],
-      skillTags: {},
-    });
-    // A re-save without a mark keeps the stored one honest: the ledger
-    // writes what well-formed lines carry, and the menu always passes the
-    // field through.
-    await saveCustomTagDef("效率工具", "效率工具");
-    expect((await loadCustomTags()).tagDefs).toEqual([
-      { key: "效率工具", label: "效率工具" },
-    ]);
-  });
-
-  it("replaces a skill's choice and clears it back to null", async () => {
-    await setSkillTag("pdf", "development");
-    await setSkillTag("pdf", "testing");
-    expect((await loadCustomTags()).skillTags).toEqual({ pdf: "testing" });
-
-    await setSkillTag("pdf", null);
-    expect((await loadCustomTags()).skillTags).toEqual({});
-  });
-
-  it("keeps tag lines when skill records are written around them", async () => {
-    await saveCustomTagDef("效率工具", "效率工具");
-    await recordSkillProvenance("anthropics/skills", "pdf");
-    await setSkillTag("pdf", "效率工具");
+    await recordSkillProvenance("anthropics/skills", "pdf", "install", ["文档处理"]);
 
     const { sources } = await reconcileProvenance(["pdf"]);
-    expect(sources.pdf?.repo).toBe("anthropics/skills");
-    expect(await loadCustomTags()).toEqual({
-      tagDefs: [{ key: "效率工具", label: "效率工具" }],
-      skillTags: { pdf: "效率工具" },
+    expect(sources.pdf).toEqual({
+      origin: "store",
+      repo: "anthropics/skills",
+      tags: ["文档处理"],
+      via: "install",
+    });
+
+    const raw = JSON.parse((await readLedgerRaw())!);
+    expect(raw.skills.pdf).toEqual({
+      origin: "store",
+      repo: "anthropics/skills",
+      tags: ["文档处理"],
     });
   });
 
-  it("prunes a removed skill's choice but keeps its definition", async () => {
-    await saveCustomTagDef("效率工具", "效率工具");
-    await setSkillTag("pdf", "效率工具");
-    await reconcileProvenance(["other"]);
+  it("distinguishes store install from third-party linked skill", async () => {
+    await recordSkillProvenance("anthropics/skills", "pdf", "install");
+    await recordSkillProvenance("fork/skills", "tool", "confirm");
 
+    const { sources } = await reconcileProvenance(["pdf", "tool"]);
+    expect(sources.pdf?.origin).toBe("store");
+    expect(sources.pdf?.via).toBe("install");
+
+    expect(sources.tool?.origin).toBe("local");
+    expect(sources.tool?.repo).toBe("fork/skills");
+    expect(sources.tool?.via).toBe("confirm");
+  });
+
+  it("records batch installs and links", async () => {
+    await recordSkillProvenanceBatch([
+      { repo: "a/repo", name: "a", reason: "install" },
+      { repo: "b/repo", name: "b", reason: "confirm" },
+    ]);
+
+    const { sources } = await reconcileProvenance(["a", "b"]);
+    expect(sources.a?.origin).toBe("store");
+    expect(sources.b?.origin).toBe("local");
+    expect(sources.b?.repo).toBe("b/repo");
+  });
+
+  it("prunes uninstalled skills during reconcile", async () => {
+    seedMockProvenance({ pdf: { repo: "anthropics/skills", origin: "store" } });
+
+    const { sources } = await reconcileProvenance(["other"]);
+    expect(sources.pdf).toBeUndefined();
+    expect(sources.other).toBeUndefined();
+
+    const raw = JSON.parse((await readLedgerRaw())!);
+    expect(raw.skills.pdf).toBeUndefined();
+    expect(raw.skills.other).toBeDefined();
+    expect(raw.skills.other.origin).toBe("local");
+  });
+
+  it("unlinks skill source without deleting local skill record", async () => {
+    await recordSkillProvenance("fork/skills", "tool", "confirm", ["开发"]);
+    await unlinkSkillSource("tool");
+
+    const { sources } = await reconcileProvenance(["tool"]);
+    expect(sources.tool).toBeUndefined();
+
+    const raw = JSON.parse((await readLedgerRaw())!);
+    expect(raw.skills.tool).toEqual({
+      origin: "local",
+      tags: ["开发"],
+    });
+  });
+
+  it("forgets skill provenance on removal", async () => {
+    await recordSkillProvenance("anthropics/skills", "pdf");
+    await removeSkillProvenance("pdf");
+
+    const { sources } = await reconcileProvenance(["other"]);
+    expect(sources.pdf).toBeUndefined();
+  });
+});
+
+describe("custom tags store", () => {
+  beforeEach(() => resetMockProvenance());
+  afterEach(() => resetMockProvenance());
+
+  it("creates, renames and deletes label-only custom tags", async () => {
+    await saveCustomTagDef("frontend", "💻 前端开发");
     expect(await loadCustomTags()).toEqual({
-      tagDefs: [{ key: "效率工具", label: "效率工具" }],
+      tagDefs: [{ key: "frontend", label: "💻 前端开发" }],
+      skillTags: {},
+    });
+
+    await renameCustomTagDef("frontend", "web", "Web 开发");
+    expect(await loadCustomTags()).toEqual({
+      tagDefs: [{ key: "web", label: "Web 开发" }],
+      skillTags: {},
+    });
+
+    await deleteCustomTagDef("web");
+    expect(await loadCustomTags()).toEqual({
+      tagDefs: [],
       skillTags: {},
     });
   });
 
-  it("deleting a definition drops the assignments pointing at it", async () => {
-    await saveCustomTagDef("效率工具", "效率工具");
-    await setSkillTag("pdf", "效率工具");
-    await setSkillTag("docx", "development");
-    await deleteCustomTagDef("效率工具");
+  it("supports multiple tags per skill", async () => {
+    await recordSkillProvenance("anthropics/skills", "pdf", "install");
+    await setSkillTags("pdf", ["办公", "文档", "常用"]);
 
-    expect(await loadCustomTags()).toEqual({
-      tagDefs: [],
-      skillTags: { docx: "development" },
-    });
+    const { sources } = await reconcileProvenance(["pdf"]);
+    expect(sources.pdf?.tags).toEqual(["办公", "文档", "常用"]);
+
+    const custom = await loadCustomTags();
+    expect(custom.skillTags.pdf).toBe("办公"); // First tag as backward-compatible single tag
   });
 
-  it("renaming moves every assignment along in one pass", async () => {
-    await saveCustomTagDef("效率工具", "效率工具", "🌟");
-    await setSkillTag("pdf", "效率工具");
-    await setSkillTag("docx", "效率工具");
-    await setSkillTag("pptx", "development");
-    await renameCustomTagDef("效率工具", "摸鱼神器", "摸鱼神器", "🎣");
+  it("deleting a tag definition removes it from assigned skills", async () => {
+    await saveCustomTagDef("test-tag", "测试");
+    await recordSkillProvenance("anthropics/skills", "pdf", "install");
+    await setSkillTags("pdf", ["test-tag", "other-tag"]);
 
-    expect(await loadCustomTags()).toEqual({
-      tagDefs: [{ key: "摸鱼神器", label: "摸鱼神器", emoji: "🎣" }],
-      skillTags: { pdf: "摸鱼神器", docx: "摸鱼神器", pptx: "development" },
-    });
-  });
+    await deleteCustomTagDef("test-tag");
 
-  it("renaming a missing tag writes nothing", async () => {
-    await setSkillTag("pdf", "development");
-    await renameCustomTagDef("ghost", "spook", "Spook");
-
-    expect(await loadCustomTags()).toEqual({
-      tagDefs: [],
-      skillTags: { pdf: "development" },
-    });
+    const { sources } = await reconcileProvenance(["pdf"]);
+    expect(sources.pdf?.tags).toEqual(["other-tag"]);
   });
 });

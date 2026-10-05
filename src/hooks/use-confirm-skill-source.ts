@@ -27,10 +27,14 @@ export function useConfirmSkillSource(name: string) {
   const { t } = useTranslation();
 
   const confirm = useCallback(
-    async (repo: string): Promise<boolean> => {
+    async (repo: string, defaultTags?: readonly string[]): Promise<boolean> => {
       setPendingRepo(repo);
       try {
-        await recordSkillProvenance(repo, name, "confirm");
+        if (defaultTags && defaultTags.length > 0) {
+          await recordSkillProvenance(repo, name, "confirm", defaultTags);
+        } else {
+          await recordSkillProvenance(repo, name, "confirm");
+        }
         await markSkillsChanged(queryClient);
         toast.add({ title: t("sourceLink.linked", { repo }), type: "success" });
         return true;

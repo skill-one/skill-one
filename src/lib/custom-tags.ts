@@ -33,9 +33,18 @@ export const MAX_TAG_EMOJI_LENGTH = 4;
  * so an unmarked tag still scans as itself rather than as a generic tag.
  */
 export function defaultTagMark(label: string): string {
-  const first = Array.from(label.trim())[0];
-  if (first === undefined) return CUSTOM_TAG_EMOJI;
-  return /[a-z]/.test(first) ? first.toUpperCase() : first;
+  const trimmed = label.trim();
+  if (!trimmed) return CUSTOM_TAG_EMOJI;
+  try {
+    for (const segment of new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(trimmed)) {
+      const first = segment.segment;
+      return /[a-z]/.test(first) ? first.toUpperCase() : first;
+    }
+  } catch {
+    const first = Array.from(trimmed)[0];
+    if (first !== undefined) return /[a-z]/.test(first) ? first.toUpperCase() : first;
+  }
+  return CUSTOM_TAG_EMOJI;
 }
 
 /** Keys no user tag may take: the system taxonomy, its blank, and facets. */

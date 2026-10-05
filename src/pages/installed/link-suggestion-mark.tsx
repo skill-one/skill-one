@@ -67,8 +67,8 @@ export function LinkSuggestionMark({
   const { t } = useTranslation();
   const { pendingRepo, confirm } = useConfirmSkillSource(name);
 
-  const pick = async (repo: string) => {
-    if (await confirm(repo)) setOpen(false);
+  const pick = async (repo: string, defaultTags?: readonly string[]) => {
+    if (await confirm(repo, defaultTags)) setOpen(false);
   };
 
   if (candidates.length === 0) {
@@ -146,7 +146,7 @@ export function LinkSuggestionMark({
             cutRepos={cutRepos}
             emptyLabel={t("detail.noOtherSources")}
             pendingRepo={pendingRepo}
-            onPick={(repo) => void pick(repo)}
+            onPick={(repo, defaultTags) => void pick(repo, defaultTags)}
           />
         </PopoverContent>
       </Popover>

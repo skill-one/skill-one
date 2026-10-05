@@ -703,7 +703,7 @@ export function SkillDetailPanel({
                   }
                 />
                 <TooltipContent className="max-w-[260px] text-left normal-case">
-                  {shown.via === "install"
+                  {shown.origin === "store" || shown.via === "install"
                     ? t("detail.sourceViaInstall")
                     : t("detail.sourceViaLink")}
                 </TooltipContent>

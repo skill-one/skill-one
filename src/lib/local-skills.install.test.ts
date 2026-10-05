@@ -57,6 +57,7 @@ describe("installSkillFromSource", () => {
     expect(recordSkillProvenance).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
+      "install",
     );
   });
 
@@ -119,6 +120,7 @@ describe("installSkillFromSource", () => {
     expect(recordSkillProvenance).toHaveBeenCalledWith(
       "anthropics/skills",
       "pdf",
+      "install",
     );
   });
 
@@ -163,5 +165,22 @@ describe("installSkillFromSource", () => {
     await vi.advanceTimersByTimeAsync(1);
     await pending;
     expect(installMockSkill).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes profile domains as default tags when present", async () => {
+    isTauri.mockReturnValue(true);
+    installSkill.mockResolvedValue({ skill: "pdf", skipped: false });
+
+    await installSkillFromSource({
+      ...PDF,
+      profile: { domain: ["document-processing"] },
+    });
+
+    expect(recordSkillProvenance).toHaveBeenCalledWith(
+      "anthropics/skills",
+      "pdf",
+      "install",
+      ["document-processing"],
+    );
   });
 });

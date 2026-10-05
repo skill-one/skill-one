@@ -128,6 +128,6 @@ describe("SelectionActionBar", () => {
     const createBtn = screen.getByRole("button", { name: /^新建$|^create$/i });
     await user.click(createBtn);
 
-    expect(onCreateTag).toHaveBeenCalledWith("Work", undefined);
+    expect(onCreateTag).toHaveBeenCalledWith("Work");
   });
 });

@@ -41,7 +41,6 @@
     "@uiw/react-codemirror": "^4.25.12",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
-    "emoji-picker-react": "^4.22.3",
     "i18next": "^26.4.2",
     "idb-keyval": "^6.3.0",
     "lucide-react": "^1.51.0",

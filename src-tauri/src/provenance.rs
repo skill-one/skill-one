@@ -16,9 +16,11 @@
 use std::path::Path;
 
 /// The ledger file inside the global skills directory (`~/.agents/skills`).
-const LEDGER_FILE: &str = ".skill-one.jsonl";
+pub const LEDGER_FILE: &str = ".skill-one.json";
+/// The legacy JSONL ledger file, read for transparent one-way migration.
+pub const LEGACY_LEDGER_FILE: &str = ".skill-one.jsonl";
 
-/// Resolve the ledger path: `<home>/.agents/skills/.skill-one.jsonl`. The
+/// Resolve the ledger path: `<home>/.agents/skills/.skill-one.json`. The
 /// directory is the library's canonical global skills dir; the commands never
 /// accept caller-controlled paths, so nothing else can be read or written.
 fn ledger_path() -> Result<std::path::PathBuf, String> {
@@ -27,21 +29,27 @@ fn ledger_path() -> Result<std::path::PathBuf, String> {
         .ok_or_else(|| "cannot resolve the home directory".to_string())
 }
 
-/// Read the raw ledger. `None` (not an error) when it does not exist — the
-/// ledger is created lazily by the first install.
+/// Read the raw ledger. Checks `.skill-one.json` first, falling back to legacy
+/// `.skill-one.jsonl` if present so the frontend can migrate transparently.
+/// `None` when neither exists.
 fn read_ledger_at(ledger: &Path) -> Result<Option<String>, String> {
     match std::fs::read_to_string(ledger) {
         Ok(content) => Ok(Some(content)),
-        // A missing file is the "no ledger yet" state, not a failure.
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            let legacy = ledger.with_file_name(LEGACY_LEDGER_FILE);
+            match std::fs::read_to_string(&legacy) {
+                Ok(content) => Ok(Some(content)),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                Err(e) => Err(format!("read {}: {e}", legacy.display())),
+            }
+        }
         Err(e) => Err(format!("read {}: {e}", ledger.display())),
     }
 }
 
 /// Replace the ledger atomically: write a sibling temp file first, then
 /// rename over the target, so a crash mid-write cannot leave a truncated
-/// ledger behind (a torn file would just parse as empty, but the rename is
-/// one syscall and cheap to do right).
+/// ledger behind. Also cleans up the legacy `.skill-one.jsonl` file once migrated.
 fn write_ledger_at(ledger: &Path, content: &str) -> Result<(), String> {
     let tmp = ledger.with_extension("tmp");
     std::fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", tmp.display()))?;
@@ -58,6 +66,11 @@ fn write_ledger_at(ledger: &Path, content: &str) -> Result<(), String> {
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
         }
+    }
+    // Clean up legacy JSONL file if it still exists alongside the new JSON ledger
+    let legacy = ledger.with_file_name(LEGACY_LEDGER_FILE);
+    if legacy.exists() {
+        let _ = std::fs::remove_file(&legacy);
     }
     Ok(())
 }
@@ -158,5 +171,31 @@ mod tests {
         let ledger = ledger(dir.path());
         std::fs::create_dir(&ledger).expect("create dir");
         assert!(read_ledger_at(&ledger).is_err());
+    }
+
+    #[test]
+    fn read_falls_back_to_legacy_jsonl() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let legacy = dir.path().join(LEGACY_LEDGER_FILE);
+        std::fs::write(&legacy, "{\"kind\":\"meta\"}\n").expect("write legacy");
+        let target = ledger(dir.path());
+        assert_eq!(
+            read_ledger_at(&target).unwrap().as_deref(),
+            Some("{\"kind\":\"meta\"}\n")
+        );
+    }
+
+    #[test]
+    fn write_removes_legacy_jsonl() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let legacy = dir.path().join(LEGACY_LEDGER_FILE);
+        std::fs::write(&legacy, "legacy").expect("write legacy");
+        let target = ledger(dir.path());
+        write_ledger_at(&target, "{\"version\":1}").expect("write target");
+        assert_eq!(
+            read_ledger_at(&target).unwrap().as_deref(),
+            Some("{\"version\":1}")
+        );
+        assert!(!legacy.exists(), "legacy file should have been cleaned up");
     }
 }

@@ -48,8 +48,8 @@ export function SourceLinkMenu({ skill }: { skill: SkillView }) {
     enabled: open,
   });
 
-  const pick = async (repo: string) => {
-    if (await confirm(repo)) setOpen(false);
+  const pick = async (repo: string, defaultTags?: readonly string[]) => {
+    if (await confirm(repo, defaultTags)) setOpen(false);
   };
 
   const unlink = async () => {
@@ -93,7 +93,7 @@ export function SourceLinkMenu({ skill }: { skill: SkillView }) {
           candidates={candidatesPending ? null : (candidates ?? [])}
           emptyLabel={t("detail.noOtherSources")}
           pendingRepo={pendingRepo}
-          onPick={(repo) => void pick(repo)}
+          onPick={(repo, defaultTags) => void pick(repo, defaultTags)}
           beforeList={
             /* The source currently on record — pinned and marked, so a
                re-selection always reads against it. */

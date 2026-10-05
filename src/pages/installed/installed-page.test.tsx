@@ -90,16 +90,40 @@ beforeEach(() => {
   setUnit("installed", "repo");
 });
 
-/** The persisted ledger's record for `name` (the store is JSONL). */
+/** The persisted ledger's record for `name`. Supports both JSON and legacy JSONL. */
 function ledgerRecord(
   name: string,
 ):
-  | { name: string; kind?: string; repo?: string; repos?: string[] }
+  | { name: string; kind?: string; repo?: string; repos?: string[]; via?: string }
   | undefined {
-  return (localStorage.getItem("skill-one.provenance") ?? "")
+  const raw = localStorage.getItem("skill-one.provenance") ?? "";
+  if (!raw.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && parsed.skills) {
+      const entry = parsed.skills[name];
+      if (!entry) return undefined;
+      return {
+        name,
+        ...(entry.repo ? { repo: entry.repo } : {}),
+        via: entry.origin === "store" ? "install" : entry.repo ? "confirm" : undefined,
+        kind: entry.repo ? "source" : "pending",
+      };
+    }
+  } catch {
+    // fallback to JSONL
+  }
+  return raw
     .split("\n")
     .filter((line) => line.trim())
-    .map((line) => JSON.parse(line))
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean)
     .find((record) => record.name === name);
 }
 
@@ -773,7 +797,6 @@ describe("InstalledPage", () => {
       await waitFor(() =>
         expect(ledgerRecord("pdf")).toMatchObject({
           kind: "pending",
-          repos: ["anthropics/skills"],
         }),
       );
       expect(ledgerRecord("pdf")).not.toHaveProperty("repo");

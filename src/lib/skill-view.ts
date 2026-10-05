@@ -99,6 +99,14 @@ export interface SkillView extends Skill {
    */
   storeBacked?: boolean;
   /**
+   * Installation origin: "store" (Skill One store) or "local" (third-party install).
+   */
+  origin?: "store" | "local";
+  /**
+   * Tags assigned to this skill.
+   */
+  tags?: string[];
+  /**
    * Installed skills only: how the recorded source was established —
    * `install` (this app installed the skill), `confirm` (the user picked the
    * source from candidates), or `description` (auto-linked). Absent for store
@@ -154,6 +162,8 @@ export function installedSkillView(
   cut?: readonly string[],
 ): SkillView {
   const ledger = provenance?.[skill.name];
+  const origin: "store" | "local" =
+    ledger?.origin ?? (ledger?.via === "install" ? "store" : "local");
   return {
     name: skill.name,
     // The display spelling is what agents-skills reports for this on-disk copy
@@ -163,10 +173,12 @@ export function installedSkillView(
     ...(skill.displayName ? { displayName: skill.displayName } : {}),
     ...(entry?.id ? { id: entry.id } : {}),
     repo: ledger?.repo ?? "",
+    origin,
+    tags: ledger?.tags,
     // How that source was established (`install` vs a confirmed or auto
     // link) — the fact that tells a store install from a linked third-party
     // copy on the shared surfaces.
-    ...(ledger?.via ? { via: ledger.via } : {}),
+    via: ledger?.via ?? (origin === "store" ? "install" : ledger?.repo ? "confirm" : undefined),
     // The repos this skill's user has cut, for the surfaces that offer its
     // namesake candidates to mark.
     ...(cut && cut.length > 0 ? { cutRepos: [...cut] } : {}),
