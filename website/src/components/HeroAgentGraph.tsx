@@ -131,11 +131,11 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
           <span className="text-slate-700 dark:text-slate-300 font-medium truncate">
             {broadcastingSkill ? (
               <span className="text-amber-600 dark:text-amber-400 font-mono font-semibold">
-                {isZh ? `⚡ 正在广播 '${broadcastingSkill}' 至所有智能体 (底层软链 0ms 秒级生效)...` : `⚡ Broadcasting '${broadcastingSkill}' to all agents (atomic symlinks active)...`}
+                {isZh ? `⚡ 动效演示 '${broadcastingSkill}' 即刻就绪 (所有智能体共享同一仓库，无需拷贝)...` : `⚡ Visualizing '${broadcastingSkill}' propagation (all agents share the same physical repo)...`}
               </span>
             ) : (
               <span>
-                {isZh ? '全量活跃智能体已链接至单一事实源 (Single Source of Truth)' : 'All active agents synchronized to Single Source of Truth'}
+                {isZh ? '所有智能体共享同一技能仓库 (~/.agents/skills) · 支持商店 / npx / 对话安装' : 'All agents share the same skills repo (~/.agents/skills) · Works with Store, npx & Agent-install'}
               </span>
             )}
           </span>
@@ -143,7 +143,7 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
 
         <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0">
           <span className="hidden sm:inline">
-            {isZh ? '点击中枢技能体验即时广播' : 'Click any skill to trigger live sync'}
+            {isZh ? '动效便于直观理解多 Agent 即刻就绪' : 'Animation illustrates instant multi-agent readiness'}
           </span>
           <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 font-semibold font-mono">
             Tauri v2 · Rust
@@ -515,7 +515,7 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
           <div className="flex items-center gap-2">
             <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
             <span className="text-slate-900 dark:text-white font-semibold">1</span>
-            <span>{isZh ? '次点击安装，所有智能体秒级热共享' : 'Click Install, Instant Multi-Agent Ready'}</span>
+            <span>{isZh ? '个共享 skills 仓库，全生态免同步直接生效' : 'Central Repository, Instantly Ready for All Agents'}</span>
           </div>
 
           <div className="flex items-center gap-2">

@@ -127,6 +127,16 @@ export interface TranslationStrings {
     releaseNotes: string;
     systemReq: string;
     openSourceBadge: string;
+    directDownload: string;
+    comingSoon: string;
+    comingSoonBadge: string;
+    toastIntel: string;
+    toastWindows: string;
+    toastLinux: string;
+    recommended: string;
+    macSubtext: string;
+    winSubtext: string;
+    linuxSubtext: string;
   };
   faq: {
     eyebrow: string;
@@ -163,25 +173,25 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       badge: "Built for the Agentic Coding Era",
       titleStart: "Install Once.",
       titleHighlight: "Ready for Every AI Agent.",
-      subtitle: "The single source of truth for Agent Skills. Stop duplicating skill files across Cursor, Claude Desktop, Windsurf, Cline, and Roo Code. One install automatically symlinks to all your coding assistants with zero disk redundancy.",
-      downloadMac: "Download for macOS",
-      downloadSub: "Universal DMG · Apple Silicon & Intel",
+      subtitle: "The single source of truth for Agent Skills. Skill One symlinks all your AI coding assistants into the exact same central skills repository (~/.agents/skills). Whether installed via the built-in market, 'npx skills', direct agent dialogues, or git clone, every tool has immediate access with zero duplication.",
+      downloadMac: "Download for macOS (Direct DMG)",
+      downloadSub: "Apple Silicon (M1-M4) · Direct DMG Download",
       viewGithub: "View on GitHub",
       trustLocal: "100% Local-First & Private",
       trustZeroDisk: "Zero Disk Duplication",
       trustAgents: "80+ Agents Auto-Detected",
-      interactivePrompt: "Click any skill or agent toggle in the live graph below to test instant broadcast synchronization:",
-      broadcasting: "Broadcasting to all agents...",
+      interactivePrompt: "All agents point to the exact same physical repository. Click any skill below to visualize how all agents immediately share it:",
+      broadcasting: "Physical single source active across all agents...",
       inSync: "In Sync across all active agents",
     },
     hub: {
       title: "Skill One Hub",
-      tagline: "Central Dispatcher & Symlink Mesh",
+      tagline: "Single Source of Truth · Multi-Channel Compatible (~/.agents/skills)",
       skillsLabel: "Skills Active",
       coverageLabel: "Agents Ready",
       activeSkills: "Active Domains",
-      clickToBroadcast: "Click any skill below to simulate live ecosystem sync",
-      guarantee: "Atomic Symlinks · Zero Redundancy · Instant Hot Reload",
+      clickToBroadcast: "Single physical repo · Broadcast animation illustrates instant readiness",
+      guarantee: "Pure Symlinks · Store/npx/Agent-Install Supported · Zero Overhead",
       statusLinked: "Linked",
       statusActive: "Active",
     },
@@ -210,11 +220,11 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       gains: {
         singleSource: {
           title: "Single Source of Truth",
-          desc: "One central skill repository (~/.agents/skills). All agents read the exact same authentic configuration.",
+          desc: "All agents transparently symlink to the exact same physical repository (~/.agents/skills). Works seamlessly with the built-in store, 'npx skills', CLI tools, or in-agent installations.",
         },
         instantSync: {
-          title: "Instant Hot Reload",
-          desc: "Install or edit once, and every active agent discovers it on the next query without restarting.",
+          title: "Instant Physical Readiness (No Daemons)",
+          desc: "No background synchronization daemons or file copy latency. Because all tools physically point to the exact same directory, any skill added or updated is immediately available across all agents on the next prompt.",
         },
         zeroWaste: {
           title: "Zero Disk Redundancy",
@@ -240,10 +250,10 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
           statLabel: "Supported AI agents",
         },
         market: {
-          title: "Curated Community Market",
-          desc: "Browse, search, and one-click install production-grade skills for Git workflows, UI generation, API integration, and automated research.",
-          stat: "1-Click",
-          statLabel: "Instant installation",
+          title: "Universal Install Sources (Market / npx / Agents)",
+          desc: "Install skills from Skill One's curated store, via 'npx skills', through direct Agent chat commands, or git clone. Since every tool symlinks to the same central repository, all sources work instantly without boundaries.",
+          stat: "Universal",
+          statLabel: "Store · npx · Agent-Install · Git",
         },
         isolation: {
           title: "Per-Agent Granular Toggles",
@@ -306,6 +316,16 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       releaseNotes: "View Release Notes (v0.22.0)",
       systemReq: "macOS 12+, Windows 10+, or modern Linux distribution",
       openSourceBadge: "MIT Licensed · 100% Free & Open Source",
+      directDownload: "Direct Download (.dmg)",
+      comingSoon: "Coming Soon",
+      comingSoonBadge: "Coming Soon",
+      toastIntel: "macOS Intel version coming soon! Stay tuned.",
+      toastWindows: "Windows version is in progress and coming soon!",
+      toastLinux: "Linux (.deb / AppImage) version is in progress and coming soon!",
+      recommended: "Recommended",
+      macSubtext: "Direct DMG Download · For Apple Silicon (M1/M2/M3/M4)",
+      winSubtext: "Native Windows Symlink Support · In Progress",
+      linuxSubtext: "Standard Posix Symlink Architecture · In Progress",
     },
     faq: {
       eyebrow: "Answers",
@@ -314,7 +334,11 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       items: [
         {
           q: "How does 'Install once, ready for all agents' actually work?",
-          a: "Skill One stores the canonical skill files in your central directory (~/.agents/skills). It then creates native OS filesystem symlinks directly into each agent's expected configuration directory (e.g. ~/.claude/skills, .cursor/skills, ~/.windsurf/rules). When an agent loads skills, the OS resolves the symlink seamlessly. You only ever edit or update one file.",
+          a: "Skill One's core principle is that all agents share the exact same physical skills repository (~/.agents/skills). It creates native OS filesystem symlinks directly into each agent's expected configuration directory (e.g. ~/.claude/skills, .cursor/skills, ~/.windsurf/rules). Because all tools point to the exact same files, there is zero data duplication, no background daemons, and no file synchronization overhead. Any skill added via the Skill One store, 'npx skills', or an agent's chat is immediately accessible everywhere.",
+        },
+        {
+          q: "Can I install skills via 'npx skills' or directly ask an Agent in chat to install them?",
+          a: "Absolutely yes! Skill One is 100% compatible with any third-party installation workflow. Because every agent's skill directory symlinks to the exact same physical repository (~/.agents/skills), skills installed via 'npx skills add', direct agent prompts, third-party CLI tools, or git clone are immediately recognized by all other 80+ agents without any manual syncing.",
         },
         {
           q: "Does Skill One require a running background daemon?",
@@ -361,25 +385,25 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       badge: "专为智能体编程时代打造",
       titleStart: "一次安装，",
       titleHighlight: "所有 Agents 直接使用。",
-      subtitle: "智能体技能的统一步调中心。告别在 Cursor、Claude Desktop、Windsurf、Cline 与 Roo Code 之间重复拷贝技能目录。一次点击安装，底层软链秒级穿透，零磁盘冗余，全生态即刻生效。",
-      downloadMac: "免费下载 macOS 版",
-      downloadSub: "Universal DMG · 完美适配 M系列芯片与 Intel",
+      subtitle: "智能体技能的单一物理源。Skill One 的核心原理是让所有 AI 编程助手通过底层软链接指向同一个中央技能仓库 (~/.agents/skills)。无论是在内置集市安装、使用 'npx skills' 命令行安装，还是在对话中直接让 Agent 安装或手动 git clone，所有智能体均可直接使用，本就是同一个物理仓库，零冗余秒级穿透。",
+      downloadMac: "直接下载 macOS 安装包",
+      downloadSub: "Apple Silicon (M1-M4) · 直接下载 DMG 安装包",
       viewGithub: "前往 GitHub 仓库",
       trustLocal: "100% 本地运行 · 极速隐私",
       trustZeroDisk: "零磁盘冗余占用",
       trustAgents: "80+ 款主流 Agent 自动识别",
-      interactivePrompt: "点击下方拓扑图中的任意技能或 Agent 开关，即刻模拟体验全生态广播联动：",
-      broadcasting: "正在广播同步至全量 Agents...",
-      inSync: "已同步就绪，所有活跃智能体即刻可用",
+      interactivePrompt: "所有智能体底层共享同一物理仓库。点击下方技能，直观可视化其如何在所有 Agent 间即刻生效：",
+      broadcasting: "单一物理事实源，各智能体已全部直接穿透访问...",
+      inSync: "所有活跃智能体均已指向同一仓库，即刻可用",
     },
     hub: {
       title: "Skill One 技能中枢",
-      tagline: "统一分发中枢 · 软链拓扑网格",
+      tagline: "单一物理事实源 · 支持集市 / npx / Agent直接安装 (~/.agents/skills)",
       skillsLabel: "已激活技能",
       coverageLabel: "就绪智能体",
       activeSkills: "激活领域",
-      clickToBroadcast: "点击下方技能卡片，模拟全生态秒级广播联动",
-      guarantee: "底层软链穿透 · 零文件冗余 · 即时热生效",
+      clickToBroadcast: "底层共享同一物理仓库 · 动效直观展示所有 Agent 的即刻就绪",
+      guarantee: "纯软链穿透 · 支持应用商店/npx/对话内安装 · 零冗余零开销",
       statusLinked: "已链接",
       statusActive: "生效中",
     },
@@ -407,12 +431,12 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       },
       gains: {
         singleSource: {
-          title: "单一事实源 (Single Source of Truth)",
-          desc: "所有技能统一存储于中央目录 (~/.agents/skills)，每个 Agent 读取的永远是最新的真实版本。",
+          title: "共享同一技能仓库 (单一事实源)",
+          desc: "所有智能体通过软链接直接指向统一的技能仓库 (~/.agents/skills)。完美支持内置集市、npx skills 命令行、第三方工具或在 Agent 对话中直接安装，全生态无缝互通。",
         },
         instantSync: {
-          title: "全局秒级即时生效",
-          desc: "在 Skill One 中安装或修改一次，所有配置生效的智能体在下一次提问时立即可用，无需重启。",
+          title: "物理同一仓库 · 即刻就绪 (无需后台守护)",
+          desc: "因为所有工具在物理上指向同一个目录，因此无需任何后台同步进程或文件拷贝延迟。任何方式安装或更新技能，所有 Agent 在下一次对话中立即可用。",
         },
         zeroWaste: {
           title: "零磁盘冗余占用",
@@ -438,10 +462,10 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
           statLabel: "支持的主流 AI 智能体",
         },
         market: {
-          title: "精选官方与社区技能集市",
-          desc: "汇聚 Git 自动化流、UI 生成组件、API 深度检索、工程化文档等生产级 Skill，一键点击即刻安装。",
-          stat: "1-Click",
-          statLabel: "一键全生态安装",
+          title: "多元安装方式全兼容 (集市 / npx / 对话安装)",
+          desc: "既可在 Skill One 优雅集市中浏览安装，也可通过 `npx skills`、在 Cursor/Claude 对话中让 Agent 直接安装，或手动 git clone。本质同源，任意方式安装均全生态通用。",
+          stat: "全渠道支持",
+          statLabel: "集市 · npx · 对话安装 · Git",
         },
         isolation: {
           title: "单 Agent 细粒度独立开关",
@@ -469,8 +493,8 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
         },
         step2: {
           num: "02",
-          title: "一键安装精选技能",
-          desc: "在集市中挑选所需技能，或将团队现有的 prompt rules 与 MCP 配置拖入中枢。",
+          title: "任意方式安装技能",
+          desc: "在集市中挑选技能，或通过 `npx skills`、在 Agent 对话中直接安装，所有方式均落入统一仓库。",
         },
         step3: {
           num: "03",
@@ -504,6 +528,16 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       releaseNotes: "查看最新发行说明 (v0.22.0)",
       systemReq: "支持 macOS 12+、Windows 10+ 及主流 Linux 发行版",
       openSourceBadge: "MIT 开源协议 · 永久免费使用",
+      directDownload: "直接下载 (.dmg)",
+      comingSoon: "即将推出",
+      comingSoonBadge: "即将推出",
+      toastIntel: "macOS Intel 芯片版本即将推出，敬请期待！",
+      toastWindows: "Windows 版本正在积极开发适配中，即将推出！",
+      toastLinux: "Linux (.deb / AppImage) 版本正在适配中，即将推出！",
+      recommended: "官方推荐",
+      macSubtext: "点击直接下载 DMG 安装包 · 完美适配 M1/M2/M3/M4",
+      winSubtext: "原生 Windows 软链与多 Agent 支持 · 开发中",
+      linuxSubtext: "标准 Linux 软链规范与生态支持 · 开发中",
     },
     faq: {
       eyebrow: "解答疑惑",
@@ -512,7 +546,11 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       items: [
         {
           q: "“一次安装，所有 agents 直接使用”的底层原理是什么？",
-          a: "Skill One 将原始技能存储在用户中央技能库目录 (~/.agents/skills) 中，然后利用操作系统原生软链接（Symlink），将技能透明映射至各智能体的本地配置目录（例如 ~/.claude/skills、.cursor/skills 等）。智能体读取时直接通过系统内核软链解析，不仅无需重复拷贝，且修改一次全工具同步生效。",
+          a: "Skill One 的核心原理是让所有智能体通过软连接共享同一个物理 skills 仓库 (~/.agents/skills)。它会自动在各工具的配置目录（如 ~/.claude/skills、.cursor/skills 等）创建系统原生软链接。因此本质上所有 Agent 读写的就是同一份物理文件，无需拷贝也无需后台文件分发广播，所有工具立即共享更新。",
+        },
+        {
+          q: "支持通过 'npx skills' 或者直接在 Agent 对话中让它安装技能吗？",
+          a: "完全支持！因为所有 Agent 的技能目录底层都软链接到了同一个中央仓库 (~/.agents/skills)，所以无论是在 Skill One 界面中安装、使用 'npx skills add' 命令安装、直接在 Cursor/Claude 对话中让 Agent 下载安装，还是 git clone，技能都会落入同一个仓库，其他所有 80+ 款智能体都能立即识别和使用。",
         },
         {
           q: "Skill One 是否需要在后台常驻后台守护进程（Daemon）？",
@@ -533,7 +571,7 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
       ],
     },
     footer: {
-      tagline: "智能体时代的通用技能中枢 · 单一事实源 · 零冗余软链拓扑",
+      tagline: "智能体时代的通用技能中枢 · 单一物理事实源 · 零冗余软链拓扑",
       rights: "Skill One 项目组 · 遵循 MIT 开源协议发布。",
       links: {
         github: "GitHub 开源仓库",

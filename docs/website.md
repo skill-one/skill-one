@@ -17,21 +17,34 @@ The Skill One website is engineered according to modern industry best practices 
    - Symmetrically connects left and right agent nodes via horizontal S-curve SVG ribbons with animated shimmer energy flows.
    - Allows visitors to click skills or agent toggles, demonstrating instant broadcast propagation through OS-level symlinks.
 
-3. **Contrast Storytelling (Problem vs. Solution)**:
+3. **Core Architectural Principle (Single Physical Repository)**:
+   - All AI agents share the **exact same physical skills repository** (`~/.agents/skills`) via native OS symlinks.
+   - Fully compatible with multi-channel installation workflows:
+     - Built-in Skill One market
+     - Third-party CLI tools (`npx skills add ...`)
+     - In-agent conversational installation (instructing Cursor, Claude, etc. in chat to install a skill)
+     - Direct `git clone` or filesystem drop
+   - Because all agents physically share the identical repository, no background synchronization daemons or file duplication are required. The UI broadcast animation serves as an intuitive visual metaphor to demonstrate instant multi-agent readiness.
+
+4. **Platform Download Matrix**:
+   - **Supported Platform (macOS Apple Silicon ARM64)**: Direct DMG file download (`Skill.One_0.22.0_aarch64.dmg`), triggering direct download without redirecting to source repository pages.
+   - **Unsupported Platforms (macOS Intel x64, Windows, Linux)**: Explicitly displays "Coming Soon" / "即将推出" with interactive toast notifications.
+
+5. **Contrast Storytelling (Problem vs. Solution)**:
    - Clear side-by-side comparison between the chaos of multi-agent silos vs. Skill One's Single Source of Truth architecture.
 
-4. **Bento Grid Feature Architecture**:
+6. **Bento Grid Feature Architecture**:
    - Highlights the 5 core technical pillars:
      - Symlink Zero-Overhead Engine
      - 80+ Agents Auto-Detection
-     - Curated Community Skill Market
+     - Universal Install Sources (Market / npx / Agents)
      - Per-Agent Granular Toggles
      - 100% Local-First & Rust Performance
 
-5. **Supported Agent Ecosystem Matrix**:
+7. **Supported Agent Ecosystem Matrix**:
    - Interactive searchable and filterable directory covering 81 AI coding assistants with official icons and detection paths.
 
-6. **Technical & SEO Excellence**:
+8. **Technical & SEO Excellence**:
    - Built on Astro 5 Static Site Generation (SSG) for sub-second page loads.
    - React Islands (`client:load`, `client:visible`) for interactivity without client-side framework bloat.
    - First-class English (`/`) and Simplified Chinese (`/zh/`) internationalization.
