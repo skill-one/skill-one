@@ -5,6 +5,10 @@ import { Search, ExternalLink, Star, CheckCircle, Sparkles, Copy, Check } from '
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
+const IDE_AGENTS = ['cursor', 'windsurf', 'cline', 'roocode', 'githubcopilot', 'continue', 'augment', 'trae'];
+const CLI_AGENTS = ['antigravity-cli', 'claude-code', 'geminicli', 'opencode', 'codex', 'goose', 'iflow-cli', 'tabnine-cli'];
+const DESKTOP_AGENTS = ['aider-desk', 'antigravity', 'astrbot', 'codestudio', 'cortex', 'lmstudio', 'pochi'];
+
 interface AgentEcosystemProps {
   lang?: 'en' | 'zh';
 }
@@ -30,6 +34,11 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   const agents = agentsData as AgentItem[];
+
+  const topCount = agents.filter((a) => a.isTop).length;
+  const ideCount = agents.filter((a) => IDE_AGENTS.includes(a.name)).length;
+  const cliCount = agents.filter((a) => CLI_AGENTS.includes(a.name)).length;
+  const desktopCount = agents.filter((a) => DESKTOP_AGENTS.includes(a.name)).length;
 
   // Keyboard shortcut '/' to focus search input
   React.useEffect(() => {
@@ -62,15 +71,9 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
 
       if (activeTab === 'all') return true;
       if (activeTab === 'top') return agent.isTop;
-      if (activeTab === 'ide') {
-        return ['cursor', 'windsurf', 'cline', 'roocode', 'githubcopilot', 'continue', 'augment', 'trae'].includes(agent.name);
-      }
-      if (activeTab === 'cli') {
-        return ['antigravity-cli', 'claude-code', 'geminicli', 'opencode', 'codex', 'goose', 'iflow-cli', 'tabnine-cli'].includes(agent.name);
-      }
-      if (activeTab === 'desktop') {
-        return ['aider-desk', 'antigravity', 'astrbot', 'codestudio', 'cortex', 'lmstudio', 'pochi'].includes(agent.name);
-      }
+      if (activeTab === 'ide') return IDE_AGENTS.includes(agent.name);
+      if (activeTab === 'cli') return CLI_AGENTS.includes(agent.name);
+      if (activeTab === 'desktop') return DESKTOP_AGENTS.includes(agent.name);
       return true;
     });
 
@@ -136,7 +139,7 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              {t.filterTop} (14)
+              {t.filterTop} ({topCount})
             </button>
             <button
               onClick={() => setActiveTab('ide')}
@@ -146,7 +149,7 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              {t.filterIde} (8)
+              {t.filterIde} ({ideCount})
             </button>
             <button
               onClick={() => setActiveTab('cli')}
@@ -156,7 +159,7 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              {t.filterCli} (8)
+              {t.filterCli} ({cliCount})
             </button>
             <button
               onClick={() => setActiveTab('desktop')}
@@ -166,7 +169,7 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              {t.filterDesktop} (7)
+              {t.filterDesktop} ({desktopCount})
             </button>
           </div>
         </div>

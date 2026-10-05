@@ -19,7 +19,10 @@ const {
     : 'Skill One is the universal single source of truth for AI Agent skills. Stop duplicating skill files across Cursor, Claude Desktop, Windsurf, Cline, and Roo Code. 100% local, zero redundancy.',
 } = Astro.props;
 
-const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://skill-one.com');
+const siteOrigin = Astro.site ?? new URL(`http://localhost${import.meta.env.BASE_URL}`);
+const canonicalURL = new URL(Astro.url.pathname, siteOrigin);
+const ogImagePath = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/skill-one-transparent.png`;
+const ogImageURL = new URL(ogImagePath, siteOrigin);
 const isZh = lang === 'zh';
 
 const structuredData = {
@@ -34,7 +37,7 @@ const structuredData = {
     priceCurrency: 'USD',
   },
   description: description,
-  url: 'https://skill-one.com',
+  url: new URL(import.meta.env.BASE_URL, siteOrigin).href,
 };
 ---
 
@@ -58,14 +61,14 @@ const structuredData = {
     <meta property="og:url" content={canonicalURL} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content="/skill-one-transparent.png" />
+    <meta property="og:image" content={ogImageURL} />
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
     <meta property="twitter:url" content={canonicalURL} />
     <meta property="twitter:title" content={title} />
     <meta property="twitter:description" content={description} />
-    <meta property="twitter:image" content="/skill-one-transparent.png" />
+    <meta property="twitter:image" content={ogImageURL} />
 
     <!-- Theme Initialization Script (Default to Light) -->
     <script is:inline>

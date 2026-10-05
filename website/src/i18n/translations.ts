@@ -211,7 +211,7 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
   en: {
     nav: {
       features: "Features",
-      agents: "Ecosystem (80+)",
+      agents: "Ecosystem",
       faq: "FAQ",
       download: "Download",
       github: "GitHub",
@@ -463,7 +463,7 @@ export const translations: Record<'en' | 'zh', TranslationStrings> = {
   zh: {
     nav: {
       features: "核心特性",
-      agents: "生态支持 (80+)",
+      agents: "生态支持",
       faq: "常见问题",
       download: "立即下载",
       github: "GitHub",
