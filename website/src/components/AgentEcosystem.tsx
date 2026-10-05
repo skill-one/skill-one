@@ -3,6 +3,8 @@ import agentsData from '../data/agents.json';
 import { translations } from '../i18n/translations';
 import { Search, ExternalLink, Star, CheckCircle, Sparkles, Copy, Check } from 'lucide-react';
 
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
 interface AgentEcosystemProps {
   lang?: 'en' | 'zh';
 }
@@ -186,7 +188,7 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <img
-                          src={agent.icon}
+                          src={`${base}${agent.icon}`}
                           alt={agent.display}
                           className="size-7 object-contain rounded-md transition-transform group-hover:scale-105"
                         />

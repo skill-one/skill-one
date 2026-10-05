@@ -10,6 +10,7 @@ interface NavbarProps {
 export function Navbar({ lang = 'en' }: NavbarProps) {
   const t = translations[lang].nav;
   const isZh = lang === 'zh';
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
 
@@ -35,10 +36,10 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
     <header className="fixed top-0 left-0 right-0 z-50 transition-colors duration-200 bg-white/80 dark:bg-[#090d16]/80 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/[0.08]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Brand Logo & Name */}
-        <a href={isZh ? '/zh/' : '/'} className="flex items-center gap-2.5 group">
+        <a href={isZh ? `${base}/zh/` : `${base}/`} className="flex items-center gap-2.5 group">
           <div className="relative">
             <img
-              src="/skill-one-transparent.png"
+              src={`${base}/skill-one-transparent.png`}
               alt="Skill One"
               className="size-8 object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-[0_2px_8px_rgba(59,130,246,0.3)]"
             />
@@ -84,7 +85,7 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
 
           {/* Language Switcher */}
           <a
-            href={t.switchLangUrl}
+            href={`${base}${t.switchLangUrl}`}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors border border-transparent hover:border-slate-200 dark:hover:border-white/10"
             title="Switch Language"
           >
@@ -124,7 +125,7 @@ export function Navbar({ lang = 'en' }: NavbarProps) {
             {isDark ? <Sun className="size-4 text-amber-400" /> : <Moon className="size-4" />}
           </button>
           <a
-            href={t.switchLangUrl}
+            href={`${base}${t.switchLangUrl}`}
             className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-slate-700 dark:text-slate-300 text-xs border border-slate-200 dark:border-white/10"
           >
             {t.switchLang}
