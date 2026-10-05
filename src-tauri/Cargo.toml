@@ -27,11 +27,7 @@ tauri-plugin-opener = "2"
 # Fetches the skills.sh live search from the Rust side: the endpoint sends no
 # CORS headers, so the webview cannot read it directly. Scoped to that one
 # origin in `capabilities/default.json`.
-#
-# Pinned to the minor the npm plugin ships (`@tauri-apps/plugin-http` 2.6.1 is
-# its latest published package): `tauri build` refuses a Rust/npm mismatch,
-# and the npm side lags the Rust crates here.
-tauri-plugin-http = "2.6.1"
+tauri-plugin-http = "2"
 # In-app self-update: fetches + verifies + installs signed releases from
 # GitHub Releases; the process plugin provides relaunch() after install.
 tauri-plugin-updater = "2"
@@ -52,7 +48,7 @@ tauri-plugin-process = "2"
 # identity is the skills.sh-style slug — the install id is `owner/repo/slug`,
 # remove/disable/enable share one `SelectionRequest`/`SelectionOutcome` pair,
 # and `Manager::new` resolves home fallibly.
-agents-skills = "0.26"
+agents-skills = "0.28"
 serde = { version = "1", features = ["derive"] }
 # Required directly by the `tauri::generate_context!` macro (updater config).
 serde_json = "1"

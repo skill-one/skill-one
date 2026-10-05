@@ -2,7 +2,7 @@
 
 [English](agents-skills-api.md) | [简体中文](agents-skills-api.zh-CN.md)
 
-本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.26 的
+本项目通过 Tauri 后端（`src-tauri/src/skills.rs`）调用 `agents-skills` v0.28 的
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
 门面，将技能安装与 agent 链接能力暴露给前端。前端经 `src/lib/skills-manager.ts`
 的 `invoke` 封装访问这些 Tauri 命令。
@@ -13,10 +13,10 @@
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.26"
+agents-skills = "0.28"
 ```
 
-## 0.15–0.26 的主要变化
+## 0.15–0.28 的主要变化
 
 本项目最初基于 0.14 编写，之后跨越了十一个 breaking 版本。下表的变化均已在
 `skills.rs` 中体现：
@@ -35,6 +35,7 @@ agents-skills = "0.26"
 | 0.24 | `owner/repo@<技能>` 未匹配到任何技能目录时，若仓库根目录存在 `SKILL.md`，会以仓库名静默安装整个仓库，而不再要求请求名等于仓库名；目录匹配仍然优先 | 无需改代码——公开类型未变；仅补充了描述该回退行为的注释与文档 |
 | 0.25 | agent 表的 `global` 字段重命名为 `skills_dir`，且该表改为取自上游 [`skill-one/agents-info`](https://github.com/skill-one/agents-info)；移除三个已消失的 agent（`jazz`、`loaf`、`promptscript`） | 无需改代码——应用从不读取 agent 表的字段，`AgentRequest` / `AgentStatus` 不受影响 |
 | 0.26 | 技能身份改为 skills.sh 风格的 slug：安装 id 为 `owner/repo/slug`（旧 `owner/repo@<skill>` 形式被拒绝），`add` / `remove` / `disable` / `enable` 全部按 frontmatter `name` slug 化后的结果匹配，安装目录则保留源仓库的原始目录名。`remove` / `disable` / `enable` 统一为一对 `SelectionRequest` / `SelectionOutcome`（各动词专属的 request/outcome 类型删除；`removed` / `enabled` / `disabled` → `applied`）。`ListedSkill` 重新获得 `display_name` 与 `path`；`Manager::skill_dir` 返回扫描到的路径。`Manager::new` / `ManagerBuilder::build` 返回 `Result`（home 解析不再静默回退） | 安装 source 改为 id `owner/repo/slug`（商店的 slug 即 id 末段）；`remove_skills` / `set_skills_enabled` 构造 `SelectionRequest` 并返回 `outcome.applied`；`manager()` 透传构造错误 |
+| 0.28 | 内部依赖与性能更新，与 0.26 API 完全兼容 | 无破坏性改动——后端命令平滑编译通过 |
 
 ### 更早的变化
 

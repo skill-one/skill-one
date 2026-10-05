@@ -51,9 +51,9 @@ test("a nav link takes a click, and the list it opens is operable", async ({
 
   // The claim: the nav is operable, not merely present. This is the assertion
   // that failed before the header's overlay was made transparent to pointers.
-  await page.getByRole("link", { name: "已安装" }).click();
+  await page.getByRole("link", { name: "我的技能" }).click();
   await expect(page).toHaveURL(/#\/installed$/);
-  await expect(page.getByRole("link", { name: "已安装" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "我的技能" })).toHaveAttribute(
     "aria-current",
     "page",
   );

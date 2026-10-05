@@ -4,7 +4,7 @@
 
 Through the Tauri backend (`src-tauri/src/skills.rs`), this project calls the
 [`Manager`](https://docs.rs/agents-skills/latest/agents_skills/manager/struct.Manager.html)
-facade of `agents-skills` v0.26 to expose skill installation and agent-linking
+facade of `agents-skills` v0.28 to expose skill installation and agent-linking
 capabilities to the frontend. The frontend reaches these Tauri commands via the
 `invoke` wrapper in `src/lib/skills-manager.ts`.
 
@@ -14,10 +14,10 @@ capabilities to the frontend. The frontend reaches these Tauri commands via the
 
 ```toml
 # src-tauri/Cargo.toml
-agents-skills = "0.26"
+agents-skills = "0.28"
 ```
 
-## What 0.15–0.26 changed
+## What 0.15–0.28 changed
 
 Eleven breaking releases separate the API this app was written against (0.14)
 from the current one. Everything below is reflected in `skills.rs`:
@@ -36,6 +36,7 @@ from the current one. Everything below is reflected in `skills.rs`:
 | 0.24 | When `owner/repo@<skill>` matches no skill directory, a `SKILL.md` at the repository root now silently installs the whole repository under the repository name, instead of failing unless the requested name equaled the repository name; a directory match still wins | No code change — the public types are unchanged; only comments/docs describing the fallback were updated |
 | 0.25 | The agent table's `global` field is renamed to `skills_dir`, and the table is now sourced from the upstream [`skill-one/agents-info`](https://github.com/skill-one/agents-info); three stale agents (`jazz`, `loaf`, `promptscript`) are removed | No code change — the app never reads the agent table's fields, and `AgentRequest` / `AgentStatus` are unaffected |
 | 0.26 | The skill identity is the skills.sh-style slug: the install id is `owner/repo/slug` (the legacy `owner/repo@<skill>` form is rejected), `add`/`remove`/`disable`/`enable` all match on the slugified frontmatter `name`, and the on-disk directory keeps the source repository's original directory name. `remove` / `disable` / `enable` share one `SelectionRequest` / `SelectionOutcome` pair (per-verb request/outcome types gone; `removed` / `enabled` / `disabled` → `applied`). `ListedSkill` regained `display_name` and `path`; `Manager::skill_dir` returns the scanned path. `Manager::new` / `ManagerBuilder::build` return `Result` (home resolution no longer silently falls back) | The install source becomes the id `owner/repo/slug` (the store's slug rides as the last segment); `remove_skills` / `set_skills_enabled` build `SelectionRequest` and return `outcome.applied`; `manager()` propagates construction errors |
+| 0.28 | Internal updates, updated dependency tree, fully compatible with 0.26 API | No breaking changes — compiles seamlessly with current Tauri backend commands |
 
 ### Earlier changes
 
