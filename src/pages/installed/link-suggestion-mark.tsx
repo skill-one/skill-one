@@ -33,7 +33,9 @@ import type { LinkCandidate } from "../../lib/link-suggestions";
  * it can press, and the tooltip names what a press does.
  *
  * With no candidate there is nothing to offer, so the mark is a statement
- * again — the plain `ThirdPartyMark`, tooltip and all.
+ * again — the plain `ThirdPartyMark`, tooltip and all, in its muted tone: an
+ * amber box would keep asking for a press that has nothing behind it, so the
+ * closed case files under the owner-face's neutral fill instead.
  *
  * It replaces what used to be two marks: the broken-chain glyph and, beside it,
  * an amber alert triangle. The glyph already says 「装了，但说不出是谁装的」, and a
@@ -72,11 +74,11 @@ export function LinkSuggestionMark({
   if (candidates.length === 0) {
     return labeled ? (
       <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <ThirdPartyMark className={className} />
+        <ThirdPartyMark muted className={className} />
         <span className="truncate">{t("common.thirdPartyInstall")}</span>
       </span>
     ) : (
-      <ThirdPartyMark className={className} />
+      <ThirdPartyMark muted className={className} />
     );
   }
 

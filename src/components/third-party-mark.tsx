@@ -14,14 +14,21 @@ import { cn } from "../lib/utils";
  * that reuses it (see `LinkSuggestionMark`) cannot drift into two shapes: a
  * source-less skill must look like itself whether or not it can be linked.
  *
- * The ink is the one deliberate departure: an owner's face is the app's only
- * true color in that column, and a source-less skill is a fact worth noticing
- * rather than a face that failed to load, so the glyph is amber. A muted glyph
- * read as an empty placeholder at a row's 20px — the one thing this mark must
- * never look like.
+ * The ink carries the mark's two tones. Amber means the fact is still open: a
+ * registry namesake exists, so the mark can become a control that links a
+ * source (`LinkSuggestionMark`) and the color asks for that one press. Muted —
+ * the owner-face fill the app files neutral facts under — means the fact is
+ * closed: nothing to link, so nothing to draw the eye toward. Amber must stay
+ * reserved for the open case; a muted glyph risks reading as a failed avatar
+ * at a row's 20px, which is why the closed tone keeps the border and the
+ * glyph's presence rather than collapsing into a bare placeholder.
  */
 export const THIRD_PARTY_MARK_CLASS =
   "flex shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500/80";
+
+/** The same box in the closed tone: a source-less skill with no candidate to link. */
+export const THIRD_PARTY_MARK_MUTED_CLASS =
+  "flex shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted text-muted-foreground";
 
 /**
  * A folder-code glyph, sized to the box it sits in rather than to a pixel constant —
@@ -57,8 +64,20 @@ export function ThirdPartyMarkGlyph() {
  *
  * This is the mark as a statement. When namesake candidates exist to link, the
  * same box becomes a control instead — `LinkSuggestionMark`.
+ *
+ * Tone: `muted` renders the closed statement — no candidate to link, so the
+ * box wears the owner-face's own neutral fill and the eye is not asked to
+ * press anything. The default stays amber for the surfaces that report the
+ * fact without knowing whether a link is still open.
  */
-export function ThirdPartyMark({ className }: { className?: string }) {
+export function ThirdPartyMark({
+  className,
+  muted = false,
+}: {
+  className?: string;
+  /** The closed tone: nothing to link, so the mark files under neutral. */
+  muted?: boolean;
+}) {
   const { t } = useTranslation();
 
   return (
@@ -68,7 +87,10 @@ export function ThirdPartyMark({ className }: { className?: string }) {
           <span
             role="img"
             aria-label={t("common.thirdPartyInstall")}
-            className={cn(THIRD_PARTY_MARK_CLASS, className)}
+            className={cn(
+              muted ? THIRD_PARTY_MARK_MUTED_CLASS : THIRD_PARTY_MARK_CLASS,
+              className,
+            )}
           >
             <ThirdPartyMarkGlyph />
           </span>

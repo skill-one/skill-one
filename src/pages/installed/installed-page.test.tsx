@@ -1823,6 +1823,35 @@ describe("InstalledPage", () => {
       ).toEqual(["开发编程", "数据分析", "内容创作", "未分类"]);
     });
 
+    it("leads each tag header with the classification's emoji", async () => {
+      seedClassifiedInstalls();
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "标签");
+      await screen.findByText("frontend-design");
+
+      // Each header carries its classification's own mark — the same
+      // resolver the row badges and the tag picker call — riding beside the
+      // label rather than inside it, so the accessible name stays the label.
+      const headerEmoji = (regionName: string) => {
+        const region = screen.getByRole("region", { name: regionName });
+        const trigger = region.querySelector<HTMLElement>(
+          "button[data-slot='collapsible-trigger']",
+        );
+        const glyph = trigger?.querySelector("span[aria-hidden='true']");
+        return {
+          text: glyph?.textContent,
+          ariaHidden: glyph?.getAttribute("aria-hidden"),
+        };
+      };
+      expect(headerEmoji("开发编程")).toEqual({ text: "💻", ariaHidden: "true" });
+      expect(headerEmoji("数据分析")).toEqual({ text: "📊", ariaHidden: "true" });
+      expect(headerEmoji("内容创作")).toEqual({ text: "✍️", ariaHidden: "true" });
+      // Nothing classified wears the question mark the row badges wear too.
+      expect(headerEmoji("未分类")).toEqual({ text: "❓", ariaHidden: "true" });
+    });
+
     it("files a tagged install under the user's tag, not the store's domain", async () => {
       seedClassifiedInstalls();
       // The single select overrides the store's answer: pdf carries a hand
@@ -1975,13 +2004,23 @@ describe("InstalledPage", () => {
       expect(screen.queryByRole("region", { name: "数据分析" })).toBeNull();
       expect(screen.queryByRole("region", { name: "办公效率" })).toBeNull();
 
+      // The header states the section's whole size from the first frame — the
+      // answer already knows it — so the count never rewrites itself as the
+      // reveal grows: 6 mounted rows, but 8 skills named.
+      expect(devSection).toHaveTextContent("8 个 skill");
+
       // Scrolling sentinel into view reveals the rest of the answer
       triggerReveal();
       await waitFor(() => expect(rowsOf(devSection)).toHaveLength(8));
+      // The reveal caught the count up to itself: the header's figure is the
+      // same one it led with, now matching the rows it lists.
+      expect(devSection).toHaveTextContent("8 个 skill");
       const dataSection = await screen.findByRole("region", { name: "数据分析" });
       await waitFor(() => expect(rowsOf(dataSection)).toHaveLength(4));
+      expect(dataSection).toHaveTextContent("4 个 skill");
       const officeSection = await screen.findByRole("region", { name: "办公效率" });
       await waitFor(() => expect(rowsOf(officeSection)).toHaveLength(2));
+      expect(officeSection).toHaveTextContent("2 个 skill");
 
       // Section order is strictly stable: 开发编程 -> 数据分析 -> 办公效率
       expect(

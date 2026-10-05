@@ -83,6 +83,10 @@ describe("LinkSuggestionMark", () => {
     ).not.toBeInTheDocument();
     const mark = screen.getByRole("img", { name: "第三方安装" });
     expect(mark).toHaveClass("rounded-full", "border", "size-4");
+    // Nothing to link, so nothing to press: the closed case wears the muted
+    // tone, not the amber that asks for a press.
+    expect(mark).toHaveClass("bg-muted", "text-muted-foreground");
+    expect(mark).not.toHaveClass("bg-amber-500/10");
   });
 
   it("explains linking in a tooltip on hover, not the plain statement", async () => {
@@ -212,6 +216,9 @@ describe("LinkSuggestionMark", () => {
       screen.queryByRole("button", { name: "关联 pdf 的商店来源" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("第三方安装")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "第三方安装" })).toBeInTheDocument();
+    // The labeled statement keeps the closed tone too: neutral, not amber.
+    const mark = screen.getByRole("img", { name: "第三方安装" });
+    expect(mark).toHaveClass("bg-muted", "text-muted-foreground");
+    expect(mark).not.toHaveClass("bg-amber-500/10");
   });
 });

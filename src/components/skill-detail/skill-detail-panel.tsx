@@ -732,7 +732,7 @@ export function SkillDetailPanel({
                   />
                 ) : (
                   <span className="inline-flex items-center gap-1.5">
-                    <ThirdPartyMark className="size-4" />
+                    <ThirdPartyMark muted className="size-4" />
                     <span className="truncate">
                       {t("common.thirdPartyInstall")}
                     </span>

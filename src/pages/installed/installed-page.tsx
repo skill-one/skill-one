@@ -231,7 +231,9 @@ function compareByStars<T>(
  * Each section's header names what it holds — the rank range it covers
  * ("1–10", "11–20", …) under the popularity grouping, the bucket's span of
  * time under the install clock, the tag's own label under the tag grouping —
- * with the count it actually lists beside it;
+ * with the count it holds beside it: the tag grouping states the section's
+ * whole size from the answer itself (the reveal below only bounds what is
+ * mounted), while the install clock counts what it has shown so far;
  * every section starts open, and a press on the header folds it. An empty
  * bucket draws no section at all. A search stands the sections down and
  * re-answers in relevance order. What the page adds to the store's surfaces
@@ -632,8 +634,14 @@ export function InstalledPage() {
   // Under the default popularity sort, live installs render directly without
   // artificial grouping.
   // Empty sections are not drawn — an absent bucket reads quieter than a zero. The
-  // count beside a header states what the section actually lists right now.
-  const sections = useMemo(() => {
+  // count beside a header states what the section holds: for the tag grouping
+  // that is the whole answer's size (the ranking pass already reads the rows
+  // the reveal has not mounted), so a header never rewrites itself mid-scroll;
+  // for the install clock it is what the revealed rows have filled so far.
+  const sections = useMemo<
+    { title: string; emoji?: string; rows: Row[]; total?: number }[]
+  >(
+    () => {
     const live = splitRows.enabled;
     if (live.length === 0) return [];
     if (sort === "tag") {
@@ -661,13 +669,27 @@ export function InstalledPage() {
         else shownByTag.set(key, [row]);
       }
 
-      const groups: { title: string; rows: Row[] }[] = [];
+      const groups: {
+        title: string;
+        emoji: string;
+        rows: Row[];
+        total: number;
+      }[] = [];
       for (const [key] of orderedTags) {
         const tagRows = shownByTag.get(key);
         if (tagRows && tagRows.length > 0) {
           groups.push({
             title: domainLabel(key, locale),
+            // The classification's own mark, the same resolver the row
+            // badges and the tag picker call — a header reads like the
+            // tags it stands for, emoji and all.
+            emoji: domainEmoji([key]),
             rows: tagRows,
+            // The whole answer's size for this tag, from the ranking pass
+            // that already reads the unrevealed rows: the header states how
+            // many skills the section holds from the first frame on, and
+            // the reveal below only decides how many of them are mounted.
+            total: activeByTag.get(key)?.length ?? tagRows.length,
           });
         }
       }
@@ -694,7 +716,9 @@ export function InstalledPage() {
       })).filter((section) => section.rows.length > 0);
     }
     return [];
-  }, [splitRows, splitActive, sort, t, locale]);
+    },
+    [splitRows, splitActive, sort, t, locale],
+  );
 
   // Whether the answer is cut in two, and — when it is — the number each row
   // prints: where it stands *within its own group*, counted from 1 in each. The
@@ -1155,9 +1179,17 @@ export function InstalledPage() {
                 : sections.map((section) => (
                     <CollapsibleSection
                       key={section.title}
+                      glyph={section.emoji}
                       title={section.title}
+                      // The tag grouping states the section's whole size — the
+                      // answer already knows it, and a header that rewrote its
+                      // own count as the reveal grew would read as a list
+                      // changing, not a list arriving. The time buckets keep
+                      // the literal count: their sections are cut from the
+                      // revealed rows alone, so what they hold is what they
+                      // have shown.
                       count={t("state.skillCount", {
-                        count: section.rows.length,
+                        count: section.total ?? section.rows.length,
                       })}
                     >
                       {skillEntries(section.rows)}

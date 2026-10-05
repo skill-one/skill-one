@@ -6,7 +6,7 @@ import { ThirdPartyMark } from "./third-party-mark";
 import { TooltipProvider } from "./ui/tooltip";
 import { renderWithRouter } from "../test/test-utils";
 
-function renderMark(props: { className?: string } = {}) {
+function renderMark(props: { className?: string; muted?: boolean } = {}) {
   return renderWithRouter(
     <TooltipProvider>
       <ThirdPartyMark {...props} />
@@ -48,6 +48,20 @@ describe("ThirdPartyMark", () => {
     expect(mark).not.toHaveClass("text-muted-foreground");
     // 72% of the box, not the 58% that left a three-pixel smudge in a square.
     expect(mark.querySelector("svg")).toHaveClass("size-[72%]");
+  });
+
+  it("files the closed case under the owner-face's neutral fill when muted", () => {
+    // A source-less skill with nothing to link is a settled fact: the muted
+    // tone reports it without the amber asking for a press that has nothing
+    // behind it — while keeping the box's border so it never collapses into a
+    // bare failed-avatar placeholder.
+    renderMark({ muted: true, className: "size-4" });
+
+    const mark = screen.getByRole("img", { name: "第三方安装" });
+    expect(mark).toHaveClass("border-border/60", "bg-muted");
+    expect(mark).toHaveClass("text-muted-foreground");
+    expect(mark).not.toHaveClass("bg-amber-500/10");
+    expect(mark).not.toHaveClass("text-amber-500/80");
   });
 
   it("spells the fact out on hover, since the mark carries no text", async () => {
