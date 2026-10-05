@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HardDrive } from "lucide-react";
@@ -105,6 +105,46 @@ describe("CollapsibleSection", () => {
 
   it("can start folded", () => {
     renderSection({ defaultOpen: false });
+    expect(screen.getByRole("button", { name: /今天/ })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByText("section body")).not.toBeInTheDocument();
+  });
+
+  it("follows a fold owned from above", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    const { rerender } = renderSection({ open: true, onOpenChange });
+
+    // Controlled: the section shows exactly the state it is handed, and a
+    // press reports the change instead of flipping anything itself. (Base UI
+    // rides a second, event-details argument along; the page's handler only
+    // ever reads the first.)
+    await user.click(screen.getByRole("button", { name: /今天/ }));
+    expect(onOpenChange).toHaveBeenCalledWith(false, expect.anything());
+    expect(screen.getByRole("button", { name: /今天/ })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByText("section body")).toBeVisible();
+
+    // The caller decides when the fold lands — the next render, a page
+    // switch's restored view, whatever owns the state.
+    rerender(
+      <CollapsibleSection title="今天" count="3 个 skill" open={false}>
+        <div>section body</div>
+      </CollapsibleSection>,
+    );
+    expect(screen.getByRole("button", { name: /今天/ })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByText("section body")).not.toBeInTheDocument();
+  });
+
+  it("reads a fold handed in folded from the first paint", () => {
+    renderSection({ open: false });
     expect(screen.getByRole("button", { name: /今天/ })).toHaveAttribute(
       "aria-expanded",
       "false",

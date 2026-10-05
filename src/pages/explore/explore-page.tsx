@@ -120,10 +120,9 @@ export function ExplorePage() {
   // answer is not a place the reader is at under another.
   const signature = `${query}\u0000${unit}\u0000${sort}\u0000${selectedDomain ?? "all"}`;
 
-  // How deep the list had been revealed, remembered per history entry: a
-  // drill-down — into a repository's page and back — unmounts this page, and
-  // the depth has to come back with it or the reader is handed a page they were
-  // not on.
+  // How deep the list had been revealed, remembered per page: switching to the
+  // installed list and back unmounts this page, and the depth has to come back
+  // with it or the reader is handed a page they were not on.
   //
   // The scroll position waits for content: until the first skill lands the page
   // holds a skeleton, and a position restored into a skeleton is spent on

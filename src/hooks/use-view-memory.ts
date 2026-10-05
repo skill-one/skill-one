@@ -6,7 +6,6 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { useLocation } from "react-router";
 
 import {
   readViewMemory,
@@ -15,8 +14,9 @@ import {
 } from "../lib/view-memory";
 
 /**
- * A list page's view, kept across a drill-down: how much of the list has been
- * revealed and where it was scrolled to.
+ * A list page's view, kept across a page switch: which of its sections are
+ * folded, how much of the list has been revealed, and where it was scrolled
+ * to.
  *
  * `useState`-shaped on purpose — the page holds one `view` object rather than a
  * handful of loose states — because the object is what has to come back
@@ -36,10 +36,10 @@ import {
  *                  the view
  * @param ready     whether the list has content to scroll yet
  * @param signature the answer this view describes. The reader's controls are
- *                  shared with the other list, so they can change this one's
- *                  answer without the page ever being unmounted: a depth
- *                  remembered under a different answer is not a place this
- *                  reader was ever at, and is dropped rather than restored.
+ *                  shared module state, so they can change this page's answer
+ *                  without the page ever being unmounted: a depth remembered
+ *                  under a different answer is not a place this reader was
+ *                  ever at, and is dropped rather than restored.
  */
 export function useViewMemory<V>(
   name: string,
@@ -47,10 +47,10 @@ export function useViewMemory<V>(
   scroller: RefObject<HTMLElement | null>,
   { ready, signature }: { ready: boolean; signature?: string },
 ): [V, (update: (view: V) => V) => void] {
-  // The entry, not the path: see `lib/view-memory`.
-  const key = `${name}:${useLocation().key}`;
+  // The page, not the history entry: see `lib/view-memory`.
+  const key = name;
 
-  /** This entry's memory, and only while it still describes this answer. */
+  /** This page's memory, and only while it still describes this answer. */
   const remembered = useCallback((): ViewMemory<V> | undefined => {
     const memory = readViewMemory<V>(key);
     if (!memory) return undefined;

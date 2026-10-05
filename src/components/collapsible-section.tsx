@@ -79,11 +79,14 @@ function keepHeaderUnderPointer(header: HTMLElement) {
  * through. The panel carries the gap to the trigger (its top padding); when
  * the section folds the panel unmounts and the gap goes with it.
  *
- * The state is deliberately uncontrolled: the lists remount on every answer
- * change (the caller keys the list by unit/query/filter), which resets folds
- * without anyone lifting the state up. Folding hides content visually only —
- * the detail drawer walks the flat data order, so its prev/next traversal is
- * independent of what is folded.
+ * The state is uncontrolled by default: the search answers remount on every
+ * answer change (the caller keys the list by unit/query/filter), which resets
+ * folds without anyone lifting the state up. A caller that wants the fold to
+ * outlive the section — the installed list remembers its folds across page
+ * switches (see `useViewMemory`) — passes `open` and `onOpenChange` instead,
+ * and the section follows. Folding hides content visually only — the detail
+ * drawer walks the flat data order, so its prev/next traversal is independent
+ * of what is folded.
  */
 export function CollapsibleSection({
   icon: Icon,
@@ -91,6 +94,8 @@ export function CollapsibleSection({
   title,
   count,
   defaultOpen = true,
+  open,
+  onOpenChange,
   children,
   className,
 }: {
@@ -109,6 +114,14 @@ export function CollapsibleSection({
   count: string;
   /** Whether the section starts unfolded; every caller starts open. */
   defaultOpen?: boolean;
+  /**
+   * The section's fold, from above. Present makes the section controlled: the
+   * caller owns the state and answers for its persistence; absent leaves the
+   * fold to the section itself, reset by whatever remounts it.
+   */
+  open?: boolean;
+  /** The fold's change, when the section is controlled. */
+  onOpenChange?: (open: boolean) => void;
   /** The section's body; whatever the caller lists inside it. */
   children: ReactNode;
   className?: string;
@@ -119,7 +132,14 @@ export function CollapsibleSection({
     // The element stays a plain <section> so the callers' sibling selectors
     // (border/separation between stacked sections) keep matching.
     <section aria-label={title} className={className}>
-      <Collapsible defaultOpen={defaultOpen} className="group/section">
+      {/* Controlled when the fold comes from above, uncontrolled otherwise —
+          Base UI reads whichever pair is present. */}
+      <Collapsible
+        defaultOpen={open === undefined ? defaultOpen : undefined}
+        open={open}
+        onOpenChange={onOpenChange}
+        className="group/section"
+      >
         {/* The pinned ground: a square-cornered, opaque rectangle that hides
             cards scrolling behind it across its whole width — the rounded
             trigger inside would leave its corners transparent. It carries no

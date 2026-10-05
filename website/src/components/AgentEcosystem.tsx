@@ -78,7 +78,7 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
     });
 
     // Prioritize flagship tools (Cursor, Claude, Windsurf, Cline, etc.) before others
-    return [...list].sort((a, b) => {
+    return list.toSorted((a, b) => {
       if (a.isTop && !b.isTop) return -1;
       if (!a.isTop && b.isTop) return 1;
       return a.display.localeCompare(b.display);

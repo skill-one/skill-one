@@ -8,15 +8,21 @@ import { resetViewMemories } from "../lib/view-memory";
 import { useViewMemory } from "./use-view-memory";
 
 /** The list this hook exists for: one control, one reveal depth, and its own
- *  scrolling element — the three things a drill-down would otherwise take. */
-function ListPage({ ready = true }: { ready?: boolean }) {
+ *  scrolling element — the three things a page switch would otherwise take.
+ *  The `name` and `signature` ride props so a test can mount the same page
+ *  under another identity and check what the memory does about it. */
+function ListPage({
+  name = "probe",
+  signature,
+}: {
+  name?: string;
+  signature?: string;
+}) {
   const scroller = useRef<HTMLDivElement | null>(null);
-  const [view, setView] = useViewMemory(
-    "probe",
-    { text: "", depth: 1 },
-    scroller,
-    { ready },
-  );
+  const [view, setView] = useViewMemory(name, { text: "", depth: 1 }, scroller, {
+    ready: true,
+    signature,
+  });
 
   return (
     <div>
@@ -142,18 +148,60 @@ describe("useViewMemory", () => {
     expect(screen.getByTestId("scroller").scrollTop).toBe(240);
   });
 
-  it("treats a fresh visit as a fresh visit", async () => {
+  it("returns the reader to the remembered view on a fresh visit too", async () => {
     const user = userEvent.setup();
     renderRoutes();
 
     await user.type(screen.getByRole("textbox", { name: "搜索" }), "pdf");
+    await user.click(screen.getByRole("button", { name: "更深" }));
     await user.click(screen.getByRole("link", { name: "进入" }));
 
-    // 新开 pushes a new entry rather than popping the old one: it has never
-    // been scrolled, so it has no position to come back to.
+    // 新开 pushes a new entry rather than popping the old one — the sidebar
+    // way of coming back. The memory follows the page, not the entry, so the
+    // view the reader left is what they land on, not a fresh one.
     await user.click(screen.getByRole("link", { name: "新开" }));
 
-    expect(await screen.findByRole("textbox", { name: "搜索" })).toHaveValue("");
+    expect(await screen.findByRole("textbox", { name: "搜索" })).toHaveValue(
+      "pdf",
+    );
+    expect(screen.getByText("深度 2")).toBeInTheDocument();
+  });
+
+  it("keeps two pages' memories apart", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderRoutes();
+
+    await user.type(screen.getByRole("textbox", { name: "搜索" }), "pdf");
+    await user.click(screen.getByRole("link", { name: "进入" }));
+    await user.click(screen.getByRole("link", { name: "新开" }));
+    unmount();
+
+    // The other list answers for itself: its name was never written to, so a
+    // page switch hands it its own fresh view, not the first page's.
+    renderRoutes(<ListPage name="other" />);
+    expect(screen.getByRole("textbox", { name: "搜索" })).toHaveValue("");
+    expect(screen.getByText("深度 1")).toBeInTheDocument();
+  });
+
+  it("drops a memory that no longer describes the answer", async () => {
+    const user = userEvent.setup();
+    const underA = renderRoutes(<ListPage signature="a" />);
+
+    // The view is written under answer "a"...
+    await user.type(screen.getByRole("textbox", { name: "搜索" }), "pdf");
+    await user.click(screen.getByRole("button", { name: "更深" }));
+    underA.unmount();
+
+    // ...and a return under a different answer is not a place the reader was
+    // ever at, so the memory stays out of the paint — and, being one view per
+    // page, the slot now describes the answer that was last shown.
+    const underB = renderRoutes(<ListPage signature="b" />);
+    expect(screen.getByRole("textbox", { name: "搜索" })).toHaveValue("");
+    expect(screen.getByText("深度 1")).toBeInTheDocument();
+    underB.unmount();
+
+    renderRoutes(<ListPage signature="a" />);
+    expect(screen.getByRole("textbox", { name: "搜索" })).toHaveValue("");
     expect(screen.getByText("深度 1")).toBeInTheDocument();
   });
 

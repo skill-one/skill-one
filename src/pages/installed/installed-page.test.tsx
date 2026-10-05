@@ -2929,4 +2929,140 @@ describe("InstalledPage", () => {
       expect(getListView().views.store).not.toHaveProperty("query");
     });
   });
+
+  /**
+   * A page switch unmounts the list and mounts it again, and the only thing
+   * that answers for what the reader had made of it is the view memory (see
+   * `useViewMemory`): the folds, the revealed depth and the scroll position
+   * are the reader's rather than the visit's, so a page they return to is the
+   * page they left. A differently-shaped answer restores nothing (the memory's
+   * signature), and each case here starts from a memory the `beforeEach`
+   * reset.
+   */
+  describe("the view a page switch returns to", () => {
+    /** The six default installs plus twelve clock-less ones, so the reveal
+     *  has more than its first chunk of rows to pace. */
+    function seedExtraInstalls() {
+      for (let i = 0; i < 12; i += 1) {
+        addMockLocalSkill(`extra-${i}`);
+      }
+    }
+
+    /** The page's own scrolling element (the list's, not the document's). */
+    function pageScroller(): HTMLElement {
+      return document.querySelector('div[class*="overflow-y-auto"]')!;
+    }
+
+    it("brings the revealed depth and the scroll position back with the page", async () => {
+      seedExtraInstalls();
+      const user = userEvent.setup();
+      const first = renderPage();
+      await pickUnit(user, "列表");
+      // The first chunk is up (in whatever order the blend put the rows in).
+      await screen.findAllByRole("listitem");
+
+      // The reader reads to the end and scrolls somewhere mid-list.
+      triggerReveal();
+      triggerReveal();
+      await waitFor(() =>
+        expect(screen.getAllByRole("listitem")).toHaveLength(18),
+      );
+      const scroller = pageScroller();
+      scroller.scrollTop = 240;
+      fireEvent.scroll(scroller);
+
+      // The switch away and back: this component is gone, and a fresh one
+      // takes its place.
+      first.unmount();
+      renderPage();
+
+      // The depth returns — the whole list mounts, not the first chunk — and
+      // the reader is put back where they left.
+      await waitFor(() =>
+        expect(screen.getAllByRole("listitem")).toHaveLength(18),
+      );
+      await waitFor(() => expect(pageScroller().scrollTop).toBe(240));
+    });
+
+    it("brings a section's fold back with the page", async () => {
+      seedExtraInstalls();
+      const user = userEvent.setup();
+      const first = renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "安装时间");
+      // The first chunk is up: the mock's extras carry today's clock, so the
+      // fresh installs fill the 今天 section first.
+      await screen.findByRole("region", { name: "今天" });
+
+      // Read to the end, so every bucket has a section of its own.
+      triggerReveal();
+      triggerReveal();
+      await waitFor(() =>
+        expect(screen.getAllByRole("listitem")).toHaveLength(18),
+      );
+
+      // 最近 7 天 folds from its header: the row leaves the view, the header
+      // and its count stay.
+      await user.click(
+        within(screen.getByRole("region", { name: "最近 7 天" })).getByRole(
+          "button",
+          { name: /最近 7 天/ },
+        ),
+      );
+      expect(
+        within(screen.getByRole("region", { name: "最近 7 天" })).queryByRole(
+          "listitem",
+        ),
+      ).not.toBeInTheDocument();
+
+      first.unmount();
+      renderPage();
+      await screen.findByRole("region", { name: "最近 7 天" });
+
+      // Folded stays folded — and a section the reader never touched keeps
+      // answering at its default, open.
+      expect(
+        within(screen.getByRole("region", { name: "最近 7 天" })).queryByRole(
+          "listitem",
+        ),
+      ).not.toBeInTheDocument();
+      expect(
+        within(screen.getByRole("region", { name: "最近 30 天" })).getAllByRole(
+          "listitem",
+        ),
+      ).toHaveLength(1);
+    });
+
+    it("keeps the parked section's fold, which starts folded", async () => {
+      setMockSkillEnabled("pdf", false);
+      const user = userEvent.setup();
+      const first = renderPage();
+      await pickUnit(user, "列表");
+      await screen.findByText("frontend-design");
+
+      // The parked half starts folded: the count on its header says there is
+      // something set aside, and none of it shows.
+      const parked = screen.getByRole("region", { name: "已禁用" });
+      expect(
+        within(parked).getByRole("button", { name: /已禁用/ }),
+      ).toHaveAttribute("aria-expanded", "false");
+
+      // The reader unfolds it; the fold is theirs, so it travels with the
+      // page like every other fold.
+      await user.click(within(parked).getByRole("button", { name: /已禁用/ }));
+      expect(
+        within(parked).getByRole("button", { name: /已禁用/ }),
+      ).toHaveAttribute("aria-expanded", "true");
+
+      first.unmount();
+      renderPage();
+      const parkedAgain = await screen.findByRole("region", {
+        name: "已禁用",
+      });
+      expect(
+        within(parkedAgain).getByRole("button", { name: /已禁用/ }),
+      ).toHaveAttribute("aria-expanded", "true");
+      expect(within(parkedAgain).getAllByRole("listitem")).toHaveLength(1);
+    });
+  });
 });

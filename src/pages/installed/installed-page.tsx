@@ -11,7 +11,7 @@ import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useCustomTags } from "../../hooks/use-custom-tags";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
-import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
+import { useViewMemory } from "../../hooks/use-view-memory";
 import { setQuery } from "../../lib/list-view";
 import { buildSearchIndex } from "../../lib/search-index";
 import { domainsOf, taxonomyRank } from "../../lib/domain-filter";
@@ -82,6 +82,33 @@ const SKELETON_CARDS = 8;
 
 /** Placeholder rows while the on-disk list is first read, in the skill unit. */
 const SKELETON_ROWS = 12;
+
+/**
+ * The installed list's remembered view (see `useViewMemory`): which sections
+ * the reader has folded, and how deep the list has been revealed. Both come
+ * back with a page switch — the folds and the place they left the list are
+ * the reader's, not the visit's — and the reveal resets with the answer (the
+ * effect on `signature`): a differently-shaped answer is not a page they were
+ * ever at.
+ */
+interface InstalledView {
+  /**
+   * Fold state per section; a section absent from here reads at its default.
+   * Keys are namespaced (see `foldKey`), so a section's own title can never
+   * reach the parked section's fold.
+   */
+  folds: Record<string, boolean>;
+  /** How many entries the progressive reveal has mounted. */
+  reveal: number;
+}
+
+/**
+ * A live section's key in the remembered folds: namespaced, so a tag named
+ * like the parked section ("parked") can never reach its fold.
+ */
+function foldKey(title: string): string {
+  return `section:${title}`;
+}
 
 /**
  * The time buckets the install-clock grouping files installs into, newest
@@ -234,7 +261,9 @@ function compareByStars<T>(
  * with the count it holds beside it: the tag grouping states the section's
  * whole size from the answer itself (the reveal below only bounds what is
  * mounted), while the install clock counts what it has shown so far;
- * every section starts open, and a press on the header folds it. An empty
+ * every section starts open, and a press on the header folds it — the folds,
+ * like the scroll position, are the reader's rather than the visit's, and
+ * come back with the page (see `useViewMemory`). An empty
  * bucket draws no section at all. A search stands the sections down and
  * re-answers in relevance order. What the page adds to the store's surfaces
  * is what only an installed skill has: enablement — at two granularities,
@@ -286,18 +315,6 @@ export function InstalledPage() {
   // where the user filed it instead of pooling under 未分类.
   const { data: customTags } = useCustomTags();
   const assignments = customTags?.skillTags ?? EMPTY_SKILL_TAGS;
-  // The tag state folded into one string, so any choice, new tag or removal
-  // re-answers the list and resets the reveal like any answer change.
-  const tagSig = useMemo(() => {
-    const defs = (customTags?.tagDefs ?? [])
-      .map((def) => def.key)
-      .join("\u0001");
-    const picks = Object.entries(assignments)
-      .map(([name, tag]) => `${name}=${tag}`)
-      .toSorted()
-      .join("\u0001");
-    return `${defs}\u0000${picks}`;
-  }, [customTags, assignments]);
   // The registry entries behind those recorded sources, keyed by skill name:
   // the store facts an on-disk record never carries (classification, the
   // install count), so the installed list can show the store's card for
@@ -324,6 +341,45 @@ export function InstalledPage() {
   const { sort = "popularity", unit = "skill" } =
     useDestinationView("installed");
   const isSearching = query.length > 0;
+
+  // The answer this page is showing, named by the controls that produced it.
+  // The view memory below keys its restore on it: a fold or a depth
+  // remembered under one answer is not a place the reader was ever at under
+  // another. Tag choices stay out of it, as they stay out of the panel reset
+  // below: they are made inside the drawer, and re-filing rows does not
+  // re-answer the page.
+  const signature = `${query}\u0000${sort}\u0000${unit}`;
+
+  // The page's own scrolling element: the list scrolls inside it, which is
+  // also why the browser restores nothing for this page (see the view below).
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  // The page's remembered view: the folds and the revealed depth, plus the
+  // scroll position the hook itself keeps. A page switch unmounts this
+  // component, and nothing else restores a page that owns its own scroller —
+  // so the view is handed to the memory on the way past and taken back on
+  // return, folds and place together.
+  const [view, setView] = useViewMemory<InstalledView>(
+    "installed",
+    { folds: {}, reveal: INITIAL_CARDS },
+    listRef,
+    { ready: !isLoading && list.length > 0, signature },
+  );
+
+  // One fold's change, as the sections below read it: written into the view
+  // (and so into the memory) rather than held by the section, so it outlives
+  // the page.
+  const setFold = useCallback(
+    (key: string, open: boolean) => {
+      setView((v) =>
+        v.folds[key] === open
+          ? v
+          : { ...v, folds: { ...v.folds, [key]: open } },
+      );
+    },
+    [setView],
+  );
+
   // Open skill in the shared detail drawer, tracked by identity rather than by
   // index: the provenance and store-entry queries land asynchronously and
   // reshape the list under the reader's pointer, so an index captured at click
@@ -331,18 +387,21 @@ export function InstalledPage() {
   // the key against its own list, and a key it cannot find keeps it closed.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  // Anything that re-answers the list resets the detail panel: its skill may
-  // not be in the new answer at all. The shape is its own answer now, so the
-  // unit joins the sort here. Tag choices stay out of it on purpose: they are
-  // made inside the drawer, so resetting on them would close the panel over
-  // the very pick it was opened for (see below).
-  const shownAnswer = useRef(`${query}\u0000${sort}\u0000${unit}`);
+  // Anything that re-answers the list resets what only described the old one:
+  // the detail panel (its skill may not be in the new answer at all) and the
+  // revealed depth (it belongs to the list it was revealed for). Only a
+  // *change* resets: mounting with the answer already in hand is the reader
+  // coming back to it, and the view they left it at is the whole point of the
+  // memory above.
+  const shownAnswer = useRef(signature);
   useEffect(() => {
-    const answer = `${query}\u0000${sort}\u0000${unit}`;
-    if (shownAnswer.current === answer) return;
-    shownAnswer.current = answer;
+    if (shownAnswer.current === signature) return;
+    shownAnswer.current = signature;
     setSelectedKey(null);
-  }, [query, sort, unit]);
+    setView((v) =>
+      v.reveal === INITIAL_CARDS ? v : { ...v, reveal: INITIAL_CARDS },
+    );
+  }, [signature, setView]);
 
   // Deep link onto the installed list: `/installed?skill=<name>` asks the
   // list's own question, which ranks the targeted skill near the top of the
@@ -570,20 +629,35 @@ export function InstalledPage() {
 
   // Progressive rendering: only the first `renderedCount` items are mounted;
   // an IntersectionObserver on the sentinel below the list extends the count
-  // while the reader scrolls. A new answer (a search, a unit, a reshaped list)
-  // re-seeds the run to the same depth.
-  const {
-    count: renderedCount,
-    sentinelRef,
-    done,
-  } = useProgressiveReveal({
-    total: itemCount,
-    initial: INITIAL_CARDS,
-    step: CARD_CHUNK,
-    resetKey: `${unit}\u0000${sort}\u0000${query}\u0000${list.length}\u0000${tagSig}`,
-  });
+  // while the reader scrolls. The depth lives in the page's view memory, so a
+  // page switch restores it together with the scroll position; a new answer
+  // (the effect on `signature`) re-seeds the run to the initial depth.
+  const renderedCount = Math.min(view.reveal, itemCount);
+  const done = renderedCount >= itemCount;
   const shownRows = activeRows.slice(0, renderedCount);
   const shownCards = activeCards.slice(0, renderedCount);
+
+  // The sentinel ends the rendered run: while it is on screen the observer
+  // extends the run, so scrolling down keeps revealing cards or rows until the
+  // answer is fully mounted. Re-observing on every extension is what keeps the
+  // reveal going while the sentinel still sits in view: observing fires the
+  // initial callback with the current intersection, so a bottom edge that
+  // stays visible loads the next chunk without a further scroll.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || done) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setView((v) => ({
+          ...v,
+          reveal: Math.min(v.reveal + CARD_CHUNK, itemCount),
+        }));
+      }
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [done, itemCount, renderedCount, setView]);
 
   // The skill unit's answer, divided by whether a skill takes part at all: the
   // live installs first, the parked ones in a section of their own below. The
@@ -1073,9 +1147,13 @@ export function InstalledPage() {
 
       {/* The list — repository cards, skill rows or grid squares; the modal
           detail drawer overlays any without reflowing it or moving its scroll
-          position. */}
+          position. The element is the page's own scroller, whose position the
+          view memory keeps (see `listRef`). */}
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5">
+        <div
+          ref={listRef}
+          className="min-h-0 flex-1 -mx-3 overflow-y-auto px-3 pb-5"
+        >
           {isError ? (
             <Placeholder
               icon={Users}
@@ -1191,6 +1269,14 @@ export function InstalledPage() {
                       count={t("state.skillCount", {
                         count: section.total ?? section.rows.length,
                       })}
+                      // The fold is remembered with the page's view: it comes
+                      // back with a page switch, and a section of the same
+                      // name under a later grouping starts from its own
+                      // default only when the reader never touched it.
+                      open={view.folds[foldKey(section.title)] ?? true}
+                      onOpenChange={(open) =>
+                        setFold(foldKey(section.title), open)
+                      }
                     >
                       {skillEntries(section.rows)}
                     </CollapsibleSection>
@@ -1203,9 +1289,11 @@ export function InstalledPage() {
                     count: splitRows.disabled.length,
                   })}
                   // The fold is the reader's ("not working with these right
-                  // now"), so it is left to survive a change of grouping —
-                  // which only re-orders or re-slices rows.
-                  defaultOpen={false}
+                  // now"), so it survives a change of grouping — which only
+                  // re-orders or re-slices rows — and a page switch, like the
+                  // sections' folds above.
+                  open={view.folds.parked ?? false}
+                  onOpenChange={(open) => setFold("parked", open)}
                   className={cn(
                     "border-t border-border/60 pt-6",
                     splitRows.enabled.length > 0 && "mt-6",
@@ -1216,9 +1304,7 @@ export function InstalledPage() {
               )}
             </>
           )}
-          {/* The sentinel ends the rendered run: while it is on screen the
-              observer above extends the run, so scrolling down keeps revealing
-              cards or rows until the answer is fully mounted. */}
+          {/* The sentinel the observer above watches. */}
           {!done && <div ref={sentinelRef} aria-hidden="true" />}
         </div>
       </div>
