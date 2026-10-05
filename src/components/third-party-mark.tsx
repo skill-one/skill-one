@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { FolderCode } from "lucide-react";
+import { Link2, Terminal } from "lucide-react";
 
 import {
   Tooltip,
@@ -9,76 +9,72 @@ import {
 import { cn } from "../lib/utils";
 
 /**
- * The owner's geometry with a different glyph inside it — `OwnerAvatar`'s round
- * box, hairline border and muted fill. Exported so the mark and the control
- * that reuses it (see `LinkSuggestionMark`) cannot drift into two shapes: a
- * source-less skill must look like itself whether or not it can be linked.
- *
- * The ink carries the mark's two tones. Amber means the fact is still open: a
- * registry namesake exists, so the mark can become a control that links a
- * source (`LinkSuggestionMark`) and the color asks for that one press. Muted —
- * the owner-face fill the app files neutral facts under — means the fact is
- * closed: nothing to link, so nothing to draw the eye toward. Amber must stay
- * reserved for the open case; a muted glyph risks reading as a failed avatar
- * at a row's 20px, which is why the closed tone keeps the border and the
- * glyph's presence rather than collapsing into a bare placeholder.
+ * Geometric shell matching `OwnerAvatar`'s round box and hairline border.
  */
 export const THIRD_PARTY_MARK_CLASS =
-  "flex shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500/80";
+  "relative flex shrink-0 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500/80";
 
 /** The same box in the closed tone: a source-less skill with no candidate to link. */
 export const THIRD_PARTY_MARK_MUTED_CLASS =
-  "flex shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted text-muted-foreground";
+  "relative flex shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted text-muted-foreground";
 
 /**
- * A folder-code glyph, sized to the box it sits in rather than to a pixel constant —
- * the same glyph at a row's 20px, a square's 16px and a card bar's
- * 24px, so one mark scales across every surface that wears it. At 58% of a 16px
- * square it was a three-pixel smudge; 72% leaves a hairline of breathing room
- * on the tightest box while still reading as a glyph rather than a picture.
- *
- * It represents a local or third-party skill on disk. Unlike a broken chain,
- * it conveys a neutral, positive representation of local code without implying
- * error or network failure.
+ * Extracts the first meaningful grapheme (letter, Chinese character, or emoji)
+ * for a skill's monogram, uppercasing Latin letters.
  */
-export function ThirdPartyMarkGlyph() {
-  return <FolderCode className="size-[72%]" aria-hidden />;
+export function skillInitial(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "S";
+  try {
+    for (const segment of new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(trimmed)) {
+      const first = segment.segment;
+      return /[a-z]/i.test(first) ? first.toUpperCase() : first;
+    }
+  } catch {
+    const first = Array.from(trimmed)[0];
+    if (first !== undefined) return /[a-z]/i.test(first) ? first.toUpperCase() : first;
+  }
+  return "S";
 }
 
 /**
- * What stands in for the owner face on a skill no source vouches for — an
- * install that came from outside this app and that the ledger never recorded a
- * repository for, which is what the installed list files as 第三方安装.
- *
- * It wears `OwnerAvatar`'s own shape, so it drops into the face's column
- * without moving the layout around it: a card's footer, a row's facts cluster
- * and a repository card's bar all size that column off this box. Every other
- * surface answers 「谁发布的」 with a person; this one answers it with the
- * absence of one, which is the whole fact such a skill has to state.
- *
- * Decoration: `OwnerAvatar` can be `aria-hidden` because every call site prints
- * the owner beside it. Nothing prints this mark's name — it *is* the statement,
- * glyph for glyph — so it is labelled instead of hidden, and the tooltip spells
- * the sentence out for a pointer. The glyph itself stays `aria-hidden` so it
- * cannot leak into the name.
- *
- * This is the mark as a statement. When namesake candidates exist to link, the
- * same box becomes a control instead — `LinkSuggestionMark`.
- *
- * Tone: `muted` renders the closed statement — no candidate to link, so the
- * box wears the owner-face's own neutral fill and the eye is not asked to
- * press anything. The default stays amber for the surfaces that report the
- * fact without knowing whether a link is still open.
+ * Terminal glyph representing local / third-party capability.
+ */
+export function ThirdPartyMarkGlyph({ className }: { className?: string }) {
+  return <Terminal className={cn("size-[72%]", className)} aria-hidden="true" />;
+}
+
+/** Check if class name represents a micro-sized element (< 24px) where badges would collide. */
+export function isMicroSize(className?: string): boolean {
+  if (!className) return false;
+  return /\b(size-[1-5]|w-[1-5]|h-[1-5])\b/.test(className);
+}
+
+/**
+ * Dual-layer avatar for third-party / local skills (Option 4):
+ * - Center: Monogram letter extracted from the skill's name (or Terminal glyph if no name).
+ * - Bottom-Right Badge: Local Terminal badge (or amber Link2 badge when linkable).
  */
 export function ThirdPartyMark({
+  name,
   className,
   muted = false,
+  candidate = false,
+  showBadge = true,
 }: {
+  /** The skill's name (e.g. "git-commit"), used to derive the monogram. */
+  name?: string;
   className?: string;
   /** The closed tone: nothing to link, so the mark files under neutral. */
   muted?: boolean;
+  /** Whether namesake candidates exist to link (shows amber link indicator). */
+  candidate?: boolean;
+  /** Whether to render the bottom-right badge when size permits. */
+  showBadge?: boolean;
 }) {
   const { t } = useTranslation();
+  const compact = isMicroSize(className);
+  const initial = name ? skillInitial(name) : null;
 
   return (
     <Tooltip>
@@ -88,15 +84,44 @@ export function ThirdPartyMark({
             role="img"
             aria-label={t("common.thirdPartyInstall")}
             className={cn(
-              muted ? THIRD_PARTY_MARK_MUTED_CLASS : THIRD_PARTY_MARK_CLASS,
+              candidate || !muted ? THIRD_PARTY_MARK_CLASS : THIRD_PARTY_MARK_MUTED_CLASS,
               className,
             )}
           >
-            <ThirdPartyMarkGlyph />
+            {initial && !compact ? (
+              <>
+                <span className="font-semibold uppercase select-none leading-none text-inherit">
+                  {initial}
+                </span>
+                {showBadge && (
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute -bottom-0.5 -right-0.5 flex size-[40%] items-center justify-center rounded-full ring-1 ring-background shadow-xs",
+                      candidate
+                        ? "bg-amber-500 text-amber-950 dark:text-amber-100"
+                        : "bg-background border border-border/80 text-muted-foreground",
+                    )}
+                  >
+                    {candidate ? (
+                      <Link2 className="size-[65%]" />
+                    ) : (
+                      <Terminal className="size-[65%]" />
+                    )}
+                  </span>
+                )}
+              </>
+            ) : (
+              <ThirdPartyMarkGlyph />
+            )}
           </span>
         }
       />
-      <TooltipContent>{t("common.thirdPartyInstallTip")}</TooltipContent>
+      <TooltipContent>
+        {candidate
+          ? t("sourceLink.tooltip")
+          : t("common.thirdPartyInstallTip")}
+      </TooltipContent>
     </Tooltip>
   );
 }

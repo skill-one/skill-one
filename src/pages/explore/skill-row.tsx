@@ -280,7 +280,12 @@ export const SkillRow = memo(function SkillRow({
             )}
           </div>
         ) : (
-          (extra ?? <ThirdPartyMark className="size-7" />)
+          (extra ?? (
+            <ThirdPartyMark
+              name={skill.name}
+              className="size-7 shrink-0 text-xs"
+            />
+          ))
         )}
 
         {/* What is it, and what does it do: the two lines every row leads with,

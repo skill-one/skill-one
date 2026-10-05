@@ -74,4 +74,29 @@ describe("ThirdPartyMark", () => {
       await screen.findByRole("tooltip"),
     ).toHaveTextContent("第三方安装，未关联来源");
   });
+
+  it("renders a dual-layer avatar with monogram and local terminal badge when name is provided", () => {
+    renderWithRouter(
+      <TooltipProvider>
+        <ThirdPartyMark name="git-commit" className="size-7" />
+      </TooltipProvider>,
+    );
+
+    const mark = screen.getByRole("img", { name: "第三方安装" });
+    expect(mark).toHaveTextContent("G");
+    // Contains terminal micro-badge in corner
+    expect(mark.querySelector("svg")).not.toBeNull();
+  });
+
+  it("renders an amber link badge when candidate is true", () => {
+    renderWithRouter(
+      <TooltipProvider>
+        <ThirdPartyMark name="pdf" candidate className="size-6" />
+      </TooltipProvider>,
+    );
+
+    const mark = screen.getByRole("img", { name: "第三方安装" });
+    expect(mark).toHaveTextContent("P");
+    expect(mark.querySelector(".bg-amber-500")).not.toBeNull();
+  });
 });

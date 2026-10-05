@@ -171,7 +171,12 @@ export function SkillGridCard({
               )}
             </div>
           ) : (
-            (extra ?? <ThirdPartyMark className="size-6" />)
+            (extra ?? (
+              <ThirdPartyMark
+                name={skill.name}
+                className="size-6 shrink-0 text-[10px]"
+              />
+            ))
           )}
           <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-tight">
             <HighlightedText

@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link2 } from "lucide-react";
 
 import { LinkCandidatePopover } from "../../components/link-candidate-popover";
 import {
+  isMicroSize,
+  skillInitial,
   THIRD_PARTY_MARK_CLASS,
   ThirdPartyMark,
   ThirdPartyMarkGlyph,
@@ -74,11 +77,11 @@ export function LinkSuggestionMark({
   if (candidates.length === 0) {
     return labeled ? (
       <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <ThirdPartyMark muted className={className} />
+        <ThirdPartyMark muted name={name} className={className} />
         <span className="truncate">{t("common.thirdPartyInstall")}</span>
       </span>
     ) : (
-      <ThirdPartyMark muted className={className} />
+      <ThirdPartyMark muted name={name} className={className} />
     );
   }
 
@@ -125,7 +128,21 @@ export function LinkSuggestionMark({
         className,
       )}
     >
-      <ThirdPartyMarkGlyph />
+      {isMicroSize(className) ? (
+        <ThirdPartyMarkGlyph />
+      ) : (
+        <>
+          <span className="font-semibold uppercase select-none leading-none text-inherit">
+            {skillInitial(name)}
+          </span>
+          <span
+            aria-hidden="true"
+            className="absolute -bottom-0.5 -right-0.5 flex size-[40%] items-center justify-center rounded-full bg-amber-500 text-amber-950 dark:text-amber-100 ring-1 ring-background shadow-xs"
+          >
+            <Link2 className="size-[65%]" />
+          </span>
+        </>
+      )}
     </button>
   );
 

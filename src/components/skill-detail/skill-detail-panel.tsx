@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import {
   CalendarDays,
   ExternalLink,
-  FolderCode,
   FolderOpen,
   Languages,
   Loader2,
@@ -677,12 +676,10 @@ export function SkillDetailPanel({
           {hasSource && owner ? (
             <OwnerAvatar owner={owner} className="size-12 shrink-0 text-lg" />
           ) : (
-            <div
-              aria-hidden="true"
-              className="flex size-12 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted text-muted-foreground"
-            >
-              <FolderCode className="size-6" />
-            </div>
+            <ThirdPartyMark
+              name={shown ? skillDisplayName(shown) : undefined}
+              className="size-12 shrink-0 text-lg"
+            />
           )}
           <div className="min-w-0 flex-1">
             <SheetTitle className="truncate text-lg font-bold tracking-tight">
