@@ -1,7 +1,7 @@
 {
   "name": "skill-one",
   "private": true,
-  "version": "0.25.0",
+  "version": "0.26.0",
   "type": "module",
   "packageManager": "pnpm@12.6.0",
   "engines": {

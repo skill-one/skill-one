@@ -9,7 +9,6 @@ import {
   removeSkillProvenance,
   unlinkSkillSource,
   markSkillUnlinked,
-  loadPendingRecords,
   loadCustomTags,
   saveCustomTagDef,
   renameCustomTagDef,

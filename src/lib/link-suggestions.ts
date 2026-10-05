@@ -48,7 +48,6 @@ import { isSearchableQuery, searchSkillsSh } from "./skills-sh";
 import {
   dismissSkillSource,
   loadPendingRecords,
-  recordSkillProvenanceBatch,
   savePendingRecords,
 } from "./provenance";
 import type {
@@ -56,7 +55,6 @@ import type {
   PersistedCandidate,
   SkillFingerprint,
 } from "./provenance";
-import type { SourceLinkReason } from "./activity";
 
 /**
  * Candidates offered for a skill, ranked by description similarity.

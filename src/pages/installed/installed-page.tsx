@@ -324,7 +324,7 @@ export function InstalledPage() {
     if (!suggestions) return [];
     const result: LinkableSkill[] = [];
     for (const skill of list) {
-      const isLinked = !!linked?.[skill.name] || !!skill.repo;
+      const isLinked = !!linked?.[skill.name]?.repo;
       if (isLinked) continue;
       const candidates = suggestions[skill.name];
       if (candidates && candidates.length > 0) {
@@ -981,7 +981,7 @@ export function InstalledPage() {
           title: t("sourceLink.batchLinkSuccess", { count: entries.length }),
           type: "success",
         });
-      } catch (e) {
+      } catch {
         toast.add({
           title: t("sourceLink.batchLinkFailed"),
           type: "error",

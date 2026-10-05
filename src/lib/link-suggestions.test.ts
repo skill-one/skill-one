@@ -7,10 +7,8 @@ import {
   rankNamesakes,
   resetLinkSuggestions,
   resolveAssociations,
-  SIMILARITY_AUTO_LINK_THRESHOLD,
   unlinkSkillSource,
 } from "./link-suggestions";
-import { descriptionSimilarity } from "./description-similarity";
 import type { Skill } from "../types/skill";
 import type { PendingRecord, StoredPending } from "./provenance";
 
