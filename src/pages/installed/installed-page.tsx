@@ -903,7 +903,7 @@ export function InstalledPage() {
     }
   };
 
-  const handleCreateAndApplyTag = async (label: string) => {
+  const handleCreateAndApplyTag = async (label: string, emoji?: string) => {
     const selectedNames = getSelectedNames();
     if (selectedNames.length === 0) return;
     const taken = collectTakenTagKeys(
@@ -923,7 +923,7 @@ export function InstalledPage() {
     }
     setBulkLoading(true);
     try {
-      await saveCustomTagDef(checked.key, label.trim());
+      await saveCustomTagDef(checked.key, label.trim(), emoji);
       await setManySkillTags(selectedNames, checked.key);
       await markSkillsChanged(queryClient);
       toast.add({

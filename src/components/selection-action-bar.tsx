@@ -5,6 +5,7 @@ import {
   CheckSquare,
   Power,
   PowerOff,
+  Smile,
   Tag as TagIcon,
   Trash2,
   X,
@@ -27,6 +28,8 @@ import {
   PopoverTrigger,
 } from "./ui/popover";
 import { domainEmoji } from "../data/domains";
+import { cn } from "../lib/utils";
+import { EmojiPickerPanel } from "./skill-detail/emoji-picker-panel";
 
 export interface SelectionTagOption {
   key: string;
@@ -51,7 +54,7 @@ export interface SelectionActionBarProps {
   /** Fired when picking a tag for bulk assignment. null means reset tag. */
   onTag?: (tagKey: string | null) => void;
   /** Fired when creating and immediately assigning a new custom tag. */
-  onCreateTag?: (label: string) => Promise<void> | void;
+  onCreateTag?: (label: string, emoji?: string) => Promise<void> | void;
   /** List of tags available to assign. */
   availableTags?: SelectionTagOption[];
   /** Fired when bulk removal is confirmed. */
@@ -82,6 +85,10 @@ export function SelectionActionBar({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [newTagDraft, setNewTagDraft] = useState("");
+  // The mark for the tag being created: "" means the label's first character,
+  // mirroring the detail page's tag menu.
+  const [markDraft, setMarkDraft] = useState("");
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
   const visible = count > 0;
   const isAllSelected = count > 0 && count === totalCount;
@@ -93,8 +100,10 @@ export function SelectionActionBar({
     e.preventDefault();
     const val = newTagDraft.trim();
     if (!val || !onCreateTag) return;
-    await onCreateTag(val);
+    await onCreateTag(val, markDraft || undefined);
     setNewTagDraft("");
+    setMarkDraft("");
+    setEmojiPickerOpen(false);
     setTagPopoverOpen(false);
   };
 
@@ -194,6 +203,67 @@ export function SelectionActionBar({
                         onSubmit={handleCreateSubmit}
                         className="mb-2 flex items-center gap-1.5"
                       >
+                        <Popover
+                          open={emojiPickerOpen}
+                          onOpenChange={setEmojiPickerOpen}
+                        >
+                          <PopoverTrigger
+                            render={
+                              <button
+                                type="button"
+                                disabled={loading}
+                                aria-label={t("tag.pickEmoji")}
+                                title={t("tag.pickEmoji")}
+                                className={cn(
+                                  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                                  "text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                                  emojiPickerOpen && "bg-muted text-foreground",
+                                )}
+                              >
+                                {markDraft ? (
+                                  <span
+                                    aria-hidden="true"
+                                    className="text-[15px] leading-none"
+                                  >
+                                    {markDraft}
+                                  </span>
+                                ) : (
+                                  <Smile className="size-3.5" aria-hidden />
+                                )}
+                              </button>
+                            }
+                          />
+                          <PopoverContent
+                            side="bottom"
+                            align="start"
+                            sideOffset={4}
+                            className="w-auto p-1 border shadow-lg bg-popover"
+                          >
+                            <EmojiPickerPanel
+                              onPick={(emoji) => {
+                                setMarkDraft(emoji);
+                                setEmojiPickerOpen(false);
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        {markDraft && (
+                          <button
+                            type="button"
+                            disabled={loading}
+                            aria-label={t("tag.clearEmoji")}
+                            title={t("tag.clearEmoji")}
+                            onClick={() => setMarkDraft("")}
+                            className={cn(
+                              "-ml-1 inline-flex size-5 shrink-0 items-center justify-center rounded",
+                              "text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
+                              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                            )}
+                          >
+                            <X className="size-3" aria-hidden />
+                          </button>
+                        )}
                         <Input
                           value={newTagDraft}
                           onChange={(e) => setNewTagDraft(e.target.value)}
