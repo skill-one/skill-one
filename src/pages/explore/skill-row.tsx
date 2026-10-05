@@ -7,6 +7,7 @@ import { Ordinal } from "../../components/ordinal";
 import {
   isInstallableSkill,
   isLiveSkill,
+  isThirdPartySkill,
   skillDisplayName,
   skillKey,
   type SkillView,
@@ -266,19 +267,11 @@ export const SkillRow = memo(function SkillRow({
             aria-hidden="true"
             className="size-7 shrink-0"
           />
-        ) : owner ? (
-          <div className="relative inline-flex shrink-0 items-center">
-            <OwnerAvatar
-              owner={owner}
-              className="size-7 shrink-0 text-xs"
-            />
-            {skill.origin === "local" && (
-              <span
-                title={t("detail.sourceViaLink")}
-                className="absolute -bottom-0.5 -right-0.5 flex size-2.5 items-center justify-center rounded-full bg-amber-500 ring-1 ring-background"
-              />
-            )}
-          </div>
+        ) : !isThirdPartySkill(skill) && owner ? (
+          <OwnerAvatar
+            owner={owner}
+            className="size-7 shrink-0 text-xs"
+          />
         ) : (
           (extra ?? (
             <ThirdPartyMark

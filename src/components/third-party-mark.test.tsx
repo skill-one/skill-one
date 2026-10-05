@@ -84,7 +84,7 @@ describe("ThirdPartyMark", () => {
 
     const mark = screen.getByRole("img", { name: "第三方安装" });
     expect(mark).toHaveTextContent("G");
-    // Contains terminal micro-badge in corner
+    // Contains folder micro-badge in corner
     expect(mark.querySelector("svg")).not.toBeNull();
   });
 

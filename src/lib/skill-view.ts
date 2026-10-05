@@ -92,6 +92,23 @@ export function isInstallableSkill(skill: SkillView): boolean {
   return !isLiveSkill(skill) || isCanonicalId(`${skill.repo}/${skill.name}`);
 }
 
+/**
+ * Whether a skill represents a third-party installation (origin === "local" or unbacked/unrecorded).
+ * Such skills wear the distinct "Monogram + Folder" avatar rather than the store author's GitHub face.
+ */
+export function isThirdPartySkill(
+  skill?: {
+    origin?: "store" | "local";
+    storeBacked?: boolean;
+    repo?: string;
+  } | null,
+): boolean {
+  if (!skill) return false;
+  if (skill.origin === "local") return true;
+  if (skill.origin === "store") return false;
+  return !skill.repo;
+}
+
 export interface SkillView extends Skill {
   /**
    * False for a skill no store entry backs: an installed record the registry

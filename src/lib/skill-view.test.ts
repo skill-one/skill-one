@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import type { InstalledSkill } from "./skills-manager";
 import type { Skill } from "../types/skill";
-import { installedSkillView, isInstallableSkill } from "./skill-view";
+import { installedSkillView, isInstallableSkill, isThirdPartySkill } from "./skill-view";
 
 /** One entry of the installed list, as the backend reports it. */
 const installedPdf: InstalledSkill = {
@@ -59,6 +59,23 @@ describe("installedSkillView", () => {
       { ...installedPdf, displayName: "Code Review" },
     );
     expect(distinct.displayName).toBe("Code Review");
+  });
+});
+
+describe("isThirdPartySkill", () => {
+  it("identifies local skills as third-party even if they have an associated repo", () => {
+    expect(isThirdPartySkill({ name: "my-skill", origin: "local", repo: "user/repo" })).toBe(true);
+    expect(isThirdPartySkill({ name: "my-skill", origin: "local" })).toBe(true);
+  });
+
+  it("identifies unbacked skills without repo or storeBacked as third-party", () => {
+    expect(isThirdPartySkill({ name: "standalone" })).toBe(true);
+    expect(isThirdPartySkill({ name: "standalone", storeBacked: false })).toBe(true);
+  });
+
+  it("does not classify store skills or linked store-backed skills as third-party", () => {
+    expect(isThirdPartySkill({ name: "store-skill", origin: "store", repo: "owner/repo" })).toBe(false);
+    expect(isThirdPartySkill({ name: "store-skill", repo: "owner/repo", storeBacked: true })).toBe(false);
   });
 });
 

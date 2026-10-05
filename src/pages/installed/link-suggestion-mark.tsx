@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link2 } from "lucide-react";
+import { Folder } from "lucide-react";
 
 import { LinkCandidatePopover } from "../../components/link-candidate-popover";
 import {
@@ -139,7 +139,7 @@ export function LinkSuggestionMark({
             aria-hidden="true"
             className="absolute -bottom-0.5 -right-0.5 flex size-[40%] items-center justify-center rounded-full bg-amber-500 text-amber-950 dark:text-amber-100 ring-1 ring-background shadow-xs"
           >
-            <Link2 className="size-[65%]" />
+            <Folder className="size-[65%]" />
           </span>
         </>
       )}

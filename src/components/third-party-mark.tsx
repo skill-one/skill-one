@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Link2, Terminal } from "lucide-react";
+import { Folder, Link2 } from "lucide-react";
 
 import {
   Tooltip,
@@ -38,10 +38,10 @@ export function skillInitial(name: string): string {
 }
 
 /**
- * Terminal glyph representing local / third-party capability.
+ * Folder glyph representing local / third-party filesystem installation.
  */
 export function ThirdPartyMarkGlyph({ className }: { className?: string }) {
-  return <Terminal className={cn("size-[72%]", className)} aria-hidden="true" />;
+  return <Folder className={cn("size-[72%]", className)} aria-hidden="true" />;
 }
 
 /** Check if class name represents a micro-sized element (< 24px) where badges would collide. */
@@ -51,9 +51,9 @@ export function isMicroSize(className?: string): boolean {
 }
 
 /**
- * Dual-layer avatar for third-party / local skills (Option 4):
- * - Center: Monogram letter extracted from the skill's name (or Terminal glyph if no name).
- * - Bottom-Right Badge: Local Terminal badge (or amber Link2 badge when linkable).
+ * Dual-layer avatar for third-party / local skills (Monogram + Folder badge):
+ * - Center: Monogram letter extracted from the skill's name (or Folder glyph if no name).
+ * - Bottom-Right Badge: Folder badge (or amber Link2 badge when linkable).
  */
 export function ThirdPartyMark({
   name,
@@ -106,7 +106,7 @@ export function ThirdPartyMark({
                     {candidate ? (
                       <Link2 className="size-[65%]" />
                     ) : (
-                      <Terminal className="size-[65%]" />
+                      <Folder className="size-[65%]" />
                     )}
                   </span>
                 )}

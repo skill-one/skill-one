@@ -6,6 +6,7 @@ import { skillDescription } from "../../lib/i18n-content";
 import {
   isInstallableSkill,
   isLiveSkill,
+  isThirdPartySkill,
   skillDisplayName,
   type SkillView,
 } from "../../lib/skill-view";
@@ -157,19 +158,11 @@ export function SkillGridCard({
         )}
         {/* Name row: owner avatar plus the name, both on one line. */}
         <div className={cn("flex min-w-0 items-center gap-2", checkable && "pr-6")}>
-          {owner ? (
-            <div className="relative inline-flex shrink-0 items-center">
-              <OwnerAvatar
-                owner={owner}
-                className="size-6 shrink-0 text-[10px]"
-              />
-              {skill.origin === "local" && (
-                <span
-                  title={t("detail.sourceViaLink")}
-                  className="absolute -bottom-0.5 -right-0.5 flex size-2 items-center justify-center rounded-full bg-amber-500 ring-1 ring-background"
-                />
-              )}
-            </div>
+          {!isThirdPartySkill(skill) && owner ? (
+            <OwnerAvatar
+              owner={owner}
+              className="size-6 shrink-0 text-[10px]"
+            />
           ) : (
             (extra ?? (
               <ThirdPartyMark
