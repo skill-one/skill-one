@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.23.1"
+version = "0.24.0"
 description = "Skill One"
 authors = ["you"]
 license = ""
