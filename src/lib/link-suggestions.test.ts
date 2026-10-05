@@ -23,6 +23,7 @@ const {
   savePendingRecords,
   dismissSkillSource,
   isTauri,
+  searchSkillsSh,
 } = vi.hoisted(() => ({
   namesakeSkills: vi.fn(),
   getRegistrySnapshot: vi.fn(),
@@ -32,10 +33,15 @@ const {
   savePendingRecords: vi.fn(),
   dismissSkillSource: vi.fn(),
   isTauri: vi.fn(),
+  searchSkillsSh: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("./registry/client", () => ({ namesakeSkills, getRegistrySnapshot }));
 vi.mock("./tauri", () => ({ isTauri }));
+vi.mock("./skills-sh", () => ({
+  searchSkillsSh,
+  isSearchableQuery: (q: string) => q.trim().length >= 2,
+}));
 vi.mock("./skills-manager", () => ({
   skillFingerprint,
   // The activity log's append path: this module links skills, which records an
@@ -116,6 +122,7 @@ beforeEach(() => {
   isTauri.mockReturnValue(true);
   mockLedger();
   mockReady([]);
+  searchSkillsSh.mockResolvedValue([]);
   skillFingerprint.mockResolvedValue(null);
 });
 
@@ -540,6 +547,54 @@ describe("resolveAssociations", () => {
       ETAG,
     );
   });
+
+  it("falls back to skills.sh when store has no namesake", async () => {
+    mockReady([]);
+    searchSkillsSh.mockResolvedValue([
+      {
+        name: "pdf",
+        id: "acme/skills/pdf",
+        repo: "acme/skills",
+        description: "",
+        stars: 0,
+        downloads: 500,
+        url: "https://www.skills.sh/acme/skills/pdf",
+        storeBacked: false,
+      },
+    ]);
+
+    const { linked, suggestions } = await resolveAssociations([
+      { name: "pdf", description: "Read PDF files." },
+    ]);
+
+    expect(linked).toEqual([]);
+    expect(suggestions.pdf).toHaveLength(1);
+    expect(suggestions.pdf[0].skill.repo).toBe("acme/skills");
+    expect(suggestions.pdf[0].skill.downloads).toBe(500);
+  });
+
+  it("filters out non-exact slug results from skills.sh fallback", async () => {
+    mockReady([]);
+    searchSkillsSh.mockResolvedValue([
+      {
+        name: "pdf-extractor",
+        id: "acme/skills/pdf-extractor",
+        repo: "acme/skills",
+        description: "",
+        stars: 0,
+        downloads: 500,
+        url: "https://www.skills.sh/acme/skills/pdf-extractor",
+        storeBacked: false,
+      },
+    ]);
+
+    const { linked, suggestions } = await resolveAssociations([
+      { name: "pdf", description: "Read PDF files." },
+    ]);
+
+    expect(linked).toEqual([]);
+    expect(suggestions).toEqual({});
+  });
 });
 
 describe("findLinkCandidates", () => {
@@ -551,6 +606,26 @@ describe("findLinkCandidates", () => {
     expect(candidates.map((c) => c.skill.repo)).toEqual(["a/skills", "b/skills"]);
     expect(recordSkillProvenanceBatch).not.toHaveBeenCalled();
     expect(savePendingRecords).not.toHaveBeenCalled();
+  });
+
+  it("falls back to skills.sh when store has no namesake", async () => {
+    mockReady([]);
+    searchSkillsSh.mockResolvedValue([
+      {
+        name: "pdf",
+        id: "acme/skills/pdf",
+        repo: "acme/skills",
+        description: "",
+        stars: 0,
+        downloads: 500,
+        url: "https://www.skills.sh/acme/skills/pdf",
+        storeBacked: false,
+      },
+    ]);
+
+    const candidates = await findLinkCandidates("pdf");
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].skill.repo).toBe("acme/skills");
   });
 
   it("excludes the currently linked repo", async () => {

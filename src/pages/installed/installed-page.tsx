@@ -69,6 +69,9 @@ import { RepoCard } from "../explore/repo-card";
 import { SearchResults, type SearchRow } from "../explore/search-results";
 import { CollapsibleSection } from "../../components/collapsible-section";
 import { splitByEnabled } from "../../lib/enabled-split";
+import { SourceLinkBanner, type LinkableSkill } from "./source-link-banner";
+import { SourceLinkBatchDialog } from "./source-link-batch-dialog";
+import { recordSkillProvenanceBatch } from "../../lib/provenance";
 
 /** Placeholder cards while the on-disk list is first read. */
 const SKELETON_CARDS = 8;
@@ -315,6 +318,55 @@ export function InstalledPage() {
   const storeEntries = useInstalledStoreEntries(linked);
 
   const list = useMemo(() => skills ?? [], [skills]);
+
+  // Detected local skills that can be linked to store sources
+  const linkableSkills = useMemo<LinkableSkill[]>(() => {
+    if (!suggestions) return [];
+    const result: LinkableSkill[] = [];
+    for (const skill of list) {
+      const isLinked = !!linked?.[skill.name] || !!skill.repo;
+      if (isLinked) continue;
+      const candidates = suggestions[skill.name];
+      if (candidates && candidates.length > 0) {
+        result.push({
+          name: skill.name,
+          localDescription: skill.description,
+          candidates,
+          recommendedCandidate: candidates[0],
+        });
+      }
+    }
+    return result;
+  }, [list, linked, suggestions]);
+
+  const [dismissedSkills, setDismissedSkills] = useState<string[]>(() => {
+    try {
+      const raw = sessionStorage.getItem("skill-one:source-link-dismissed");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+
+  const isBannerDismissed = useMemo(() => {
+    if (linkableSkills.length === 0) return true;
+    return linkableSkills.every((s) => dismissedSkills.includes(s.name));
+  }, [linkableSkills, dismissedSkills]);
+
+  const handleDismissBanner = useCallback(() => {
+    const updated = Array.from(
+      new Set([...dismissedSkills, ...linkableSkills.map((s) => s.name)]),
+    );
+    setDismissedSkills(updated);
+    try {
+      sessionStorage.setItem(
+        "skill-one:source-link-dismissed",
+        JSON.stringify(updated),
+      );
+    } catch {}
+  }, [dismissedSkills, linkableSkills]);
 
   // What the reader is looking for and how the list reads: both are shared
   // with the store's list (see `lib/list-view`), so they are read from the
@@ -908,6 +960,46 @@ export function InstalledPage() {
   const multiSelect = useMultiSelect<string>();
   const [bulkLoading, setBulkLoading] = useState(false);
 
+  const handleBatchLink = useCallback(
+    async (
+      selections: readonly {
+        name: string;
+        repo: string;
+        defaultTags?: readonly string[];
+      }[],
+    ) => {
+      try {
+        const entries = selections.map((item) => ({
+          name: item.name,
+          repo: item.repo,
+          reason: "confirm" as const,
+          defaultTags: item.defaultTags,
+        }));
+        await recordSkillProvenanceBatch(entries);
+        await markSkillsChanged(queryClient);
+        toast.add({
+          title: t("sourceLink.batchLinkSuccess", { count: entries.length }),
+          type: "success",
+        });
+      } catch (e) {
+        toast.add({
+          title: t("sourceLink.batchLinkFailed"),
+          type: "error",
+        });
+      }
+    },
+    [queryClient, t],
+  );
+
+  const handleLinkAllRecommended = useCallback(async () => {
+    const selections = linkableSkills.map((s) => ({
+      name: s.name,
+      repo: s.recommendedCandidate.skill.repo,
+      defaultTags: s.recommendedCandidate.skill.profile?.domain,
+    }));
+    await handleBatchLink(selections);
+  }, [linkableSkills, handleBatchLink]);
+
   const allVisibleKeys = useMemo(
     () => rows.map((r) => skillKey(r.skill)),
     [rows],
@@ -1149,6 +1241,15 @@ export function InstalledPage() {
         searching={isSearching}
       />
 
+      {!isSearching && !isBannerDismissed && linkableSkills.length > 0 && (
+        <SourceLinkBanner
+          skills={linkableSkills}
+          onLinkAll={handleLinkAllRecommended}
+          onOpenReview={() => setBatchDialogOpen(true)}
+          onDismiss={handleDismissBanner}
+        />
+      )}
+
       {/* The list — repository cards, skill rows or grid squares; the modal
           detail drawer overlays any without reflowing it or moving its scroll
           position. The element is the page's own scroller, whose position the
@@ -1334,6 +1435,13 @@ export function InstalledPage() {
         onSelect={setSelectedKey}
         onRemoved={() => setSelectedKey(null)}
         surface="installed"
+      />
+
+      <SourceLinkBatchDialog
+        open={batchDialogOpen}
+        onOpenChange={setBatchDialogOpen}
+        skills={linkableSkills}
+        onConfirm={handleBatchLink}
       />
 
       {unit !== "repo" && (

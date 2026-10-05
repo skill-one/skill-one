@@ -44,6 +44,7 @@ import { skillFingerprint } from "./skills-manager";
 import { isTauri } from "./tauri";
 import { descriptionSimilarity } from "./description-similarity";
 import { popularity } from "./popularity";
+import { isSearchableQuery, searchSkillsSh } from "./skills-sh";
 import {
   dismissSkillSource,
   loadPendingRecords,
@@ -186,6 +187,43 @@ export async function unlinkSkillSource(
 }
 
 /**
+ * When the registry index carries no store namesake for `name`, fallback to
+ * searching skills.sh live for exact same-slug entries.
+ */
+async function findNamesakesWithSkillsShFallback(
+  name: string,
+  namesakes: Skill[],
+): Promise<Skill[]> {
+  if (namesakes.length > 0 || !isSearchableQuery(name)) return namesakes;
+  try {
+    const hits = await searchSkillsSh(name);
+    const exact = hits.filter(
+      (h) => h.name.toLowerCase() === name.toLowerCase() && h.repo,
+    );
+    const seenRepos = new Set<string>();
+    const result: Skill[] = [];
+    for (const h of exact) {
+      if (!seenRepos.has(h.repo)) {
+        seenRepos.add(h.repo);
+        result.push({
+          name: h.name,
+          id: h.id,
+          displayName: h.displayName,
+          repo: h.repo,
+          description: h.description || "",
+          stars: h.stars || 0,
+          downloads: h.downloads || 0,
+          url: h.url,
+        });
+      }
+    }
+    return result;
+  } catch {
+    return namesakes;
+  }
+}
+
+/**
  * On-demand candidates for the detail drawer's change-source popover: the
  * namesakes of `name` ranked by description similarity, minus the currently
  * linked repo. A pure lookup — nothing is written; the caller records the
@@ -196,8 +234,13 @@ export async function findLinkCandidates(
   description?: string,
   opts?: { excludeRepo?: string },
 ): Promise<LinkCandidate[]> {
+  if (!getRegistrySnapshot().ready) return [];
   const byName = await findNamesakes([name]);
-  return rankNamesakes(byName.get(name) ?? [], description ?? "").filter(
+  let namesakes = byName.get(name) ?? [];
+  if (namesakes.length === 0) {
+    namesakes = await findNamesakesWithSkillsShFallback(name, namesakes);
+  }
+  return rankNamesakes(namesakes, description ?? "").filter(
     (c) => !opts?.excludeRepo || c.skill.repo !== opts.excludeRepo,
   );
 }
@@ -325,7 +368,10 @@ export async function resolveAssociations(
 
   await Promise.all(
     outstanding.map(async ({ skill, cached }) => {
-      const namesakes = byName.get(skill.name) ?? [];
+      let namesakes = byName.get(skill.name) ?? [];
+      if (namesakes.length === 0 && getRegistrySnapshot().ready) {
+        namesakes = await findNamesakesWithSkillsShFallback(skill.name, namesakes);
+      }
       if (namesakes.length === 0) {
         resolved.set(skill.name, []);
         if (cached) {

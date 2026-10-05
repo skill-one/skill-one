@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Loader2, Star } from "lucide-react";
+import { Download, Loader2, Star } from "lucide-react";
 
 import { useAppLocale } from "../i18n/use-language";
 import { skillDescription } from "../lib/i18n-content";
@@ -85,6 +85,14 @@ export function LinkCandidateList({
                       <Star className="size-2.5 fill-amber-500/30 text-amber-500" aria-hidden />
                       {formatCount(skill.stars)}
                     </span>
+                  ) : skill.downloads > 0 ? (
+                    <span
+                      className="inline-flex items-center gap-0.5 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[9px] font-medium tabular-nums text-muted-foreground"
+                      title={t("sourceLink.downloadsTitle")}
+                    >
+                      <Download className="size-2.5" aria-hidden />
+                      {formatCount(skill.downloads)}
+                    </span>
                   ) : null}
                 </div>
               </div>
@@ -92,12 +100,14 @@ export function LinkCandidateList({
               {/* Row 2: Description + Similarity */}
               <div className="flex items-baseline justify-between gap-2 min-w-0 w-full">
                 <span className="line-clamp-1 truncate text-[11px] leading-snug text-muted-foreground group-hover:text-foreground/80">
-                  {skillDescription(skill, locale)}
+                  {skillDescription(skill, locale) || t("sourceLink.skillsShResult")}
                 </span>
                 <span className="shrink-0 text-[10px] text-muted-foreground/75 tabular-nums">
-                  {t("sourceLink.similarity", {
-                    percent: Math.round(similarity * 100),
-                  })}
+                  {similarity > 0
+                    ? t("sourceLink.similarity", {
+                        percent: Math.round(similarity * 100),
+                      })
+                    : t("sourceLink.fromSkillsSh")}
                 </span>
               </div>
             </button>

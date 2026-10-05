@@ -4,6 +4,7 @@
     "categories": "Categories"
   },
   "common": {
+    "cancel": "Cancel",
     "unknown": "Unknown",
     "unknownError": "Unknown error",
     "noDescription": "No description",
@@ -212,8 +213,24 @@
     "recommendedBadge": "Recommended",
     "localLabel": "Local description",
     "starsTitle": "Repository stars",
+    "downloadsTitle": "skills.sh installs",
+    "fromSkillsSh": "via skills.sh",
+    "skillsShResult": "skills.sh search result",
     "similarity": "{{percent}}% similar description",
-    "footnote": "Only the source is recorded; local files stay unchanged."
+    "footnote": "Only the source is recorded; local files stay unchanged.",
+    "bannerTitle": "Found {{count}} skills available to link",
+    "bannerSubtitle": "Including {{names}}; link to get auto-updates and documentation",
+    "reviewAction": "Review...",
+    "linkAllAction": "Link recommended ({{count}})",
+    "dismissBanner": "Dismiss banner",
+    "batchLinkSuccess": "Successfully linked {{count}} skill sources",
+    "batchLinkFailed": "Failed to link sources",
+    "dialogTitle": "Link skill sources",
+    "dialogDescription": "Choose store repositories for detected local skills to enable auto-updates and full details.",
+    "dialogSelectAll": "Select all",
+    "dialogConfirmAction": "Confirm linking ({{count}})",
+    "dialogNoSelection": "No skills selected",
+    "dialogChangeCandidate": "Change source repository"
   },
   "refresh": {
     "dataUpdated": "Skill data updated to the latest snapshot"

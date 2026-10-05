@@ -4,6 +4,7 @@
     "categories": "分类"
   },
   "common": {
+    "cancel": "取消",
     "unknown": "未知",
     "unknownError": "未知错误",
     "noDescription": "暂无描述",
@@ -212,8 +213,24 @@
     "recommendedBadge": "推荐",
     "localLabel": "本地描述",
     "starsTitle": "仓库星标数",
+    "downloadsTitle": "skills.sh 安装数",
+    "fromSkillsSh": "来自 skills.sh",
+    "skillsShResult": "skills.sh 搜索结果",
     "similarity": "描述相似 {{percent}}%",
-    "footnote": "仅记录来源，本地文件不变"
+    "footnote": "仅记录来源，本地文件不变",
+    "bannerTitle": "发现 {{count}} 个本地技能可关联商店来源",
+    "bannerSubtitle": "包含 {{names}}，关联后可获取自动更新与官方文档",
+    "reviewAction": "逐项查看...",
+    "linkAllAction": "一键关联推荐源 ({{count}})",
+    "dismissBanner": "关闭提示",
+    "batchLinkSuccess": "已成功关联 {{count}} 个技能来源",
+    "batchLinkFailed": "批量关联来源失败",
+    "dialogTitle": "关联技能来源",
+    "dialogDescription": "为检测到的本地技能选择商店来源仓库，关联后可获取自动更新与详细说明。",
+    "dialogSelectAll": "全选",
+    "dialogConfirmAction": "确认关联 ({{count}})",
+    "dialogNoSelection": "未选择技能",
+    "dialogChangeCandidate": "更换来源仓库"
   },
   "refresh": {
     "dataUpdated": "技能数据已更新到最新快照"

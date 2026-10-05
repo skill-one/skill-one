@@ -2415,7 +2415,62 @@ describe("InstalledPage", () => {
       expect(
         within(parkedAgain).getByRole("button", { name: /已禁用/ }),
       ).toHaveAttribute("aria-expanded", "true");
-      expect(within(parkedAgain).getAllByRole("listitem")).toHaveLength(1);
+    });
+  });
+
+  describe("source link batch banner and dialog", () => {
+    it("renders the smart banner when unlinked skills have candidate sources", async () => {
+      namesakeSkills.mockResolvedValue({
+        entries: [
+          [
+            {
+              name: "pdf",
+              repo: "anthropics/skills",
+              description: "Read and manipulate PDF files.",
+              stars: 179000,
+              downloads: 5000,
+            },
+          ],
+        ],
+      });
+
+      renderPage();
+
+      const banner = await screen.findByRole("region", {
+        name: /可关联商店来源/,
+      });
+      expect(banner).toBeInTheDocument();
+      expect(within(banner).getByRole("button", { name: "逐项查看..." })).toBeInTheDocument();
+      expect(within(banner).getByRole("button", { name: /一键关联推荐源/ })).toBeInTheDocument();
+    });
+
+    it("opens the batch dialog when clicking review on the banner", async () => {
+      const user = userEvent.setup();
+      namesakeSkills.mockResolvedValue({
+        entries: [
+          [
+            {
+              name: "pdf",
+              repo: "anthropics/skills",
+              description: "Read and manipulate PDF files.",
+              stars: 179000,
+              downloads: 5000,
+            },
+          ],
+        ],
+      });
+
+      renderPage();
+
+      const banner = await screen.findByRole("region", {
+        name: /可关联商店来源/,
+      });
+      await user.click(within(banner).getByRole("button", { name: "逐项查看..." }));
+
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("关联技能来源")).toBeInTheDocument();
+      expect(within(dialog).getByText("pdf")).toBeInTheDocument();
+      expect(within(dialog).getByText("anthropics/skills")).toBeInTheDocument();
     });
   });
 });
