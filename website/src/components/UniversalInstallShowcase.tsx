@@ -43,7 +43,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
   };
 
   const handleCopyCli = () => {
-    navigator.clipboard.writeText('npx skills add @antigravity/shadcn-ui');
+    void navigator.clipboard.writeText('npx skills add @antigravity/shadcn-ui');
     setCopiedCli(true);
     setTimeout(() => setCopiedCli(false), 2500);
   };

@@ -53,7 +53,7 @@ export function AgentEcosystem({ lang = 'en' }: AgentEcosystemProps) {
   }, []);
 
   const handleCopyPath = (agentName: string, path: string) => {
-    navigator.clipboard.writeText(path);
+    void navigator.clipboard.writeText(path);
     setCopiedAgent(agentName);
     setTimeout(() => setCopiedAgent(null), 2000);
   };
