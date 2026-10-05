@@ -1157,7 +1157,11 @@ describe("ExplorePage search", () => {
     );
 
   it("lets a search ignore the domain filter", async () => {
-    const user = userEvent.setup();
+    // delay: null makes the run of keystrokes synchronous, so the 150 ms
+    // settle timer can only fire once the word is finished. On a loaded CI
+    // runner the default inter-keystroke awaits exceed the settle window and
+    // the word commits half-typed, remounting the search answer mid-assertion.
+    const user = userEvent.setup({ delay: null });
     harness.reset();
     harness.init();
     harness.pushAll([
@@ -1201,7 +1205,10 @@ describe("ExplorePage search", () => {
   });
 
   it("answers a search with skill rows in the skill unit", async () => {
-    const user = userEvent.setup();
+    // delay: null, as in "lets a search ignore the domain filter" above: a
+    // loaded CI runner types slower than the settle window, and a half-typed
+    // commit remounts the answer and detaches the row under the assertion.
+    const user = userEvent.setup({ delay: null });
     bootGadgetRegistry();
     renderExplorePage();
 
