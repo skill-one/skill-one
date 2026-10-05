@@ -351,8 +351,70 @@ export function serializeLedger(
 
 const BROWSER_STORAGE_KEY = "skill-one.provenance";
 
+export const DEFAULT_BROWSER_PREVIEW_LEDGER: SkillOneConfig = {
+  version: 1,
+  skills: {
+    pdf: {
+      origin: "store",
+      repo: "anthropics/skills",
+      tags: ["documents", "效率工具"],
+    },
+    "frontend-design": {
+      origin: "store",
+      repo: "shadcn/ui",
+      tags: ["frontend", "界面开发"],
+    },
+    "mcp-builder": {
+      origin: "store",
+      repo: "modelcontextprotocol/servers",
+      tags: ["mcp", "开发辅助"],
+    },
+    "code-review": {
+      origin: "local",
+      repo: "google-deepmind/skills",
+      tags: ["code-review", "AI Agent"],
+    },
+    "react-query-helper": {
+      origin: "local",
+      repo: "tanstack/query",
+      tags: ["frontend"],
+    },
+    "git-commit": {
+      origin: "local",
+      tags: ["效率工具", "开发辅助"],
+    },
+    "dingtalk-doc": {
+      origin: "local",
+      tags: ["办公写作"],
+    },
+    "微信读书助手": {
+      origin: "local",
+      tags: ["阅读学习"],
+    },
+    "🤖-auto-agent": {
+      origin: "local",
+      tags: ["AI Agent"],
+    },
+    "legacy-data-cleaner": {
+      origin: "local",
+    },
+  },
+  customTags: [
+    { key: "效率工具", label: "效率工具" },
+    { key: "AI Agent", label: "AI Agent" },
+    { key: "开发辅助", label: "开发辅助" },
+    { key: "办公写作", label: "办公写作" },
+    { key: "阅读学习", label: "阅读学习" },
+    { key: "界面开发", label: "界面开发" },
+  ],
+};
+
 async function loadLedger(): Promise<ParsedLedger> {
-  const raw = isTauri() ? await readProvenanceRaw() : storage.getItem(BROWSER_STORAGE_KEY);
+  let raw = isTauri() ? await readProvenanceRaw() : storage.getItem(BROWSER_STORAGE_KEY);
+  if (!isTauri() && !raw && import.meta.env.MODE !== "test" && !import.meta.env.VITEST) {
+    storage.setItem(BROWSER_STORAGE_KEY, serializeLedger(DEFAULT_BROWSER_PREVIEW_LEDGER));
+    raw = storage.getItem(BROWSER_STORAGE_KEY);
+  }
   return parseLedger(raw);
 }
 

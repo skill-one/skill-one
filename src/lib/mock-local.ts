@@ -26,7 +26,18 @@ export function mockPathFor(name: string): string {
  * fixed epochs: a pinned timestamp would drift into reading "3年前" for every
  * row over time instead of showing the spread.
  */
-const mockGlobalRows = [
+const isTestEnv =
+  import.meta.env.MODE === "test" || Boolean(import.meta.env.VITEST);
+
+interface MockSkillRow {
+  name: string;
+  description: string;
+  installedDaysAgo: number;
+  displayName?: string;
+  enabled?: boolean;
+}
+
+const mockTestRows: MockSkillRow[] = [
   {
     name: "pdf",
     description: "PDF 文档读取、生成、合并、拆分与标注。",
@@ -62,6 +73,45 @@ const mockGlobalRows = [
   },
 ];
 
+const mockBrowserPreviewRows: MockSkillRow[] = [
+  ...mockTestRows,
+  {
+    name: "react-query-helper",
+    displayName: "React Query Helper",
+    description: "React Query 状态流转与服务端缓存管理辅助工具。",
+    installedDaysAgo: 5,
+  },
+  {
+    name: "git-commit",
+    description: "智能 Git Conventional Commit 提交信息生成与检查工具。",
+    installedDaysAgo: 8,
+  },
+  {
+    name: "dingtalk-doc",
+    description: "钉钉文档读取、Markdown 解析与富文本导出工具。",
+    installedDaysAgo: 20,
+  },
+  {
+    name: "微信读书助手",
+    displayName: "微信读书助手",
+    description: "导出微信读书笔记、划线标注并同步到本地 Markdown。",
+    installedDaysAgo: 60,
+  },
+  {
+    name: "🤖-auto-agent",
+    displayName: "🤖-auto-agent",
+    description: "本地自动化 Agent 脚本执行器与任务链调度引擎。",
+    installedDaysAgo: 90,
+  },
+  {
+    name: "legacy-data-cleaner",
+    displayName: "Legacy Data Cleaner",
+    description: "旧版数据迁移与临时脏数据清洗脚本（已停用）。",
+    installedDaysAgo: 150,
+    enabled: false,
+  },
+];
+
 /** Unix seconds `days` ago, standing in for a directory's creation time. */
 function mockInstalledAt(days: number): number {
   return Math.floor(Date.now() / 1000) - days * 24 * 60 * 60;
@@ -73,6 +123,7 @@ function mockSkill(
   description: string,
   installedAt: number | null,
   displayName?: string,
+  enabled = true,
 ): InstalledSkill {
   return {
     name,
@@ -80,18 +131,20 @@ function mockSkill(
     // no distinct one folds to the slug.
     displayName: displayName ?? name,
     description,
-    enabled: true,
+    enabled,
     installedAt,
   };
 }
 
 function buildMockSkills(): InstalledSkill[] {
-  return mockGlobalRows.map((row) =>
+  const rows = isTestEnv ? mockTestRows : mockBrowserPreviewRows;
+  return rows.map((row) =>
     mockSkill(
       row.name,
       row.description,
       mockInstalledAt(row.installedDaysAgo),
-      "displayName" in row ? row.displayName : undefined,
+      row.displayName,
+      row.enabled ?? true,
     ),
   );
 }
