@@ -1852,7 +1852,9 @@ describe("InstalledPage", () => {
 
     it("preserves stable tag section order and fills progressively when installs exceed initial chunk", async () => {
       // 14 skills: 8 in development, 4 in data-analysis, 2 in office-productivity.
-      // Initial chunk is 6, so progressive reveal triggers across chunks.
+      // The skill unit's initial chunk is 12 (see `REVEAL`), so the first paint
+      // covers the two leading sections and the progressive reveal is what
+      // brings the last one in.
       const names = [
         "dev-1", "dev-2", "dev-3", "dev-4", "dev-5", "dev-6", "dev-7", "dev-8",
         "data-1", "data-2", "data-3", "data-4",
@@ -1895,15 +1897,17 @@ describe("InstalledPage", () => {
       await pickUnit(user, "列表");
       await pickSort(user, "标签");
 
-      // Initial chunk (6): only the first 6 items of the leading tag (开发编程) are mounted
+      // Initial chunk (12): the leading tag (开发编程) and the one after it are
+      // mounted whole; the last section waits for the reveal.
       const devSection = await screen.findByRole("region", { name: "开发编程" });
-      expect(rowsOf(devSection)).toHaveLength(6);
-      expect(screen.queryByRole("region", { name: "数据分析" })).toBeNull();
+      expect(rowsOf(devSection)).toHaveLength(8);
+      const initialDataSection = await screen.findByRole("region", { name: "数据分析" });
+      expect(rowsOf(initialDataSection)).toHaveLength(4);
       expect(screen.queryByRole("region", { name: "办公效率" })).toBeNull();
 
       // The header states the section's whole size from the first frame — the
       // answer already knows it — so the count never rewrites itself as the
-      // reveal grows: 6 mounted rows, but 8 skills named.
+      // reveal grows: 8 mounted rows, but 8 skills named.
       expect(devSection).toHaveTextContent("8 个 skill");
 
       // Scrolling sentinel into view reveals the rest of the answer

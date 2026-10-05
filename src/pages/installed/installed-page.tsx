@@ -12,7 +12,7 @@ import { useCustomTags } from "../../hooks/use-custom-tags";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useViewMemory } from "../../hooks/use-view-memory";
-import { setQuery } from "../../lib/list-view";
+import { setQuery, REVEAL } from "../../lib/list-view";
 import { buildSearchIndex } from "../../lib/search-index";
 import { domainsOf, taxonomyRank } from "../../lib/domain-filter";
 import { DOMAINS, domainEmoji, domainLabel } from "../../data/domains";
@@ -68,14 +68,6 @@ import { RepoCard } from "../explore/repo-card";
 import { SearchResults, type SearchRow } from "../explore/search-results";
 import { CollapsibleSection } from "../../components/collapsible-section";
 import { splitByEnabled } from "../../lib/enabled-split";
-
-/**
- * How many repository cards mount with the page, and how many more mount each
- * time the reader scrolls the list's sentinel into view — the same progressive
- * pacing the store's lists use.
- */
-const INITIAL_CARDS = 6;
-const CARD_CHUNK = 6;
 
 /** Placeholder cards while the on-disk list is first read. */
 const SKELETON_CARDS = 8;
@@ -361,7 +353,7 @@ export function InstalledPage() {
   // return, folds and place together.
   const [view, setView] = useViewMemory<InstalledView>(
     "installed",
-    { folds: {}, reveal: INITIAL_CARDS },
+    { folds: {}, reveal: REVEAL[unit].initial },
     listRef,
     { ready: !isLoading && list.length > 0, signature },
   );
@@ -399,9 +391,11 @@ export function InstalledPage() {
     shownAnswer.current = signature;
     setSelectedKey(null);
     setView((v) =>
-      v.reveal === INITIAL_CARDS ? v : { ...v, reveal: INITIAL_CARDS },
+      v.reveal === REVEAL[unit].initial
+        ? v
+        : { ...v, reveal: REVEAL[unit].initial },
     );
-  }, [signature, setView]);
+  }, [signature, setView, unit]);
 
   // Deep link onto the installed list: `/installed?skill=<name>` asks the
   // list's own question, which ranks the targeted skill near the top of the
@@ -651,13 +645,13 @@ export function InstalledPage() {
       if (entries.some((entry) => entry.isIntersecting)) {
         setView((v) => ({
           ...v,
-          reveal: Math.min(v.reveal + CARD_CHUNK, itemCount),
+          reveal: Math.min(v.reveal + REVEAL[unit].step, itemCount),
         }));
       }
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [done, itemCount, renderedCount, setView]);
+  }, [done, itemCount, renderedCount, setView, unit]);
 
   // The skill unit's answer, divided by whether a skill takes part at all: the
   // live installs first, the parked ones in a section of their own below. The

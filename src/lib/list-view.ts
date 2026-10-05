@@ -75,6 +75,27 @@ export const LIST_SORTS: Readonly<Record<Destination, readonly ListSort[]>> = {
  */
 export type ListUnit = "repo" | "skill" | "grid";
 
+/**
+ * How much of an answer mounts with the page, and how much more each
+ * scroll-to-bottom reveals — per unit, because the three shapes hold very
+ * different numbers of entries per screen. A chunk is a screenful, not a token
+ * number: the first paint should cover the viewport, which the shared figures
+ * the pages used before could not do for every shape at once (6 entries fill
+ * two screens of repository cards but under half a screen of squares).
+ *
+ * Measured at the app's default window (1280×800, 13rem sidebar): a grid
+ * screen holds ~15-20 squares, a row screen ~9-10 rows, a card screen ~3
+ * repository cards. The figures leave a margin over one screen so the
+ * sentinel's first extension is a scroll, not a mount already due.
+ */
+export const REVEAL: Readonly<
+  Record<ListUnit, { initial: number; step: number }>
+> = {
+  grid: { initial: 18, step: 18 },
+  skill: { initial: 12, step: 12 },
+  repo: { initial: 6, step: 6 },
+};
+
 /** One list's own reading: what it answers, in what order, in what shape, narrowed to what. */
 export interface DestinationView {
   /**

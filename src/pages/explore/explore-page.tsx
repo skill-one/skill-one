@@ -7,7 +7,7 @@ import { skillKey } from "../../lib/skill-view";
 import { useRegistryStats } from "../../hooks/use-registry-stats";
 import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { domainFacets, domainsOf } from "../../lib/domain-filter";
-import { LIST_SORTS } from "../../lib/list-view";
+import { LIST_SORTS, REVEAL } from "../../lib/list-view";
 import { byRepoRank } from "../../lib/registry/repo-rank";
 import {
   REPO_CARD_SKELETON_CLASS,
@@ -39,16 +39,6 @@ const byInstalls = (
   b.skill.downloads - a.skill.downloads ||
   a.skill.repo.localeCompare(b.skill.repo) ||
   a.skill.name.localeCompare(b.skill.name);
-
-/**
- * How many repository cards mount with the page, and how many more mount each
- * time the reader scrolls the list's sentinel into view. The page has no
- * pagination — rendering, not folding, is what paces the list: the first chunk
- * paints with the page, and each scroll-to-bottom extends the run until every
- * card of the answer is on screen.
- */
-const INITIAL_GROUPS = 6;
-const GROUP_CHUNK = 6;
 
 /**
  * The explore page's remembered view: how deep the list had been revealed.
@@ -129,7 +119,7 @@ export function ExplorePage() {
   // nothing.
   const [view, setView] = useViewMemory<ExploreView>(
     "explore",
-    { visibleCount: INITIAL_GROUPS },
+    { visibleCount: REVEAL[unit].initial },
     listRef,
     { ready: stats.count > 0, signature },
   );
@@ -248,13 +238,13 @@ export function ExplorePage() {
       if (entries.some((entry) => entry.isIntersecting)) {
         setView((v) => ({
           ...v,
-          visibleCount: Math.min(v.visibleCount + GROUP_CHUNK, itemCount),
+          visibleCount: Math.min(v.visibleCount + REVEAL[unit].step, itemCount),
         }));
       }
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [allRendered, itemCount, renderedCount, setView]);
+  }, [allRendered, itemCount, renderedCount, setView, unit]);
 
   // The skill shown in the detail panel, by identity; null keeps the panel
   // closed. Clicking a row while the panel is open simply swaps the selection,
@@ -289,11 +279,11 @@ export function ExplorePage() {
     shownAnswer.current = signature;
     setSelected(null);
     setView((v) =>
-      v.visibleCount === INITIAL_GROUPS
+      v.visibleCount === REVEAL[unit].initial
         ? v
-        : { ...v, visibleCount: INITIAL_GROUPS },
+        : { ...v, visibleCount: REVEAL[unit].initial },
     );
-  }, [signature, setView]);
+  }, [signature, setView, unit]);
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 pt-3 pb-5">

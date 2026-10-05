@@ -7,7 +7,7 @@ import { useProgressiveReveal } from "../../hooks/use-progressive-reveal";
 import { useSkillsShSearch } from "../../hooks/use-skills-sh-search";
 import { openExternal } from "../../lib/open-external";
 import { skillKey, type SkillView } from "../../lib/skill-view";
-import type { Destination, ListUnit } from "../../lib/list-view";
+import { REVEAL, type Destination, type ListUnit } from "../../lib/list-view";
 import {
   REPO_CARD_SKELETON_CLASS,
   REPO_LIST_CLASS,
@@ -108,16 +108,6 @@ export interface SearchRow {
 /** React-key identity of the pool card. */
 const LOCAL_POOL_KEY = "local";
 
-/**
- * How much of the registry's answer mounts with the question, and how much more
- * each scroll to the end of it brings. A chunk is a screenful rather than a
- * token number: the answer should be readable before the reader has scrolled at
- * all, which is the whole difference between a search that feels instant and one
- * that feels like it is still working.
- */
-const INITIAL_HITS = 12;
-const HIT_CHUNK = 12;
-
 export function SearchResults({
   unit,
   query,
@@ -190,8 +180,8 @@ export function SearchResults({
     // The repository unit lists repositories; the two skill shapes (rows and
     // the compact grid) list skills, one entry each either way.
     total: unit === "repo" ? storeGroups.length : storeHits.length,
-    initial: INITIAL_HITS,
-    step: HIT_CHUNK,
+    initial: REVEAL[unit].initial,
+    step: REVEAL[unit].step,
     resetKey: `${unit}\u0000${query}`,
   });
 
