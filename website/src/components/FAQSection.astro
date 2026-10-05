@@ -1,0 +1,48 @@
+---
+import { translations } from '../i18n/translations';
+import { HelpCircle, ChevronDown } from 'lucide-react';
+
+interface Props {
+  lang?: 'en' | 'zh';
+}
+
+const { lang = 'en' } = Astro.props;
+const t = translations[lang].faq;
+---
+
+<section id="faq" class="py-24 relative">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6">
+    <!-- Header -->
+    <div class="text-center max-w-2xl mx-auto mb-16">
+      <span class="text-xs font-semibold uppercase tracking-wider text-blue-400 font-mono">
+        {t.eyebrow}
+      </span>
+      <h2 class="text-3xl sm:text-4xl font-bold text-white tracking-tight mt-2 mb-4">
+        {t.title}
+      </h2>
+      <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+        {t.subtitle}
+      </p>
+    </div>
+
+    <!-- FAQ Accordion List -->
+    <div class="space-y-4">
+      {t.items.map((item, idx) => (
+        <details class="group rounded-2xl border border-white/10 bg-slate-900/60 p-5 backdrop-blur-md transition-all duration-200 open:border-blue-500/30 open:bg-slate-900/90">
+          <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-sm sm:text-base text-white focus:outline-none">
+            <span class="flex items-center gap-3">
+              <span class="size-6 rounded-md bg-blue-500/10 text-blue-400 text-xs font-mono flex items-center justify-center shrink-0">
+                0{idx + 1}
+              </span>
+              <span>{item.q}</span>
+            </span>
+            <ChevronDown class="size-4 text-slate-400 transition-transform duration-200 group-open:rotate-180 shrink-0 ml-4" />
+          </summary>
+          <div class="mt-4 pt-3 border-t border-white/5 text-xs sm:text-sm text-slate-300 leading-relaxed pl-9">
+            {item.a}
+          </div>
+        </details>
+      ))}
+    </div>
+  </div>
+</section>

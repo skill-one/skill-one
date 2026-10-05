@@ -1,0 +1,140 @@
+---
+import { translations } from '../i18n/translations';
+import { XCircle, CheckCircle2, ArrowRight, FolderSync, AlertTriangle, ShieldCheck } from 'lucide-react';
+
+interface Props {
+  lang?: 'en' | 'zh';
+}
+
+const { lang = 'en' } = Astro.props;
+const t = translations[lang].problem;
+const isZh = lang === 'zh';
+---
+
+<section id="problem-solution" class="py-24 relative border-t border-white/[0.08] bg-[#070b14]/50">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6">
+    <!-- Header -->
+    <div class="text-center max-w-3xl mx-auto mb-16">
+      <span class="text-xs font-semibold uppercase tracking-wider text-blue-400 font-mono">
+        {t.eyebrow}
+      </span>
+      <h2 class="text-3xl sm:text-4xl font-bold text-white tracking-tight mt-2 mb-4">
+        {t.title}
+      </h2>
+      <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+        {t.subtitle}
+      </p>
+    </div>
+
+    <!-- 2-Column Side-by-Side Comparison -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+      {/* LEFT: Without Skill One */}
+      <div class="rounded-2xl border border-red-500/20 bg-slate-900/40 p-6 sm:p-8 flex flex-col justify-between backdrop-blur-sm relative overflow-hidden">
+        <div class="absolute -top-12 -right-12 size-36 bg-red-500/10 blur-3xl pointer-events-none rounded-full"></div>
+
+        <div>
+          <div class="flex items-center gap-3 mb-6">
+            <div class="size-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+              <XCircle class="size-5" />
+            </div>
+            <div>
+              <h3 class="text-lg font-bold text-white leading-tight">{t.withoutTitle}</h3>
+              <p class="text-xs text-red-400/80">{t.withoutDesc}</p>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <div class="p-4 rounded-xl bg-black/30 border border-red-500/10">
+              <h4 class="text-sm font-semibold text-slate-200 flex items-center gap-2 mb-1">
+                <AlertTriangle class="size-4 text-red-400" />
+                {t.pains.duplication.title}
+              </h4>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                {t.pains.duplication.desc}
+              </p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-black/30 border border-red-500/10">
+              <h4 class="text-sm font-semibold text-slate-200 flex items-center gap-2 mb-1">
+                <AlertTriangle class="size-4 text-red-400" />
+                {t.pains.drift.title}
+              </h4>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                {t.pains.drift.desc}
+              </p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-black/30 border border-red-500/10">
+              <h4 class="text-sm font-semibold text-slate-200 flex items-center gap-2 mb-1">
+                <AlertTriangle class="size-4 text-red-400" />
+                {t.pains.overhead.title}
+              </h4>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                {t.pains.overhead.desc}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 pt-4 border-t border-white/5 text-[11px] text-slate-400 font-mono flex items-center justify-between">
+          <span>{isZh ? '手动同步维护成本' : 'Manual maintenance effort'}</span>
+          <span class="text-red-400 font-semibold">{isZh ? '高耗时 / 易出错' : 'High / Prone to Errors'}</span>
+        </div>
+      </div>
+
+      {/* RIGHT: With Skill One */}
+      <div class="rounded-2xl border border-emerald-500/30 bg-slate-900/60 p-6 sm:p-8 flex flex-col justify-between backdrop-blur-md relative overflow-hidden shadow-xl shadow-emerald-950/20">
+        <div class="absolute -top-12 -right-12 size-36 bg-emerald-500/15 blur-3xl pointer-events-none rounded-full"></div>
+
+        <div>
+          <div class="flex items-center gap-3 mb-6">
+            <div class="size-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <CheckCircle2 class="size-5" />
+            </div>
+            <div>
+              <h3 class="text-lg font-bold text-white leading-tight">{t.withTitle}</h3>
+              <p class="text-xs text-emerald-400/90">{t.withDesc}</p>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20">
+              <h4 class="text-sm font-semibold text-emerald-200 flex items-center gap-2 mb-1">
+                <FolderSync class="size-4 text-emerald-400" />
+                {t.gains.singleSource.title}
+              </h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                {t.gains.singleSource.desc}
+              </p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20">
+              <h4 class="text-sm font-semibold text-emerald-200 flex items-center gap-2 mb-1">
+                <CheckCircle2 class="size-4 text-emerald-400" />
+                {t.gains.instantSync.title}
+              </h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                {t.gains.instantSync.desc}
+              </p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20">
+              <h4 class="text-sm font-semibold text-emerald-200 flex items-center gap-2 mb-1">
+                <ShieldCheck class="size-4 text-emerald-400" />
+                {t.gains.zeroWaste.title}
+              </h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                {t.gains.zeroWaste.desc}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 pt-4 border-t border-emerald-500/20 text-[11px] text-slate-300 font-mono flex items-center justify-between">
+          <span>{isZh ? '软链自动化就绪效率' : 'Symlink readiness efficiency'}</span>
+          <span class="text-emerald-400 font-semibold">{isZh ? '0 秒 · 100% 自动化' : '0 sec · 100% Automated'}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

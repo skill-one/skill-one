@@ -1,0 +1,88 @@
+---
+import { translations } from '../i18n/translations';
+import { Globe } from 'lucide-react';
+
+interface Props {
+  lang?: 'en' | 'zh';
+}
+
+const { lang = 'en' } = Astro.props;
+const t = translations[lang].footer;
+const nav = translations[lang].nav;
+const isZh = lang === 'zh';
+---
+
+<footer class="border-t border-white/[0.08] bg-[#050810] py-16 text-xs text-slate-400">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6">
+    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-12 border-b border-white/5">
+      <!-- Brand & Tagline -->
+      <div class="space-y-3">
+        <div class="flex items-center gap-2.5">
+          <img
+            src="/skill-one-transparent.png"
+            alt="Skill One"
+            class="size-7 object-contain"
+          />
+          <span class="font-bold text-base text-white">Skill One</span>
+        </div>
+        <p class="text-xs text-slate-400 max-w-sm leading-relaxed">
+          {t.tagline}
+        </p>
+      </div>
+
+      <!-- Links Column -->
+      <div class="flex flex-wrap items-center gap-6 sm:gap-8 font-medium">
+        <a
+          href="https://github.com/skill-one/skill-one"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-white transition-colors"
+        >
+          {t.links.github}
+        </a>
+        <a
+          href="https://github.com/skill-one/skill-one/releases"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-white transition-colors"
+        >
+          {t.links.releases}
+        </a>
+        <a
+          href="https://github.com/skill-one/skill-one/blob/main/README.md"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-white transition-colors"
+        >
+          {t.links.docs}
+        </a>
+        <a
+          href="https://github.com/skill-one/skill-one/blob/main/LICENSE"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-white transition-colors"
+        >
+          {t.links.license}
+        </a>
+      </div>
+    </div>
+
+    <!-- Bottom Bar -->
+    <div class="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-400">
+      <p>{t.rights}</p>
+
+      <div class="flex items-center gap-4">
+        <!-- Language Switcher in Footer -->
+        <a
+          href={nav.switchLangUrl}
+          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors border border-white/5 text-[11px]"
+        >
+          <Globe class="size-3" />
+          <span>{nav.switchLang}</span>
+        </a>
+
+        <span>Built with Astro 5 & React</span>
+      </div>
+    </div>
+  </div>
+</footer>

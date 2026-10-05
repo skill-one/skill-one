@@ -1,0 +1,80 @@
+---
+import '../styles/global.css';
+import { Navbar } from '../components/Navbar';
+import Footer from '../components/Footer.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+  lang?: 'en' | 'zh';
+}
+
+const {
+  lang = 'en',
+  title = lang === 'zh'
+    ? 'Skill One - 智能体时代的通用技能中枢 | 一次安装，所有 Agents 直接使用'
+    : 'Skill One - Universal Agent Skill Hub | Install Once, Ready for Every AI Agent',
+  description = lang === 'zh'
+    ? 'Skill One 是 AI 智能体技能的统一步调中心。告别在 Cursor、Claude Desktop、Windsurf、Cline 间重复拷贝技能目录。一次点击安装，底层软链秒级穿透，零磁盘冗余。'
+    : 'Skill One is the universal single source of truth for AI Agent skills. Stop duplicating skill files across Cursor, Claude Desktop, Windsurf, Cline, and Roo Code. 100% local, zero redundancy.',
+} = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://skill-one.com');
+const isZh = lang === 'zh';
+
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Skill One',
+  operatingSystem: 'macOS, Windows, Linux',
+  applicationCategory: 'DeveloperApplication',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+  },
+  description: description,
+  url: 'https://skill-one.com',
+};
+---
+
+<!doctype html>
+<html lang={isZh ? 'zh-CN' : 'en'} class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonicalURL} />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- Primary Meta Tags -->
+    <title>{title}</title>
+    <meta name="title" content={title} />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#090d16" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content="/skill-one-transparent.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content={canonicalURL} />
+    <meta property="twitter:title" content={title} />
+    <meta property="twitter:description" content={description} />
+    <meta property="twitter:image" content="/skill-one-transparent.png" />
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+  </head>
+  <body class="bg-[#090d16] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-blue-500/30 selection:text-blue-200">
+    <Navbar client:load lang={lang} />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <Footer lang={lang} />
+  </body>
+</html>

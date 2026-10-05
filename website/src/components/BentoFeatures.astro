@@ -1,0 +1,177 @@
+---
+import { translations } from '../i18n/translations';
+import { Layers, ScanFace, Store, ToggleRight, ShieldCheck, Zap, ArrowUpRight } from 'lucide-react';
+
+interface Props {
+  lang?: 'en' | 'zh';
+}
+
+const { lang = 'en' } = Astro.props;
+const t = translations[lang].features;
+const isZh = lang === 'zh';
+---
+
+<section id="features" class="py-24 relative">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6">
+    <!-- Section Header -->
+    <div class="text-center max-w-3xl mx-auto mb-16">
+      <span class="text-xs font-semibold uppercase tracking-wider text-blue-400 font-mono">
+        {t.eyebrow}
+      </span>
+      <h2 class="text-3xl sm:text-4xl font-bold text-white tracking-tight mt-2 mb-4">
+        {t.title}
+      </h2>
+      <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
+        {t.subtitle}
+      </p>
+    </div>
+
+    <!-- Bento Grid Container -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* CARD 1: Symlink Zero-Overhead Engine (Spans 2 cols) */}
+      <div class="md:col-span-2 rounded-2xl border border-white/10 bg-slate-900/60 p-6 sm:p-8 backdrop-blur-md flex flex-col justify-between relative overflow-hidden group hover:border-blue-500/40 transition-all duration-300">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full pointer-events-none group-hover:bg-blue-500/20 transition-all"></div>
+
+        <div>
+          <div class="size-11 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 mb-5">
+            <Layers class="size-6" />
+          </div>
+
+          <h3 class="text-xl font-bold text-white mb-2">
+            {t.bento.symlink.title}
+          </h3>
+          <p class="text-sm text-slate-300 leading-relaxed max-w-xl mb-6">
+            {t.bento.symlink.desc}
+          </p>
+
+          <!-- Interactive Micro Architecture Diagram -->
+          <div class="rounded-xl border border-white/10 bg-black/40 p-4 font-mono text-xs">
+            <div class="flex items-center justify-between text-slate-400 pb-2 border-b border-white/10 text-[11px]">
+              <span>~/.agents/skills/shadcn-ui (Canonical Source)</span>
+              <span class="text-emerald-400 font-semibold">{isZh ? '物理唯一' : '1 Physical Copy'}</span>
+            </div>
+            <div class="pt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+              <div class="p-2 rounded bg-slate-800/80 border border-white/5 flex items-center gap-2">
+                <span class="text-emerald-400">↳</span>
+                <span class="text-slate-300">.cursor/skills</span>
+              </div>
+              <div class="p-2 rounded bg-slate-800/80 border border-white/5 flex items-center gap-2">
+                <span class="text-emerald-400">↳</span>
+                <span class="text-slate-300">.claude/skills</span>
+              </div>
+              <div class="p-2 rounded bg-slate-800/80 border border-white/5 flex items-center gap-2">
+                <span class="text-emerald-400">↳</span>
+                <span class="text-slate-300">.windsurf/rules</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-white/5 flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-blue-400 font-mono">{t.bento.symlink.stat}</span>
+          <span class="text-xs text-slate-400">{t.bento.symlink.statLabel}</span>
+        </div>
+      </div>
+
+      {/* CARD 2: 80+ Agents Auto-Detection */}
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6 sm:p-8 backdrop-blur-md flex flex-col justify-between relative overflow-hidden group hover:border-purple-500/40 transition-all duration-300">
+        <div class="absolute top-0 right-0 w-48 h-48 bg-purple-500/10 blur-3xl rounded-full pointer-events-none"></div>
+
+        <div>
+          <div class="size-11 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-5">
+            <ScanFace class="size-6" />
+          </div>
+
+          <h3 class="text-xl font-bold text-white mb-2">
+            {t.bento.autoDetect.title}
+          </h3>
+          <p class="text-sm text-slate-300 leading-relaxed mb-6">
+            {t.bento.autoDetect.desc}
+          </p>
+
+          <div class="flex items-center gap-2 py-2">
+            <img src="/agents/icons/cursor-color.svg" alt="Cursor" class="size-6 rounded" />
+            <img src="/agents/icons/claudecode-color.svg" alt="Claude" class="size-6 rounded" />
+            <img src="/agents/icons/windsurf.svg" alt="Windsurf" class="size-6 rounded" />
+            <img src="/agents/icons/antigravity-color.svg" alt="Antigravity" class="size-6 rounded" />
+            <span class="text-xs text-purple-300 font-mono font-bold">+76 more</span>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-white/5 flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-purple-400 font-mono">{t.bento.autoDetect.stat}</span>
+          <span class="text-xs text-slate-400">{t.bento.autoDetect.statLabel}</span>
+        </div>
+      </div>
+
+      {/* CARD 3: Curated Community Market */}
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6 sm:p-8 backdrop-blur-md flex flex-col justify-between relative overflow-hidden group hover:border-teal-500/40 transition-all duration-300">
+        <div class="absolute top-0 right-0 w-48 h-48 bg-teal-500/10 blur-3xl rounded-full pointer-events-none"></div>
+
+        <div>
+          <div class="size-11 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 mb-5">
+            <Store class="size-6" />
+          </div>
+
+          <h3 class="text-xl font-bold text-white mb-2">
+            {t.bento.market.title}
+          </h3>
+          <p class="text-sm text-slate-300 leading-relaxed mb-4">
+            {t.bento.market.desc}
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-white/5 flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-teal-400 font-mono">{t.bento.market.stat}</span>
+          <span class="text-xs text-slate-400">{t.bento.market.statLabel}</span>
+        </div>
+      </div>
+
+      {/* CARD 4: Per-Agent Granular Toggles */}
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6 sm:p-8 backdrop-blur-md flex flex-col justify-between relative overflow-hidden group hover:border-amber-500/40 transition-all duration-300">
+        <div class="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 blur-3xl rounded-full pointer-events-none"></div>
+
+        <div>
+          <div class="size-11 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-5">
+            <ToggleRight class="size-6" />
+          </div>
+
+          <h3 class="text-xl font-bold text-white mb-2">
+            {t.bento.isolation.title}
+          </h3>
+          <p class="text-sm text-slate-300 leading-relaxed mb-4">
+            {t.bento.isolation.desc}
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-white/5 flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-amber-400 font-mono">{t.bento.isolation.stat}</span>
+          <span class="text-xs text-slate-400">{t.bento.isolation.statLabel}</span>
+        </div>
+      </div>
+
+      {/* CARD 5: 100% Local-First & Rust Core */}
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6 sm:p-8 backdrop-blur-md flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-300">
+        <div class="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none"></div>
+
+        <div>
+          <div class="size-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-5">
+            <ShieldCheck class="size-6" />
+          </div>
+
+          <h3 class="text-xl font-bold text-white mb-2">
+            {t.bento.privacy.title}
+          </h3>
+          <p class="text-sm text-slate-300 leading-relaxed mb-4">
+            {t.bento.privacy.desc}
+          </p>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-white/5 flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-emerald-400 font-mono">{t.bento.privacy.stat}</span>
+          <span class="text-xs text-slate-400">{t.bento.privacy.statLabel}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

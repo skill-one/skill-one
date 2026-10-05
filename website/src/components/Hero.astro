@@ -1,0 +1,92 @@
+---
+import { translations } from '../i18n/translations';
+import { HeroAgentGraph } from './HeroAgentGraph';
+import { Download, ShieldCheck, Cpu, Layers, Sparkles, ArrowRight } from 'lucide-react';
+import { GithubIcon } from './GithubIcon';
+
+interface Props {
+  lang?: 'en' | 'zh';
+}
+
+const { lang = 'en' } = Astro.props;
+const t = translations[lang].hero;
+const isZh = lang === 'zh';
+---
+
+<section class="relative pt-32 pb-20 overflow-hidden">
+  <!-- Radial Ambient Glow -->
+  <div class="radial-gradient-hero absolute top-0 left-1/2 -translate-x-1/2 w-full h-[600px] pointer-events-none"></div>
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center relative z-10">
+    <!-- Top Pill Badge -->
+    <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-blue-500/10 border border-blue-500/20 text-blue-300 mb-8 backdrop-blur-md">
+      <Sparkles class="size-3.5 text-blue-400" />
+      <span>{t.badge}</span>
+      <span class="text-blue-400/50">|</span>
+      <span class="text-slate-300">v0.22.0 Released</span>
+    </div>
+
+    <!-- Main Value Prop Headline -->
+    <h1 class="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-white tracking-tight leading-[1.1] mb-6">
+      <span>{t.titleStart}</span>{' '}
+      <span class="bg-gradient-to-r from-blue-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
+        {t.titleHighlight}
+      </span>
+    </h1>
+
+    <!-- Subtitle explaining Single Source of Truth & Zero Redundancy -->
+    <p class="max-w-3xl mx-auto text-base sm:text-lg text-slate-300 mb-10 leading-relaxed font-normal">
+      {t.subtitle}
+    </p>
+
+    <!-- Call to Actions -->
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+      <!-- Direct Download DMG -->
+      <a
+        href="#download"
+        class="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-xl shadow-blue-600/25 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 text-sm"
+      >
+        <Download class="size-4" />
+        <div class="text-left">
+          <div class="leading-tight">{t.downloadMac}</div>
+          <div class="text-[10px] text-blue-100 font-normal">{t.downloadSub}</div>
+        </div>
+      </a>
+
+      <!-- GitHub Link -->
+      <a
+        href="https://github.com/skill-one/skill-one"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-semibold text-slate-200 bg-slate-900/80 hover:bg-slate-800 border border-white/15 hover:border-white/25 transition-all duration-200 hover:-translate-y-0.5 text-sm backdrop-blur-md"
+      >
+        <GithubIcon className="size-4" />
+        <span>{t.viewGithub}</span>
+      </a>
+    </div>
+
+    <!-- Trust Seals Bar -->
+    <div class="flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs text-slate-400 mb-14">
+      <div class="flex items-center gap-2">
+        <ShieldCheck class="size-4 text-emerald-400" />
+        <span>{t.trustLocal}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <Layers class="size-4 text-blue-400" />
+        <span>{t.trustZeroDisk}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <Cpu class="size-4 text-purple-400" />
+        <span>{t.trustAgents}</span>
+      </div>
+    </div>
+
+    <!-- Interactive Graph Island Showcase -->
+    <div class="text-left">
+      <div class="text-center mb-3 text-xs text-slate-400">
+        <span>{t.interactivePrompt}</span>
+      </div>
+      <HeroAgentGraph client:load lang={lang} />
+    </div>
+  </div>
+</section>
