@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { translations } from '../i18n/translations';
+import { translations } from '../i18n/translations';const base = import.meta.env.BASE_URL.replace(//$/, '');
 import {
   Store,
   Terminal,
@@ -314,7 +314,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
               <div className="space-y-4 animate-in fade-in duration-300">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
                   <div className="flex items-center gap-2">
-                    <img src="/agents/icons/cursor-color.svg" alt="Agent" className="size-4 rounded" />
+                    <img src={`${base}/agents/icons/cursor-color.svg`} alt="Agent" className="size-4 rounded" />
                     <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                       {t.chatTab.chatTitle}
                     </span>
@@ -342,7 +342,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                   {/* Assistant Reply */}
                   {chatPromptSending ? (
                     <div className="flex items-start gap-3">
-                      <img src="/skill-one-transparent.png" alt="AI" className="size-6 object-contain mt-1 animate-pulse" />
+                      <img src={`${base}/skill-one-transparent.png`} alt="AI" className="size-6 object-contain mt-1 animate-pulse" />
                       <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-mono flex items-center gap-2">
                         <span className="size-2 rounded-full bg-blue-500 animate-ping" />
                         <span>{isZh ? 'Agent 正在向 ~/.agents/skills 写入技能...' : 'Agent writing to ~/.agents/skills...'}</span>
@@ -350,7 +350,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                     </div>
                   ) : chatPromptSent ? (
                     <div className="flex items-start gap-3">
-                      <img src="/skill-one-transparent.png" alt="AI" className="size-6 object-contain mt-1" />
+                      <img src={`${base}/skill-one-transparent.png`} alt="AI" className="size-6 object-contain mt-1" />
                       <div className="max-w-[88%] rounded-2xl rounded-tl-sm bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-4 py-3 text-xs sm:text-sm leading-relaxed border border-slate-200 dark:border-white/5 shadow-2xs">
                         <p className="mb-2">{t.chatTab.agentMessage}</p>
                         <div className="p-2 rounded-lg bg-white dark:bg-black/30 border border-slate-200/80 dark:border-white/5 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
@@ -451,7 +451,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
               }`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <img src="/skill-one-transparent.png" alt="Skill One" className="size-6 object-contain" />
+                    <img src={`${base}/skill-one-transparent.png`} alt="Skill One" className="size-6 object-contain" />
                     <span className="text-xs font-bold text-slate-900 dark:text-white font-mono">
                       ~/.agents/skills
                     </span>
@@ -490,7 +490,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                       : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-white/10'
                   }`}>
                     <div className="flex items-center gap-2">
-                      <img src="/agents/icons/cursor-color.svg" alt="Cursor" className="size-4 rounded" />
+                      <img src={`${base}/agents/icons/cursor-color.svg`} alt="Cursor" className="size-4 rounded" />
                       <span className="text-slate-800 dark:text-slate-200 font-medium">.cursor/skills</span>
                     </div>
                     <span className="text-emerald-600 dark:text-emerald-400 text-[10px] flex items-center gap-1">
@@ -505,7 +505,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                       : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-white/10'
                   }`}>
                     <div className="flex items-center gap-2">
-                      <img src="/agents/icons/claudecode-color.svg" alt="Claude" className="size-4 rounded" />
+                      <img src={`${base}/agents/icons/claudecode-color.svg`} alt="Claude" className="size-4 rounded" />
                       <span className="text-slate-800 dark:text-slate-200 font-medium">.claude/skills</span>
                     </div>
                     <span className="text-emerald-600 dark:text-emerald-400 text-[10px] flex items-center gap-1">
@@ -520,7 +520,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                       : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-white/10'
                   }`}>
                     <div className="flex items-center gap-2">
-                      <img src="/agents/icons/windsurf.svg" alt="Windsurf" className="size-4 rounded" />
+                      <img src={`${base}/agents/icons/windsurf.svg`} alt="Windsurf" className="size-4 rounded" />
                       <span className="text-slate-800 dark:text-slate-200 font-medium">.windsurf/rules</span>
                     </div>
                     <span className="text-emerald-600 dark:text-emerald-400 text-[10px] flex items-center gap-1">
@@ -535,7 +535,7 @@ export const UniversalInstallShowcase: React.FC<UniversalInstallShowcaseProps> =
                       : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-white/10'
                   }`}>
                     <div className="flex items-center gap-2">
-                      <img src="/agents/icons/cline-color.svg" alt="Cline" className="size-4 rounded" />
+                      <img src={`${base}/agents/icons/cline-color.svg`} alt="Cline" className="size-4 rounded" />
                       <span className="text-slate-800 dark:text-slate-200 font-medium">.cline/skills</span>
                     </div>
                     <span className="text-emerald-600 dark:text-emerald-400 text-[10px] flex items-center gap-1">

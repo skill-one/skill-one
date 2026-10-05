@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { translations } from '../i18n/translations';
 import { Zap, CheckCircle2 } from 'lucide-react';
 
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
 interface HeroAgentGraphProps {
   lang?: 'en' | 'zh';
 }
@@ -334,7 +336,7 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-white/10">
               <div className="flex items-center gap-2.5">
                 <img
-                  src="/skill-one-transparent.png"
+                  src={`${base}/skill-one-transparent.png`}
                   alt="Skill One"
                   className="size-7 object-contain drop-shadow-[0_2px_6px_rgba(46,127,217,0.3)]"
                 />
@@ -483,7 +485,7 @@ export function HeroAgentGraph({ lang = 'en' }: HeroAgentGraphProps) {
           <div className="rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-slate-900 p-4 shadow-sm">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-white/10">
               <div className="flex items-center gap-2">
-                <img src="/skill-one-transparent.png" alt="Skill One" className="size-6" />
+                <img src={`${base}/skill-one-transparent.png`} alt="Skill One" className="size-6" />
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">{t.title}</h3>
               </div>
               <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono">
