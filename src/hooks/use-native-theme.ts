@@ -5,8 +5,7 @@ import { isTauri } from "../lib/tauri";
 
 /**
  * Mirror the app theme onto the native window so OS-drawn surfaces — title
- * bar, scrollbars, form controls, and the tray popover's vibrancy material —
- * follow the UI instead of staying light.
+ * bar, scrollbars, and form controls — follow the UI instead of staying light.
  *
  * `theme` is the user's *choice* (light | dark | system), not the resolved
  * value. `system` maps to Tauri's `null`, which hands "follow the system" to

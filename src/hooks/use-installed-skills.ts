@@ -1,8 +1,5 @@
 import { useQuery, type QueryClient } from "@tanstack/react-query";
-import { emit } from "@tauri-apps/api/event";
 
-import { isTauri } from "../lib/tauri";
-import { SKILLS_CHANGED_EVENT } from "../popover/popover-events";
 import { fetchInstalledSkills } from "../lib/local-skills";
 import type { InstalledSkill } from "../lib/skills-manager";
 
@@ -10,7 +7,7 @@ import type { InstalledSkill } from "../lib/skills-manager";
  * The TanStack Query cache-key prefix for the installed-skill list. Every
  * consumer writes (install / remove / toggle) and invalidates this key —
  * so one `invalidateQueries({ queryKey: INSTALLED_SKILLS_QUERY_KEY })`
- * refreshes the list and the sidebar / popover counts at once.
+ * refreshes the list and the badge counts at once.
  */
 export const INSTALLED_SKILLS_QUERY_KEY = ["installed-skills"] as const;
 
@@ -24,8 +21,8 @@ export const PROVENANCE_QUERY_KEY = ["skill-provenance", "v3"] as const;
 
 /**
  * The installed-skills list for the global skills directory. Shared by the
- * installed page, the sidebar badge, the install buttons, and the popover —
- * they all read the same cache entry via the shared key.
+ * installed page, the sidebar badge, and the install buttons — they all read
+ * the same cache entry via the shared key.
  */
 export function useInstalledSkills() {
   // v5 already names these isLoading (=== isPending), isError and error, so
@@ -101,30 +98,17 @@ export function installedSignature(
 }
 
 /**
- * Broadcast that the installed-skills list changed to every other window.
- * Each window keeps its own query cache (the popover is a separate webview),
- * so invalidating only the local cache never reaches them. A no-op outside
- * Tauri so the browser / test environment stays silent.
- */
-export function notifySkillsChanged(): void {
-  if (isTauri()) void emit(SKILLS_CHANGED_EVENT);
-}
-
-/**
  * The single call every successful skill mutation should make: refresh this
- * window's cached list (and the provenance map, which changes with it) and
- * notify the other windows. Returns the invalidation promise so mutation
- * success handlers can `await` it.
+ * window's cached list (and the provenance map, which changes with it).
+ * Returns the invalidation promise so mutation success handlers can `await` it.
  */
 export function markSkillsChanged(
   queryClient: QueryClient,
 ): Promise<void> {
-  const invalidated = Promise.all([
+  return Promise.all([
     queryClient.invalidateQueries({
       queryKey: INSTALLED_SKILLS_QUERY_KEY,
     }),
     queryClient.invalidateQueries({ queryKey: PROVENANCE_QUERY_KEY }),
   ]).then(() => undefined);
-  notifySkillsChanged();
-  return invalidated;
 }

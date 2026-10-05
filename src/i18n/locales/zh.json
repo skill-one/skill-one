@@ -234,13 +234,6 @@
     "noMatchSkill": "没有符合条件的 skill",
     "noMatchRepo": "没有符合条件的仓库"
   },
-  "popover": {
-    "skillCount": "{{count}} 个技能",
-    "loadFailed": "技能列表加载失败",
-    "noneEnabled": "没有已启用的技能",
-    "noneEnabledHint": "在主应用中安装或启用一个吧",
-    "open": "打开 Skill One"
-  },
   "detail": {
     "source": "源",
     "localFile": "本地文件",

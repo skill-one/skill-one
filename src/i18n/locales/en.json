@@ -234,13 +234,6 @@
     "noMatchSkill": "No skills match the filters",
     "noMatchRepo": "No repositories match the filters"
   },
-  "popover": {
-    "skillCount": "{{count}} skills",
-    "loadFailed": "Failed to load skill list",
-    "noneEnabled": "No enabled skills",
-    "noneEnabledHint": "Install or enable one in the main app",
-    "open": "Open Skill One"
-  },
   "detail": {
     "source": "Source",
     "localFile": "Local file",

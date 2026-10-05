@@ -342,7 +342,7 @@ export function InstalledPage() {
     setSelectedKey(null);
   }, [query, sort, unit]);
 
-  // Deep link from the menu bar popover: `/installed?skill=<name>` asks the
+  // Deep link onto the installed list: `/installed?skill=<name>` asks the
   // list's own question, which ranks the targeted skill near the top of the
   // answer (its name is the whole query) along with any sibling whose terms it
   // shares. The param is consumed (removed) once applied, so a refresh stays on

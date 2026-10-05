@@ -10,8 +10,7 @@ import en from "./locales/en.json";
 import zh from "./locales/zh.json";
 
 /**
- * The app's single i18next instance, shared by every React entry (main
- * window and tray popover). Resources are bundled JSON — nothing is fetched
+ * The app's single i18next instance. Resources are bundled JSON — nothing is fetched
  * at runtime — so init is synchronous and the first paint already speaks the
  * right language. `LanguageProvider` afterwards tracks preference and
  * platform-language changes and calls `changeLanguage` on this instance.
