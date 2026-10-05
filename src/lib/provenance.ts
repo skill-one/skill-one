@@ -62,6 +62,7 @@ export interface PersistedCandidate {
   downloads: number;
   description: string;
   descriptionZh?: string;
+  domain?: string[];
 }
 
 /**
@@ -457,15 +458,14 @@ export async function recordSkillProvenance(
     const ledger = await loadLedger();
     const origin: "store" | "local" = reason === "install" ? "store" : "local";
     const existing = ledger.config.skills[name];
-    const tags =
-      defaultTags && defaultTags.length > 0 && (!existing?.tags || existing.tags.length === 0)
-        ? [...defaultTags]
-        : existing?.tags;
+    const existingTags = existing?.tags ?? [];
+    const newTags = defaultTags ?? [];
+    const mergedTags = Array.from(new Set([...existingTags, ...newTags]));
 
     ledger.config.skills[name] = {
       origin,
       repo,
-      ...(tags && tags.length > 0 ? { tags } : {}),
+      ...(mergedTags.length > 0 ? { tags: mergedTags } : {}),
     };
     ledger.records.set(name, { kind: "source", name, repo, via: reason });
 
@@ -489,17 +489,14 @@ export async function recordSkillProvenanceBatch(
     for (const entry of entries) {
       const origin: "store" | "local" = entry.reason === "install" ? "store" : "local";
       const existing = ledger.config.skills[entry.name];
-      const tags =
-        entry.defaultTags &&
-        entry.defaultTags.length > 0 &&
-        (!existing?.tags || existing.tags.length === 0)
-          ? [...entry.defaultTags]
-          : existing?.tags;
+      const existingTags = existing?.tags ?? [];
+      const newTags = entry.defaultTags ?? [];
+      const mergedTags = Array.from(new Set([...existingTags, ...newTags]));
 
       ledger.config.skills[entry.name] = {
         origin,
         repo: entry.repo,
-        ...(tags && tags.length > 0 ? { tags } : {}),
+        ...(mergedTags.length > 0 ? { tags: mergedTags } : {}),
       };
       ledger.records.set(entry.name, {
         kind: "source",

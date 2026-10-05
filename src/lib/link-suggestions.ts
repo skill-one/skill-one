@@ -238,6 +238,7 @@ function toPersisted(candidate: LinkCandidate): PersistedCandidate {
     downloads: skill.downloads,
     description: skill.description,
     ...(skill.descriptionZh !== undefined ? { descriptionZh: skill.descriptionZh } : {}),
+    ...(skill.profile?.domain ? { domain: skill.profile.domain } : {}),
   };
 }
 
@@ -251,6 +252,7 @@ function reviveCandidates(name: string, candidates: PersistedCandidate[]): LinkC
       stars: candidate.stars,
       downloads: candidate.downloads,
       ...(candidate.descriptionZh !== undefined ? { descriptionZh: candidate.descriptionZh } : {}),
+      ...(candidate.domain ? { profile: { domain: candidate.domain } } : {}),
     },
   }));
 }
@@ -283,6 +285,7 @@ export async function resolveAssociations(
     repo: string;
     name: string;
     reason: SourceLinkReason;
+    defaultTags?: readonly string[];
   }> = [];
   const upserts = new Map<string, PendingRecord>();
   const drops = new Set<string>();
@@ -386,6 +389,7 @@ export async function resolveAssociations(
           repo: cleared[0].skill.repo,
           name: skill.name,
           reason: "description",
+          defaultTags: cleared[0].skill.profile?.domain,
         });
         linked.push(skill.name);
         resolved.set(skill.name, []);

@@ -436,8 +436,11 @@ export function InstalledPage() {
   const rows = useMemo<Row[]>(() => {
     const withTag = (skill: SkillView): SkillView => {
       const tag = assignments[skill.name];
-      if (!tag) return skill;
-      return { ...skill, profile: { domain: [tag] } };
+      if (tag) return { ...skill, profile: { domain: [tag] } };
+      if (skill.tags && skill.tags.length > 0) {
+        return { ...skill, profile: { domain: skill.tags } };
+      }
+      return skill;
     };
     if (!hits) {
       return list.map((skill) => ({

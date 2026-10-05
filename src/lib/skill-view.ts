@@ -93,8 +93,9 @@ export function isInstallableSkill(skill: SkillView): boolean {
 }
 
 /**
- * Whether a skill represents a third-party installation (origin === "local" or unbacked/unrecorded).
- * Such skills wear the distinct "Monogram + Folder" avatar rather than the store author's GitHub face.
+ * Whether a skill represents an unlinked / unsourced third-party skill.
+ * Once linked to a source repository, the skill carries an owner and renders
+ * that owner's avatar rather than the third-party monogram + folder mark.
  */
 export function isThirdPartySkill(
   skill?: {
@@ -105,8 +106,6 @@ export function isThirdPartySkill(
   } | null,
 ): boolean {
   if (!skill) return false;
-  if (skill.origin === "local") return true;
-  if (skill.origin === "store") return false;
   return !skill.repo;
 }
 

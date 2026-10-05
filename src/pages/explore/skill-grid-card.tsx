@@ -6,7 +6,6 @@ import { skillDescription } from "../../lib/i18n-content";
 import {
   isInstallableSkill,
   isLiveSkill,
-  isThirdPartySkill,
   skillDisplayName,
   type SkillView,
 } from "../../lib/skill-view";
@@ -158,7 +157,7 @@ export function SkillGridCard({
         )}
         {/* Name row: owner avatar plus the name, both on one line. */}
         <div className={cn("flex min-w-0 items-center gap-2", checkable && "pr-6")}>
-          {!isThirdPartySkill(skill) && owner ? (
+          {owner ? (
             <OwnerAvatar
               owner={owner}
               className="size-6 shrink-0 text-[10px]"

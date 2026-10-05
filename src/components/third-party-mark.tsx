@@ -97,16 +97,16 @@ export function ThirdPartyMark({
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "absolute -bottom-0.5 -right-0.5 flex size-[40%] items-center justify-center rounded-full ring-1 ring-background shadow-xs",
+                      "absolute -bottom-0.5 -right-0.5 flex size-[48%] min-w-3 min-h-3 items-center justify-center rounded-full ring-1.5 ring-background shadow-xs",
                       candidate
                         ? "bg-amber-500 text-amber-950 dark:text-amber-100"
-                        : "bg-background border border-border/80 text-muted-foreground",
+                        : "bg-background border border-border/90 text-foreground/80 dark:text-foreground/90",
                     )}
                   >
                     {candidate ? (
-                      <Link2 className="size-[65%]" />
+                      <Link2 className="size-[75%] stroke-[2.2]" />
                     ) : (
-                      <Folder className="size-[65%]" />
+                      <Folder className="size-[75%] stroke-[2.2]" />
                     )}
                   </span>
                 )}

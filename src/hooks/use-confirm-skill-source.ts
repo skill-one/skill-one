@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "../components/ui/toast";
 import { markSkillsChanged } from "./use-installed-skills";
 import { recordSkillProvenance } from "../lib/provenance";
+import { lookupSkills } from "../lib/registry/client";
 import { errorMessage } from "../lib/utils";
 
 /**
@@ -30,8 +31,19 @@ export function useConfirmSkillSource(name: string) {
     async (repo: string, defaultTags?: readonly string[]): Promise<boolean> => {
       setPendingRepo(repo);
       try {
-        if (defaultTags && defaultTags.length > 0) {
-          await recordSkillProvenance(repo, name, "confirm", defaultTags);
+        let tags = defaultTags;
+        if (!tags || tags.length === 0) {
+          try {
+            const { entries } = await lookupSkills([{ repo, name }]);
+            if (entries[0]?.profile?.domain && entries[0].profile.domain.length > 0) {
+              tags = entries[0].profile.domain;
+            }
+          } catch {
+            // non-fatal lookup miss
+          }
+        }
+        if (tags && tags.length > 0) {
+          await recordSkillProvenance(repo, name, "confirm", tags);
         } else {
           await recordSkillProvenance(repo, name, "confirm");
         }

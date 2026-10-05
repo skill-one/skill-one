@@ -137,9 +137,9 @@ export function LinkSuggestionMark({
           </span>
           <span
             aria-hidden="true"
-            className="absolute -bottom-0.5 -right-0.5 flex size-[40%] items-center justify-center rounded-full bg-amber-500 text-amber-950 dark:text-amber-100 ring-1 ring-background shadow-xs"
+            className="absolute -bottom-0.5 -right-0.5 flex size-[48%] min-w-3 min-h-3 items-center justify-center rounded-full bg-amber-500 text-amber-950 dark:text-amber-100 ring-1.5 ring-background shadow-xs"
           >
-            <Folder className="size-[65%]" />
+            <Folder className="size-[75%] stroke-[2.2]" />
           </span>
         </>
       )}

@@ -63,17 +63,14 @@ describe("installedSkillView", () => {
 });
 
 describe("isThirdPartySkill", () => {
-  it("identifies local skills as third-party even if they have an associated repo", () => {
-    expect(isThirdPartySkill({ name: "my-skill", origin: "local", repo: "user/repo" })).toBe(true);
+  it("identifies unlinked skills without a repo as third-party", () => {
     expect(isThirdPartySkill({ name: "my-skill", origin: "local" })).toBe(true);
-  });
-
-  it("identifies unbacked skills without repo or storeBacked as third-party", () => {
     expect(isThirdPartySkill({ name: "standalone" })).toBe(true);
-    expect(isThirdPartySkill({ name: "standalone", storeBacked: false })).toBe(true);
+    expect(isThirdPartySkill({ name: "standalone", repo: "" })).toBe(true);
   });
 
-  it("does not classify store skills or linked store-backed skills as third-party", () => {
+  it("does not classify linked skills as third-party so they wear owner avatar", () => {
+    expect(isThirdPartySkill({ name: "my-skill", origin: "local", repo: "user/repo" })).toBe(false);
     expect(isThirdPartySkill({ name: "store-skill", origin: "store", repo: "owner/repo" })).toBe(false);
     expect(isThirdPartySkill({ name: "store-skill", repo: "owner/repo", storeBacked: true })).toBe(false);
   });

@@ -27,7 +27,6 @@ import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
 import {
-  isThirdPartySkill,
   skillDisplayName,
   skillKey,
   type SkillView,
@@ -674,7 +673,7 @@ export function SkillDetailPanel({
               no known source has no owner to show, so its name stays flush
               left; the initials stand-in is the cover's job, and the cover
               is gone. */}
-          {shown && !isThirdPartySkill(shown) && owner ? (
+          {hasSource && owner ? (
             <OwnerAvatar owner={owner} className="size-12 shrink-0 text-lg" />
           ) : (
             <ThirdPartyMark
