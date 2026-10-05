@@ -65,7 +65,8 @@ function keepHeaderUnderPointer(header: HTMLElement) {
  * way, so a folded section still states how much it holds.
  *
  * The header reads left to right as the disclosure chevron, the section's own
- * glyph (a fixed icon per source, supplied only where sources stack), the
+ * glyph (a fixed icon per source, supplied only where sources stack; or an
+ * emoji where the section is a classification the taxonomy colors), the
  * title, and the count as a quiet badge riding the title. The chevron is
  * always drawn rather than hover-revealed: it is the one control on the row,
  * and its direction is the section's state, so a reader scanning folded
@@ -86,6 +87,7 @@ function keepHeaderUnderPointer(header: HTMLElement) {
  */
 export function CollapsibleSection({
   icon: Icon,
+  glyph,
   title,
   count,
   defaultOpen = true,
@@ -94,6 +96,13 @@ export function CollapsibleSection({
 }: {
   /** The section's glyph; one fixed icon per source, when sources stack. */
   icon?: LucideIcon;
+  /**
+   * The section's emoji, where its identity is a colored classification mark
+   * (a tag grouping's headers lead with the tag's own emoji). It rides beside
+   * the title rather than inside it, so the header's accessible name stays
+   * the label alone; `aria-hidden` because it decorates a name already read.
+   */
+  glyph?: string;
   /** The section's name, e.g. 今天 or 应用商店. */
   title: string;
   /** The section's own count phrase, e.g. 3 个 skill. */
@@ -149,6 +158,16 @@ export function CollapsibleSection({
               aria-hidden="true"
               className="size-4 shrink-0 text-muted-foreground"
             />
+          )}
+          {glyph && (
+            <span
+              aria-hidden="true"
+              // The row glyphs' slot geometry (see RepoCard's domain slot): a
+              // fixed 16px lane, so every header's title starts on one line.
+              className="w-4 shrink-0 text-center text-[13px] leading-none"
+            >
+              {glyph}
+            </span>
           )}
           <span className="truncate text-sm font-semibold">{title}</span>
           <Badge variant="secondary" className="shrink-0 tabular-nums">
