@@ -1,7 +1,7 @@
-import { useRef, useState, type ReactElement } from "react";
+import { useMemo, useRef, useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Check, Pencil, RotateCcw, X } from "lucide-react";
+import { Check, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { DOMAINS, domainLabel } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useCustomTags } from "../../hooks/use-custom-tags";
@@ -32,17 +32,14 @@ import { Input } from "../ui/input";
 import { toast } from "../ui/toast";
 import { errorMessage, cn } from "../../lib/utils";
 
+const EMPTY_DEFS: never[] = [];
+
 /**
  * The installed skill's tag picker in the detail drawer, opened by the
- * classification badge itself: one press on the badge shows the creation
- * row first, then — when the reader has coined any — their own tags leading
- * the list, with the system domains after, plus the ways out: clearing
- * back to the store's classification, or deleting a tag no
- * skill uses anymore. A custom tag's pencil reuses the creation row as its
- * editor — prefilled, saving back over the tag (and moving every assignment
- * along when the name changes) — so there is one form, not two. Nothing is
- * written until the user picks, creates, saves, clears or deletes; the list
- * re-answers through the shared `markSkillsChanged` invalidation.
+ * classification badge itself: one press on the badge shows the creation /
+ * search row first, followed by filtered custom and system categories,
+ * supporting search-as-you-type, 1-click toggle unassign, and safe definition
+ * management.
  */
 export function SkillTagMenu({
   skillName,
@@ -76,7 +73,7 @@ export function SkillTagMenu({
   const { t } = useTranslation();
   const locale = useAppLocale();
   const { data: customTags } = useCustomTags();
-  const defs = customTags?.tagDefs ?? [];
+  const defs = customTags?.tagDefs ?? EMPTY_DEFS;
 
   const getTagUsedCount = (key: string) => {
     let count = 0;
@@ -101,23 +98,6 @@ export function SkillTagMenu({
     }
   };
 
-  const pick = async (key: string) => {
-    if (busy || key === effectiveKey) {
-      setOpen(false);
-      return;
-    }
-    setBusy(true);
-    try {
-      await setSkillTag(skillName, key);
-      await markSkillsChanged(queryClient);
-      setOpen(false);
-    } catch (e) {
-      toast.add({ title: errorMessage(e, t("tag.failed")), type: "error" });
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const clear = async () => {
     if (busy || assignedKey == null) {
       setOpen(false);
@@ -128,6 +108,30 @@ export function SkillTagMenu({
       await setSkillTag(skillName, null);
       await markSkillsChanged(queryClient);
       toast.add({ title: t("tag.cleared"), type: "success" });
+      setOpen(false);
+    } catch (e) {
+      toast.add({ title: errorMessage(e, t("tag.failed")), type: "error" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pick = async (key: string) => {
+    if (busy) return;
+    // Clicking the already assigned key toggles it off (clears it back to default)
+    if (assignedKey === key) {
+      await clear();
+      return;
+    }
+    // If it's already the effective store classification without a custom assignment, close
+    if (key === effectiveKey && assignedKey == null) {
+      setOpen(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await setSkillTag(skillName, key);
+      await markSkillsChanged(queryClient);
       setOpen(false);
     } catch (e) {
       toast.add({ title: errorMessage(e, t("tag.failed")), type: "error" });
@@ -197,12 +201,82 @@ export function SkillTagMenu({
       await deleteCustomTagDef(key);
       await markSkillsChanged(queryClient);
       toast.add({ title: t("tag.deleted"), type: "success" });
-      // Stays open: removing one unused tag often precedes removing the next.
     } catch (e) {
       toast.add({ title: errorMessage(e, t("tag.failed")), type: "error" });
     } finally {
       setBusy(false);
     }
+  };
+
+  const trimmedDraft = draft.trim();
+  const searchLower = trimmedDraft.toLowerCase();
+
+  const filteredDefs = useMemo(() => {
+    if (editingKey != null || !searchLower) return defs;
+    return defs.filter(
+      (d) =>
+        d.label.toLowerCase().includes(searchLower) ||
+        d.key.toLowerCase().includes(searchLower),
+    );
+  }, [defs, editingKey, searchLower]);
+
+  const filteredDomains = useMemo(() => {
+    if (editingKey != null || !searchLower) return DOMAINS;
+    return DOMAINS.filter((d) => {
+      const label = domainLabel(d.key, locale).toLowerCase();
+      return (
+        label.includes(searchLower) ||
+        d.key.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [locale, editingKey, searchLower]);
+
+  const exactMatchExists = useMemo(() => {
+    if (!trimmedDraft) return false;
+    const isCustomMatch = defs.some(
+      (d) =>
+        d.label.toLowerCase() === searchLower ||
+        d.key.toLowerCase() === searchLower,
+    );
+    const isDomainMatch = DOMAINS.some(
+      (d) =>
+        domainLabel(d.key, locale).toLowerCase() === searchLower ||
+        d.key.toLowerCase() === searchLower,
+    );
+    return isCustomMatch || isDomainMatch;
+  }, [defs, locale, searchLower, trimmedDraft]);
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    if (editingKey != null) {
+      await create();
+      return;
+    }
+    if (!trimmedDraft) return;
+
+    // If typing an exact match of an existing item, pick it
+    const exactDef = defs.find(
+      (d) =>
+        d.label.toLowerCase() === searchLower ||
+        d.key.toLowerCase() === searchLower,
+    );
+    if (exactDef) {
+      await pick(exactDef.key);
+      return;
+    }
+    const exactDomain = DOMAINS.find(
+      (d) =>
+        domainLabel(d.key, locale).toLowerCase() === searchLower ||
+        d.key.toLowerCase() === searchLower,
+    );
+    if (exactDomain) {
+      await pick(exactDomain.key);
+      return;
+    }
+
+    // Otherwise create as new tag
+    await create();
   };
 
   const itemClass = (active: boolean) =>
@@ -218,8 +292,6 @@ export function SkillTagMenu({
       <Popover
         open={open}
         onOpenChange={(next) => {
-          // Closing discards the form: a half-typed rename never survives into
-          // the next open, so the row always reads as what the ledger holds.
           if (!next) cancelEdit();
           setOpen(next);
         }}
@@ -231,8 +303,10 @@ export function SkillTagMenu({
               aria-label={t("tag.editAria", { name: skillName })}
               title={t("tag.edit")}
               className={cn(
-                "group/tag-btn inline-flex cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 transition-colors",
-                "hover:bg-muted/80 text-muted-foreground hover:text-foreground",
+                "group/tag-btn inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition-colors",
+                assignedKey != null
+                  ? "bg-secondary/80 hover:bg-secondary text-secondary-foreground border border-border/50 font-medium"
+                  : "hover:bg-muted/80 text-muted-foreground hover:text-foreground",
                 "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               )}
             >
@@ -256,28 +330,40 @@ export function SkillTagMenu({
               </span>
             )}
           </div>
-          {/* Creation leads: the list below scrolls past a dozen system
-              domains, so a form parked at the end would hide the one action a
-              first-time reader opened the menu for. Picking still costs
-              nothing extra — one compact row above it. */}
           <form
             className="flex items-center gap-1.5"
             onSubmit={(e) => {
-              e.preventDefault();
-              void create();
+              void handleFormSubmit(e);
             }}
           >
-            <Input
-              ref={inputRef}
-              value={draft}
-              disabled={busy}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={
-                editingKey != null ? t("tag.rename") : t("tag.newPlaceholder")
-              }
-              aria-label={t("tag.newPlaceholder")}
-              className="h-7 text-[12px]"
-            />
+            <div className="relative flex-1">
+              <Input
+                ref={inputRef}
+                value={draft}
+                disabled={busy}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={
+                  editingKey != null
+                    ? t("tag.rename")
+                    : t("tag.searchOrNewPlaceholder")
+                }
+                aria-label={t("tag.newPlaceholder")}
+                className="h-7 text-[12px] pr-6"
+              />
+              {draft.length > 0 && editingKey == null && (
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => {
+                    setDraft("");
+                    inputRef.current?.focus();
+                  }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
             {editingKey != null && (
               <Button
                 type="button"
@@ -301,16 +387,30 @@ export function SkillTagMenu({
             </Button>
           </form>
           <div className="max-h-64 overflow-y-auto">
-            {/* Custom tags lead, when any exist: they are the labels the reader
-                coined themselves, so the menu answers with them before the
-                system domains. With none defined the system list stands alone,
-                headers and all, exactly as before. */}
-            {defs.length > 0 && (
+            {/* Quick create option when search query doesn't match existing tags */}
+            {editingKey == null && trimmedDraft.length > 0 && !exactMatchExists && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void create()}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-primary hover:bg-primary/10 transition-colors font-medium border border-dashed border-primary/30 mb-1"
+              >
+                <Plus className="size-3.5 shrink-0" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">
+                  {t("tag.createPrompt", { name: trimmedDraft })}
+                </span>
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  Enter
+                </span>
+              </button>
+            )}
+
+            {filteredDefs.length > 0 && (
               <>
                 <p className="px-2 pt-1 pb-0.5 text-[10px] text-muted-foreground/70">
                   {t("tag.customGroup")}
                 </p>
-                {defs.map((def) => {
+                {filteredDefs.map((def) => {
                   const count = getTagUsedCount(def.key);
                   return (
                     <div key={def.key} className="group flex items-center gap-0.5">
@@ -343,9 +443,6 @@ export function SkillTagMenu({
                           <Check className="size-3 shrink-0" aria-hidden />
                         )}
                       </button>
-                      {/* The pencil stays for used tags too: renaming moves every
-                          assignment along, so unlike deletion it needs no unused
-                          guard. It toggles — a second press backs out. */}
                       <button
                         type="button"
                         disabled={busy}
@@ -391,40 +488,51 @@ export function SkillTagMenu({
                           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                         )}
                       >
-                        <X className="size-3" aria-hidden />
+                        <Trash2 className="size-3" aria-hidden />
                       </button>
                     </div>
                   );
                 })}
               </>
             )}
-            <p
-              className={cn(
-                "px-2 pb-0.5 text-[10px] text-muted-foreground/70",
-                defs.length > 0 ? "pt-2" : "pt-1",
-              )}
-            >
-              {t("tag.systemGroup")}
-            </p>
-            {DOMAINS.map((domain) => (
-              <button
-                key={domain.key}
-                type="button"
-                disabled={busy}
-                onClick={() => void pick(domain.key)}
-                className={itemClass(effectiveKey === domain.key)}
-              >
-                <span aria-hidden="true" className="text-[13px] leading-none">
-                  {domain.emoji}
-                </span>
-                <span className="min-w-0 flex-1 truncate">
-                  {domainLabel(domain.key, locale)}
-                </span>
-                {effectiveKey === domain.key && (
-                  <Check className="size-3 shrink-0" aria-hidden />
-                )}
-              </button>
-            ))}
+
+            {filteredDomains.length > 0 && (
+              <>
+                <p
+                  className={cn(
+                    "px-2 pb-0.5 text-[10px] text-muted-foreground/70",
+                    filteredDefs.length > 0 ? "pt-2" : "pt-1",
+                  )}
+                >
+                  {t("tag.systemGroup")}
+                </p>
+                {filteredDomains.map((domain) => (
+                  <button
+                    key={domain.key}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void pick(domain.key)}
+                    className={itemClass(effectiveKey === domain.key)}
+                  >
+                    <span aria-hidden="true" className="text-[13px] leading-none">
+                      {domain.emoji}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {domainLabel(domain.key, locale)}
+                    </span>
+                    {effectiveKey === domain.key && (
+                      <Check className="size-3 shrink-0" aria-hidden />
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+
+            {filteredDefs.length === 0 && filteredDomains.length === 0 && (
+              <p className="px-2 py-3 text-center text-[11px] text-muted-foreground">
+                {t("tag.noMatchingTags")}
+              </p>
+            )}
           </div>
           {assignedKey != null && (
             <Button

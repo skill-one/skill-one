@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "motion/react";
 import {
   CheckSquare,
+  Plus,
   Power,
   PowerOff,
   Tag as TagIcon,
@@ -88,6 +89,31 @@ export function SelectionActionBar({
 
   const customTags = availableTags.filter((tag) => tag.isCustom !== false);
   const systemTags = availableTags.filter((tag) => tag.isCustom === false);
+
+  const query = newTagDraft.trim().toLowerCase();
+  const filteredCustomTags = customTags.filter(
+    (tag) =>
+      !query ||
+      tag.label.toLowerCase().includes(query) ||
+      tag.key.toLowerCase().includes(query),
+  );
+  const filteredSystemTags = systemTags.filter(
+    (tag) =>
+      !query ||
+      tag.label.toLowerCase().includes(query) ||
+      tag.key.toLowerCase().includes(query),
+  );
+  const exactMatchExists =
+    Boolean(query) &&
+    (customTags.some(
+      (item) =>
+        item.label.toLowerCase() === query || item.key.toLowerCase() === query,
+    ) ||
+      systemTags.some(
+        (item) =>
+          item.label.toLowerCase() === query ||
+          item.key.toLowerCase() === query,
+      ));
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,7 +223,8 @@ export function SelectionActionBar({
                         <Input
                           value={newTagDraft}
                           onChange={(e) => setNewTagDraft(e.target.value)}
-                          placeholder={t("tag.newPlaceholder")}
+                          placeholder={t("tag.searchOrNewPlaceholder")}
+                          aria-label={t("tag.newPlaceholder")}
                           className="h-7 text-xs flex-1"
                           disabled={loading}
                         />
@@ -214,6 +241,26 @@ export function SelectionActionBar({
                     )}
 
                     <div className="max-h-60 overflow-y-auto space-y-0.5">
+                      {/* Quick create prompt if user typed a name that does not match any existing tag */}
+                      {Boolean(newTagDraft.trim()) && !exactMatchExists && onCreateTag && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start text-xs font-medium h-7 gap-1.5 text-primary border-dashed border-primary/30 hover:bg-primary/10"
+                          onClick={async () => {
+                            const val = newTagDraft.trim();
+                            await onCreateTag(val);
+                            setNewTagDraft("");
+                            setTagPopoverOpen(false);
+                          }}
+                        >
+                          <Plus className="size-3" />
+                          <span className="truncate">
+                            {t("tag.createPrompt", { name: newTagDraft.trim() })}
+                          </span>
+                        </Button>
+                      )}
+
                       <Button
                         variant="ghost"
                         size="sm"
@@ -226,12 +273,12 @@ export function SelectionActionBar({
                         {t("tag.clear")}
                       </Button>
 
-                      {customTags.length > 0 && (
+                      {filteredCustomTags.length > 0 && (
                         <>
                           <div className="px-2 pt-1.5 pb-0.5 text-[10px] font-medium text-muted-foreground/70">
                             {t("tag.customGroup")}
                           </div>
-                          {customTags.map((tag) => (
+                          {filteredCustomTags.map((tag) => (
                             <Button
                               key={tag.key}
                               variant="ghost"
@@ -251,12 +298,12 @@ export function SelectionActionBar({
                         </>
                       )}
 
-                      {systemTags.length > 0 && (
+                      {filteredSystemTags.length > 0 && (
                         <>
                           <div className="px-2 pt-2 pb-0.5 text-[10px] font-medium text-muted-foreground/70">
                             {t("tag.systemGroup")}
                           </div>
-                          {systemTags.map((tag) => (
+                          {filteredSystemTags.map((tag) => (
                             <Button
                               key={tag.key}
                               variant="ghost"
@@ -274,6 +321,12 @@ export function SelectionActionBar({
                             </Button>
                           ))}
                         </>
+                      )}
+
+                      {filteredCustomTags.length === 0 && filteredSystemTags.length === 0 && (
+                        <div className="py-2 text-center text-[11px] text-muted-foreground">
+                          {t("tag.noMatchingTags")}
+                        </div>
                       )}
                     </div>
                   </PopoverContent>

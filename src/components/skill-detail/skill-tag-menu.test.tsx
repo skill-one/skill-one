@@ -123,4 +123,76 @@ describe("SkillTagMenu", () => {
       expect(tags.tagDefs.find((d) => d.key === "unused-tag")).toBeUndefined();
     });
   });
+
+  it("filters tags matching search query and offers quick create for new tag", async () => {
+    const user = userEvent.setup();
+    seedMockCustomTags(
+      [{ key: "active-tag", label: "效率工具", emoji: "⚡" }],
+      {},
+    );
+
+    renderWithRouter(
+      <SkillTagMenu
+        skillName="skill-a"
+        assignedKey={null}
+        effectiveKey="development"
+        trigger={<span>开发工具</span>}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "编辑 skill-a 的标签" }),
+    );
+
+    const input = await screen.findByRole("textbox", { name: "新建标签…" });
+    await user.type(input, "测试分类");
+
+    // Quick create option appears
+    const createPrompt = await screen.findByRole("button", {
+      name: /新建标签「测试分类」/,
+    });
+    expect(createPrompt).toBeInTheDocument();
+    await user.click(createPrompt);
+
+    // Verifies tag is created and assigned
+    await waitFor(async () => {
+      const tags = await loadCustomTags();
+      expect(tags.tagDefs.find((d) => d.label === "测试分类")).toBeDefined();
+      expect(tags.skillTags["skill-a"]).toBe("测试分类");
+    });
+  });
+
+  it("toggles off assigned custom tag when clicking it again", async () => {
+    const user = userEvent.setup();
+    seedMockCustomTags(
+      [{ key: "效率工具", label: "效率工具", emoji: "⚡" }],
+      { "skill-a": "效率工具" },
+    );
+
+    renderWithRouter(
+      <SkillTagMenu
+        skillName="skill-a"
+        assignedKey="效率工具"
+        effectiveKey="效率工具"
+        trigger={<span>效率工具</span>}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "编辑 skill-a 的标签" }),
+    );
+
+    const assignedTagBtn = await screen.findByRole("button", {
+      name: /^效率工具/,
+    });
+    expect(assignedTagBtn).toBeInTheDocument();
+
+    // Clicking the already-assigned tag toggles it off
+    await user.click(assignedTagBtn);
+
+    await waitFor(async () => {
+      const tags = await loadCustomTags();
+      expect(tags.skillTags["skill-a"]).toBeUndefined();
+    });
+  });
 });
