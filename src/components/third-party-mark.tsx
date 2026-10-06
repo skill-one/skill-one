@@ -89,12 +89,12 @@ export function ThirdPartyMark({
         className,
       )}
     >
-      {initial && !compact ? (
+      {initial ? (
         <>
           <span className="font-semibold uppercase select-none leading-none text-foreground">
             {initial}
           </span>
-          {showBadge && candidate && (
+          {showBadge && candidate && !compact && (
             <span
               aria-hidden="true"
               className="absolute -bottom-0.5 -right-0.5 flex size-[48%] min-w-3 min-h-3 items-center justify-center rounded-full ring-1.5 ring-background shadow-xs bg-amber-500 text-amber-950 dark:text-amber-100"

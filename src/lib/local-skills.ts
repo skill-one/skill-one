@@ -38,9 +38,11 @@ import {
   mockPathFor,
   removeMockSkill,
   setMockSkillEnabled,
+  setMockSkillsCount,
   setMockSkillMd,
   unlinkMockAgent,
 } from "./mock-local";
+export { setMockSkillsCount };
 import {
   recordSkillProvenance,
   removeSkillProvenanceBatch,

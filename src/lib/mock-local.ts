@@ -164,6 +164,33 @@ export function getMockInstalledSkills(): InstalledSkill[] {
   return mockSkills;
 }
 
+/** Set total mock skills count for browser testing / demo. */
+export function setMockSkillsCount(count: number): void {
+  if (count <= 0) {
+    mockSkills = [];
+    return;
+  }
+  const base = buildMockSkills();
+  if (count <= base.length) {
+    mockSkills = base.slice(0, count);
+    return;
+  }
+  const extra: InstalledSkill[] = [];
+  for (let i = base.length; i < count; i++) {
+    const num = i + 1;
+    extra.push(
+      mockSkill(
+        `skill-${num}`,
+        `Skill ${num} 模拟能力描述。`,
+        mockInstalledAt(Math.floor(i / 2)),
+        `Skill ${num}`,
+        true,
+      ),
+    );
+  }
+  mockSkills = [...base, ...extra];
+}
+
 /** Remove a skill by name. */
 export function removeMockSkill(name: string): void {
   mockSkills = mockSkills.filter((s) => s.name !== name);
