@@ -1211,6 +1211,7 @@ describe("ExplorePage search", () => {
     const user = userEvent.setup({ delay: null });
     bootGadgetRegistry();
     renderExplorePage();
+    await screen.findByText("gadget-master");
 
     await pickUnit(user, "列表");
     await user.type(await searchField(), "gadget");
