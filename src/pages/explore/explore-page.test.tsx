@@ -630,7 +630,7 @@ describe("ExplorePage", () => {
     const strayRow = await screen.findByRole("button", {
       name: "查看 stray 详情",
     });
-    expect(strayRow).toHaveTextContent("📦");
+    expect(strayRow).toHaveTextContent("其他");
     expect(
       screen.getByRole("button", { name: "查看 orphan 详情" }),
     ).toHaveTextContent("❓");

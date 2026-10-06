@@ -27,7 +27,6 @@ import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
 import {
-  isLinkedLocalSkill,
   skillDisplayName,
   skillKey,
   type SkillView,
@@ -44,7 +43,6 @@ import { effectiveDomains } from "../../lib/custom-tags";
 import { useCustomTags } from "../../hooks/use-custom-tags";
 import { SkillTagMenu } from "./skill-tag-menu";
 import { SkillPopularity } from "../skill-popularity";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
   SheetContent,
@@ -699,21 +697,6 @@ export function SkillDetailPanel({
               <SheetTitle className="truncate text-lg font-bold tracking-tight">
                 {shown ? skillDisplayName(shown) : null}
               </SheetTitle>
-              {isLinkedLocalSkill(shown) && (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Badge
-                        variant="secondary"
-                        className="h-5 px-1.5 text-xs font-normal text-muted-foreground shrink-0 select-none cursor-default"
-                      >
-                        {t("common.localBadge")}
-                      </Badge>
-                    }
-                  />
-                  <TooltipContent>{t("common.localLinkedTooltip")}</TooltipContent>
-                </Tooltip>
-              )}
             </div>
             {hasSource && !isStore && shown && shown.origin === "local" ? (
               <div className="mt-1 flex flex-wrap items-center gap-2">

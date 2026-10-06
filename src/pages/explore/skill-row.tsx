@@ -6,7 +6,6 @@ import { skillDescription } from "../../lib/i18n-content";
 import { Ordinal } from "../../components/ordinal";
 import {
   isInstallableSkill,
-  isLinkedLocalSkill,
   isLiveSkill,
   skillDisplayName,
   skillKey,
@@ -305,31 +304,15 @@ export const SkillRow = memo(function SkillRow({
             <h3 className="truncate text-[14px] font-medium leading-tight">
               <HighlightedText text={skillDisplayName(skill)} terms={matched?.name} />
             </h3>
-            {isLinkedLocalSkill(skill) && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Badge
-                      variant="secondary"
-                      className="h-4 px-1 text-[10px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
-                    >
-                      {t("common.localBadge")}
-                    </Badge>
-                  }
-                />
-                <TooltipContent>{t("common.localLinkedTooltip")}</TooltipContent>
-              </Tooltip>
-            )}
             {!live && hasTag && (
               <Tooltip>
                 <TooltipTrigger
                   render={
                     <Badge
                       variant="secondary"
-                      className="h-4 gap-1 px-1.5 text-[10px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
+                      className="h-4 px-1.5 text-[10px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
                     >
-                      <span aria-hidden="true">{domainEmoji(domain)}</span>
-                      {meta && <span>{domainLabel(meta.key, locale)}</span>}
+                      {meta ? domainLabel(meta.key, locale) : domainEmoji(domain)}
                     </Badge>
                   }
                 />

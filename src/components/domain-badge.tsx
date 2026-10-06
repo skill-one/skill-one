@@ -40,12 +40,19 @@ export function DomainBadge({
   const meta = domainMeta(key);
   const label = domainLabel(key, locale);
   const tooltip = domainTooltip(domain, locale);
+  const isInitialPrefix = Boolean(
+    meta?.emoji &&
+      label &&
+      label.trim().toLowerCase().startsWith(meta.emoji.toLowerCase()),
+  );
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <Badge variant={variant} className={className}>
-            {meta && <span aria-hidden="true">{meta.emoji}</span>}
+            {meta && !isInitialPrefix && (
+              <span aria-hidden="true">{meta.emoji}</span>
+            )}
             {label}
           </Badge>
         }
