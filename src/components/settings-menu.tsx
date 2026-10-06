@@ -300,6 +300,10 @@ export function SettingsMenu() {
             <Braces />
             {t("developer.title")}
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <div className="px-2 py-1.5 text-center font-mono text-[11px] text-muted-foreground/60 select-none">
+            Skill One v{__APP_VERSION__}
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
       {/* Mounted outside the menu: its content unmounts on close and would

@@ -113,7 +113,12 @@ export function AdvancedSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t("advanced.title")}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>{t("advanced.title")}</DialogTitle>
+            <span className="font-mono text-[11px] font-normal text-muted-foreground/60 select-none">
+              v{__APP_VERSION__}
+            </span>
+          </div>
           <DialogDescription>
             {t("advanced.description")}
           </DialogDescription>

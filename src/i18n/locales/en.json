@@ -334,38 +334,6 @@
   "developer": {
     "title": "Developer",
     "description": "Internal data for debugging: the provenance ledger (.skill-one.jsonl) recording where each installed skill came from.",
-    "recordCount_one": "{{count}} record",
-    "recordCount_other": "{{count}} records",
-    "viewAria": "Choose the ledger view",
-    "view": {
-      "structured": "Structured",
-      "raw": "Raw JSONL"
-    },
-    "kind": {
-      "meta": "header",
-      "source": "source",
-      "pending": "pending",
-      "unknown": "unrecognized"
-    },
-    "field": {
-      "kind": "kind",
-      "index": "index",
-      "name": "name",
-      "repo": "repo",
-      "via": "via",
-      "key": "key",
-      "repos": "repos",
-      "fingerprint": "fingerprint",
-      "candidates": "candidates",
-      "similarity": "similarity",
-      "stars": "stars",
-      "downloads": "downloads",
-      "description": "description",
-      "descriptionZh": "descriptionZh",
-      "mtimeMs": "mtimeMs",
-      "size": "size"
-    },
-    "unparsableLine": "Unparsable line",
     "empty": "The ledger is empty — install a skill and its source will be recorded here",
     "reveal": "Show in folder",
     "refresh": "Refresh",
