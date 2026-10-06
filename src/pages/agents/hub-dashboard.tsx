@@ -69,20 +69,21 @@ export function HubDashboard({
     >
       {/* Brand & Hub Title — Floating Notch on Top Border */}
       <div
-        title={t("agents.hub.tagline")}
-        className="absolute -top-3.5 left-4 z-10 flex max-w-[320px] items-center gap-1.5 rounded-full border border-border/70 bg-card px-2.5 py-0.5 shadow-2xs backdrop-blur-md"
+        className="absolute -top-[18px] left-4 z-10 flex items-center gap-2 rounded-lg border border-border/70 bg-card px-2.5 py-1 shadow-2xs backdrop-blur-md"
       >
         <img
           src="/skill-one-transparent.png"
           alt="Skill One"
-          className="size-4 shrink-0 object-contain drop-shadow-xs"
+          className="size-5 shrink-0 object-contain drop-shadow-xs"
         />
-        <span className="truncate text-xs font-semibold tracking-tight text-foreground">
-          {t("agents.hub.title")}
-        </span>
-        <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">
-          {t("agents.hub.tagline")}
-        </span>
+        <div className="flex flex-col min-w-0">
+          <span className="text-xs font-semibold leading-tight tracking-tight text-foreground">
+            {t("agents.hub.title")}
+          </span>
+          <span className="text-[10px] leading-tight text-muted-foreground">
+            {t("agents.hub.tagline")}
+          </span>
+        </div>
       </div>
 
       {/* Skills Stats Badge — Floating on Top-Right Border */}
