@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { translations } from '../i18n/translations';
-import { Zap, CheckCircle2, Check, ArrowRight } from 'lucide-react';
+import { Zap, CheckCircle2, ArrowRight } from 'lucide-react';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
