@@ -11,7 +11,11 @@ import {
   type SkillView,
 } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
-import { domainEmoji, domainTooltip } from "../../data/domains";
+import {
+  domainEmoji,
+  domainTooltip,
+  UNCLASSIFIED_DOMAIN,
+} from "../../data/domains";
 import {
   HighlightedText,
   type SkillMatched,
@@ -59,6 +63,7 @@ export function SkillGridCard({
   checked = false,
   onCheckChange,
   selectionMode = false,
+  showUnclassified = true,
 }: {
   /** The skill to render, from the registry or from the installed list. */
   skill: SkillView;
@@ -93,10 +98,15 @@ export function SkillGridCard({
   onCheckChange?: (checked: boolean) => void;
   /** Whether multi-selection mode is active across the list/grid. */
   selectionMode?: boolean;
+  /** Whether to show unclassified domain glyph (❓). Defaults to true. */
+  showUnclassified?: boolean;
 }) {
   const storeBacked = skill.storeBacked !== false;
   const [owner] = skill.repo.split("/");
   const domain = skill.profile?.domain;
+  const hasTag = showUnclassified
+    ? true
+    : Boolean(domain && domain.length > 0 && domain[0] !== UNCLASSIFIED_DOMAIN);
   const live = isLiveSkill(skill);
   const locale = useAppLocale();
   const { t } = useTranslation();
@@ -207,7 +217,7 @@ export function SkillGridCard({
 
         {/* Footer: category glyph, the figure the list answers in, corner action. */}
         <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-muted-foreground">
-          {!live && (
+          {!live && hasTag && (
             <Tooltip>
               <TooltipTrigger
                 render={

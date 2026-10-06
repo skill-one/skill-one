@@ -812,11 +812,9 @@ describe("InstalledPage", () => {
       );
       const dialog = await screen.findByRole("dialog");
 
-      // The badge itself opens the tag menu — no separate affordance beside
-      // it — and the popover teleports outside the sheet element, so its
-      // contents are queried at the screen level like the link candidates.
+      // For untagged skills, the drawer offers "为 pdf 添加标签" (+ 添加标签).
       await user.click(
-        within(dialog).getByRole("button", { name: "编辑 pdf 的标签" }),
+        within(dialog).getByRole("button", { name: "为 pdf 添加标签" }),
       );
       await user.click(await screen.findByRole("button", { name: "开发编程" }));
       await waitFor(async () =>
@@ -1431,6 +1429,23 @@ describe("InstalledPage", () => {
       setSort("installed", "popularity");
       await screen.findAllByRole("button", { name: /查看 .+ 详情/ });
       expect(screen.queryByLabelText(/^安装于 /)).toBeNull();
+    });
+
+    it("does not render any tag or question mark for untagged skills in list and grid views", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await pickUnit(user, "列表");
+      const pdfRow = await screen.findByRole("button", {
+        name: "查看 pdf 详情",
+      });
+      expect(pdfRow).not.toHaveTextContent("❓");
+
+      await pickUnit(user, "网格");
+      const pdfCard = await screen.findByRole("button", {
+        name: "查看 pdf 详情",
+      });
+      expect(pdfCard).not.toHaveTextContent("❓");
     });
 
     it("orders one source's several installs by time instead of folding them", async () => {

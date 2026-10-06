@@ -1189,6 +1189,7 @@ export function InstalledPage() {
         checked={multiSelect.isSelected(key)}
         onCheckChange={() => multiSelect.toggle(key)}
         selectionMode={multiSelect.isSelectionMode}
+        showUnclassified={false}
       />
     );
   };
@@ -1213,6 +1214,7 @@ export function InstalledPage() {
         checked={multiSelect.isSelected(key)}
         onCheckChange={() => multiSelect.toggle(key)}
         selectionMode={multiSelect.isSelectionMode}
+        showUnclassified={false}
       />
     );
   };

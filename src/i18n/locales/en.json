@@ -423,6 +423,8 @@
   },
   "tag": {
     "title": "Choose a tag",
+    "addTag": "Add tag",
+    "addTagAria": "Add tag for {{name}}",
     "edit": "Edit tag",
     "editAria": "Edit tag for {{name}}",
     "systemGroup": "System",

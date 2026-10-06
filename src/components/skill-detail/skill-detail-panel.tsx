@@ -577,14 +577,17 @@ export function SkillDetailPanel({
         assignedKey={assignedTagKey}
         effectiveKey={effectiveTagKey}
         trigger={
-          <DomainBadge
-            domain={shown.profile?.domain ?? [UNCLASSIFIED_DOMAIN]}
-            variant="ghost"
-            className="px-0 py-0"
-          />
+          effectiveTagKey !== UNCLASSIFIED_DOMAIN ? (
+            <DomainBadge
+              domain={[effectiveTagKey]}
+              variant="ghost"
+              className="px-0 py-0"
+            />
+          ) : undefined
         }
       />
-    ) : shown?.profile ? (
+    ) : shown?.profile?.domain &&
+      shown.profile.domain[0] !== UNCLASSIFIED_DOMAIN ? (
       <DomainBadge
         key="domain"
         domain={shown.profile.domain}

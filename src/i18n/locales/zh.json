@@ -423,6 +423,8 @@
   },
   "tag": {
     "title": "选择标签",
+    "addTag": "添加标签",
+    "addTagAria": "为 {{name}} 添加标签",
     "edit": "编辑标签",
     "editAria": "编辑 {{name}} 的标签",
     "systemGroup": "系统分类",

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { DOMAINS, domainLabel } from "../../data/domains";
+import { DOMAINS, domainLabel, UNCLASSIFIED_DOMAIN } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useCustomTags } from "../../hooks/use-custom-tags";
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
@@ -54,7 +54,7 @@ export function SkillTagMenu({
   /** What the badge shows now: the choice, else the store's classification. */
   effectiveKey: string;
   /** The badge the menu opens from — pressed, not hovered, to choose a tag. */
-  trigger: ReactElement;
+  trigger?: ReactElement;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -287,6 +287,8 @@ export function SkillTagMenu({
       active && "bg-muted/60 font-medium",
     );
 
+  const isUnclassified = effectiveKey === UNCLASSIFIED_DOMAIN;
+
   return (
     <div className="inline-flex items-center gap-1">
       <Popover
@@ -300,18 +302,36 @@ export function SkillTagMenu({
           render={
             <button
               type="button"
-              aria-label={t("tag.editAria", { name: skillName })}
-              title={t("tag.edit")}
+              aria-label={
+                isUnclassified
+                  ? t("tag.addTagAria", { name: skillName })
+                  : t("tag.editAria", { name: skillName })
+              }
+              title={isUnclassified ? t("tag.addTag") : t("tag.edit")}
               className={cn(
                 "group/tag-btn inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition-colors",
-                assignedKey != null
-                  ? "bg-secondary/80 hover:bg-secondary text-secondary-foreground border border-border/50 font-medium"
-                  : "hover:bg-muted/80 text-muted-foreground hover:text-foreground",
+                isUnclassified
+                  ? "border border-dashed border-border/80 hover:border-foreground/40 text-muted-foreground hover:text-foreground hover:bg-muted/50 font-normal"
+                  : assignedKey != null
+                    ? "bg-secondary/80 hover:bg-secondary text-secondary-foreground border border-border/50 font-medium"
+                    : "hover:bg-muted/80 text-muted-foreground hover:text-foreground",
                 "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               )}
             >
-              {trigger}
-              <Pencil className="size-2.5 opacity-40 transition-opacity group-hover/tag-btn:opacity-100" aria-hidden />
+              {isUnclassified ? (
+                <>
+                  <Plus className="size-3 shrink-0" aria-hidden />
+                  <span>{t("tag.addTag")}</span>
+                </>
+              ) : (
+                <>
+                  {trigger}
+                  <Pencil
+                    className="size-2.5 opacity-40 transition-opacity group-hover/tag-btn:opacity-100"
+                    aria-hidden
+                  />
+                </>
+              )}
             </button>
           }
         />

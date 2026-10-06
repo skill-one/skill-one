@@ -13,7 +13,11 @@ import {
   type SkillView,
 } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
-import { domainEmoji, domainTooltip } from "../../data/domains";
+import {
+  domainEmoji,
+  domainTooltip,
+  UNCLASSIFIED_DOMAIN,
+} from "../../data/domains";
 import {
   HighlightedText,
   type SkillMatched,
@@ -104,6 +108,7 @@ export const SkillRow = memo(function SkillRow({
   checked = false,
   onCheckChange,
   selectionMode = false,
+  showUnclassified = true,
 }: {
   /** The skill to render, from the registry or from the installed list. */
   skill: SkillView;
@@ -162,6 +167,8 @@ export const SkillRow = memo(function SkillRow({
   onCheckChange?: (checked: boolean) => void;
   /** Whether multi-selection mode is active across the list/grid. */
   selectionMode?: boolean;
+  /** Whether to show unclassified domain glyph (❓). Defaults to true. */
+  showUnclassified?: boolean;
 }) {
   // The row's own identity, and the one handler it needs to answer a click with
   // it — built here so a caller can pass a handler it already had.
@@ -179,6 +186,9 @@ export const SkillRow = memo(function SkillRow({
   // has none.
   const [owner] = skill.repo.split("/");
   const domain = skill.profile?.domain;
+  const hasTag = showUnclassified
+    ? true
+    : Boolean(domain && domain.length > 0 && domain[0] !== UNCLASSIFIED_DOMAIN);
   // A live skills.sh row claims nothing its source does not carry — which is
   // no description and no classification at all — so it draws neither the
   // 暂无描述 placeholder nor the ❓ mark (see `isLiveSkill`); an installed
@@ -330,7 +340,7 @@ export const SkillRow = memo(function SkillRow({
             and the face left of it sits in a column of its own instead of
             drifting with the digits' width. */}
         <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
-          {!live && (
+          {!live && hasTag && (
             <Tooltip>
               <TooltipTrigger
                 render={

@@ -195,4 +195,25 @@ describe("SkillTagMenu", () => {
       expect(tags.skillTags["skill-a"]).toBeUndefined();
     });
   });
+
+  it("renders '+ 添加标签' trigger for untagged skill and opens popover", async () => {
+    const user = userEvent.setup();
+    renderWithRouter(
+      <SkillTagMenu
+        skillName="my-tool"
+        assignedKey={null}
+        effectiveKey="unclassified"
+      />,
+    );
+
+    const addBtn = screen.getByRole("button", {
+      name: "为 my-tool 添加标签",
+    });
+    expect(addBtn).toBeInTheDocument();
+    expect(addBtn).toHaveTextContent("添加标签");
+    expect(addBtn).not.toHaveTextContent("❓");
+
+    await user.click(addBtn);
+    expect(await screen.findByText("选择标签")).toBeInTheDocument();
+  });
 });
