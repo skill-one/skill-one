@@ -15,7 +15,9 @@ import { SkillDetailPanel, type SkillDetailSurface } from "./skill-detail-panel"
  * `surface` is the one thing the caller has to say about itself: the panel
  * offers the store's install CTA only for the store, and the installed list's
  * enable switch only for the installed list, so the drawer matches the card
- * the reader opened it from.
+ * the reader opened it from. The installed list's walk also includes a card's
+ * uninstalled siblings; for a skill not on disk the panel itself falls back to
+ * the store's install chrome (see `SkillDetailPanel`).
  */
 export function SkillDetailDrawer({
   skills,

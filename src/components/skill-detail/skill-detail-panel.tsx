@@ -23,7 +23,10 @@ import {
   readLocalSkillRaw,
   saveLocalSkillMd,
 } from "../../lib/local-skills";
-import { markSkillsChanged } from "../../hooks/use-installed-skills";
+import {
+  markSkillsChanged,
+  useInstalledSkills,
+} from "../../hooks/use-installed-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
 import {
@@ -197,6 +200,11 @@ function InstalledAt({ installedAt }: { installedAt?: number | null }) {
  * has — the install CTA and the registry-only figures on the store, and the
  * enable switch the store cannot offer. Everything else is read off the skill
  * itself, so a surface never has to describe its own skill twice.
+ *
+ * `installed` is the owner, not a promise that the open skill is on disk: the
+ * installed list's repository cards also open uninstalled siblings in this
+ * drawer, and the panel checks the on-disk list per skill and presents such a
+ * skill with the store chrome (see `effectiveSurface`).
  */
 export type SkillDetailSurface = "store" | "installed";
 
@@ -233,10 +241,11 @@ interface SkillDetailPanelProps {
  * SKILL.md body, and hides behind the header's 源 tooltip so it costs no
  * permanent rows; unhashed entries and local installs simply show less.
  *
- * `surface` is the only thing the panel cannot read off the skill: which
- * listing opened it. The store's chrome — the install CTA and the install
- * figure — is shown there and nowhere else, so the drawer and the card of the
- * listing it was opened from always present the same skill the same way.
+ * `surface` names the listing that opened it; the one fact the panel itself
+ * adds is whether the open skill is actually on disk. An uninstalled skill
+ * opened from the installed list therefore reads exactly as it does on the
+ * store — install CTA, no enable switch or editing — so the drawer always
+ * presents a skill the way its facts say it exists.
  */
 export function SkillDetailPanel({
   skill,
@@ -298,6 +307,29 @@ export function SkillDetailPanel({
   const effectiveTagKey =
     effectiveDomains({ profile: shown?.profile }, assignedTagKey)[0] ??
     UNCLASSIFIED_DOMAIN;
+
+  // The chrome this skill actually gets. The installed list's repository cards
+  // also list each repository's uninstalled siblings, and those rows open this
+  // same drawer — but a skill that is not on disk is a store skill here: the
+  // install CTA instead of the enable switch, no editing, no tag filing. The
+  // on-disk list the install/remove buttons themselves read decides it.
+  //
+  // While that list is still loading (data absent) the declared surface wins:
+  // an uninstalled row is only reachable once the list loaded, so downgrading
+  // early would flash the install CTA over every installed skill on a cold
+  // cache. The check is also on `skill` (the live selection) rather than the
+  // latched `shown`: while the sheet plays its exit animation `skill` is null
+  // and the panel keeps its closing chrome instead of swapping CTA mid-slide.
+  // An install done in the drawer flips this live — the CTA gives way to the
+  // enable switch as the skill joins the installed list.
+  const { data: installedSkills } = useInstalledSkills();
+  const effectiveSurface: SkillDetailSurface =
+    surface === "installed" &&
+    skill != null &&
+    installedSkills != null &&
+    !installedSkills.some((record) => record.name === skill.name)
+      ? "store"
+      : surface;
 
   // Leaving the current skill (or closing the drawer) drops any edit session, so
   // the next skill never opens on a stale draft. The drawer language resets with
@@ -387,9 +419,10 @@ export function SkillDetailPanel({
     return () => window.removeEventListener("keydown", onKeyDownCapture, true);
   }, [editing]);
 
-  // Editing is offered only where a writable file exists: an installed skill.
-  // A store row is remote mirror content with nothing to save to.
-  const editable = surface === "installed" && shown != null;
+  // Editing is offered only where a writable file exists: an installed skill
+  // actually on disk. An uninstalled sibling opened on the installed surface
+  // reads as a store row — remote mirror content with nothing to save to.
+  const editable = effectiveSurface === "installed" && shown != null;
 
   // The raw file (frontmatter included) is read only once editing starts, and
   // kept apart from the display detail — a save must round-trip the file, which
@@ -462,10 +495,11 @@ export function SkillDetailPanel({
   // global directory by hand, or installed by another tool): nothing to link
   // to, and the source line falls back to the local-install label.
   const hasSource = shown != null && shown.repo !== "";
-  // The store's install CTA is the one thing the surface itself decides: the
-  // installed list installs nothing (its skills are already on disk) and offers
-  // the enable switch in that slot instead.
-  const isStore = surface === "store";
+  // The store's install CTA is the one thing the chrome decides: a skill on
+  // disk on the installed surface offers the enable switch, while a skill not
+  // on disk — a store row, or an uninstalled sibling opened from the installed
+  // list — offers the install CTA instead.
+  const isStore = effectiveSurface === "store";
   // Whether the registry actually backs this skill's figures and classification.
   // The store's rows always are; an installed row only when the app resolved the
   // store entry its recorded source points at — so a record the registry does

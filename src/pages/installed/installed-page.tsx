@@ -270,8 +270,8 @@ function compareByStars<T>(
  * badge beside an install whose source the ledger cannot vouch for. A card
  * also names what its repository still has that this machine does not: a
  * badge on the card's bar states the count of uninstalled siblings, and a
- * press on the bar unfolds them (each with the store's install button) as
- * their own group under the divider.
+ * press on the bar unfolds them (each openable to its detail panel and carrying
+ * the store's install button) as their own group under the divider.
  * The skill shape carries its per-row switch, and every grouping feeds the
  * same detail drawer, so what a skill looks like never depends on how the
  * list is grouped.
@@ -890,6 +890,13 @@ export function InstalledPage() {
   // lists it: a card's preview cap and the progressive reveal are rendering
   // choices, not the list's extent.
   //
+  // In the repository unit a card's uninstalled siblings walk too, right after
+  // that card's installs — the same order the unfolded card lists them — so
+  // pressing an uninstalled row can open its panel and ←/→ follows the card.
+  // They are plain registry `Skill`s, which satisfy `SkillView` (every field
+  // the view adds is optional); the panel itself reads the on-disk list and
+  // presents such a skill with the store's install chrome.
+  //
   // In the skill unit it walks the *split* order, so the row ←/→ lands on is the
   // row below or above the one on screen. Walking the raw sort order instead
   // would make the walk disagree with the list the moment anything is parked —
@@ -897,11 +904,14 @@ export function InstalledPage() {
   const detailSkills = useMemo(
     () =>
       unit === "repo"
-        ? activeCards.flatMap((card) => card.items.map((row) => row.skill))
+        ? activeCards.flatMap((card) => [
+            ...card.items.map((row) => row.skill),
+            ...(card.repo ? (uninstalledByRepo.get(card.repo) ?? []) : []),
+          ])
         : [...splitActive.enabled, ...splitActive.disabled].map(
             (row) => row.skill,
           ),
-    [unit, splitActive, activeCards],
+    [unit, splitActive, activeCards, uninstalledByRepo],
   );
 
   // A retag lands while the drawer is open on the skill being filed, so it
@@ -1429,10 +1439,12 @@ export function InstalledPage() {
 
       {/* Same right-side detail drawer the store pages use, told which list
           owns it: the installed surface replaces the store's install CTA with
-          the enable switch and shows no registry-only figures. ←/→ walks the
-          whole list. Uninstalling from it closes it: this list shrinks with
-          the skill. (Selection by identity is what makes that swap impossible
-          in the first place — see `SkillDetailDrawer`.) */}
+          the enable switch and shows no registry-only figures. Its walk also
+          covers the cards' uninstalled siblings; the panel sees such a skill
+          is not on disk and hands it the store's install chrome instead.
+          ←/→ walks the whole list. Uninstalling from it closes it: this list
+          shrinks with the skill. (Selection by identity is what makes that
+          swap impossible in the first place — see `SkillDetailDrawer`.) */}
       <SkillDetailDrawer
         skills={detailSkills}
         selected={selected}

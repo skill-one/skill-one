@@ -692,10 +692,11 @@ export function RepoCard({
               before its rows begin — without it the rows would butt against
               the divider and read as one list with the installed ones. The
               marker is a fold control like the bar is: one fold, either press
-              moves it. Each row carries the store's hover-revealed install
-              button, and none opens the detail panel (this surface's drawer
-              walks the *installed* list — an uninstalled row's destination is
-              the install itself). The fold is the card's own `expanded`, so a
+              moves it. Each row is the same control an installed row is — a
+              press opens the skill's detail panel (the caller's drawer walks
+              these rows too) — with the store's hover-revealed install button
+              as its sibling, so inspecting and installing are both one press
+              away. The fold is the card's own `expanded`, so a
               card holding cap-hidden rows and uninstalled ones reveals both
               with the one press. */}
           {uninstalled && uninstalled.length > 0 && expanded && (
@@ -725,18 +726,35 @@ export function RepoCard({
                 className="grid grid-cols-2 gap-x-8 -mx-1.5"
               >
                 {uninstalled.map((skill) => {
+                  const key = skillKey(skill);
                   const domainKey = skill.profile?.domain?.[0];
                   const meta = domainKey ? domainMeta(domainKey) : undefined;
                   const hasTag = showUnclassified
                     ? true
                     : Boolean(meta && meta.key !== UNCLASSIFIED_DOMAIN);
+                  const isSelected = selected != null && selected === key;
                   return (
                     <li
-                      key={skill.name}
+                      key={key}
                       data-skill={skill.name}
                       className="group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent"
                     >
-                      <span className="flex min-w-0 flex-1 items-center gap-2 py-1">
+                      {/* The same row control the installed skills use: a
+                          press opens the detail panel, and the install button
+                          beside it is a sibling rather than a child, so the
+                          two never nest. */}
+                      <button
+                        type="button"
+                        onClick={() => onOpenSkill(key)}
+                        aria-label={t("common.viewDetailAria", {
+                          name: skill.name,
+                        })}
+                        aria-current={isSelected ? "true" : undefined}
+                        className={cn(
+                          "flex min-w-0 flex-1 items-center gap-2 py-1 text-left focus-visible:outline-none",
+                          isSelected && "text-primary",
+                        )}
+                      >
                         <span
                           aria-hidden="true"
                           className="w-4 shrink-0 text-center text-[13px]"
@@ -746,20 +764,20 @@ export function RepoCard({
                         <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
                           {skillDisplayName(skill)}
                         </span>
-                      <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                        {skillDescription(skill, locale) ||
-                          t("common.noDescription")}
-                      </span>
-                    </span>
-                    {/* The same floating slot the installed rows' controls
+                        <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                          {skillDescription(skill, locale) ||
+                            t("common.noDescription")}
+                        </span>
+                      </button>
+                      {/* The same floating slot the installed rows' controls
                           live in: revealed on hover or focus, floating over a
                           gradient of the row's own hover surface. After an
                           install the button settles into its 已安装 badge and
                           the wrapper keeps it on screen. */}
-                    <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100 has-data-unchecked:opacity-100">
-                      <SkillInstallButton skill={skill} className="h-7 w-7" />
-                    </span>
-                  </li>
+                      <span className="absolute top-1/2 right-1 flex -translate-y-1/2 rounded-md bg-gradient-to-l from-accent via-accent to-transparent pl-6 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100 has-data-[state=installed]:opacity-100 has-data-unchecked:opacity-100">
+                        <SkillInstallButton skill={skill} className="h-7 w-7" />
+                      </span>
+                    </li>
                   );
                 })}
               </ul>

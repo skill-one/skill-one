@@ -9,8 +9,9 @@ import {
   fetchSkillZhDetail,
 } from "../../lib/skill-detail-api";
 import {
-  fetchInstalledSkills,
   fetchLocalSkillDetail,
+  fetchInstalledSkills,
+  installSkillFromSource,
   openInstalledSkillDir,
   readLocalSkillRaw,
   removeInstalledSkill,
@@ -39,11 +40,19 @@ vi.mock("../../lib/skill-detail-api", () => ({
 vi.mock("../../lib/local-skills", () => ({
   fetchLocalSkillDetail: vi.fn(),
   fetchInstalledSkills: vi.fn(),
+  installSkillFromSource: vi.fn(),
   openInstalledSkillDir: vi.fn(),
   readLocalSkillRaw: vi.fn(),
   removeInstalledSkill: vi.fn(),
   saveLocalSkillMd: vi.fn(),
   setSkillEnabled: vi.fn(),
+  SkillAlreadyInstalledError: class SkillAlreadyInstalledError extends Error {
+    skillName: string;
+    constructor(skillName: string) {
+      super(skillName);
+      this.skillName = skillName;
+    }
+  },
 }));
 
 vi.mock("../../lib/open-external", () => ({
@@ -470,6 +479,58 @@ describe("SkillDetailPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("gives an uninstalled skill the store chrome on the installed surface", async () => {
+    // The installed list's repository cards open uninstalled siblings in this
+    // same drawer. The on-disk list (empty here) says this skill is not
+    // installed, so it reads exactly as it does on the store: the install CTA,
+    // and none of the installed-only chrome.
+    renderDrawer({ skill, surface: "installed" });
+
+    // The mirror body still loads while the header settles.
+    await screen.findByText("Use this skill for PDFs.");
+    expect(
+      screen.getByRole("button", { name: "安装" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "编辑" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "打开文件夹" }),
+    ).not.toBeInTheDocument();
+    // A registry skill is still backed: its repo line and figure read normally.
+    expect(
+      screen.getByRole("link", { name: "anthropics/skills" }),
+    ).toBeInTheDocument();
+  });
+
+  it("flips to the installed chrome once the skill lands on disk", async () => {
+    const user = userEvent.setup();
+    vi.mocked(installSkillFromSource).mockResolvedValue(undefined);
+    // Opens while uninstalled — the store CTA — then the install lands and the
+    // shared on-disk list answers with the skill present.
+    vi.mocked(fetchInstalledSkills)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([installedPdf])
+      .mockResolvedValue([installedPdf]);
+    mockFetchLocalSkillDetail.mockResolvedValue(detail);
+    renderDrawer({ skill: { ...skill, path: undefined }, surface: "installed" });
+
+    expect(
+      await screen.findByRole("button", { name: "安装" }),
+    ).toBeInTheDocument();
+
+    // Installing invalidates the shared query; refetching now reports the
+    // skill on disk, which swaps the CTA for the enable switch live.
+    await user.click(screen.getByRole("button", { name: "安装" }));
+    expect(
+      await screen.findByRole("switch", { name: "关闭 pdf" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "安装" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("reports how long ago an installed skill landed on disk", async () => {
     vi.mocked(fetchInstalledSkills).mockResolvedValue([installedPdf]);
     mockFetchLocalSkillDetail.mockResolvedValue(detail);
@@ -652,6 +713,22 @@ describe("SkillDetailPanel", () => {
 });
 
 describe("SkillDetailPanel source linking", () => {
+  // These flows only exist for skills on disk: the panel now tells an
+  // installed-surface skill's chrome from the on-disk list. Seed both names
+  // the suite opens the drawer for.
+  beforeEach(() => {
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([
+      installedPdf,
+      {
+        name: "my-tool",
+        path: "/Users/me/.agents/skills/my-tool",
+        enabled: true,
+        description: "",
+        installedAt: 1_760_000_000,
+      },
+    ]);
+  });
+
   /** A same-name store entry, as `findLinkCandidates` serves it. */
   const forkCandidate = {
     skill: {
@@ -1019,6 +1096,13 @@ describe("SkillDetailPanel installed translation", () => {
 });
 
 describe("SkillDetailPanel editing", () => {
+  // Editing only exists for a skill on disk, which the panel now reads from
+  // the on-disk list before offering it; the store-surface case in this suite
+  // stays covered by its own test.
+  beforeEach(() => {
+    vi.mocked(fetchInstalledSkills).mockResolvedValue([installedPdf]);
+  });
+
   /** A raw SKILL.md: the editor opens on the file, frontmatter included. */
   const raw = "---\nname: pdf\n---\n\n# PDF\n\nBody.";
 
