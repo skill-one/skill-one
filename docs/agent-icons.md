@@ -72,6 +72,5 @@ monochrome glyph to a colored `cursor-color.svg` and lost its `mono` flag.
   precomputed edge colors.
 - `hooks/use-agent-icons.test.ts` and `hooks/use-agent-edge-color.test.tsx`
   — synchronous resolution, neutral fallbacks.
-- `pages/installed/agent-avatar-group.test.tsx` and
-  `pages/agents/agent-graph.test.tsx` mock the hook so layout tests never
+- `pages/agents/agent-graph.test.tsx` mocks the hook so layout tests never
   touch the network.

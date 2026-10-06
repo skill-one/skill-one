@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import type { ParseKeys } from "i18next";
 import { Boxes, PowerOff, Users } from "lucide-react";
 
-import { useInstalledSkills, markSkillsChanged } from "../../hooks/use-installed-skills";
+import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
@@ -14,31 +13,13 @@ import { useDestinationView, useListQuery } from "../../hooks/use-list-view";
 import { useViewMemory } from "../../hooks/use-view-memory";
 import { setQuery, REVEAL } from "../../lib/list-view";
 import { buildSearchIndex } from "../../lib/search-index";
-import { domainsOf, taxonomyRank } from "../../lib/domain-filter";
-import {
-  DOMAINS,
-  domainEmoji,
-  domainLabel,
-  fullTagEmoji,
-  UNCLASSIFIED_DOMAIN,
-} from "../../data/domains";
+import { DOMAINS, domainEmoji, domainLabel } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useMultiSelect } from "../../hooks/use-multi-select";
 import {
   SelectionActionBar,
   type SelectionTagOption,
 } from "../../components/selection-action-bar";
-import { toast } from "../../components/ui/toast";
-import {
-  removeInstalledSkills,
-  setManySkillsEnabled,
-} from "../../lib/local-skills";
-import { saveCustomTagDef, setManySkillTags } from "../../lib/provenance";
-import {
-  collectTakenTagKeys,
-  validateNewTag,
-  type TagValidationError,
-} from "../../lib/custom-tags";
 import {
   installedSkillView,
   skillDisplayName,
@@ -56,28 +37,34 @@ import {
 import { SkillDetailDrawer } from "../../components/skill-detail/skill-detail-drawer";
 import { Placeholder } from "../../components/placeholder";
 import { cn, errorMessage } from "../../lib/utils";
-import { popularity } from "../../lib/popularity";
 import type { Skill } from "../../types/skill";
-import type { SkillMatched } from "../../components/highlighted-text";
 import { SkillEnableSwitch } from "../../components/skill-enable-switch";
 import { RepoEnableSwitch } from "../../components/repo-enable-switch";
 import { SkillRow } from "../explore/skill-row";
 import { SkillGridCard } from "../explore/skill-grid-card";
-import {
-  compareByInstalledTime,
-  newestInstallTime,
-} from "../../lib/install-time";
 import { SkeletonList } from "../../components/skeleton-list";
 import { ListToolbar } from "../../components/list-toolbar";
 import { LinkSuggestionMark } from "./link-suggestion-mark";
-import type { LinkCandidate } from "../../lib/link-suggestions";
 import { RepoCard } from "../explore/repo-card";
 import { SearchResults, type SearchRow } from "../explore/search-results";
 import { CollapsibleSection } from "../../components/collapsible-section";
 import { splitByEnabled } from "../../lib/enabled-split";
 import { SourceLinkBanner, type LinkableSkill } from "./source-link-banner";
 import { SourceLinkBatchDialog } from "./source-link-batch-dialog";
-import { recordSkillProvenanceBatch } from "../../lib/provenance";
+import {
+  LOCAL_POOL_KEY,
+  starsOf,
+  isRowEnabled,
+  groupRowsByRepo,
+  sortRepoGroups,
+  sortSkillRows,
+  buildInstalledSections,
+  buildRowOrdinals,
+  type Row,
+  type RepoGroup,
+  type InstalledSection,
+} from "./installed-grouping";
+import { useInstalledBulkActions } from "./use-installed-bulk-actions";
 
 /** Placeholder cards while the on-disk list is first read. */
 const SKELETON_CARDS = 8;
@@ -111,30 +98,6 @@ interface InstalledView {
 function foldKey(title: string): string {
   return `section:${title}`;
 }
-
-/**
- * The time buckets the install-clock grouping files installs into, newest
- * first. Each bucket holds the installs whose age (in whole days) falls below
- * its bound and above the previous one's — rolling windows, so 昨天 means "a
- * day or two old", not a calendar date. The last bucket takes everything
- * older, and an install whose record carries no timestamp reads last (see
- * `compareByInstalledTime`) and files there too: an unreadable clock is not a
- * fresh one.
- */
-const TIME_BUCKETS: { titleKey: ParseKeys; maxAgeDays: number | null }[] = [
-  { titleKey: "list.bucketToday", maxAgeDays: 1 },
-  { titleKey: "list.bucketYesterday", maxAgeDays: 2 },
-  { titleKey: "list.bucketLast7", maxAgeDays: 7 },
-  { titleKey: "list.bucketLast30", maxAgeDays: 30 },
-  { titleKey: "list.bucketEarlier", maxAgeDays: null },
-];
-
-/** One day, in seconds — `installedAt` is a Unix-seconds stamp. */
-const DAY_SECONDS = 86_400;
-
-/** React-key identity of the pool card: skills no recorded source vouches for. */
-const LOCAL_POOL_KEY = "local";
-
 /**
  * The tag assignments before the ledger answers: no choices yet. Module-level
  * so the rows memo below keeps a stable identity while the query is pending —
@@ -142,87 +105,6 @@ const LOCAL_POOL_KEY = "local";
  * never hit.
  */
 const EMPTY_SKILL_TAGS: Record<string, string> = {};
-
-/** One installed skill, precomputed where the list is built. */
-interface Row {
-  skill: SkillView;
-  enabled: boolean;
-  suggestion?: LinkCandidate[];
-  /** Search-hit highlights, so a searched name reads like the store's. */
-  matched?: SkillMatched;
-}
-
-/** One card's worth of installs: a repository, or the source-less pool. */
-interface RepoGroup {
-  /** `owner/repo`, or "" for the pool of skills no source vouches for. */
-  repo: string;
-  items: Row[];
-}
-
-/**
- * The stars a card's bar shows: the registry's figure, and only when the card's
- * source resolved to a store entry. An install the registry cannot place has no
- * figure to state, which is not the same as a figure of zero. The figure is
- * read from whichever row resolved — the card files by its newest install, so
- * that row is no longer necessarily the one the registry placed.
- */
-function starsOf(group: RepoGroup): number | undefined {
-  const backed = group.items.find((row) => row.skill.storeBacked);
-  return backed ? backed.skill.stars : undefined;
-}
-
-/**
- * The comparator behind the 热度 sort: the registry's blended
- * installs-and-stars figure, most-popular first, and an equal figure falls
- * back to the install's own clock, newest first — the order the list was born
- * answering in, so the fallback never surprises. `popularityOf` reads a plain
- * number (a row the registry does not back carries no figure at all and reads
- * 0: such a row simply sinks, never borrowing stars it cannot show).
- */
-function compareByPopularity<T>(
-  popularityOf: (item: T) => number,
-  timeOf: (item: T) => number | null | undefined,
-  tieBreak: (a: T, b: T) => number = () => 0,
-): (a: T, b: T) => number {
-  return (a, b) => {
-    const pa = popularityOf(a);
-    const pb = popularityOf(b);
-    if (pa !== pb) return pb - pa;
-    return compareByInstalledTime(timeOf, tieBreak)(a, b);
-  };
-}
-
-/** A row's name, the tie-break both sorts share inside the flat lists. */
-const byName = (a: Row, b: Row) => a.skill.name.localeCompare(b.skill.name);
-
-/**
- * Whether a row's skill takes part in the collection. Named once at module level
- * so the two splits below can depend on it: a predicate rebuilt on every render
- * would be a new identity each time, and a `useMemo` keyed on it would never hit.
- */
-const isRowEnabled = (row: Row) => row.enabled;
-
-/**
- * The comparator behind the 按仓库 sort: the most-starred repository leads,
- * and the figure-less cards — the source-less pool, or a source the registry
- * no longer lists — sink below every figure. Cards the stars cannot separate
- * (equal figures, all figures absent) fall back to the newest-install order
- * the repository reading was born with, then to the name.
- */
-function compareByStars<T>(
-  figureOf: (item: T) => number | undefined,
-  fallback: (a: T, b: T) => number,
-): (a: T, b: T) => number {
-  return (a, b) => {
-    const sa = figureOf(a);
-    const sb = figureOf(b);
-    if (sa == null && sb == null) return fallback(a, b);
-    if (sa == null) return 1;
-    if (sb == null) return -1;
-    if (sa !== sb) return sb - sa;
-    return fallback(a, b);
-  };
-}
 
 /**
  * The installed list — the management counterpart of the store's 全部 page.
@@ -559,93 +441,16 @@ export function InstalledPage() {
   // newest install is the first row rather than hidden past the preview cap.
   // The cards themselves are name-ordered here purely as the stable base the
   // star and time orderings tie break against.
-  const cards = useMemo<RepoGroup[]>(() => {
-    const byRepo = new Map<string, Row[]>();
-    for (const row of rows) {
-      const bucket = byRepo.get(row.skill.repo);
-      if (bucket) bucket.push(row);
-      else byRepo.set(row.skill.repo, [row]);
-    }
-    return Array.from(byRepo, ([repo, items]) => ({
-      repo,
-      items: items.toSorted(
-        compareByInstalledTime((row) => row.skill.installedAt, byName),
-      ),
-    })).toSorted((a, b) => a.repo.localeCompare(b.repo));
-  }, [rows]);
+  const cards = useMemo<RepoGroup[]>(() => groupRowsByRepo(rows), [rows]);
 
-  // The skill unit's flat order: the installs in the chosen grouping's order —
-  // the registry's popularity blend (the default; also the within-section
-  // reading the tag grouping hands its sections), or newest-first by the
-  // recorded install time (see `lib/install-time`). Installs the platform
-  // recorded no birth time for settle last in the time order. A search is left
-  // exactly as the index answered it: relevance is a ranking too, and the
-  // better one while a question is live — the same order the store keeps there.
-  const activeRows = useMemo(() => {
-    if (unit === "repo") return [];
-    if (isSearching) return rows;
-    if (sort === "installed") {
-      return rows.toSorted(
-        compareByInstalledTime((row) => row.skill.installedAt),
-      );
-    }
-    if (sort === "tag") {
-      const tagCounts = new Map<string, number>();
-      for (const row of rows) {
-        if (row.enabled) {
-          const key = domainsOf(row.skill)[0];
-          tagCounts.set(key, (tagCounts.get(key) ?? 0) + 1);
-        }
-      }
-      return rows.toSorted((a, b) => {
-        const tagA = domainsOf(a.skill)[0];
-        const tagB = domainsOf(b.skill)[0];
-        if (tagA !== tagB) {
-          if (tagA === UNCLASSIFIED_DOMAIN) return -1;
-          if (tagB === UNCLASSIFIED_DOMAIN) return 1;
-          const countA = tagCounts.get(tagA) ?? 0;
-          const countB = tagCounts.get(tagB) ?? 0;
-          if (countA !== countB) return countB - countA;
-          const rankA = taxonomyRank(tagA);
-          const rankB = taxonomyRank(tagB);
-          if (rankA !== rankB) return rankA - rankB;
-          const labelDiff = domainLabel(tagA, locale).localeCompare(
-            domainLabel(tagB, locale),
-          );
-          if (labelDiff !== 0) return labelDiff;
-        }
-        return compareByPopularity(
-          (row: Row) => popularity(row.skill),
-          (row: Row) => row.skill.installedAt,
-          byName,
-        )(a, b);
-      });
-    }
-    return rows.toSorted(
-      compareByPopularity(
-        (row) => popularity(row.skill),
-        (row) => row.skill.installedAt,
-        byName,
-      ),
-    );
-  }, [unit, rows, isSearching, sort, locale]);
+  const activeRows = useMemo(
+    () => (unit === "repo" ? [] : sortSkillRows(rows, sort, locale, isSearching)),
+    [unit, rows, isSearching, sort, locale],
+  );
 
-  // The repository shape's flat order — the sort's own answer over cards:
-  // third-party installed skills card is pinned to the top, followed by
-  // repositories sorted by stars (ties broken by newest install).
   const activeCards = useMemo<RepoGroup[]>(() => {
     if (unit !== "repo" || isSearching) return [];
-    const byNewestInstall = compareByInstalledTime<RepoGroup>(
-      (card) => newestInstallTime(card.items, (row) => row.skill.installedAt),
-      (a, b) => a.repo.localeCompare(b.repo),
-    );
-    return cards.toSorted((a, b) => {
-      const isLocalA = !a.repo;
-      const isLocalB = !b.repo;
-      if (isLocalA && !isLocalB) return -1;
-      if (!isLocalA && isLocalB) return 1;
-      return compareByStars((card) => starsOf(card), byNewestInstall)(a, b);
-    });
+    return sortRepoGroups(cards);
   }, [unit, isSearching, cards]);
 
   // The registry's own grouping — every skill it lists, per repository — so
@@ -754,145 +559,22 @@ export function InstalledPage() {
   // row's number never shifts under the reader as more is revealed.
   const split = splitRows.disabled.length > 0;
 
-  // The live answer, divided into titled sections when the chosen grouping
-  // provides semantic buckets (按安装时间分组 files each install into the time
-  // bucket its age falls in: 今天 / 昨天 / 最近 7 天 / 最近 30 天 / 更早;
-  // 按标签分组 files each install under its leading classification).
-  // Under the default popularity sort, live installs render directly without
-  // artificial grouping.
-  // Empty sections are not drawn — an absent bucket reads quieter than a zero. The
-  // count beside a header states what the section holds: for the tag grouping
-  // that is the whole answer's size (the ranking pass already reads the rows
-  // the reveal has not mounted), so a header never rewrites itself mid-scroll;
-  // for the install clock it is what the revealed rows have filled so far.
-  const sections = useMemo<
-    { title: string; emoji?: string; rows: Row[]; total?: number }[]
-  >(
-    () => {
-    const live = splitRows.enabled;
-    if (live.length === 0) return [];
-    if (sort === "tag") {
-      const liveActive = splitActive.enabled;
-      const activeByTag = new Map<string, Row[]>();
-      for (const row of liveActive) {
-        const key = domainsOf(row.skill)[0];
-        const bucket = activeByTag.get(key);
-        if (bucket) bucket.push(row);
-        else activeByTag.set(key, [row]);
-      }
-
-      const orderedTags = Array.from(activeByTag.entries()).toSorted(
-        ([keyA, itemsA], [keyB, itemsB]) => {
-          if (keyA === UNCLASSIFIED_DOMAIN) return -1;
-          if (keyB === UNCLASSIFIED_DOMAIN) return 1;
-          return (
-            itemsB.length - itemsA.length ||
-            taxonomyRank(keyA) - taxonomyRank(keyB) ||
-            domainLabel(keyA, locale).localeCompare(domainLabel(keyB, locale))
-          );
-        },
-      );
-
-      const shownByTag = new Map<string, Row[]>();
-      for (const row of live) {
-        const key = domainsOf(row.skill)[0];
-        const bucket = shownByTag.get(key);
-        if (bucket) bucket.push(row);
-        else shownByTag.set(key, [row]);
-      }
-
-      const groups: {
-        title: string;
-        emoji: string;
-        rows: Row[];
-        total: number;
-      }[] = [];
-      for (const [key] of orderedTags) {
-        const tagRows = shownByTag.get(key);
-        if (tagRows && tagRows.length > 0) {
-          groups.push({
-            title: domainLabel(key, locale),
-            // The classification's own mark, the same resolver the row
-            // badges and the tag picker call — a header reads like the
-            // tags it stands for, emoji and all.
-            emoji: fullTagEmoji(key),
-            rows: tagRows,
-            // The whole answer's size for this tag, from the ranking pass
-            // that already reads the unrevealed rows: the header states how
-            // many skills the section holds from the first frame on, and
-            // the reveal below only decides how many of them are mounted.
-            total: activeByTag.get(key)?.length ?? tagRows.length,
-          });
-        }
-      }
-      return groups;
-    }
-    if (sort === "installed") {
-      const buckets: Row[][] = TIME_BUCKETS.map(() => []);
-      for (const row of live) {
-        const stamp = row.skill.installedAt;
-        const ageDays =
-          stamp == null ? null : (Date.now() / 1000 - stamp) / DAY_SECONDS;
-        const index =
-          ageDays == null
-            ? TIME_BUCKETS.length - 1
-            : TIME_BUCKETS.findIndex(
-                (bucket) =>
-                  bucket.maxAgeDays !== null && ageDays < bucket.maxAgeDays,
-              );
-        buckets[index === -1 ? TIME_BUCKETS.length - 1 : index].push(row);
-      }
-      return TIME_BUCKETS.map((bucket, index) => ({
-        title: t(bucket.titleKey),
-        rows: buckets[index],
-      })).filter((section) => section.rows.length > 0);
-    }
-    return [];
-    },
-    [splitRows, splitActive, sort, t, locale],
+  const sections = useMemo<InstalledSection[]>(
+    () =>
+      buildInstalledSections({
+        liveRows: splitRows.enabled,
+        liveActiveRows: splitActive.enabled,
+        sort,
+        locale,
+        t,
+      }),
+    [splitRows, splitActive, sort, locale, t],
   );
 
-  // Whether the answer is cut in two, and — when it is — the number each row
-  // prints: where it stands *within its own group*, counted from 1 in each. The
-  // parked half is a section of its own, with a header that states how much it
-  // holds, so it numbers itself as the list it is rather than continuing the
-  // live list above it.
-  //
-  // Counting across the split instead would be the alternative, and it is wrong
-  // here for a reason worth stating: the flat order interleaves the halves, so
-  // the live list would carry the gaps where a parked row used to sit (2, 4,
-  // 5, 6) and the parked section would hold the very numbers the live one gave
-  // up (1, 3). A run that jumps 1, 2, 4 and then restarts at 1 reads as one list
-  // with rows gone missing — the opposite of what the section's own run is for.
-  // Each group also numbers the order its own sort gave it, which is the only
-  // order a reader looking at that group can see.
-  //
-  // The count survives the progressive reveal: `splitByEnabled` preserves each
-  // group's order, so the revealed prefix is a prefix of the whole group and a
-  // row's number never shifts under the reader as more is revealed.
-  //
-  // Under 按标签分组 the groups are the sections above, so the run restarts
-  // with each tag: a row numbers its place within its own tag, and the
-  // podium is that tag's three most-popular installs. The parked half numbers
-  // itself as it does under every grouping.
-  const rowOrdinals = useMemo(() => {
-    const ordinals = new Map<string, number>();
-    if (sort === "tag") {
-      for (const section of sections) {
-        section.rows.forEach((row, index) =>
-          ordinals.set(skillKey(row.skill), index),
-        );
-      }
-      splitRows.disabled.forEach((row, index) =>
-        ordinals.set(skillKey(row.skill), index),
-      );
-    } else {
-      for (const group of [splitRows.enabled, splitRows.disabled]) {
-        group.forEach((row, index) => ordinals.set(skillKey(row.skill), index));
-      }
-    }
-    return ordinals;
-  }, [sort, sections, splitRows]);
+  const rowOrdinals = useMemo(
+    () => buildRowOrdinals(sort, sections, splitRows),
+    [sort, sections, splitRows],
+  );
 
   // The drawer walks every skill of the answer on screen, in the order the unit
   // lists it: a card's preview cap and the progressive reveal are rendering
@@ -976,47 +658,25 @@ export function InstalledPage() {
 
   const queryClient = useQueryClient();
   const multiSelect = useMultiSelect<string>();
-  const [bulkLoading, setBulkLoading] = useState(false);
+  const { clear: clearSelection, count: selectedCount } = multiSelect;
 
-  const handleBatchLink = useCallback(
-    async (
-      selections: readonly {
-        name: string;
-        repo: string;
-        defaultTags?: readonly string[];
-      }[],
-    ) => {
-      try {
-        const entries = selections.map((item) => ({
-          name: item.name,
-          repo: item.repo,
-          reason: "confirm" as const,
-          defaultTags: item.defaultTags,
-        }));
-        await recordSkillProvenanceBatch(entries);
-        await markSkillsChanged(queryClient);
-        toast.add({
-          title: t("sourceLink.batchLinkSuccess", { count: entries.length }),
-          type: "success",
-        });
-      } catch {
-        toast.add({
-          title: t("sourceLink.batchLinkFailed"),
-          type: "error",
-        });
-      }
-    },
-    [queryClient, t],
-  );
-
-  const handleLinkAllRecommended = useCallback(async () => {
-    const selections = linkableSkills.map((s) => ({
-      name: s.name,
-      repo: s.recommendedCandidate.skill.repo,
-      defaultTags: s.recommendedCandidate.skill.profile?.domain,
-    }));
-    await handleBatchLink(selections);
-  }, [linkableSkills, handleBatchLink]);
+  const {
+    bulkLoading,
+    handleBulkEnable,
+    handleBulkDisable,
+    handleBulkTag,
+    handleCreateAndApplyTag,
+    handleBulkDelete,
+    handleBatchLink,
+    handleLinkAllRecommended,
+  } = useInstalledBulkActions({
+    queryClient,
+    t,
+    selectedList: multiSelect.selectedList,
+    clearSelection,
+    customTags,
+    linkableSkills,
+  });
 
   const allVisibleKeys = useMemo(
     () => rows.map((r) => skillKey(r.skill)),
@@ -1039,141 +699,11 @@ export function InstalledPage() {
     return [...customDefs, ...systemDefs];
   }, [customTags, locale]);
 
-  const { clear: clearSelection, count: selectedCount } = multiSelect;
   useEffect(() => {
     if (unit === "repo" && selectedCount > 0) {
       clearSelection();
     }
   }, [unit, selectedCount, clearSelection]);
-
-  const getSelectedNames = () =>
-    multiSelect.selectedList.map((k) => k.slice(k.lastIndexOf("/") + 1));
-
-  const handleBulkEnable = async () => {
-    const selectedNames = getSelectedNames();
-    if (selectedNames.length === 0) return;
-    setBulkLoading(true);
-    try {
-      await setManySkillsEnabled(selectedNames, true);
-      await markSkillsChanged(queryClient);
-      toast.add({
-        title: t("multiSelect.enableSuccess", { count: selectedNames.length }),
-        type: "success",
-      });
-      clearSelection();
-    } catch (e) {
-      toast.add({
-        title: errorMessage(e, t("action.toggleFailed")),
-        type: "error",
-      });
-    } finally {
-      setBulkLoading(false);
-    }
-  };
-
-  const handleBulkDisable = async () => {
-    const selectedNames = getSelectedNames();
-    if (selectedNames.length === 0) return;
-    setBulkLoading(true);
-    try {
-      await setManySkillsEnabled(selectedNames, false);
-      await markSkillsChanged(queryClient);
-      toast.add({
-        title: t("multiSelect.disableSuccess", { count: selectedNames.length }),
-        type: "success",
-      });
-      clearSelection();
-    } catch (e) {
-      toast.add({
-        title: errorMessage(e, t("action.toggleFailed")),
-        type: "error",
-      });
-    } finally {
-      setBulkLoading(false);
-    }
-  };
-
-  const handleBulkTag = async (tagKey: string | null) => {
-    const selectedNames = getSelectedNames();
-    if (selectedNames.length === 0) return;
-    setBulkLoading(true);
-    try {
-      await setManySkillTags(selectedNames, tagKey);
-      await markSkillsChanged(queryClient);
-      toast.add({
-        title: t("multiSelect.tagSuccess", { count: selectedNames.length }),
-        type: "success",
-      });
-      clearSelection();
-    } catch (e) {
-      toast.add({
-        title: errorMessage(e, t("tag.failed")),
-        type: "error",
-      });
-    } finally {
-      setBulkLoading(false);
-    }
-  };
-
-  const handleCreateAndApplyTag = async (label: string, emoji?: string) => {
-    const selectedNames = getSelectedNames();
-    if (selectedNames.length === 0) return;
-    const taken = collectTakenTagKeys(
-      (customTags?.tagDefs ?? []).map((def) => def.key),
-    );
-    const checked = validateNewTag(label, taken);
-    if (!checked.ok) {
-      const errMap: Record<TagValidationError, string> = {
-        empty: t("tag.errorEmpty"),
-        tooLong: t("tag.errorTooLong"),
-        reserved: t("tag.errorReserved"),
-        duplicate: t("tag.errorDuplicate"),
-        emojiLong: t("tag.errorEmojiLong"),
-      };
-      toast.add({ title: errMap[checked.error], type: "error" });
-      return;
-    }
-    setBulkLoading(true);
-    try {
-      await saveCustomTagDef(checked.key, label.trim(), emoji);
-      await setManySkillTags(selectedNames, checked.key);
-      await markSkillsChanged(queryClient);
-      toast.add({
-        title: t("multiSelect.tagSuccess", { count: selectedNames.length }),
-        type: "success",
-      });
-      clearSelection();
-    } catch (e) {
-      toast.add({
-        title: errorMessage(e, t("tag.failed")),
-        type: "error",
-      });
-    } finally {
-      setBulkLoading(false);
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    const selectedNames = getSelectedNames();
-    if (selectedNames.length === 0) return;
-    setBulkLoading(true);
-    try {
-      await removeInstalledSkills(selectedNames);
-      await markSkillsChanged(queryClient);
-      toast.add({
-        title: t("multiSelect.uninstallSuccess", { count: selectedNames.length }),
-        type: "success",
-      });
-      clearSelection();
-    } catch (e) {
-      toast.add({
-        title: errorMessage(e, t("action.retry")),
-        type: "error",
-      });
-    } finally {
-      setBulkLoading(false);
-    }
-  };
 
   /**
    * One row of the skill unit. Shared by every rank section and the parked one

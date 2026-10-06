@@ -4,99 +4,64 @@
 
 ## Overview
 
-Skill One is a Tauri v2 desktop app. The frontend (React) handles rendering and data reads; the backend (Rust) handles every operation that modifies the local filesystem.
+Skill One is a desktop app built on Tauri v2. The frontend (React 19) handles presentation and data retrieval, while the backend (Rust + `agents-skills`) handles local filesystem operations and agent skill directory linking.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                   React frontend (WebView)              │
-│  components / hooks / lib                               │
-│   ├── Read: lib/registry/, skill-*-api.ts               │
-│   │         └─ cdn-config.ts (direct GitHub / CDN)      │
-│   ├── Write: local-skills.ts ──► skills-manager.ts      │
-│   │                             └─ invoke (Tauri IPC)   │
-│   └── Fallback: mock-local.ts (in-memory, browser mode) │
+│                   React Frontend (WebView)              │
+│  components / hooks / lib / pages                       │
+│   ├── Read: lib/registry/, worker.ts, search-index.ts   │
+│   │         └─ CDN Mirrors (jsDelivr / JSDMirror)       │
+│   ├── State: TanStack Query v5 + IDB + LocalStorage     │
+│   └── Write: local-skills.ts ──► skills-manager.ts      │
+│                                 └─ invoke (Tauri IPC)   │
 └──────────────────────────┬──────────────────────────────┘
                            │ Tauri IPC
 ┌──────────────────────────▼──────────────────────────────┐
-│                   Rust backend (src-tauri)              │
-│   skills.rs: install / list / remove / enable / link     │
-│   └─ agents-skills library (crates.io dependency)       │
+│                   Rust Backend (src-tauri)              │
+│   skills.rs: install / remove / enable / link           │
+│   dir_fingerprint.rs: stat-only change detection        │
+│   provenance.rs: metadata ledger (.skill-one.json)      │
+│   activity.rs: append-only audit log                    │
+│   └─ agents-skills crate                                │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## Division of Responsibilities
 
-### Frontend (reads)
+### 1. Frontend (Reads & Search)
 
-- **`src/lib/registry/`**: The registry as a service — `client.ts` is the main-thread proxy of `worker.ts`, `index-stream.ts` probes the published snapshot and streams/parses `skills.jsonl` (JSONL, line by line, so skills become available while the download runs), `worker-controller.ts` answers grouped browse, search and lookup requests, and `cache.ts` persists the parsed list. Consumers filter and group through it rather than holding the registry.
-- **`src/lib/search-index.ts`**: The store's single search entry point — a MiniSearch index over the skill's name, shared by the skill registry and the installed list. It defines what counts as a match (see *Browsing the skill list*, step 9), on MiniSearch's own tokenizer; `src/lib/search-skills.ts` adds the registry's own ranking on top (name tiers, popularity). Neither the repository nor the description is a search field. The registry builds its index inside the worker, the small per-page lists build one in a `useMemo`.
-- **`src/lib/skill-detail-api.ts`**: Fetches a single skill's `SKILL.md` on demand and parses its frontmatter and body. Also fetches the snapshot's optional Chinese page (`skills/<dir>/SKILL.zh.md`) that leads the detail body in Chinese mode — where the English file itself is fetched only when the reader flips the drawer to the original through the header's 查看原文 toggle (or the skill ships no translation).
-- **`src/lib/cdn-config.ts`**: Manages download sources. Defaults to direct `raw.githubusercontent.com` access, falls back to a CDN mirror (`cdn.jsdmirror.com`) on failure, and lets users configure a custom CDN in "Settings". Candidate URLs are tried in priority order — including mid-stream, when a body fails partway through — and the configuration is persisted to localStorage.
+- **`src/lib/registry/`**: Background registry service. A dedicated Web Worker (`worker.ts`) downloads and streams `skills.jsonl` from CDN mirrors, parsing records chunk-by-chunk into IndexedDB without blocking the main UI thread.
+- **`src/lib/search-index.ts`**: High-performance client-side full-text search powered by MiniSearch over skill slugs and metadata.
+- **`src/lib/cdn-config.ts`**: Fallback download source chain: direct GitHub → JSDMirror / jsDelivr mirrors → custom configured CDN.
+- **Query Persistence**: Persistent caching via TanStack Query and IndexedDB ensures instantaneous offline start and background revalidation.
 
-Read data is cached through TanStack Query (`staleTime` 10 minutes, `gcTime` infinite), so after a restart the app can render from cache first and refresh in the background. Each candidate request has a 10-second timeout guarding the response headers; streamed bodies additionally enforce a stall timeout between chunks (a multi-megabyte download legitimately outlasts any fixed cap). The registry index has its own two persistence layers, both inside the worker: the parsed list in IndexedDB and the snapshot etag it was served from (see *Browsing the skill list*), which together let a launch skip the download entirely when nothing was published since. Small queries such as the installed list and agent status are persisted through TanStack Query; the parsed index is far too large for the WebView localStorage quota and is deliberately kept out of it.
+### 2. Backend (System & Filesystem)
 
-### Backend (writes)
+- **`src-tauri/src/skills.rs`**: Exposes Tauri commands for local skill lifecycle management delegating to `agents-skills::Manager`. Blocking operations run on thread pools via `spawn_blocking`.
+- **`src-tauri/src/dir_fingerprint.rs`**: Stat-only recursive directory fingerprint (`mtime` + `size`) providing instant change-detection without reading file contents.
+- **`src-tauri/src/provenance.rs`**: Atomic reads and writes for the provenance manifest at `~/.agents/skills/.skill-one.json`.
+- **`src-tauri/src/activity.rs`**: Append-only audit logger at `<app_log_dir>/activity.jsonl` with automatic 2 MiB rotation.
 
-- **`src-tauri/src/skills.rs`**: Exposes 10 Tauri commands (`install_skill`, `list_installed_skills`, `remove_skills`, `set_skills_enabled`, `link_agents`, `link_status`, `read_skill_md`, `analyze_skill`, `skill_fingerprint`), all of which route their blocking work (GitHub downloads, install, link, hashing, etc.) through a shared `spawn_blocking` helper to keep it off the async runtime.
-- Internally, the commands delegate to the `Manager` facade of the `agents-skills` library and return camelCase DTOs to the frontend. Since agents-skills 0.15 linking is one-way: an agent's own skills are adopted into the canonical dir (a name clash keeps the canonical copy), its other files are quarantined into `.misc/<agent>/`, and unlink only breaks the symlink. `list` also reports each skill's description and install time, which the app passes straight through. Since 0.21 an install is one source and one skill — since 0.26 the source is the id `owner/repo/slug`; the backend downloads the repository tarball from codeload.github.com and matches the skill locally (the GitHub REST API and its anonymous rate limit are no longer involved) — and a failure is the command's `Err`, so `install_skill` returns just `{ skill, skipped }`.
-- **`src-tauri/src/skill_hash.rs`**: The content identity of a skill directory — the skills.sh upstream hash plus a stat-only change-detection fingerprint, produced by one recursive walk (see `docs/skill-provenance.md`). `analyze_skill` returns both; `skill_fingerprint` is the stat-only half, the cheap validity check that lets the ledger reuse a stored hash across restarts.
-- **`src-tauri/src/provenance.rs`**: Two fixed-path file commands (`read_provenance`/`write_provenance`) over the provenance ledger at `~/.agents/skills/.skill-one.jsonl` — atomic writes, plus a transparent read of the legacy JSON document until the first JSONL write converts and removes it. All schema knowledge lives in the frontend (`src/lib/provenance.ts`).
-- **`src-tauri/src/activity.rs`**: The append-only activity log at `<app_log_dir>/activity.jsonl` — `append_activity` (rotating at 2 MiB), `read_activity` (the newest `limit` lines across the active file and its backup), `clear_activity`, and `open_activity_dir`. Thin like `provenance.rs`: the schema and the discovery baseline live in the frontend (`src/lib/activity.ts`; see `docs/activity-log.md`).
+### 3. Browser Fallback
 
-### Frontend write wrapper
+When running in browser environments (`pnpm dev` or Vitest), `isTauri()` returns `false` and `local-skills.ts` seamlessly redirects calls to in-memory mocks (`mock-local.ts`).
 
-- **`src/lib/skills-manager.ts`**: Typed wrapper (`invoke`) around the Tauri commands.
-- **`src/lib/local-skills.ts`**: UI-facing data-access layer that uniformly handles the two implementations — "Tauri backend / browser mock" — transparently to components.
+## Core Modules
 
-### Browser fallback
+| Module / Path | Responsibility |
+| :--- | :--- |
+| `src/App.tsx` | App shell, HashRouter, query persistence, and auto-refresh workers |
+| `src/pages/agents/` | Home view: Agent dependency graph, link toggles, and status ribbons |
+| `src/pages/explore/` | Store view: Catalog browsing, search results, and repository cards |
+| `src/pages/installed/` | Installed skills view: Custom tagging, time-bucketing, and bulk actions |
+| `src/pages/installed/installed-grouping.ts` | Pure functions for sorting, time-bucketing, and section generation |
+| `src/pages/installed/use-installed-bulk-actions.ts` | Hook encapsulating multi-selection, batch toggling, tagging, and linking |
+| `src/components/skill-detail/` | Drawer & panel for Markdown preview, editing (CodeMirror 6), and tags |
+| `src/components/list-toolbar.tsx` | Unified toolbar for search queries, layout units (card/row/grid), and sorting |
+| `src/lib/provenance.ts` | Client-side reconciliation and schema handling for `.skill-one.json` |
 
-When the app is not running in a Tauri environment (e.g. `pnpm dev` or Vitest tests), `isTauri()` returns `false` and `local-skills.ts` falls back to the in-memory data in `mock-local.ts`, so the UI and interaction flows can be fully previewed without a native environment.
+## Data Flows
 
-## Key Files
-
-| File | Responsibility |
-| --- | --- |
-| `src/App.tsx` | Routing, layout, TanStack Query provider, and cache persistence |
-| `src/components/app-header.tsx` | The app's chrome, one row: the two-destination segmented navigation leading it, the brand centred over the row, the settings entry closing it, and the window's drag region — which is what the overlay title bar leaves to the app. The mark is taken out of the flow and centred on the header's own box, because the traffic lights' leading padding is twice the trailing one. The header holds the window's own controls and nothing else; a list's controls — its question among them — stand on that list |
-| `src/components/app-nav.tsx` | The app's navigation: the three destinations as one segmented control in the header (active over the whole route family, including drill-down pages). Links, not tabs: they are places with history, so the active state is `aria-current="page"` and a tablist would claim panels that do not exist |
-| `src/components/segmented.ts` | The one segmented look, shared by the header's destinations and a list's shape switch: a muted track with the chosen half raised out of it in the surface colour under one quiet shadow. It is shadcn's own `Tabs` default variant as a **recipe** rather than the `Tabs` component, because the two callers are links and toggles rather than tab sets — only the appearance is shared, and each control keeps its own primitive's behaviour and accessibility. Three departures from the tabs recipe, all about how small a pill can be: 2px of track padding, a 2px gap between halves, and a 24px half rather than the tabs' 28px one — a 28px-tall control, one step under the `h-8` field a list's shape switch stands beside. The radius is a capsule at every size (`rounded-full` on both the track and the halves, so the inner pill is round whatever height a caller asks for) rather than a fixed one, which only reads as a pill by accident and less so the taller the control grows |
-| `src/components/list-toolbar.tsx` | A list's own first row, the only row above its answer, and the one place that decides how the four controls stand: as **two groups** — the search field in the component library's own `max-w-sm` box with the shape switch at its own width beside it on the leading edge, the scope and the order docked to the trailing edge by `ml-auto`, which is where the tools put the controls that read the answer (MUI's density and columns, Ant Design Pro's density and column settings, Airtable's sort and view options). The split follows what a live search does to them: the field and the shape still answer into a search, so they lead; the scope and the order are the two a search overrides, so they stand together at the far edge. The shape is a pair of toggles rather than a menu, because both of its two answers can stand on the row at once. A live search locks the scope and the order where they stand rather than unmounting them, because a row that emptied itself on the first keystroke would move the field out from under the reader's cursor; the shape stays live, since a search answers in sections and reads them in the shape the reader chose. A list that answers in one order shows no order control at all. The field is locked until the index over the registry exists, and only for the store: the installed list is already in memory |
-| `src/components/list-facets.tsx` | The list's scope picker, a dropdown on that list's own first row beside its sort switch: the trigger states the current scope, and the menu lists 全部 plus every domain the list holds, each with its count |
-| `src/lib/list-view.ts` | The shared view behind those controls: each list's own question, scope, order and shape — the order and the shape are two answers again, each persisted under its own key, while the question and the scope stay session-only. Each list holds its own question because the two answers to it are different answers (the registry's index vs. this machine's records), so one list's question never re-answers the other |
-| `src/lib/enabled-split.ts` | The one thing about the installed skill list's order the reader does not pick: a **stable partition** of the sorted rows into the live half and the parked (disabled) half, both keeping the order they arrived in. Enablement is not a fourth sort but a division of whichever sort was chosen, so it is applied *after* the sort rather than folded into each comparator — which is what makes it hold for every order the list offers and for one added later, instead of only for the orders somebody remembered to wrap. The installed page runs it twice over the same predicate: over the revealed rows to draw the two groups, and over the whole answer so the detail drawer's ←/→ walks the order the reader sees rather than the raw sort order |
-| `src/pages/explore/repo-card.tsx` | One card per repository, led by its most-installed skills in a capped preview and headed by a single top bar — identity on the left, the expansion offer on the right (「＋ N」 when the cap holds rows back, 「− N 个 skill」 on the open card, nothing on a card that already fits). Pressing the bar expands the card in place: it spans the whole grid row, the revealed rows run in two balanced columns, and the reflow runs as one motion layout transition (the transitioning card rides above its neighbours; reduced-motion readers get the cut). Under a search the cap never hides rows — every match is on screen, no toggle — and the cap instead measures *big*: a card holding more skills than the reader's preview setting takes that open footprint on its own (full grid row, two-column body) |
-| `src/pages/explore/search-results.tsx` | The search answer, rendered by both searchable lists while a question is live, as **one group per source, all open by default** (`CollapsibleSection`) — the name says which source a row came from, the count says how much of it there is, and the fold lets a reader who wants one source's answer fold the other two away. The groups read in the order of trust and cost: 1) **the list's own source** (the registry's index on the store, this machine's records on the installed list), 2) **the registry's index** answering an installed search, 3) **skills.sh's live catalogue** on *both* surfaces. Nothing waits behind a press: a search has already cost the reader a query, so it has also told us they want the whole answer, and skills.sh — the one cross-network request, bounded by the endpoint's two-character floor and a five-minute cache — is asked as the query settles, holding a skeleton of the unit's own shape while it is in flight. A source that answered empty renders nothing at all (an absent group reads quieter than a zero); a source still answering is present, so its eventual absence is a verdict rather than a gap. **The asking list's own source is the one exception: it leaves one quiet line** (`noIndexMatch` / `noInstalledMatch`) in the slot its group would have held. Three groups where one of them belongs to *this* list is not three equal sources — a reader who searched 「已安装」 and finds rows under no 「已安装」 header reads them as installs until they look up and find a different source's name, so the scope change is stated rather than left to be noticed. The line is **centred** in the answer column with the source's own glyph travelling with it, so it still names the scope it speaks for while reading as a notice rather than as a header; a lone sentence stranded at the left edge of a wide column reads as a fragment that drifted onto the page. The full-height `Placeholder` is the other centred empty statement, and the two stay distinct by what they claim rather than by where they sit: this one names a source, that one names every source. The line yields to the **empty state, which is the whole search's verdict** (`noMatch` / `noSourceMatch`), spoken only once every source has come back empty — a page that says "no matches" above a full page of results is lying about its own contents, and one fact does not need saying twice. The store's live group is deduplicated against the registry's. The detail drawer walks the answer a row was opened in, wearing that answer's surface, which is why the open skill is addressed by answer plus identity |
-| `src/components/collapsible-section.tsx` | The shell every source group in the search answer is drawn through, and the parked-skills group under the installed list's live rows: a header row of a disclosure chevron, the source glyph, the title and a count badge, pinning while its section passes and folding it on a press of the row. Every search group starts open; the installed list's parked group starts **folded** (its rows are set aside by definition, so the page lands on the live list alone and the badge is what says there is more below). The count stays on the header while folded. The state is uncontrolled by default (every search answer change remounts the list); the installed list's sections pass `open`/`onOpenChange` instead so their folds travel with the page (`use-view-memory`) |
-| `src/pages/explore/live-groups.ts` | The live skills.sh answer re-filed by repository, for the search view's repository unit: buckets the deduped hits by their `owner/repo`, keeping the endpoint's own relevance order for the buckets and each bucket's skills most-installed first. The list's shape decides what the live section is made of — repository cards here (uncapped under the search, like every search card: the card is the whole live answer), one flat row per skill in the skill unit. A live card's bar is a label — the rows, which open skills.sh, are the only way out |
-| `src/lib/view-memory.ts` / `src/hooks/use-view-memory.ts` | A list page's view — its controls, its revealed depth, its scroll position, its section folds — remembered per page, because a page that owns its own scrolling element is a page the browser restores nothing for: switching pages unmounts the page, and the memory hands the view back on return (guarded by the answer's signature, so a differently-shaped answer restores nothing) |
-| `src/lib/avatar-source.ts` | The single answer to where an owner's avatar lives: the dataset mirror's `dist` branch through the download source chain, then GitHub's own endpoint — every surface draws from this one chain |
-| `src/lib/tauri.ts` | Detects whether the app runs inside the Tauri WebView |
-| `src/lib/open-external.ts` | Opens external links in the system browser (Tauri needs the opener plugin) |
-| `src/lib/activity.ts` / `src/components/activity-dialog.tsx` | The append-only activity log — what the app did to the user's skills and agents — and its viewer, reached from the settings popover (see `docs/activity-log.md`) |
-| `src-tauri/tauri.conf.json` | Window, build, and packaging configuration |
-| `src-tauri/capabilities/default.json` | Permission declarations for the main window (`core:default`, `opener:default`, `updater:default`, `process:allow-restart`, and the skills.sh search origin for `http:default`) |
-
-## Data Flow Examples
-
-**Installing a skill**:
-
-1. The user clicks "Install" on the explore page.
-2. `local-skills.installSkillFromSource(skill)` checks the environment and hands the row's upstream id `owner/repo/slug` to the backend verbatim.
-3. Tauri environment → `skills-manager.installSkill` → `invoke("install_skill", ...)` → Rust `install_skill` command → `agents-skills::Manager.add` (it downloads the repository tarball from codeload.github.com and matches the skill by slug locally).
-4. When finished, the frontend refreshes the `installed-skills` query cache.
-5. Browser environment → writes via `mock-local.installMockSkill`.
-
-**Browsing the skill list**:
-
-1. The registry lives in a lazily spawned worker (`lib/registry/worker.ts` behind the `lib/registry/client.ts` proxy): the main thread only ever receives a grouped answer, a capped search reply and pushed progress, never the multi-megabyte index.
-2. On boot the worker reads the parsed index from IndexedDB (`lib/registry/cache.ts`) and serves it immediately — cold start paints from cache with no network wait.
-3. It then probes the snapshot with a cache-busted `HEAD` on the `dist` branch's index body (headers only — GitHub's API is never called), reading the body's etag as the freshness identity so no cached copy can make an old snapshot look current. Etag equal to the cached one: the multi-megabyte body is not downloaded at all.
-4. Otherwise `registry/index-stream.ts` streams `skills.jsonl` **addressed at that SHA** (immutable, so a CDN copy is always the right bytes), parsing each line as it arrives; pages render from the partial list right away. A partial list is always a prefix of the final one in registry order, so paging stays stable while the count climbs — but the list is ordered by popularity (the blended installs-and-stars figure of `src/lib/popularity.ts`), so its first page is a best-so-far slice and early rows move down as the stream delivers more skills.
-5. Search waits for the whole dataset: the MiniSearch index (built by `lib/search-index.ts`, see step 9) is created once the stream completes (rebuilding it per snapshot would cost more than the download itself), and the search field stays locked until the worker reports `ready`. A query is therefore never answered over a partial registry — the worker returns nothing before the index exists, as a backstop to the disabled field.
-6. The landed dataset overwrites the IndexedDB record together with its identity (snapshot etag, `Last-Modified` time).
-7. `cdn-config.ts` tries the configured CDN, direct GitHub and the default CDN in order; a source that fails mid-stream hands over to the next and restarts the parse.
-8. The announced identity reaches the main thread through the client snapshot, where Settings shows which snapshot is in use and whether this launch reused the local cache. Only what the pages asked for — a grouped answer, a search reply — is kept in the TanStack Query memory cache; the registry itself is not duplicated there.
-9. Ordering has one rule and one exception: the browsed list has one shape — one card per repository, most-starred first, with each repository's skills in the browse order — while a search is always answered in relevance order. A query re-answers the list's *order*, never its layout, and there is no control on the page that could claim otherwise. The ranking described below is the skill registry's own. That order is: every query term must match, with no fallback to any term; exact and prefix name hits rank first, ordered among themselves by popularity — a name match already settles *what* the skill is, so among namesakes the blended installs-and-stars figure is the difference that matters; the remaining name hits (terms carried without starting the name) follow, ordered by popularity with the BM25 score as the final tie-break.
-10. The repository answer is one flat grid in the ranking `byRepoRank` defines — no group headers over it — and the reveal paces that grid: the first chunk mounts with the page, and scrolling to the sentinel mounts the rest.
-
-What counts as a match has one definition, in `lib/search-index.ts`, used by the two remaining searchable lists (the skill registry and the installed skills): every query term must equal an indexed term or be the start of one, and nothing else is forgiven — a mistyped word, a fragment from the middle of a word, or a term only some other document carries does not count. Prefix matching is kept because a half-typed word is an unfinished query rather than a wrong one. Tokenization is MiniSearch's own — split on whitespace and punctuation, then lowercase — which is all the one indexed field needs: a skill's name is an ASCII slug. (The rows highlight a matched term wherever it occurs, so a term inside a longer word is marked too.)
+- **Skill Installation**: User triggers install → `local-skills.ts` passes `owner/repo/slug` → Tauri command `install_skill` invokes `agents-skills` → repository tarball downloaded & extracted → React Query cache invalidated → activity log entry appended.
+- **Registry Synchronization**: App boot → Worker reads IndexedDB cache → cache-busted `HEAD` check on snapshot ETag → if updated, streams SHA-pinned `skills.jsonl` in chunks → parses into IndexedDB and builds MiniSearch index.

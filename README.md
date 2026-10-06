@@ -2,51 +2,52 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-A desktop app for finding, installing, and managing agent skills. Built on Tauri v2 with a React + shadcn/ui frontend; the Rust backend (the `agents-skills` library) provides skill installation and agent-linking capabilities.
+Skill One is an open-source desktop application for discovering, installing, and managing AI agent skills. Built on **Tauri v2**, **React 19**, and **shadcn/ui**, powered by the [`agents-skills`](https://github.com/skill-one) native library.
 
 > Maintained by the **skill-one** organization: <https://github.com/skill-one>
 
-## Features
+---
 
-- **Store / Explore**: Browse the skills registry, view each skill's description (`SKILL.md`), and install with one click.
-- **My Skills**: View, update, and uninstall installed skills.
-- **Agent Linking**: Link the skill directories of various agents (Claude Code, Cursor, Gemini CLI, etc.) to a unified directory, with support for migrating existing skills.
-- **Auto-Update**: The app checks for new releases at startup, on refocus, and hourly, then installs signed updates in one click — no re-downloading, and no Apple Developer account involved (updates are verified with a minisign key).
-- **Settings**: Configure the download source for registry files (direct GitHub or a CDN mirror).
+## Highlights
+
+- **AI Agents Hub (Home)**: Visualizes detected AI coding agents (Claude Code, Cursor, Windsurf, Trae, Gemini CLI, etc.) with real-time linking status and one-click symlink integration.
+- **Skill Store & Explore**: Fast client-side searching over extensive skills registries via CDN mirrors, featuring one-click installation and live skills.sh discovery.
+- **Installed Skills Management**: Full control over local skills — enable/disable toggles, custom tagging, time-bucketing, batch operations, third-party source association, and in-place `SKILL.md` Markdown editing.
+- **In-App Auto-Updates**: Seamless minisign signature-verified self-updates without manual re-downloads.
+- **Audit Activity Log**: Append-only local log tracking all install, remove, link, and configuration changes.
+
+---
 
 ## Installation
 
-Grab the latest `.dmg` from the [Releases](https://github.com/skill-one/skill-one/releases) page (currently macOS on Apple Silicon), then:
+Download the latest `.dmg` from [GitHub Releases](https://github.com/skill-one/skill-one/releases) (macOS Apple Silicon):
 
 1. Open the `.dmg` and drag **Skill One** into your **Applications** folder.
-2. Launch it — see the [macOS first-launch note](#macos-first-launch) for the one-time Gatekeeper step.
+2. Launch the app. If prompted by macOS Gatekeeper on first open:
+   - Right-click (or Control-click) **Skill One** → select **Open**; or
+   - Go to **System Settings → Privacy & Security** → click **Open Anyway**; or
+   - Run in Terminal: `xattr -d com.apple.quarantine "/Applications/Skill One.app"`
 
-From v0.2.0 onwards you never need to download again: new versions arrive through the built-in updater. (Installs of earlier versions have no updater, so they need this one manual reinstall.)
+Subsequent updates are delivered automatically within the app.
 
-## Staying up to date
+---
 
-The app checks for updates at startup, whenever it regains focus, and hourly as a fallback. When a newer version exists it offers **Update now** — download, install, relaunch. You can also check manually: **Settings popover → Software Update**. Update packages are signature-verified before installation; a package with an invalid signature is never installed.
+## App Views
 
-## macOS first launch
+- **Agents (`/`)**: Topology view of all supported agents, connection ribbons, and link status.
+- **Explore (`/explore`)**: Browse the global registry, filter by domains, or search in real-time.
+- **Installed (`/installed`)**: Manage locally installed skills, organize tags, and bulk enable/disable.
+- **Settings Menu**: Configure CDN mirror sources, inspect activity logs, or check for updates.
 
-The app is ad-hoc signed, so a manually downloaded `.dmg` may be blocked by Gatekeeper on first launch. Clear it once, using any of these:
-
-- Right-click (or Control-click) the app → **Open** → **Open** in the dialog;
-- **System Settings → Privacy & Security** → **Open Anyway** next to the blocked-app notice;
-- Run `xattr -d com.apple.quarantine "/Applications/Skill One.app"` in Terminal.
-
-After that the app opens normally, and later in-app updates never prompt again.
-
-## Usage
-
-After launching the app, use the 商店 / 我的 switch in the window header to move between the following pages:
-
-1. **Store / Explore**: Browse and install skills.
-2. **My Skills**: Update or uninstall installed skills.
-3. **Agent Linking**: Manage skill-directory links and migration for each agent.
-4. **Settings**: Switch the registry download source (direct GitHub or a CDN mirror), and check for app updates.
-5. **Activity Log**: Review what the app has done to your skills and agents — installs, removals, enablement, agent links, and source associations.
+---
 
 ## Development
 
-For developer-facing build, architecture, and testing docs, see [docs/development.md](docs/development.md). The test layers are documented in [docs/testing.md](docs/testing.md). The updater pipeline is documented in [docs/auto-update.md](docs/auto-update.md). The activity log is documented in [docs/activity-log.md](docs/activity-log.md).
+See the developer guides in [docs/](docs/):
+
+- [Architecture & Design](docs/architecture.md)
+- [Development Setup](docs/development.md)
+- [Testing Architecture](docs/testing.md)
+- [Skill Provenance Specification](docs/skill-provenance.md)
+- [Activity Audit Log](docs/activity-log.md)
+- [Auto-Update Pipeline](docs/auto-update.md)

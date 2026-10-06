@@ -64,5 +64,4 @@ agent 图标在 tile 处的平均色。这个平均色是**预计算而非渲染
 - `lib/agent-icons.test.ts` —— 内建映射、本地候选、特性表、预计算边缘色。
 - `hooks/use-agent-icons.test.ts` 与 `hooks/use-agent-edge-color.test.ts`
   —— 同步解析与中性回退。
-- `pages/installed/agent-avatar-group.test.tsx` 与
-  `pages/agents/agent-graph.test.tsx` mock 了 hook，布局测试不触碰网络。
+- `pages/agents/agent-graph.test.tsx` mock 了 hook，布局测试不触碰网络。

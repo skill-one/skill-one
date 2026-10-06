@@ -109,15 +109,6 @@ export function isThirdPartySkill(
   return !skill.repo;
 }
 
-/**
- * Whether a skill is a locally installed skill that has been linked to a store source.
- */
-export function isLinkedLocalSkill(
-  skill?: { origin?: "store" | "local"; repo?: string } | null,
-): boolean {
-  return Boolean(skill && skill.origin === "local" && skill.repo);
-}
-
 export interface SkillView extends Skill {
   /**
    * False for a skill no store entry backs: an installed record the registry

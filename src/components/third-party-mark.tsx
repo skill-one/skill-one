@@ -15,9 +15,6 @@ import { cn } from "../lib/utils";
 export const THIRD_PARTY_MARK_CLASS =
   "relative flex shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted text-muted-foreground";
 
-/** The same box in the closed tone: identical neutral fill. */
-export const THIRD_PARTY_MARK_MUTED_CLASS = THIRD_PARTY_MARK_CLASS;
-
 /**
  * Extracts the first meaningful grapheme (letter, Chinese character, or emoji)
  * for a skill's monogram, uppercasing Latin letters.

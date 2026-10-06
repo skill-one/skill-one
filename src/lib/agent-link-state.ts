@@ -1,5 +1,3 @@
-import type { ParseKeys } from "i18next";
-
 import type { AgentStatus } from "./skills-manager";
 
 /**
@@ -22,18 +20,3 @@ export function agentLinkState(agent: AgentStatus): AgentLinkState {
     (agent.internalOthers?.length ?? 0) > 0;
   return hasContent ? "warning" : "unlinked";
 }
-
-/** Short status label key for the graph's node cards; the canonical agent keeps its own word. */
-export function agentStateLabelKey(agent: AgentStatus): ParseKeys {
-  if (agent.canonical) return "agent.native";
-  return agentLinkState(agent) === "linked"
-    ? "agent.linked"
-    : "agent.unlinked";
-}
-
-/** Status dot color used on the node cards (and as the ribbon-state reference). */
-export const agentStateDotClass: Record<AgentLinkState, string> = {
-  linked: "bg-emerald-500",
-  warning: "bg-amber-500",
-  unlinked: "bg-muted-foreground",
-};

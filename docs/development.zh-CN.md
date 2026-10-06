@@ -1,183 +1,73 @@
-# 开发说明
+# 开发指南 (Development Guide)
 
 [English](development.md) | [简体中文](development.zh-CN.md)
 
-面向开发者的构建、技术栈、架构、测试与发布说明。使用者说明见 [README](../README.md)。
+面向开发者的构建、架构、测试与技术栈说明。面向用户的基本说明见 [README](../README.zh-CN.md)。
 
 ## 技术栈
 
-| 层         | 技术                                                                                            |
-| ---------- | ----------------------------------------------------------------------------------------------- |
-| 桌面运行时 | [Tauri v2](https://v2.tauri.app/) + Rust                                                        |
-| UI         | [React 19](https://react.dev/) + [shadcn/ui](https://ui.shadcn.com/)（Base UI + Tailwind CSS） |
-| 路由       | [react-router v8](https://reactrouter.com/)（HashRouter）                                       |
-| 数据请求   | [TanStack Query v5](https://tanstack.com/query)（持久化到 localStorage）                        |
-| 构建       | [Vite 8](https://vite.dev/) + TypeScript 7.0                                                    |
-| 测试       | [Vitest 4](https://vitest.dev/) + Testing Library                                               |
+| 分层 | 选型与工具 |
+| :--- | :--- |
+| **桌面运行时** | [Tauri v2](https://v2.tauri.app/) + Rust |
+| **前端框架** | [React 19](https://react.dev/) + TypeScript |
+| **UI 组件库** | [shadcn/ui](https://ui.shadcn.com/) (`@base-ui/react` 原语 + Tailwind CSS v4) |
+| **路由** | [react-router v8](https://reactrouter.com/) (HashRouter) |
+| **状态与缓存** | [TanStack Query v5](https://tanstack.com/query) + IndexedDB + LocalStorage |
+| **全文检索** | [MiniSearch](https://lucaong.github.io/minisearch/) |
+| **构建工具** | [Vite 8](https://vite.dev/) + [oxlint](https://oxc.rs/) |
+| **测试框架** | [Vitest](https://vitest.dev/) + Testing Library + Playwright |
 
-## 环境要求
+## 环境准备
 
-- **Node.js**（≥ 24，当前的 Active LTS，见 `.nvmrc`）与 [pnpm](https://pnpm.io/)（版本由 `package.json` 的 `packageManager` 字段锁定）
-  - 这个下限不是随意定的：Vite 8 要求 Node 20.19+/22.12+，而 react-router v8 要求 Node 22.22+，且只支持维护期 LTS 线的「最新小版本」。Node 24 是 Active LTS，因此 CI 与本地开发都统一以它为目标。`package.json` 用 `engines.node` 声明该约束（默认只是警告，不会强制拦截；若要强制，请在 `.npmrc` 中加 `engine-strict=true`）。
-- **Rust** 工具链，`rustc >= 1.88`
-- **Tauri 系统依赖**：参见 [Tauri 前置依赖](https://v2.tauri.app/start/prerequisites/)
+- **Node.js**：≥ 24（参考 `.nvmrc`）与 [pnpm](https://pnpm.io/)（v12+）。
+- **Rust**：`rustc >= 1.88`。
+- **Tauri 系统依赖**：根据操作系统参考 [Tauri 官方指引](https://v2.tauri.app/start/prerequisites/)。
 
-## 快速开始
+## 常用命令
 
 ```bash
-pnpm install         # 安装依赖
-pnpm dev             # 仅启动前端（浏览器模式，内存 mock 数据）
-pnpm tauri dev       # 启动桌面应用（Tauri 开发模式）
-pnpm test:run        # 单次运行测试
-pnpm tauri build     # 构建发布包
+pnpm install          # 安装项目依赖
+pnpm dev              # 启动纯前端预览（带内存 Mock）
+pnpm tauri dev        # 启动原生桌面应用开发环境
+pnpm typecheck        # TypeScript 类型检查
+pnpm lint             # 基于 oxlint 的快速静态分析
+pnpm test:run         # 执行全部单元测试
+pnpm tauri build      # 构建发布版桌面安装包
 ```
-
-## 常用脚本
-
-| 命令                                            | 说明                              |
-| ----------------------------------------------- | --------------------------------- |
-| `pnpm dev`                                      | 启动 Vite 开发服务器（端口 5173） |
-| `pnpm dev:test`                                 | 在 5273 端口启动第二个桌面开发实例，测试/开发时不占用主端口 5173 |
-| `pnpm build`                                    | 类型检查 + 前端构建               |
-| `pnpm typecheck`                                | 仅运行 TypeScript 类型检查        |
-| `pnpm preview`                                  | 预览构建产物                      |
-| `pnpm tauri dev`                                | 启动桌面应用（开发模式）          |
-| `pnpm tauri build`                              | 打包桌面应用                      |
-| `pnpm test` / `test:run` / `test:coverage`      | 运行 / 单次运行 / 覆盖率测试      |
-| `pnpm lint` / `lint:fix`                        | 代码检查（仅语法规则）/ 带自动修复 |
-| `pnpm lint:types`                               | 代码检查（含类型感知规则，需要类型图，更慢） |
 
 ## 项目结构
 
 ```
 skill-one/
-├── src/                    # 前端（React + TypeScript）
-│   ├── components/         # 跨页面共享组件
-│   │   ├── ui/             # shadcn/ui 组件
-│   │   ├── app-header.tsx  # 应用外壳，单行：行首入口导航，品牌居中，行尾设置
-│   │   ├── app-nav.tsx     # 应用导航：两个入口做成 header 里的分段控件
-│   │   ├── segmented.ts    # 全应用唯一一份分段控件外观（cva），header 入口导航与列表形态开关共用
-│   │   ├── collapsible-section.tsx # 所有分组列表共用的吸顶可折叠分组头
-│   │   ├── list-facets.tsx # 当前列表内容区首行的分类 chips（含「更多」浮层）
-│   │   ├── list-sort-select.tsx # 列表的排序菜单——热度，加上安装时间与 Token 占用（仅已安装页）
-│   │   ├── list-unit-toggle.tsx # 两个列表共用的形态开关——skill 行或仓库卡片，一对分段按钮
-│   │   ├── agent-icon.tsx  # agent 品牌图标
-│   │   ├── owner-avatar.tsx# owner 头像（元信息行的作者头像）
-│   │   ├── repo-hover-card.tsx # 作者头像 + 其仓库信息浮窗
-│   │   ├── skill-detail/    # 共享的 skill 详情面板与模态抽屉
-│   │   ├── settings-popover.tsx # 锚定在 header 行尾的设置浮窗
-│   │   ├── advanced-settings-dialog.tsx # 二级设置（CDN 基址 + 数据源）
-│   │   └── placeholder.tsx # 各列表页共用的「无内容」空态
-│   ├── pages/              # 页面级组件，按页聚合（含私有子组件与测试）
-│   │   ├── explore/        # 商店探索相关页面（skill-row / repo-card / live-groups / search-results）
-│   │   └── installed/      # 已安装页（agent 头像菜单 / agent-link-settings-dialog 等）
-│   ├── hooks/              # 自定义 hooks
-│   ├── lib/                # API / 业务逻辑层
-│   ├── types/              # 类型定义
-│   ├── data/               # 静态数据（分类 key → 标签/单色图标映射）
-│   ├── test/               # 测试工具与 setup
-│   ├── App.tsx             # 路由与布局
-│   └── main.tsx            # 入口
-├── src-tauri/              # 后端（Rust + Tauri）
-│   ├── src/                # Tauri 命令（install/list/remove/link 等）
-│   ├── capabilities/       # 权限声明
-│   └── tauri.conf.json     # Tauri 配置
-├── components.json         # shadcn/ui 配置
-└── vite.config.ts          # Vite + Vitest 配置
+├── src/                    # 前端代码 (React 19 + TypeScript)
+│   ├── components/         # 共享业务与 UI 组件
+│   │   ├── ui/             # shadcn/ui 组件库
+│   │   ├── app-header.tsx  # 顶栏导航与设置入口
+│   │   ├── list-toolbar.tsx# 统一搜索框、视图模式切换与排序栏
+│   │   ├── skill-detail/   # 技能详情抽屉、Markdown 预览及编辑器
+│   │   └── settings-menu.tsx # 设置菜单弹层（CDN 源、版本更新、活动日志）
+│   ├── pages/              # 核心路由页面
+│   │   ├── agents/         # 首页：Agent 拓扑关系与开关关联
+│   │   ├── explore/        # 商店：技能目录浏览与搜索结果展示
+│   │   └── installed/      # 已安装：技能管理、分组分桶与多选批量操作
+│   ├── hooks/              # 自定义 React Hooks
+│   ├── lib/                # 服务层、注册表 Worker 与 Tauri IPC 封装
+│   ├── data/               # 静态数据与分类字典
+│   ├── App.tsx             # 路由分发与全局 Provider
+│   └── main.tsx            # 前端入口
+├── src-tauri/              # 原生后端代码 (Rust)
+│   ├── src/                # Tauri 命令与本地文件系统交互
+│   ├── capabilities/       # 安全能力与系统权限声明
+│   └── tauri.conf.json     # 窗口与打包配置
+├── docs/                   # 架构与技术文档
+└── website/                # 官方网站 (Astro)
 ```
 
-## 架构
+## 技术文档索引
 
-应用采用「前端负责读取、后端负责写入」的分层：
-
-- **读取**：skills 注册表索引与单个 skill 的 `SKILL.md` 由前端通过可配置的下载源（直连 GitHub 或 CDN 镜像）直接拉取，并缓存到 TanStack Query。
-- **写入**：技能的安装、卸载，以及 agent 目录的链接，均通过 Tauri 命令委托给 Rust 侧的 `agents-skills` 库。
-- **浏览器兜底**：在纯浏览器环境（开发服务器 / 测试）下，写入操作回退到内存 mock，保证 UI 可完整体验。
-
-详细说明见 [`architecture.zh-CN.md`](architecture.zh-CN.md)；后端用到的 `agents-skills` 接口见 [`agents-skills-api.zh-CN.md`](agents-skills-api.zh-CN.md)；商店注册表索引的格式与用法见 [`index-format.zh-CN.md`](index-format.zh-CN.md)。
-
-## 主题
-
-应用支持浅色、深色与跟随系统三种外观，可在「设置浮窗 → 外观」区切换。
-
-shadcn/ui 原生自带深色调色板：`src/index.css` 同时定义了 `:root` 与 `.dark` 两套 oklch 变量，并声明了 `@custom-variant dark (&:is(.dark *))`，`src/components/ui/` 下的组件全部读取语义化 token。因此支持暗黑模式只需在 `<html>` 上切换 `dark` 类，这正是 [next-themes](https://github.com/pacocoursey/next-themes) 所做的事：
-
-- `src/components/theme-provider.tsx` —— 唯一的共享配置（`attribute="class"`、`defaultTheme="system"`、`enableColorScheme`、`storageKey="skill-one-theme"`），并负责把主题同步到原生窗口。
-- `src/components/theme-mode-toggle.tsx` —— 设置浮窗里的三选 `ToggleGroup` 分段控件。
-- `src/hooks/use-native-theme.ts` —— 在 Tauri 环境中调用 `getCurrentWindow().setTheme()`，让系统绘制的部分（标题栏、滚动条、表单控件）一并跟随；`system` 映射为 `null`，交由操作系统自行决定。macOS 上 `set_theme` 是全应用生效的，主窗口这一次调用会覆盖所有窗口。
-
-只有主窗口入口 `src/main.tsx` 需要挂载 Provider。
-
-新增 UI 样式时的约定：
-
-- 使用语义化 token（`bg-background`、`text-muted-foreground`、`border-border`），不要直接写调色板颜色，这样切换主题无需改动组件。
-- 只有当颜色位于品牌渐变或图片之上、两种主题下观感一致时，才可以使用固定色。
-- 确实无法避免时（如 `text-emerald-600` 这类状态文案），必须同时补上 `dark:` 变体。
-
-## 组件
-
-`src/components/ui/` 存放 [shadcn/ui](https://ui.shadcn.com/) 组件，取自 Tailwind v4 注册表的 `new-york` 风格。新增或刷新某个组件：
-
-```bash
-pnpm dlx shadcn@latest add <component>
-```
-
-改动这些组件时有两条约定：
-
-- **`cn` 要从 `cn` 包导入**——`import { cn } from "cn"`，而不是 `@/lib/utils`。这正是注册表产出的写法，因此新加的组件无需再改导入。`src/lib/utils.ts` 仍会 re-export `cn`（与 shadcn 的 `utils` 注册项保持一致），但新代码不应再绕经它。
-- **`add` 会覆盖文件。** 若干组件带有有意的本地改动：`badge` 增加了 `success` 变体，`drawer` 加宽到 600px，`card` 调整了密度。执行 `add` 后请检查 `git diff`，不要假定文件与注册表一致。
-
-## 测试
-
-各层划分与每层存在的理由，见 [testing.zh-CN.md](testing.zh-CN.md)。
-
-| 层 | 工具 | 命令 | 覆盖范围 |
-| --- | --- | --- | --- |
-| 单元 / 组件 | Vitest + Testing Library（jsdom） | `pnpm test` / `test:run` | 纯逻辑与组件的隔离行为 |
-| 覆盖率门禁 | Vitest（`@vitest/coverage-v8`） | `pnpm test:coverage` | 校验 `vite.config.ts` 中的阈值 |
-| 命令逻辑 | `cargo test` | `cd src-tauri && cargo test` | Tauri 命令层，跑在沙箱化的 `Manager` 上 |
-| 端到端 | Playwright | `pnpm test:e2e` | 浏览器中组装起来的应用，以及视觉基线 |
-
-组件测试与 `src/lib` 下的单元测试均遵循「一个文件对应一个 `*.test.ts(x)`」的约定，可通过 `pnpm test:run` 一键运行。端到端用例位于 `e2e/`，通过 `tsconfig.node.json` 参与类型检查。
-
-## 内容安全策略（CSP）
-
-`src-tauri/tauri.conf.json` 中配置了 `app.security.csp`。不配置时应用完全没有任何策略；配置后 WebView 会拒绝指令不允许的一切。构建时 Tauri 会为打包代码追加 nonce 与 hash。
-
-| 指令 | 值 | 原因 |
-| --- | --- | --- |
-| `default-src` | `'self'` | 未在下面列出的资源都来自打包产物。 |
-| `script-src` | `'self'` | 不允许 inline 与 `eval` —— Tauri 会对打包脚本做 nonce 匹配。 |
-| `style-src` | `'self' 'unsafe-inline'` | Tailwind 产出独立样式表，但 React 会写内联 `style` 属性。 |
-| `img-src` | `'self' https: data: blob:` | skill 封面、owner 头像与 `SKILL.md` 里的图片天然是远程的。 |
-| `font-src` | `'self' data:` | 内联的字体子集。 |
-| `worker-src` | `'self' blob:` | registry worker 是打包出的 ES module；`blob:` 兼容被内联的情况。 |
-| `connect-src` | `'self' ipc: http://ipc.localhost https: http://localhost:* http://127.0.0.1:*` | `ipc:` 是 Tauri 的命令通道；`https:` 用于 registry、`SKILL.md` 与头像；环回地址允许自建镜像走明文 HTTP。 |
-
-修改时有两点要留意：
-
-- **`connect-src` 里的 `https:` 是刻意且宽泛的。** 下载源在「设置」里由用户自定义，构建时无法预知主机名。非环回地址的明文 HTTP 自定义 CDN 会被拦截 —— 要收紧这里，必须同时给该输入框加上校验。
-- **CSP 只存在于打包后的应用中。** 开发时（`pnpm dev`）页面由 Vite 提供，不带任何策略。目前没有自动附加 CSP 的测试，修改 CSP 后请在 `pnpm tauri build` 的产物上手动验证。
-
-渲染远程 `SKILL.md` 内容与 CSP 是两件事：`react-markdown` 没有启用 `rehype-raw`，源码里的裸 HTML 不会被渲染，链接与图片 URL 也会经过 scheme 白名单解析（`src/components/markdown.tsx`）。CSP 是兜底，不是主要防线。
-
-## 隔离 worktree
-
-新任务在 `.worktrees/` 下的 `git worktree` 里进行，以保证 `main` 的检出照常可用；worktree 里的 dev server 不能占用 5173（那是 `main` 的端口，且启用 `strictPort`），请用 5273 的 `pnpm dev:test`。
-
-两个设置细节能省下真实的时间：
-
-- **依赖要真装。** 软链主检出的 `node_modules` 会让 `pnpm build` 失败：pnpm 会先跑一遍安装预检，而软链目录满足不了它。在 worktree 里正常执行 `pnpm install`，`pnpm build`、`pnpm typecheck` 与 CI 的行为才会完全一致。
-- **共用 Rust 构建缓存。** `src-tauri/target` 有几十 GB，别让每个 worktree 从头编译一遍：用 `CARGO_TARGET_DIR=<repo>/src-tauri/target cargo check` 指回主检出。注意：设了这个变量就**不要**执行 `cargo clean`，它会连主检出的缓存一起删掉；要先取消该变量，或只对 worktree 自己的 target 做清理。
-
-## 发布
-
-发版就是推一个附注 tag——完整流程与产物说明见 [auto-update.zh-CN.md](auto-update.zh-CN.md)。简要：
-
-1. **更新版本号**：必须保持一致的位置见 [auto-update.zh-CN.md](auto-update.zh-CN.md) 第 1 步，那份文档同时给出提交命令。
-2. **提交并打 tag**：`chore(release): bump version to X.Y.Z`，随后 `git tag -a vX.Y.Z -m "vX.Y.Z"`。
-3. **推送**：先 `git push origin main`，再推 tag——推送 `v*` tag 正是触发构建的动作。
-
-[GitHub Actions](../.github/workflows/release.yml) 会在 `macos-14`（arm64）上构建，并上传 `.dmg`、经 minisign 签名的 `Skill One.app.tar.gz` 与应用内更新器读取的 `latest.json` 清单。
-
-> 应用为 ad-hoc 签名分发，手动下载的 macOS 版本首次启动需在「系统设置 → 隐私与安全性」中允许打开。自 v0.2.0 起，已安装的应用可在应用内自行完成更新。
+- [系统架构与数据流](architecture.zh-CN.md)
+- [技能溯源数据账本规范](skill-provenance.zh-CN.md)
+- [操作活动审计日志](activity-log.zh-CN.md)
+- [测试架构与分层](testing.zh-CN.md)
+- [应用内签名自更新机制](auto-update.zh-CN.md)
+- [SKILL.md 就地编辑方案](editing-skills.zh-CN.md)
