@@ -948,7 +948,7 @@ export function InstalledPage() {
           unit !== "repo"
             ? rowExtra(
                 row,
-                unit === "grid" ? "size-6 text-[10px]" : "size-7 text-xs",
+                unit === "grid" ? "size-10 text-xs" : "size-7 text-xs",
               )
             : undefined,
         action: <SkillEnableSwitch skill={row.skill} />,
@@ -1207,7 +1207,7 @@ export function InstalledPage() {
         fact={sort === "installed" ? "installedAt" : "popularity"}
         selected={key === selected}
         muted={!row.enabled}
-        extra={rowExtra(row, "size-6 text-[10px]")}
+        extra={rowExtra(row, "size-10 text-xs")}
         action={<SkillEnableSwitch skill={row.skill} />}
         onSelect={() => setSelectedKey(key)}
         checkable={true}

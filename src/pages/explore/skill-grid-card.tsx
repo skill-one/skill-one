@@ -168,34 +168,40 @@ export function SkillGridCard({
             />
           </span>
         )}
-        {/* Name row: owner avatar plus the name, both on one line. */}
-        <div className={cn("flex min-w-0 items-center gap-2", checkable && "pr-6")}>
+        {/* Header row: owner avatar (enlarged) on left, two rows (name and source) on right */}
+        <div className={cn("flex min-w-0 items-center gap-2.5", checkable && "pr-6")}>
           {owner ? (
             <OwnerAvatar
               owner={owner}
-              className="size-6 shrink-0 text-[10px]"
+              className="size-10 shrink-0 text-xs"
             />
           ) : (
             (extra ?? (
               <ThirdPartyMark
                 name={skillDisplayName(skill)}
-                className="size-6 shrink-0 text-[10px]"
+                className="size-10 shrink-0 text-xs"
               />
             ))
           )}
-          <div className="min-w-0 flex-1 flex items-center gap-1.5">
-            <h3 className="min-w-0 truncate text-[13px] font-medium leading-tight">
+          <div className="min-w-0 flex-1 flex flex-col justify-center">
+            <h3 className="truncate text-[13px] font-medium leading-tight">
               <HighlightedText
                 text={skillDisplayName(skill)}
                 terms={matched?.name}
               />
             </h3>
+            <p
+              className="mt-0.5 truncate text-[11px] text-muted-foreground"
+              title={skill.repo || t("common.thirdPartyInstall")}
+            >
+              {skill.repo || t("common.thirdPartyInstall")}
+            </p>
           </div>
         </div>
 
         {/* What it does, at most two lines so every square stays a square. */}
         {!live && (
-          <p className="mt-1 line-clamp-2 min-h-0 flex-1 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-2 line-clamp-2 min-h-0 flex-1 text-[12px] leading-snug text-muted-foreground">
             {skillDescription(skill, locale) || t("common.noDescription")}
           </p>
         )}
