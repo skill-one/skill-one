@@ -15,6 +15,7 @@ import {
 import { cn } from "../../lib/utils";
 import {
   domainEmoji,
+  domainMeta,
   domainTooltip,
   UNCLASSIFIED_DOMAIN,
 } from "../../data/domains";
@@ -186,9 +187,11 @@ export const SkillRow = memo(function SkillRow({
   // has none.
   const [owner] = skill.repo.split("/");
   const domain = skill.profile?.domain;
+  const domainKey = domain?.[0];
+  const meta = domainKey ? domainMeta(domainKey) : undefined;
   const hasTag = showUnclassified
     ? true
-    : Boolean(domain && domain.length > 0 && domain[0] !== UNCLASSIFIED_DOMAIN);
+    : Boolean(meta && meta.key !== UNCLASSIFIED_DOMAIN);
   // A live skills.sh row claims nothing its source does not carry — which is
   // no description and no classification at all — so it draws neither the
   // 暂无描述 placeholder nor the ❓ mark (see `isLiveSkill`); an installed

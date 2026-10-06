@@ -39,7 +39,7 @@ import {
   formatUnixDate,
 } from "../../lib/utils";
 import { DomainBadge } from "../domain-badge";
-import { UNCLASSIFIED_DOMAIN } from "../../data/domains";
+import { domainMeta, UNCLASSIFIED_DOMAIN } from "../../data/domains";
 import { effectiveDomains } from "../../lib/custom-tags";
 import { useCustomTags } from "../../hooks/use-custom-tags";
 import { SkillTagMenu } from "./skill-tag-menu";
@@ -577,7 +577,8 @@ export function SkillDetailPanel({
         assignedKey={assignedTagKey}
         effectiveKey={effectiveTagKey}
         trigger={
-          effectiveTagKey !== UNCLASSIFIED_DOMAIN ? (
+          effectiveTagKey !== UNCLASSIFIED_DOMAIN &&
+          domainMeta(effectiveTagKey) != null ? (
             <DomainBadge
               domain={[effectiveTagKey]}
               variant="ghost"

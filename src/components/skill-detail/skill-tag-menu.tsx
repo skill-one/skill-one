@@ -2,7 +2,12 @@ import { useMemo, useRef, useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { DOMAINS, domainLabel, UNCLASSIFIED_DOMAIN } from "../../data/domains";
+import {
+  DOMAINS,
+  domainLabel,
+  domainMeta,
+  UNCLASSIFIED_DOMAIN,
+} from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useCustomTags } from "../../hooks/use-custom-tags";
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
@@ -287,7 +292,7 @@ export function SkillTagMenu({
       active && "bg-muted/60 font-medium",
     );
 
-  const isUnclassified = effectiveKey === UNCLASSIFIED_DOMAIN;
+  const isUnclassified = trigger == null;
 
   return (
     <div className="inline-flex items-center gap-1">

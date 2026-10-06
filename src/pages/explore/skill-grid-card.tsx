@@ -13,6 +13,7 @@ import {
 import { cn } from "../../lib/utils";
 import {
   domainEmoji,
+  domainMeta,
   domainTooltip,
   UNCLASSIFIED_DOMAIN,
 } from "../../data/domains";
@@ -104,9 +105,11 @@ export function SkillGridCard({
   const storeBacked = skill.storeBacked !== false;
   const [owner] = skill.repo.split("/");
   const domain = skill.profile?.domain;
+  const key = domain?.[0];
+  const meta = key ? domainMeta(key) : undefined;
   const hasTag = showUnclassified
     ? true
-    : Boolean(domain && domain.length > 0 && domain[0] !== UNCLASSIFIED_DOMAIN);
+    : Boolean(meta && meta.key !== UNCLASSIFIED_DOMAIN);
   const live = isLiveSkill(skill);
   const locale = useAppLocale();
   const { t } = useTranslation();

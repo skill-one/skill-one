@@ -359,31 +359,27 @@ export const DEFAULT_BROWSER_PREVIEW_LEDGER: SkillOneConfig = {
     pdf: {
       origin: "store",
       repo: "anthropics/skills",
-      tags: ["documents", "效率工具"],
+      tags: ["效率工具"],
     },
     "frontend-design": {
       origin: "store",
       repo: "shadcn/ui",
-      tags: ["frontend", "界面开发"],
     },
     "mcp-builder": {
       origin: "store",
       repo: "modelcontextprotocol/servers",
-      tags: ["mcp", "开发辅助"],
     },
     "code-review": {
       origin: "local",
       repo: "google-deepmind/skills",
-      tags: ["code-review", "AI Agent"],
     },
     "react-query-helper": {
       origin: "local",
       repo: "tanstack/query",
-      tags: ["frontend"],
     },
     "git-commit": {
       origin: "local",
-      tags: ["效率工具", "开发辅助"],
+      tags: ["开发辅助"],
     },
     "dingtalk-doc": {
       origin: "local",
