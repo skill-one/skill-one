@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactElement } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Check, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { DOMAINS, domainLabel } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useCustomTags } from "../../hooks/use-custom-tags";
@@ -288,7 +288,7 @@ export function SkillTagMenu({
     );
 
   return (
-    <>
+    <div className="inline-flex items-center gap-1">
       <Popover
         open={open}
         onOpenChange={(next) => {
@@ -534,20 +534,27 @@ export function SkillTagMenu({
               </p>
             )}
           </div>
-          {assignedKey != null && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 justify-start px-2 text-[11px]"
-              disabled={busy}
-              onClick={() => void clear()}
-            >
-              <RotateCcw className="size-3" aria-hidden />
-              {t("tag.clear")}
-            </Button>
-          )}
         </PopoverContent>
       </Popover>
+      {assignedKey != null && (
+        <button
+          type="button"
+          disabled={busy}
+          aria-label={t("tag.clearAria", { name: skillName })}
+          title={t("tag.clear")}
+          onClick={(e) => {
+            e.stopPropagation();
+            void clear();
+          }}
+          className={cn(
+            "inline-flex size-4 cursor-pointer items-center justify-center rounded-full text-muted-foreground/60 transition-colors",
+            "hover:bg-destructive/10 hover:text-destructive",
+            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          )}
+        >
+          <X className="size-2.5" aria-hidden />
+        </button>
+      )}
       <Dialog
         open={confirmDelete != null}
         onOpenChange={(next) => {
@@ -590,6 +597,6 @@ export function SkillTagMenu({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

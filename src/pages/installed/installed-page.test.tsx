@@ -888,10 +888,7 @@ describe("InstalledPage", () => {
       // classification, so the skill stays listed and the drawer stays open
       // over it while the badge answers the fallback.
       await user.click(
-        within(dialog).getByRole("button", { name: "编辑 pdf 的标签" }),
-      );
-      await user.click(
-        await screen.findByRole("button", { name: "恢复默认分类" }),
+        within(dialog).getByRole("button", { name: "移除 pdf 的标签" }),
       );
       await waitFor(async () =>
         expect((await loadCustomTags()).skillTags).toEqual({}),
