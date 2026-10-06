@@ -272,14 +272,12 @@ describe("InstalledPage", () => {
       const { container } = renderPage();
 
       await screen.findByText("acme/big");
-      // Heaviest first, and the pool last because it has no stars to weigh — the
-      // same order the bars themselves imply. It is numbered all the same: it is
-      // third in this list, and a card without a figure is a card without a
-      // weight, not a card without a place.
+      // The third-party pool card is pinned first for quick management,
+      // followed by repositories in stars order.
       expect(cardStack(container)).toEqual([
-        { repo: "acme/big", ordinal: "1" },
-        { repo: "acme/small", ordinal: "2" },
-        { repo: "", ordinal: "3" },
+        { repo: "", ordinal: "1" },
+        { repo: "acme/big", ordinal: "2" },
+        { repo: "acme/small", ordinal: "3" },
       ]);
     });
 
@@ -1247,12 +1245,11 @@ describe("InstalledPage", () => {
       const { baseElement } = renderPage();
 
       await screen.findByText("zoo/new");
-      // One flat list, newest install first: the fresh repository leads, the
-      // pool follows on the age of its newest member, the all-old repository
-      // trails.
+      // One flat list: third-party card is pinned first, followed by repositories
+      // in newest-install order.
       expect(cardBarNames(baseElement)).toEqual([
-        "zoo/new",
         "第三方安装",
+        "zoo/new",
         "acme/tools",
       ]);
     });
@@ -1269,8 +1266,8 @@ describe("InstalledPage", () => {
       const { baseElement } = renderPage();
 
       await screen.findByText("acme/tools");
-      // The pool (newest docx, 3 days) is the other, older card.
-      expect(cardBarNames(baseElement)).toEqual(["acme/tools", "第三方安装"]);
+      // The pool is pinned first, followed by acme/tools.
+      expect(cardBarNames(baseElement)).toEqual(["第三方安装", "acme/tools"]);
 
       // Inside the card, newest first.
       const card = baseElement.querySelector('[data-repo="acme/tools"]');
@@ -1335,9 +1332,9 @@ describe("InstalledPage", () => {
       ).not.toBeInTheDocument();
       await waitFor(() =>
         expect(cardBarNames(baseElement)).toEqual([
+          "第三方安装",
           "zoo/a",
           "zoo/b",
-          "第三方安装",
         ]),
       );
     });
@@ -1392,23 +1389,20 @@ describe("InstalledPage", () => {
       renderPage();
 
       await screen.findByText("zoo/new");
-      // pdf is the only row of the freshest card; the next thing the walk reaches
-      // is the pool's own newest row (docx, 3 days back) — the card boundary does
-      // not interrupt the walk.
-      const pdfButton = await screen.findByRole("button", {
-        name: "查看 pdf 详情",
+      // docx and pptx belong to the pinned third-party card; opening docx
+      // walks its card, and the next card reached across the boundary is zoo/new (pdf).
+      const docxButton = await screen.findByRole("button", {
+        name: "查看 docx 详情",
       });
-      await user.click(pdfButton);
+      await user.click(docxButton);
       const dialog = await screen.findByRole("dialog");
-      expect(within(dialog).getByText("pdf")).toBeInTheDocument();
+      expect(within(dialog).getByText("docx")).toBeInTheDocument();
 
       fireEvent.keyDown(window, { key: "ArrowRight" });
-      // The drawer now shows the pool's own newest install (docx), identified by
-      // its description the same way the other drawer test names it.
-      expect(
-        await within(dialog).findByText("以编程方式创建和编辑 Word 文档。"),
-      ).toBeInTheDocument();
-      expect(within(dialog).getByText("docx")).toBeInTheDocument();
+      expect(within(dialog).getByText("pptx")).toBeInTheDocument();
+
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      expect(within(dialog).getByText("pdf")).toBeInTheDocument();
     });
 
     // The skill unit: the store's second reading of the same installs — one row
@@ -1738,6 +1732,38 @@ describe("InstalledPage", () => {
       expect(names).toHaveLength(4);
       expect(names.at(-1)).toBe("查看 pdf 详情");
     });
+
+    it("selects and deselects all skills in a time bucket section via its group checkbox", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await pickUnit(user, "列表");
+      await pickSort(user, "安装时间");
+      await screen.findByText("frontend-design");
+
+      const earlierCheckbox = screen.getByRole("checkbox", {
+        name: "选择分组 更早",
+      });
+      expect(earlierCheckbox).not.toBeChecked();
+
+      // Clicking the group checkbox selects all 3 skills in this section
+      await user.click(earlierCheckbox);
+      expect(earlierCheckbox).toBeChecked();
+
+      // Check that the group checkbox and the 3 items in 更早 are selected
+      const earlierRegion = screen.getByRole("region", { name: "更早" });
+      const checkboxes = within(earlierRegion).getAllByRole("checkbox");
+      expect(checkboxes).toHaveLength(4);
+      for (const cb of checkboxes) {
+        expect(cb).toBeChecked();
+      }
+
+      // Clicking again deselects all 3 skills
+      await user.click(earlierCheckbox);
+      expect(earlierCheckbox).not.toBeChecked();
+      for (const cb of checkboxes) {
+        expect(cb).not.toBeChecked();
+      }
+    });
   });
 
   /**
@@ -1824,7 +1850,7 @@ describe("InstalledPage", () => {
       ).not.toBeInTheDocument();
       expect(
         screen.getAllByRole("region").map((region) => region.ariaLabel),
-      ).toEqual(["开发编程", "数据分析", "内容创作", "未分类"]);
+      ).toEqual(["未分类", "开发编程", "数据分析", "内容创作"]);
     });
 
     it("leads each tag header with the classification's emoji", async () => {
@@ -2044,25 +2070,32 @@ describe("InstalledPage", () => {
       await pickSort(user, "标签");
       await screen.findByText("frontend-design");
 
-      // Open the last skill of 开发编程 (pptx)
-      const pptxButton = await screen.findByRole("button", {
-        name: "查看 pptx 详情",
+      // Open frontend-design in 未分类 (the first section)
+      const fdButton = await screen.findByRole("button", {
+        name: "查看 frontend-design 详情",
       });
-      await user.click(pptxButton);
+      await user.click(fdButton);
       const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("frontend-design")).toBeInTheDocument();
+
+      // Press ArrowRight: moves to the first skill of 开发编程 (docx)
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      expect(within(dialog).getByText("docx")).toBeInTheDocument();
+
+      // Next in 开发编程: pdf -> pptx
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      expect(within(dialog).getByText("pdf")).toBeInTheDocument();
+
+      fireEvent.keyDown(window, { key: "ArrowRight" });
       expect(within(dialog).getByText("pptx")).toBeInTheDocument();
 
-      // Press ArrowRight: moves to the first skill of the next tag section (数据分析 -> mcp-builder)
+      // Press ArrowRight: moves to 数据分析 -> mcp-builder
       fireEvent.keyDown(window, { key: "ArrowRight" });
       expect(within(dialog).getByText("mcp-builder")).toBeInTheDocument();
 
       // Press ArrowRight: moves to 内容创作 -> Code Review
       fireEvent.keyDown(window, { key: "ArrowRight" });
       expect(within(dialog).getByText("Code Review")).toBeInTheDocument();
-
-      // Press ArrowRight: moves to 未分类 -> frontend-design
-      fireEvent.keyDown(window, { key: "ArrowRight" });
-      expect(within(dialog).getByText("frontend-design")).toBeInTheDocument();
     });
   });
 

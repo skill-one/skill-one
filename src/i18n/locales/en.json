@@ -443,6 +443,7 @@
     "disableSuccess": "Disabled {{count}} skills",
     "tagSuccess": "Tag updated for {{count}} skills",
     "uninstallSuccess": "Uninstalled {{count}} skills",
-    "selectSkillAria": "Select {{name}}"
+    "selectSkillAria": "Select {{name}}",
+    "selectGroupAria": "Select group {{name}}"
   }
 }

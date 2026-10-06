@@ -173,4 +173,82 @@ describe("CollapsibleSection", () => {
     );
     await expectNoA11yViolations(container);
   });
+
+  describe("checkable header with hover selection", () => {
+    it("renders chevron and accessible checkbox when checkable", () => {
+      renderSection({
+        checkable: true,
+        checked: false,
+        selectAriaLabel: "选择分组 今天",
+      });
+
+      const checkbox = screen.getByRole("checkbox", { name: "选择分组 今天" });
+      expect(checkbox).toBeInTheDocument();
+      expect(checkbox).not.toBeChecked();
+
+      const titleTrigger = screen.getByRole("button", { name: /今天/ });
+      expect(titleTrigger).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("clicking checkbox calls onCheckChange and does not fold section", async () => {
+      const user = userEvent.setup();
+      const onCheckChange = vi.fn();
+      renderSection({
+        checkable: true,
+        checked: false,
+        onCheckChange,
+        selectAriaLabel: "选择分组 今天",
+      });
+
+      const checkbox = screen.getByRole("checkbox", { name: "选择分组 今天" });
+      await user.click(checkbox);
+
+      expect(onCheckChange).toHaveBeenCalledWith(true);
+      // Section body remains visible (was not collapsed)
+      expect(screen.getByText("section body")).toBeVisible();
+    });
+
+    it("clicking the title button folds the section without triggering onCheckChange", async () => {
+      const user = userEvent.setup();
+      const onCheckChange = vi.fn();
+      renderSection({
+        checkable: true,
+        checked: false,
+        onCheckChange,
+      });
+
+      const titleTrigger = screen.getByRole("button", { name: /今天/ });
+      await user.click(titleTrigger);
+
+      expect(onCheckChange).not.toHaveBeenCalled();
+      expect(screen.queryByText("section body")).not.toBeInTheDocument();
+    });
+
+    it("supports indeterminate and checked states without a11y violations", async () => {
+      const { container, rerender } = renderSection({
+        checkable: true,
+        indeterminate: true,
+        selectAriaLabel: "选择分组 今天",
+      });
+
+      const checkbox = screen.getByRole("checkbox", { name: "选择分组 今天" });
+      expect(checkbox).toHaveAttribute("aria-checked", "mixed");
+      await expectNoA11yViolations(container);
+
+      rerender(
+        <CollapsibleSection
+          title="今天"
+          count="3 个 skill"
+          checkable={true}
+          checked={true}
+          selectAriaLabel="选择分组 今天"
+        >
+          <div>section body</div>
+        </CollapsibleSection>,
+      );
+
+      expect(screen.getByRole("checkbox", { name: "选择分组 今天" })).toBeChecked();
+      await expectNoA11yViolations(container);
+    });
+  });
 });

@@ -71,6 +71,26 @@ describe("useMultiSelect", () => {
     expect(result.current.isSelectionMode).toBe(false);
   });
 
+  it("supports selectBatch and unselectBatch", () => {
+    const { result } = renderHook(() => useMultiSelect());
+
+    act(() => {
+      result.current.selectBatch(["x", "y", "z"]);
+    });
+    expect(result.current.count).toBe(3);
+    expect(result.current.isSelected("x")).toBe(true);
+    expect(result.current.isSelected("y")).toBe(true);
+    expect(result.current.isSelected("z")).toBe(true);
+
+    act(() => {
+      result.current.unselectBatch(["y", "z"]);
+    });
+    expect(result.current.count).toBe(1);
+    expect(result.current.isSelected("x")).toBe(true);
+    expect(result.current.isSelected("y")).toBe(false);
+    expect(result.current.isSelected("z")).toBe(false);
+  });
+
   it("clears on Escape key if escapeToClear is true", () => {
     const { result } = renderHook(() => useMultiSelect({ escapeToClear: true }));
 

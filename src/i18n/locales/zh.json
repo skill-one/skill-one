@@ -443,6 +443,7 @@
     "disableSuccess": "已停用 {{count}} 个技能",
     "tagSuccess": "已为 {{count}} 个技能更新标签",
     "uninstallSuccess": "已卸载 {{count}} 个技能",
-    "selectSkillAria": "选择 {{name}}"
+    "selectSkillAria": "选择 {{name}}",
+    "selectGroupAria": "选择分组 {{name}}"
   }
 }

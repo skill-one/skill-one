@@ -17,6 +17,8 @@ export interface UseMultiSelectReturn<T extends string = string> {
   toggle: (key: T) => void;
   select: (key: T) => void;
   unselect: (key: T) => void;
+  selectBatch: (keys: T[]) => void;
+  unselectBatch: (keys: T[]) => void;
   selectAll: (keys: T[]) => void;
   clear: () => void;
 }
@@ -69,6 +71,34 @@ export function useMultiSelect<T extends string = string>(
     });
   }, []);
 
+  const selectBatch = useCallback((keys: T[]) => {
+    setSelectedKeys((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const k of keys) {
+        if (!next.has(k)) {
+          next.add(k);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const unselectBatch = useCallback((keys: T[]) => {
+    setSelectedKeys((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const k of keys) {
+        if (next.has(k)) {
+          next.delete(k);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
   const selectAll = useCallback((keys: T[]) => {
     setSelectedKeys((prev) => {
       if (prev.size === keys.length && keys.every((k) => prev.has(k))) {
@@ -107,6 +137,8 @@ export function useMultiSelect<T extends string = string>(
       toggle,
       select,
       unselect,
+      selectBatch,
+      unselectBatch,
       selectAll,
       clear,
     }),
@@ -119,6 +151,8 @@ export function useMultiSelect<T extends string = string>(
       toggle,
       select,
       unselect,
+      selectBatch,
+      unselectBatch,
       selectAll,
       clear,
     ],

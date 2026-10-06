@@ -15,7 +15,13 @@ import { useViewMemory } from "../../hooks/use-view-memory";
 import { setQuery, REVEAL } from "../../lib/list-view";
 import { buildSearchIndex } from "../../lib/search-index";
 import { domainsOf, taxonomyRank } from "../../lib/domain-filter";
-import { DOMAINS, domainEmoji, domainLabel, fullTagEmoji } from "../../data/domains";
+import {
+  DOMAINS,
+  domainEmoji,
+  domainLabel,
+  fullTagEmoji,
+  UNCLASSIFIED_DOMAIN,
+} from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useMultiSelect } from "../../hooks/use-multi-select";
 import {
@@ -595,6 +601,8 @@ export function InstalledPage() {
         const tagA = domainsOf(a.skill)[0];
         const tagB = domainsOf(b.skill)[0];
         if (tagA !== tagB) {
+          if (tagA === UNCLASSIFIED_DOMAIN) return -1;
+          if (tagB === UNCLASSIFIED_DOMAIN) return 1;
           const countA = tagCounts.get(tagA) ?? 0;
           const countB = tagCounts.get(tagB) ?? 0;
           if (countA !== countB) return countB - countA;
@@ -623,26 +631,21 @@ export function InstalledPage() {
   }, [unit, rows, isSearching, sort, locale]);
 
   // The repository shape's flat order — the sort's own answer over cards:
-  // by their repository's stars (the 按仓库 option; the figure-less pool and
-  // unlisted sources sink, and cards the stars cannot separate keep the
-  // newest-install order). A search answers in the shared search view instead,
-  // in the shape on screen — the cards here are the browse answer's, and
-  // relevance ranks skills, not repositories.
+  // third-party installed skills card is pinned to the top, followed by
+  // repositories sorted by stars (ties broken by newest install).
   const activeCards = useMemo<RepoGroup[]>(() => {
     if (unit !== "repo" || isSearching) return [];
-    // Cards are led by the repository's own stars, and that is the whole of
-    // their order: a card is a repository, so the figure it answers in is the
-    // repository's. The three orders the row shape offers say nothing about it —
-    // which is why the order control is gone in this shape (see `ListToolbar`),
-    // and why an installed-clock or token pick could never have reordered these
-    // cards whatever the control said.
     const byNewestInstall = compareByInstalledTime<RepoGroup>(
       (card) => newestInstallTime(card.items, (row) => row.skill.installedAt),
       (a, b) => a.repo.localeCompare(b.repo),
     );
-    return cards.toSorted(
-      compareByStars((card) => starsOf(card), byNewestInstall),
-    );
+    return cards.toSorted((a, b) => {
+      const isLocalA = !a.repo;
+      const isLocalB = !b.repo;
+      if (isLocalA && !isLocalB) return -1;
+      if (!isLocalA && isLocalB) return 1;
+      return compareByStars((card) => starsOf(card), byNewestInstall)(a, b);
+    });
   }, [unit, isSearching, cards]);
 
   // The registry's own grouping — every skill it lists, per repository — so
@@ -779,10 +782,15 @@ export function InstalledPage() {
       }
 
       const orderedTags = Array.from(activeByTag.entries()).toSorted(
-        ([keyA, itemsA], [keyB, itemsB]) =>
-          itemsB.length - itemsA.length ||
-          taxonomyRank(keyA) - taxonomyRank(keyB) ||
-          domainLabel(keyA, locale).localeCompare(domainLabel(keyB, locale)),
+        ([keyA, itemsA], [keyB, itemsB]) => {
+          if (keyA === UNCLASSIFIED_DOMAIN) return -1;
+          if (keyB === UNCLASSIFIED_DOMAIN) return 1;
+          return (
+            itemsB.length - itemsA.length ||
+            taxonomyRank(keyA) - taxonomyRank(keyB) ||
+            domainLabel(keyA, locale).localeCompare(domainLabel(keyB, locale))
+          );
+        },
       );
 
       const shownByTag = new Map<string, Row[]>();
@@ -1382,54 +1390,109 @@ export function InstalledPage() {
               {sort === "popularity"
                 ? splitRows.enabled.length > 0 &&
                   skillEntries(splitRows.enabled)
-                : sections.map((section) => (
-                    <CollapsibleSection
-                      key={section.title}
-                      glyph={section.emoji}
-                      title={section.title}
-                      // The tag grouping states the section's whole size — the
-                      // answer already knows it, and a header that rewrote its
-                      // own count as the reveal grew would read as a list
-                      // changing, not a list arriving. The time buckets keep
-                      // the literal count: their sections are cut from the
-                      // revealed rows alone, so what they hold is what they
-                      // have shown.
-                      count={t("state.skillCount", {
-                        count: section.total ?? section.rows.length,
-                      })}
-                      // The fold is remembered with the page's view: it comes
-                      // back with a page switch, and a section of the same
-                      // name under a later grouping starts from its own
-                      // default only when the reader never touched it.
-                      open={view.folds[foldKey(section.title)] ?? true}
-                      onOpenChange={(open) =>
-                        setFold(foldKey(section.title), open)
-                      }
-                    >
-                      {skillEntries(section.rows)}
-                    </CollapsibleSection>
-                  ))}
-              {split && (
-                <CollapsibleSection
-                  icon={PowerOff}
-                  title={t("list.disabled")}
-                  count={t("state.skillCount", {
-                    count: splitRows.disabled.length,
+                : sections.map((section) => {
+                    const sectionKeys = section.rows.map((row) =>
+                      skillKey(row.skill),
+                    );
+                    const allChecked =
+                      sectionKeys.length > 0 &&
+                      sectionKeys.every((key) => multiSelect.isSelected(key));
+                    const someChecked = sectionKeys.some((key) =>
+                      multiSelect.isSelected(key),
+                    );
+                    const indeterminate = someChecked && !allChecked;
+
+                    return (
+                      <CollapsibleSection
+                        key={section.title}
+                        glyph={section.emoji}
+                        title={section.title}
+                        // The tag grouping states the section's whole size — the
+                        // answer already knows it, and a header that rewrote its
+                        // own count as the reveal grew would read as a list
+                        // changing, not a list arriving. The time buckets keep
+                        // the literal count: their sections are cut from the
+                        // revealed rows alone, so what they hold is what they
+                        // have shown.
+                        count={t("state.skillCount", {
+                          count: section.total ?? section.rows.length,
+                        })}
+                        // The fold is remembered with the page's view: it comes
+                        // back with a page switch, and a section of the same
+                        // name under a later grouping starts from its own
+                        // default only when the reader never touched it.
+                        open={view.folds[foldKey(section.title)] ?? true}
+                        onOpenChange={(open) =>
+                          setFold(foldKey(section.title), open)
+                        }
+                        checkable={true}
+                        checked={allChecked}
+                        indeterminate={indeterminate}
+                        selectionMode={multiSelect.isSelectionMode}
+                        onCheckChange={() => {
+                          if (allChecked) {
+                            multiSelect.unselectBatch(sectionKeys);
+                          } else {
+                            multiSelect.selectBatch(sectionKeys);
+                          }
+                        }}
+                        selectAriaLabel={t("multiSelect.selectGroupAria", {
+                          name: section.title,
+                        })}
+                      >
+                        {skillEntries(section.rows)}
+                      </CollapsibleSection>
+                    );
                   })}
-                  // The fold is the reader's ("not working with these right
-                  // now"), so it survives a change of grouping — which only
-                  // re-orders or re-slices rows — and a page switch, like the
-                  // sections' folds above.
-                  open={view.folds.parked ?? false}
-                  onOpenChange={(open) => setFold("parked", open)}
-                  className={cn(
-                    "border-t border-border/60 pt-6",
-                    splitRows.enabled.length > 0 && "mt-6",
-                  )}
-                >
-                  {skillEntries(splitRows.disabled)}
-                </CollapsibleSection>
-              )}
+              {split && (() => {
+                const disabledKeys = splitRows.disabled.map((row) =>
+                  skillKey(row.skill),
+                );
+                const allDisabledChecked =
+                  disabledKeys.length > 0 &&
+                  disabledKeys.every((key) => multiSelect.isSelected(key));
+                const someDisabledChecked = disabledKeys.some((key) =>
+                  multiSelect.isSelected(key),
+                );
+                const disabledIndeterminate =
+                  someDisabledChecked && !allDisabledChecked;
+
+                return (
+                  <CollapsibleSection
+                    icon={PowerOff}
+                    title={t("list.disabled")}
+                    count={t("state.skillCount", {
+                      count: splitRows.disabled.length,
+                    })}
+                    // The fold is the reader's ("not working with these right
+                    // now"), so it survives a change of grouping — which only
+                    // re-orders or re-slices rows — and a page switch, like the
+                    // sections' folds above.
+                    open={view.folds.parked ?? false}
+                    onOpenChange={(open) => setFold("parked", open)}
+                    className={cn(
+                      "border-t border-border/60 pt-6",
+                      splitRows.enabled.length > 0 && "mt-6",
+                    )}
+                    checkable={true}
+                    checked={allDisabledChecked}
+                    indeterminate={disabledIndeterminate}
+                    selectionMode={multiSelect.isSelectionMode}
+                    onCheckChange={() => {
+                      if (allDisabledChecked) {
+                        multiSelect.unselectBatch(disabledKeys);
+                      } else {
+                        multiSelect.selectBatch(disabledKeys);
+                      }
+                    }}
+                    selectAriaLabel={t("multiSelect.selectGroupAria", {
+                      name: t("list.disabled"),
+                    })}
+                  >
+                    {skillEntries(splitRows.disabled)}
+                  </CollapsibleSection>
+                );
+              })()}
             </>
           )}
           {/* The sentinel the observer above watches. */}
