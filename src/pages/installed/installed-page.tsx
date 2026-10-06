@@ -1321,6 +1321,7 @@ export function InstalledPage() {
                   repo={card.repo}
                   stars={starsOf(card)}
                   index={index}
+                  showUnclassified={false}
                   skills={card.items.map((row) => ({
                     skill: row.skill,
                     muted: !row.enabled,

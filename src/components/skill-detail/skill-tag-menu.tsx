@@ -5,8 +5,6 @@ import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   DOMAINS,
   domainLabel,
-  domainMeta,
-  UNCLASSIFIED_DOMAIN,
 } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useCustomTags } from "../../hooks/use-custom-tags";

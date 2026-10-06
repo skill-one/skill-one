@@ -5,7 +5,7 @@ import { Minus, Plus, Star } from "lucide-react";
 
 import { useAppLocale } from "../../i18n/use-language";
 import { skillDescription } from "../../lib/i18n-content";
-import { domainEmoji } from "../../data/domains";
+import { domainEmoji, domainMeta, UNCLASSIFIED_DOMAIN } from "../../data/domains";
 import {
   isInstallableSkill,
   isLiveSkill,
@@ -205,6 +205,7 @@ export function RepoCard({
   hoverAction = true,
   footerAction,
   uninstalled,
+  showUnclassified = true,
 }: {
   /** `owner/repo` — the repository the card stands for; empty for the installed
    *  list's pool of skills no recorded source vouches for. */
@@ -261,6 +262,11 @@ export function RepoCard({
    * store, whose rows *are* the repository) draws no section at all.
    */
   uninstalled?: Skill[];
+  /**
+   * Whether to display the fallback question mark for unclassified/untagged skills.
+   * Defaults to true in explore views; false on installed page.
+   */
+  showUnclassified?: boolean;
 }) {
   const { t } = useTranslation();
   const locale = useAppLocale();
@@ -550,6 +556,11 @@ export function RepoCard({
               // `isLiveSkill`); an installed row the store cannot resolve is a
               // local fact, and keeps both.
               const live = isLiveSkill(skill);
+              const domainKey = skill.profile?.domain?.[0];
+              const meta = domainKey ? domainMeta(domainKey) : undefined;
+              const hasTag = showUnclassified
+                ? true
+                : Boolean(meta && meta.key !== UNCLASSIFIED_DOMAIN);
               const isSelected = selected != null && selected === key;
               // The caller's own row control, else the store's install button —
               // withheld from a live hit whose source no install id can be
@@ -598,7 +609,7 @@ export function RepoCard({
                       aria-hidden="true"
                       className="w-4 shrink-0 text-center text-[13px]"
                     >
-                      {!live && domainEmoji(skill.profile?.domain)}
+                      {!live && hasTag && domainEmoji(skill.profile?.domain)}
                     </span>
                     {/* The name is the identifier and the row's one strong
                         element — semibold where the description is plain — and
@@ -707,19 +718,25 @@ export function RepoCard({
                 aria-label={t("state.uninstalledListAria", { name })}
                 className="grid grid-cols-2 gap-x-8 -mx-1.5"
               >
-                {uninstalled.map((skill) => (
-                  <li
-                    key={skill.name}
-                    data-skill={skill.name}
-                    className="group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent"
-                  >
-                    <span className="flex min-w-0 flex-1 items-center gap-2 py-1">
-                      <span
-                        aria-hidden="true"
-                        className="w-4 shrink-0 text-center text-[13px]"
-                      >
-                        {domainEmoji(skill.profile?.domain)}
-                      </span>
+                {uninstalled.map((skill) => {
+                  const domainKey = skill.profile?.domain?.[0];
+                  const meta = domainKey ? domainMeta(domainKey) : undefined;
+                  const hasTag = showUnclassified
+                    ? true
+                    : Boolean(meta && meta.key !== UNCLASSIFIED_DOMAIN);
+                  return (
+                    <li
+                      key={skill.name}
+                      data-skill={skill.name}
+                      className="group/row relative flex items-center rounded-md px-1.5 transition-colors hover:bg-accent focus-within:bg-accent"
+                    >
+                      <span className="flex min-w-0 flex-1 items-center gap-2 py-1">
+                        <span
+                          aria-hidden="true"
+                          className="w-4 shrink-0 text-center text-[13px]"
+                        >
+                          {hasTag && domainEmoji(skill.profile?.domain)}
+                        </span>
                         <span className="max-w-[55%] shrink-0 truncate text-[13px] font-semibold">
                           {skillDisplayName(skill)}
                         </span>
@@ -737,7 +754,8 @@ export function RepoCard({
                       <SkillInstallButton skill={skill} className="h-7 w-7" />
                     </span>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
           )}
