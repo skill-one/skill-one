@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 
-import { domainLabel, domainMeta, domainTooltip } from "../data/domains";
+import { domainLabel, domainTooltip, fullTagEmoji } from "../data/domains";
 import { useAppLocale } from "../i18n/use-language";
 import { Badge } from "./ui/badge";
 import {
@@ -37,22 +37,15 @@ export function DomainBadge({
   const locale = useAppLocale();
   const key = domain[0];
   if (!key) return null;
-  const meta = domainMeta(key);
   const label = domainLabel(key, locale);
   const tooltip = domainTooltip(domain, locale);
-  const isInitialPrefix = Boolean(
-    meta?.emoji &&
-      label &&
-      label.trim().toLowerCase().startsWith(meta.emoji.toLowerCase()),
-  );
+  const emoji = fullTagEmoji(key);
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <Badge variant={variant} className={className}>
-            {meta && !isInitialPrefix && (
-              <span aria-hidden="true">{meta.emoji}</span>
-            )}
+            {emoji && <span aria-hidden="true">{emoji}</span>}
             {label}
           </Badge>
         }

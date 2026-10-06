@@ -7,6 +7,8 @@ import {
   domainLabel,
   domainMeta,
   domainTooltip,
+  fullTagEmoji,
+  isSystemDomain,
   registerCustomTagMeta,
 } from "./domains";
 
@@ -39,16 +41,31 @@ describe("the domain taxonomy's three states", () => {
     expect(domainLabel(UNCLASSIFIED_DOMAIN, "zh")).toBe("未分类");
   });
 
-  it("answers for a skill nothing classified, whatever left it blank", () => {
+  it("answers empty emoji for a skill nothing classified, omitting the ? mark", () => {
     // No profile at all, an empty list, and a key this build does not know are
-    // one state: nobody classified the skill.
-    expect(domainEmoji(undefined)).toBe("❓");
-    expect(domainEmoji([])).toBe("❓");
-    expect(domainEmoji(["future-domain"])).toBe("❓");
+    // unclassified: no ? emoji is rendered.
+    expect(domainEmoji(undefined)).toBe("");
+    expect(domainEmoji([])).toBe("");
+    expect(domainEmoji(["future-domain"])).toBe("");
+    expect(fullTagEmoji(UNCLASSIFIED_DOMAIN)).toBe("");
     const blank = domainMeta(UNCLASSIFIED_DOMAIN)?.description.zh;
     // The tip carries the scope text, not the emoji the tip itself hangs off.
     expect(domainTooltip([], "zh")).toBe(blank);
     expect(domainTooltip(["future-domain"], "zh")).toBe(blank);
+  });
+
+  it("distinguishes store predefined tags from custom and unclassified tags for fullTagEmoji", () => {
+    expect(isSystemDomain("development")).toBe(true);
+    expect(isSystemDomain("office-productivity")).toBe(true);
+    expect(isSystemDomain("other")).toBe(true);
+    expect(isSystemDomain("my-custom-tag")).toBe(false);
+    expect(isSystemDomain(UNCLASSIFIED_DOMAIN)).toBe(false);
+
+    expect(fullTagEmoji("development")).toBe("💻");
+    expect(fullTagEmoji("office-productivity")).toBe("🗂️");
+    expect(fullTagEmoji("other")).toBe("📦");
+    expect(fullTagEmoji("my-custom-tag")).toBe("");
+    expect(fullTagEmoji(UNCLASSIFIED_DOMAIN)).toBe("");
   });
 
   it("names the other domains beside the leading one", () => {

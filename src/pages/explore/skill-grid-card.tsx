@@ -209,7 +209,7 @@ export function SkillGridCard({
 
         {/* Footer: category glyph, the figure the list answers in, corner action. */}
         <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-muted-foreground">
-          {!live && hasTag && (
+          {!live && hasTag && Boolean(domainEmoji(domain)) && (
             <Tooltip>
               <TooltipTrigger
                 render={

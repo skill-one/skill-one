@@ -42,4 +42,10 @@ describe("DomainBadge", () => {
     expect(screen.getByText("开发辅助")).toBeInTheDocument();
     expect(screen.queryByText("开")).toBeNull();
   });
+
+  it("renders unclassified label and no question mark emoji", () => {
+    renderWithRouter(<DomainBadge domain={["unclassified"]} />);
+    expect(screen.getByText("未分类")).toBeInTheDocument();
+    expect(screen.queryByText("❓")).toBeNull();
+  });
 });

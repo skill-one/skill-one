@@ -1770,8 +1770,8 @@ describe("InstalledPage", () => {
       expect(headerEmoji("开发编程")).toEqual({ text: "💻", ariaHidden: "true" });
       expect(headerEmoji("数据分析")).toEqual({ text: "📊", ariaHidden: "true" });
       expect(headerEmoji("内容创作")).toEqual({ text: "✍️", ariaHidden: "true" });
-      // Nothing classified wears the question mark the row badges wear too.
-      expect(headerEmoji("未分类")).toEqual({ text: "❓", ariaHidden: "true" });
+      // Unclassified sections do not display any glyph/emoji.
+      expect(headerEmoji("未分类")).toEqual({ text: undefined, ariaHidden: undefined });
     });
 
     it("files a tagged install under the user's tag, not the store's domain", async () => {

@@ -96,12 +96,12 @@ describe("HubDashboard", () => {
       <HubDashboard agents={mockAgents} skills={unclassifiedSkills} />,
     );
 
-    // The summary bar (the row led by the "已启用技能" label) must mark the
-    // unclassified group ❓; 📦 is the "other" domain, a different state.
+    // The summary bar (the row led by the "已启用技能" label) must not mark the
+    // unclassified group with ❓; 📦 is the "other" domain, a different state.
     const summaryBar = screen
       .getByText("已启用技能:")
       .closest("div.flex.items-center");
-    expect(summaryBar).toHaveTextContent("❓");
+    expect(summaryBar).not.toHaveTextContent("❓");
     expect(summaryBar).toHaveTextContent("17");
     expect(summaryBar).not.toHaveTextContent("📦");
   });

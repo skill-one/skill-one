@@ -11,7 +11,6 @@ import { useCustomTags } from "../../hooks/use-custom-tags";
 import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import {
   collectTakenTagKeys,
-  defaultTagMark,
   validateNewTag,
   type TagValidationError,
 } from "../../lib/custom-tags";
@@ -448,12 +447,14 @@ export function SkillTagMenu({
                           "w-auto min-w-0 flex-1",
                         )}
                       >
-                        <span
-                          aria-hidden="true"
-                          className="text-[13px] leading-none"
-                        >
-                          {def.emoji ?? defaultTagMark(def.label)}
-                        </span>
+                        {def.emoji && (
+                          <span
+                            aria-hidden="true"
+                            className="text-[13px] leading-none"
+                          >
+                            {def.emoji}
+                          </span>
+                        )}
                         <span className="min-w-0 flex-1 truncate">
                           {def.label}
                         </span>

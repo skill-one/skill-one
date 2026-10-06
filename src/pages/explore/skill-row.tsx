@@ -13,10 +13,10 @@ import {
 } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
 import {
-  domainEmoji,
   domainLabel,
   domainMeta,
   domainTooltip,
+  fullTagEmoji,
   UNCLASSIFIED_DOMAIN,
 } from "../../data/domains";
 import {
@@ -310,9 +310,12 @@ export const SkillRow = memo(function SkillRow({
                   render={
                     <Badge
                       variant="secondary"
-                      className="h-4 px-1.5 text-[10px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
+                      className="h-4 gap-1 px-1.5 text-[10px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
                     >
-                      {meta ? domainLabel(meta.key, locale) : domainEmoji(domain)}
+                      {domainKey && fullTagEmoji(domainKey) && (
+                        <span aria-hidden="true">{fullTagEmoji(domainKey)}</span>
+                      )}
+                      <span>{meta ? domainLabel(meta.key, locale) : ""}</span>
                     </Badge>
                   }
                 />

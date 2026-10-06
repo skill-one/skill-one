@@ -548,7 +548,7 @@ describe("ExplorePage", () => {
     const unclassified = screen.getByRole("menuitemradio", {
       name: /^未分类/,
     });
-    expect(unclassified).toHaveTextContent("❓");
+    expect(unclassified).not.toHaveTextContent("❓");
     expect(screen.queryByRole("menuitemradio", { name: /^其他/ })).toBeNull();
 
     // Picking a domain scopes the list to its repositories alone.
@@ -610,7 +610,7 @@ describe("ExplorePage", () => {
       name: /^未分类/,
     });
     expect(other).toHaveTextContent("📦");
-    expect(unclassified).toHaveTextContent("❓");
+    expect(unclassified).not.toHaveTextContent("❓");
     expect(other).toHaveTextContent("1");
     expect(unclassified).toHaveTextContent("1");
     await user.keyboard("{Escape}");
@@ -623,7 +623,7 @@ describe("ExplorePage", () => {
     const orphanCardRow = screen.getByRole("button", {
       name: "查看 orphan 详情",
     });
-    expect(orphanCardRow).toHaveTextContent("❓");
+    expect(orphanCardRow).not.toHaveTextContent("❓");
 
     // … and so do the skill unit's rows, which share the resolver.
     await pickUnit(user, "列表");
@@ -633,7 +633,7 @@ describe("ExplorePage", () => {
     expect(strayRow).toHaveTextContent("其他");
     expect(
       screen.getByRole("button", { name: "查看 orphan 详情" }),
-    ).toHaveTextContent("❓");
+    ).not.toHaveTextContent("❓");
   });
 
   it("lists skills by install count, one row per skill", async () => {

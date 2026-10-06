@@ -289,9 +289,11 @@ export function SelectionActionBar({
                                 setTagPopoverOpen(false);
                               }}
                             >
-                              <span className="text-sm leading-none">
-                                {tag.emoji ?? domainEmoji([tag.key])}
-                              </span>
+                              {tag.emoji && (
+                                <span className="text-sm leading-none">
+                                  {tag.emoji}
+                                </span>
+                              )}
                               <span className="truncate">{tag.label}</span>
                             </Button>
                           ))}

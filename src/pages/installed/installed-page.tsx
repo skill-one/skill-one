@@ -15,7 +15,7 @@ import { useViewMemory } from "../../hooks/use-view-memory";
 import { setQuery, REVEAL } from "../../lib/list-view";
 import { buildSearchIndex } from "../../lib/search-index";
 import { domainsOf, taxonomyRank } from "../../lib/domain-filter";
-import { DOMAINS, domainEmoji, domainLabel } from "../../data/domains";
+import { DOMAINS, domainEmoji, domainLabel, fullTagEmoji } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useMultiSelect } from "../../hooks/use-multi-select";
 import {
@@ -807,7 +807,7 @@ export function InstalledPage() {
             // The classification's own mark, the same resolver the row
             // badges and the tag picker call — a header reads like the
             // tags it stands for, emoji and all.
-            emoji: domainEmoji([key]),
+            emoji: fullTagEmoji(key),
             rows: tagRows,
             // The whole answer's size for this tag, from the ranking pass
             // that already reads the unrevealed rows: the header states how
