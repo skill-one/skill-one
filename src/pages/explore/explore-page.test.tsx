@@ -1214,19 +1214,21 @@ describe("ExplorePage search", () => {
     await screen.findByText("gadget-master");
 
     await pickUnit(user, "列表");
+    await waitFor(() => expect(repoCards().length).toBe(0));
+
     await user.type(await searchField(), "gadget");
 
     // The match comes back as a skill row rather than a repository card: the
     // shape stays open under a live question, because relevance ranks the same
-    // entries either way round.
-    expect(
-      await screen.findByRole(
-        "button",
-        { name: "查看 gadget-master 详情" },
-        { timeout: 4000 },
-      ),
-    ).toBeInTheDocument();
-    expect(repoCards().length).toBe(0);
+    // entries either way round. waitFor retries getByRole so a detached node
+    // from pre-search state doesn't fail the assertion mid-remount.
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "查看 gadget-master 详情" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("tool-0")).not.toBeInTheDocument();
+      expect(repoCards().length).toBe(0);
+    });
   });
 
   it("filters skills by search text and restores when cleared", async () => {
