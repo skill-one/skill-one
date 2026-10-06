@@ -37,6 +37,9 @@ export default defineConfig({
   reporter: process.env.CI ? "line" : [["list"]],
   timeout: 30_000,
   expect: { timeout: 10_000 },
+  // Fails the whole run instead of letting a hung teardown occupy a CI
+  // runner indefinitely.
+  globalTimeout: 15 * 60_000,
 
   use: {
     baseURL: `http://localhost:${PORT}`,
@@ -53,7 +56,10 @@ export default defineConfig({
     // The dev server rather than a preview of a build: the E2E run should not
     // need `pnpm build` first, and the dev server is what CI would otherwise
     // be testing against anyway.
-    command: `pnpm exec vite --port ${PORT} --strictPort`,
+    // Invoke the vite binary directly: a `pnpm exec` wrapper spawns vite as a
+    // child that does not receive the teardown signal, so Playwright waits
+    // forever for the webServer to exit and the CI job hangs.
+    command: `node_modules/.bin/vite --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
