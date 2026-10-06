@@ -1,6 +1,6 @@
 ---
 import { translations } from '../i18n/translations';
-import { XCircle, CheckCircle2, FolderSync, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { XCircle, CheckCircle2, FolderSync, AlertTriangle, ShieldCheck, ArrowRight, Layers } from 'lucide-react';
 
 interface Props {
   lang?: 'en' | 'zh';
@@ -8,6 +8,7 @@ interface Props {
 
 const { lang = 'en' } = Astro.props;
 const t = translations[lang].problem;
+const isZh = lang === 'zh';
 
 const pains = [
   { icon: AlertTriangle, ...t.pains.duplication },
@@ -22,54 +23,89 @@ const gains = [
 ];
 ---
 
-<section id="problem-solution" class="py-16 relative border-t border-slate-200/80 dark:border-white/[0.08] transition-colors">
+<section id="problem-solution" class="py-20 relative border-t border-slate-200/80 dark:border-white/[0.08] transition-colors">
   <div class="max-w-6xl mx-auto px-4 sm:px-6">
     <!-- Header -->
-    <div class="text-center max-w-3xl mx-auto mb-10">
+    <div class="text-center max-w-3xl mx-auto mb-12">
       <span class="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 font-mono">
         {t.eyebrow}
       </span>
       <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight mt-2">
         {t.title}
       </h2>
+      <p class="text-slate-600 dark:text-slate-400 text-sm mt-2 max-w-xl mx-auto">
+        {t.subtitle}
+      </p>
     </div>
 
-    <!-- Compact Comparison Strip -->
+    <!-- Visual Comparison Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
       {/* LEFT: Without Skill One */}
-      <div class="rounded-2xl border border-rose-200/80 dark:border-red-500/20 bg-rose-50/40 dark:bg-slate-900/40 p-6 backdrop-blur-sm">
-        <div class="flex items-center gap-2.5 mb-4">
-          <XCircle class="size-4 text-rose-600 dark:text-red-400" />
-          <h3 class="text-sm font-bold text-slate-900 dark:text-white">{t.withoutTitle}</h3>
-          <span class="text-[11px] text-rose-600 dark:text-red-400/80 font-medium">{t.withoutDesc}</span>
+      <div class="rounded-2xl border border-rose-200/80 dark:border-red-500/20 bg-rose-50/40 dark:bg-slate-900/40 p-6 sm:p-7 backdrop-blur-sm flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-2">
+              <XCircle class="size-5 text-rose-600 dark:text-red-400" />
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">{t.withoutTitle}</h3>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 dark:bg-red-500/15 text-rose-700 dark:text-red-400 border border-rose-200 dark:border-red-500/30">
+              {isZh ? '8x 冗余维护' : '8x Redundancy'}
+            </span>
+          </div>
+
+          <ul class="space-y-4">
+            {pains.map((pain) => (
+              <li class="flex items-start gap-3 text-xs leading-relaxed">
+                <pain.icon class="size-4 text-rose-500 dark:text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <div class="font-bold text-slate-900 dark:text-slate-100">{pain.title}</div>
+                  <div class="text-slate-600 dark:text-slate-400 mt-0.5">{pain.desc}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul class="space-y-3">
-          {pains.map((pain) => (
-            <li class="flex items-start gap-2.5 text-xs leading-relaxed">
-              <pain.icon class="size-3.5 text-rose-500 dark:text-red-400 shrink-0 mt-0.5" />
-              <span class="font-semibold text-slate-800 dark:text-slate-200 shrink-0">{pain.title}</span>
-              <span class="text-slate-600 dark:text-slate-400">{pain.desc}</span>
-            </li>
-          ))}
-        </ul>
+
+        {/* Visual Mini Mockup for Problem */}
+        <div class="mt-6 pt-4 border-t border-rose-200/60 dark:border-white/5 flex items-center justify-between text-[11px] text-rose-700 dark:text-red-400/90 font-mono">
+          <span>~/.cursor/skills</span>
+          <span>~/.claude/skills</span>
+          <span>~/.windsurf/...</span>
+        </div>
       </div>
 
       {/* RIGHT: With Skill One */}
-      <div class="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/50 dark:bg-slate-900/60 p-6 backdrop-blur-md">
-        <div class="flex items-center gap-2.5 mb-4">
-          <CheckCircle2 class="size-4 text-emerald-600 dark:text-emerald-400" />
-          <h3 class="text-sm font-bold text-slate-900 dark:text-white">{t.withTitle}</h3>
-          <span class="text-[11px] text-emerald-700 dark:text-emerald-400/90 font-medium">{t.withDesc}</span>
+      <div class="rounded-2xl border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50/50 dark:bg-slate-900/60 p-6 sm:p-7 backdrop-blur-md flex flex-col justify-between shadow-xs">
+        <div>
+          <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-2">
+              <CheckCircle2 class="size-5 text-emerald-600 dark:text-emerald-400" />
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">{t.withTitle}</h3>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30">
+              {isZh ? '0 字节冗余 · 秒级同步' : '0 MB Waste · 0ms Sync'}
+            </span>
+          </div>
+
+          <ul class="space-y-4">
+            {gains.map((gain) => (
+              <li class="flex items-start gap-3 text-xs leading-relaxed">
+                <gain.icon class="size-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <div class="font-bold text-emerald-950 dark:text-emerald-200">{gain.title}</div>
+                  <div class="text-slate-600 dark:text-slate-300 mt-0.5">{gain.desc}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul class="space-y-3">
-          {gains.map((gain) => (
-            <li class="flex items-start gap-2.5 text-xs leading-relaxed">
-              <gain.icon class="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-              <span class="font-semibold text-emerald-950 dark:text-emerald-200 shrink-0">{gain.title}</span>
-              <span class="text-slate-600 dark:text-slate-300">{gain.desc}</span>
-            </li>
-          ))}
-        </ul>
+
+        {/* Visual Mini Mockup for Solution */}
+        <div class="mt-6 pt-4 border-t border-emerald-200 dark:border-white/5 flex items-center justify-between text-[11px] text-emerald-700 dark:text-emerald-400 font-mono">
+          <span class="font-semibold">~/.agents/skills</span>
+          <ArrowRight class="size-3.5" />
+          <span class="text-slate-600 dark:text-slate-300">80+ Agents (Symlinks)</span>
+        </div>
       </div>
     </div>
   </div>
