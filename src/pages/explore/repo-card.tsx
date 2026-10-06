@@ -628,10 +628,16 @@ export function RepoCard({
                           t("common.noDescription")}
                     </span>
                   </button>
-                  {/* The row's own additions sit beside the row button rather
-                      than inside it: a control nested in a control is invalid,
-                      and a click must never mean both. */}
-                  {extra}
+                  {extra && (
+                    <span
+                      className={cn(
+                        "relative z-10 shrink-0",
+                        rowActions && hoverAction && "mr-9",
+                      )}
+                    >
+                      {extra}
+                    </span>
+                  )}
                   {/* The installed list's rows carry no corner control: the
                       group switch on the bar owns enablement, and an
                       individual switch waits on the repository's own page. */}

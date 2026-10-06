@@ -1325,15 +1325,16 @@ export function InstalledPage() {
                   skills={card.items.map((row) => ({
                     skill: row.skill,
                     muted: !row.enabled,
-                    extra: !card.repo ? (
-                      <LinkSuggestionMark
-                        name={row.skill.name}
-                        localDescription={row.skill.description}
-                        candidates={row.suggestion ?? []}
-                        cutRepos={row.skill.cutRepos}
-                        className="size-4"
-                      />
-                    ) : undefined,
+                    extra:
+                      !card.repo && row.suggestion && row.suggestion.length > 0 ? (
+                        <LinkSuggestionMark
+                          name={row.skill.name}
+                          localDescription={row.skill.description}
+                          candidates={row.suggestion}
+                          cutRepos={row.skill.cutRepos}
+                          className="size-4"
+                        />
+                      ) : undefined,
                     // Each row's own enable switch, in the card's floating
                     // hover slot; the disabled rows stay dimmed so the group
                     // switch's state has its evidence.

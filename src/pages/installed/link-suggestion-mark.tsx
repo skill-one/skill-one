@@ -126,7 +126,7 @@ export function LinkSuggestionMark({
       )}
     >
       {isMicroSize(className) ? (
-        <ThirdPartyMarkGlyph />
+        <Link2 className="size-[70%] stroke-[2.2] text-amber-600 dark:text-amber-400" />
       ) : (
         <>
           <span className="font-semibold uppercase select-none leading-none text-foreground">
