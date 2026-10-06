@@ -187,51 +187,53 @@ export function SourceLinkBatchDialog({
                 {/* Arrow indicator */}
                 <ArrowRight className="size-3.5 text-muted-foreground/40 shrink-0" aria-hidden />
 
-                {/* Right: Target candidate repo */}
-                <div className="shrink-0">
+                {/* Right: Target candidate repo (fixed width keeps arrows aligned) */}
+                <div className="w-60 shrink-0">
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
                         <button
                           type="button"
                           title={t("sourceLink.dialogChangeCandidate")}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                          className="inline-flex w-full items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer"
                         />
                       }
                     >
-                      {currentCandidate.skill.repo ? (
-                        <>
-                          <OwnerAvatar
-                            owner={currentCandidate.skill.repo.split("/")[0]}
-                            className="size-3.5 text-[8px]"
-                          />
-                          <span className="font-medium text-foreground max-w-[130px] truncate text-[11px]">
-                            {currentCandidate.skill.repo}
-                          </span>
-                          {isRecommended && (
-                            <span className="rounded bg-primary/10 px-1 py-0.2 text-[9px] text-primary border border-primary/20">
-                              {t("sourceLink.recommendedBadge")}
+                      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                        {currentCandidate.skill.repo ? (
+                          <>
+                            <OwnerAvatar
+                              owner={currentCandidate.skill.repo.split("/")[0]}
+                              className="size-3.5 shrink-0 text-[8px]"
+                            />
+                            <span className="min-w-0 flex-1 truncate font-medium text-foreground text-[11px]">
+                              {currentCandidate.skill.repo}
                             </span>
-                          )}
-                          {currentCandidate.skill.stars > 0 ? (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground">
-                              <Star className="size-2 text-amber-500 fill-amber-500/30" />
-                              {formatCount(currentCandidate.skill.stars)}
-                            </span>
-                          ) : currentCandidate.skill.downloads > 0 ? (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground">
-                              <Download className="size-2 text-muted-foreground" />
-                              {formatCount(currentCandidate.skill.downloads)}
-                            </span>
-                          ) : null}
-                        </>
-                      ) : (
-                        <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Unlink className="size-3 text-muted-foreground/80" />
-                          <span>{t("sourceLink.dialogKeepUnlinkedShort")}</span>
-                        </div>
-                      )}
-                      <ChevronDown className="size-3 text-muted-foreground/70" />
+                            {isRecommended && (
+                              <span className="shrink-0 rounded bg-primary/10 px-1 py-0.2 text-[9px] text-primary border border-primary/20">
+                                {t("sourceLink.recommendedBadge")}
+                              </span>
+                            )}
+                            {currentCandidate.skill.stars > 0 ? (
+                              <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground">
+                                <Star className="size-2 text-amber-500 fill-amber-500/30" />
+                                {formatCount(currentCandidate.skill.stars)}
+                              </span>
+                            ) : currentCandidate.skill.downloads > 0 ? (
+                              <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] tabular-nums text-muted-foreground">
+                                <Download className="size-2 text-muted-foreground" />
+                                {formatCount(currentCandidate.skill.downloads)}
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <Unlink className="size-3 text-muted-foreground/80" />
+                            <span>{t("sourceLink.dialogKeepUnlinkedShort")}</span>
+                          </div>
+                        )}
+                      </div>
+                      <ChevronDown className="size-3 shrink-0 text-muted-foreground/70" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[300px]">
                       {item.candidates.map((c) => {
