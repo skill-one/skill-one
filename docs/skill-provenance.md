@@ -327,12 +327,11 @@ Key properties:
   (`registerCustomTagMeta`), so a tag wears the 🏷️ mark wherever a system
   domain wears its emoji, and the facet picker lists it with its count. The
   store page never sees them: its rows answer the registry's taxonomy alone.
-- **Edited in the detail drawer.** The installed surface's classification
-  badge carries the tag picker: system domains, custom tags, a new-tag
-  field (a smile toggle plus the name — the toggle opens the full
-  `emoji-picker-react` panel, lazy-chunked with the Chinese dataset, and
-  wears the pick itself; leaving it blank files the tag under its first
-  character — creating files the skill at once), reset-to-default, and deletion of a tag no skill uses anymore (an
-  unused tag is the only deletable kind, so removing one can never orphan a
-  choice). Best-effort writes like every ledger update, refreshed through
-  `markSkillsChanged`.
+- **Edited in the detail drawer and bulk actions.** The installed surface's
+  classification badge triggers the tag picker: search-and-filter across
+  custom and system categories with keyboard navigation, inline quick
+  creation when no match exists, 1-click toggle to unassign an active tag,
+  reset-to-default, inline renaming, and safe deletion with cascade
+  confirmation when a tag is in use. Multi-selection also provides bulk
+  tagging and creation through the floating action bar. Best-effort writes
+  like every ledger update, refreshed through `markSkillsChanged`.

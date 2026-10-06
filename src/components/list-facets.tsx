@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { ChevronDown } from "lucide-react";
 
-import { domainLabel, domainMeta } from "../data/domains";
+import { domainLabel, fullTagEmoji } from "../data/domains";
 import { useAppLocale } from "../i18n/use-language";
 import { Button } from "./ui/button";
 import {
@@ -60,7 +60,7 @@ export function ListFacets({
   const locale = useAppLocale();
 
   const current = facets.find((facet) => facet.key === selected);
-  const currentEmoji = selected === null ? undefined : domainMeta(selected)?.emoji;
+  const currentEmoji = selected === null ? undefined : fullTagEmoji(selected);
   const currentLabel =
     selected === null ? t("facet.all") : domainLabel(selected, locale);
 
@@ -115,7 +115,7 @@ export function ListFacets({
             </span>
           </DropdownMenuRadioItem>
           {facets.map((facet) => {
-            const emoji = domainMeta(facet.key)?.emoji;
+            const emoji = fullTagEmoji(facet.key);
             return (
               <DropdownMenuRadioItem
                 key={facet.key}

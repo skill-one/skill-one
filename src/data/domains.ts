@@ -178,7 +178,7 @@ export const UNCLASSIFIED_DOMAIN = "unclassified";
 const UNCLASSIFIED: DomainMeta = {
   key: UNCLASSIFIED_DOMAIN,
   name: { en: "Unclassified", zh: "未分类" },
-  emoji: "❓",
+  emoji: "",
   description: {
     en: "No classification: not listed in the store, or an unknown upstream key",
     zh: "没有分类信息: 商店未收录, 或上游的分类键本版不认识",
@@ -196,6 +196,15 @@ const BY_NAME = new Map(
     [domain.name.zh, domain],
   ]),
 );
+
+const SYSTEM_KEYS = new Set(DOMAINS.map((domain) => domain.key));
+
+/**
+ * Whether a classification key belongs to the store's static preset taxonomy.
+ */
+export function isSystemDomain(key?: string | null): boolean {
+  return Boolean(key && SYSTEM_KEYS.has(key));
+}
 
 /**
  * The metadata for one domain, looked up by its upstream key or by its
@@ -252,15 +261,29 @@ export function domainLabel(key: string, locale: AppLocale): string {
 }
 
 /**
+ * The emoji to display beside a full tag label.
+ *
+ * Rules:
+ * 1. For store predefined tags, returns the store's canonical emoji (e.g. 💻, 📦).
+ * 2. For local/custom tags, returns "" (never an extra initial letter).
+ * 3. For unclassified tags, returns "" (never ? or ❓).
+ */
+export function fullTagEmoji(key?: string | null): string {
+  if (!key || key === UNCLASSIFIED_DOMAIN) return "";
+  if (isSystemDomain(key)) {
+    return domainMeta(key)?.emoji ?? "";
+  }
+  return "";
+}
+
+/**
  * The mark a skill wears in a list's glyph slot: its leading domain's emoji, or
- * the question mark when nothing classified it — an empty list, or a key this
- * build does not know. The one resolver the row and the card both call, so a
- * skill is marked the same wherever it is listed; a slot with nothing to say is
- * still a slot that lines up.
+ * initial letter for a custom tag, and empty string for unclassified tags.
  */
 export function domainEmoji(domain?: readonly string[]): string {
   const key = domain?.[0];
-  return (key ? domainMeta(key)?.emoji : undefined) ?? UNCLASSIFIED.emoji;
+  if (!key || key === UNCLASSIFIED_DOMAIN) return "";
+  return domainMeta(key)?.emoji ?? "";
 }
 
 /**

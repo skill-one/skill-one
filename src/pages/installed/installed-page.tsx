@@ -15,7 +15,7 @@ import { useViewMemory } from "../../hooks/use-view-memory";
 import { setQuery, REVEAL } from "../../lib/list-view";
 import { buildSearchIndex } from "../../lib/search-index";
 import { domainsOf, taxonomyRank } from "../../lib/domain-filter";
-import { DOMAINS, domainEmoji, domainLabel } from "../../data/domains";
+import { DOMAINS, domainEmoji, domainLabel, fullTagEmoji } from "../../data/domains";
 import { useAppLocale } from "../../i18n/use-language";
 import { useMultiSelect } from "../../hooks/use-multi-select";
 import {
@@ -807,7 +807,7 @@ export function InstalledPage() {
             // The classification's own mark, the same resolver the row
             // badges and the tag picker call — a header reads like the
             // tags it stands for, emoji and all.
-            emoji: domainEmoji([key]),
+            emoji: fullTagEmoji(key),
             rows: tagRows,
             // The whole answer's size for this tag, from the ranking pass
             // that already reads the unrevealed rows: the header states how
@@ -948,7 +948,7 @@ export function InstalledPage() {
           unit !== "repo"
             ? rowExtra(
                 row,
-                unit === "grid" ? "size-6 text-[10px]" : "size-7 text-xs",
+                unit === "grid" ? "size-10 text-xs" : "size-7 text-xs",
               )
             : undefined,
         action: <SkillEnableSwitch skill={row.skill} />,
@@ -1189,6 +1189,7 @@ export function InstalledPage() {
         checked={multiSelect.isSelected(key)}
         onCheckChange={() => multiSelect.toggle(key)}
         selectionMode={multiSelect.isSelectionMode}
+        showUnclassified={false}
       />
     );
   };
@@ -1206,13 +1207,14 @@ export function InstalledPage() {
         fact={sort === "installed" ? "installedAt" : "popularity"}
         selected={key === selected}
         muted={!row.enabled}
-        extra={rowExtra(row, "size-6 text-[10px]")}
+        extra={rowExtra(row, "size-10 text-xs")}
         action={<SkillEnableSwitch skill={row.skill} />}
         onSelect={() => setSelectedKey(key)}
         checkable={true}
         checked={multiSelect.isSelected(key)}
         onCheckChange={() => multiSelect.toggle(key)}
         selectionMode={multiSelect.isSelectionMode}
+        showUnclassified={false}
       />
     );
   };
@@ -1319,18 +1321,20 @@ export function InstalledPage() {
                   repo={card.repo}
                   stars={starsOf(card)}
                   index={index}
+                  showUnclassified={false}
                   skills={card.items.map((row) => ({
                     skill: row.skill,
                     muted: !row.enabled,
-                    extra: !card.repo ? (
-                      <LinkSuggestionMark
-                        name={row.skill.name}
-                        localDescription={row.skill.description}
-                        candidates={row.suggestion ?? []}
-                        cutRepos={row.skill.cutRepos}
-                        className="size-4"
-                      />
-                    ) : undefined,
+                    extra:
+                      !card.repo && row.suggestion && row.suggestion.length > 0 ? (
+                        <LinkSuggestionMark
+                          name={row.skill.name}
+                          localDescription={row.skill.description}
+                          candidates={row.suggestion}
+                          cutRepos={row.skill.cutRepos}
+                          className="size-4"
+                        />
+                      ) : undefined,
                     // Each row's own enable switch, in the card's floating
                     // hover slot; the disabled rows stay dimmed so the group
                     // switch's state has its evidence.

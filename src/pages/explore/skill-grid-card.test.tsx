@@ -102,13 +102,14 @@ describe("SkillGridCard", () => {
     // hidden: no text sits beside it to name it, so the glyph is the statement.
     expect(screen.getByRole("img", { name: "第三方安装" })).toBeInTheDocument();
     expect(container.querySelector("[data-slot='avatar']")).toBeNull();
-    // The square no longer repeats the words beside the mark.
-    expect(screen.queryByText("第三方安装")).toBeNull();
+    // The source line states third-party install when no repository is linked.
+    expect(screen.getByText("第三方安装")).toBeInTheDocument();
     unmount();
 
-    // A sourced square keeps the owner's face where the mark would be.
+    // A sourced square keeps the owner's face and states the source repository.
     renderCard(backed);
     expect(screen.queryByRole("img", { name: "第三方安装" })).toBeNull();
+    expect(screen.getByText("anthropics/skills")).toBeInTheDocument();
     expect(document.querySelector("[data-slot='avatar']")).not.toBeNull();
   });
 

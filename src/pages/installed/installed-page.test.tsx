@@ -812,11 +812,9 @@ describe("InstalledPage", () => {
       );
       const dialog = await screen.findByRole("dialog");
 
-      // The badge itself opens the tag menu — no separate affordance beside
-      // it — and the popover teleports outside the sheet element, so its
-      // contents are queried at the screen level like the link candidates.
+      // For untagged skills, the drawer offers "为 pdf 添加标签" (+ 添加标签).
       await user.click(
-        within(dialog).getByRole("button", { name: "编辑 pdf 的标签" }),
+        within(dialog).getByRole("button", { name: "为 pdf 添加标签" }),
       );
       await user.click(await screen.findByRole("button", { name: "开发编程" }));
       await waitFor(async () =>
@@ -888,10 +886,7 @@ describe("InstalledPage", () => {
       // classification, so the skill stays listed and the drawer stays open
       // over it while the badge answers the fallback.
       await user.click(
-        within(dialog).getByRole("button", { name: "编辑 pdf 的标签" }),
-      );
-      await user.click(
-        await screen.findByRole("button", { name: "恢复默认分类" }),
+        within(dialog).getByRole("button", { name: "移除 pdf 的标签" }),
       );
       await waitFor(async () =>
         expect((await loadCustomTags()).skillTags).toEqual({}),
@@ -1436,6 +1431,23 @@ describe("InstalledPage", () => {
       expect(screen.queryByLabelText(/^安装于 /)).toBeNull();
     });
 
+    it("does not render any tag or question mark for untagged skills in list and grid views", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await pickUnit(user, "列表");
+      const pdfRow = await screen.findByRole("button", {
+        name: "查看 pdf 详情",
+      });
+      expect(pdfRow).not.toHaveTextContent("❓");
+
+      await pickUnit(user, "网格");
+      const pdfCard = await screen.findByRole("button", {
+        name: "查看 pdf 详情",
+      });
+      expect(pdfCard).not.toHaveTextContent("❓");
+    });
+
     it("orders one source's several installs by time instead of folding them", async () => {
       const user = userEvent.setup();
       // Four installs share one source the registry still lists: where the old
@@ -1758,8 +1770,8 @@ describe("InstalledPage", () => {
       expect(headerEmoji("开发编程")).toEqual({ text: "💻", ariaHidden: "true" });
       expect(headerEmoji("数据分析")).toEqual({ text: "📊", ariaHidden: "true" });
       expect(headerEmoji("内容创作")).toEqual({ text: "✍️", ariaHidden: "true" });
-      // Nothing classified wears the question mark the row badges wear too.
-      expect(headerEmoji("未分类")).toEqual({ text: "❓", ariaHidden: "true" });
+      // Unclassified sections do not display any glyph/emoji.
+      expect(headerEmoji("未分类")).toEqual({ text: undefined, ariaHidden: undefined });
     });
 
     it("files a tagged install under the user's tag, not the store's domain", async () => {

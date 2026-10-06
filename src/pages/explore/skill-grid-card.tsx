@@ -5,13 +5,17 @@ import { useAppLocale } from "../../i18n/use-language";
 import { skillDescription } from "../../lib/i18n-content";
 import {
   isInstallableSkill,
-  isLinkedLocalSkill,
   isLiveSkill,
   skillDisplayName,
   type SkillView,
 } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
-import { domainEmoji, domainTooltip } from "../../data/domains";
+import {
+  domainEmoji,
+  domainMeta,
+  domainTooltip,
+  UNCLASSIFIED_DOMAIN,
+} from "../../data/domains";
 import {
   HighlightedText,
   type SkillMatched,
@@ -22,7 +26,6 @@ import { SkillInstallButton } from "../../components/skill-install-button";
 import { SkillInstalledTime } from "../../components/skill-installed-time";
 import { SkillPopularity } from "../../components/skill-popularity";
 import { Card } from "../../components/ui/card";
-import { Badge } from "../../components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -59,6 +62,7 @@ export function SkillGridCard({
   checked = false,
   onCheckChange,
   selectionMode = false,
+  showUnclassified = true,
 }: {
   /** The skill to render, from the registry or from the installed list. */
   skill: SkillView;
@@ -93,10 +97,17 @@ export function SkillGridCard({
   onCheckChange?: (checked: boolean) => void;
   /** Whether multi-selection mode is active across the list/grid. */
   selectionMode?: boolean;
+  /** Whether to show unclassified domain glyph (❓). Defaults to true. */
+  showUnclassified?: boolean;
 }) {
   const storeBacked = skill.storeBacked !== false;
   const [owner] = skill.repo.split("/");
   const domain = skill.profile?.domain;
+  const key = domain?.[0];
+  const meta = key ? domainMeta(key) : undefined;
+  const hasTag = showUnclassified
+    ? true
+    : Boolean(meta && meta.key !== UNCLASSIFIED_DOMAIN);
   const live = isLiveSkill(skill);
   const locale = useAppLocale();
   const { t } = useTranslation();
@@ -157,49 +168,40 @@ export function SkillGridCard({
             />
           </span>
         )}
-        {/* Name row: owner avatar plus the name, both on one line. */}
-        <div className={cn("flex min-w-0 items-center gap-2", checkable && "pr-6")}>
+        {/* Header row: owner avatar (enlarged) on left, two rows (name and source) on right */}
+        <div className={cn("flex min-w-0 items-center gap-2.5", checkable && "pr-6")}>
           {owner ? (
             <OwnerAvatar
               owner={owner}
-              className="size-6 shrink-0 text-[10px]"
+              className="size-10 shrink-0 text-xs"
             />
           ) : (
             (extra ?? (
               <ThirdPartyMark
                 name={skillDisplayName(skill)}
-                className="size-6 shrink-0 text-[10px]"
+                className="size-10 shrink-0 text-xs"
               />
             ))
           )}
-          <div className="min-w-0 flex-1 flex items-center gap-1.5">
-            <h3 className="min-w-0 truncate text-[13px] font-medium leading-tight">
+          <div className="min-w-0 flex-1 flex flex-col justify-center">
+            <h3 className="truncate text-[13px] font-medium leading-tight">
               <HighlightedText
                 text={skillDisplayName(skill)}
                 terms={matched?.name}
               />
             </h3>
-            {isLinkedLocalSkill(skill) && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Badge
-                      variant="secondary"
-                      className="h-3.5 px-1 text-[9px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
-                    >
-                      {t("common.localBadge")}
-                    </Badge>
-                  }
-                />
-                <TooltipContent>{t("common.localLinkedTooltip")}</TooltipContent>
-              </Tooltip>
-            )}
+            <p
+              className="mt-0.5 truncate text-[11px] text-muted-foreground"
+              title={skill.repo || t("common.thirdPartyInstall")}
+            >
+              {skill.repo || t("common.thirdPartyInstall")}
+            </p>
           </div>
         </div>
 
         {/* What it does, at most two lines so every square stays a square. */}
         {!live && (
-          <p className="mt-1 line-clamp-2 min-h-0 flex-1 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-2 line-clamp-2 min-h-0 flex-1 text-[12px] leading-snug text-muted-foreground">
             {skillDescription(skill, locale) || t("common.noDescription")}
           </p>
         )}
@@ -207,7 +209,7 @@ export function SkillGridCard({
 
         {/* Footer: category glyph, the figure the list answers in, corner action. */}
         <div className="mt-auto flex items-center gap-2 pt-1 text-[11px] text-muted-foreground">
-          {!live && (
+          {!live && hasTag && Boolean(domainEmoji(domain)) && (
             <Tooltip>
               <TooltipTrigger
                 render={

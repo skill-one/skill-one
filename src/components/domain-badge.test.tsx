@@ -35,4 +35,17 @@ describe("DomainBadge", () => {
     expect(screen.getByText("future-domain")).toBeInTheDocument();
     expect(screen.queryByText("❓")).toBeNull();
   });
+
+  it("omits the emoji when it is just the initial character of the label", () => {
+    // Custom tag without explicit emoji gets its first character as emoji (e.g. "开" for "开发辅助")
+    renderWithRouter(<DomainBadge domain={["开发辅助"]} />);
+    expect(screen.getByText("开发辅助")).toBeInTheDocument();
+    expect(screen.queryByText("开")).toBeNull();
+  });
+
+  it("renders unclassified label and no question mark emoji", () => {
+    renderWithRouter(<DomainBadge domain={["unclassified"]} />);
+    expect(screen.getByText("未分类")).toBeInTheDocument();
+    expect(screen.queryByText("❓")).toBeNull();
+  });
 });

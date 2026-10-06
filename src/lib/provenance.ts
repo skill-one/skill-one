@@ -359,31 +359,27 @@ export const DEFAULT_BROWSER_PREVIEW_LEDGER: SkillOneConfig = {
     pdf: {
       origin: "store",
       repo: "anthropics/skills",
-      tags: ["documents", "效率工具"],
+      tags: ["效率工具"],
     },
     "frontend-design": {
       origin: "store",
       repo: "shadcn/ui",
-      tags: ["frontend", "界面开发"],
     },
     "mcp-builder": {
       origin: "store",
       repo: "modelcontextprotocol/servers",
-      tags: ["mcp", "开发辅助"],
     },
     "code-review": {
       origin: "local",
       repo: "google-deepmind/skills",
-      tags: ["code-review", "AI Agent"],
     },
     "react-query-helper": {
       origin: "local",
       repo: "tanstack/query",
-      tags: ["frontend"],
     },
     "git-commit": {
       origin: "local",
-      tags: ["效率工具", "开发辅助"],
+      tags: ["开发辅助"],
     },
     "dingtalk-doc": {
       origin: "local",
@@ -417,7 +413,15 @@ async function loadLedger(): Promise<ParsedLedger> {
     storage.setItem(BROWSER_STORAGE_KEY, serializeLedger(DEFAULT_BROWSER_PREVIEW_LEDGER));
     raw = storage.getItem(BROWSER_STORAGE_KEY);
   }
-  return parseLedger(raw);
+  const parsed = parseLedger(raw);
+  if (!isTauri() && import.meta.env.MODE !== "test" && !import.meta.env.VITEST) {
+    // Sanitize legacy preview mock tags from browser localStorage
+    if (parsed.config.skills["code-review"]?.tags?.includes("code-review")) {
+      parsed.config.skills["code-review"].tags = undefined;
+      await saveLedger(parsed);
+    }
+  }
+  return parsed;
 }
 
 async function saveLedger(ledger: ParsedLedger): Promise<void> {

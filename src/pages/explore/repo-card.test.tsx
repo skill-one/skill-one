@@ -536,4 +536,14 @@ describe("RepoCard", () => {
     // across-then-down two columns the folded preview and the expansion use.
     expectTwoColumnBody(container);
   });
+
+  it("omits question mark for untagged skills when showUnclassified is false", () => {
+    // pdf is classified under office-productivity, docx is untagged
+    renderCard({ showUnclassified: false });
+
+    // The card contains the classified emoji for pdf
+    expect(screen.getByText("🗂️")).toBeInTheDocument();
+    // Untagged skills should not render ❓
+    expect(screen.queryByText("❓")).not.toBeInTheDocument();
+  });
 });

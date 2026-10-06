@@ -6,14 +6,19 @@ import { skillDescription } from "../../lib/i18n-content";
 import { Ordinal } from "../../components/ordinal";
 import {
   isInstallableSkill,
-  isLinkedLocalSkill,
   isLiveSkill,
   skillDisplayName,
   skillKey,
   type SkillView,
 } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
-import { domainEmoji, domainTooltip } from "../../data/domains";
+import {
+  domainLabel,
+  domainMeta,
+  domainTooltip,
+  fullTagEmoji,
+  UNCLASSIFIED_DOMAIN,
+} from "../../data/domains";
 import {
   HighlightedText,
   type SkillMatched,
@@ -104,6 +109,7 @@ export const SkillRow = memo(function SkillRow({
   checked = false,
   onCheckChange,
   selectionMode = false,
+  showUnclassified = true,
 }: {
   /** The skill to render, from the registry or from the installed list. */
   skill: SkillView;
@@ -162,6 +168,8 @@ export const SkillRow = memo(function SkillRow({
   onCheckChange?: (checked: boolean) => void;
   /** Whether multi-selection mode is active across the list/grid. */
   selectionMode?: boolean;
+  /** Whether to show unclassified domain glyph (❓). Defaults to true. */
+  showUnclassified?: boolean;
 }) {
   // The row's own identity, and the one handler it needs to answer a click with
   // it — built here so a caller can pass a handler it already had.
@@ -179,6 +187,11 @@ export const SkillRow = memo(function SkillRow({
   // has none.
   const [owner] = skill.repo.split("/");
   const domain = skill.profile?.domain;
+  const domainKey = domain?.[0];
+  const meta = domainKey ? domainMeta(domainKey) : undefined;
+  const hasTag = showUnclassified
+    ? true
+    : Boolean(meta && meta.key !== UNCLASSIFIED_DOMAIN);
   // A live skills.sh row claims nothing its source does not carry — which is
   // no description and no classification at all — so it draws neither the
   // 暂无描述 placeholder nor the ❓ mark (see `isLiveSkill`); an installed
@@ -291,19 +304,22 @@ export const SkillRow = memo(function SkillRow({
             <h3 className="truncate text-[14px] font-medium leading-tight">
               <HighlightedText text={skillDisplayName(skill)} terms={matched?.name} />
             </h3>
-            {isLinkedLocalSkill(skill) && (
+            {!live && hasTag && (
               <Tooltip>
                 <TooltipTrigger
                   render={
                     <Badge
                       variant="secondary"
-                      className="h-4 px-1 text-[10px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
+                      className="h-4 gap-1 px-1.5 text-[10px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
                     >
-                      {t("common.localBadge")}
+                      {domainKey && fullTagEmoji(domainKey) && (
+                        <span aria-hidden="true">{fullTagEmoji(domainKey)}</span>
+                      )}
+                      <span>{meta ? domainLabel(meta.key, locale) : ""}</span>
                     </Badge>
                   }
                 />
-                <TooltipContent>{t("common.localLinkedTooltip")}</TooltipContent>
+                <TooltipContent>{domainTooltip(domain ?? [], locale)}</TooltipContent>
               </Tooltip>
             )}
           </div>
@@ -314,34 +330,10 @@ export const SkillRow = memo(function SkillRow({
           )}
         </div>
 
-        {/* The facts cluster, pushed to the far end and kept whole: the source's
-            owner face, then the figure the list answers in — both short and
-            fixed, so the description keeps the width it needs. The face drops
-            out on a repository's own page (see `showSource`): the head already
-            names it, and 48 identical copies only crowd the names. A skill with
-            no source at all wears the third-party mark in the same slot — it is
-            the same column, sized the same, so the figures stay aligned across a
-            list that mixes the two kinds. The classification lives on the
-            leading glyph, so it is not repeated here. The figure takes a fixed
-            right-aligned slot,
-            sized to the format's longest rendering ("169.6K" for the blend,
-            a relative age like "12个月前" for the stamp): the digits then end
-            on one edge at the row's far right, where magnitudes are compared,
-            and the face left of it sits in a column of its own instead of
-            drifting with the digits' width. */}
+        {/* The facts cluster, pushed to the far end and kept whole: the figure
+            the list answers in, short and fixed, so the description keeps the width
+            it needs. The figure takes a fixed right-aligned slot. */}
         <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
-          {!live && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span className="flex size-5 shrink-0 items-center justify-center text-sm leading-none">
-                    {domainEmoji(domain)}
-                  </span>
-                }
-              />
-              <TooltipContent>{domainTooltip(domain ?? [], locale)}</TooltipContent>
-            </Tooltip>
-          )}
           {fact === "installedAt" ? (
             <SkillInstalledTime
               skill={skill}

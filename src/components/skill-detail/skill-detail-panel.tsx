@@ -27,7 +27,6 @@ import { markSkillsChanged } from "../../hooks/use-installed-skills";
 import { githubBlobUrl } from "../../lib/cdn-config";
 import { openExternal } from "../../lib/open-external";
 import {
-  isLinkedLocalSkill,
   skillDisplayName,
   skillKey,
   type SkillView,
@@ -39,12 +38,11 @@ import {
   formatUnixDate,
 } from "../../lib/utils";
 import { DomainBadge } from "../domain-badge";
-import { UNCLASSIFIED_DOMAIN } from "../../data/domains";
+import { domainMeta, UNCLASSIFIED_DOMAIN } from "../../data/domains";
 import { effectiveDomains } from "../../lib/custom-tags";
 import { useCustomTags } from "../../hooks/use-custom-tags";
 import { SkillTagMenu } from "./skill-tag-menu";
 import { SkillPopularity } from "../skill-popularity";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
   SheetContent,
@@ -288,9 +286,15 @@ export function SkillDetailPanel({
   // into it), so the effective key is the choice, else the profile's leading
   // domain, else the explicit unclassified state.
   const { data: customTags } = useCustomTags();
-  const assignedTagKey = shown
+  const rawAssignedKey = shown
     ? (customTags?.skillTags[shown.name] ?? null)
     : null;
+  const assignedTagKey =
+    rawAssignedKey != null &&
+    rawAssignedKey !== UNCLASSIFIED_DOMAIN &&
+    domainMeta(rawAssignedKey) != null
+      ? rawAssignedKey
+      : null;
   const effectiveTagKey =
     effectiveDomains({ profile: shown?.profile }, assignedTagKey)[0] ??
     UNCLASSIFIED_DOMAIN;
@@ -577,14 +581,18 @@ export function SkillDetailPanel({
         assignedKey={assignedTagKey}
         effectiveKey={effectiveTagKey}
         trigger={
-          <DomainBadge
-            domain={shown.profile?.domain ?? [UNCLASSIFIED_DOMAIN]}
-            variant="ghost"
-            className="px-0 py-0"
-          />
+          effectiveTagKey !== UNCLASSIFIED_DOMAIN &&
+          domainMeta(effectiveTagKey) != null ? (
+            <DomainBadge
+              domain={[effectiveTagKey]}
+              variant="ghost"
+              className="px-0 py-0"
+            />
+          ) : undefined
         }
       />
-    ) : shown?.profile ? (
+    ) : shown?.profile?.domain &&
+      shown.profile.domain[0] !== UNCLASSIFIED_DOMAIN ? (
       <DomainBadge
         key="domain"
         domain={shown.profile.domain}
@@ -689,21 +697,6 @@ export function SkillDetailPanel({
               <SheetTitle className="truncate text-lg font-bold tracking-tight">
                 {shown ? skillDisplayName(shown) : null}
               </SheetTitle>
-              {isLinkedLocalSkill(shown) && (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Badge
-                        variant="secondary"
-                        className="h-5 px-1.5 text-xs font-normal text-muted-foreground shrink-0 select-none cursor-default"
-                      >
-                        {t("common.localBadge")}
-                      </Badge>
-                    }
-                  />
-                  <TooltipContent>{t("common.localLinkedTooltip")}</TooltipContent>
-                </Tooltip>
-              )}
             </div>
             {hasSource && !isStore && shown && shown.origin === "local" ? (
               <div className="mt-1 flex flex-wrap items-center gap-2">

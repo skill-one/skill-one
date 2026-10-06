@@ -130,4 +130,43 @@ describe("SelectionActionBar", () => {
 
     expect(onCreateTag).toHaveBeenCalledWith("Work");
   });
+
+  it("filters tag options with search query and offers quick create button", async () => {
+    const user = userEvent.setup();
+    const onCreateTag = vi.fn();
+
+    renderWithRouter(
+      <SelectionActionBar
+        count={2}
+        totalCount={5}
+        onSelectAll={() => {}}
+        onClear={() => {}}
+        availableTags={[
+          { key: "design", label: "Design Tools", isCustom: true },
+          { key: "dev", label: "Development", isCustom: false },
+        ]}
+        onTag={() => {}}
+        onCreateTag={onCreateTag}
+      />,
+    );
+
+    const tagBtn = screen.getByRole("button", { name: /加标签|tag/i });
+    await user.click(tagBtn);
+
+    const input = screen.getByPlaceholderText(/新建标签|new tag/i);
+    await user.type(input, "Analytics");
+
+    // Existing tags filtered out
+    expect(screen.queryByText("Design Tools")).not.toBeInTheDocument();
+    expect(screen.queryByText("Development")).not.toBeInTheDocument();
+
+    // Quick create prompt visible
+    const quickCreateBtn = await screen.findByRole("button", {
+      name: /新建标签「Analytics」|Create tag "Analytics"/i,
+    });
+    expect(quickCreateBtn).toBeInTheDocument();
+    await user.click(quickCreateBtn);
+
+    expect(onCreateTag).toHaveBeenCalledWith("Analytics");
+  });
 });
