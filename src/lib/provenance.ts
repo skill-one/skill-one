@@ -16,6 +16,7 @@ import {
 } from "./skills-manager";
 import type { SkillFingerprint } from "./skills-manager";
 import { logActivity, type SourceLinkReason } from "./activity";
+import { domainMeta } from "../data/domains";
 
 export type { SkillFingerprint };
 
@@ -413,7 +414,15 @@ async function loadLedger(): Promise<ParsedLedger> {
     storage.setItem(BROWSER_STORAGE_KEY, serializeLedger(DEFAULT_BROWSER_PREVIEW_LEDGER));
     raw = storage.getItem(BROWSER_STORAGE_KEY);
   }
-  return parseLedger(raw);
+  const parsed = parseLedger(raw);
+  if (!isTauri() && import.meta.env.MODE !== "test" && !import.meta.env.VITEST) {
+    // Sanitize legacy preview mock tags from browser localStorage
+    if (parsed.config.skills["code-review"]?.tags?.includes("code-review")) {
+      parsed.config.skills["code-review"].tags = undefined;
+      await saveLedger(parsed);
+    }
+  }
+  return parsed;
 }
 
 async function saveLedger(ledger: ParsedLedger): Promise<void> {

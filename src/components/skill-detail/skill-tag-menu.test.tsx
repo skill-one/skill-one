@@ -216,4 +216,21 @@ describe("SkillTagMenu", () => {
     await user.click(addBtn);
     expect(await screen.findByText("选择标签")).toBeInTheDocument();
   });
+
+  it("does not render clear button when untagged even if assignedKey is passed", () => {
+    renderWithRouter(
+      <SkillTagMenu
+        skillName="my-tool"
+        assignedKey="orphan-key"
+        effectiveKey="unclassified"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "为 my-tool 添加标签" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "清除 my-tool 的标签" }),
+    ).not.toBeInTheDocument();
+  });
 });

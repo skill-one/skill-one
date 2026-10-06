@@ -288,9 +288,15 @@ export function SkillDetailPanel({
   // into it), so the effective key is the choice, else the profile's leading
   // domain, else the explicit unclassified state.
   const { data: customTags } = useCustomTags();
-  const assignedTagKey = shown
+  const rawAssignedKey = shown
     ? (customTags?.skillTags[shown.name] ?? null)
     : null;
+  const assignedTagKey =
+    rawAssignedKey != null &&
+    rawAssignedKey !== UNCLASSIFIED_DOMAIN &&
+    domainMeta(rawAssignedKey) != null
+      ? rawAssignedKey
+      : null;
   const effectiveTagKey =
     effectiveDomains({ profile: shown?.profile }, assignedTagKey)[0] ??
     UNCLASSIFIED_DOMAIN;

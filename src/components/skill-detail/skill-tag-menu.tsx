@@ -559,7 +559,7 @@ export function SkillTagMenu({
           </div>
         </PopoverContent>
       </Popover>
-      {assignedKey != null && (
+      {!isUnclassified && assignedKey != null && (
         <button
           type="button"
           disabled={busy}
