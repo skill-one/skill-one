@@ -107,3 +107,43 @@ export function formatRelativeTime(
     numeric: "always",
   }).format(Math.trunc(delta / unit[1]), unit[0]);
 }
+
+/**
+ * Formats an install timestamp according to progressive/hybrid time rules:
+ * - Within 30 days: relative time (e.g. "刚刚", "2小时前", "3天前").
+ * - Beyond 30 days: compact absolute date:
+ *   - Same calendar year: "8月12日" (zh) / "Aug 12" (en).
+ *   - Different calendar year: "2025年11月4日" (zh) / "Nov 4, 2025" (en).
+ *
+ * An unrecorded or unparseable timestamp returns null.
+ */
+export function formatSmartTime(
+  seconds: number | null | undefined,
+  locale: AppLocale,
+  now: number = Date.now(),
+): string | null {
+  if (seconds == null || !Number.isFinite(seconds)) return null;
+  const delta = seconds - now / 1000;
+  const ageSeconds = -delta;
+
+  // Recent times (or future timestamps caused by clock skew) use relative format.
+  if (ageSeconds < 30 * 24 * 60 * 60) {
+    return formatRelativeTime(seconds, locale, now);
+  }
+
+  const date = new Date(seconds * 1000);
+  const nowDate = new Date(now);
+  const sameYear = date.getFullYear() === nowDate.getFullYear();
+
+  if (locale === "zh") {
+    return sameYear
+      ? `${date.getMonth() + 1}月${date.getDate()}日`
+      : `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}

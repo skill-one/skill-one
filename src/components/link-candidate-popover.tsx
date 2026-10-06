@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 
 import { LinkCandidateList } from "./link-candidate-list";
 import type { LinkCandidate } from "../lib/link-suggestions";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
 
 /**
  * The body both link surfaces show when they offer a skill's source: the
@@ -55,6 +57,17 @@ export function LinkCandidatePopover({
   afterList?: ReactNode;
 }) {
   const { t } = useTranslation();
+  const [manualRepo, setManualRepo] = useState("");
+  const trimmed = manualRepo.trim();
+  const cleanRepo = trimmed
+    .replace(/^https?:\/\/github\.com\//i, "")
+    .replace(/\.git$/i, "")
+    .trim();
+  const isValidRepo =
+    cleanRepo.includes("/") &&
+    !cleanRepo.startsWith("/") &&
+    !cleanRepo.endsWith("/");
+
   return (
     <>
       <div className="flex flex-col gap-1 border-b border-border/40 pb-2">
@@ -91,6 +104,37 @@ export function LinkCandidatePopover({
       ) : (
         <p className="px-2 text-[11px] text-muted-foreground">{emptyLabel}</p>
       )}
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (isValidRepo && !pendingRepo) {
+            onPick(cleanRepo, undefined);
+          }
+        }}
+        className="flex items-center gap-1.5 pt-1.5 border-t border-border/30"
+      >
+        <Input
+          type="text"
+          value={manualRepo}
+          onChange={(e) => setManualRepo(e.target.value)}
+          placeholder={t("sourceLink.manualInputPlaceholder")}
+          className="h-7 text-xs flex-1"
+        />
+        <Button
+          type="submit"
+          size="sm"
+          variant="outline"
+          disabled={!isValidRepo || Boolean(pendingRepo)}
+          className="h-7 px-2.5 text-xs shrink-0 cursor-pointer"
+        >
+          {pendingRepo === cleanRepo ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            t("sourceLink.manualInputButton")
+          )}
+        </Button>
+      </form>
 
       <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[10px]">
         <span className="text-muted-foreground/75">{t("sourceLink.footnote")}</span>

@@ -53,6 +53,7 @@ export function LinkSuggestionMark({
   cutRepos,
   className,
   labeled = false,
+  showMark = true,
 }: {
   /** The skill whose source is unknown; also what the trigger is named for. */
   name: string;
@@ -65,6 +66,8 @@ export function LinkSuggestionMark({
   className?: string;
   /** Whether to render a labeled pill button (e.g. in the detail drawer). */
   labeled?: boolean;
+  /** Whether to render the leading avatar glyph when labeled is true. */
+  showMark?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
@@ -77,7 +80,7 @@ export function LinkSuggestionMark({
   if (candidates.length === 0) {
     return labeled ? (
       <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <ThirdPartyMark name={name} className={className} />
+        {showMark && <ThirdPartyMark name={name} className={className} />}
         <span className="truncate">{t("common.thirdPartyInstall")}</span>
       </span>
     ) : (
@@ -102,9 +105,11 @@ export function LinkSuggestionMark({
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
       )}
     >
-      <span className={cn(THIRD_PARTY_MARK_CLASS, className)}>
-        <ThirdPartyMarkGlyph />
-      </span>
+      {showMark && (
+        <span className={cn(THIRD_PARTY_MARK_CLASS, className)}>
+          <ThirdPartyMarkGlyph />
+        </span>
+      )}
       <span className="truncate">{t("common.thirdPartyInstall")}</span>
       <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] font-normal text-amber-600 dark:text-amber-400 underline decoration-amber-500/40 underline-offset-2">
         · {t("sourceLink.linkSuggestionAction")}

@@ -64,6 +64,7 @@ import { SkillInstallButton } from "../skill-install-button";
 import { SkillRemoveButton } from "../skill-remove-button";
 import { LinkSuggestionMark } from "../../pages/installed/link-suggestion-mark";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
+import { findLinkCandidates } from "../../lib/link-suggestions";
 import { SourceLinkMenu } from "./source-link-menu";
 import { ExpandableDescription } from "./expandable-description";
 
@@ -500,6 +501,17 @@ export function SkillDetailPanel({
   // on disk — a store row, or an uninstalled sibling opened from the installed
   // list — offers the install CTA instead.
   const isStore = effectiveSurface === "store";
+
+  // When an installed skill has no source association, fetch candidates on demand
+  // so the user gets real-time recommendations (including skills.sh namesake matches)
+  // even if startup batch scan was skipped or deferred.
+  const { data: onDemandCandidates } = useQuery({
+    queryKey: ["link-candidates-on-demand", shown?.name],
+    queryFn: () => findLinkCandidates(shown!.name, shown?.description),
+    enabled: Boolean(shown && !hasSource && !isStore),
+    staleTime: 60 * 1000,
+  });
+  const effectiveCandidates = onDemandCandidates ?? suggestion ?? [];
   // Whether the registry actually backs this skill's figures and classification.
   // The store's rows always are; an installed row only when the app resolved the
   // store entry its recorded source points at — so a record the registry does
@@ -722,7 +734,7 @@ export function SkillDetailPanel({
           ) : (
             <ThirdPartyMark
               name={shown ? skillDisplayName(shown) : undefined}
-              candidate={Boolean(suggestion && suggestion.length > 0)}
+              candidate={Boolean(effectiveCandidates && effectiveCandidates.length > 0)}
               className="size-12 shrink-0 text-lg"
             />
           )}
@@ -760,14 +772,14 @@ export function SkillDetailPanel({
                   <LinkSuggestionMark
                     name={shown.name}
                     localDescription={shown.description}
-                    candidates={suggestion ?? []}
+                    candidates={effectiveCandidates}
                     cutRepos={shown.cutRepos}
                     className="size-4"
                     labeled
+                    showMark={false}
                   />
                 ) : (
                   <span className="inline-flex items-center gap-1.5">
-                    <ThirdPartyMark muted className="size-4" />
                     <span className="truncate">
                       {t("common.thirdPartyInstall")}
                     </span>

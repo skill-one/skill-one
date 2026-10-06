@@ -298,7 +298,9 @@ export const SkillRow = memo(function SkillRow({
         {/* What is it, and what does it do: the two lines every row leads with,
             both clamped to one line so the list stays a list. A live row states
             no description — its source publishes none, so the line claims
-            nothing rather than a placeholder. */}
+            nothing rather than a placeholder. When fact is installedAt, the
+            install time trails the description inline with a separator bullet,
+            eliminating the vast gap between description and right edge. */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 min-w-0">
             <h3 className="truncate text-[14px] font-medium leading-tight">
@@ -324,32 +326,42 @@ export const SkillRow = memo(function SkillRow({
             )}
           </div>
           {!live && (
-            <p className="truncate text-[12px] leading-snug text-muted-foreground">
-              {skillDescription(skill, locale) || t("common.noDescription")}
-            </p>
+            <div className="flex items-center gap-2 text-[12px] leading-snug text-muted-foreground">
+              <span className="truncate">
+                {skillDescription(skill, locale) || t("common.noDescription")}
+              </span>
+              {fact === "installedAt" && skill.installedAt != null && (
+                <>
+                  <span
+                    className="shrink-0 text-muted-foreground/40 select-none"
+                    aria-hidden="true"
+                  >
+                    ·
+                  </span>
+                  <SkillInstalledTime skill={skill} />
+                </>
+              )}
+            </div>
+          )}
+          {live && fact === "installedAt" && skill.installedAt != null && (
+            <div className="flex items-center text-[12px] leading-snug text-muted-foreground">
+              <SkillInstalledTime skill={skill} />
+            </div>
           )}
         </div>
 
-        {/* The facts cluster, pushed to the far end and kept whole: the figure
-            the list answers in, short and fixed, so the description keeps the width
-            it needs. The figure takes a fixed right-aligned slot. */}
-        <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
-          {fact === "installedAt" ? (
-            <SkillInstalledTime
+        {/* The facts cluster: popularity states registry blend on store-backed rows.
+            The install clock sits inline with the description above so wide rows
+            avoid an empty gulf between text and time. */}
+        {fact === "popularity" && storeBacked && (
+          <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
+            <SkillPopularity
               skill={skill}
               align="end"
-              className="w-24 justify-end"
+              className="w-16 justify-end"
             />
-          ) : (
-            storeBacked && (
-              <SkillPopularity
-                skill={skill}
-                align="end"
-                className="w-16 justify-end"
-              />
-            )
-          )}
-        </div>
+          </div>
+        )}
 
         {/* The corner action. Clicks on the slot stop here: the row body opens
             the detail panel, the action must not. The installed list hands over

@@ -6,6 +6,7 @@ import {
   formatCount,
   formatDate,
   formatRelativeTime,
+  formatSmartTime,
 } from "./utils";
 
 describe("cn", () => {
@@ -71,6 +72,42 @@ describe("formatRelativeTime", () => {
     // Only clock skew or a hand-made directory produces one; saying 2小时后
     // is honest about what the filesystem reported.
     expect(formatRelativeTime(ago(-2 * 3600), "zh", NOW)).toBe("2小时后");
+  });
+});
+
+describe("formatSmartTime", () => {
+  const NOW = Date.parse("2026-09-19T12:00:00Z");
+  const ago = (seconds: number) => Math.floor(NOW / 1000) - seconds;
+
+  it("returns null for missing or invalid stamps", () => {
+    expect(formatSmartTime(undefined, "zh")).toBeNull();
+    expect(formatSmartTime(null, "zh")).toBeNull();
+    expect(formatSmartTime(Number.NaN, "zh")).toBeNull();
+  });
+
+  it("uses relative time within 30 days", () => {
+    expect(formatSmartTime(ago(30), "zh", NOW)).toBe("刚刚");
+    expect(formatSmartTime(ago(3600), "zh", NOW)).toBe("1小时前");
+    expect(formatSmartTime(ago(3 * 86400), "zh", NOW)).toBe("3天前");
+    expect(formatSmartTime(ago(25 * 86400), "zh", NOW)).toBe("25天前");
+  });
+
+  it("uses compact date beyond 30 days within the same year", () => {
+    // 60 days ago: July 2026
+    const stamp = ago(60 * 86400);
+    const resultZh = formatSmartTime(stamp, "zh", NOW);
+    expect(resultZh).toMatch(/^\d+月\d+日$/);
+    const resultEn = formatSmartTime(stamp, "en", NOW);
+    expect(resultEn).toMatch(/^[A-Z][a-z]{2}\s\d+$/);
+  });
+
+  it("includes year when beyond current year", () => {
+    // 400 days ago: 2025
+    const stamp = ago(400 * 86400);
+    const resultZh = formatSmartTime(stamp, "zh", NOW);
+    expect(resultZh).toMatch(/^2025年\d+月\d+日$/);
+    const resultEn = formatSmartTime(stamp, "en", NOW);
+    expect(resultEn).toContain("2025");
   });
 });
 

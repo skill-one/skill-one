@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAppLocale } from "../i18n/use-language";
 import type { SkillView } from "../lib/skill-view";
-import { cn, formatRelativeTime, formatUnixDate } from "../lib/utils";
+import { cn, formatSmartTime, formatUnixDate } from "../lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /**
@@ -15,12 +15,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
  * order displays it where the popularity sort displays the blend — the number
  * beside a row is always the one the list above it was answered in.
  *
- * The trigger shows the relative age ("3天前"), the rendering that answers
- * "recently?" while the list reads newest-first; hovering or focusing states
- * the exact date, the rendering that answers "exactly when". The two share
- * the same guard the detail panel's `InstalledAt` uses (`lib/utils`): an
- * unrecorded time — some filesystems report none — renders nothing at all,
- * an absent fact never a zero.
+ * The trigger states progressive time ("3天前" within 30 days, or compact
+ * date e.g. "8月12日" beyond 30 days), balancing recency feeling with long-term
+ * precision; hovering or focusing reveals the exact timestamp. An unrecorded
+ * time renders nothing at all.
  */
 export function SkillInstalledTime({
   skill,
@@ -37,16 +35,16 @@ export function SkillInstalledTime({
 }) {
   const { t } = useTranslation();
   const locale = useAppLocale();
-  const relative = formatRelativeTime(skill.installedAt, locale);
+  const displayTime = formatSmartTime(skill.installedAt, locale);
   // One guard for both renderings: no recorded time, no fact to state.
-  if (!relative) return null;
+  if (!displayTime) return null;
   const exact = formatUnixDate(skill.installedAt, locale);
 
   return (
     // The app-level TooltipProvider (App.tsx) owns the delay group.
     <Tooltip>
       <TooltipTrigger
-        aria-label={t("common.installedTimeAria", { relative, exact })}
+        aria-label={t("common.installedTimeAria", { relative: displayTime, exact })}
         // The stamp sits on a clickable surface (a list row opens the detail
         // panel); a click on it stays there.
         onClick={(e) => e.stopPropagation()}
@@ -57,7 +55,7 @@ export function SkillInstalledTime({
       >
         <CalendarDays aria-hidden className="h-3.5 w-3.5 shrink-0" />
         <span className="whitespace-nowrap font-medium tabular-nums">
-          {relative}
+          {displayTime}
         </span>
       </TooltipTrigger>
       <TooltipContent side={side} align={align}>

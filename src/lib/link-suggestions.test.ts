@@ -593,6 +593,39 @@ describe("resolveAssociations", () => {
     expect(linked).toEqual([]);
     expect(suggestions).toEqual({});
   });
+
+  it("does not memoize dead end or drop cache when skills.sh search fails", async () => {
+    mockReady([]);
+    searchSkillsSh.mockRejectedValue(new Error("HTTP 429"));
+
+    const { linked, suggestions } = await resolveAssociations([
+      { name: "pdf", description: "Read PDF files." },
+    ]);
+
+    expect(linked).toEqual([]);
+    expect(suggestions).toEqual({});
+    expect(savePendingRecords).toHaveBeenCalledWith([], [], '"e1"');
+
+    // On subsequent pass, it should retry searchSkillsSh instead of hitting memoized dead end
+    searchSkillsSh.mockResolvedValue([
+      {
+        name: "pdf",
+        id: "acme/skills/pdf",
+        repo: "acme/skills",
+        description: "",
+        stars: 0,
+        downloads: 500,
+        url: "https://www.skills.sh/acme/skills/pdf",
+        storeBacked: false,
+      },
+    ]);
+
+    const retried = await resolveAssociations([
+      { name: "pdf", description: "Read PDF files." },
+    ]);
+    expect(retried.suggestions.pdf).toHaveLength(1);
+    expect(retried.suggestions.pdf[0].skill.repo).toBe("acme/skills");
+  });
 });
 
 describe("findLinkCandidates", () => {

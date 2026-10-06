@@ -191,8 +191,10 @@ export async function unlinkSkillSource(
 async function findNamesakesWithSkillsShFallback(
   name: string,
   namesakes: Skill[],
-): Promise<Skill[]> {
-  if (namesakes.length > 0 || !isSearchableQuery(name)) return namesakes;
+): Promise<{ namesakes: Skill[]; ok: boolean }> {
+  if (namesakes.length > 0 || !isSearchableQuery(name)) {
+    return { namesakes, ok: true };
+  }
   try {
     const hits = await searchSkillsSh(name);
     const exact = hits.filter(
@@ -215,9 +217,9 @@ async function findNamesakesWithSkillsShFallback(
         });
       }
     }
-    return result;
+    return { namesakes: result, ok: true };
   } catch {
-    return namesakes;
+    return { namesakes, ok: false };
   }
 }
 
@@ -236,7 +238,8 @@ export async function findLinkCandidates(
   const byName = await findNamesakes([name]);
   let namesakes = byName.get(name) ?? [];
   if (namesakes.length === 0) {
-    namesakes = await findNamesakesWithSkillsShFallback(name, namesakes);
+    const fallback = await findNamesakesWithSkillsShFallback(name, namesakes);
+    namesakes = fallback.namesakes;
   }
   return rankNamesakes(namesakes, description ?? "").filter(
     (c) => !opts?.excludeRepo || c.skill.repo !== opts.excludeRepo,
@@ -322,6 +325,27 @@ function sameFingerprint(a: SkillFingerprint, b: SkillFingerprint): boolean {
  * re-query the worker nor re-rank anything until the served snapshot or the
  * skill's own content changes.
  */
+/**
+ * Concurrency-limited async mapper to prevent HTTP 429 rate limits when querying upstream APIs.
+ */
+async function mapConcurrent<T>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  let index = 0;
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (index < items.length) {
+        const i = index++;
+        await fn(items[i]);
+      }
+    },
+  );
+  await Promise.all(workers);
+}
+
 export async function resolveAssociations(
   unlinked: Array<{ name: string; description?: string }>,
 ): Promise<{ linked: string[]; suggestions: LinkSuggestions }> {
@@ -364,42 +388,45 @@ export async function resolveAssociations(
   // Pass 2 — query namesakes for skills the ledger did not answer
   const byName = await findNamesakes(outstanding.map((entry) => entry.skill.name));
 
-  await Promise.all(
-    outstanding.map(async ({ skill, cached }) => {
-      let namesakes = byName.get(skill.name) ?? [];
-      if (namesakes.length === 0 && getRegistrySnapshot().ready) {
-        namesakes = await findNamesakesWithSkillsShFallback(skill.name, namesakes);
-      }
-      if (namesakes.length === 0) {
+  await mapConcurrent(outstanding, 2, async ({ skill, cached }) => {
+    let namesakes = byName.get(skill.name) ?? [];
+    let queryOk = true;
+    if (namesakes.length === 0 && getRegistrySnapshot().ready) {
+      const fallback = await findNamesakesWithSkillsShFallback(skill.name, namesakes);
+      namesakes = fallback.namesakes;
+      queryOk = fallback.ok;
+    }
+    if (namesakes.length === 0) {
+      if (queryOk) {
         resolved.set(skill.name, []);
         if (cached) {
           drops.add(skill.name);
         }
-        return;
       }
+      return;
+    }
 
-      const fingerprint = isTauri() ? await skillFingerprint(skill.name) : null;
-      const unchanged =
-        fingerprint !== null &&
-        cached?.fingerprint !== undefined &&
-        sameFingerprint(fingerprint, cached.fingerprint);
+    const fingerprint = isTauri() ? await skillFingerprint(skill.name) : null;
+    const unchanged =
+      fingerprint !== null &&
+      cached?.fingerprint !== undefined &&
+      sameFingerprint(fingerprint, cached.fingerprint);
 
-      const key = rankingKey(namesakes);
-      const ranked =
-        unchanged && cached?.key === key && cached.candidates?.length
-          ? reviveCandidates(skill.name, cached.candidates)
-          : rankNamesakes(namesakes, skill.description ?? "");
+    const key = rankingKey(namesakes);
+    const ranked =
+      unchanged && cached?.key === key && cached.candidates?.length
+        ? reviveCandidates(skill.name, cached.candidates)
+        : rankNamesakes(namesakes, skill.description ?? "");
 
-      resolved.set(skill.name, ranked);
-      upserts.set(skill.name, {
-        kind: "pending",
-        name: skill.name,
-        key,
-        ...(fingerprint ? { fingerprint } : {}),
-        candidates: ranked.map(toPersisted),
-      });
-    }),
-  );
+    resolved.set(skill.name, ranked);
+    upserts.set(skill.name, {
+      kind: "pending",
+      name: skill.name,
+      key,
+      ...(fingerprint ? { fingerprint } : {}),
+      candidates: ranked.map(toPersisted),
+    });
+  });
 
   await savePendingRecords([...upserts.values()], [...drops], served);
 

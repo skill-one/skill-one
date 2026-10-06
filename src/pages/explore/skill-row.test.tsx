@@ -228,6 +228,16 @@ describe("SkillRow figure slot", () => {
     expect(screen.queryByLabelText(/^热度 /)).toBeNull();
   });
 
+  it("renders progressive compact date beyond 30 days inline with description", () => {
+    // 60 days ago
+    const older = {
+      ...installed,
+      installedAt: Math.floor(Date.now() / 1000) - 60 * 24 * 60 * 60,
+    };
+    renderRow(older, "installedAt");
+    expect(screen.getByLabelText(/^安装于 \d+月\d+日/)).toBeInTheDocument();
+  });
+
   it("handles multi-selection check and row click toggling", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
