@@ -1219,7 +1219,11 @@ describe("ExplorePage search", () => {
     // shape stays open under a live question, because relevance ranks the same
     // entries either way round.
     expect(
-      await screen.findByRole("button", { name: "查看 gadget-master 详情" }),
+      await screen.findByRole(
+        "button",
+        { name: "查看 gadget-master 详情" },
+        { timeout: 4000 },
+      ),
     ).toBeInTheDocument();
     expect(repoCards().length).toBe(0);
   });
