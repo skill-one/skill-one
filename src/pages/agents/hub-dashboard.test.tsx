@@ -16,7 +16,7 @@ const mockSkills: InstalledSkill[] = [
 ];
 
 describe("HubDashboard", () => {
-  it("renders hub figure with title, brand logo, stats, and enabled skills", () => {
+  it("renders hub figure with floating notch, brand logo, stats, and enabled skills", () => {
     renderWithRouter(
       <HubDashboard agents={mockAgents} skills={mockSkills} />,
     );
@@ -26,18 +26,18 @@ describe("HubDashboard", () => {
     expect(screen.getByText("SkillOne 共享中心")).toBeInTheDocument();
     expect(screen.getByText("安装一次，全 agents 直接使用")).toBeInTheDocument();
 
-    // Brand logo image
+    // Brand logo image in notch
     const logo = screen.getByAltText("Skill One");
     expect(logo).toHaveAttribute("src", "/skill-one-transparent.png");
 
-    // Stats
+    // Skills stats in floating badge
     expect(screen.getByText("1")).toBeInTheDocument(); // 1 enabled
     expect(screen.getByText("/2")).toBeInTheDocument(); // of 2 total
-    expect(screen.getByText(/1 个待处理/)).toBeInTheDocument();
 
-    // Redundant navigation buttons are removed from the hub card
+    // Redundant navigation buttons and domain summary bar are removed
     expect(screen.queryByRole("link", { name: /商店/ })).toBeNull();
     expect(screen.queryByRole("link", { name: /管理/ })).toBeNull();
+    expect(screen.queryByText(/已启用技能:/)).toBeNull();
 
     // Enabled skills rendered
     expect(screen.getByText("PDF")).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe("HubDashboard", () => {
     expect(screen.getByText("还没有启用的技能")).toBeInTheDocument();
   });
 
-  it("adapts gracefully to 100+ skills with domain overview and view-all link", () => {
+  it("adapts gracefully to 100+ skills with view-all link", () => {
     const manySkills: InstalledSkill[] = Array.from({ length: 105 }, (_, i) => ({
       name: `skill-${i}`,
       displayName: `Skill ${i}`,
@@ -79,9 +79,7 @@ describe("HubDashboard", () => {
     expect(viewAllLink).toHaveTextContent("+55");
   });
 
-  it("counts skills without a store profile as unclassified, not other", () => {
-    // A worker-less test environment has no store entries, so every enabled
-    // skill is unclassified — the summary bar must say ❓, never 📦.
+  it("renders skills cleanly with avatars without redundant category summary bar", () => {
     const unclassifiedSkills: InstalledSkill[] = Array.from(
       { length: 17 },
       (_, i) => ({
@@ -96,13 +94,11 @@ describe("HubDashboard", () => {
       <HubDashboard agents={mockAgents} skills={unclassifiedSkills} />,
     );
 
-    // The summary bar (the row led by the "已启用技能" label) must mark the
-    // unclassified group ❓; 📦 is the "other" domain, a different state.
-    const summaryBar = screen
-      .getByText("已启用技能:")
-      .closest("div.flex.items-center");
-    expect(summaryBar).toHaveTextContent("❓");
-    expect(summaryBar).toHaveTextContent("17");
-    expect(summaryBar).not.toHaveTextContent("📦");
+    // Redundant category summary bar is omitted
+    expect(screen.queryByText(/已启用技能:/)).toBeNull();
+
+    // Each skill chip renders an avatar mark
+    const marks = screen.getAllByRole("img", { name: "第三方安装" });
+    expect(marks.length).toBe(17);
   });
 });

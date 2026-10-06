@@ -332,7 +332,6 @@ describe("AgentGraph", () => {
 
     const disk = await screen.findByRole("figure", { name: HUB });
     expect(disk).toHaveTextContent(`${skills.length}/${skills.length}`);
-    expect(disk).toHaveTextContent("1 个待处理");
     expect(disk).toHaveTextContent("安装一次，全 agents 直接使用");
 
     // Redundant navigation buttons are removed from the hub card

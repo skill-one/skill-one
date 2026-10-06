@@ -3,15 +3,16 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Users } from "lucide-react";
 
 import { fetchAgentStatus } from "../../lib/local-skills";
-import { errorMessage } from "../../lib/utils";
+import { agentLinkState } from "../../lib/agent-link-state";
+import { cn, errorMessage } from "../../lib/utils";
 import { Placeholder } from "../../components/placeholder";
 import { AgentGraph } from "./agent-graph";
 
 /**
  * The agents page — the app's home. Every detected agent is rendered
  * in a balanced, symmetrical dual-column layout flanking the central SkillOne hub.
- * Redundant top counts and manual refresh buttons have been removed in favor
- * of the Hub's unified coverage indicators and automated status queries.
+ * Agent connection and attention statuses are positioned at the top-left of the canvas,
+ * allowing the central hub card to focus exclusively on skills.
  */
 export function AgentsPage() {
   const { t } = useTranslation();
@@ -28,9 +29,39 @@ export function AgentsPage() {
   });
 
   const list = agents ?? [];
+  const linkedCount = list.filter((a) => agentLinkState(a) === "linked").length;
+  const attentionCount = list.filter((a) => agentLinkState(a) === "warning").length;
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col px-8 py-3">
+      {/* Top-left Agent connection and attention status */}
+      {!isLoading && !isError && list.length > 0 && (
+        <div className="flex shrink-0 items-center gap-3 pb-1.5">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "size-2 rounded-full",
+                linkedCount > 0
+                  ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+                  : "bg-muted-foreground/40",
+              )}
+            />
+            <span className="text-xs font-medium text-muted-foreground">
+              {t("agents.head.linkedAgents", { count: linkedCount })}
+            </span>
+          </div>
+
+          {attentionCount > 0 && (
+            <span
+              title={t("agents.attention", { count: attentionCount })}
+              className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400"
+            >
+              {t("agents.attention", { count: attentionCount })}
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isError ? (
           <Placeholder

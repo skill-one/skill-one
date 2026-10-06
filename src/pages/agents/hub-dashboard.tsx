@@ -4,21 +4,22 @@ import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 
 import type { AgentStatus, InstalledSkill } from "../../lib/skills-manager";
-import { agentLinkState } from "../../lib/agent-link-state";
-import { domainEmoji, UNCLASSIFIED_DOMAIN } from "../../data/domains";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "../../components/ui/tooltip";
+import { OwnerAvatar } from "../../components/owner-avatar";
+import { ThirdPartyMark } from "../../components/third-party-mark";
+import { skillDisplayName } from "../../lib/skill-view";
 import { cn } from "../../lib/utils";
 
 interface HubDashboardProps {
-  agents: AgentStatus[];
+  agents?: AgentStatus[];
   skills: InstalledSkill[];
   loading?: boolean;
   className?: string;
@@ -26,11 +27,11 @@ interface HubDashboardProps {
 }
 
 /**
- * Modern dashboard card acting as the SkillOne core hub.
- * Designed with seamless brand integration, clean borders and high scalability.
+ * Modern dashboard card acting as the central SkillOne hub.
+ * Uses a floating border notch header to maximize interior vertical space
+ * for active skill chips with owner avatars.
  */
 export function HubDashboard({
-  agents,
   skills,
   loading = false,
   className,
@@ -44,43 +45,9 @@ export function HubDashboard({
     [skills],
   );
 
-  const linkedAgentsCount = agents.filter(
-    (agent) => agentLinkState(agent) === "linked",
-  ).length;
-
-  const attentionCount = agents.filter(
-    (agent) => agentLinkState(agent) === "warning",
-  ).length;
-
-  // Resolve classification emojis for skills
+  // Resolve classification and repository source for owner avatars
   const { data: provenance } = useSkillProvenance();
   const storeEntries = useInstalledStoreEntries(provenance?.linked);
-
-  const getEmoji = (name: string) => {
-    return domainEmoji(storeEntries[name]?.profile?.domain);
-  };
-
-  // Group domain statistics for overview when skills are numerous. A skill the
-  // store has no profile for is unclassified (❓), not "other" (📦) — the two
-  // states stay apart, matching the per-skill chips' marks.
-  const domainSummary = useMemo(() => {
-    if (enabled.length <= 16) return [];
-    const counts = new Map<string, number>();
-    for (const skill of enabled) {
-      const domainList = storeEntries[skill.name]?.profile?.domain;
-      const primaryKey =
-        domainList && domainList.length > 0 ? domainList[0] : UNCLASSIFIED_DOMAIN;
-      counts.set(primaryKey, (counts.get(primaryKey) ?? 0) + 1);
-    }
-    return Array.from(counts.entries())
-      .map(([key, count]) => ({
-        key,
-        emoji: domainEmoji([key]) ?? "📦",
-        count,
-      }))
-      .toSorted((a, b) => b.count - a.count)
-      .slice(0, 4);
-  }, [enabled, storeEntries]);
 
   const maxVisibleChips = 50;
   const visibleSkills = enabled.slice(0, maxVisibleChips);
@@ -96,109 +63,85 @@ export function HubDashboard({
       data-slot="hub-dashboard"
       style={{ width }}
       className={cn(
-        "relative select-none border-border/60 bg-card/90 shadow-sm backdrop-blur-md",
+        "relative select-none overflow-visible border-border/60 bg-card/90 shadow-sm backdrop-blur-md",
         className,
       )}
     >
-      {/* Attention Chip */}
-      {attentionCount > 0 && (
-        <span
-          title={t("agents.attention", { count: attentionCount })}
-          className="absolute -top-2.5 right-3 z-10 rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400"
-        >
-          {t("agents.attention", { count: attentionCount })}
+      {/* Brand & Hub Title — Floating Notch on Top Border */}
+      <div
+        title={t("agents.hub.tagline")}
+        className="absolute -top-3.5 left-4 z-10 flex max-w-[320px] items-center gap-1.5 rounded-full border border-border/70 bg-card px-2.5 py-0.5 shadow-2xs backdrop-blur-md"
+      >
+        <img
+          src="/skill-one-transparent.png"
+          alt="Skill One"
+          className="size-4 shrink-0 object-contain drop-shadow-xs"
+        />
+        <span className="truncate text-xs font-semibold tracking-tight text-foreground">
+          {t("agents.hub.title")}
         </span>
-      )}
+        <span className="hidden truncate text-[10px] text-muted-foreground sm:inline">
+          {t("agents.hub.tagline")}
+        </span>
+      </div>
 
-      <CardHeader className="p-3.5 pb-2">
-        <div className="flex items-center justify-between gap-3">
-          {/* Brand Logo & Hub Title — seamless with background like the app header */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <img
-              src="/skill-one-transparent.png"
-              alt="Skill One"
-              className="size-6 shrink-0 object-contain drop-shadow-xs"
-            />
-            <div className="min-w-0">
-              <CardTitle className="text-sm font-semibold leading-none text-foreground">
-                {t("agents.hub.title")}
-              </CardTitle>
-              <p className="mt-1 truncate text-[11px] text-muted-foreground">
-                {t("agents.hub.tagline")}
-              </p>
-            </div>
-          </div>
+      {/* Skills Stats Badge — Floating on Top-Right Border */}
+      <div className="absolute -top-3 right-4 z-10">
+        <Badge
+          variant="secondary"
+          className="border-border/60 bg-card/95 px-2 py-0 text-[11px] font-medium tabular-nums shadow-2xs backdrop-blur-md"
+        >
+          <span className="font-semibold text-foreground">{enabled.length}</span>
+          <span className="text-muted-foreground">/{total}</span>
+          <span className="ml-1 text-[10px] text-muted-foreground">
+            {t("agents.hub.skillsLabel")}
+          </span>
+        </Badge>
+      </div>
 
-          {/* Stats Badges */}
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            <Badge
-              variant="secondary"
-              className="border-border/40 bg-muted/60 px-1.5 py-0 text-[11px] font-medium tabular-nums"
-            >
-              <span className="font-semibold text-foreground">{enabled.length}</span>
-              <span className="text-muted-foreground">/{total}</span>
-              <span className="ml-1 text-[10px] text-muted-foreground">
-                {t("agents.hub.skillsLabel")}
-              </span>
-            </Badge>
-            <span className="text-[10px] text-muted-foreground">
-              {t("agents.hub.coverage", {
-                linked: linkedAgentsCount,
-                total: agents.length,
-              })}
-            </span>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="p-3.5 pt-1">
+      <CardContent className="p-4 pt-5">
         {/* Active Skills Flow Container */}
         {loading ? (
-          <div className="flex h-24 items-center justify-center">
+          <div className="flex h-28 items-center justify-center">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           </div>
         ) : enabled.length === 0 ? (
-          <div className="flex h-24 items-center justify-center text-xs text-muted-foreground">
+          <div className="flex h-28 items-center justify-center text-xs text-muted-foreground">
             {t("agents.hub.noneEnabled")}
           </div>
         ) : (
-          <div className="flex min-h-[100px] flex-col justify-end space-y-2">
-            {/* Domain Summary Bar when 16+ skills */}
-            {domainSummary.length > 0 && (
-              <div className="flex items-center gap-2 border-b border-border/30 pb-1.5 text-[10px] text-muted-foreground">
-                <span className="shrink-0 font-medium text-foreground/80">
-                  {t("agents.hub.activeSkills")}:
-                </span>
-                <div className="flex items-center gap-1.5 truncate">
-                  {domainSummary.map((d) => (
-                    <span
-                      key={d.key}
-                      className="inline-flex items-center gap-0.5 rounded border border-border/30 bg-muted/50 px-1 py-0.5 font-medium tabular-nums"
-                    >
-                      <span>{d.emoji}</span>
-                      <span>{d.count}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
+          <div className="flex min-h-[120px] flex-col justify-end">
             {/* Skill Chips Flow — bottom-up stacking with dynamic width */}
-            <div className="flex max-h-52 flex-wrap-reverse content-end gap-1.5 overflow-y-auto pr-1 mt-auto">
-              {visibleSkills.map((skill) => (
-                <span
-                  key={skill.name}
-                  data-skill={skill.name}
-                  className="inline-flex shrink-0 max-w-[150px] items-center gap-1.5 rounded-md border border-border/40 bg-muted/40 px-2 py-0.5 text-[11px] font-medium shadow-2xs hover:bg-muted/60 transition-colors"
-                >
-                  <span className="text-[12px] leading-none shrink-0">
-                    {getEmoji(skill.name)}
+            <div className="flex max-h-60 flex-wrap-reverse content-end gap-1.5 overflow-y-auto pr-1 mt-auto">
+              {visibleSkills.map((skill) => {
+                const displayName = skillDisplayName(skill);
+                const repo =
+                  provenance?.linked?.[skill.name]?.repo ??
+                  storeEntries[skill.name]?.repo;
+                const owner = repo ? repo.split("/")[0] : undefined;
+
+                return (
+                  <span
+                    key={skill.name}
+                    data-skill={skill.name}
+                    title={displayName}
+                    className="inline-flex shrink-0 max-w-[160px] items-center gap-1.5 rounded-md border border-border/40 bg-muted/40 px-2 py-0.5 text-[11px] font-medium shadow-2xs transition-colors hover:bg-muted/60"
+                  >
+                    {owner ? (
+                      <OwnerAvatar
+                        owner={owner}
+                        className="size-4 shrink-0 text-[8px]"
+                      />
+                    ) : (
+                      <ThirdPartyMark
+                        name={displayName}
+                        className="size-4 shrink-0 text-[8px]"
+                      />
+                    )}
+                    <span className="truncate">{displayName}</span>
                   </span>
-                  <span className="truncate">
-                    {skill.displayName ?? skill.name}
-                  </span>
-                </span>
-              ))}
+                );
+              })}
 
               {/* Interactive Overflow Button */}
               {overflowCount > 0 && (
