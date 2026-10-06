@@ -68,6 +68,11 @@ test("a nav link takes a click, and the list it opens is operable", async ({
 
   // A row is reachable and takes a click, which is the same claim one level
   // down: the interactive surface is not just in the document.
-  await row.click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  // Wrap in expect.toPass so a cold-start reload (e.g. Vite on-demand optimizeDeps)
+  // or initial mount remount does not drop the click.
+  await expect(async () => {
+    const detailRow = page.getByRole("button", { name: /查看 pdf 详情/ });
+    await detailRow.click();
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
 });
