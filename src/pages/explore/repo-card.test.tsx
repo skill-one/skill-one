@@ -546,4 +546,94 @@ describe("RepoCard", () => {
     // Untagged skills should not render ❓
     expect(screen.queryByText("❓")).not.toBeInTheDocument();
   });
+
+  describe("uninstalled siblings", () => {
+    /** One registry skill the machine does not have, the way the installed
+     *  list hands it over through `uninstalled`. */
+    const uninstalledSkill: Skill = {
+      name: "pdf-annotate",
+      repo: REPO,
+      description: "Annotate PDFs.",
+      stars: 1,
+      downloads: 1,
+    };
+
+    /** The bar toggle for the one-installed + one-uninstalled card. */
+    const expandBar = () =>
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: `展开 ${REPO} 的全部 2 个 skill`,
+        }),
+      );
+
+    it("keeps the uninstalled rows behind the bar until it is expanded", () => {
+      renderCard({ skills: [skills[0]], uninstalled: [uninstalledSkill] });
+
+      expect(
+        screen.queryByRole("button", { name: "查看 pdf-annotate 详情" }),
+      ).toBeNull();
+
+      expandBar();
+
+      expect(
+        screen.getByRole("button", { name: "查看 pdf-annotate 详情" }),
+      ).toBeInTheDocument();
+    });
+
+    it("opens an uninstalled skill's detail panel from its row", () => {
+      const onOpenSkill = vi.fn();
+      renderCard({
+        skills: [skills[0]],
+        uninstalled: [uninstalledSkill],
+        onOpenSkill,
+        selected: skillKey(uninstalledSkill),
+      });
+
+      expandBar();
+
+      const row = screen.getByRole("button", {
+        name: "查看 pdf-annotate 详情",
+      });
+      fireEvent.click(row);
+
+      // Same identity every row addresses the drawer by, installed or not.
+      expect(onOpenSkill).toHaveBeenCalledWith(skillKey(uninstalledSkill));
+      // The open row is marked in place, and the installed row is not.
+      expect(row).toHaveAttribute("aria-current", "true");
+      expect(
+        screen.getByRole("button", { name: "查看 pdf 详情" }),
+      ).not.toHaveAttribute("aria-current");
+    });
+
+    it("keeps the install button beside the uninstalled row, never inside it", async () => {
+      const user = userEvent.setup();
+      const onOpenSkill = vi.fn();
+      vi.mocked(installSkillFromSource).mockResolvedValue(undefined);
+      renderCard({
+        skills: [skills[0]],
+        uninstalled: [uninstalledSkill],
+        onOpenSkill,
+      });
+
+      expandBar();
+      const section = screen.getByRole("list", {
+        name: `${REPO} 的未安装 skill`,
+      });
+      const row = within(section).getByRole("button", {
+        name: "查看 pdf-annotate 详情",
+      });
+      // Sibling controls, never nested — inspecting and installing are two
+      // separate presses.
+      expect(within(row).queryAllByRole("button")).toHaveLength(0);
+
+      await user.click(within(section).getByRole("button", { name: "安装" }));
+
+      expect(installSkillFromSource).toHaveBeenCalledWith({
+        id: "anthropics/skills/pdf-annotate",
+        repo: REPO,
+        name: "pdf-annotate",
+      });
+      expect(onOpenSkill).not.toHaveBeenCalled();
+    });
+  });
 });

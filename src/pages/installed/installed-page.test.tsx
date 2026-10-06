@@ -547,9 +547,9 @@ describe("InstalledPage", () => {
 
       // One press on the bar unfolds the uninstalled group in place, and the
       // hairline arrives with it — now there are two lists to keep apart —
-      // with the store's install CTA on the row: no switch, and no drawer: an
-      // uninstalled row's destination is the install itself. The installed
-      // group is untouched: pdf keeps its own row and its switch.
+      // with the store's install CTA on the row beside the same detail button
+      // the installed rows carry: no switch on an uninstalled row. The
+      // installed group is untouched: pdf keeps its own row and its switch.
       await user.click(bar);
       const section = screen.getByRole("list", {
         name: "anthropics/skills 的未安装 skill",
@@ -577,6 +577,88 @@ describe("InstalledPage", () => {
         }),
       ).not.toBeInTheDocument();
       expect(screen.queryByText("pdf-annotate")).not.toBeInTheDocument();
+    });
+
+    it("opens the detail drawer for an uninstalled row with the store chrome", async () => {
+      const user = userEvent.setup();
+      // pdf is installed and recorded; pdf-annotate is the repository sibling
+      // this machine does not have.
+      seedMockProvenance({ pdf: { repo: "anthropics/skills" } });
+      getGroups.mockResolvedValue({
+        groups: [
+          {
+            key: "anthropics/skills",
+            title: "anthropics/skills",
+            skills: [
+              {
+                skill: {
+                  name: "pdf",
+                  repo: "anthropics/skills",
+                  description: "PDF 文档读取、生成、合并、拆分与标注。",
+                  stars: 1,
+                  downloads: 1,
+                },
+                matched: {},
+              },
+              {
+                skill: {
+                  name: "pdf-annotate",
+                  repo: "anthropics/skills",
+                  description: "为 PDF 添加批注。",
+                  stars: 1,
+                  downloads: 1,
+                },
+                matched: {},
+              },
+            ],
+          },
+        ],
+        total: 2,
+      });
+      renderPage();
+
+      await user.click(
+        await screen.findByRole("button", {
+          name: "展开 anthropics/skills 的全部 2 个 skill",
+        }),
+      );
+      const section = screen.getByRole("list", {
+        name: "anthropics/skills 的未安装 skill",
+      });
+      await user.click(
+        within(section).getByRole("button", {
+          name: "查看 pdf-annotate 详情",
+        }),
+      );
+
+      // The same drawer the installed rows open — but a skill not on disk gets
+      // the store's chrome: the install CTA, and no enable switch or editing.
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByText("pdf-annotate")).toBeInTheDocument();
+      expect(
+        within(dialog).getByRole("button", { name: "安装" }),
+      ).toBeInTheDocument();
+      expect(within(dialog).queryByRole("switch")).toBeNull();
+      expect(
+        within(dialog).queryByRole("button", { name: "编辑" }),
+      ).toBeNull();
+      // The row behind the drawer marks which skill is open. The open modal
+      // makes the list inert to the accessibility tree, so read the attribute
+      // straight off the DOM.
+      const openRow = section.querySelector(
+        'button[aria-label="查看 pdf-annotate 详情"]',
+      );
+      expect(openRow).toHaveAttribute("aria-current", "true");
+
+      // ← walks the card in list order: the installed sibling comes first, and
+      // it arrives with the installed chrome (its switch, no install CTA).
+      fireEvent.keyDown(window, { key: "ArrowLeft" });
+      expect(
+        await within(dialog).findByRole("switch", { name: "关闭 pdf" }),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).queryByRole("button", { name: "安装" }),
+      ).toBeNull();
     });
 
     it("draws no uninstalled section on the pool card", async () => {
