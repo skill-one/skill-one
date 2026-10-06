@@ -15,6 +15,7 @@ import {
 import { cn } from "../../lib/utils";
 import {
   domainEmoji,
+  domainLabel,
   domainMeta,
   domainTooltip,
   UNCLASSIFIED_DOMAIN,
@@ -319,6 +320,22 @@ export const SkillRow = memo(function SkillRow({
                 <TooltipContent>{t("common.localLinkedTooltip")}</TooltipContent>
               </Tooltip>
             )}
+            {!live && hasTag && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Badge
+                      variant="secondary"
+                      className="h-4 gap-1 px-1.5 text-[10px] font-normal text-muted-foreground shrink-0 select-none cursor-default"
+                    >
+                      <span aria-hidden="true">{domainEmoji(domain)}</span>
+                      {meta && <span>{domainLabel(meta.key, locale)}</span>}
+                    </Badge>
+                  }
+                />
+                <TooltipContent>{domainTooltip(domain ?? [], locale)}</TooltipContent>
+              </Tooltip>
+            )}
           </div>
           {!live && (
             <p className="truncate text-[12px] leading-snug text-muted-foreground">
@@ -327,34 +344,10 @@ export const SkillRow = memo(function SkillRow({
           )}
         </div>
 
-        {/* The facts cluster, pushed to the far end and kept whole: the source's
-            owner face, then the figure the list answers in — both short and
-            fixed, so the description keeps the width it needs. The face drops
-            out on a repository's own page (see `showSource`): the head already
-            names it, and 48 identical copies only crowd the names. A skill with
-            no source at all wears the third-party mark in the same slot — it is
-            the same column, sized the same, so the figures stay aligned across a
-            list that mixes the two kinds. The classification lives on the
-            leading glyph, so it is not repeated here. The figure takes a fixed
-            right-aligned slot,
-            sized to the format's longest rendering ("169.6K" for the blend,
-            a relative age like "12个月前" for the stamp): the digits then end
-            on one edge at the row's far right, where magnitudes are compared,
-            and the face left of it sits in a column of its own instead of
-            drifting with the digits' width. */}
+        {/* The facts cluster, pushed to the far end and kept whole: the figure
+            the list answers in, short and fixed, so the description keeps the width
+            it needs. The figure takes a fixed right-aligned slot. */}
         <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
-          {!live && hasTag && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span className="flex size-5 shrink-0 items-center justify-center text-sm leading-none">
-                    {domainEmoji(domain)}
-                  </span>
-                }
-              />
-              <TooltipContent>{domainTooltip(domain ?? [], locale)}</TooltipContent>
-            </Tooltip>
-          )}
           {fact === "installedAt" ? (
             <SkillInstalledTime
               skill={skill}

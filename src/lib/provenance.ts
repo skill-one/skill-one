@@ -16,7 +16,6 @@ import {
 } from "./skills-manager";
 import type { SkillFingerprint } from "./skills-manager";
 import { logActivity, type SourceLinkReason } from "./activity";
-import { domainMeta } from "../data/domains";
 
 export type { SkillFingerprint };
 
