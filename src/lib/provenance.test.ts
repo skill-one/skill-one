@@ -14,6 +14,7 @@ import {
   renameCustomTagDef,
   deleteCustomTagDef,
   setSkillTags,
+  setManySkillTags,
   ledgerLines,
   readLedgerRaw,
   resetMockProvenance,
@@ -166,6 +167,20 @@ describe("ledgerLines", () => {
     ["whitespace only", "  \n  "],
   ] as const)("returns no lines for %s", (_label, raw) => {
     expect(ledgerLines(raw)).toEqual([]);
+  });
+
+  it("parses line-by-line jsonl including broken lines", () => {
+    const jsonl = [
+      JSON.stringify({ kind: "meta", version: 1 }),
+      "{invalid-json",
+      JSON.stringify({ kind: "source", name: "test-skill" }),
+      "",
+    ].join("\n");
+    const lines = ledgerLines(jsonl);
+    expect(lines).toHaveLength(3);
+    expect(lines[0]?.record).toMatchObject({ kind: "meta", version: 1 });
+    expect(lines[1]?.broken).toBe("{invalid-json");
+    expect(lines[2]?.record).toMatchObject({ kind: "source", name: "test-skill" });
   });
 });
 
@@ -328,5 +343,15 @@ describe("custom tags store", () => {
 
     const { sources } = await reconcileProvenance(["pdf"]);
     expect(sources.pdf?.tags).toEqual(["other-tag"]);
+  });
+
+  it("sets multiple skill tags using object entries", async () => {
+    await recordSkillProvenance("anthropics/skills", "pdf", "install");
+    await setManySkillTags([
+      { name: "pdf", tag: "工作" },
+      { name: "other", tag: null },
+    ]);
+    const custom = await loadCustomTags();
+    expect(custom.skillTags.pdf).toBe("工作");
   });
 });
