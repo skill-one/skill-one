@@ -15,7 +15,7 @@ import {
 } from "./ui/dialog";
 
 /**
- * The developer viewer: displays the provenance ledger (.skill-one.jsonl)
+ * The developer viewer: displays the provenance ledger (.skill-one.json)
  * in its raw, verbatim form without parsing or structured transformations.
  */
 export function DeveloperDialog({

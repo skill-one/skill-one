@@ -3,7 +3,7 @@ import { translations } from '../i18n/translations';
 import { Download, Apple, Monitor, Terminal, Clock, Check, X, Sparkles } from 'lucide-react';
 import {
   MAC_ARM_DMG_URL,
-  DMG_FILENAME,
+  MAC_ARM_DMG_FILENAME,
   MAC_X64_DMG_URL,
   MAC_X64_DMG_FILENAME,
   WIN_EXE_URL,
@@ -93,7 +93,7 @@ export const DownloadCards: React.FC<DownloadCardsProps> = ({ lang = 'en' }) => 
               {/* Apple Silicon direct download */}
               <a
                 href={MAC_ARM_DMG_URL}
-                download={DMG_FILENAME}
+                download={MAC_ARM_DMG_FILENAME}
                 onClick={() => triggerDownloadFeedback('mac-arm')}
                 className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold transition-all shadow-sm hover:shadow group"
               >

@@ -12,10 +12,6 @@ export const MAC_ARM_DMG_URL = `${DOWNLOAD_BASE_URL}/${MAC_ARM_DMG_FILENAME}`;
 export const MAC_X64_DMG_FILENAME = `Skill.One_${APP_VERSION}_x64.dmg`;
 export const MAC_X64_DMG_URL = `${DOWNLOAD_BASE_URL}/${MAC_X64_DMG_FILENAME}`;
 
-// Aliases for backwards compatibility with existing imports
-export const DMG_FILENAME = MAC_ARM_DMG_FILENAME;
-export const DMG_URL = MAC_ARM_DMG_URL;
-
 // Windows (NSIS Installer & MSI)
 export const WIN_EXE_FILENAME = `Skill.One_${APP_VERSION}_x64-setup.exe`;
 export const WIN_EXE_URL = `${DOWNLOAD_BASE_URL}/${WIN_EXE_FILENAME}`;

@@ -76,4 +76,3 @@ The ledger is formatted as human-readable JSON:
 1. **Location**: Co-located adjacent to skills in `~/.agents/skills/.skill-one.json`. Ignored by CLI scanners as a hidden dotfile.
 2. **Atomic Writes**: Saved atomically via temporary sibling files and rename operations in Rust (`provenance.rs`).
 3. **Reconciliation**: On startup, entries for skills no longer present on disk are pruned automatically.
-4. **Transparent Migration**: Automatically detects and migrates legacy line-based `.skill-one.jsonl` files on first boot.

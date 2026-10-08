@@ -19,7 +19,7 @@ const {
   recordSkillProvenanceBatch,
   loadPendingRecords,
   savePendingRecords,
-  dismissSkillSource,
+  unlinkSkillSource: unlinkSkillProvenance,
   isTauri,
   searchSkillsSh,
 } = vi.hoisted(() => ({
@@ -29,7 +29,7 @@ const {
   recordSkillProvenanceBatch: vi.fn(),
   loadPendingRecords: vi.fn(),
   savePendingRecords: vi.fn(),
-  dismissSkillSource: vi.fn(),
+  unlinkSkillSource: vi.fn(),
   isTauri: vi.fn(),
   searchSkillsSh: vi.fn().mockResolvedValue([]),
 }));
@@ -50,7 +50,7 @@ vi.mock("./provenance", () => ({
   recordSkillProvenanceBatch,
   loadPendingRecords,
   savePendingRecords,
-  dismissSkillSource,
+  unlinkSkillSource: unlinkSkillProvenance,
 }));
 
 /** The snapshot identity the mocked registry serves. */
@@ -681,7 +681,7 @@ describe("unlinkSkillSource", () => {
 
     await unlinkSkillSource("pdf", "anthropics/skills");
 
-    expect(dismissSkillSource).toHaveBeenCalledWith("pdf", "anthropics/skills");
+    expect(unlinkSkillProvenance).toHaveBeenCalledWith("pdf", "anthropics/skills");
   });
 
   it("clears the session memo, so the next pass re-runs the lookup", async () => {

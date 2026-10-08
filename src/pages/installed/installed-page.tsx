@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Boxes, PowerOff, Users } from "lucide-react";
+import { Boxes, Loader2, PowerOff, Users } from "lucide-react";
 
 import { useInstalledSkills } from "../../hooks/use-installed-skills";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRegistryGroups } from "../../hooks/use-registry-groups";
+import { useRegistrySnapshot } from "../../hooks/use-registry-snapshot";
 import { useSkillProvenance } from "../../hooks/use-skill-provenance";
 import { useCustomTags } from "../../hooks/use-custom-tags";
 import { useInstalledStoreEntries } from "../../hooks/use-installed-store-entries";
@@ -181,16 +182,32 @@ export function InstalledPage() {
   // The locale the tag sections name themselves in: a tag header is the
   // classification's own label, resolved the same way the row badges are.
   const locale = useAppLocale();
-  const { data: skills, isLoading, isError, error } = useInstalledSkills();
+  const { data: skills, isLoading: isSkillsLoading, isError, error } = useInstalledSkills();
 
   // Install sources recorded by this app (the provenance ledger), reconciled
   // against the on-disk list on every fetch. Absent entries mean "installed
   // by another tool" — those keep the local-install presentation, and if the
   // registry has plausible namesakes the row offers a confirmable link.
   const { data: provenanceState } = useSkillProvenance();
+  const isSyncingRegistry = useRegistrySnapshot((s) => !s.ready && s.count > 0);
+  const registryCount = useRegistrySnapshot((s) => s.count);
+  const isRegistryIndexing = useRegistrySnapshot((s) => Boolean(s.indexing));
   const linked = provenanceState?.linked;
   const suggestions = provenanceState?.suggestions;
   const cut = provenanceState?.cut;
+
+  // We keep showing skeletons until skills scan is done, and if there are skills,
+  // until the provenance ledger (skill-one.json) finishes resolving.
+  // This prevents flashing an unlinked "third-party" state before ledger resolves.
+  const isLoading =
+    isSkillsLoading ||
+    (skills != null && skills.length > 0 && provenanceState == null);
+
+  const stageHint = isSkillsLoading
+    ? t("state.scanningLocal")
+    : provenanceState == null
+      ? t("state.readingLedger")
+      : null;
 
   // The user taxonomy plus one tag choice per installed skill, read off the
   // same ledger as the sources above (and refreshed by the same
@@ -791,6 +808,22 @@ export function InstalledPage() {
         searching={isSearching}
       />
 
+      {!isSearching && isSyncingRegistry && (
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 min-w-0">
+            <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />
+            <span className="truncate">
+              {isRegistryIndexing
+                ? t("state.indexingRegistry")
+                : t("state.syncingRegistry", { count: registryCount })}
+            </span>
+          </div>
+          <span className="text-[11px] text-muted-foreground/80 shrink-0 hidden sm:inline">
+            {t("state.registrySyncingBanner")}
+          </span>
+        </div>
+      )}
+
       {!isSearching && !isBannerDismissed && linkableSkills.length > 0 && (
         <SourceLinkBanner
           skills={linkableSkills}
@@ -817,26 +850,31 @@ export function InstalledPage() {
               })}
             />
           ) : isLoading ? (
-            // The same card- or row-shaped skeleton the store lists paint:
-            // switching to this page lands on its final layout instead of an
-            // empty spin.
-            <SkeletonList
-              rows={unit === "repo" ? SKELETON_CARDS : SKELETON_ROWS}
-              listClassName={
-                unit === "repo"
-                  ? REPO_LIST_CLASS
-                  : unit === "grid"
-                    ? SKILL_GRID_LIST_CLASS
-                    : SKILL_ROW_LIST_CLASS
-              }
-              itemClassName={
-                unit === "repo"
-                  ? REPO_CARD_SKELETON_CLASS
-                  : unit === "grid"
-                    ? SKILL_GRID_SKELETON_CLASS
-                    : SKILL_ROW_SKELETON_CLASS
-              }
-            />
+            <div className="flex flex-col gap-3">
+              {stageHint && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground py-1 px-0.5 animate-pulse">
+                  <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />
+                  <span>{stageHint}</span>
+                </div>
+              )}
+              <SkeletonList
+                rows={unit === "repo" ? SKELETON_CARDS : SKELETON_ROWS}
+                listClassName={
+                  unit === "repo"
+                    ? REPO_LIST_CLASS
+                    : unit === "grid"
+                      ? SKILL_GRID_LIST_CLASS
+                      : SKILL_ROW_LIST_CLASS
+                }
+                itemClassName={
+                  unit === "repo"
+                    ? REPO_CARD_SKELETON_CLASS
+                    : unit === "grid"
+                      ? SKILL_GRID_SKELETON_CLASS
+                      : SKILL_ROW_SKELETON_CLASS
+                }
+              />
+            </div>
           ) : list.length === 0 ? (
             <Placeholder icon={Boxes} message={t("state.noInstalled")} />
           ) : isSearching ? (

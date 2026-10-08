@@ -3,8 +3,6 @@
  *
  * Stores installed skill provenance (origin: store vs local, associated GitHub repo, tags)
  * and custom taxonomy definitions. Formatted as clean, human-readable JSON.
- *
- * Automatically migrates legacy `.skill-one.jsonl` files on first read.
  */
 
 import { isTauri } from "./tauri";
@@ -42,68 +40,8 @@ export interface SkillOneConfig {
   customTags?: CustomTagDef[];
 }
 
-/**
- * Backward-compatible source record.
- */
-export interface SourceRecord {
-  kind: "source";
-  name: string;
-  repo: string;
-  via?: SourceLinkReason;
-}
-
-/**
- * Backward-compatible candidate structure.
- */
-export interface PersistedCandidate {
-  repo: string;
-  similarity: number;
-  stars: number;
-  downloads: number;
-  description: string;
-  descriptionZh?: string;
-  domain?: string[];
-}
-
-/**
- * Backward-compatible pending record.
- */
-export interface PendingRecord {
-  kind: "pending";
-  name: string;
-  key?: string;
-  fingerprint?: SkillFingerprint;
-  candidates?: PersistedCandidate[];
-  repos?: string[];
-}
-
-export interface TagDefRecord {
-  kind: "tag-def";
-  key: string;
-  label: string;
-  emoji?: string;
-}
-
-export interface SkillTagRecord {
-  kind: "skill-tag";
-  name: string;
-  tag: string;
-}
-
-export type LedgerRecord =
-  | SourceRecord
-  | PendingRecord
-  | TagDefRecord
-  | SkillTagRecord;
-
-/** Parsed ledger structure consumed by legacy callers and internal state. */
-export interface ParsedLedger {
-  index?: string;
-  records: Map<string, SourceRecord | PendingRecord>;
-  tagDefs: Map<string, TagDefRecord>;
-  skillTags: Map<string, string>;
-  config: SkillOneConfig;
-}
+/** Parsed ledger structure (alias to SkillOneConfig). */
+export type ParsedLedger = SkillOneConfig;
 
 export interface SkillProvenance {
   origin: "store" | "local";
@@ -124,228 +62,69 @@ export interface ReconciledProvenance {
   emptyRepos: Set<string>;
 }
 
+export interface PendingRecord {
+  kind: "pending";
+  name: string;
+  key?: string;
+  fingerprint?: SkillFingerprint;
+  candidates?: PersistedCandidate[];
+  repos?: string[];
+}
+
+export interface PersistedCandidate {
+  repo: string;
+  similarity: number;
+  stars: number;
+  downloads: number;
+  description: string;
+  descriptionZh?: string;
+  domain?: string[];
+}
+
 export interface StoredPending {
   index?: string;
   records: Record<string, PendingRecord>;
 }
 
-// ------------------------------------------------------------------- parsing & migration
+// ------------------------------------------------------------------- parsing & serialization
 
-function emptyParsedLedger(): ParsedLedger {
-  return {
-    records: new Map(),
-    tagDefs: new Map(),
-    skillTags: new Map(),
-    config: { version: 1, skills: {}, customTags: [] },
-  };
+function emptyConfig(): SkillOneConfig {
+  return { version: 1, skills: {}, customTags: [] };
 }
 
-/** Parse raw ledger content (supports both new JSON and legacy JSONL). */
-export function parseLedger(raw: string | null | undefined): ParsedLedger {
-  const ledger = emptyParsedLedger();
-  if (!raw) return ledger;
+/** Parse raw ledger content (`~/.agents/skills/.skill-one.json`). */
+export function parseLedger(raw: string | null | undefined): SkillOneConfig {
+  if (!raw) return emptyConfig();
 
   const trimmed = raw.trim();
-  if (!trimmed) return ledger;
+  if (!trimmed) return emptyConfig();
 
-  // 1. Try parsing as new JSON config
-  if (trimmed.startsWith("{") && !trimmed.includes('"kind":')) {
-    try {
-      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-      if (parsed && typeof parsed === "object" && parsed.skills && typeof parsed.skills === "object") {
-        const skillsObj = parsed.skills as Record<string, SkillEntry>;
-        const customTagsArr = Array.isArray(parsed.customTags)
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      parsed.skills &&
+      typeof parsed.skills === "object"
+    ) {
+      return {
+        version: 1,
+        skills: parsed.skills as Record<string, SkillEntry>,
+        customTags: Array.isArray(parsed.customTags)
           ? (parsed.customTags as CustomTagDef[])
-          : [];
-
-        ledger.config = {
-          version: 1,
-          skills: skillsObj,
-          customTags: customTagsArr,
-        };
-
-        // Populate backward-compatible maps
-        for (const [name, entry] of Object.entries(skillsObj)) {
-          if (entry.repo) {
-            ledger.records.set(name, {
-              kind: "source",
-              name,
-              repo: entry.repo,
-              via: entry.origin === "store" ? "install" : "confirm",
-            });
-          } else {
-            ledger.records.set(name, { kind: "pending", name });
-          }
-
-          if (entry.tags && entry.tags.length > 0) {
-            ledger.skillTags.set(name, entry.tags[0]);
-          }
-        }
-
-        for (const tag of customTagsArr) {
-          ledger.tagDefs.set(tag.key, {
-            kind: "tag-def",
-            key: tag.key,
-            label: tag.label,
-          });
-        }
-
-        return ledger;
-      }
-    } catch {
-      // Fall through to JSONL parser
+          : [],
+      };
     }
+  } catch {
+    // Malformed JSON: return empty ledger
   }
 
-  // 2. Parse legacy JSONL lines
-  for (const line of trimmed.split("\n")) {
-    const l = line.trim();
-    if (!l) continue;
-    let entry: Record<string, unknown>;
-    try {
-      entry = JSON.parse(l);
-    } catch {
-      continue;
-    }
-    if (typeof entry !== "object" || entry === null) continue;
-
-    if (entry.kind === "meta") {
-      if (typeof entry.index === "string" && entry.index.length > 0) {
-        ledger.index = entry.index;
-      }
-      continue;
-    }
-
-    if (entry.kind === "tag-def") {
-      if (typeof entry.key === "string" && typeof entry.label === "string") {
-        const key = entry.key.trim();
-        const label = entry.label.trim();
-        if (key && label) {
-          ledger.tagDefs.set(key, {
-            kind: "tag-def",
-            key,
-            label,
-            emoji: typeof entry.emoji === "string" ? entry.emoji : undefined,
-          });
-          ledger.config.customTags = ledger.config.customTags ?? [];
-          if (!ledger.config.customTags.some((t) => t.key === key)) {
-            ledger.config.customTags.push({ key, label });
-          }
-        }
-      }
-      continue;
-    }
-
-    if (entry.kind === "skill-tag") {
-      if (typeof entry.name === "string" && typeof entry.tag === "string") {
-        const name = entry.name.trim();
-        const tag = entry.tag.trim();
-        if (name && tag) {
-          ledger.skillTags.set(name, tag);
-          const skill = ledger.config.skills[name] ?? { origin: "local" };
-          skill.tags = [tag];
-          ledger.config.skills[name] = skill;
-        } else if (name && !tag) {
-          ledger.skillTags.delete(name);
-          if (ledger.config.skills[name]) {
-            delete ledger.config.skills[name].tags;
-          }
-        }
-      }
-      continue;
-    }
-
-    if (typeof entry.name !== "string" || !entry.name) continue;
-    const name = entry.name.trim();
-
-    if (entry.kind === "source" && typeof entry.repo === "string" && entry.repo) {
-      const origin: "store" | "local" = entry.via === "install" ? "store" : "local";
-      const via: SourceLinkReason | undefined =
-        entry.via === "install" || entry.via === "confirm" || entry.via === "description"
-          ? (entry.via as SourceLinkReason)
-          : undefined;
-
-      ledger.records.set(name, {
-        kind: "source",
-        name,
-        repo: entry.repo,
-        via,
-      });
-
-      const skill = ledger.config.skills[name] ?? { origin };
-      skill.origin = origin;
-      skill.repo = entry.repo;
-      ledger.config.skills[name] = skill;
-    } else if (entry.kind === "pending") {
-      const pending: PendingRecord = { kind: "pending", name };
-      if (Array.isArray(entry.repos)) {
-        pending.repos = entry.repos.filter((r): r is string => typeof r === "string");
-      }
-      if (Array.isArray(entry.candidates)) {
-        pending.candidates = entry.candidates.filter(
-          (c): c is PersistedCandidate => typeof c === "object" && c !== null && typeof c.repo === "string",
-        );
-      }
-      ledger.records.set(name, pending);
-
-      if (!ledger.config.skills[name]) {
-        ledger.config.skills[name] = { origin: "local" };
-      }
-    }
-  }
-
-  return ledger;
+  return emptyConfig();
 }
 
-/** Serialize to indented JSON. Supports both new config object and legacy arguments. */
-export function serializeLedger(
-  configOrIndex?: SkillOneConfig | string,
-  records?: Iterable<LedgerRecord>,
-  tagDefs?: Iterable<TagDefRecord>,
-  skillTags?: Iterable<readonly [string, string]>,
-): string {
-  if (configOrIndex && typeof configOrIndex === "object" && "version" in configOrIndex) {
-    return `${JSON.stringify(configOrIndex, null, 2)}\n`;
-  }
 
-  // Construct from legacy parameters
-  const config: SkillOneConfig = {
-    version: 1,
-    skills: {},
-    customTags: [],
-  };
-
-  if (records) {
-    for (const record of records) {
-      if (record.kind === "source") {
-        config.skills[record.name] = {
-          origin: record.via === "install" ? "store" : "local",
-          repo: record.repo,
-        };
-      } else if (record.kind === "pending") {
-        if (!config.skills[record.name]) {
-          config.skills[record.name] = { origin: "local" };
-        }
-      }
-    }
-  }
-
-  if (tagDefs) {
-    for (const def of tagDefs) {
-      config.customTags?.push({ key: def.key, label: def.label });
-    }
-  }
-
-  if (skillTags) {
-    for (const [name, tag] of skillTags) {
-      if (tag) {
-        const skill = config.skills[name] ?? { origin: "local" };
-        skill.tags = [tag];
-        config.skills[name] = skill;
-      }
-    }
-  }
-
+/** Serialize SkillOneConfig to indented JSON. */
+export function serializeLedger(config: SkillOneConfig): string {
   return `${JSON.stringify(config, null, 2)}\n`;
 }
 
@@ -407,25 +186,17 @@ export const DEFAULT_BROWSER_PREVIEW_LEDGER: SkillOneConfig = {
   ],
 };
 
-async function loadLedger(): Promise<ParsedLedger> {
+async function loadLedger(): Promise<SkillOneConfig> {
   let raw = isTauri() ? await readProvenanceRaw() : storage.getItem(BROWSER_STORAGE_KEY);
   if (!isTauri() && !raw && import.meta.env.MODE !== "test" && !import.meta.env.VITEST) {
     storage.setItem(BROWSER_STORAGE_KEY, serializeLedger(DEFAULT_BROWSER_PREVIEW_LEDGER));
     raw = storage.getItem(BROWSER_STORAGE_KEY);
   }
-  const parsed = parseLedger(raw);
-  if (!isTauri() && import.meta.env.MODE !== "test" && !import.meta.env.VITEST) {
-    // Sanitize legacy preview mock tags from browser localStorage
-    if (parsed.config.skills["code-review"]?.tags?.includes("code-review")) {
-      parsed.config.skills["code-review"].tags = undefined;
-      await saveLedger(parsed);
-    }
-  }
-  return parsed;
+  return parseLedger(raw);
 }
 
-async function saveLedger(ledger: ParsedLedger): Promise<void> {
-  const text = serializeLedger(ledger.config);
+async function saveLedger(config: SkillOneConfig): Promise<void> {
+  const text = serializeLedger(config);
   if (isTauri()) {
     await writeProvenanceRaw(text);
     return;
@@ -460,21 +231,20 @@ export async function recordSkillProvenance(
   defaultTags?: readonly string[],
 ): Promise<void> {
   try {
-    const ledger = await loadLedger();
+    const config = await loadLedger();
     const origin: "store" | "local" = reason === "install" ? "store" : "local";
-    const existing = ledger.config.skills[name];
+    const existing = config.skills[name];
     const existingTags = existing?.tags ?? [];
     const newTags = defaultTags ?? [];
     const mergedTags = Array.from(new Set([...existingTags, ...newTags]));
 
-    ledger.config.skills[name] = {
+    config.skills[name] = {
       origin,
       repo,
       ...(mergedTags.length > 0 ? { tags: mergedTags } : {}),
     };
-    ledger.records.set(name, { kind: "source", name, repo, via: reason });
 
-    await saveLedger(ledger);
+    await saveLedger(config);
     if (repo) {
       await logSkillSourceLink(repo, name, reason);
     }
@@ -492,28 +262,22 @@ export async function recordSkillProvenanceBatch(
   }[],
 ): Promise<void> {
   try {
-    const ledger = await loadLedger();
+    const config = await loadLedger();
     for (const entry of entries) {
       const reason = entry.reason ?? "confirm";
       const origin: "store" | "local" = reason === "install" ? "store" : "local";
-      const existing = ledger.config.skills[entry.name];
+      const existing = config.skills[entry.name];
       const existingTags = existing?.tags ?? [];
       const newTags = entry.defaultTags ?? [];
       const mergedTags = Array.from(new Set([...existingTags, ...newTags]));
 
-      ledger.config.skills[entry.name] = {
+      config.skills[entry.name] = {
         origin,
         repo: entry.repo,
         ...(mergedTags.length > 0 ? { tags: mergedTags } : {}),
       };
-      ledger.records.set(entry.name, {
-        kind: "source",
-        name: entry.name,
-        repo: entry.repo,
-        via: reason,
-      });
     }
-    await saveLedger(ledger);
+    await saveLedger(config);
     for (const entry of entries) {
       if (entry.repo) {
         await logSkillSourceLink(entry.repo, entry.name, entry.reason ?? "confirm");
@@ -535,11 +299,9 @@ export async function markSkillUnlinked(name: string): Promise<void> {
 
 export async function removeSkillProvenance(name: string): Promise<void> {
   try {
-    const ledger = await loadLedger();
-    delete ledger.config.skills[name];
-    ledger.records.delete(name);
-    ledger.skillTags.delete(name);
-    await saveLedger(ledger);
+    const config = await loadLedger();
+    delete config.skills[name];
+    await saveLedger(config);
   } catch (e) {
     console.warn("provenance: failed to forget install source", e);
   }
@@ -547,17 +309,15 @@ export async function removeSkillProvenance(name: string): Promise<void> {
 
 export async function removeSkillProvenanceBatch(names: readonly string[]): Promise<void> {
   try {
-    const ledger = await loadLedger();
+    const config = await loadLedger();
     let changed = false;
     for (const name of names) {
-      if (ledger.config.skills[name]) {
-        delete ledger.config.skills[name];
+      if (config.skills[name]) {
+        delete config.skills[name];
         changed = true;
       }
-      ledger.records.delete(name);
-      ledger.skillTags.delete(name);
     }
-    if (changed) await saveLedger(ledger);
+    if (changed) await saveLedger(config);
   } catch (e) {
     console.warn("provenance: failed to forget install sources", e);
   }
@@ -566,21 +326,15 @@ export async function removeSkillProvenanceBatch(names: readonly string[]): Prom
 /** Unlink a skill's source repository while retaining its origin: local status and tags. */
 export async function unlinkSkillSource(name: string, _repo?: string): Promise<void> {
   try {
-    const ledger = await loadLedger();
-    if (ledger.config.skills[name]) {
-      delete ledger.config.skills[name].repo;
-      ledger.config.skills[name].origin = "local";
-      ledger.records.set(name, { kind: "pending", name });
-      await saveLedger(ledger);
+    const config = await loadLedger();
+    if (config.skills[name]) {
+      delete config.skills[name].repo;
+      config.skills[name].origin = "local";
+      await saveLedger(config);
     }
   } catch (e) {
     console.warn("provenance: failed to unlink skill source", e);
   }
-}
-
-/** Backward-compatible alias for unlinking a source. */
-export async function dismissSkillSource(name: string, repo: string): Promise<void> {
-  await unlinkSkillSource(name, repo);
 }
 
 /**
@@ -591,34 +345,31 @@ export async function dismissSkillSource(name: string, repo: string): Promise<vo
 export async function reconcileProvenance(
   installedNames: readonly string[],
 ): Promise<ReconciledProvenance> {
-  const ledger = await loadLedger();
+  const config = await loadLedger();
   const installed = new Set(installedNames);
   let changed = false;
 
   // Prune removed skills
-  for (const name of Object.keys(ledger.config.skills)) {
+  for (const name of Object.keys(config.skills)) {
     if (!installed.has(name)) {
-      delete ledger.config.skills[name];
-      ledger.records.delete(name);
-      ledger.skillTags.delete(name);
+      delete config.skills[name];
       changed = true;
     }
   }
 
   // Ensure every on-disk skill has an entry
   for (const name of installedNames) {
-    if (!ledger.config.skills[name]) {
-      ledger.config.skills[name] = { origin: "local" };
-      ledger.records.set(name, { kind: "pending", name });
+    if (!config.skills[name]) {
+      config.skills[name] = { origin: "local" };
       changed = true;
     }
   }
 
-  if (changed) await saveLedger(ledger);
+  if (changed) await saveLedger(config);
 
   const sources: Record<string, SkillProvenance> = {};
   const emptyRepos = new Set<string>();
-  for (const [name, entry] of Object.entries(ledger.config.skills)) {
+  for (const [name, entry] of Object.entries(config.skills)) {
     if (entry.repo) {
       sources[name] = {
         origin: entry.origin,
@@ -637,9 +388,9 @@ export async function reconcileProvenance(
 // ---------------------------------------------------- pending records & suggestions
 
 export async function loadPendingRecords(): Promise<StoredPending> {
-  const ledger = await loadLedger();
+  const config = await loadLedger();
   const records: Record<string, PendingRecord> = {};
-  for (const [name, entry] of Object.entries(ledger.config.skills)) {
+  for (const [name, entry] of Object.entries(config.skills)) {
     if (!entry.repo) {
       records[name] = { kind: "pending", name };
     }
@@ -658,14 +409,14 @@ export async function savePendingRecords(
 // ------------------------------------------------------------- custom tags
 
 export async function loadCustomTags(): Promise<CustomTags> {
-  const ledger = await loadLedger();
-  const tagDefs = (ledger.config.customTags ?? []).map(({ key, label }) => ({
+  const config = await loadLedger();
+  const tagDefs = (config.customTags ?? []).map(({ key, label }) => ({
     key,
     label,
   }));
   const skillTags: Record<string, string> = {};
 
-  for (const [name, entry] of Object.entries(ledger.config.skills)) {
+  for (const [name, entry] of Object.entries(config.skills)) {
     if (entry.tags && entry.tags.length > 0) {
       skillTags[name] = entry.tags[0];
     }
@@ -679,37 +430,32 @@ export async function saveCustomTagDef(
   label: string,
   _emoji?: string,
 ): Promise<void> {
-  const ledger = await loadLedger();
-  ledger.config.customTags = ledger.config.customTags ?? [];
-  const existing = ledger.config.customTags.find((t) => t.key === key);
+  const config = await loadLedger();
+  config.customTags = config.customTags ?? [];
+  const existing = config.customTags.find((t) => t.key === key);
   if (existing) {
     existing.label = label;
   } else {
-    ledger.config.customTags.push({ key, label });
+    config.customTags.push({ key, label });
   }
-  ledger.tagDefs.set(key, { kind: "tag-def", key, label });
-  await saveLedger(ledger);
+  await saveLedger(config);
 }
 
 export async function deleteCustomTagDef(key: string): Promise<void> {
-  const ledger = await loadLedger();
-  if (ledger.config.customTags) {
-    ledger.config.customTags = ledger.config.customTags.filter((t) => t.key !== key);
+  const config = await loadLedger();
+  if (config.customTags) {
+    config.customTags = config.customTags.filter((t) => t.key !== key);
   }
-  ledger.tagDefs.delete(key);
 
   // Remove tag from skills
-  for (const [name, entry] of Object.entries(ledger.config.skills)) {
+  for (const entry of Object.values(config.skills)) {
     if (entry.tags) {
       entry.tags = entry.tags.filter((t) => t !== key);
       if (entry.tags.length === 0) delete entry.tags;
     }
-    if (ledger.skillTags.get(name) === key) {
-      ledger.skillTags.delete(name);
-    }
   }
 
-  await saveLedger(ledger);
+  await saveLedger(config);
 }
 
 export async function renameCustomTagDef(
@@ -717,40 +463,30 @@ export async function renameCustomTagDef(
   newKey: string,
   newLabel: string,
 ): Promise<void> {
-  const ledger = await loadLedger();
-  if (ledger.config.customTags) {
-    const existing = ledger.config.customTags.find((t) => t.key === oldKey);
+  const config = await loadLedger();
+  if (config.customTags) {
+    const existing = config.customTags.find((t) => t.key === oldKey);
     if (existing) {
       existing.key = newKey;
       existing.label = newLabel;
     }
   }
 
-  for (const [name, entry] of Object.entries(ledger.config.skills)) {
+  for (const entry of Object.values(config.skills)) {
     if (entry.tags) {
       entry.tags = entry.tags.map((t) => (t === oldKey ? newKey : t));
     }
-    if (ledger.skillTags.get(name) === oldKey) {
-      ledger.skillTags.set(name, newKey);
-    }
   }
 
-  await saveLedger(ledger);
+  await saveLedger(config);
 }
 
 export async function setSkillTags(name: string, tags: string[]): Promise<void> {
-  const ledger = await loadLedger();
-  const entry = ledger.config.skills[name] ?? { origin: "local" };
+  const config = await loadLedger();
+  const entry = config.skills[name] ?? { origin: "local" };
   entry.tags = tags.length > 0 ? tags : undefined;
-  ledger.config.skills[name] = entry;
-
-  if (tags.length > 0) {
-    ledger.skillTags.set(name, tags[0]);
-  } else {
-    ledger.skillTags.delete(name);
-  }
-
-  await saveLedger(ledger);
+  config.skills[name] = entry;
+  await saveLedger(config);
 }
 
 export async function setSkillTag(name: string, tag: string | null): Promise<void> {
@@ -763,7 +499,7 @@ export async function setManySkillTags(
     | readonly { name: string; tag: string | null }[],
   singleTag?: string | null,
 ): Promise<void> {
-  const ledger = await loadLedger();
+  const config = await loadLedger();
   const list: readonly { name: string; tag: string | null }[] =
     typeof namesOrEntries[0] === "string"
       ? (namesOrEntries as readonly string[]).map((name) => ({
@@ -773,16 +509,11 @@ export async function setManySkillTags(
       : (namesOrEntries as readonly { name: string; tag: string | null }[]);
 
   for (const { name, tag } of list) {
-    const entry = ledger.config.skills[name] ?? { origin: "local" };
+    const entry = config.skills[name] ?? { origin: "local" };
     entry.tags = tag ? [tag] : undefined;
-    ledger.config.skills[name] = entry;
-    if (tag) {
-      ledger.skillTags.set(name, tag);
-    } else {
-      ledger.skillTags.delete(name);
-    }
+    config.skills[name] = entry;
   }
-  await saveLedger(ledger);
+  await saveLedger(config);
 }
 
 // ------------------------------------------------------------- developer view
@@ -802,56 +533,38 @@ export function ledgerLines(raw: string | null | undefined): LedgerLine[] {
   if (!raw || !raw.trim()) return [];
   const trimmed = raw.trim();
 
-  // If JSON config, present as clean structured cards
-  if (trimmed.startsWith("{") && !trimmed.includes('"kind":')) {
-    try {
-      const config = JSON.parse(trimmed) as SkillOneConfig;
-      const lines: LedgerLine[] = [];
-      let lineNum = 1;
-      lines.push({ line: lineNum++, record: { kind: "meta", version: config.version } });
-      for (const [name, entry] of Object.entries(config.skills || {})) {
-        lines.push({
-          line: lineNum++,
-          record: {
-            kind: entry.repo ? "source" : "pending",
-            name,
-            origin: entry.origin,
-            repo: entry.repo,
-            tags: entry.tags,
-            via: entry.origin === "store" ? "install" : entry.repo ? "confirm" : undefined,
-          },
-        });
-      }
-      for (const tag of config.customTags || []) {
-        lines.push({
-          line: lineNum++,
-          record: {
-            kind: "tag-def",
-            key: tag.key,
-            label: tag.label,
-          },
-        });
-      }
-      return lines;
-    } catch {
-      // Fall through to line-by-line
+  try {
+    const config = JSON.parse(trimmed) as SkillOneConfig;
+    const lines: LedgerLine[] = [];
+    let lineNum = 1;
+    lines.push({ line: lineNum++, record: { kind: "meta", version: config.version } });
+    for (const [name, entry] of Object.entries(config.skills || {})) {
+      lines.push({
+        line: lineNum++,
+        record: {
+          kind: entry.repo ? "source" : "pending",
+          name,
+          origin: entry.origin,
+          repo: entry.repo,
+          tags: entry.tags,
+          via: entry.origin === "store" ? "install" : entry.repo ? "confirm" : undefined,
+        },
+      });
     }
-  }
-
-  // Fallback line-by-line parser
-  const lines: LedgerLine[] = [];
-  let lineNumber = 0;
-  for (const line of raw.split("\n")) {
-    lineNumber += 1;
-    const t = line.trim();
-    if (!t) continue;
-    try {
-      lines.push({ line: lineNumber, record: JSON.parse(t) });
-    } catch {
-      lines.push({ line: lineNumber, broken: t });
+    for (const tag of config.customTags || []) {
+      lines.push({
+        line: lineNum++,
+        record: {
+          kind: "tag-def",
+          key: tag.key,
+          label: tag.label,
+        },
+      });
     }
+    return lines;
+  } catch {
+    return [{ line: 1, broken: trimmed }];
   }
-  return lines;
 }
 
 export async function revealProvenanceDir(): Promise<void> {
@@ -893,22 +606,22 @@ export function seedMockCustomTags(
 ): void {
   if (isTauri()) return;
   const existing = storage.getItem(BROWSER_STORAGE_KEY);
-  const parsed = parseLedger(existing);
+  const config = parseLedger(existing);
 
   for (const def of defs) {
-    if (!parsed.config.customTags) parsed.config.customTags = [];
-    const idx = parsed.config.customTags.findIndex((t) => t.key === def.key);
-    if (idx >= 0) parsed.config.customTags[idx] = { key: def.key, label: def.label };
-    else parsed.config.customTags.push({ key: def.key, label: def.label });
+    if (!config.customTags) config.customTags = [];
+    const idx = config.customTags.findIndex((t) => t.key === def.key);
+    if (idx >= 0) config.customTags[idx] = { key: def.key, label: def.label };
+    else config.customTags.push({ key: def.key, label: def.label });
   }
 
   for (const [name, tag] of Object.entries(assignments)) {
-    const skill = parsed.config.skills[name] ?? { origin: "local" };
+    const skill = config.skills[name] ?? { origin: "local" };
     skill.tags = [tag];
-    parsed.config.skills[name] = skill;
+    config.skills[name] = skill;
   }
 
-  storage.setItem(BROWSER_STORAGE_KEY, serializeLedger(parsed.config));
+  storage.setItem(BROWSER_STORAGE_KEY, serializeLedger(config));
 }
 
 export function seedMockLedgerRaw(raw: string): void {

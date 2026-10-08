@@ -20,7 +20,7 @@
  * reconcile pass or app restart:
  *
  * - **Session memo** (`resolved`): cleared when the served dataset changes.
- * - **Ledger** (`PendingRecord` in `.skill-one.jsonl`, persisted): the ranking
+ * - **Ledger** (`.skill-one.json`, persisted): the ranking
  *   is stamped with the served snapshot's identity, guarded by a stat-only
  *   directory `fingerprint`, and keyed by a digest of its ranking input. A
  *   restart re-runs nothing while the snapshot and the directory are unchanged.
@@ -46,7 +46,7 @@ import { descriptionSimilarity } from "./description-similarity";
 import { popularity } from "./popularity";
 import { isSearchableQuery, searchSkillsSh } from "./skills-sh";
 import {
-  dismissSkillSource,
+  unlinkSkillSource as unlinkSkillProvenance,
   loadPendingRecords,
   savePendingRecords,
 } from "./provenance";
@@ -180,7 +180,7 @@ export async function unlinkSkillSource(
   name: string,
   repo?: string,
 ): Promise<void> {
-  await dismissSkillSource(name, repo ?? "");
+  await unlinkSkillProvenance(name, repo ?? "");
   resolved.delete(name);
 }
 

@@ -3,7 +3,7 @@ import { translations } from '../i18n/translations';
 import { HeroAgentGraph } from './HeroAgentGraph';
 import { Download, ShieldCheck, Cpu, Layers, Sparkles } from 'lucide-react';
 import { GithubIcon } from './GithubIcon';
-import { APP_VERSION, DMG_URL, DMG_FILENAME } from '../lib/version';
+import { APP_VERSION, MAC_ARM_DMG_URL, MAC_ARM_DMG_FILENAME } from '../lib/version';
 
 interface Props {
   lang?: 'en' | 'zh';
@@ -41,8 +41,8 @@ const isZh = lang === 'zh';
     <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
       <!-- Direct Download DMG -->
       <a
-        href={DMG_URL}
-        download={DMG_FILENAME}
+        href={MAC_ARM_DMG_URL}
+        download={MAC_ARM_DMG_FILENAME}
         class="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 text-sm"
       >
         <Download class="size-4" />

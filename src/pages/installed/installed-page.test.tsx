@@ -90,7 +90,7 @@ beforeEach(() => {
   setUnit("installed", "repo");
 });
 
-/** The persisted ledger's record for `name`. Supports both JSON and legacy JSONL. */
+/** The persisted ledger's record for `name`. */
 function ledgerRecord(
   name: string,
 ):
@@ -111,20 +111,9 @@ function ledgerRecord(
       };
     }
   } catch {
-    // fallback to JSONL
+    return undefined;
   }
-  return raw
-    .split("\n")
-    .filter((line) => line.trim())
-    .map((line) => {
-      try {
-        return JSON.parse(line);
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean)
-    .find((record) => record.name === name);
+  return undefined;
 }
 
 /**
@@ -2599,5 +2588,20 @@ describe("InstalledPage", () => {
       expect(within(dialog).getByText("pdf")).toBeInTheDocument();
       expect(within(dialog).getByText("anthropics/skills")).toBeInTheDocument();
     });
+
+    it("displays registry syncing indicator when registry is streaming in background", async () => {
+      registrySnapshot.ready = false;
+      (registrySnapshot as any).count = 1500;
+      try {
+        renderPage();
+        expect(
+          await screen.findByText(/正在同步官方技能库/),
+        ).toBeInTheDocument();
+      } finally {
+        registrySnapshot.ready = true;
+        (registrySnapshot as any).count = 0;
+      }
+    });
   });
 });
+

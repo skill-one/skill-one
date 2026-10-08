@@ -52,59 +52,42 @@ describe("parseLedger", () => {
     const raw = JSON.stringify(SAMPLE_CONFIG, null, 2);
     const parsed = parseLedger(raw);
 
-    expect(parsed.config.version).toBe(1);
-    expect(parsed.config.skills.pdf).toEqual({
+    expect(parsed.version).toBe(1);
+    expect(parsed.skills.pdf).toEqual({
       origin: "store",
       repo: "anthropics/skills",
       tags: ["文档处理", "办公"],
     });
-    expect(parsed.config.skills["my-tool"]).toEqual({
+    expect(parsed.skills["my-tool"]).toEqual({
       origin: "local",
       tags: ["自定义"],
     });
-    expect(parsed.config.skills["find-skills"]).toEqual({
+    expect(parsed.skills["find-skills"]).toEqual({
       origin: "local",
       repo: "vercel-labs/skills",
       tags: ["开发工具"],
     });
-    expect(parsed.config.customTags).toHaveLength(2);
-
-    // Backward-compatible maps
-    expect(parsed.records.get("pdf")).toMatchObject({
-      repo: "anthropics/skills",
-      via: "install",
-    });
-    expect(parsed.records.get("find-skills")).toMatchObject({
-      repo: "vercel-labs/skills",
-      via: "confirm",
-    });
-    expect(parsed.tagDefs.get("frontend")?.label).toBe("💻 前端开发");
+    expect(parsed.customTags).toHaveLength(2);
   });
 
-  it("transparently migrates legacy JSONL format", () => {
-    const legacy = [
-      JSON.stringify({ kind: "meta", index: '"e1"' }),
-      JSON.stringify({ kind: "source", name: "pdf", repo: "anthropics/skills", via: "install" }),
-      JSON.stringify({ kind: "source", name: "find-skills", repo: "vercel-labs/skills", via: "confirm" }),
-      JSON.stringify({ kind: "pending", name: "local-tool" }),
-      JSON.stringify({ kind: "tag-def", key: "frontend", label: "前端开发" }),
-      JSON.stringify({ kind: "skill-tag", name: "pdf", tag: "frontend" }),
-    ].join("\n");
-
-    const parsed = parseLedger(legacy);
-    expect(parsed.config.skills.pdf).toEqual({
-      origin: "store",
-      repo: "anthropics/skills",
-      tags: ["frontend"],
-    });
-    expect(parsed.config.skills["find-skills"]).toEqual({
+  it("parses new format even when repo or skill name contains 'kind'", () => {
+    const configWithKind = {
+      version: 1,
+      skills: {
+        "kind-checker": {
+          origin: "local",
+          repo: "kubernetes-sigs/kind",
+          tags: ["kindness"],
+        },
+      },
+      customTags: [{ key: "kindness", label: "Kindness" }],
+    };
+    const parsed = parseLedger(JSON.stringify(configWithKind, null, 2));
+    expect(parsed.skills["kind-checker"]).toEqual({
       origin: "local",
-      repo: "vercel-labs/skills",
+      repo: "kubernetes-sigs/kind",
+      tags: ["kindness"],
     });
-    expect(parsed.config.skills["local-tool"]).toEqual({
-      origin: "local",
-    });
-    expect(parsed.config.customTags).toEqual([{ key: "frontend", label: "前端开发" }]);
   });
 
   it.each([
@@ -112,21 +95,7 @@ describe("parseLedger", () => {
     ["an empty string", ""],
     ["truncated JSON", "not json {"],
   ] as const)("returns an empty ledger for %s", (_label, raw) => {
-    expect(parseLedger(raw).records.size).toBe(0);
-    expect(parseLedger(raw).config.skills).toEqual({});
-  });
-
-  it("skips broken lines during legacy migration and keeps valid ones", () => {
-    const raw = [
-      JSON.stringify({ kind: "source", name: "pdf", repo: "anthropics/skills", via: "install" }),
-      "{broken json",
-      "random garbage",
-      JSON.stringify({ kind: "tag-def", key: "custom", label: "Custom" }),
-    ].join("\n");
-
-    const parsed = parseLedger(raw);
-    expect(parsed.config.skills.pdf?.repo).toBe("anthropics/skills");
-    expect(parsed.config.customTags).toEqual([{ key: "custom", label: "Custom" }]);
+    expect(parseLedger(raw).skills).toEqual({});
   });
 });
 
@@ -141,7 +110,7 @@ describe("serializeLedger", () => {
   it("round-trips through parseLedger and serializeLedger", () => {
     const json = serializeLedger(SAMPLE_CONFIG);
     const parsed = parseLedger(json);
-    expect(parsed.config).toEqual(SAMPLE_CONFIG);
+    expect(parsed).toEqual(SAMPLE_CONFIG);
   });
 });
 
@@ -169,18 +138,10 @@ describe("ledgerLines", () => {
     expect(ledgerLines(raw)).toEqual([]);
   });
 
-  it("parses line-by-line jsonl including broken lines", () => {
-    const jsonl = [
-      JSON.stringify({ kind: "meta", version: 1 }),
-      "{invalid-json",
-      JSON.stringify({ kind: "source", name: "test-skill" }),
-      "",
-    ].join("\n");
-    const lines = ledgerLines(jsonl);
-    expect(lines).toHaveLength(3);
-    expect(lines[0]?.record).toMatchObject({ kind: "meta", version: 1 });
-    expect(lines[1]?.broken).toBe("{invalid-json");
-    expect(lines[2]?.record).toMatchObject({ kind: "source", name: "test-skill" });
+  it("captures invalid JSON as broken line", () => {
+    const lines = ledgerLines("{invalid-json");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.broken).toBe("{invalid-json");
   });
 });
 

@@ -260,7 +260,12 @@
     "uninstalledListAria": "Uninstalled skills of {{name}}",
     "noInstalled": "No skills installed yet",
     "noMatchSkill": "No skills match the filters",
-    "noMatchRepo": "No repositories match the filters"
+    "noMatchRepo": "No repositories match the filters",
+    "scanningLocal": "Scanning local skills directory…",
+    "readingLedger": "Reading provenance ledger and configuration…",
+    "syncingRegistry": "Syncing skills registry ({{count}} downloaded)…",
+    "indexingRegistry": "Building skills search index…",
+    "registrySyncingBanner": "Syncing skills registry in the background; full store details will appear shortly"
   },
   "detail": {
     "source": "Source",
@@ -336,7 +341,7 @@
   },
   "developer": {
     "title": "Developer",
-    "description": "Internal data for debugging: the provenance ledger (.skill-one.jsonl) recording where each installed skill came from.",
+    "description": "Internal data for debugging: the provenance ledger (.skill-one.json) recording where each installed skill came from.",
     "empty": "The ledger is empty — install a skill and its source will be recorded here",
     "reveal": "Show in folder",
     "refresh": "Refresh",

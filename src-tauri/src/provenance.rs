@@ -1,12 +1,11 @@
 //! Provenance ledger: the app's own install-source record, stored as
-//! `.skill-one.jsonl` inside the global skills directory.
+//! `.skill-one.json` inside the global skills directory.
 //!
 //! `agents-skills` 0.13 dropped its lockfile, so an installed skill can no
 //! longer be tied back to the repo it came from. This module restores the
 //! association at the app level: after each successful install the frontend
-//! writes the ledger — a `meta` header line naming the registry snapshot the
-//! cached records belong to, then one line per skill (its install source, or a
-//! suggestion still waiting on the user). The file is a hidden dotfile without
+//! writes the ledger as clean, human-readable JSON recording skill provenance
+//! (origin, repo, tags) and custom taxonomy. The file is a hidden dotfile without
 //! a SKILL.md, so the library's directory scan ignores it and it never shows up
 //! as a skill.
 //!
@@ -17,8 +16,6 @@ use std::path::Path;
 
 /// The ledger file inside the global skills directory (`~/.agents/skills`).
 pub const LEDGER_FILE: &str = ".skill-one.json";
-/// The legacy JSONL ledger file, read for transparent one-way migration.
-pub const LEGACY_LEDGER_FILE: &str = ".skill-one.jsonl";
 
 /// Resolve the ledger path: `<home>/.agents/skills/.skill-one.json`. The
 /// directory is the library's canonical global skills dir; the commands never
@@ -29,27 +26,18 @@ fn ledger_path() -> Result<std::path::PathBuf, String> {
         .ok_or_else(|| "cannot resolve the home directory".to_string())
 }
 
-/// Read the raw ledger. Checks `.skill-one.json` first, falling back to legacy
-/// `.skill-one.jsonl` if present so the frontend can migrate transparently.
-/// `None` when neither exists.
+/// Read the raw ledger. Returns `None` when it does not exist yet.
 fn read_ledger_at(ledger: &Path) -> Result<Option<String>, String> {
     match std::fs::read_to_string(ledger) {
         Ok(content) => Ok(Some(content)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            let legacy = ledger.with_file_name(LEGACY_LEDGER_FILE);
-            match std::fs::read_to_string(&legacy) {
-                Ok(content) => Ok(Some(content)),
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                Err(e) => Err(format!("read {}: {e}", legacy.display())),
-            }
-        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(format!("read {}: {e}", ledger.display())),
     }
 }
 
 /// Replace the ledger atomically: write a sibling temp file first, then
 /// rename over the target, so a crash mid-write cannot leave a truncated
-/// ledger behind. Also cleans up the legacy `.skill-one.jsonl` file once migrated.
+/// ledger behind.
 fn write_ledger_at(ledger: &Path, content: &str) -> Result<(), String> {
     let tmp = ledger.with_extension("tmp");
     std::fs::write(&tmp, content).map_err(|e| format!("write {}: {e}", tmp.display()))?;
@@ -66,11 +54,6 @@ fn write_ledger_at(ledger: &Path, content: &str) -> Result<(), String> {
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
         }
-    }
-    // Clean up legacy JSONL file if it still exists alongside the new JSON ledger
-    let legacy = ledger.with_file_name(LEGACY_LEDGER_FILE);
-    if legacy.exists() {
-        let _ = std::fs::remove_file(&legacy);
     }
     Ok(())
 }
@@ -171,31 +154,5 @@ mod tests {
         let ledger = ledger(dir.path());
         std::fs::create_dir(&ledger).expect("create dir");
         assert!(read_ledger_at(&ledger).is_err());
-    }
-
-    #[test]
-    fn read_falls_back_to_legacy_jsonl() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let legacy = dir.path().join(LEGACY_LEDGER_FILE);
-        std::fs::write(&legacy, "{\"kind\":\"meta\"}\n").expect("write legacy");
-        let target = ledger(dir.path());
-        assert_eq!(
-            read_ledger_at(&target).unwrap().as_deref(),
-            Some("{\"kind\":\"meta\"}\n")
-        );
-    }
-
-    #[test]
-    fn write_removes_legacy_jsonl() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let legacy = dir.path().join(LEGACY_LEDGER_FILE);
-        std::fs::write(&legacy, "legacy").expect("write legacy");
-        let target = ledger(dir.path());
-        write_ledger_at(&target, "{\"version\":1}").expect("write target");
-        assert_eq!(
-            read_ledger_at(&target).unwrap().as_deref(),
-            Some("{\"version\":1}")
-        );
-        assert!(!legacy.exists(), "legacy file should have been cleaned up");
     }
 }
